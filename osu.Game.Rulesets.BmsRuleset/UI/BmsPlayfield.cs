@@ -1,0 +1,211 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Input.Bindings;
+using osu.Framework.Input.Events;
+using osu.Game.Audio;
+using osu.Game.Rulesets.BmsRuleset.Audio;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
+using osu.Game.Rulesets.BmsRuleset.Skinning;
+using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.UI;
+using osu.Game.Skinning;
+
+namespace osu.Game.Rulesets.BmsRuleset.UI;
+
+/// <summary>
+///     First native BMS playfield.
+/// </summary>
+/// <remarks>
+///     This is intentionally a simple vertical lane field, not a copied mania stage. It provides the
+///     minimum object pooling and layout surface needed to remove the mania dependency. Later phases
+///     will split this into BMS columns, BGA layers, key beams, and native scroll timing.
+/// </remarks>
+public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
+{
+    public const int COLUMNS_PER_PLAYER = 8;
+
+    public int TotalColumns { get; }
+
+    public BmsLayoutVariant LayoutVariant { get; }
+
+    public BmsStage Stage { get; }
+
+    public bool IsAutoplay { get; }
+
+    public double TimeRange { get; set; } = BmsDrawableRuleset.ComputeScrollTime(8);
+
+    private readonly IReadOnlyList<BmsHitObject> hitObjects;
+
+    private readonly Dictionary<int, int> nextSoundIndexByColumn = new();
+
+    private readonly BmsSkinnableSound keySound = new();
+
+    private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
+
+    public BmsPlayfield(IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K, bool isAutoplay = false)
+    {
+        this.hitObjects = hitObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
+        TotalColumns = Math.Max(1, totalColumns);
+        LayoutVariant = layoutVariant;
+        IsAutoplay = isAutoplay;
+
+        Anchor = Anchor.Centre;
+        Origin = Anchor.Centre;
+        RelativeSizeAxes = Axes.Both;
+
+        InternalChildren =
+        [
+            Stage = new BmsStage(TotalColumns, LayoutVariant),
+            HitObjectContainer,
+            keySound,
+        ];
+    }
+
+    #region Disposal
+
+    protected override void Dispose(bool isDisposing)
+    {
+        NewResult -= onNewResult;
+        base.Dispose(isDisposing);
+    }
+
+    #endregion
+
+    public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
+    {
+        var column = BmsKeyBindingConfiguration.ActionToColumn(e.Action, LayoutVariant);
+
+        if (column == null || column.Value >= TotalColumns)
+            return false;
+
+        playNextKeySound(column.Value);
+
+        var target = HitObjectContainer.AliveObjects
+            .OfType<DrawableBmsHitObject>()
+            .Where(d => !d.Judged && d.HitObject.Column == column.Value)
+            .OrderBy(d => Math.Abs(Time.Current - d.HitObject.StartTime))
+            .FirstOrDefault(d => d.HitObject.HitWindows.ResultFor(Time.Current - d.HitObject.StartTime) != HitResult.None);
+
+        return target?.TryHit() == true;
+    }
+
+    public void PressColumn(int column)
+    {
+        if (column < 0 || column >= TotalColumns)
+            return;
+
+        playNextKeySound(column);
+    }
+
+    public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
+    {
+    }
+
+    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
+
+    protected override void LoadComplete()
+    {
+        base.LoadComplete();
+
+        NewResult += onNewResult;
+    }
+
+    [BackgroundDependencyLoader(true)]
+    private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
+    {
+        RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, 512);
+
+        if (samplePlaybackDisabler != null)
+            samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
+    }
+
+    private void onNewResult(DrawableHitObject drawableHitObject, JudgementResult result)
+    {
+        if (!result.IsHit || drawableHitObject is not DrawableBmsHitObject bmsHitObject)
+            return;
+
+        var column = Math.Clamp(bmsHitObject.HitObject.Column, 0, Stage.Columns.Length - 1);
+        Stage.Columns[column].HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
+            BmsSkinComponents.HitExplosion,
+            LayoutVariant,
+            column,
+            bmsHitObject.HitObject.IsLongNote)));
+
+        Stage.JudgementArea.Clear(false);
+        Stage.JudgementArea.Add(new SkinnableDrawable(new SkinComponentLookup<HitResult>(result.Type), _ => Empty())
+        {
+            RelativeSizeAxes = Axes.None,
+            AutoSizeAxes = Axes.Both,
+        });
+    }
+
+    private void playNextKeySound(int column)
+    {
+        if (samplePlaybackDisabled.Value)
+            return;
+
+        if (findNextSoundHitObject(column) is not { } hitObject || string.IsNullOrEmpty(hitObject.SamplePath))
+            return;
+
+        keySound.SampleInfo = new BmsSampleInfo(hitObject.SamplePath);
+        keySound.Play();
+    }
+
+    private BmsHitObject? findNextSoundHitObject(int column)
+    {
+        var index = nextSoundIndexByColumn.GetValueOrDefault(column);
+
+        while (index < hitObjects.Count)
+        {
+            var hitObject = hitObjects[index];
+
+            if (hitObject.Column != column || hasNoteFinished(hitObject))
+            {
+                index++;
+                continue;
+            }
+
+            nextSoundIndexByColumn[column] = index;
+            return hitObject;
+        }
+
+        nextSoundIndexByColumn[column] = index;
+        return null;
+    }
+
+    private bool hasNoteFinished(BmsHitObject hitObject)
+    {
+        var drawable = HitObjectContainer.AliveObjects
+            .OfType<DrawableBmsHitObject>()
+            .FirstOrDefault(d => ReferenceEquals(d.HitObject, hitObject));
+
+        if (drawable?.Judged == true)
+            return true;
+
+        if (Time.Current > hitObject.StartTime && drawable == null)
+            return true;
+
+        return Time.Current > hitObject.StartTime + hitObject.HitWindows.WindowFor(HitResult.Miss);
+    }
+
+    private sealed class BmsHitObjectLifetimeEntry : HitObjectLifetimeEntry
+    {
+        public BmsHitObjectLifetimeEntry(HitObject hitObject)
+            : base(hitObject)
+        {
+            // The native BMS renderer currently uses a generous fixed lifetime until BMS-specific
+            // scroll timing and LN rendering are implemented.
+            LifetimeEnd = hitObject.GetEndTime() + 1000;
+        }
+    }
+}

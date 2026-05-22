@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup Label="Project">
+        <TargetFramework>net8.0</TargetFramework>
+        <AssemblyTitle>osu.Game.Rulesets.BmsRuleset</AssemblyTitle>
+        <OutputType>Library</OutputType>
+        <PlatformTarget>AnyCPU</PlatformTarget>
+        <RootNamespace>osu.Game.Rulesets.BmsRuleset</RootNamespace>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <ItemGroup>
+        <EmbeddedResource Include="Resources\**"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="ppy.osu.Game" Version="2026.518.0"/>
+    </ItemGroup>
+</Project>
