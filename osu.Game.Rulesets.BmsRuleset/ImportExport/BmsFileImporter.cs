@@ -189,7 +189,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         return findExistingResourceWithAnyExtension(pathWithoutExtension) ?? path;
     }
 
-    private static IEnumerable<string> parseReferencedResources(string chartPath) => BmsChartParser.ScanResourceReferences(File.ReadLines(chartPath));
+    private static IEnumerable<string> parseReferencedResources(string chartPath) => BmsChartParser.ScanResourceReferences(BmsChartParser.ReadAllLines(chartPath));
 
     private static string? findExistingResourceWithAnyExtension(string pathWithoutExtension)
     {
@@ -204,6 +204,11 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
     private static RealmFile addFileUsage(BeatmapSetInfo beatmapSetInfo, string path, byte[] content, RealmFileStore fileStore, Realm realm)
     {
+        var fileName = Path.GetFileName(path);
+
+        if (beatmapSetInfo.Files.FirstOrDefault(f => string.Equals(f.Filename, fileName, StringComparison.OrdinalIgnoreCase)) is { } existingUsage)
+            return existingUsage.File;
+
         RealmFile realmFile;
         using (var ms = new MemoryStream(content))
             realmFile = fileStore.Add(ms, realm);
@@ -211,16 +216,35 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         if (!realmFile.IsManaged)
             realm.Add(realmFile);
 
-        beatmapSetInfo.Files.Add(new RealmNamedFileUsage(realmFile, Path.GetFileName(path)));
+        beatmapSetInfo.Files.Add(new RealmNamedFileUsage(realmFile, fileName));
         return realmFile;
     }
 
-    private static BmsChartMetadata parseChartMetadata(string chartPath) => BmsChartParser.ScanMetadata(File.ReadLines(chartPath), chartPath);
+    private static BmsChartMetadata parseChartMetadata(string chartPath) => BmsChartParser.ScanMetadata(BmsChartParser.ReadAllLines(chartPath), chartPath);
 
     private static bool isChartFile(string path) => Constant.BMS_EXTENSIONS.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
     private static bool isBrokenLegacyBmsImport(BeatmapInfo beatmap) =>
         beatmap.Ruleset.ShortName == "bms" && beatmap.BeatmapSet != null && beatmap.File == null;
+
+    private static BeatmapSetInfo? findCompatibleActiveSet(Realm realm, string directory, IEnumerable<ChartImport> charts)
+    {
+        var directoryName = Path.GetFileName(directory);
+        var setTitle = charts.Select(c => c.Metadata.SetTitle).FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
+        var artist = charts.Select(c => c.Metadata.Artist).FirstOrDefault(a => !string.IsNullOrWhiteSpace(a));
+
+        return realm.All<BeatmapSetInfo>().AsEnumerable()
+            .Where(s => !s.DeletePending && !s.Protected)
+            .Where(s => s.Beatmaps.Any(b => b.Ruleset.ShortName == "bms"))
+            .Where(s => s.Files.Any(f => string.Equals(Path.GetDirectoryName(f.Filename), directoryName, StringComparison.OrdinalIgnoreCase))
+                        || s.Beatmaps.Any(b => string.Equals(b.Metadata.Title, setTitle, StringComparison.OrdinalIgnoreCase)
+                                               && (string.IsNullOrWhiteSpace(artist) || string.Equals(b.Metadata.Artist, artist, StringComparison.OrdinalIgnoreCase))))
+            .FirstOrDefault();
+    }
+
+    private static string calculateSetHash(BeatmapSetInfo beatmapSetInfo) => string.Join(string.Empty, beatmapSetInfo.Beatmaps
+        .Select(b => b.MD5Hash)
+        .OrderBy(h => h, StringComparer.OrdinalIgnoreCase)).ToLowerInvariant();
 
     private bool importSet(ImportSet importSet, RealmFileStore fileStore)
     {
@@ -247,10 +271,11 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     return false;
                 }
 
-                var existing = r.All<BeatmapInfo>().AsEnumerable()
-                    .Where(b => chartHashes.Contains(b.MD5Hash) && b.BeatmapSet != null)
-                    .OrderBy(b => b.BeatmapSet!.DeletePending)
-                    .FirstOrDefault();
+                var existingBeatmaps = r.All<BeatmapInfo>().AsEnumerable()
+                    .Where(b => chartHashes.Contains(b.MD5Hash) && b.BeatmapSet is { DeletePending: false })
+                    .ToArray();
+                var existing = existingBeatmaps.FirstOrDefault();
+                var replacingBrokenLegacy = false;
 
                 if (existing != null)
                 {
@@ -258,34 +283,33 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     {
                         Logger.Log($"BMS import: replacing legacy broken set {Path.GetFileName(importSet.Directory)}");
                         existing.BeatmapSet!.DeletePending = true;
-                    }
-                    else if (existing.BeatmapSet?.DeletePending == true)
-                    {
-                        existing.BeatmapSet.DeletePending = false;
-                        existing.BeatmapSet.DateAdded = DateTimeOffset.UtcNow;
-                        Logger.Log($"BMS import: restored deleted set {Path.GetFileName(importSet.Directory)}");
-
-                        transaction.Commit();
-                        return true;
-                    }
-                    else
-                    {
-                        Logger.Log($"BMS import: skipping duplicate set {Path.GetFileName(importSet.Directory)}");
-                        return true;
+                        replacingBrokenLegacy = true;
                     }
                 }
 
-                var beatmapSetInfo = new BeatmapSetInfo
+                var chartsToImport = replacingBrokenLegacy ? charts : charts.Where(c => !existingBeatmaps.Any(b => b.MD5Hash == c.Md5Hash)).ToArray();
+
+                if (chartsToImport.Length == 0)
+                {
+                    Logger.Log($"BMS import: skipping duplicate set {Path.GetFileName(importSet.Directory)}");
+                    return true;
+                }
+
+                var beatmapSetInfo = replacingBrokenLegacy ? null : existing?.BeatmapSet;
+
+                beatmapSetInfo ??= findCompatibleActiveSet(r, importSet.Directory, charts) ?? new BeatmapSetInfo
                 {
                     OnlineID = -1,
                     DateAdded = DateTimeOffset.UtcNow,
                 };
 
-                foreach (var chart in charts)
+                var isNewSet = !beatmapSetInfo.IsManaged;
+
+                foreach (var chart in chartsToImport)
                 {
                     var metadata = new BeatmapMetadata
                     {
-                        Title = chart.Metadata.Title,
+                        Title = chart.Metadata.SetTitle,
                         Artist = chart.Metadata.Artist,
                         Author = new RealmUser { Username = Constant.AUTHOR },
                     };
@@ -312,9 +336,11 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 foreach (var resourcePath in importSet.ResourcePaths)
                     addFileUsage(beatmapSetInfo, resourcePath, File.ReadAllBytes(resourcePath), fileStore, r);
 
-                beatmapSetInfo.Hash = string.Join(string.Empty, chartHashes).ToLowerInvariant();
+                beatmapSetInfo.Hash = calculateSetHash(beatmapSetInfo);
 
-                r.Add(beatmapSetInfo);
+                if (isNewSet)
+                    r.Add(beatmapSetInfo);
+
                 transaction.Commit();
 
                 Logger.Log($"BMS import: imported {Path.GetFileName(importSet.Directory)} ({charts.Length} charts, {importSet.ResourcePaths.Count} resources)");
@@ -338,6 +364,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
         public string Md5Hash { get; } = BitConverter.ToString(MD5.HashData(content)).Replace("-", string.Empty).ToLowerInvariant();
 
-        public BmsChartMetadata Metadata { get; set; } = new(System.IO.Path.GetFileNameWithoutExtension(path), string.Empty, "BMS", BmsLayout.BMS5_KEY_COLUMNS);
+        public BmsChartMetadata Metadata { get; set; } = new(System.IO.Path.GetFileNameWithoutExtension(path), string.Empty, "BMS", BmsLayout.BMS5_KEY_COLUMNS,
+            System.IO.Path.GetFileNameWithoutExtension(path));
     }
 }

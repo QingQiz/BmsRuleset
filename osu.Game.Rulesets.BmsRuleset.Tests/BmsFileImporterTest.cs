@@ -74,6 +74,8 @@ public partial class BmsFileImporterTest
     private sealed record ImportedSetSnapshot(
         int BeatmapCount,
         int FileCount,
+        string Title,
+        string Artist,
         string[] DifficultyNames,
         (string DifficultyName, float CircleSize, int Variant)[] Layouts,
         (string MD5Hash, string Hash, string Path)[] ChartHashes,
@@ -81,6 +83,37 @@ public partial class BmsFileImporterTest
         int DistinctRealmFileHashes);
 
     private sealed record ImportedBeatmapPathSnapshot(string BeatmapPath, string StoredPath, string MD5Hash);
+
+    [Test]
+    public void TestDirectoryImportAddsMissingChartsToExistingSingleChartSet()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+
+            var importer = new BmsFileImporter(realm, storage);
+            var directory = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Destr0yer (by 削除 feat. Nikki Simmons)");
+
+            await importer.Import(Path.Combine(directory, "destr0yer_starhyper.bms")).ConfigureAwait(false);
+            await importer.Import(directory).ConfigureAwait(false);
+
+            var result = realm.Run(r =>
+            {
+                var sets = r.All<BeatmapSetInfo>().AsEnumerable().ToArray();
+                var set = sets.Single(s => !s.DeletePending);
+
+                return (SetCount: sets.Length, ActiveBeatmapCount: set.Beatmaps.Count,
+                    DifficultyNames: set.Beatmaps.Select(b => b.DifficultyName).OrderBy(n => n, StringComparer.Ordinal).ToArray(),
+                    ChartFileCount: set.Files.Count(f => Constant.BMS_EXTENSIONS.Contains(Path.GetExtension(f.Filename), StringComparer.OrdinalIgnoreCase)));
+            });
+
+            Assert.That(result.SetCount, Is.EqualTo(1));
+            Assert.That(result.ActiveBeatmapCount, Is.EqualTo(6));
+            Assert.That(result.DifficultyNames, Does.Contain("DP HYP☆R"));
+            Assert.That(result.DifficultyNames, Does.Contain("DP ☆NOTHER"));
+            Assert.That(result.ChartFileCount, Is.EqualTo(6));
+        });
+    }
 
     [Test]
     public void TestHandledExtensions()
@@ -146,6 +179,8 @@ public partial class BmsFileImporterTest
                 return new ImportedSetSnapshot(
                     set.Beatmaps.Count,
                     set.Files.Count,
+                    set.Metadata.Title,
+                    set.Metadata.Artist,
                     set.Beatmaps.Select(b => b.DifficultyName).OrderBy(n => n, StringComparer.Ordinal).ToArray(),
                     set.Beatmaps.Select(b => (b.DifficultyName, b.Difficulty.CircleSize, new BmsRuleset().GetVariantForBeatmap(b))).ToArray(),
                     set.Beatmaps.Select(b => (b.MD5Hash, b.Hash, b.Path)).ToArray(),
@@ -195,6 +230,8 @@ public partial class BmsFileImporterTest
                 return new ImportedSetSnapshot(
                     set.Beatmaps.Count,
                     set.Files.Count,
+                    set.Metadata.Title,
+                    set.Metadata.Artist,
                     set.Beatmaps.Select(b => b.DifficultyName).ToArray(),
                     set.Beatmaps.Select(b => (b.DifficultyName, b.Difficulty.CircleSize, new BmsRuleset().GetVariantForBeatmap(b))).ToArray(),
                     set.Beatmaps.Select(b => (b.MD5Hash, b.Hash, b.Path)).ToArray(),
@@ -209,6 +246,43 @@ public partial class BmsFileImporterTest
             Assert.That(result.FileNames, Does.Contain("_7NORMAL.bms"));
             Assert.That(result.FileNames, Does.Contain("kick_deep2.ogg"));
             Assert.That(result.FileNames, Does.Contain("_title.png"));
+        });
+    }
+
+    [Test]
+    public void TestReimportCreatesFreshSetWhenPreviousImportIsSoftDeleted()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+
+            var importer = new BmsFileImporter(realm, storage);
+            var chartPath = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Aleph-0 (by LeaF)", "_7NORMAL.bms");
+
+            await importer.Import(chartPath).ConfigureAwait(false);
+
+            realm.Write(r =>
+            {
+                var set = r.All<BeatmapSetInfo>().Single();
+                set.DeletePending = true;
+            });
+
+            await importer.Import(chartPath).ConfigureAwait(false);
+
+            var result = realm.Run(r =>
+            {
+                var sets = r.All<BeatmapSetInfo>().AsEnumerable().ToArray();
+                var active = sets.Single(s => !s.DeletePending);
+                var deleted = sets.Single(s => s.DeletePending);
+
+                return (SetCount: sets.Length, ActiveCount: sets.Count(s => !s.DeletePending), DeletedStillPending: deleted.DeletePending,
+                    FileResolved: active.Beatmaps.Single().File != null);
+            });
+
+            Assert.That(result.SetCount, Is.EqualTo(2));
+            Assert.That(result.ActiveCount, Is.EqualTo(1));
+            Assert.That(result.DeletedStillPending, Is.True);
+            Assert.That(result.FileResolved, Is.True);
         });
     }
 
@@ -252,34 +326,38 @@ public partial class BmsFileImporterTest
     }
 
     [Test]
-    public void TestReimportRestoresSoftDeletedSet()
+    public void TestSequentialChartImportsMergeIntoOneActiveBeatmapSet()
     {
         runImportTest(async (realm, storage) =>
         {
             addBmsRuleset(realm);
 
             var importer = new BmsFileImporter(realm, storage);
-            var chartPath = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Aleph-0 (by LeaF)", "_7NORMAL.bms");
+            var directory = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Destr0yer (by 削除 feat. Nikki Simmons)");
 
-            await importer.Import(chartPath).ConfigureAwait(false);
-
-            realm.Write(r =>
-            {
-                var set = r.All<BeatmapSetInfo>().Single();
-                set.DeletePending = true;
-            });
-
-            await importer.Import(chartPath).ConfigureAwait(false);
+            await importer.Import(Path.Combine(directory, "destr0yer_starhyper.bms")).ConfigureAwait(false);
+            await importer.Import(Path.Combine(directory, "destr0yer_starnother.bms")).ConfigureAwait(false);
 
             var result = realm.Run(r =>
             {
-                var sets = r.All<BeatmapSetInfo>().AsEnumerable().ToArray();
-                return (SetCount: sets.Length, ActiveCount: sets.Count(s => !s.DeletePending), FileResolved: sets.Single().Beatmaps.Single().File != null);
+                var set = r.All<BeatmapSetInfo>().Single(s => !s.DeletePending);
+
+                return new ImportedSetSnapshot(
+                    set.Beatmaps.Count,
+                    set.Files.Count,
+                    set.Metadata.Title,
+                    set.Metadata.Artist,
+                    set.Beatmaps.Select(b => b.DifficultyName).OrderBy(n => n, StringComparer.Ordinal).ToArray(),
+                    set.Beatmaps.Select(b => (b.DifficultyName, b.Difficulty.CircleSize, new BmsRuleset().GetVariantForBeatmap(b))).ToArray(),
+                    set.Beatmaps.Select(b => (b.MD5Hash, b.Hash, b.Path)).ToArray(),
+                    set.Files.Select(f => f.Filename).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToArray(),
+                    set.Files.Select(f => f.File.Hash).Distinct().Count());
             });
 
-            Assert.That(result.SetCount, Is.EqualTo(1));
-            Assert.That(result.ActiveCount, Is.EqualTo(1));
-            Assert.That(result.FileResolved, Is.True);
+            Assert.That(result.BeatmapCount, Is.EqualTo(2));
+            Assert.That(result.Title, Is.EqualTo("Destr0yer"));
+            Assert.That(result.Artist, Is.EqualTo("削除 feat. Nikki Simmons"));
+            Assert.That(result.DifficultyNames, Is.EqualTo(new[] { "DP HYP☆R", "DP ☆NOTHER" }));
         });
     }
 }

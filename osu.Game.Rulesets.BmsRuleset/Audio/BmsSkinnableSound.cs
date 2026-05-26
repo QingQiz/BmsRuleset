@@ -41,6 +41,7 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
 
     private readonly List<ActiveChannel> activeChannels = [];
     private readonly IBindable<bool> samplePlaybackDisabled = new BindableBool();
+    private readonly BindableDouble pauseFrequency = new(1);
 
     private readonly record struct ResolvedSample(ISampleInfo Info, ISample Sample);
 
@@ -78,6 +79,7 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
         if (samplePlaybackDisabled.Value)
             return;
 
+        pauseFrequency.Value = 1;
         FlushPendingSkinChanges();
         cleanupStoppedChannels();
 
@@ -91,6 +93,7 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
         channel.Volume.Value = Math.Max(0, resolved.Info.Volume) / 100.0;
         channel.Play();
         bindToUniversalVolume(channel);
+        channel.AddAdjustment(AdjustableProperty.Frequency, pauseFrequency);
 
         activeChannels.Add(new ActiveChannel(channel));
     }
@@ -102,7 +105,7 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
             if (activeChannel.Channel.IsDisposed || !activeChannel.Channel.Playing)
                 continue;
 
-            activeChannel.Channel.Stop();
+            pauseFrequency.Value = 0;
             activeChannel.Paused = true;
         }
     }
@@ -113,6 +116,7 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
             return;
 
         FlushPendingSkinChanges();
+        pauseFrequency.Value = 1;
 
         if (activeChannels.Count == 0)
         {
@@ -134,6 +138,7 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
     public virtual void Stop()
     {
         RequestedPlaying = false;
+        pauseFrequency.Value = 1;
 
         foreach (var activeChannel in activeChannels)
         {

@@ -1,13 +1,24 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 static internal partial class BmsChartParser
 {
+    private static readonly Encoding shift_jis_encoding =
+        CodePagesEncodingProvider.Instance.GetEncoding(932)
+        ?? throw new InvalidOperationException("Shift-JIS encoding is not available.");
+
+    static BmsChartParser()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
     public static IEnumerable<string> ScanResourceReferences(IEnumerable<string> lines) =>
         from rawLine in lines
         select stripComments(rawLine).Trim()
@@ -21,10 +32,13 @@ static internal partial class BmsChartParser
         where value.Length > 0
         select value;
 
+    public static string[] ReadAllLines(string path) => decodeText(File.ReadAllBytes(path)).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+
     public static BmsChartMetadata ScanMetadata(IEnumerable<string> lines, string? path = null)
     {
         var title = path == null ? string.Empty : Path.GetFileNameWithoutExtension(path);
         var artist = string.Empty;
+        var subtitle = string.Empty;
         var channels = new List<string>();
         int? playerMode = null;
 
@@ -61,24 +75,74 @@ static internal partial class BmsChartParser
                     artist = value;
                     break;
 
+                case "SUBTITLE":
+                    subtitle = value;
+                    break;
+
                 case "PLAYER" when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedPlayerMode):
                     playerMode = parsedPlayerMode;
                     break;
             }
         }
 
-        return new BmsChartMetadata(title, artist, inferDifficultyName(title, path), BmsLayout.InferTotalColumns(channels, path, playerMode));
+        var setTitle = inferSetTitle(title);
+        var difficultyName = inferDifficultyName(title, subtitle, path);
+
+        return new BmsChartMetadata(title, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path, playerMode), setTitle);
     }
 
-    private static string inferDifficultyName(string title, string? path)
+    private static string decodeText(byte[] content)
+    {
+        if (content.Length >= 3 && content[0] == 0xef && content[1] == 0xbb && content[2] == 0xbf)
+            return Encoding.UTF8.GetString(content);
+
+        var utf8 = new UTF8Encoding(false, true);
+
+        try
+        {
+            return utf8.GetString(content);
+        }
+        catch (DecoderFallbackException)
+        {
+            return shift_jis_encoding.GetString(content);
+        }
+    }
+
+    private static string inferSetTitle(string title)
     {
         var start = title.LastIndexOf('[');
         var end = title.LastIndexOf(']');
 
-        if (start >= 0 && end > start)
-            return title[(start + 1)..end];
+        if (start > 0 && end == title.Length - 1)
+            return title[..start].TrimEnd();
+
+        return title;
+    }
+
+    private static string inferDifficultyName(string title, string subtitle, string? path)
+    {
+        var subtitleDifficulty = tryExtractBracketedSuffix(subtitle);
+
+        if (!string.IsNullOrWhiteSpace(subtitleDifficulty))
+            return subtitleDifficulty;
+
+        var titleDifficulty = tryExtractBracketedSuffix(title);
+
+        if (!string.IsNullOrWhiteSpace(titleDifficulty))
+            return titleDifficulty;
 
         return path == null ? title : Path.GetFileNameWithoutExtension(path);
+    }
+
+    private static string? tryExtractBracketedSuffix(string value)
+    {
+        var start = value.LastIndexOf('[');
+        var end = value.LastIndexOf(']');
+
+        if (start >= 0 && end == value.Length - 1 && end > start)
+            return value[(start + 1)..end].Trim();
+
+        return null;
     }
 
     [GeneratedRegex(@"^#(?:WAV[0-9A-Z]{2}|BMP[0-9A-Z]{2}|BGA[0-9A-Z]{2}|STAGEFILE|BANNER|BACKBMP|MOVIE)\s+(.+)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]

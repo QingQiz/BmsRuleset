@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using osu.Game.Beatmaps;
@@ -37,7 +38,7 @@ public class BmsBeatmapDecoder : Decoder<Beatmap>
 
     protected override void ParseStreamInto(LineBufferedReader stream, Beatmap output)
     {
-        var parseResult = BmsChartParser.Parse(readLines(stream), output.BeatmapInfo?.Path);
+        var parseResult = BmsChartParser.Parse(readLines(stream, output.BeatmapInfo?.Path), output.BeatmapInfo?.Path);
 
         applyMetadata(output, parseResult);
         populateTiming(output, parseResult.TimingMap.BpmEvents);
@@ -65,8 +66,11 @@ public class BmsBeatmapDecoder : Decoder<Beatmap>
         }
     }
 
-    private static string[] readLines(LineBufferedReader stream)
+    private static string[] readLines(LineBufferedReader stream, string? path)
     {
+        if (path != null && File.Exists(path))
+            return BmsChartParser.ReadAllLines(path);
+
         var lines = new List<string>();
 
         while (stream.ReadLine() is { } line)

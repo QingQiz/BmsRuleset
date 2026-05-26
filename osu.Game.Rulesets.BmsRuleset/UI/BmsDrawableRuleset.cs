@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 using osu.Framework.Input;
 using osu.Game.Beatmaps;
 using osu.Game.Input.Handlers;
@@ -77,8 +78,27 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     {
         private const double allowable_late_start = 100;
 
+        private readonly BindableBool isPaused = new();
+
         private bool hasSeenClockFrame;
         private double previousTime;
+
+        protected override void LoadAsyncComplete()
+        {
+            base.LoadAsyncComplete();
+
+            if (this.FindClosestParent<BmsDrawableRuleset>() is { } ruleset)
+            {
+                isPaused.BindTo(ruleset.IsPaused);
+                isPaused.BindValueChanged(paused =>
+                {
+                    if (paused.NewValue)
+                        Pause();
+                    else
+                        Resume();
+                }, true);
+            }
+        }
 
         protected override void LoadComplete()
         {
@@ -99,14 +119,16 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
             if (Time.Current < startTime)
             {
-                Stop();
+                if (!isPaused.Value)
+                    Stop();
+
                 LifetimeStart = startTime;
                 LifetimeEnd = double.MaxValue;
                 previousTime = Time.Current;
                 return;
             }
 
-            if (previousTime < startTime && Time.Current >= startTime && !RequestedPlaying && Time.Current - startTime < allowable_late_start)
+            if (!isPaused.Value && previousTime < startTime && Time.Current >= startTime && !RequestedPlaying && Time.Current - startTime < allowable_late_start)
                 Play();
 
             previousTime = Time.Current;
