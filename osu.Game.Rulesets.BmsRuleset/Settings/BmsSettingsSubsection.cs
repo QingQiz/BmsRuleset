@@ -90,7 +90,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Text = "Delete all imported BMS files",
                 RelativeSizeAxes = Axes.X,
                 Height = 36,
-                Action = () => bmsImporter?.DeleteAllBmsFiles(),
+                Action = () => bmsImporter?.DeleteAllBmsFilesAsync(),
                 Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
             },
         ];

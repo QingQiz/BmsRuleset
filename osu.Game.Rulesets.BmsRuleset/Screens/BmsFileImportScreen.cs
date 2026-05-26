@@ -8,12 +8,15 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Platform;
 using osu.Framework.Screens;
+using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Screens;
 using osuTK;
 
@@ -40,11 +43,19 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     private FillFlowContainer buttonGroup;
     private Bindable<string> lastImportPath;
 
-    [Resolved]
-    private OsuGameBase game { get; set; } = null!;
+    private BmsFileImporter importer;
 
     [Resolved(CanBeNull = true)]
     private BmsRulesetConfigManager resolvedConfig { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private RealmAccess realm { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private Storage storage { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private INotificationOverlay notifications { get; set; }
 
     public override void OnEntering(ScreenTransitionEvent e)
     {
@@ -67,6 +78,10 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     {
         lastImportPath = (config ?? resolvedConfig)?.GetBindable<string>(BmsRulesetSetting.LastImportPath);
         var lastPath = lastImportPath?.Value;
+
+        importer = realm != null && storage != null
+            ? new BmsFileImporter(realm, storage, notifications)
+            : null!;
 
         buttonGroup = new FillFlowContainer
         {
@@ -197,12 +212,16 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
         if (paths.Length == 0)
             return;
 
-        Task.Factory.StartNew(async () =>
+        // Bypass game.Import() which groups paths by extension (see OsuGameBase.Importing.cs:33).
+        // A BMS directory typically contains .bms, .bme, .bml, and .pms files side by side;
+        // per-extension dispatch would split them into separate import calls, producing
+        // multiple notifications and potentially fragmenting charts across multiple beatmap sets.
+        // Calling the importer directly processes all chart files as one atomic batch.
+        Task.Run(async () =>
         {
-            await game.Import(paths).ConfigureAwait(false);
-
+            await importer.Import(paths).ConfigureAwait(false);
             Schedule(() => { fileSelector.CurrentPath.TriggerChange(); });
-        }, TaskCreationOptions.LongRunning);
+        });
     }
 
     private void startDirectoryImport(bool recursive)

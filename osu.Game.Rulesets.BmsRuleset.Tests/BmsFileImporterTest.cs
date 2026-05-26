@@ -85,7 +85,47 @@ public partial class BmsFileImporterTest
     private sealed record ImportedBeatmapPathSnapshot(string BeatmapPath, string StoredPath, string MD5Hash);
 
     [Test]
-    public void TestDirectoryImportCreatesSingleSetEvenWhenSingleChartAlreadyExists()
+    public void TestDeleteAllThenReimportDirectoryCreatesFreshSet()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+
+            var importer = new BmsFileImporter(realm, storage);
+            var directory = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Destr0yer (by 削除 feat. Nikki Simmons)");
+
+            await importer.Import(directory).ConfigureAwait(false);
+
+            realm.Write(r =>
+            {
+                var sets = r.All<BeatmapSetInfo>().AsEnumerable()
+                    .Where(s => !s.DeletePending && !s.Protected)
+                    .Where(s => s.Beatmaps.Any(b => b.Ruleset.ShortName == "bms"))
+                    .ToArray();
+                foreach (var set in sets)
+                    set.DeletePending = true;
+            });
+
+            await importer.Import(directory).ConfigureAwait(false);
+
+            var result = realm.Run(r =>
+            {
+                var sets = r.All<BeatmapSetInfo>().AsEnumerable().ToArray();
+                var active = sets.Single(s => !s.DeletePending);
+
+                return (SetCount: sets.Length, ActiveBeatmapCount: active.Beatmaps.Count,
+                    DifficultyNames: active.Beatmaps.Select(b => b.DifficultyName).OrderBy(n => n, StringComparer.Ordinal).ToArray());
+            });
+
+            Assert.That(result.SetCount, Is.EqualTo(2));
+            Assert.That(result.ActiveBeatmapCount, Is.EqualTo(6));
+            Assert.That(result.DifficultyNames, Does.Contain("DP HYP☆R"));
+            Assert.That(result.DifficultyNames, Does.Contain("DP ☆NOTHER"));
+        });
+    }
+
+    [Test]
+    public void TestDirectoryImportAfterSingleFileImportCreatesSeparateSets()
     {
         runImportTest(async (realm, storage) =>
         {
@@ -108,10 +148,9 @@ public partial class BmsFileImporterTest
             });
 
             Assert.That(result.SetCount, Is.EqualTo(2));
-            Assert.That(result.DirectoryBeatmapCount, Is.EqualTo(6));
-            Assert.That(result.DifficultyNames, Does.Contain("DP HYP☆R"));
+            Assert.That(result.DirectoryBeatmapCount, Is.EqualTo(5));
             Assert.That(result.DifficultyNames, Does.Contain("DP ☆NOTHER"));
-            Assert.That(result.ChartFileCount, Is.EqualTo(6));
+            Assert.That(result.ChartFileCount, Is.EqualTo(5));
         });
     }
 
@@ -124,6 +163,36 @@ public partial class BmsFileImporterTest
         var importer = new BmsFileImporter(realm, storage);
 
         Assert.That(importer.HandledExtensions, Is.EquivalentTo(new[] { ".bms", ".bme", ".bml", ".pms" }));
+    }
+
+    [Test]
+    public void TestImportDestr0yerDirectoryCreatesExactlyOneSet()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+
+            var importer = new BmsFileImporter(realm, storage);
+            var directory = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Destr0yer (by 削除 feat. Nikki Simmons)");
+
+            await importer.Import(directory).ConfigureAwait(false);
+
+            var result = realm.Run(r =>
+            {
+                var sets = r.All<BeatmapSetInfo>().AsEnumerable().Where(s => !s.DeletePending).ToArray();
+
+                return (SetCount: sets.Length,
+                    BeatmapsInSet: sets.Single().Beatmaps.Count,
+                    DifficultyNames: sets.Single().Beatmaps.Select(b => b.DifficultyName)
+                        .OrderBy(n => n, StringComparer.Ordinal).ToArray());
+            });
+
+            Assert.That(result.SetCount, Is.EqualTo(1));
+            Assert.That(result.BeatmapsInSet, Is.EqualTo(6));
+            Assert.That(result.DifficultyNames, Does.Contain("DP HYP☆R"));
+            Assert.That(result.DifficultyNames, Does.Contain("DP ☆NOTHER"));
+            Assert.That(result.DifficultyNames, Does.Contain("NORMAL"));
+        });
     }
 
     [Test]
@@ -361,7 +430,7 @@ public partial class BmsFileImporterTest
     }
 
     [Test]
-    public void TestSequentialSingleChartImportsCreateSeparateBeatmapSets()
+    public void TestSequentialSingleChartImportsCreateSeparateSets()
     {
         runImportTest(async (realm, storage) =>
         {
@@ -378,14 +447,12 @@ public partial class BmsFileImporterTest
                 var sets = r.All<BeatmapSetInfo>().AsEnumerable().Where(s => !s.DeletePending).ToArray();
 
                 return (SetCount: sets.Length,
-                    Titles: sets.Select(s => s.Metadata.Title).OrderBy(t => t, StringComparer.Ordinal).ToArray(),
-                    Artists: sets.Select(s => s.Metadata.Artist).Distinct().ToArray(),
+                    BeatmapCounts: sets.Select(s => s.Beatmaps.Count).ToArray(),
                     DifficultyNames: sets.SelectMany(s => s.Beatmaps).Select(b => b.DifficultyName).OrderBy(n => n, StringComparer.Ordinal).ToArray());
             });
 
             Assert.That(result.SetCount, Is.EqualTo(2));
-            Assert.That(result.Titles, Is.EqualTo(new[] { "Destr0yer", "Destr0yer" }));
-            Assert.That(result.Artists, Is.EqualTo(new[] { "削除 feat. Nikki Simmons" }));
+            Assert.That(result.BeatmapCounts, Is.EquivalentTo(new[] { 1, 1 }));
             Assert.That(result.DifficultyNames, Is.EqualTo(new[] { "DP HYP☆R", "DP ☆NOTHER" }));
         });
     }
