@@ -8,18 +8,18 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Screens;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Screens;
 
-public partial class BmsFileImportScreen : OsuScreen
+public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) : OsuScreen
 {
     public override bool HideOverlaysOnEnter => true;
 
@@ -33,16 +33,18 @@ public partial class BmsFileImportScreen : OsuScreen
 
     private RoundedButton importButton = null!;
     private RoundedButton importFolderButton = null!;
-    private RoundedButton importAllButton = null!;
 
     [Cached]
     private OverlayColourProvider colourProvider = new(OverlayColourScheme.Purple);
 
+    private FillFlowContainer buttonGroup;
+    private Bindable<string> lastImportPath;
+
     [Resolved]
     private OsuGameBase game { get; set; } = null!;
 
-    [Resolved]
-    private Storage storage { get; set; } = null!;
+    [Resolved(CanBeNull = true)]
+    private BmsRulesetConfigManager resolvedConfig { get; set; }
 
     public override void OnEntering(ScreenTransitionEvent e)
     {
@@ -63,7 +65,45 @@ public partial class BmsFileImportScreen : OsuScreen
     [BackgroundDependencyLoader]
     private void load()
     {
-        var lastPath = readLastPath();
+        lastImportPath = (config ?? resolvedConfig)?.GetBindable<string>(BmsRulesetSetting.LastImportPath);
+        var lastPath = lastImportPath?.Value;
+
+        buttonGroup = new FillFlowContainer
+        {
+            Anchor = Anchor.BottomCentre,
+            Origin = Anchor.BottomCentre,
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y,
+            Direction = FillDirection.Vertical,
+            Spacing = new Vector2(0, button_vertical_margin),
+            Width = 0.9f,
+            Padding = new MarginPadding { Bottom = 2 * button_vertical_margin },
+            Children =
+            [
+                importButton = new RoundedButton
+                {
+                    Text = "Import selected file",
+                    RelativeSizeAxes = Axes.X,
+                    Height = button_height,
+                    Action = () => startImport(fileSelector.CurrentFile.Value?.FullName),
+                },
+                importFolderButton = new RoundedButton
+                {
+                    Text = "Import all in current folder",
+                    RelativeSizeAxes = Axes.X,
+                    Height = button_height,
+                    Action = () => startDirectoryImport(false),
+                },
+                new RoundedButton
+                {
+                    Text = "Import all from directory (recursive)",
+                    TooltipText = "Imports all BMS files from the selected directory and subdirectories",
+                    RelativeSizeAxes = Axes.X,
+                    Height = button_height,
+                    Action = () => startDirectoryImport(true),
+                },
+            ],
+        };
 
         InternalChild = contentContainer = new Container
         {
@@ -118,52 +158,7 @@ public partial class BmsFileImportScreen : OsuScreen
                                 },
                             },
                         },
-                        new FillFlowContainer
-                        {
-                            Anchor = Anchor.BottomCentre,
-                            Origin = Anchor.BottomCentre,
-                            RelativeSizeAxes = Axes.X,
-                            AutoSizeAxes = Axes.Y,
-                            Direction = FillDirection.Vertical,
-                            Spacing = new Vector2(0, button_vertical_margin),
-                            Width = 0.9f,
-                            Padding = new MarginPadding { Bottom = 2 * button_vertical_margin },
-                            Children =
-                            [
-                                importButton = new RoundedButton
-                                {
-                                    Text = "Import selected file",
-                                    RelativeSizeAxes = Axes.X,
-                                    Height = button_height,
-                                    Action = () => startImport(fileSelector.CurrentFile.Value?.FullName),
-                                },
-                                importFolderButton = new RoundedButton
-                                {
-                                    Text = "Import all in current folder",
-                                    RelativeSizeAxes = Axes.X,
-                                    Height = button_height,
-                                    Action = () =>
-                                    {
-                                        var currentPath = fileSelector.CurrentPath.Value;
-                                        if (currentPath != null && currentPath.Exists)
-                                            startDirectoryImport(currentPath.FullName, false);
-                                    },
-                                },
-                                importAllButton = new RoundedButton
-                                {
-                                    Text = "Import all from directory (recursive)",
-                                    RelativeSizeAxes = Axes.X,
-                                    Height = button_height,
-                                    TooltipText = "Imports all BMS files from the selected directory and subdirectories",
-                                    Action = () =>
-                                    {
-                                        var currentPath = fileSelector.CurrentPath.Value;
-                                        if (currentPath != null && currentPath.Exists)
-                                            startDirectoryImport(currentPath.FullName, true);
-                                    },
-                                },
-                            ],
-                        },
+                        buttonGroup,
                     ],
                 },
             ],
@@ -183,10 +178,12 @@ public partial class BmsFileImportScreen : OsuScreen
                           && newDirectory.EnumerateFiles().Any(f => Constant.BMS_EXTENSIONS.Contains(f.Extension));
 
         importFolderButton.Enabled.Value = hasBmsFiles;
-        importAllButton.Enabled.Value = hasBmsFiles;
 
         if (newDirectory != null)
-            writeLastPath(newDirectory.FullName);
+        {
+            if (lastImportPath != null)
+                lastImportPath.Value = newDirectory.FullName;
+        }
     }
 
     private void fileChanged(ValueChangedEvent<FileInfo> selectedFile)
@@ -208,44 +205,23 @@ public partial class BmsFileImportScreen : OsuScreen
         }, TaskCreationOptions.LongRunning);
     }
 
-    private void startDirectoryImport(string path, bool recursive)
+    private void startDirectoryImport(bool recursive)
     {
-        if (string.IsNullOrEmpty(path))
+        var path = fileSelector.CurrentPath.Value;
+        if (path == null || !path.Exists)
             return;
 
-        var searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-        var filesToImport = Directory.GetFiles(path, "*.*", searchOption)
-            .Where(file => Constant.BMS_EXTENSIONS.Contains(Path.GetExtension(file)))
-            .ToList();
+        var files = Directory.GetFiles(
+            path.ToString(), "*.*",
+            recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 
-        if (filesToImport.Count == 0)
+        var filesToImport = files
+            .Where(Constant.IsChartFile)
+            .ToArray();
+
+        if (filesToImport.Length == 0)
             return;
 
-        startImport(filesToImport.ToArray());
-    }
-
-    private string readLastPath()
-    {
-        try
-        {
-            var fullPath = storage.GetFullPath("bms_import_path.txt");
-            return File.Exists(fullPath) ? File.ReadAllText(fullPath).Trim() : string.Empty;
-        }
-        catch
-        {
-            return string.Empty;
-        }
-    }
-
-    private void writeLastPath(string path)
-    {
-        try
-        {
-            var fullPath = storage.GetFullPath("bms_import_path.txt");
-            File.WriteAllText(fullPath, path);
-        }
-        catch
-        {
-        }
+        startImport(filesToImport);
     }
 }

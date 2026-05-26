@@ -21,8 +21,6 @@ Native osu! ruleset plugin for BMS-family charts. Do not reintroduce `ppy.osu.Ga
 
 - `BmsRuleset` extends `Ruleset` directly; gameplay path should stay native: `BmsDrawableRuleset`, `BmsPlayfield`, `BmsHitObject`, `BmsDifficultyCalculator`, BMS mod wrappers.
 - `BmsBeatmapConverter` is intentionally pass-through for decoded `BmsHitObject`s; do not convert BMS through mania objects.
-- `BmsHitObject.TickInfo` carries native tick data (`Tick`, `EndTick`, `TickResolution`), while `BmsHitObject` itself keeps projected osu! `StartTime`/`Duration`. Keep new parser/render logic tick-first.
-- `CreateSkinTransformer()` returns `BmsLegacySkinTransformer` for `LegacySkin`; native BMS skinning is not implemented yet.
 - `BmsRuleset.CreateIcon()` still uses `OsuIcon.RulesetMania` as a placeholder. This is tracked debt, not a dependency.
 
 ## BMS Parser Rules
@@ -30,7 +28,6 @@ Native osu! ruleset plugin for BMS-family charts. Do not reintroduce `ppy.osu.Ga
 - `192` is only the base/default tick resolution. Expand resolution for payload divisions and measure lengths that would otherwise create fractional ticks.
 - STOP values are in BMS base `1/192` whole-note units even when internal tick resolution expands.
 - Project ticks to milliseconds at timing boundaries only; preserve native timing data where possible.
-- Aleph-0 contains extreme BPMs such as `#BPM01 0.2441406`; osu! `TimingControlPoint` clamps beat lengths, so it cannot be the source of truth for native BMS timing.
 - `#RANDOM/#IF` control flow must eventually be runtime/replay-resolved. Do not permanently flatten branches during import.
 - `#LNTYPE 1`, `#LNTYPE 2`, and `#LNOBJ` are required native formats, not mania hold-note shims.
 - Channel `01` is BGM/autoplay sample data, not playable notes.
@@ -58,6 +55,5 @@ Native osu! ruleset plugin for BMS-family charts. Do not reintroduce `ppy.osu.Ga
 ## UI/Test Harness Gotchas
 
 - `SettingsSubsection` is a `FillFlowContainer`; children should not use `RelativeSizeAxes = Axes.Both` there.
-- `BmsRulesetConfigManager` is not globally registered. For arbitrary screens, use `Storage` persistence like `BmsFileImportScreen.readLastPath/writeLastPath`.
 - File import handler registration is in `BmsSettingsSubsection.load()` via `game.RegisterImportHandler(...)`; unregister in `Dispose()` and guard against double registration.
 - Screen tests needing popovers must provide `PopoverContainer` plus cached `OverlayColourProvider` for controls like `OsuDirectorySelector`.

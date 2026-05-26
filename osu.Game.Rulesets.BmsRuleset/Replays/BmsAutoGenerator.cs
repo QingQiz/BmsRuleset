@@ -10,6 +10,9 @@ namespace osu.Game.Rulesets.BmsRuleset.Replays;
 
 public class BmsAutoGenerator(BmsBeatmap beatmap) : AutoGenerator<BmsReplayFrame>(beatmap)
 {
+    public const double RELEASE_DELAY = 20;
+
+    // ReSharper disable once InconsistentNaming
     private new BmsBeatmap Beatmap => (BmsBeatmap)base.Beatmap;
 
     private readonly record struct ActionPoint(double Time, BmsAction Action, bool Press);
@@ -52,11 +55,11 @@ public class BmsAutoGenerator(BmsBeatmap beatmap) : AutoGenerator<BmsReplayFrame
     {
         var endTime = current.GetEndTime();
 
-        if (current.IsLongNote && current.Duration > 0)
-            return endTime;
+        if (current.IsLongNote)
+            return current.Duration > 0 ? endTime : endTime + 1;
 
-        return nextObject == null || nextObject.StartTime > endTime + KEY_UP_DELAY
-            ? endTime + KEY_UP_DELAY
+        return nextObject == null || nextObject.StartTime > endTime + RELEASE_DELAY
+            ? endTime + RELEASE_DELAY
             : endTime + (nextObject.StartTime - endTime) * 0.9;
     }
 

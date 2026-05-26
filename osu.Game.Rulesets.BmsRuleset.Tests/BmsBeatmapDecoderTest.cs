@@ -168,6 +168,22 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestLongNoteTailSampleEventsUseHeadSampleAtTailTime()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAV01 ln.wav
+                             #LNTYPE 1
+                             #00151:0101
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(1));
+        Assert.That(converted.LongNoteTailSampleEvents[0].SampleKey, Is.EqualTo("01"));
+        Assert.That(converted.LongNoteTailSampleEvents[0].Time, Is.EqualTo(3000).Within(0.001));
+    }
+
+    [Test]
     public void TestMeasureZeroStartsAtTimeZeroAndMeasureOneStartsAfterOneMeasure()
     {
         var beatmap = decode("""

@@ -13,6 +13,7 @@ public sealed record BmsParseResult(
     int TotalColumns,
     IReadOnlyDictionary<string, string> SampleDefinitions,
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents,
+    IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents,
     IReadOnlyList<BmsParsedHitObject> HitObjects);
 
 public readonly record struct BmsParsedHitObject(

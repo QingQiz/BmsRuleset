@@ -7,7 +7,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Replays;
 
 public class BmsFramedReplayInputHandler(Replay replay) : FramedReplayInputHandler<BmsReplayFrame>(replay)
 {
-    protected override bool IsImportant(BmsReplayFrame frame) => frame.Actions.Count > 0;
+    protected override bool IsImportant(BmsReplayFrame frame) => true;
 
     protected override void CollectReplayInputs(List<IInput> inputs)
     {

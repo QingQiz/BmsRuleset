@@ -85,7 +85,7 @@ public partial class BmsFileImporterTest
     private sealed record ImportedBeatmapPathSnapshot(string BeatmapPath, string StoredPath, string MD5Hash);
 
     [Test]
-    public void TestDirectoryImportAddsMissingChartsToExistingSingleChartSet()
+    public void TestDirectoryImportCreatesSingleSetEvenWhenSingleChartAlreadyExists()
     {
         runImportTest(async (realm, storage) =>
         {
@@ -99,16 +99,16 @@ public partial class BmsFileImporterTest
 
             var result = realm.Run(r =>
             {
-                var sets = r.All<BeatmapSetInfo>().AsEnumerable().ToArray();
-                var set = sets.Single(s => !s.DeletePending);
+                var sets = r.All<BeatmapSetInfo>().AsEnumerable().Where(s => !s.DeletePending).ToArray();
+                var directorySet = sets.Single(s => s.Beatmaps.Count > 1);
 
-                return (SetCount: sets.Length, ActiveBeatmapCount: set.Beatmaps.Count,
-                    DifficultyNames: set.Beatmaps.Select(b => b.DifficultyName).OrderBy(n => n, StringComparer.Ordinal).ToArray(),
-                    ChartFileCount: set.Files.Count(f => Constant.BMS_EXTENSIONS.Contains(Path.GetExtension(f.Filename), StringComparer.OrdinalIgnoreCase)));
+                return (SetCount: sets.Length, DirectoryBeatmapCount: directorySet.Beatmaps.Count,
+                    DifficultyNames: directorySet.Beatmaps.Select(b => b.DifficultyName).OrderBy(n => n, StringComparer.Ordinal).ToArray(),
+                    ChartFileCount: directorySet.Files.Count(f => Constant.BMS_EXTENSIONS.Contains(Path.GetExtension(f.Filename), StringComparer.OrdinalIgnoreCase)));
             });
 
-            Assert.That(result.SetCount, Is.EqualTo(1));
-            Assert.That(result.ActiveBeatmapCount, Is.EqualTo(6));
+            Assert.That(result.SetCount, Is.EqualTo(2));
+            Assert.That(result.DirectoryBeatmapCount, Is.EqualTo(6));
             Assert.That(result.DifficultyNames, Does.Contain("DP HYP☆R"));
             Assert.That(result.DifficultyNames, Does.Contain("DP ☆NOTHER"));
             Assert.That(result.ChartFileCount, Is.EqualTo(6));
@@ -250,6 +250,41 @@ public partial class BmsFileImporterTest
     }
 
     [Test]
+    public void TestRecursiveDirectoryImportCreatesOneSetPerChartDirectory()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+
+            var root = Path.Combine(storage.GetFullPath(string.Empty), "recursive-import");
+            var first = Path.Combine(root, "first");
+            var second = Path.Combine(root, "second");
+
+            Directory.CreateDirectory(first);
+            Directory.CreateDirectory(second);
+
+            File.Copy(Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Aleph-0 (by LeaF)", "_7NORMAL.bms"), Path.Combine(first, "_7NORMAL.bms"));
+            File.Copy(Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Destr0yer (by 削除 feat. Nikki Simmons)", "destr0yer_starhyper.bms"),
+                Path.Combine(second, "destr0yer_starhyper.bms"));
+
+            var importer = new BmsFileImporter(realm, storage);
+
+            await importer.Import(root).ConfigureAwait(false);
+
+            var result = realm.Run(r => r.All<BeatmapSetInfo>().AsEnumerable()
+                .Where(s => !s.DeletePending)
+                .Select(s => (s.Metadata.Title, BeatmapCount: s.Beatmaps.Count))
+                .OrderBy(s => s.Title, StringComparer.Ordinal)
+                .ToArray());
+
+            Assert.That(result, Has.Length.EqualTo(2));
+            Assert.That(result.Select(s => s.BeatmapCount), Is.EqualTo(new[] { 1, 1 }));
+            Assert.That(result.Select(s => s.Title), Does.Contain("Aleph-0"));
+            Assert.That(result.Select(s => s.Title), Does.Contain("Destr0yer"));
+        });
+    }
+
+    [Test]
     public void TestReimportCreatesFreshSetWhenPreviousImportIsSoftDeleted()
     {
         runImportTest(async (realm, storage) =>
@@ -326,7 +361,7 @@ public partial class BmsFileImporterTest
     }
 
     [Test]
-    public void TestSequentialChartImportsMergeIntoOneActiveBeatmapSet()
+    public void TestSequentialSingleChartImportsCreateSeparateBeatmapSets()
     {
         runImportTest(async (realm, storage) =>
         {
@@ -340,23 +375,17 @@ public partial class BmsFileImporterTest
 
             var result = realm.Run(r =>
             {
-                var set = r.All<BeatmapSetInfo>().Single(s => !s.DeletePending);
+                var sets = r.All<BeatmapSetInfo>().AsEnumerable().Where(s => !s.DeletePending).ToArray();
 
-                return new ImportedSetSnapshot(
-                    set.Beatmaps.Count,
-                    set.Files.Count,
-                    set.Metadata.Title,
-                    set.Metadata.Artist,
-                    set.Beatmaps.Select(b => b.DifficultyName).OrderBy(n => n, StringComparer.Ordinal).ToArray(),
-                    set.Beatmaps.Select(b => (b.DifficultyName, b.Difficulty.CircleSize, new BmsRuleset().GetVariantForBeatmap(b))).ToArray(),
-                    set.Beatmaps.Select(b => (b.MD5Hash, b.Hash, b.Path)).ToArray(),
-                    set.Files.Select(f => f.Filename).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToArray(),
-                    set.Files.Select(f => f.File.Hash).Distinct().Count());
+                return (SetCount: sets.Length,
+                    Titles: sets.Select(s => s.Metadata.Title).OrderBy(t => t, StringComparer.Ordinal).ToArray(),
+                    Artists: sets.Select(s => s.Metadata.Artist).Distinct().ToArray(),
+                    DifficultyNames: sets.SelectMany(s => s.Beatmaps).Select(b => b.DifficultyName).OrderBy(n => n, StringComparer.Ordinal).ToArray());
             });
 
-            Assert.That(result.BeatmapCount, Is.EqualTo(2));
-            Assert.That(result.Title, Is.EqualTo("Destr0yer"));
-            Assert.That(result.Artist, Is.EqualTo("削除 feat. Nikki Simmons"));
+            Assert.That(result.SetCount, Is.EqualTo(2));
+            Assert.That(result.Titles, Is.EqualTo(new[] { "Destr0yer", "Destr0yer" }));
+            Assert.That(result.Artists, Is.EqualTo(new[] { "削除 feat. Nikki Simmons" }));
             Assert.That(result.DifficultyNames, Is.EqualTo(new[] { "DP HYP☆R", "DP ☆NOTHER" }));
         });
     }

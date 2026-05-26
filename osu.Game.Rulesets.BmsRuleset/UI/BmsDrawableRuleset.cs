@@ -67,14 +67,16 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     [BackgroundDependencyLoader]
     private void load()
     {
-        foreach (var sampleEvent in ((BmsBeatmap)Beatmap).BackgroundSampleEvents.OrderBy(e => e.Time))
+        var beatmap = (BmsBeatmap)Beatmap;
+
+        foreach (var sampleEvent in beatmap.BackgroundSampleEvents.OrderBy(e => e.Time))
         {
-            if (((BmsBeatmap)Beatmap).SampleDefinitions.TryGetValue(sampleEvent.SampleKey, out var samplePath))
+            if (beatmap.SampleDefinitions.TryGetValue(sampleEvent.SampleKey, out var samplePath))
                 FrameStableComponents.Add(new BmsBackgroundSample(sampleEvent.Time, new BmsSampleInfo(samplePath)));
         }
     }
 
-    private partial class BmsBackgroundSample(double startTime, BmsSampleInfo sampleInfo) : BmsSkinnableSound(sampleInfo)
+    private partial class BmsBackgroundSample(double startTime, BmsSampleInfo sampleInfo) : BmsChartSampleSound(sampleInfo)
     {
         private const double allowable_late_start = 100;
 

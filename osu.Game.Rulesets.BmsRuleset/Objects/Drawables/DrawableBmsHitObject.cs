@@ -2,6 +2,7 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
@@ -27,7 +28,10 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     private const float travel_distance = 560;
 
     private Container noteContainer = null!;
+    private Box? longNoteBody;
+    private Box? longNoteTail;
     private SkinnableDrawable? note;
+    private bool longNoteStarted;
     private int skinnedColumn = -1;
 
     public DrawableBmsHitObject()
@@ -47,6 +51,26 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (result == HitResult.None)
             return false;
 
+        if (HitObject.IsLongNote)
+        {
+            longNoteStarted = true;
+            return true;
+        }
+
+        ApplyResult(result);
+        return true;
+    }
+
+    public bool TryRelease()
+    {
+        if (Judged || HitObject?.HitWindows == null || !HitObject.IsLongNote || !longNoteStarted)
+            return false;
+
+        var result = HitObject.HitWindows.ResultFor(Time.Current - HitObject.EndTime);
+
+        if (result == HitResult.None)
+            return false;
+
         ApplyResult(result);
         return true;
     }
@@ -62,10 +86,17 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         base.OnApply();
 
         Alpha = 1;
+        longNoteStarted = false;
         updateNotePiece();
 
         if (note != null)
             note.Colour = HitObject.IsLongNote ? Color4.Cyan : Color4.White;
+
+        if (longNoteBody != null)
+            longNoteBody.Alpha = HitObject.IsLongNote ? 0.55f : 0;
+
+        if (longNoteTail != null)
+            longNoteTail.Alpha = HitObject.IsLongNote ? 1 : 0;
     }
 
     protected override void Update()
@@ -89,6 +120,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         }
 
         var timeUntilHit = HitObject.StartTime - Time.Current;
+        var endTimeUntilHit = HitObject.EndTime - Time.Current;
 
         if (!double.IsFinite(timeUntilHit))
         {
@@ -99,6 +131,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         var timeRange = playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(8);
         var hitTargetPosition = stage?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION;
         var y = parentHeight - hitTargetPosition - (float)(timeUntilHit / timeRange) * travel_distance;
+        var tailY = parentHeight - hitTargetPosition - (float)(endTimeUntilHit / timeRange) * travel_distance;
         var position = columnContainer != null && Parent != null
             ? Parent.ToLocalSpace(columnContainer.ToScreenSpace(new Vector2(0, y)))
             : new Vector2(0, y);
@@ -111,8 +144,12 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
         Position = position;
         Size = new Vector2(Math.Max(1, parentWidth), Math.Max(DefaultBmsNotePiece.NOTE_HEIGHT, note?.DrawHeight ?? 0));
+        updateLongNotePieces(y, tailY);
 
-        if (playfield?.IsAutoplay == true && !Judged && Time.Current >= HitObject.StartTime)
+        if (playfield?.IsAutoplay == true && HitObject.IsLongNote && Time.Current >= HitObject.StartTime)
+            longNoteStarted = true;
+
+        if (playfield?.IsAutoplay == true && !Judged && Time.Current >= (HitObject.IsLongNote ? HitObject.EndTime : HitObject.StartTime))
         {
             Alpha = 0;
             ApplyMaxResult();
@@ -126,6 +163,12 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     {
         if (userTriggered || HitObject.HitWindows == null)
             return;
+
+        if (HitObject.IsLongNote && !longNoteStarted && Time.Current > HitObject.StartTime + HitObject.HitWindows.WindowFor(HitResult.Miss))
+        {
+            ApplyResult(HitResult.Miss);
+            return;
+        }
 
         if (timeOffset > HitObject.HitWindows.WindowFor(HitResult.Miss))
             ApplyResult(HitResult.Miss);
@@ -145,7 +188,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         {
             case ArmedState.Hit:
                 this.FadeOut();
-                LifetimeEnd = HitStateUpdateTime + 100;
+                LifetimeEnd = Math.Max(HitObject.EndTime, HitStateUpdateTime) + 100;
                 break;
 
             case ArmedState.Miss:
@@ -171,6 +214,45 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         {
             RelativeSizeAxes = Axes.Both,
         });
+
+        AddInternal(longNoteBody = new Box
+        {
+            Anchor = Anchor.BottomLeft,
+            Origin = Anchor.BottomLeft,
+            RelativeSizeAxes = Axes.X,
+            Colour = Color4.Cyan,
+            Alpha = 0,
+        });
+
+        AddInternal(longNoteTail = new Box
+        {
+            Anchor = Anchor.BottomLeft,
+            Origin = Anchor.BottomLeft,
+            RelativeSizeAxes = Axes.X,
+            Height = DefaultBmsNotePiece.NOTE_HEIGHT,
+            Colour = Color4.Cyan,
+            Alpha = 0,
+        });
+    }
+
+    private void updateLongNotePieces(float headY, float tailY)
+    {
+        if (longNoteBody == null || longNoteTail == null)
+            return;
+
+        if (!HitObject.IsLongNote)
+        {
+            longNoteBody.Alpha = 0;
+            longNoteTail.Alpha = 0;
+            return;
+        }
+
+        var height = Math.Max(DefaultBmsNotePiece.NOTE_HEIGHT, Math.Abs(tailY - headY));
+        longNoteBody.Y = Math.Min(0, tailY - headY);
+        longNoteBody.Height = height;
+        longNoteBody.Alpha = 0.55f;
+        longNoteTail.Y = tailY - headY;
+        longNoteTail.Alpha = 1;
     }
 
     private void updateNotePiece()

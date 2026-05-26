@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
@@ -10,11 +11,10 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
 
-/// <inheritdoc />
 /// <summary>
-///     Skinnable BMS sample playback which treats chart samples as chart audio, not osu! effects.
+///     BMS chart sample playback. Samples are defined by the chart resources, not by the user skin.
 /// </summary>
-public partial class BmsSkinnableSound : SkinReloadableDrawable
+public partial class BmsChartSampleSound : SkinReloadableDrawable
 {
     public override bool RemoveWhenNotAlive => false;
 
@@ -42,6 +42,7 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
     private readonly List<ActiveChannel> activeChannels = [];
     private readonly IBindable<bool> samplePlaybackDisabled = new BindableBool();
     private readonly BindableDouble pauseFrequency = new(1);
+    private readonly BindableDouble requestedVolume = new(1);
 
     private readonly record struct ResolvedSample(ISampleInfo Info, ISample Sample);
 
@@ -51,11 +52,11 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
     [Resolved(CanBeNull = true)]
     private AudioManager? audioManager { get; set; }
 
-    public BmsSkinnableSound()
+    public BmsChartSampleSound()
     {
     }
 
-    public BmsSkinnableSound(ISampleInfo sample)
+    public BmsChartSampleSound(ISampleInfo sample)
     {
         SampleInfo = sample;
     }
@@ -86,13 +87,11 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
         if (resolvedSample is not { } resolved)
             return;
 
-        bindToUniversalVolume(resolved.Sample);
-
         var channel = resolved.Sample.GetChannel();
         channel.ManualFree = true;
-        channel.Volume.Value = Math.Max(0, resolved.Info.Volume) / 100.0;
+        requestedVolume.Value = Math.Max(0, resolved.Info.Volume) / 100.0;
         channel.Play();
-        bindToUniversalVolume(channel);
+        bindChartAudioAdjustments(channel);
         channel.AddAdjustment(AdjustableProperty.Frequency, pauseFrequency);
 
         activeChannels.Add(new ActiveChannel(channel));
@@ -130,7 +129,7 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
                 continue;
 
             activeChannel.Channel.Play();
-            bindToUniversalVolume(activeChannel.Channel);
+            bindChartAudioAdjustments(activeChannel.Channel);
             activeChannel.Paused = false;
         }
     }
@@ -138,7 +137,6 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
     public virtual void Stop()
     {
         RequestedPlaying = false;
-        pauseFrequency.Value = 1;
 
         foreach (var activeChannel in activeChannels)
         {
@@ -150,6 +148,7 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
         }
 
         activeChannels.Clear();
+        pauseFrequency.Value = 1;
     }
 
     protected override void SkinChanged(ISkinSource skin)
@@ -164,6 +163,13 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
 
         cleanupStoppedChannels();
     }
+
+    private static LegacyBeatmapSkin? extractBeatmapSkin(ISkin skin) => skin switch
+    {
+        LegacyBeatmapSkin beatmapSkin => beatmapSkin,
+        SkinTransformer transformer => transformer.Skin as LegacyBeatmapSkin,
+        _ => null,
+    };
 
     [BackgroundDependencyLoader(true)]
     private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
@@ -188,13 +194,26 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
         if (sampleInfo == null)
             return;
 
-        var sample = CurrentSkin.GetSample(sampleInfo);
+        var sample = getBeatmapSample(sampleInfo);
 
         if (sample == null)
             return;
 
-        bindToUniversalVolume(sample);
+        bindChartAudioAdjustments(sample);
         resolvedSample = new ResolvedSample(sampleInfo, sample);
+    }
+
+    private ISample? getBeatmapSample(ISampleInfo info)
+    {
+        foreach (var skin in CurrentSkin.AllSources.Select(extractBeatmapSkin).Where(s => s != null))
+        {
+            var sample = skin!.GetSample(info);
+
+            if (sample != null)
+                return sample;
+        }
+
+        return null;
     }
 
     private void cleanupStoppedChannels()
@@ -223,12 +242,13 @@ public partial class BmsSkinnableSound : SkinReloadableDrawable
             RequestedPlaying = false;
     }
 
-    private void bindToUniversalVolume(IAdjustableAudioComponent component)
+    private void bindChartAudioAdjustments(IAdjustableAudioComponent component)
     {
         component.RemoveAllAdjustments(AdjustableProperty.Volume);
+        component.AddAdjustment(AdjustableProperty.Volume, requestedVolume);
 
         if (audioManager != null)
-            component.AddAdjustment(AdjustableProperty.Volume, audioManager.Volume);
+            component.AddAdjustment(AdjustableProperty.Volume, audioManager.AggregateVolume);
     }
 
     private sealed class ActiveChannel(SampleChannel channel)

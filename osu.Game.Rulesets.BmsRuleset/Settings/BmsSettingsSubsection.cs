@@ -82,7 +82,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Text = "Import BMS files",
                 RelativeSizeAxes = Axes.X,
                 Height = 36,
-                Action = () => { performer?.PerformFromScreen(menu => menu.Push(new BmsFileImportScreen())); },
+                Action = () => { performer?.PerformFromScreen(menu => menu.Push(new BmsFileImportScreen(manager))); },
                 Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
             },
             new DangerousRoundedButton

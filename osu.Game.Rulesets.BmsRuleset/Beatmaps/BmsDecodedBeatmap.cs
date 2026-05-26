@@ -18,6 +18,8 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 
     public IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; } = [];
 
+    public IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; } = [];
+
     public void CopyFrom(BmsParseResult parseResult)
     {
         TickResolution = parseResult.TickResolution;
@@ -26,5 +28,6 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
         LayoutVariant = parseResult.LayoutVariant;
         SampleDefinitions = parseResult.SampleDefinitions;
         BackgroundSampleEvents = parseResult.BackgroundSampleEvents;
+        LongNoteTailSampleEvents = parseResult.LongNoteTailSampleEvents;
     }
 }

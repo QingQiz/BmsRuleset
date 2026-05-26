@@ -46,6 +46,10 @@ static internal partial class BmsChartParser
             .ThenBy(h => h.Tick)
             .ThenBy(h => h.Column)
             .ToArray();
+        var longNoteTailSampleEvents = collectLongNoteTailSampleEvents(hitObjects)
+            .OrderBy(e => e.Time)
+            .ThenBy(e => e.Tick)
+            .ToArray();
 
         return new BmsParseResult(
             state.Title,
@@ -58,6 +62,7 @@ static internal partial class BmsChartParser
             totalColumns,
             sampleDefinitions,
             collectBackgroundSampleEvents(state, measureStarts, tickResolution, timingEvents, stopEvents).ToArray(),
+            longNoteTailSampleEvents,
             hitObjects);
     }
 
@@ -167,6 +172,17 @@ static internal partial class BmsChartParser
         return from line in state.ChannelLines.Where(l => l.Channel == "01")
                from cell in expandCells(line, measureStarts, false)
                select new BmsSampleEvent(projectTickToTime(cell.Tick, timingEvents, stopEvents, tickResolution), cell.Tick, cell.Value);
+    }
+
+    private static IEnumerable<BmsSampleEvent> collectLongNoteTailSampleEvents(IEnumerable<BmsParsedHitObject> hitObjects)
+    {
+        foreach (var hitObject in hitObjects)
+        {
+            if (!hitObject.IsLongNote || string.IsNullOrWhiteSpace(hitObject.SampleKey) || hitObject.EndTick <= hitObject.Tick)
+                continue;
+
+            yield return new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, hitObject.SampleKey);
+        }
     }
 
     private static int calculateTickResolution(ParseState state)

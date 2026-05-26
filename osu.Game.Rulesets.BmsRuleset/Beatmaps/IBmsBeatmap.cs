@@ -16,6 +16,8 @@ public interface IBmsBeatmap
     IReadOnlyDictionary<string, string> SampleDefinitions { get; set; }
 
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; }
+
+    IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; }
 }
 
 static internal class BmsBeatmapExtensions
@@ -28,5 +30,6 @@ static internal class BmsBeatmapExtensions
         target.TimingMap = source.TimingMap;
         target.SampleDefinitions = source.SampleDefinitions;
         target.BackgroundSampleEvents = source.BackgroundSampleEvents;
+        target.LongNoteTailSampleEvents = source.LongNoteTailSampleEvents;
     }
 }

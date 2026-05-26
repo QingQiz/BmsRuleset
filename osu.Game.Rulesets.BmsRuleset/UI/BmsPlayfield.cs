@@ -48,7 +48,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private readonly Dictionary<int, int> nextSoundIndexByColumn = new();
 
-    private readonly BmsSkinnableSound keySound = new();
+    private readonly BmsChartSampleSound keySound = new();
 
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
@@ -109,6 +109,17 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
     {
+        var column = BmsKeyBindingConfiguration.ActionToColumn(e.Action, LayoutVariant);
+
+        if (column == null || column.Value >= TotalColumns)
+            return;
+
+        HitObjectContainer.AliveObjects
+            .OfType<DrawableBmsHitObject>()
+            .Where(d => !d.Judged && d.HitObject.IsLongNote && d.HitObject.Column == column.Value)
+            .OrderBy(d => Math.Abs(Time.Current - d.HitObject.EndTime))
+            .FirstOrDefault(d => d.HitObject.HitWindows.ResultFor(Time.Current - d.HitObject.EndTime) != HitResult.None)
+            ?.TryRelease();
     }
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
@@ -164,6 +175,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     private BmsHitObject? findNextSoundHitObject(int column)
     {
         var index = nextSoundIndexByColumn.GetValueOrDefault(column);
+
+        while (index < hitObjects.Count && hitObjects[index].StartTime < Time.Current - 100)
+            index++;
 
         while (index < hitObjects.Count)
         {

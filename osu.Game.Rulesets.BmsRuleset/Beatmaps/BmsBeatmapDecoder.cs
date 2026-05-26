@@ -69,7 +69,7 @@ public class BmsBeatmapDecoder : Decoder<Beatmap>
     private static string[] readLines(LineBufferedReader stream, string? path)
     {
         if (path != null && File.Exists(path))
-            return BmsChartParser.ReadAllLines(path);
+            return BmsChartParser.ReadAllLines(File.ReadAllBytes(path));
 
         var lines = new List<string>();
 

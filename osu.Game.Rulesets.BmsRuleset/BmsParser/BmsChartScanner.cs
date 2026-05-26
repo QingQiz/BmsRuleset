@@ -32,7 +32,7 @@ static internal partial class BmsChartParser
         where value.Length > 0
         select value;
 
-    public static string[] ReadAllLines(string path) => decodeText(File.ReadAllBytes(path)).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+    public static string[] ReadAllLines(byte[] bytes) => decodeText(bytes).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
 
     public static BmsChartMetadata ScanMetadata(IEnumerable<string> lines, string? path = null)
     {
@@ -88,7 +88,7 @@ static internal partial class BmsChartParser
         var setTitle = inferSetTitle(title);
         var difficultyName = inferDifficultyName(title, subtitle, path);
 
-        return new BmsChartMetadata(title, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path, playerMode), setTitle);
+        return new BmsChartMetadata(setTitle, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path, playerMode));
     }
 
     private static string decodeText(byte[] content)
