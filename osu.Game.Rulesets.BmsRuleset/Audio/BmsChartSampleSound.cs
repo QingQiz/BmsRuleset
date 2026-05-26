@@ -82,7 +82,6 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
 
         pauseFrequency.Value = 1;
         FlushPendingSkinChanges();
-        cleanupStoppedChannels();
 
         if (resolvedSample is not { } resolved)
             return;
@@ -91,9 +90,36 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
         channel.ManualFree = true;
         requestedVolume.Value = Math.Max(0, resolved.Info.Volume) / 100.0;
         channel.Play();
-        bindChartAudioAdjustments(channel);
-        channel.AddAdjustment(AdjustableProperty.Frequency, pauseFrequency);
 
+        // TODO FIXME 开头的sample 快进/skip时会停止播放，另外 review 快进到 某个 sample 的中间部分，sample是否会播放
+
+        // channel.Play() enqueues two BindAdjustments calls on the audio thread via
+        // AudioCollectionManager.AddItem: one that binds channel ← sampleBass, and one
+        // that binds sampleBass ← factory (which carries VolumeSample / effect-volume).
+        // Those run after this game-thread code, so a plain synchronous cleanup here
+        // would be silently overwritten.
+        //
+        // Strategy:
+        //   1. Apply the synchronous cleanup now (covers the case where all volumes are
+        //      1.0 and the aggregate never changes, so the handler below never fires –
+        //      but in that case the extra factor of 1.0 from sampleBass is harmless).
+        //   2. Subscribe a one-shot handler to channel.AggregateVolume.ValueChanged.
+        //      It fires the instant BindAdjustments (audio thread) changes the aggregate,
+        //      unsubscribes itself, and re-applies the clean isolation.
+        //
+        // The event add/remove uses Interlocked (compiler-generated), so game-thread add
+        // and audio-thread invoke/remove are both safe.
+        bindChartAudioAdjustments(channel);
+
+        Action<ValueChangedEvent<double>>? isolateOnBind = null;
+        isolateOnBind = _ =>
+        {
+            channel.AggregateVolume.ValueChanged -= isolateOnBind!;
+            bindChartAudioAdjustments(channel);
+        };
+        channel.AggregateVolume.ValueChanged += isolateOnBind;
+
+        channel.AddAdjustment(AdjustableProperty.Frequency, pauseFrequency);
         activeChannels.Add(new ActiveChannel(channel));
     }
 

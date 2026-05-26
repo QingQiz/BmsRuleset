@@ -116,27 +116,40 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             if (!hasSeenClockFrame)
             {
                 hasSeenClockFrame = true;
-                previousTime = double.IsFinite(Time.Current - Time.Elapsed) ? Time.Current - Time.Elapsed : Time.Current;
+                // Initialise to current time so the very first frame does not
+                // produce a spurious clock-jump when the player starts mid-song.
+                previousTime = Time.Current;
             }
+
+            var clockJumped = Time.Current - previousTime > allowable_late_start;
 
             if (Time.Current < startTime)
             {
                 if (!isPaused.Value)
                     Stop();
-
-                LifetimeStart = startTime;
-                LifetimeEnd = double.MaxValue;
-                previousTime = Time.Current;
-                return;
             }
-
-            if (!isPaused.Value && previousTime < startTime && Time.Current >= startTime && !RequestedPlaying && Time.Current - startTime < allowable_late_start)
-                Play();
+            else if (clockJumped && HasActiveChannels)
+            {
+                // The clock jumped forward (e.g. skip button) while this sample
+                // was playing.  Stop it so it doesn't continue from the wrong
+                // position.  Do NOT re-trigger it: the sample's window has passed.
+                Stop();
+            }
+            else if (!isPaused.Value && !RequestedPlaying)
+            {
+                // Only play within the 100 ms window after startTime.
+                // Do NOT use clockJumped here – a forward skip should never
+                // restart a sample that was already in the past.
+                if (Time.Current - startTime < allowable_late_start)
+                    Play();
+            }
 
             previousTime = Time.Current;
 
             LifetimeStart = double.MinValue;
-            LifetimeEnd = RequestedPlaying || HasActiveChannels ? double.MaxValue : startTime;
+            LifetimeEnd = (RequestedPlaying || HasActiveChannels || Time.Current < startTime + allowable_late_start)
+                ? double.MaxValue
+                : startTime;
         }
     }
 }
