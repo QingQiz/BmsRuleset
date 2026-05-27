@@ -4,7 +4,10 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Input.Bindings;
+using osu.Framework.Input.Events;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Skinning;
 using osuTK.Graphics;
@@ -45,7 +48,7 @@ public sealed partial class BmsColumn : CompositeDrawable
             {
                 RelativeSizeAxes = Axes.Both,
             },
-            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, layoutVariant, index), _ => Empty())
+            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, layoutVariant, index), _ => new DefaultBmsKeyArea(index, layoutVariant, IsScratch))
             {
                 RelativeSizeAxes = Axes.Both,
                 CentreComponent = false,
@@ -143,6 +146,71 @@ public sealed partial class BmsColumn : CompositeDrawable
                 RelativeSizeAxes = Axes.Both,
                 Colour = Color4.White.Opacity(isScratch ? 0.85f : 0.65f),
             };
+        }
+    }
+
+    /// <summary>
+    ///     Default code-drawn key area that shows at the bottom of each column and
+    ///     brightens briefly when the bound key is pressed.
+    /// </summary>
+    private sealed partial class DefaultBmsKeyArea : CompositeDrawable, IKeyBindingHandler<BmsAction>
+    {
+        private readonly int columnIndex;
+        private readonly BmsLayoutVariant layoutVariant;
+        private readonly bool isScratch;
+
+        private Box light = null!;
+
+        public DefaultBmsKeyArea(int columnIndex, BmsLayoutVariant layoutVariant, bool isScratch)
+        {
+            this.columnIndex = columnIndex;
+            this.layoutVariant = layoutVariant;
+            this.isScratch = isScratch;
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            RelativeSizeAxes = Axes.X;
+            AutoSizeAxes = Axes.Y;
+            Anchor = Anchor.BottomCentre;
+            Origin = Anchor.BottomCentre;
+
+            InternalChildren =
+            [
+                new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = isScratch ? Color4.DarkSlateBlue.Opacity(0.55f) : Color4.White.Opacity(0.08f),
+                    Height = 60,
+                },
+                light = new Box
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 60,
+                    Colour = Color4.White.Opacity(0.45f),
+                    Blending = BlendingParameters.Additive,
+                    Alpha = 0,
+                },
+            ];
+        }
+
+        public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
+        {
+            if (BmsKeyBindingConfiguration.ActionToColumn(e.Action, layoutVariant) != (int?)columnIndex)
+                return false;
+
+            light.FadeIn(10);
+            return false;
+        }
+
+        public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
+        {
+            if (BmsKeyBindingConfiguration.ActionToColumn(e.Action, layoutVariant) != (int?)columnIndex)
+                return;
+
+            light.FadeOut(120);
         }
     }
 }
