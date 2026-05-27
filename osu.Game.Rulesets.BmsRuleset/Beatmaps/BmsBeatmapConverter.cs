@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -49,6 +49,9 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
         if (!hasBmsData)
             remapColumns(converted);
+
+        // Stamp the chart-level #RANK onto every hit object so CreateHitWindows() has it.
+        stampRankOnHitObjects(converted);
 
         return converted;
     }
@@ -110,6 +113,12 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             measures,
             [new BmsBpmEvent(0, 130, 0)],
             []);
+    }
+
+    private static void stampRankOnHitObjects(BmsBeatmap beatmap)
+    {
+        foreach (var hitObject in beatmap.HitObjects)
+            hitObject.BmsRank = beatmap.Rank;
     }
 
     private bool tryCopyBmsData(BmsBeatmap converted)

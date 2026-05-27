@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -7,6 +7,8 @@ public sealed record BmsParseResult(
     string? Artist,
     string? Source,
     float? OverallDifficulty,
+    int Rank,
+    double Total,
     int TickResolution,
     BmsTimingMap TimingMap,
     BmsLayoutVariant LayoutVariant,

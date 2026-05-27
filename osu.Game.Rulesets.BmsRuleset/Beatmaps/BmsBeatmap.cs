@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -13,6 +13,15 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
     public int TotalColumns { get; set; }
 
     public BmsLayoutVariant LayoutVariant { get; set; } = BmsLayoutVariant.Bms5K;
+
+    /// <summary>BMS #RANK value: 0=Very Hard, 1=Hard, 2=Normal (default), 3=Easy, 4=Very Easy.</summary>
+    public int Rank { get; set; } = 2;
+
+    /// <summary>
+    ///     BMS #TOTAL value: gauge recovery coefficient.
+    ///     Zero means the default formula applies.
+    /// </summary>
+    public double Total { get; set; } = 0;
 
     public BmsTimingMap? TimingMap { get; set; }
 

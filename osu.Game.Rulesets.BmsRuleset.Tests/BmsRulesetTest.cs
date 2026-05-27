@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -23,7 +23,9 @@ using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Tests.Beatmaps;
 using osuTK.Graphics;
@@ -384,6 +386,75 @@ public class BmsRulesetTest
         Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
             Is.EqualTo("Note/Note-1H"));
     }
+    [Test]
+    public void TestHitWindowDefaultRankIsNormal()
+    {
+        // RANK 2 (Normal): perfect=18, great=40, good=100, ok/meh/miss=200
+        var windows = new BmsHitWindows();
+        windows.SetDifficulty(5); // OD ignored for BMS windows
+
+        Assert.That(windows.WindowFor(HitResult.Perfect), Is.EqualTo(18).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Great), Is.EqualTo(40).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Good), Is.EqualTo(100).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Ok), Is.EqualTo(200).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Meh), Is.EqualTo(200).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Miss), Is.EqualTo(200).Within(0.001));
+    }
+
+    [Test]
+    [TestCase(0, 8,  24,  40)]   // RANK 0 - Very Hard
+    [TestCase(1, 15, 30,  60)]   // RANK 1 - Hard
+    [TestCase(2, 18, 40,  100)]  // RANK 2 - Normal
+    [TestCase(3, 21, 60,  120)]  // RANK 3 - Easy
+    [TestCase(4, 21, 60,  200)]  // RANK 4 - Very Easy
+    public void TestHitWindowRank(int rank, double expectedPerfect, double expectedGreat, double expectedGood)
+    {
+        var windows = new BmsHitWindows(rank);
+        windows.SetDifficulty(5); // OD value is irrelevant for BMS windows
+
+        Assert.That(windows.WindowFor(HitResult.Perfect), Is.EqualTo(expectedPerfect).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Great), Is.EqualTo(expectedGreat).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Good), Is.EqualTo(expectedGood).Within(0.001));
+        // BAD (Ok), POOR (Meh), and Miss are all 200 ms for every rank
+        Assert.That(windows.WindowFor(HitResult.Ok), Is.EqualTo(200).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Meh), Is.EqualTo(200).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Miss), Is.EqualTo(200).Within(0.001));
+    }
+
+    [Test]
+    public void TestBmsRankParsedFromChart()
+    {
+        // Rank parsing is tested end-to-end via the decoder.
+        // Direct BmsChartParser access is internal; see BmsBeatmapDecoderTest for coverage.
+        Assert.Pass("Rank parsing is covered by BmsBeatmapDecoderTest.TestRankParsedFromChart.");
+    }
+
+    [Test]
+    public void TestBmsRankDefaultWhenAbsent()
+    {
+        // Default rank tested end-to-end via the decoder; see BmsBeatmapDecoderTest.
+        Assert.Pass("Default rank is covered by BmsBeatmapDecoderTest.TestRankDefaultsToNormalWhenAbsent.");
+    }
+
+    [Test]
+    public void TestBmsRankStampedOnHitObject()
+    {
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            Rank = 1,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+            },
+        };
+        var converter = ruleset.CreateBeatmapConverter(beatmap);
+        var converted = (BmsBeatmap)converter.Convert();
+
+        Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(1));
+    }
+
 
     [Test]
     public void TestMetadata()
@@ -391,5 +462,270 @@ public class BmsRulesetTest
         Assert.That(ruleset.ShortName, Is.EqualTo("bms"));
         Assert.That(ruleset.Description, Is.EqualTo("BMS Ruleset"));
         Assert.That(ruleset.RulesetAPIVersionSupported, Is.Not.Null.And.Not.Empty);
+    }
+
+    [Test]
+    public void TestScoreProcessorBaseScoreIsPgreatTwo()
+    {
+        var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
+
+        Assert.That(processor.GetBaseScoreForResult(HitResult.Perfect), Is.EqualTo(2));
+        Assert.That(processor.GetBaseScoreForResult(HitResult.Great), Is.EqualTo(1));
+        Assert.That(processor.GetBaseScoreForResult(HitResult.Good), Is.EqualTo(0));
+        Assert.That(processor.GetBaseScoreForResult(HitResult.Ok), Is.EqualTo(0));
+        Assert.That(processor.GetBaseScoreForResult(HitResult.Meh), Is.EqualTo(0));
+        Assert.That(processor.GetBaseScoreForResult(HitResult.Miss), Is.EqualTo(0));
+    }
+
+    [Test]
+    [TestCase(1.0,           ScoreRank.X)]  // All PGREAT
+    [TestCase(8.0 / 9.0,    ScoreRank.S)]  // AAA
+    [TestCase(7.0 / 9.0,    ScoreRank.A)]  // AA
+    [TestCase(6.0 / 9.0,    ScoreRank.B)]  // A
+    [TestCase(5.0 / 9.0,    ScoreRank.C)]  // B
+    [TestCase(4.0 / 9.0,    ScoreRank.D)]  // below
+    public void TestScoreProcessorRankFromAccuracy(double accuracy, ScoreRank expectedRank)
+    {
+        var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
+
+        // Build result dict with just misses/perfects, using accuracy to differentiate.
+        // All PGREATs (accuracy==1.0) → X; otherwise use generic non-all-perfect results.
+        var results = new Dictionary<HitResult, int>();
+        if (accuracy < 1.0)
+            results[HitResult.Miss] = 1; // Ensures not all-PGREAT for non-X ranks.
+
+        var rank = processor.RankFromScore(accuracy, results);
+
+        Assert.That(rank, Is.EqualTo(expectedRank));
+    }
+
+    [Test]
+    public void TestScoreProcessorRankXRequiresNoNonPgreat()
+    {
+        var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
+
+        // Even at accuracy=1.0, if there's a GREAT it shouldn't be X.
+        var resultsWithGreat = new Dictionary<HitResult, int> { [HitResult.Great] = 1 };
+        var rank = processor.RankFromScore(1.0, resultsWithGreat);
+
+        // With GREAT present at accuracy=1.0 (impossible in practice, but we test the guard)
+        // the guard checks for non-perfect results; this should NOT be X.
+        Assert.That(rank, Is.Not.EqualTo(ScoreRank.X));
+    }
+
+    [Test]
+    public void TestGaugeInitialHealthIsTwentyPercent()
+    {
+        var processor = (BmsHealthProcessor)ruleset.CreateHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        Assert.That(processor.Health.Value, Is.EqualTo(0.2).Within(0.001));
+    }
+
+    [Test]
+    public void TestGaugePgreatGainDrivenByTotal()
+    {
+        // With #TOTAL=200 and 1 note: pgreat gain = 200/100/1 = 2.0 (capped at Health.MaxValue=1).
+        // We verify the computed per-note gain is TOTAL/(100*N).
+        var processor = (BmsHealthProcessor)ruleset.CreateHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            Total = 200,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        // After one PGREAT the health should increase by total/100/noteCount = 200/100/1 = 2.0,
+        // but Health is capped at MaxValue=1 so the observable result is 1.0.
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        {
+            Type = HitResult.Perfect,
+        });
+
+        Assert.That(processor.Health.Value, Is.EqualTo(1.0).Within(0.001));
+    }
+
+    [Test]
+    public void TestGaugeMissReducesHealthByFourPointEightPercent()
+    {
+        var processor = (BmsHealthProcessor)ruleset.CreateHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            // Small #TOTAL so PGREAT gain is negligible for this test.
+            Total = 10,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+                new BmsHitObject { StartTime = 2000, Column = 2 },
+            },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        var initialHealth = processor.Health.Value;
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        {
+            Type = HitResult.Miss,
+        });
+
+        // Miss = −4.8%, but clamped at 0.
+        var expectedHealth = Math.Max(0.0, initialHealth - 0.048);
+        Assert.That(processor.Health.Value, Is.EqualTo(expectedHealth).Within(0.001));
+    }
+
+    [Test]
+    public void TestGaugeBadReducesHealthByThreePointTwoPercent()
+    {
+        var processor = (BmsHealthProcessor)ruleset.CreateHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            Total = 10, // Small #TOTAL so PGREAT gain is negligible.
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+                new BmsHitObject { StartTime = 2000, Column = 2 },
+            },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        var initialHealth = processor.Health.Value;
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        {
+            Type = HitResult.Ok, // BAD
+        });
+
+        // BAD = −3.2%, but clamped at 0.
+        var expectedHealth = Math.Max(0.0, initialHealth - 0.032);
+        Assert.That(processor.Health.Value, Is.EqualTo(expectedHealth).Within(0.001));
+    }
+
+    [Test]
+    public void TestScoreProcessorBadBreaksCombo()
+    {
+        // BAD (Ok) must reset combo to 0 in BMS, even though HitResult.Ok.IsHit() = true in osu!.
+        var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+                new BmsHitObject { StartTime = 2000, Column = 2 },
+                new BmsHitObject { StartTime = 3000, Column = 3 },
+            },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        // Two PGREATs → combo 2.
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+            { Type = HitResult.Perfect });
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
+            { Type = HitResult.Perfect });
+        Assert.That(processor.Combo.Value, Is.EqualTo(2));
+
+        // BAD (Ok) → combo must reset to 0.
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[2], beatmap.HitObjects[2].CreateJudgement())
+            { Type = HitResult.Ok });
+        Assert.That(processor.Combo.Value, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void TestScoreProcessorPoorBreaksCombo()
+    {
+        // POOR (Meh) must reset combo to 0 in BMS, even though HitResult.Meh.IsHit() = true in osu!.
+        var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+                new BmsHitObject { StartTime = 2000, Column = 2 },
+                new BmsHitObject { StartTime = 3000, Column = 3 },
+            },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        // Two PGREATs → combo 2.
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+            { Type = HitResult.Perfect });
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
+            { Type = HitResult.Perfect });
+        Assert.That(processor.Combo.Value, Is.EqualTo(2));
+
+        // POOR (Meh) → combo must reset to 0.
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[2], beatmap.HitObjects[2].CreateJudgement())
+            { Type = HitResult.Meh });
+        Assert.That(processor.Combo.Value, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void TestScoreProcessorRankNeverF()
+    {
+        // In BMS, ScoreRank.F is never assigned from accuracy — fail is gauge-only.
+        var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
+        var results = new Dictionary<HitResult, int> { [HitResult.Miss] = 100 };
+
+        // Even at accuracy 0 the lowest rank should be D, not F.
+        var rank = processor.RankFromScore(0.0, results);
+        Assert.That(rank, Is.Not.EqualTo(ScoreRank.F));
+        Assert.That(rank, Is.EqualTo(ScoreRank.D));
+    }
+
+    [Test]
+    public void TestGaugeClearConditionPassesAtEightyPercent()
+    {
+        // Normal gauge clear: ≥ 80% at song end → no failure.
+        var processor = (BmsHealthProcessor)ruleset.CreateHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            Total = 400, // Large enough that one PGREAT reaches ≥ 80%.
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        // One PGREAT: gain = 400/100/1 = 4.0, capped → health = 1.0.
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+            { Type = HitResult.Perfect });
+
+        Assert.That(processor.HasFailed, Is.False);
+        Assert.That(processor.Health.Value, Is.GreaterThanOrEqualTo(0.8));
+    }
+
+    [Test]
+    public void TestGaugeClearConditionFailsBelowEightyPercent()
+    {
+        // Normal gauge clear: < 80% at last note → failure must be triggered.
+        var processor = (BmsHealthProcessor)ruleset.CreateHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            Total = 10, // Small TOTAL so PGREAT gain is negligible; health stays near initial 20%.
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        // One PGREAT with tiny gain: health = 0.20 + 0.001 ≈ 0.201, well below 0.80.
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+            { Type = HitResult.Perfect });
+
+        Assert.That(processor.Health.Value, Is.LessThan(0.8));
+        Assert.That(processor.HasFailed, Is.True);
     }
 }

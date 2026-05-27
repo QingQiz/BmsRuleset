@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -56,6 +56,8 @@ static internal partial class BmsChartParser
             state.Artist,
             state.Source,
             state.OverallDifficulty,
+            state.Rank,
+            state.Total,
             tickResolution,
             timingMap,
             layoutVariant,
@@ -131,6 +133,16 @@ static internal partial class BmsChartParser
             case "LNTYPE":
                 if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnType))
                     state.LnType = lnType;
+                break;
+
+            case "RANK":
+                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rank) && rank >= 0 && rank <= 4)
+                    state.Rank = rank;
+                break;
+
+            case "TOTAL":
+                if (tryParseDouble(value, out var total) && total > 0)
+                    state.Total = total;
                 break;
 
             case "PLAYER":
@@ -564,6 +576,12 @@ static internal partial class BmsChartParser
         public double InitialBpm { get; set; } = 130;
 
         public int LnType { get; set; } = 1;
+
+        // Default RANK 2 = NORMAL per BMS spec.
+        public int Rank { get; set; } = 2;
+
+        /// <summary>BMS #TOTAL value: gauge recovery coefficient. Zero means use the default formula.</summary>
+        public double Total { get; set; } = 0;
 
         public int? PlayerMode { get; set; }
 

@@ -24,14 +24,14 @@ Current state:
 - `BmsInputManager` provides native action binding infrastructure.
 - `BmsPlayfield` routes layout-specific actions for 5K, 7K, 5K DP, 7K DP, PMS 9K, and PMS DP to columns and can judge top-level visible tap notes.
 - `DrawableBmsHitObject.TryHit()` applies user-triggered timing-window results; passive misses still apply after the miss window.
-- There is no full key state handling, key beams, LN release judgement, or column hit queues.
-- Key press triggers the next lane sample independently from judgement, matching BMS key-sound behaviour more closely than osu! hit sounds.
+- `OnPressed` now selects the earliest unjudged in-window note in the column (by `StartTime`), ensuring strict sequential ordering and preventing a later note from being hit before an earlier one.
+- `OnReleased` similarly selects the earliest held LN in the release window (by `EndTime`).
+- `CheckForResult` now anchors the LN release-miss to `EndTime` (not `StartTime`), fixing a bug where long notes would be passively failed during their body duration. LN drop (held but never released past `EndTime + missWindow`) correctly applies `HitResult.Miss`.
+- There is no full key state handling or key beams. Scratch/turntable semantics are column-routing only.
 
 TODO:
 
-- Replace the temporary alive-object scan with explicit column hit queues.
 - Add scratch turntable semantics beyond column routing.
-- Add LN hold/release input semantics.
 - Extend replay/autoplay for LN releases and future branch decisions.
 
 ### Renderer Is Time-Based Placeholder, Not Tick-Based BMS
@@ -75,22 +75,33 @@ Files:
 
 Current state:
 
-- `BmsHitWindows` uses placeholder OD-derived windows.
-- `#RANK` and `#EXRANK` are not parsed into hit windows.
-- `BmsScoreProcessor` uses a generic osu!-style formula and `Perfect = 305` compatibility-style base score.
-- EX-score, PG/GR/GD/BD/POOR style BMS result semantics are not modelled.
-- Combo and rank logic are not BMS gauge/clear based.
-- `GetValidHitResults()` exposes osu! result names (`Perfect`, `Great`, `Good`, `Ok`, `Meh`, `Miss`) rather than a native BMS result model.
+- `BmsHitWindows` uses LR2 hit windows driven by `#RANK` (0–4). Beatoraja windows are fully documented in comments as an alternative. `SetDifficulty` ignores OD.
+- `#RANK` is parsed and stamped per-object (`BmsHitObject.BmsRank`); each object creates its own `BmsHitWindows(BmsRank)`.
+- `BmsResultFor` implements asymmetric early/late windows: Early POOR zone (−1000 to −200 ms) returns `Miss`; beyond −1000 ms returns `None` (Empty POOR territory).
+- `BmsScoreProcessor` implements EX-score: Perfect=2, Great=1, all else=0; no combo multiplier. `ComputeTotalScore = accuracy × 1,000,000`.
+- DJ LEVEL rank mapping: X (all Perfect), S≥8/9 EX, A≥7/9, B≥6/9, C≥5/9, D otherwise.
+- `GetValidHitResults()` returns all 6: Perfect/Great/Good/Ok/Meh/Miss mapping to BMS PGREAT/GREAT/GOOD/BAD/POOR/EARLY-POOR.
+- Empty POOR (press outside all note windows) breaks combo and drains gauge via `RegisterEmptyPoor` on both processors.
+
+Known combo-break mismatches vs native BMS (osu! framework constraint):
+
+- **BAD → `Ok`**: `HitResult.Ok.IsHit()` returns `true` in osu!, so `Ok` increases combo, not breaks it. BMS BAD must break combo.
+- **POOR → `Meh`**: `HitResult.Meh.IsHit()` returns `true` in osu!, so `Meh` increases combo, not breaks it. BMS POOR must break combo.
+- **EARLY POOR → `Miss`**: `Miss` correctly breaks combo. However, native BMS EARLY POOR does not break combo. Documented accepted mismatch.
+
+Pass/fail mismatch:
+
+- **`ScoreRank.F`** is assigned by the base `ScoreProcessor` when accuracy drops below a threshold. BMS pass/fail is gauge-only (Normal gauge: ≥ 80% at song end). The accuracy-based F rank is currently incorrect.
 
 TODO:
 
-- Parse and apply `#RANK` / `#EXRANK`.
-- Decide native BMS judgement result mapping and display names.
-- Implement EX-score and BMS score calculations.
-- Implement clear lamps/rank rules separately from osu! rank rules.
-- Add tests for RANK/EXRANK windows and EX-score outcomes.
+- Force-break combo on `Ok` (BAD) and `Meh` (POOR) results in `BmsScoreProcessor` by overriding `ApplyResultInternal`.
+- Override `RankFromScore` to never return `ScoreRank.F`; fail state is gauge-only.
+- Implement clear lamp logic driven by `BmsHealthProcessor.Health` at song end (≥ 80% = clear, < 80% = fail/no-clear).
+- Parse and apply `#EXRANK`.
+- Add display name aliases for BMS judgement labels (PGREAT, GREAT, etc.) in HUD.
 
-### Gauge/Health Is Placeholder
+### Gauge/Health
 
 Files:
 
@@ -98,17 +109,23 @@ Files:
 
 Current state:
 
-- Passive drain is disabled by returning `0` from `ComputeDrainRate()`.
-- Hit/miss gauge deltas are hardcoded generic formulas using osu! `DrainRate`.
-- Long-note head/tail/nested miss semantics are not native.
-- Normal, easy, hard, ex-hard, hazard, course, PMS, and DP gauge behaviours are not implemented.
+- Passive drain is disabled (`ComputeDrainRate()` returns 0).
+- `BmsHealthProcessor` implements the BMS Normal gauge: starts at 20%, discrete hit deltas driven by `#TOTAL`. PGREAT +`total/100/N`, GREAT ×0.5 of that, GOOD ×0.2, BAD (Ok) −3.2%, POOR/MISS (Meh/Miss) −4.8%.
+- Default `#TOTAL` formula `max(7.605×N/(0.01×N+6.5), 160)` used when `#TOTAL` is absent from chart.
+- `#TOTAL` parsing pipeline is complete: BmsParser → BmsParseResult → IBmsBeatmap → BmsBeatmap → BmsDecodedBeatmap.
+- Empty POOR gauge drain implemented via `RegisterEmptyPoor` (−4.8%, no note consumed).
+- `CheckDefaultFailCondition` from the base `HealthProcessor` triggers failure at `Health ≤ 0`. This is the Hazard gauge rule, not Normal gauge. For Normal gauge, the player may drop below 80% mid-song and recover; failure only occurs if gauge reaches 0.
+- Long-note drop records `HitResult.Miss` instead of `HitResult.Meh`; both map to −4.8% so the delta is correct but the result type is semantically wrong (drop = POOR, not EARLY POOR).
+- Easy, hard, ex-hard, hazard, course, PMS, and DP gauge behaviours are not implemented.
+- Normal gauge clear condition (≥ 80% at final note) is not enforced; a player finishing at 5% health is not failed.
 
 TODO:
 
-- Model BMS gauges explicitly.
-- Parse/import `#TOTAL` and use it in gauge calculation.
-- Implement gauge modifiers and clear conditions.
-- Add tests for normal/easy/hard/ex-hard gauge transitions and LN misses.
+- Enforce Normal gauge clear condition: trigger failure if `Health < 0.8` at song end (after the last note is judged).
+- Fix LN drop result type: use `HitResult.Meh` instead of `HitResult.Miss` in `DrawableBmsHitObject.CheckForResult` for the drop path.
+- Model LN-specific gauge events (head miss vs. drop vs. tail miss).
+- Implement easy/hard/ex-hard/hazard gauge variants and gauge-selection mods.
+- Add course gauge continuity.
 
 ## Parser And Timing Gaps
 

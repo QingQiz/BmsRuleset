@@ -12,6 +12,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
@@ -52,6 +53,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
+    [Resolved(CanBeNull = true)]
+    private BmsHealthProcessor? healthProcessor { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private BmsScoreProcessor? scoreProcessor { get; set; }
+
     public BmsPlayfield(IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K, bool isAutoplay = false)
     {
         this.hitObjects = hitObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
@@ -90,13 +97,27 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         playNextKeySound(column.Value);
 
+        // Use the earliest unjudged note in this column that is within a hit window.
+        // Picking by StartTime (not by distance) ensures strict sequential ordering:
+        // a later note can never be hit before an earlier one in the same column.
         var target = HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
-            .Where(d => !d.Judged && d.HitObject.Column == column.Value)
-            .OrderBy(d => Math.Abs(Time.Current - d.HitObject.StartTime))
-            .FirstOrDefault(d => d.HitObject.HitWindows.ResultFor(Time.Current - d.HitObject.StartTime) != HitResult.None);
+            .Where(d => !d.Judged && d.HitObject.Column == column.Value
+                        && d.HitObject.HitWindows is BmsHitWindows w
+                        && w.BmsResultFor(Time.Current - d.HitObject.StartTime) != HitResult.None)
+            .MinBy(d => d.HitObject.StartTime);
 
-        return target?.TryHit() == true;
+        if (target?.TryHit() == true)
+            return true;
+
+        // No note was consumed. Check whether this press falls inside the Empty POOR zone:
+        // a press earlier than −early_poor_window ms before every unjudged note in this
+        // column (or when there are no remaining notes at all).
+        // Empty POOR: combo break + gauge penalty, but no note is consumed.
+        if (!IsAutoplay)
+            registerEmptyPoor();
+
+        return false;
     }
 
     public void PressColumn(int column)
@@ -114,11 +135,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (column == null || column.Value >= TotalColumns)
             return;
 
+        // Release: find the earliest LN in this column that is held and within the release window.
         HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
-            .Where(d => !d.Judged && d.HitObject.IsLongNote && d.HitObject.Column == column.Value)
-            .OrderBy(d => Math.Abs(Time.Current - d.HitObject.EndTime))
-            .FirstOrDefault(d => d.HitObject.HitWindows.ResultFor(Time.Current - d.HitObject.EndTime) != HitResult.None)
+            .Where(d => !d.Judged && d.HitObject.IsLongNote && d.HitObject.Column == column.Value
+                        && d.HitObject.HitWindows.ResultFor(Time.Current - d.HitObject.EndTime) != HitResult.None)
+            .MinBy(d => d.HitObject.EndTime)
             ?.TryRelease();
     }
 
@@ -159,6 +181,21 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             AutoSizeAxes = Axes.Both,
         });
     }
+
+    // ── EMPTY POOR ────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Fires an Empty POOR: a keypress that found no note to consume.
+    ///     Breaks combo and drains gauge by the same amount as a normal POOR,
+    ///     but does not register a <see cref="JudgementResult"/> against any note.
+    /// </summary>
+    private void registerEmptyPoor()
+    {
+        scoreProcessor?.RegisterEmptyPoor();
+        healthProcessor?.RegisterEmptyPoor();
+    }
+
+    // ── KEY SOUND ─────────────────────────────────────────────────────────
 
     private void playNextKeySound(int column)
     {

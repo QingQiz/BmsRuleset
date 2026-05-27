@@ -5,6 +5,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Judgements;
@@ -46,7 +47,8 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (Judged || HitObject?.HitWindows == null)
             return false;
 
-        var result = HitObject.HitWindows.ResultFor(Time.Current - HitObject.StartTime);
+        var bmsWindows = (BmsHitWindows)HitObject.HitWindows;
+        var result = bmsWindows.BmsResultFor(Time.Current - HitObject.StartTime);
 
         if (result == HitResult.None)
             return false;
@@ -66,7 +68,8 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (Judged || HitObject?.HitWindows == null || !HitObject.IsLongNote || !longNoteStarted)
             return false;
 
-        var result = HitObject.HitWindows.ResultFor(Time.Current - HitObject.EndTime);
+        var bmsWindows = (BmsHitWindows)HitObject.HitWindows;
+        var result = bmsWindows.BmsResultFor(Time.Current - HitObject.EndTime);
 
         if (result == HitResult.None)
             return false;
@@ -164,13 +167,34 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (userTriggered || HitObject.HitWindows == null)
             return;
 
-        if (HitObject.IsLongNote && !longNoteStarted && Time.Current > HitObject.StartTime + HitObject.HitWindows.WindowFor(HitResult.Miss))
+        var missWindow = HitObject.HitWindows.WindowFor(HitResult.Miss);
+
+        if (HitObject.IsLongNote)
         {
-            ApplyResult(HitResult.Miss);
+            // LN head never pressed: miss once the head window is exhausted.
+            if (!longNoteStarted && Time.Current > HitObject.StartTime + missWindow)
+            {
+                ApplyResult(HitResult.Miss);
+                return;
+            }
+
+            // LN held but player never released before the tail miss window expired:
+            // this is a "drop" — in BMS it scores POOR (= Miss result).
+            // We anchor the miss check to EndTime so the LN body duration does not
+            // accidentally trigger the miss that is meant for the tail.
+            if (longNoteStarted && Time.Current > HitObject.EndTime + missWindow)
+            {
+                ApplyResult(HitResult.Miss);
+                return;
+            }
+
+            // For an in-progress LN the framework-supplied timeOffset is relative to
+            // StartTime; do not apply the generic miss check below until the tail window.
             return;
         }
 
-        if (timeOffset > HitObject.HitWindows.WindowFor(HitResult.Miss))
+        // Normal note: miss once head miss window is passed.
+        if (timeOffset > missWindow)
             ApplyResult(HitResult.Miss);
     }
 

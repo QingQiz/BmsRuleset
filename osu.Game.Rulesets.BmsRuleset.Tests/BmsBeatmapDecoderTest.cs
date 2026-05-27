@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using System.Text;
 using NUnit.Framework;
@@ -335,5 +335,81 @@ public class BmsBeatmapDecoderTest
         Assert.That(second.SampleKey, Is.EqualTo("02"));
         Assert.That(second.TickInfo.Tick, Is.EqualTo(288));
         Assert.That(second.StartTime, Is.EqualTo(3000).Within(0.001));
+    }
+
+    [Test]
+    public void TestRankParsedFromChart()
+    {
+        var beatmap = decode("""
+                             #RANK 1
+                             #TITLE Test
+                             #BPM 130
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Rank, Is.EqualTo(1));
+        Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestRankDefaultsToNormalWhenAbsent()
+    {
+        var beatmap = decode("""
+                             #TITLE Test
+                             #BPM 130
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Rank, Is.EqualTo(2)); // NORMAL
+        Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(2));
+    }
+
+    [Test]
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void TestRankPreservedForAllValidValues(int rank)
+    {
+        var beatmap = decode($"#RANK {rank}\n#BPM 130\n#00111:01");
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Rank, Is.EqualTo(rank));
+    }
+
+    [Test]
+    public void TestTotalParsedFromChart()
+    {
+        var beatmap = decode("""
+                             #TOTAL 250
+                             #BPM 130
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Total, Is.EqualTo(250).Within(0.001));
+    }
+
+    [Test]
+    public void TestTotalDefaultsToZeroWhenAbsent()
+    {
+        var beatmap = decode("""
+                             #BPM 130
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Total, Is.EqualTo(0).Within(0.001));
+    }
+
+    [Test]
+    public void TestTotalPreservesDecimalValue()
+    {
+        var beatmap = decode($"#TOTAL 160.5\n#BPM 130\n#00111:01");
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Total, Is.EqualTo(160.5).Within(0.001));
     }
 }
