@@ -8,6 +8,10 @@ Native osu! ruleset plugin for BMS-family charts. Do not reintroduce `ppy.osu.Ga
 - If missing, clone `https://github.com/ppy/osu.git` and `https://github.com/ppy/osu-framework.git`; community rulesets are linked from `https://github.com/ppy/osu/discussions/13096`.
 - Trust csproj/sln/tests over docs when they disagree.
 
+## Ruleset Rules
+
+- Background Sample and KeySound volumes should NOT be effected by the effect volume of global volume settings.
+
 ## Commands
 
 - Build plugin: `dotnet build "osu.Game.Rulesets.BmsRuleset"`

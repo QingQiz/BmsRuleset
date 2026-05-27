@@ -146,7 +146,15 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     /// </summary>
     private partial class BmsBackgroundAudioPlayer(IReadOnlyList<BgmEvent> sortedEvents) : SkinReloadableDrawable
     {
+        /// <summary>Maximum age of a BGM event that will still be played on a normal (non-seek) frame.</summary>
         private const double allowable_late_start = 100;
+
+        /// <summary>
+        ///     On a seek (clock jumped by more than <see cref="allowable_late_start"/>), rewind
+        ///     <see cref="nextIndex"/> this many ms before the target time so events near the
+        ///     seek destination are replayed from their beginning (SampleChannel cannot seek).
+        /// </summary>
+        private const double seek_lookback = 3000;
 
         private readonly BindableBool isPaused = new();
         private readonly BindableDouble pauseFrequency = new(1);
@@ -221,27 +229,36 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
                 previousTime = Time.Current;
             }
 
-            bool clockJumped = Time.Current - previousTime > allowable_late_start;
+            double delta = Time.Current - previousTime;
             previousTime = Time.Current;
 
-            if (clockJumped)
+            // ── Seek detection ───────────────────────────────────────────────────────
+            // Large delta means the clock jumped (intro skip, replay scrub, etc.).
+            // Stop any in-flight channels and rewind nextIndex to SEEK_LOOKBACK before
+            // the new position so events near the target are replayed from their start.
+            bool seeked = Math.Abs(delta) > allowable_late_start;
+
+            if (seeked)
             {
                 stopAll();
-                // Advance past events whose window has now elapsed.
+                nextIndex = 0;
+
                 while (nextIndex < sortedEvents.Count
-                       && sortedEvents[nextIndex].Time < Time.Current - allowable_late_start)
+                       && sortedEvents[nextIndex].Time < Time.Current - seek_lookback)
                     nextIndex++;
             }
 
             if (isPaused.Value)
                 return;
 
+            double tolerance = seeked ? seek_lookback : allowable_late_start;
+
             while (nextIndex < sortedEvents.Count)
             {
                 var evt = sortedEvents[nextIndex];
                 if (Time.Current < evt.Time) break;
 
-                if (Time.Current - evt.Time < allowable_late_start)
+                if (Time.Current - evt.Time < tolerance)
                     playEvent(evt);
 
                 nextIndex++;
@@ -267,14 +284,12 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
                 return cached;
 
             ISample? sample = null;
+
             foreach (var source in CurrentSkin.AllSources.Select(extractBeatmapSkin).Where(s => s != null))
             {
                 sample = source!.GetSample(evt.SampleInfo);
                 if (sample != null) break;
             }
-
-            if (sample != null)
-                bindAudioAdjustments(sample);
 
             // Cache even if null so we don't retry a missing file every frame.
             samples[evt.SampleKey] = sample;
@@ -289,37 +304,56 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
             var channel = sample.GetChannel();
             channel.ManualFree = true;
-            bindAudioAdjustments(channel);
             channel.AddAdjustment(AdjustableProperty.Frequency, pauseFrequency);
+
+            // Play() must be called before bindBgmVolumeAdjustments because Play() triggers
+            // sample.AddItem(channel) → channel.BindAdjustments(sample), which would otherwise
+            // re-add the VolumeSample chain that bindBgmVolumeAdjustments strips out.
             channel.Play();
+
+            // 1. Synchronous cleanup — covers the case where all volumes are 1.0 and the
+            //    aggregate never changes (handler below would never fire in that case, but a
+            //    factor of 1.0 from VolumeSample is harmless then, so this is belt-and-braces).
+            bindBgmVolumeAdjustments(channel);
+
+            // 2. One-shot handler — fires when the audio-thread BindAdjustments call (enqueued
+            //    by AudioCollectionManager.AddItem inside Play()) changes AggregateVolume.
+            //    It unsubscribes itself and re-strips VolumeSample from the chain.
+            Action<ValueChangedEvent<double>>? isolateOnBind = null;
+            isolateOnBind = _ =>
+            {
+                channel.AggregateVolume.ValueChanged -= isolateOnBind!;
+                bindBgmVolumeAdjustments(channel);
+            };
+            channel.AggregateVolume.ValueChanged += isolateOnBind;
+
             activeChannels.Add(new ActiveBgmChannel(channel));
         }
 
-        private void bindAudioAdjustments(IAdjustableAudioComponent component)
+        /// <summary>
+        ///     Strips all inherited volume adjustments (including the <c>VolumeSample</c> /
+        ///     effects-volume adjustment inherited through the <c>SampleStore</c> → <c>Sample</c>
+        ///     parent chain) and applies master × music-volume instead.
+        /// </summary>
+        /// <remarks>
+        ///     Called immediately after <see cref="SampleChannel.Play"/> (synchronous pass) and
+        ///     again via a one-shot <c>AggregateVolume.ValueChanged</c> handler (audio-thread pass)
+        ///     to cover the race where <c>AudioCollectionManager.AddItem</c> re-adds <c>VolumeSample</c>
+        ///     asynchronously after the synchronous cleanup.
+        ///     BGM audio (BMS channel 01) should follow the music-volume slider, not
+        ///     the effects/hitsound-volume slider.
+        /// </remarks>
+        private void bindBgmVolumeAdjustments(IAdjustableAudioComponent component)
         {
+            // RemoveAllAdjustments strips every source from the aggregate (including the
+            // parent-propagated VolumeSample) and re-adds only the component's own Volume.
             component.RemoveAllAdjustments(AdjustableProperty.Volume);
             component.AddAdjustment(AdjustableProperty.Volume, requestedVolume);
+
             if (audioManager != null)
-                component.AddAdjustment(AdjustableProperty.Volume, audioManager.AggregateVolume);
-        }
-
-        private void pauseAll()
-        {
-            pauseFrequency.Value = 0;
-            foreach (var ac in activeChannels)
-                ac.Paused = true;
-        }
-
-        private void resumeAll()
-        {
-            pauseFrequency.Value = 1;
-            foreach (var ac in activeChannels)
             {
-                if (ac.Paused && !ac.Channel.IsDisposed)
-                {
-                    ac.Channel.Play();
-                    ac.Paused = false;
-                }
+                component.AddAdjustment(AdjustableProperty.Volume, audioManager.Volume);      // master
+                component.AddAdjustment(AdjustableProperty.Volume, audioManager.VolumeTrack); // music
             }
         }
 
@@ -333,7 +367,31 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
                     ac.Channel.Dispose();
                 }
             }
+
             activeChannels.Clear();
+            pauseFrequency.Value = 1;
+        }
+
+        private void pauseAll()
+        {
+            pauseFrequency.Value = 0;
+
+            foreach (var ac in activeChannels)
+                ac.Paused = true;
+        }
+
+        private void resumeAll()
+        {
+            pauseFrequency.Value = 1;
+
+            foreach (var ac in activeChannels)
+            {
+                if (ac.Paused && !ac.Channel.IsDisposed)
+                {
+                    ac.Channel.Play();
+                    ac.Paused = false;
+                }
+            }
         }
 
         private void cleanupFinishedChannels()
@@ -341,13 +399,15 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             for (int i = activeChannels.Count - 1; i >= 0; i--)
             {
                 var ac = activeChannels[i];
+
                 if (ac.Channel.IsDisposed)
                 {
                     activeChannels.RemoveAt(i);
                     continue;
                 }
 
-                if (ac.Paused) continue;
+                if (ac.Paused)
+                    continue;
 
                 if (ac.Channel.Played && !ac.Channel.Playing)
                 {
