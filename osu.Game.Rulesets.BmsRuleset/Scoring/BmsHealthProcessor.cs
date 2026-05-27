@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
@@ -45,10 +44,25 @@ public partial class BmsHealthProcessor(double drainStartTime) : LegacyDrainingH
     private double pgreatGain;
     private bool initialized;
 
+    /// <summary>
+    ///     Applies an Empty POOR gauge penalty directly — no note is consumed.
+    ///     Empty POOR arises when a key is pressed outside every note's Early POOR window,
+    ///     so there is no judgement result to route through the normal pipeline.
+    /// </summary>
+    public void RegisterEmptyPoor()
+    {
+        ensureInitialized();
+        Health.Value = Math.Max(0, Health.Value + miss_delta);
+    }
+
     protected override double ComputeDrainRate()
     {
-        base.ComputeDrainRate();
-        return 0; // Disable passive drain; BMS uses discrete hit/miss deltas only.
+        // BMS uses discrete hit/miss deltas only — no passive drain at all.
+        // Do NOT call base.ComputeDrainRate(): it runs LegacyDrainingHealthProcessor's
+        // while(true) convergence loop which diverges for BMS charts because our
+        // pgreatGain per-note HP recovery is always less than the framework's
+        // hpRecoveryAvailable threshold (computed from DrainRate), causing an infinite loop.
+        return 0;
     }
 
     /// <summary>
@@ -80,6 +94,25 @@ public partial class BmsHealthProcessor(double drainStartTime) : LegacyDrainingH
         Health.Value = initial_health;
     }
 
+    protected override IEnumerable<HitObject> EnumerateTopLevelHitObjects() => Beatmap.HitObjects;
+
+    protected override IEnumerable<HitObject> EnumerateNestedHitObjects(HitObject hitObject) => hitObject.NestedHitObjects;
+
+    protected override double GetHealthIncreaseFor(HitObject hitObject, HitResult result)
+    {
+        ensureInitialized();
+
+        return result switch
+        {
+            HitResult.Perfect => pgreatGain,
+            HitResult.Great => pgreatGain * 0.5, // GREAT
+            HitResult.Good => pgreatGain * 0.2,  // GOOD
+            HitResult.Ok => bad_delta,           // BAD
+            HitResult.Meh => miss_delta,         // POOR (passive miss or in-range-early-press)
+            _ => 0,
+        };
+    }
+
     private void ensureInitialized()
     {
         if (initialized) return;
@@ -100,35 +133,5 @@ public partial class BmsHealthProcessor(double drainStartTime) : LegacyDrainingH
 
         // total is expressed as a percentage; convert to fraction then distribute across notes.
         pgreatGain = total / 100.0 / noteCount;
-    }
-
-    protected override IEnumerable<HitObject> EnumerateTopLevelHitObjects() => Beatmap.HitObjects;
-
-    protected override IEnumerable<HitObject> EnumerateNestedHitObjects(HitObject hitObject) => hitObject.NestedHitObjects;
-
-    protected override double GetHealthIncreaseFor(HitObject hitObject, HitResult result)
-    {
-        ensureInitialized();
-
-        return result switch
-        {
-            HitResult.Perfect => pgreatGain,
-            HitResult.Great => pgreatGain * 0.5, // GREAT
-            HitResult.Good => pgreatGain * 0.2,  // GOOD
-            HitResult.Ok => bad_delta,           // BAD
-            HitResult.Meh => miss_delta,         // POOR (passive miss or in-range-early-press)
-            _ => 0,
-        };
-    }
-
-    /// <summary>
-    ///     Applies an Empty POOR gauge penalty directly — no note is consumed.
-    ///     Empty POOR arises when a key is pressed outside every note's Early POOR window,
-    ///     so there is no judgement result to route through the normal pipeline.
-    /// </summary>
-    public void RegisterEmptyPoor()
-    {
-        ensureInitialized();
-        Health.Value = Math.Max(0, Health.Value + miss_delta);
     }
 }

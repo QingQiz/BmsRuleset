@@ -232,11 +232,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (!judgementDrawableCache.TryGetValue(result, out var drawable))
             return;
 
-        // Return the current occupant of JudgementArea to the pool (Clear(false) = remove without dispose).
-        foreach (var child in Stage.JudgementArea)
-            judgementDrawablePool.Add(child);
-
+        // Collect the current occupant(s) of JudgementArea before clearing, so we can return
+        // them to the pool.  We must clear the container FIRST — a drawable can only belong to
+        // one container, so Add-to-pool while still owned by JudgementArea would throw.
+        var evicted = Stage.JudgementArea.ToArray();
         Stage.JudgementArea.Clear(false);
+        foreach (var child in evicted)
+            judgementDrawablePool.Add(child);
 
         // Move the cached drawable into the display area and replay its animation.
         judgementDrawablePool.Remove(drawable, false);

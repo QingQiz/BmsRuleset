@@ -168,34 +168,6 @@ public sealed partial class BmsColumn : CompositeDrawable
             this.isScratch = isScratch;
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Anchor = Anchor.BottomCentre;
-            Origin = Anchor.BottomCentre;
-
-            InternalChildren =
-            [
-                new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = isScratch ? Color4.DarkSlateBlue.Opacity(0.55f) : Color4.White.Opacity(0.08f),
-                    Height = 60,
-                },
-                light = new Box
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 60,
-                    Colour = Color4.White.Opacity(0.45f),
-                    Blending = BlendingParameters.Additive,
-                    Alpha = 0,
-                },
-            ];
-        }
-
         public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
         {
             if (BmsKeyBindingConfiguration.ActionToColumn(e.Action, layoutVariant) != (int?)columnIndex)
@@ -211,6 +183,34 @@ public sealed partial class BmsColumn : CompositeDrawable
                 return;
 
             light.FadeOut(120);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            RelativeSizeAxes = Axes.X;
+            AutoSizeAxes = Axes.Y;
+            Anchor = Anchor.BottomCentre;
+            Origin = Anchor.BottomCentre;
+
+            InternalChildren =
+            [
+                new Box
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 60,
+                    Colour = isScratch ? Color4.DarkSlateBlue.Opacity(0.55f) : Color4.White.Opacity(0.08f),
+                },
+                light = new Box
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 60,
+                    Colour = Color4.White.Opacity(0.45f),
+                    Blending = BlendingParameters.Additive,
+                    Alpha = 0,
+                },
+            ];
         }
     }
 }

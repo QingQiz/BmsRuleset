@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Audio;
+using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input;
@@ -22,6 +24,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
+using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
@@ -42,9 +45,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     private readonly BindableDouble configScrollSpeed = new(8);
 
-    public static double ComputeScrollTime(double scrollSpeed) => MAX_TIME_RANGE / Math.Max(1, scrollSpeed);
-
-    public override DrawableHitObject<BmsHitObject>? CreateDrawableRepresentation(BmsHitObject h) => null;
+    private readonly record struct BgmEvent(double Time, string SampleKey, BmsSampleInfo SampleInfo);
 
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
     [Resolved(CanBeNull = true)]
@@ -55,6 +56,21 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     [Resolved(CanBeNull = true)]
     private ScoreManager? scoreManager { get; set; }
+
+    #region Disposal
+
+    protected override void Dispose(bool isDisposing)
+    {
+        if (healthProcessor != null)
+            healthProcessor.Failed -= onHealthFailed;
+        base.Dispose(isDisposing);
+    }
+
+    #endregion
+
+    public static double ComputeScrollTime(double scrollSpeed) => MAX_TIME_RANGE / Math.Max(1, scrollSpeed);
+
+    public override DrawableHitObject<BmsHitObject>? CreateDrawableRepresentation(BmsHitObject h) => null;
 
     protected override Playfield CreatePlayfield()
     {
@@ -82,6 +98,12 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         }
     }
 
+    protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);
+
+    protected override ReplayInputHandler CreateReplayInputHandler(Replay replay) => new BmsFramedReplayInputHandler(replay);
+
+    protected override ReplayRecorder CreateReplayRecorder(Score score) => new BmsReplayRecorder(score);
+
     private bool onHealthFailed()
     {
         // Do not block the fail — return true to allow it to proceed.
@@ -101,39 +123,69 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         return true;
     }
 
-    protected override void Dispose(bool isDisposing)
-    {
-        if (healthProcessor != null)
-            healthProcessor.Failed -= onHealthFailed;
-        base.Dispose(isDisposing);
-    }
-
-    protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);
-
-    protected override ReplayInputHandler CreateReplayInputHandler(Replay replay) => new BmsFramedReplayInputHandler(replay);
-
-    protected override ReplayRecorder CreateReplayRecorder(Score score) => new BmsReplayRecorder(score);
-
     [BackgroundDependencyLoader]
     private void load()
     {
         var beatmap = (BmsBeatmap)Beatmap;
 
-        foreach (var sampleEvent in beatmap.BackgroundSampleEvents.OrderBy(e => e.Time))
-        {
-            if (beatmap.SampleDefinitions.TryGetValue(sampleEvent.SampleKey, out var samplePath))
-                FrameStableComponents.Add(new BmsBackgroundSample(sampleEvent.Time, new BmsSampleInfo(samplePath)));
-        }
+        var events = beatmap.BackgroundSampleEvents
+            .OrderBy(e => e.Time)
+            .Where(e => beatmap.SampleDefinitions.ContainsKey(e.SampleKey))
+            .Select(e => new BgmEvent(e.Time, e.SampleKey, new BmsSampleInfo(beatmap.SampleDefinitions[e.SampleKey])))
+            .ToList();
+
+        if (events.Count > 0)
+            FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events));
     }
 
-    private partial class BmsBackgroundSample(double startTime, BmsSampleInfo sampleInfo) : BmsChartSampleSound(sampleInfo)
+    /// <summary>
+    ///     Single component that drives ALL BGM auto-play events.
+    ///     Replaces the old design of one <see cref="BmsChartSampleSound"/> per event,
+    ///     which created thousands of <c>SkinReloadableDrawable</c> instances and
+    ///     caused the async load to time out.
+    /// </summary>
+    private partial class BmsBackgroundAudioPlayer(IReadOnlyList<BgmEvent> sortedEvents) : SkinReloadableDrawable
     {
         private const double allowable_late_start = 100;
 
         private readonly BindableBool isPaused = new();
+        private readonly BindableDouble pauseFrequency = new(1);
+        private readonly BindableDouble requestedVolume = new(1);
 
-        private bool hasSeenClockFrame;
+        // One ISample per unique sample key – resolved lazily on first play.
+        // Null value means "looked up but not found in the beatmap skin".
+        private readonly Dictionary<string, ISample?> samples = new();
+        private readonly List<ActiveBgmChannel> activeChannels = new();
+
+        private int nextIndex;
         private double previousTime;
+        private bool hasSeenFrame;
+
+        [Resolved(CanBeNull = true)]
+        private AudioManager? audioManager { get; set; }
+
+        #region Disposal
+
+        protected override void Dispose(bool isDisposing)
+        {
+            stopAll();
+            samples.Clear();
+            base.Dispose(isDisposing);
+        }
+
+        #endregion
+
+        protected override void SkinChanged(ISkinSource skin)
+        {
+            base.SkinChanged(skin);
+
+            // Invalidate the sample cache so stale ISample references aren't used
+            // after a skin change, but do NOT load any audio files here.
+            // Actual audio loading is deferred to the first time each event fires.
+            // This keeps SkinChanged() fast whether it is called on the async-load
+            // thread or the update thread.
+            samples.Clear();
+        }
 
         protected override void LoadAsyncComplete()
         {
@@ -142,12 +194,12 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             if (this.FindClosestParent<BmsDrawableRuleset>() is { } ruleset)
             {
                 isPaused.BindTo(ruleset.IsPaused);
-                isPaused.BindValueChanged(paused =>
+                isPaused.BindValueChanged(v =>
                 {
-                    if (paused.NewValue)
-                        Pause();
+                    if (v.NewValue)
+                        pauseAll();
                     else
-                        Resume();
+                        resumeAll();
                 }, true);
             }
         }
@@ -155,7 +207,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            LifetimeStart = startTime;
+            LifetimeStart = double.MinValue;
             LifetimeEnd = double.MaxValue;
         }
 
@@ -163,43 +215,153 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         {
             base.Update();
 
-            if (!hasSeenClockFrame)
+            if (!hasSeenFrame)
             {
-                hasSeenClockFrame = true;
-                // Initialise to current time so the very first frame does not
-                // produce a spurious clock-jump when the player starts mid-song.
+                hasSeenFrame = true;
                 previousTime = Time.Current;
             }
 
-            var clockJumped = Time.Current - previousTime > allowable_late_start;
-
-            if (Time.Current < startTime)
-            {
-                if (!isPaused.Value)
-                    Stop();
-            }
-            else if (clockJumped && HasActiveChannels)
-            {
-                // The clock jumped forward (e.g. skip button) while this sample
-                // was playing.  Stop it so it doesn't continue from the wrong
-                // position.  Do NOT re-trigger it: the sample's window has passed.
-                Stop();
-            }
-            else if (!isPaused.Value && !RequestedPlaying)
-            {
-                // Only play within the 100 ms window after startTime.
-                // Do NOT use clockJumped here – a forward skip should never
-                // restart a sample that was already in the past.
-                if (Time.Current - startTime < allowable_late_start)
-                    Play();
-            }
-
+            bool clockJumped = Time.Current - previousTime > allowable_late_start;
             previousTime = Time.Current;
 
-            LifetimeStart = double.MinValue;
-            LifetimeEnd = (RequestedPlaying || HasActiveChannels || Time.Current < startTime + allowable_late_start)
-                ? double.MaxValue
-                : startTime;
+            if (clockJumped)
+            {
+                stopAll();
+                // Advance past events whose window has now elapsed.
+                while (nextIndex < sortedEvents.Count
+                       && sortedEvents[nextIndex].Time < Time.Current - allowable_late_start)
+                    nextIndex++;
+            }
+
+            if (isPaused.Value)
+                return;
+
+            while (nextIndex < sortedEvents.Count)
+            {
+                var evt = sortedEvents[nextIndex];
+                if (Time.Current < evt.Time) break;
+
+                if (Time.Current - evt.Time < allowable_late_start)
+                    playEvent(evt);
+
+                nextIndex++;
+            }
+
+            cleanupFinishedChannels();
+        }
+
+        private static LegacyBeatmapSkin? extractBeatmapSkin(ISkin skin) => skin switch
+        {
+            LegacyBeatmapSkin s => s,
+            SkinTransformer t => t.Skin as LegacyBeatmapSkin,
+            _ => null,
+        };
+
+        /// <summary>
+        ///     Returns the <see cref="ISample"/> for <paramref name="evt"/>,
+        ///     resolving it from the beatmap skin on first access and caching the result.
+        /// </summary>
+        private ISample? resolveSample(BgmEvent evt)
+        {
+            if (samples.TryGetValue(evt.SampleKey, out var cached))
+                return cached;
+
+            ISample? sample = null;
+            foreach (var source in CurrentSkin.AllSources.Select(extractBeatmapSkin).Where(s => s != null))
+            {
+                sample = source!.GetSample(evt.SampleInfo);
+                if (sample != null) break;
+            }
+
+            if (sample != null)
+                bindAudioAdjustments(sample);
+
+            // Cache even if null so we don't retry a missing file every frame.
+            samples[evt.SampleKey] = sample;
+            return sample;
+        }
+
+        private void playEvent(BgmEvent evt)
+        {
+            var sample = resolveSample(evt);
+            if (sample == null)
+                return;
+
+            var channel = sample.GetChannel();
+            channel.ManualFree = true;
+            bindAudioAdjustments(channel);
+            channel.AddAdjustment(AdjustableProperty.Frequency, pauseFrequency);
+            channel.Play();
+            activeChannels.Add(new ActiveBgmChannel(channel));
+        }
+
+        private void bindAudioAdjustments(IAdjustableAudioComponent component)
+        {
+            component.RemoveAllAdjustments(AdjustableProperty.Volume);
+            component.AddAdjustment(AdjustableProperty.Volume, requestedVolume);
+            if (audioManager != null)
+                component.AddAdjustment(AdjustableProperty.Volume, audioManager.AggregateVolume);
+        }
+
+        private void pauseAll()
+        {
+            pauseFrequency.Value = 0;
+            foreach (var ac in activeChannels)
+                ac.Paused = true;
+        }
+
+        private void resumeAll()
+        {
+            pauseFrequency.Value = 1;
+            foreach (var ac in activeChannels)
+            {
+                if (ac.Paused && !ac.Channel.IsDisposed)
+                {
+                    ac.Channel.Play();
+                    ac.Paused = false;
+                }
+            }
+        }
+
+        private void stopAll()
+        {
+            foreach (var ac in activeChannels)
+            {
+                if (!ac.Channel.IsDisposed)
+                {
+                    ac.Channel.Stop();
+                    ac.Channel.Dispose();
+                }
+            }
+            activeChannels.Clear();
+        }
+
+        private void cleanupFinishedChannels()
+        {
+            for (int i = activeChannels.Count - 1; i >= 0; i--)
+            {
+                var ac = activeChannels[i];
+                if (ac.Channel.IsDisposed)
+                {
+                    activeChannels.RemoveAt(i);
+                    continue;
+                }
+
+                if (ac.Paused) continue;
+
+                if (ac.Channel.Played && !ac.Channel.Playing)
+                {
+                    ac.Channel.Dispose();
+                    activeChannels.RemoveAt(i);
+                }
+            }
+        }
+
+        private sealed class ActiveBgmChannel(SampleChannel channel)
+        {
+            public SampleChannel Channel { get; } = channel;
+
+            public bool Paused { get; set; }
         }
     }
 }
