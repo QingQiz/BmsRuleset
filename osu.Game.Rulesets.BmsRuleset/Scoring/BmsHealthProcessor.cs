@@ -8,6 +8,8 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 
+// TODO empty health. see https://iidx.org/misc/iidx_lr2_beatoraja_diff
+
 /// <summary>
 ///     BMS-native Normal gauge health processor.
 /// </summary>
@@ -114,8 +116,7 @@ public partial class BmsHealthProcessor(double drainStartTime) : LegacyDrainingH
             HitResult.Great => pgreatGain * 0.5, // GREAT
             HitResult.Good => pgreatGain * 0.2,  // GOOD
             HitResult.Ok => bad_delta,           // BAD
-            HitResult.Meh => miss_delta,         // POOR (normal, passive)
-            HitResult.Miss => miss_delta,        // EARLY POOR / auto-miss
+            HitResult.Meh => miss_delta,         // POOR (passive miss or in-range-early-press)
             _ => 0,
         };
     }

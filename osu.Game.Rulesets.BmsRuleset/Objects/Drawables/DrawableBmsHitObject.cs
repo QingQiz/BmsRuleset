@@ -167,24 +167,22 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (userTriggered || HitObject.HitWindows == null)
             return;
 
-        var missWindow = HitObject.HitWindows.WindowFor(HitResult.Miss);
+        var missWindow = HitObject.HitWindows.WindowFor(HitResult.Ok); // BAD is the passive-miss boundary
 
         if (HitObject.IsLongNote)
         {
-            // LN head never pressed: miss once the head window is exhausted.
+            // LN head never pressed: passive POOR once the head BAD window is exhausted.
             if (!longNoteStarted && Time.Current > HitObject.StartTime + missWindow)
             {
-                ApplyResult(HitResult.Miss);
+                ApplyResult(HitResult.Meh);
                 return;
             }
 
-            // LN held but player never released before the tail miss window expired:
-            // this is a "drop" — in BMS it scores POOR (= Miss result).
-            // We anchor the miss check to EndTime so the LN body duration does not
-            // accidentally trigger the miss that is meant for the tail.
+            // LN held but player never released before the tail BAD window expired:
+            // this is a "drop" — scores POOR (Meh) in BMS.
             if (longNoteStarted && Time.Current > HitObject.EndTime + missWindow)
             {
-                ApplyResult(HitResult.Miss);
+                ApplyResult(HitResult.Meh);
                 return;
             }
 
@@ -193,9 +191,9 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             return;
         }
 
-        // Normal note: miss once head miss window is passed.
+        // Normal note: passive POOR (Meh) once the BAD window is passed with no keypress.
         if (timeOffset > missWindow)
-            ApplyResult(HitResult.Miss);
+            ApplyResult(HitResult.Meh);
     }
 
     protected override void UpdateInitialTransforms()

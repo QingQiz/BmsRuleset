@@ -4,6 +4,7 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Audio;
@@ -33,8 +34,6 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 /// </remarks>
 public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
 {
-    public const int COLUMNS_PER_PLAYER = 8;
-
     public int TotalColumns { get; }
 
     public BmsLayoutVariant LayoutVariant { get; }
@@ -50,6 +49,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     private readonly Dictionary<int, int> nextSoundIndexByColumn = new();
 
     private readonly BmsChartSampleSound keySound = new();
+
+    // Pre-built SkinnableDrawable per HitResult — created once at load, reused on every judgement
+    // display by removing from the pool container and adding to JudgementArea, then restoring on
+    // the next clear. This avoids a full skin lookup + child construction on every hit.
+    private readonly Dictionary<HitResult, SkinnableDrawable> judgementDrawableCache = new();
+
+    // Off-screen container that keeps cached drawables loaded when not shown in JudgementArea.
+    private readonly Container judgementDrawablePool;
 
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
@@ -75,6 +82,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             Stage = new BmsStage(TotalColumns, LayoutVariant),
             HitObjectContainer,
             keySound,
+            judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both },
         ];
     }
 
@@ -102,9 +110,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // a later note can never be hit before an earlier one in the same column.
         var target = HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
-            .Where(d => !d.Judged && d.HitObject.Column == column.Value
-                        && d.HitObject.HitWindows is BmsHitWindows w
-                        && w.BmsResultFor(Time.Current - d.HitObject.StartTime) != HitResult.None)
+            .Where(d => !d.Judged &&
+                        d.HitObject.Column == column.Value &&
+                        d.HitObject.HitWindows is BmsHitWindows w &&
+                        w.BmsResultFor(Time.Current - d.HitObject.StartTime) != HitResult.None)
             .MinBy(d => d.HitObject.StartTime);
 
         if (target?.TryHit() == true)
@@ -118,14 +127,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             registerEmptyPoor();
 
         return false;
-    }
-
-    public void PressColumn(int column)
-    {
-        if (column < 0 || column >= TotalColumns)
-            return;
-
-        playNextKeySound(column);
     }
 
     public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
@@ -151,6 +152,25 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         base.LoadComplete();
 
         NewResult += onNewResult;
+
+        // Pre-build one SkinnableDrawable per result type so that showJudgement() never
+        // allocates during gameplay.  HitResult.Miss is the empty-POOR display key.
+        foreach (var result in BmsRuleset.STATIC_VALID_HIT_RESULTS)
+        {
+            var drawable = new SkinnableDrawable(
+                new SkinComponentLookup<HitResult>(result),
+                r => new BmsDefaultJudgementPiece(
+                    result == HitResult.Miss
+                        ? HitResult.Meh // empty POOR shows "POOR" text
+                        : ((SkinComponentLookup<HitResult>)r).Component))
+            {
+                RelativeSizeAxes = Axes.None,
+                AutoSizeAxes = Axes.Both,
+            };
+
+            judgementDrawableCache[result] = drawable;
+            judgementDrawablePool.Add(drawable);
+        }
     }
 
     [BackgroundDependencyLoader(true)]
@@ -164,22 +184,22 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private void onNewResult(DrawableHitObject drawableHitObject, JudgementResult result)
     {
-        if (!result.IsHit || drawableHitObject is not DrawableBmsHitObject bmsHitObject)
+        if (drawableHitObject is not DrawableBmsHitObject bmsHitObject)
             return;
 
-        var column = Math.Clamp(bmsHitObject.HitObject.Column, 0, Stage.Columns.Length - 1);
-        Stage.Columns[column].HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
-            BmsSkinComponents.HitExplosion,
-            LayoutVariant,
-            column,
-            bmsHitObject.HitObject.IsLongNote)));
-
-        Stage.JudgementArea.Clear(false);
-        Stage.JudgementArea.Add(new SkinnableDrawable(new SkinComponentLookup<HitResult>(result.Type), _ => Empty())
+        // Hit explosion only on hits (not misses).
+        if (result.IsHit)
         {
-            RelativeSizeAxes = Axes.None,
-            AutoSizeAxes = Axes.Both,
-        });
+            var column = Math.Clamp(bmsHitObject.HitObject.Column, 0, Stage.Columns.Length - 1);
+            Stage.Columns[column].HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
+                BmsSkinComponents.HitExplosion,
+                LayoutVariant,
+                column,
+                bmsHitObject.HitObject.IsLongNote)));
+        }
+
+        // Show judgement text for every result type (hits and misses).
+        showJudgement(result.Type);
     }
 
     // ── EMPTY POOR ────────────────────────────────────────────────────────
@@ -188,11 +208,45 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     ///     Fires an Empty POOR: a keypress that found no note to consume.
     ///     Breaks combo and drains gauge by the same amount as a normal POOR,
     ///     but does not register a <see cref="JudgementResult"/> against any note.
+    ///     Displays the POOR image (same as a note POOR) in the judgement area.
     /// </summary>
     private void registerEmptyPoor()
     {
         scoreProcessor?.RegisterEmptyPoor();
         healthProcessor?.RegisterEmptyPoor();
+
+        // Show the POOR image. We look up HitResult.Miss, which the skin transformer
+        // maps to the same mania-hit0 image as HitResult.Meh (POOR), so both note POORs
+        // and empty POORs display identically.
+        showJudgement(HitResult.Miss);
+    }
+
+    /// <summary>
+    ///     Moves the pre-built <see cref="SkinnableDrawable"/> for <paramref name="result"/> from
+    ///     the hidden pool container into <see cref="BmsStage.JudgementArea"/> and replays its
+    ///     animation.  Any previously shown drawable is returned to the pool container so it stays
+    ///     loaded and ready for the next use.
+    /// </summary>
+    private void showJudgement(HitResult result)
+    {
+        if (!judgementDrawableCache.TryGetValue(result, out var drawable))
+            return;
+
+        // Return the current occupant of JudgementArea to the pool (Clear(false) = remove without dispose).
+        foreach (var child in Stage.JudgementArea)
+            judgementDrawablePool.Add(child);
+
+        Stage.JudgementArea.Clear(false);
+
+        // Move the cached drawable into the display area and replay its animation.
+        judgementDrawablePool.Remove(drawable, false);
+        Stage.JudgementArea.Add(drawable);
+
+        if (drawable.Drawable is IAnimatableJudgement animatable)
+        {
+            drawable.ResetAnimation();
+            animatable.PlayAnimation();
+        }
     }
 
     // ── KEY SOUND ─────────────────────────────────────────────────────────
@@ -213,7 +267,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         var index = nextSoundIndexByColumn.GetValueOrDefault(column);
 
-        while (index < hitObjects.Count && hitObjects[index].StartTime < Time.Current - 100)
+        // Skip notes that are definitely past all hit windows. Use the full BAD window (the widest
+        // late window) so we never jump over a note that is still judgeable on a late keypress.
+        while (index < hitObjects.Count && hitObjects[index].StartTime < Time.Current - BmsHitWindows.BAD_WINDOW)
             index++;
 
         while (index < hitObjects.Count)
@@ -246,7 +302,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (Time.Current > hitObject.StartTime && drawable == null)
             return true;
 
-        return Time.Current > hitObject.StartTime + hitObject.HitWindows.WindowFor(HitResult.Miss);
+        return Time.Current > hitObject.StartTime + hitObject.HitWindows.WindowFor(HitResult.Ok);
     }
 
     private sealed class BmsHitObjectLifetimeEntry : HitObjectLifetimeEntry

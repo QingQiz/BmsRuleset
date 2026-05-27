@@ -22,6 +22,9 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 
+// TODO remove osu native health bar, replace with bms native health bar, skinnable (only position)
+// TODO mine
+// TODO rank mark
 public partial class BmsLegacySkinTransformer : SkinTransformer
 {
     private const double hit_explosion_fade_in_duration = 80;
@@ -32,12 +35,13 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
 
     private static readonly (HitResult Result, LegacyManiaSkinConfigurationLookups Lookup, string Filename)[] hit_result_mappings =
     [
-        (HitResult.Perfect, LegacyManiaSkinConfigurationLookups.Hit300g, "mania-hit300g"),
-        (HitResult.Great, LegacyManiaSkinConfigurationLookups.Hit300, "mania-hit300"),
-        (HitResult.Good, LegacyManiaSkinConfigurationLookups.Hit200, "mania-hit200"),
-        (HitResult.Ok, LegacyManiaSkinConfigurationLookups.Hit100, "mania-hit100"),
-        (HitResult.Meh, LegacyManiaSkinConfigurationLookups.Hit50, "mania-hit50"),
-        (HitResult.Miss, LegacyManiaSkinConfigurationLookups.Hit0, "mania-hit0"),
+        // BMS → osu!mania legacy skin image mapping (matches LR2 / BMS convention):
+        (HitResult.Perfect, LegacyManiaSkinConfigurationLookups.Hit300g, "mania-hit300g"), // PGREAT
+        (HitResult.Great, LegacyManiaSkinConfigurationLookups.Hit300, "mania-hit300"),     // GREAT
+        (HitResult.Good, LegacyManiaSkinConfigurationLookups.Hit200, "mania-hit200"),      // GOOD
+        (HitResult.Ok, LegacyManiaSkinConfigurationLookups.Hit50, "mania-hit50"),          // BAD
+        (HitResult.Meh, LegacyManiaSkinConfigurationLookups.Hit0, "mania-hit0"),           // POOR (note consumed: passive miss or in-POOR-zone keypress)
+        (HitResult.Miss, LegacyManiaSkinConfigurationLookups.Hit0, "mania-hit0"),          // Empty POOR (keypress with no note) — same image as POOR
     ];
 
     public BmsLegacySkinTransformer(ISkin skin, IBeatmap beatmap)
@@ -198,7 +202,7 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
                 .Then().Delay(160)
                 .FadeOutFromOne(40, Easing.In);
 
-            if (result == HitResult.Miss)
+            if (result is HitResult.Meh or HitResult.Miss)
             {
                 animation.ScaleTo(1.2f).Then().ScaleTo(1, 100, Easing.Out);
                 return;

@@ -231,8 +231,8 @@ dotnet run --project "osu.Game.Rulesets.BmsRuleset.Tests"
 
 ## Phase 7: Native DrawableRuleset and Playfield
 
-- [x] 新增 `UI/BmsDrawableRuleset.cs`。
-- [x] 新增 `UI/BmsPlayfield.cs`。
+- [x] 新增 `UI/BmsDrawableRuleset.cs`。Subscribes to `HealthProcessor.Failed` via DI for failed score saving.
+- [x] 新增 `UI/BmsPlayfield.cs`。Pre-caches one `SkinnableDrawable` per `HitResult` at `LoadComplete`; reuses them on every judgement display without per-hit allocations.
 - [x] 新增 `UI/BmsColumn.cs`。
 - [x] 新增 `Objects/Drawables/DrawableBmsHitObject.cs`。
 - [x] 注册 object pool。
@@ -267,21 +267,25 @@ dotnet run --project "osu.Game.Rulesets.BmsRuleset.Tests"
 - [x] 新增 `BmsAction`。
 - [x] 新增 BMS input manager。
 - [x] 实现 layout-to-action mapping。
-- [ ] 实现 `BmsHitWindows` 不再继承 mania hit windows。
-- [ ] 实现 `#RANK` judgement preset。
+- [x] 实现 `BmsHitWindows` with `#RANK`-driven LR2 windows (not mania hit windows). `BmsHitWindows.BadWindow` exposed as `public const double` for use by other systems.
+- [x] 实现 `#RANK` judgement preset。
 - [ ] 实现 dynamic `#EXRANKxx` / channel `A0` preservation，后续接入 judgement change。
-- [x] 实现 key-sound press playback。
+- [x] 实现 key-sound press playback。`findNextSoundHitObject` skips notes more than `BadWindow` (200 ms) in the past, so late-BAD keypresses play the correct note's keysound.
 - [x] 实现 BGM autoplay playback。
-- [ ] 实现 `BmsScoreProcessor` EX score / counts。
-- [ ] 实现 `BmsGaugeProcessor` normal gauge。
+- [x] 实现 `BmsScoreProcessor` EX score / counts / DJ LEVEL / combo reset on BAD and POOR.
+- [x] 实现 `BmsHealthProcessor` Normal gauge (`#TOTAL`-driven, starts 20%, clear at ≥80% end, fail at 0).
+- [x] 实现 Empty POOR: `RegisterEmptyPoor` on both processors; POOR image displayed via pre-cached `SkinnableDrawable`.
 - [ ] 实现 hard/easy gauge mods。
 
 验收标准：
 
 - 玩家按 BMS action 命中 BMS note。
-- key sound 在 hit 时播放，BGM 自动播放。
-- score result 显示 BMS counts 和 EX score。
-- gauge 无 passive drain，按 BMS gauge 规则变化。
+- key sound 在 hit 时播放，BGM 自动播放。✓
+- Late BAD keypress plays the current note's keysound, not the next note's. ✓
+- score result 显示 BMS counts 和 EX score。✓
+- gauge 无 passive drain，按 BMS Normal gauge 规则变化。✓
+- Empty POOR breaks combo, drains gauge, shows POOR image. ✓
+- hard/easy gauge mods 待实现。
 
 测试步骤：
 

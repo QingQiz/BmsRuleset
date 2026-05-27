@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Input.Handlers;
 using osu.Game.Replays;
@@ -16,8 +18,10 @@ using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
@@ -42,6 +46,16 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     public override DrawableHitObject<BmsHitObject>? CreateDrawableRepresentation(BmsHitObject h) => null;
 
+    // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
+    [Resolved(CanBeNull = true)]
+    private HealthProcessor? healthProcessor { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private GameplayState? gameplayState { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private ScoreManager? scoreManager { get; set; }
+
     protected override Playfield CreatePlayfield()
     {
         var beatmap = (BmsBeatmap)Beatmap;
@@ -56,6 +70,42 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             config.BindWith(BmsRulesetSetting.ScrollSpeed, configScrollSpeed);
 
         configScrollSpeed.BindValueChanged(speed => ((BmsPlayfield)Playfield).TimeRange = ComputeScrollTime(speed.NewValue), true);
+
+        // BMS convention: save every play to the local DB, including failed ones.
+        // Player hard-codes SoloPlayer and has no Ruleset.CreatePlayer() hook, so we
+        // hook the HealthProcessor.Failed event from inside DrawableRuleset instead.
+        // We defer import by 500 ms so that Player.ConcludeFailedScore (which stamps
+        // ScoreInfo.Rank = F) has already run by the time we read the score.
+        if (healthProcessor != null && gameplayState != null && scoreManager != null && ReplayScore == null)
+        {
+            healthProcessor.Failed += onHealthFailed;
+        }
+    }
+
+    private bool onHealthFailed()
+    {
+        // Do not block the fail — return true to allow it to proceed.
+        // Defer import so ConcludeFailedScore (rank = F stamp) has run first.
+        Scheduler.AddDelayed(() =>
+        {
+            if (gameplayState == null || scoreManager == null)
+                return;
+
+            var scoreCopy = gameplayState.Score.ScoreInfo.DeepClone();
+            Task.Run(() => scoreManager.Import(scoreCopy))
+                .ContinueWith(
+                    t => Logger.Error(t.Exception, "BMS: failed to save failed score to database."),
+                    TaskContinuationOptions.OnlyOnFaulted);
+        }, 500);
+
+        return true;
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        if (healthProcessor != null)
+            healthProcessor.Failed -= onHealthFailed;
+        base.Dispose(isDisposing);
     }
 
     protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);

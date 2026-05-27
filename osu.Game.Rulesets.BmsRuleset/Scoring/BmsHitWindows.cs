@@ -8,15 +8,16 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         BMS six-tier judgement mapped to osu! <see cref="T:osu.Game.Rulesets.Scoring.HitResult">HitResult</see> values:
+///         BMS five-tier judgement mapped to osu! <see cref="T:osu.Game.Rulesets.Scoring.HitResult">HitResult</see> values:
 ///         <list type="table">
 ///             <item><term>PGREAT → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Perfect">HitResult.Perfect</see></term><description>Tightest window; 2 EX points.</description></item>
 ///             <item><term>GREAT  → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Great">HitResult.Great</see></term> <description>1 EX point; no combo break.</description></item>
 ///             <item><term>GOOD   → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Good">HitResult.Good</see></term>  <description>0 EX points; no combo break.</description></item>
-///             <item><term>BAD    → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Ok">HitResult.Ok</see></term>    <description>0 EX points; breaks combo in native BMS.</description></item>
-///             <item><term>POOR (normal, passive) → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Meh">HitResult.Meh</see></term><description>Note passed with no input; breaks combo.</description></item>
-///             <item><term>EARLY POOR (excess input) → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Miss">HitResult.Miss</see></term><description>Key pressed far before note window; does not break combo in native BMS but treated as auto-miss here.</description></item>
+///             <item><term>BAD    → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Ok">HitResult.Ok</see></term>    <description>0 EX points; breaks combo.</description></item>
+///             <item><term>POOR   → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Meh">HitResult.Meh</see></term>  <description>0 EX points; breaks combo. Two causes: (1) passive miss — note's BAD window expired with no keypress; (2) in-range keypress — key pressed in the POOR zone (+BAD..+poor_window ms before the note), consuming the note. Both display as "POOR".</description></item>
 ///         </list>
+///         Empty POOR (空POOR): keypress with no note in any window — handled separately via <c>RegisterEmptyPoor</c>; no <see cref="T:osu.Game.Rulesets.Judgements.JudgementResult"/> is created.
+///         <see cref="T:osu.Game.Rulesets.Scoring.HitResult.Miss"/> is not used for note judgements in BMS.
 ///     </para>
 ///     <para>
 ///         Two reference implementations exist for BMS timing windows. <b>Currently using LR2.</b>
@@ -24,7 +25,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 ///     <para>
 ///         <b>Lunatic Rave 2 (LR2)</b> — symmetric ±ms windows per <c>#RANK</c>:
 ///         <list type="table">
-///             <listheader><term>RANK</term><description>PGREAT / GREAT / GOOD / BAD  (all ±ms; POOR and EARLY POOR share the BAD boundary on the late side; EARLY POOR extends to −1000 ms on the early side)</description></listheader>
+///             <listheader><term>RANK</term><description>PGREAT / GREAT / GOOD / BAD (all ±ms). POOR zone extends from ±BAD to +poor_window ms before the note (LR2: +1000 ms). A keypress in the POOR zone consumes the note as POOR. Earlier than +poor_window ms → Empty POOR territory (keypress does not consume note).</description></listheader>
 ///             <item><term>0 Very Hard</term> <description>±8   / ±24  / ±40  / ±200</description></item>
 ///             <item><term>1 Hard</term>      <description>±15  / ±30  / ±60  / ±200</description></item>
 ///             <item><term>2 Normal</term>    <description>±18  / ±40  / ±100 / ±200</description></item>
@@ -79,16 +80,19 @@ public class BmsHitWindows : HitWindows
     //   RANK 4: −350 / +275 ms
     // Beatoraja Empty POOR: early = −500 ms, late = +150 ms (all ranks).
 
-    private const double bad_poor_window = 200; // LR2 BAD / POOR outer boundary (late side)
+    /// <summary>BAD window half-width (±ms). Also the boundary for passive POOR and the POOR zone outer edge.</summary>
+    public const double BAD_WINDOW = 200; // LR2 BAD outer boundary (±ms)
+
+    private const double bad_poor_window = BAD_WINDOW;
 
     /// <summary>
-    ///     Early POOR window: a keypress between −<see cref="bad_poor_window"/> ms and
-    ///     −<see cref="early_poor_window"/> ms <em>before</em> the note consumes the note as
-    ///     <see cref="HitResult.Miss"/> (EARLY POOR / combo break).
-    ///     Presses earlier than −<see cref="early_poor_window"/> ms return
-    ///     <see cref="HitResult.None"/> so the playfield can register an Empty POOR instead.
+    ///     POOR zone: a keypress between +<see cref="bad_poor_window"/> ms and
+    ///     +<see cref="poor_window"/> ms <em>before</em> the note (positive = before note in LR2 convention)
+    ///     consumes the note as POOR (<see cref="HitResult.Meh"/>).
+    ///     Presses earlier than +<see cref="poor_window"/> ms return
+    ///     <see cref="HitResult.None"/> so the playfield registers an Empty POOR instead.
     /// </summary>
-    private const double early_poor_window = 1000; // ms before the note head
+    private const double poor_window = 1000; // ms before the note head (LR2 空PR = +1000)
 
     private readonly int rank;
     private double pgreat;
@@ -107,7 +111,7 @@ public class BmsHitWindows : HitWindows
     public override bool IsHitResultAllowed(HitResult result) => result switch
     {
         HitResult.Perfect or HitResult.Great or HitResult.Good
-            or HitResult.Ok or HitResult.Meh or HitResult.Miss => true,
+            or HitResult.Ok or HitResult.Meh => true,
         _ => false,
     };
 
@@ -130,50 +134,50 @@ public class BmsHitWindows : HitWindows
         HitResult.Perfect => pgreat,
         HitResult.Great => great,
         HitResult.Good => good,
-        HitResult.Ok => bad_poor_window,   // BAD
-        HitResult.Meh => bad_poor_window,  // POOR (normal, passive miss)
-        HitResult.Miss => bad_poor_window, // EARLY POOR / auto-miss
+        HitResult.Ok => bad_poor_window,  // BAD
+        HitResult.Meh => bad_poor_window, // POOR (passive miss: auto-judged after BAD window expires)
         _ => 0,
     };
 
     /// <summary>
-    ///     BMS-native asymmetric result lookup. Use this instead of the base
+    ///     BMS-native asymmetric result lookup for a user keypress. Use this instead of the base
     ///     <c>ResultFor</c> everywhere in BMS gameplay code.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         BMS timing is <b>not symmetric</b>. The early side has an extended
-    ///         "EARLY POOR" zone that the late side does not:
+    ///         LR2 timing is <b>asymmetric on the early side</b>. The POOR zone extends further
+    ///         before the note than the BAD window does, consuming the note without giving BAD credit:
     ///         <list type="bullet">
-    ///             <item>Late press (+offset): normal windows up to +<see cref="bad_poor_window"/> ms,
-    ///             then <see cref="HitResult.None"/> (note already passively missed).</item>
-    ///             <item>Early press (−offset, small): same normal windows down to −<see cref="bad_poor_window"/> ms.</item>
-    ///             <item>Early press (−offset, large): between −<see cref="bad_poor_window"/> and
-    ///             −<see cref="early_poor_window"/> ms → <see cref="HitResult.Miss"/> (EARLY POOR,
-    ///             consumes the note).</item>
-    ///             <item>Earlier than −<see cref="early_poor_window"/> ms →
-    ///             <see cref="HitResult.None"/> (Empty POOR zone; note not consumed).</item>
+    ///             <item>Offset within ±<see cref="bad_poor_window"/> ms: normal PGREAT/GREAT/GOOD/BAD by tightest matching window.</item>
+    ///             <item>Early press beyond −<see cref="bad_poor_window"/> ms up to −<see cref="poor_window"/> ms (POOR zone):
+    ///             consumes the note as POOR (<see cref="HitResult.Meh"/>).</item>
+    ///             <item>Earlier than −<see cref="poor_window"/> ms: <see cref="HitResult.None"/> —
+    ///             note is not consumed; playfield registers an Empty POOR instead.</item>
+    ///             <item>Late press beyond +<see cref="bad_poor_window"/> ms: <see cref="HitResult.None"/> —
+    ///             note has already been passively missed; passive POOR is applied by <c>CheckForResult</c>.</item>
     ///         </list>
+    ///         <b>Note on sign convention</b>: <paramref name="timeOffset"/> = <c>Time.Current − note.StartTime</c>.
+    ///         Negative = keypress before the note. Positive = keypress after the note.
     ///     </para>
     /// </remarks>
     public HitResult BmsResultFor(double timeOffset)
     {
-        if (timeOffset < -early_poor_window)
-            return HitResult.None; // Too early even for Early POOR — Empty POOR territory.
+        if (timeOffset < -poor_window)
+            return HitResult.None; // Too early — Empty POOR territory; note not consumed.
 
         if (timeOffset < -bad_poor_window)
-            return HitResult.Miss; // Early POOR zone: consumes the note as Miss.
+            return HitResult.Meh; // POOR zone: keypress before note outside BAD window; consumes note as POOR.
 
-        // Within the normal ±bad_poor_window range: use the standard descending search,
-        // but on the absolute offset so early and late are symmetric within this zone.
+        // Within the normal ±bad_poor_window range: descending search on absolute offset
+        // so early and late are symmetric within this zone.
         var abs = System.Math.Abs(timeOffset);
-        for (var result = HitResult.Perfect; result >= HitResult.Miss; --result)
+        for (var result = HitResult.Perfect; result >= HitResult.Meh; --result)
         {
             if (IsHitResultAllowed(result) && abs <= WindowFor(result))
                 return result;
         }
 
-        // Late press beyond +bad_poor_window: None (passive miss path handles this).
+        // Late press beyond +bad_poor_window: None (passive POOR applied by CheckForResult).
         return HitResult.None;
     }
 }

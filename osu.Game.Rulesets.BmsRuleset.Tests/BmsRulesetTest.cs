@@ -398,15 +398,15 @@ public class BmsRulesetTest
         Assert.That(windows.WindowFor(HitResult.Good), Is.EqualTo(100).Within(0.001));
         Assert.That(windows.WindowFor(HitResult.Ok), Is.EqualTo(200).Within(0.001));
         Assert.That(windows.WindowFor(HitResult.Meh), Is.EqualTo(200).Within(0.001));
-        Assert.That(windows.WindowFor(HitResult.Miss), Is.EqualTo(200).Within(0.001));
+        // Miss is not a valid BMS note result; HitResult.Miss window returns 0.
     }
 
     [Test]
-    [TestCase(0, 8,  24,  40)]   // RANK 0 - Very Hard
-    [TestCase(1, 15, 30,  60)]   // RANK 1 - Hard
-    [TestCase(2, 18, 40,  100)]  // RANK 2 - Normal
-    [TestCase(3, 21, 60,  120)]  // RANK 3 - Easy
-    [TestCase(4, 21, 60,  200)]  // RANK 4 - Very Easy
+    [TestCase(0, 8, 24, 40)]   // RANK 0 - Very Hard
+    [TestCase(1, 15, 30, 60)]  // RANK 1 - Hard
+    [TestCase(2, 18, 40, 100)] // RANK 2 - Normal
+    [TestCase(3, 21, 60, 120)] // RANK 3 - Easy
+    [TestCase(4, 21, 60, 200)] // RANK 4 - Very Easy
     public void TestHitWindowRank(int rank, double expectedPerfect, double expectedGreat, double expectedGood)
     {
         var windows = new BmsHitWindows(rank);
@@ -415,10 +415,10 @@ public class BmsRulesetTest
         Assert.That(windows.WindowFor(HitResult.Perfect), Is.EqualTo(expectedPerfect).Within(0.001));
         Assert.That(windows.WindowFor(HitResult.Great), Is.EqualTo(expectedGreat).Within(0.001));
         Assert.That(windows.WindowFor(HitResult.Good), Is.EqualTo(expectedGood).Within(0.001));
-        // BAD (Ok), POOR (Meh), and Miss are all 200 ms for every rank
+        // BAD (Ok) and POOR (Meh) are both 200 ms for every rank
         Assert.That(windows.WindowFor(HitResult.Ok), Is.EqualTo(200).Within(0.001));
         Assert.That(windows.WindowFor(HitResult.Meh), Is.EqualTo(200).Within(0.001));
-        Assert.That(windows.WindowFor(HitResult.Miss), Is.EqualTo(200).Within(0.001));
+        // Miss is not a valid BMS note result; window returns 0.
     }
 
     [Test]
@@ -474,16 +474,16 @@ public class BmsRulesetTest
         Assert.That(processor.GetBaseScoreForResult(HitResult.Good), Is.EqualTo(0));
         Assert.That(processor.GetBaseScoreForResult(HitResult.Ok), Is.EqualTo(0));
         Assert.That(processor.GetBaseScoreForResult(HitResult.Meh), Is.EqualTo(0));
-        Assert.That(processor.GetBaseScoreForResult(HitResult.Miss), Is.EqualTo(0));
+        Assert.That(processor.GetBaseScoreForResult(HitResult.Miss), Is.EqualTo(0)); // Empty POOR — no EX-score
     }
 
     [Test]
-    [TestCase(1.0,           ScoreRank.X)]  // All PGREAT
-    [TestCase(8.0 / 9.0,    ScoreRank.S)]  // AAA
-    [TestCase(7.0 / 9.0,    ScoreRank.A)]  // AA
-    [TestCase(6.0 / 9.0,    ScoreRank.B)]  // A
-    [TestCase(5.0 / 9.0,    ScoreRank.C)]  // B
-    [TestCase(4.0 / 9.0,    ScoreRank.D)]  // below
+    [TestCase(1.0, ScoreRank.X)]       // All PGREAT
+    [TestCase(8.0 / 9.0, ScoreRank.S)] // AAA
+    [TestCase(7.0 / 9.0, ScoreRank.A)] // AA
+    [TestCase(6.0 / 9.0, ScoreRank.B)] // A
+    [TestCase(5.0 / 9.0, ScoreRank.C)] // B
+    [TestCase(4.0 / 9.0, ScoreRank.D)] // below
     public void TestScoreProcessorRankFromAccuracy(double accuracy, ScoreRank expectedRank)
     {
         var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
@@ -492,7 +492,7 @@ public class BmsRulesetTest
         // All PGREATs (accuracy==1.0) → X; otherwise use generic non-all-perfect results.
         var results = new Dictionary<HitResult, int>();
         if (accuracy < 1.0)
-            results[HitResult.Miss] = 1; // Ensures not all-PGREAT for non-X ranks.
+            results[HitResult.Meh] = 1; // Ensures not all-PGREAT for non-X ranks.
 
         var rank = processor.RankFromScore(accuracy, results);
 
@@ -554,7 +554,7 @@ public class BmsRulesetTest
     }
 
     [Test]
-    public void TestGaugeMissReducesHealthByFourPointEightPercent()
+    public void TestGaugePoorReducesHealthByFourPointEightPercent()
     {
         var processor = (BmsHealthProcessor)ruleset.CreateHealthProcessor(0);
         var beatmap = new BmsBeatmap
@@ -574,10 +574,10 @@ public class BmsRulesetTest
         var initialHealth = processor.Health.Value;
         processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
         {
-            Type = HitResult.Miss,
+            Type = HitResult.Meh,
         });
 
-        // Miss = −4.8%, but clamped at 0.
+        // POOR = −4.8%, but clamped at 0.
         var expectedHealth = Math.Max(0.0, initialHealth - 0.048);
         Assert.That(processor.Health.Value, Is.EqualTo(expectedHealth).Within(0.001));
     }
@@ -677,7 +677,7 @@ public class BmsRulesetTest
     {
         // In BMS, ScoreRank.F is never assigned from accuracy — fail is gauge-only.
         var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
-        var results = new Dictionary<HitResult, int> { [HitResult.Miss] = 100 };
+        var results = new Dictionary<HitResult, int> { [HitResult.Meh] = 100 };
 
         // Even at accuracy 0 the lowest rank should be D, not F.
         var rank = processor.RankFromScore(0.0, results);
@@ -727,5 +727,67 @@ public class BmsRulesetTest
 
         Assert.That(processor.Health.Value, Is.LessThan(0.8));
         Assert.That(processor.HasFailed, Is.True);
+    }
+
+    [Test]
+    public void TestRegisterEmptyPoorIncrementsStatisticsCounter()
+    {
+        // Empty POOR is recorded as HitResult.Miss in Statistics so it can be
+        // shown in the results screen and HUD judgement counter.
+        var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
+
+        Assert.That(processor.Statistics.GetValueOrDefault(HitResult.Miss), Is.EqualTo(0));
+
+        processor.RegisterEmptyPoor();
+        Assert.That(processor.Statistics.GetValueOrDefault(HitResult.Miss), Is.EqualTo(1));
+
+        processor.RegisterEmptyPoor();
+        processor.RegisterEmptyPoor();
+        Assert.That(processor.Statistics.GetValueOrDefault(HitResult.Miss), Is.EqualTo(3));
+    }
+
+    [Test]
+    public void TestRegisterEmptyPoorBreaksCombo()
+    {
+        // Empty POOR must reset combo regardless of note judgement pipeline.
+        var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        // Build up combo via a PGREAT judgement.
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+            { Type = HitResult.Perfect });
+        Assert.That(processor.Combo.Value, Is.GreaterThan(0));
+
+        processor.RegisterEmptyPoor();
+        Assert.That(processor.Combo.Value, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void TestEmptyPoorDoesNotBlockXRank()
+    {
+        // X rank requires all notes to be PGREAT. Empty POOR is not a note result
+        // and should not prevent X rank even when present.
+        var processor = (BmsScoreProcessor)ruleset.CreateScoreProcessor();
+
+        var results = new Dictionary<HitResult, int>
+        {
+            [HitResult.Miss] = 5, // 5 Empty POORs
+        };
+
+        // At accuracy = 1.0 (all notes PGREAT) with only Empty POORs, rank should be X.
+        var rank = processor.RankFromScore(1.0, results);
+        Assert.That(rank, Is.EqualTo(ScoreRank.X));
+    }
+
+    [Test]
+    public void TestEmptyPoorDisplayNameIsEPoor()
+    {
+        Assert.That(ruleset.GetDisplayNameForHitResult(HitResult.Miss).ToString(), Is.EqualTo("E-POOR"));
     }
 }

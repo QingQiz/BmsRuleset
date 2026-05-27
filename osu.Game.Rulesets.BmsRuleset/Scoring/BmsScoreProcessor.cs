@@ -74,36 +74,43 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
     {
-        // All PGREATs → rainbow S (DJ LEVEL MAX / perfect full combo).
-        if (accuracy >= 1.0 - 1e-9
-            && results.GetValueOrDefault(HitResult.Great) == 0
-            && results.GetValueOrDefault(HitResult.Good) == 0
-            && results.GetValueOrDefault(HitResult.Ok) == 0
-            && results.GetValueOrDefault(HitResult.Meh) == 0
-            && results.GetValueOrDefault(HitResult.Miss) == 0)
-            return ScoreRank.X;
-
-        // Traditional BMS DJ LEVEL thresholds expressed as EX-score ratios.
-        // AAA = 8/9 of max ≈ 0.889, AA = 7/9 ≈ 0.778, A = 6/9 ≈ 0.667.
-        // We expose S/A/B/C/D as approximate equivalents.
-        if (accuracy >= 8.0 / 9.0) return ScoreRank.S;
-        if (accuracy >= 7.0 / 9.0) return ScoreRank.A;
-        if (accuracy >= 6.0 / 9.0) return ScoreRank.B;
-        if (accuracy >= 5.0 / 9.0) return ScoreRank.C;
+        return accuracy switch
+        {
+            // All PGREATs → rainbow S (DJ LEVEL MAX / perfect full combo).
+            >= 1.0 - 1e-9 when results.GetValueOrDefault(HitResult.Great) == 0 &&
+                               results.GetValueOrDefault(HitResult.Good) == 0 &&
+                               results.GetValueOrDefault(HitResult.Ok) == 0 &&
+                               results.GetValueOrDefault(HitResult.Meh) == 0
+                => ScoreRank.X,
+            // Traditional BMS DJ LEVEL thresholds expressed as EX-score ratios.
+            // AAA = 8/9 of max ≈ 0.889, AA = 7/9 ≈ 0.778, A = 6/9 ≈ 0.667.
+            // We expose S/A/B/C/D as approximate equivalents.
+            >= 8.0 / 9.0 => ScoreRank.S,
+            >= 7.0 / 9.0 => ScoreRank.A,
+            >= 6.0 / 9.0 => ScoreRank.B,
+            >= 5.0 / 9.0 => ScoreRank.C,
+            _ => ScoreRank.D,
+        };
 
         // BMS pass/fail is determined solely by gauge at song end, not by score accuracy.
         // ScoreRank.F is never assigned here; failure is communicated through BmsHealthProcessor.
-        return ScoreRank.D;
     }
 
     protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
         => base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
 
     /// <summary>
-    ///     Breaks combo for an Empty POOR (key pressed with no note to consume).
-    ///     Empty POORs do not contribute to EX-score or accuracy — they only reset the combo.
+    ///     Records an Empty POOR: a keypress that found no note to consume.
+    ///     Breaks combo and increments the Empty POOR counter stored under
+    ///     <see cref="HitResult.Miss"/> in the score statistics so it
+    ///     appears in the results-screen statistics and the live HUD judgement counter.
+    ///     Empty POORs do not affect EX-score or accuracy.
     /// </summary>
-    public void RegisterEmptyPoor() => Combo.Value = 0;
+    public void RegisterEmptyPoor()
+    {
+        Combo.Value = 0;
+        ScoreResultCounts[HitResult.Miss] = ScoreResultCounts.GetValueOrDefault(HitResult.Miss) + 1;
+    }
 
     private class JudgementOrderComparer : IComparer<HitObject>
     {

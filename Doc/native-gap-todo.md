@@ -26,7 +26,8 @@ Current state:
 - `DrawableBmsHitObject.TryHit()` applies user-triggered timing-window results; passive misses still apply after the miss window.
 - `OnPressed` now selects the earliest unjudged in-window note in the column (by `StartTime`), ensuring strict sequential ordering and preventing a later note from being hit before an earlier one.
 - `OnReleased` similarly selects the earliest held LN in the release window (by `EndTime`).
-- `CheckForResult` now anchors the LN release-miss to `EndTime` (not `StartTime`), fixing a bug where long notes would be passively failed during their body duration. LN drop (held but never released past `EndTime + missWindow`) correctly applies `HitResult.Miss`.
+- `CheckForResult` now anchors the LN release-miss to `EndTime` (not `StartTime`), fixing a bug where long notes would be passively failed during their body duration. LN drop (held but never released past `EndTime + missWindow`) correctly applies `HitResult.Meh` (POOR). Passive misses on normal notes also apply `HitResult.Meh` (POOR). `HitResult.Miss` is not used for note results; it is the Empty POOR counter in `Statistics`.
+- Key sound on press plays the note whose keysound is most relevant: `findNextSoundHitObject` skips only notes whose `StartTime < Time.Current − BmsHitWindows.BadWindow` (200 ms), so a late keypress within the BAD window still triggers the correct note's keysound rather than the next note.
 - There is no full key state handling or key beams. Scratch/turntable semantics are column-routing only.
 
 TODO:
@@ -77,29 +78,29 @@ Current state:
 
 - `BmsHitWindows` uses LR2 hit windows driven by `#RANK` (0–4). Beatoraja windows are fully documented in comments as an alternative. `SetDifficulty` ignores OD.
 - `#RANK` is parsed and stamped per-object (`BmsHitObject.BmsRank`); each object creates its own `BmsHitWindows(BmsRank)`.
-- `BmsResultFor` implements asymmetric early/late windows: Early POOR zone (−1000 to −200 ms) returns `Miss`; beyond −1000 ms returns `None` (Empty POOR territory).
+- `BmsResultFor` implements asymmetric early/late windows: POOR zone (−1000 to −200 ms) returns `Meh` (note consumed as POOR); beyond −1000 ms returns `None` (Empty POOR territory, no note consumed); beyond +200 ms returns `None` (passive miss handled by `CheckForResult`).
 - `BmsScoreProcessor` implements EX-score: Perfect=2, Great=1, all else=0; no combo multiplier. `ComputeTotalScore = accuracy × 1,000,000`.
 - DJ LEVEL rank mapping: X (all Perfect), S≥8/9 EX, A≥7/9, B≥6/9, C≥5/9, D otherwise.
-- `GetValidHitResults()` returns all 6: Perfect/Great/Good/Ok/Meh/Miss mapping to BMS PGREAT/GREAT/GOOD/BAD/POOR/EARLY-POOR.
-- Empty POOR (press outside all note windows) breaks combo and drains gauge via `RegisterEmptyPoor` on both processors.
+- `GetValidHitResults()` returns all 6: Perfect/Great/Good/Ok/Meh/Miss mapping to BMS PGREAT/GREAT/GOOD/BAD/POOR/E-POOR. `HitResult.Miss` is repurposed as the **Empty POOR counter** in `Statistics`; it is not a note judgement result (`IsHitResultAllowed` returns false for it, `WindowFor(Miss)` returns 0).
+- Empty POOR (press outside all note windows) breaks combo and drains gauge via `RegisterEmptyPoor` on both processors. `BmsPlayfield.registerEmptyPoor()` also displays the POOR image in `JudgementArea` by looking up `SkinComponentLookup<HitResult>(HitResult.Miss)`.
+- `BmsRuleset.HIT_RESULT_LABELS` is the single source of truth for BMS judgement label strings (PGREAT/GREAT/GOOD/BAD/POOR/E-POOR). Both `GetDisplayNameForHitResult` and `BmsDefaultJudgementPiece` read from it.
+- Judgement drawables are pre-built once per result type at `LoadComplete` (one `SkinnableDrawable` per `HitResult` in `judgementDrawableCache`) and reused on every hit by moving them between a hidden pool container and `JudgementArea`. No `SkinnableDrawable` is allocated during gameplay.
 
 Known combo-break mismatches vs native BMS (osu! framework constraint):
 
-- **BAD → `Ok`**: `HitResult.Ok.IsHit()` returns `true` in osu!, so `Ok` increases combo, not breaks it. BMS BAD must break combo.
-- **POOR → `Meh`**: `HitResult.Meh.IsHit()` returns `true` in osu!, so `Meh` increases combo, not breaks it. BMS POOR must break combo.
-- **EARLY POOR → `Miss`**: `Miss` correctly breaks combo. However, native BMS EARLY POOR does not break combo. Documented accepted mismatch.
+- **BAD → `Ok`**: `HitResult.Ok.IsHit()` returns `true` in osu!, so `Ok` increases combo, not breaks it. BMS BAD must break combo. `BmsScoreProcessor.ApplyScoreChange` overrides this by resetting `Combo.Value = 0` after any `Ok` or `Meh` result.
+- **POOR → `Meh`**: Same override applies; combo is reset to 0.
+- **Empty POOR → `Miss`**: `Miss` is not a note result; `RegisterEmptyPoor` breaks combo and drains gauge directly on both processors without going through the judgement pipeline.
 
-Pass/fail mismatch:
+Pass/fail:
 
-- **`ScoreRank.F`** is assigned by the base `ScoreProcessor` when accuracy drops below a threshold. BMS pass/fail is gauge-only (Normal gauge: ≥ 80% at song end). The accuracy-based F rank is currently incorrect.
+- **`ScoreRank.F`**: `BmsScoreProcessor.RankFromScore` never returns `ScoreRank.F`; fail state is gauge-only (Normal gauge: < 80% at final note or gauge hits 0).
+- **Normal gauge clear condition**: `BmsHealthProcessor.CheckDefaultFailCondition` triggers failure only when `JudgedHits >= MaxHits && Health < 0.8` (end-of-song check) or when `Health <= 0` (gauge bottomed out).
 
 TODO:
 
-- Force-break combo on `Ok` (BAD) and `Meh` (POOR) results in `BmsScoreProcessor` by overriding `ApplyResultInternal`.
-- Override `RankFromScore` to never return `ScoreRank.F`; fail state is gauge-only.
-- Implement clear lamp logic driven by `BmsHealthProcessor.Health` at song end (≥ 80% = clear, < 80% = fail/no-clear).
 - Parse and apply `#EXRANK`.
-- Add display name aliases for BMS judgement labels (PGREAT, GREAT, etc.) in HUD.
+- Add `BmsResultsScreen` showing EX score, DJ LEVEL, gauge end %, PGREAT/GREAT/GOOD/BAD/POOR/E-POOR counts, clear type.
 
 ### Gauge/Health
 
@@ -110,19 +111,17 @@ Files:
 Current state:
 
 - Passive drain is disabled (`ComputeDrainRate()` returns 0).
-- `BmsHealthProcessor` implements the BMS Normal gauge: starts at 20%, discrete hit deltas driven by `#TOTAL`. PGREAT +`total/100/N`, GREAT ×0.5 of that, GOOD ×0.2, BAD (Ok) −3.2%, POOR/MISS (Meh/Miss) −4.8%.
+- `BmsHealthProcessor` implements the BMS Normal gauge: starts at 20%, discrete hit deltas driven by `#TOTAL`. PGREAT +`total/100/N`, GREAT ×0.5 of that, GOOD ×0.2, BAD (Ok) −3.2%, POOR (Meh) −4.8%.
 - Default `#TOTAL` formula `max(7.605×N/(0.01×N+6.5), 160)` used when `#TOTAL` is absent from chart.
 - `#TOTAL` parsing pipeline is complete: BmsParser → BmsParseResult → IBmsBeatmap → BmsBeatmap → BmsDecodedBeatmap.
 - Empty POOR gauge drain implemented via `RegisterEmptyPoor` (−4.8%, no note consumed).
-- `CheckDefaultFailCondition` from the base `HealthProcessor` triggers failure at `Health ≤ 0`. This is the Hazard gauge rule, not Normal gauge. For Normal gauge, the player may drop below 80% mid-song and recover; failure only occurs if gauge reaches 0.
-- Long-note drop records `HitResult.Miss` instead of `HitResult.Meh`; both map to −4.8% so the delta is correct but the result type is semantically wrong (drop = POOR, not EARLY POOR).
-- Easy, hard, ex-hard, hazard, course, PMS, and DP gauge behaviours are not implemented.
-- Normal gauge clear condition (≥ 80% at final note) is not enforced; a player finishing at 5% health is not failed.
+- `CheckDefaultFailCondition` triggers failure when gauge hits 0 mid-song, or when `JudgedHits >= MaxHits && Health < 0.8` at song end (Normal gauge clear condition).
+- Long-note drop records `HitResult.Meh` (POOR) and passive normal-note misses also record `HitResult.Meh` (POOR). `HitResult.Miss` is the Empty POOR counter; it is not emitted as a note judgement result.
 
 TODO:
 
-- Enforce Normal gauge clear condition: trigger failure if `Health < 0.8` at song end (after the last note is judged).
-- Fix LN drop result type: use `HitResult.Meh` instead of `HitResult.Miss` in `DrawableBmsHitObject.CheckForResult` for the drop path.
+- ~~Enforce Normal gauge clear condition.~~ ✓ Done.
+- ~~Fix LN drop result type.~~ ✓ Done.
 - Model LN-specific gauge events (head miss vs. drop vs. tail miss).
 - Implement easy/hard/ex-hard/hazard gauge variants and gauge-selection mods.
 - Add course gauge continuity.
@@ -245,6 +244,32 @@ TODO:
 - Support stream/archive import tasks correctly.
 - Decide duplicate handling per chart vs per set.
 - Compute deterministic set hash independent of chart ordering details.
+
+## Failed Score Saving
+
+Files:
+
+- `UI/BmsDrawableRuleset.cs`
+- `UI/BmsPlayer.cs`
+
+Current state:
+
+- BMS convention: every play (including failed ones) is saved to the local score DB so players can track gauge improvement.
+- `osu.Game.Screens.Play.SoloSongSelect` hard-codes `new SoloPlayer()` and there is no `Ruleset.CreatePlayer()` hook in the current framework version.
+- `BmsDrawableRuleset.LoadComplete` subscribes to `HealthProcessor.Failed` (resolved from Player's DI cache). When the fail event fires, a 500 ms deferred import is scheduled via `ScoreManager.Import(gameplayState.Score.ScoreInfo.DeepClone())`. The delay allows `Player.ConcludeFailedScore` (which stamps `Rank = F`) to run first.
+- Import is fire-and-forget with error logging via `Task.ContinueWith(OnlyOnFaulted)`.
+- Replay scores are excluded from the import (checked via `ReplayScore != null`).
+- `BmsPlayer.cs` was deleted — it was never instantiated at runtime. `TestSceneBmsPlayer.cs` was also deleted.
+
+Known limitations:
+
+- `ScoreManager` is null in test environments without a full game DI context; guarded with `CanBeNull = true`.
+- The 500 ms delay is a heuristic. If `ConcludeFailedScore` is not yet called by then, the imported score will lack `Rank = F`.
+
+TODO:
+
+- When the framework adds `Ruleset.CreatePlayer()`, switch to a proper `BmsPlayer` subclass and remove the `BmsDrawableRuleset` hack.
+- Consider a more robust synchronisation mechanism (e.g. subscribing to a `Player.OnConcludeFailedScore` event) rather than fixed delay.
 
 ## Mods And Automation Gaps
 

@@ -32,7 +32,7 @@
 | `Beatmaps/BmsFileImporter.cs` | Folder import 生成一个 set 多个 beatmap，single chart import 生成单 chart set，并导入引用资源。 | 实现完整 import planner、relative resource paths、stream/archive import。 |
 | `Objects/BmsHitObject.cs` | `Column`、`IsLongNote`、`Duration`、`SamplePath`、`TickInfo`。 | 增加 mine、invisible、native LN head/tail/body 等 BMS 数据。 |
 | `UI/*` / `Skinning/*` | Native playfield/stage/columns/note drawables，time-based render，legacy mania skin component compatibility。 | 补全 LN body、STOP freeze/soflan、BGA、key beams、native skin format。 |
-| `Scoring/*` | Native shell with osu!-compatible result plumbing and placeholder windows/gauge/score。 | 实现 BMS 判定、EX score、combo、clear lamp、gauge。 |
+| `Scoring/*` | Native BMS scoring: EX score (Perfect=2, Great=1, else 0), DJ LEVEL rank, combo reset on BAD/POOR, `RankFromScore` never returns F. Normal gauge via `BmsHealthProcessor` (`#TOTAL`-driven, starts at 20%, fails at gauge=0 or <80% at end). Empty POOR via `RegisterEmptyPoor` on both processors. | Implement clear lamp storage, results screen, `#EXRANK`, easy/hard gauge variants. |
 
 ## 总体架构
 
@@ -447,15 +447,18 @@ Layout maps actions to columns. 5K, 7K, 5K DP, 7K DP, PMS 9K, and PMS DP have se
 
 ### Judgement and Gauge
 
-BMS judgement should support `#RANK` and later `#EXRANKxx` dynamic changes. Initial target：
+BMS judgement should support `#RANK` and later `#EXRANKxx` dynamic changes. Current implementation:
 
-| Result | Use |
-|---|---|
-| `Perfect` | PGREAT / highest timing. |
-| `Great` | GREAT. |
-| `Good` | GOOD. |
-| `Ok` | BAD or low hit depending design. |
-| `Miss` | POOR / miss. |
+| Result | BMS name | Use |
+|---|---|---|
+| `Perfect` | PGREAT | Tightest window; 2 EX points. |
+| `Great` | GREAT | 1 EX point; no combo break. |
+| `Good` | GOOD | 0 EX points; no combo break. |
+| `Ok` | BAD | 0 EX points; breaks combo (forced reset in `BmsScoreProcessor`). |
+| `Meh` | POOR | 0 EX points; breaks combo. Two causes: (1) passive miss — BAD window expired; (2) in-POOR-zone keypress (−200 to −1000 ms before note). |
+| `Miss` | E-POOR | **Not a note judgement result.** Repurposed as the Empty POOR counter in `Statistics`. `IsHitResultAllowed` returns false; `WindowFor(Miss)` = 0. Displayed in HUD and results screen as "E-POOR". |
+
+`BmsRuleset.HIT_RESULT_LABELS` is the single source of truth for all label strings. Both `GetDisplayNameForHitResult` and `BmsDefaultJudgementPiece` read from it.
 
 Gauge should not be passive osu! drain. It should be event-based：
 
@@ -482,7 +485,7 @@ Native BMS scoring should expose：
 
 BMS audio is key-sounded：
 
-- Key press plays the next sample queued for that lane, even when the press does not judge a note。
+- Key press plays the keysound of the earliest judgeable note in the lane. `findNextSoundHitObject` skips only notes whose `StartTime < Time.Current − BadWindow` (200 ms), so a late keypress within the BAD window plays the current note's keysound, not the next note's.
 - Miss judgement does not play a hit sound, and osu! default hitsounds are disabled for BMS notes。
 - BGM channel `01` autoplay samples at projected tick time。
 - Invisible notes may alter key sound behavior later。

@@ -107,15 +107,46 @@ public class BmsRuleset : Ruleset
         _ => null,
     };
 
-    public override IEnumerable<HitResult> GetValidHitResults() =>
+    /// <summary>
+    ///     Single source of truth for BMS judgement label names.
+    ///     Used by <see cref="GetDisplayNameForHitResult"/> and the default judgement piece.
+    ///     <list type="table">
+    ///         <item><term>Perfect</term><description>PGREAT</description></item>
+    ///         <item><term>Great</term><description>GREAT</description></item>
+    ///         <item><term>Good</term><description>GOOD</description></item>
+    ///         <item><term>Ok</term><description>BAD</description></item>
+    ///         <item><term>Meh</term><description>POOR  (note consumed: passive miss or in-POOR-zone keypress)</description></item>
+    ///         <item><term>Miss</term><description>E-POOR (Empty POOR: keypress with no note to consume)</description></item>
+    ///     </list>
+    /// </summary>
+    public static readonly IReadOnlyDictionary<HitResult, string> HIT_RESULT_LABELS = new Dictionary<HitResult, string>
+    {
+        [HitResult.Perfect] = "PGREAT",
+        [HitResult.Great] = "GREAT",
+        [HitResult.Good] = "GOOD",
+        [HitResult.Ok] = "BAD",
+        [HitResult.Meh] = "POOR",
+        [HitResult.Miss] = "E-POOR",
+    };
+
+    public override IEnumerable<HitResult> GetValidHitResults() => STATIC_VALID_HIT_RESULTS;
+
+    /// <summary>
+    ///     Static version of <see cref="GetValidHitResults"/> for use by types that cannot hold
+    ///     a <see cref="BmsRuleset"/> instance (e.g. <see cref="UI.BmsPlayfield"/> during load).
+    /// </summary>
+    public static readonly IReadOnlyList<HitResult> STATIC_VALID_HIT_RESULTS =
     [
         HitResult.Perfect,
         HitResult.Great,
         HitResult.Good,
         HitResult.Ok,
         HitResult.Meh,
-        HitResult.Miss,
+        HitResult.Miss, // Empty POOR counter (keypress with no note to consume)
     ];
+
+    public override LocalisableString GetDisplayNameForHitResult(HitResult result) =>
+        HIT_RESULT_LABELS.TryGetValue(result, out var label) ? label : base.GetDisplayNameForHitResult(result);
 
     public override IRulesetConfigManager CreateConfig(SettingsStore? settings) =>
         new BmsRulesetConfigManager(settings, RulesetInfo);
