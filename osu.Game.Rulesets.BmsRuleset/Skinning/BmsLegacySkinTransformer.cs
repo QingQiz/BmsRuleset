@@ -23,7 +23,6 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 
-// TODO remove osu native health bar, replace with bms native health bar, skinnable (only position)
 // TODO rank mark
 public partial class BmsLegacySkinTransformer : SkinTransformer
 {
@@ -66,7 +65,12 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
     public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
     {
         if (lookup is GlobalSkinnableContainerLookup containerLookup && containerLookup.Lookup == GlobalSkinnableContainers.MainHUDComponents && containerLookup.Ruleset != null)
-            return isLegacySkin.Value ? createLegacyHud() : base.GetDrawableComponent(lookup);
+        {
+            if (isLegacySkin.Value)
+                return createLegacyHud();
+
+            return base.GetDrawableComponent(lookup);
+        }
 
         if (lookup is SkinComponentLookup<HitResult> resultLookup && hasLegacyResources())
             return getResult(resultLookup.Component) ?? base.GetDrawableComponent(lookup);
@@ -131,6 +135,31 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
         return distanceToEdge % 2 == 0 ? "1" : "2";
     }
 
+    private float getStageRightOffset()
+    {
+        var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
+        var x = 0f;
+        var min = float.MaxValue;
+        var max = float.MinValue;
+
+        for (var i = 0; i < totalColumns; i++)
+        {
+            var lookup = new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, i);
+            var width = getManiaConfig<float>(LegacyManiaSkinConfigurationLookups.ColumnWidth, lookup)?.Value
+                        ?? (lookup.IsScratch ? 42 : 48);
+
+            if (!lookup.IsScratch)
+            {
+                min = Math.Min(min, x);
+                max = Math.Max(max, x + width);
+            }
+
+            x += width;
+        }
+
+        return min == float.MaxValue ? x / 2 : x - (min + max) / 2;
+    }
+
     private Drawable createLegacyHud() => new DefaultSkinComponentsContainer(container =>
     {
         foreach (var d in container.OfType<ISerialisableDrawable>())
@@ -142,7 +171,6 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
             new LegacyScoreCounter(),
             new LegacyAccuracyCounter(),
             new LegacySongProgress(),
-            new LegacyHealthDisplay(),
             new BarHitErrorMeter { Anchor = Anchor.BottomCentre, Origin = Anchor.CentreLeft, Rotation = -90 },
         ],
     };
@@ -310,16 +338,16 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
 
             upSprite = transformer.getAnimation(transformer.getKeyImageName(lookup, false))?.With(d =>
             {
-                d.Anchor = Anchor.BottomCentre;
-                d.Origin = Anchor.BottomCentre;
+                d.Anchor = Anchor.TopCentre;
+                d.Origin = Anchor.TopCentre;
                 d.RelativeSizeAxes = Axes.X;
                 d.Width = 1;
             });
 
             downSprite = transformer.getAnimation(transformer.getKeyImageName(lookup, true))?.With(d =>
             {
-                d.Anchor = Anchor.BottomCentre;
-                d.Origin = Anchor.BottomCentre;
+                d.Anchor = Anchor.TopCentre;
+                d.Origin = Anchor.TopCentre;
                 d.RelativeSizeAxes = Axes.X;
                 d.Width = 1;
                 d.Alpha = 0;
@@ -328,7 +356,8 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
             InternalChild = new Container
             {
                 Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
+                Origin = Anchor.TopCentre,
+                Y = -(transformer.getManiaConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? 0),
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 Children =
@@ -399,6 +428,7 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
         private readonly BmsLegacySkinTransformer transformer;
         private readonly BmsSkinComponentLookup lookup;
         private readonly float? widthForNoteHeightScale;
+        private readonly float columnWidthForNoteHeightScale;
         private Drawable? noteAnimation;
 
         public LegacyBmsNotePiece(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup)
@@ -406,6 +436,8 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
             this.transformer = transformer;
             this.lookup = lookup;
             widthForNoteHeightScale = transformer.getManiaConfig<float>(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale)?.Value;
+            columnWidthForNoteHeightScale = transformer.getManiaConfig<float>(LegacyManiaSkinConfigurationLookups.ColumnWidth, lookup)?.Value
+                                            ?? (lookup.IsScratch ? 42 : 48);
 
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -442,7 +474,9 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
             if (texture == null)
                 return;
 
-            var noteHeight = widthForNoteHeightScale ?? DrawWidth;
+            var noteHeight = widthForNoteHeightScale == null
+                ? DrawWidth
+                : widthForNoteHeightScale.Value * DrawWidth / Math.Max(1, columnWidthForNoteHeightScale);
             noteAnimation.Scale = Vector2.Divide(new Vector2(DrawWidth, noteHeight), texture.DisplayWidth);
         }
     }
@@ -463,7 +497,7 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
             var lightImage = transformer.getManiaConfig<string>(LegacyManiaSkinConfigurationLookups.LightImage, lookup)?.Value ?? "mania-stage-light";
             var lightPosition = transformer.getManiaConfig<float>(LegacyManiaSkinConfigurationLookups.LightPosition, lookup)?.Value ?? 0;
             var lightFramePerSecond = transformer.getManiaConfig<int>(LegacyManiaSkinConfigurationLookups.LightFramePerSecond, lookup)?.Value ?? 60;
-            var leftLineWidth = transformer.getManiaConfig<float>(LegacyManiaSkinConfigurationLookups.LeftLineWidth, lookup)?.Value ?? 1;
+            var leftLineWidth = lookup.ColumnIndex == 0 ? transformer.getManiaConfig<float>(LegacyManiaSkinConfigurationLookups.LeftLineWidth, lookup)?.Value ?? 1 : 0;
             var rightLineWidth = transformer.getManiaConfig<float>(LegacyManiaSkinConfigurationLookups.RightLineWidth, lookup)?.Value ?? 1;
             light = transformer.GetAnimation(lightImage, true, true, frameLength: 1000d / lightFramePerSecond)?.With(d =>
             {
@@ -483,23 +517,15 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
                     RelativeSizeAxes = Axes.Both,
                 }, backgroundColour),
                 light ?? Empty(),
-                new Box
+                new BmsColumnSeparator(leftLineWidth, lineColour)
                 {
-                    RelativeSizeAxes = Axes.Y,
-                    Scale = new Vector2(0.740f, 1),
-                    Width = leftLineWidth,
-                    Colour = lineColour,
-                    Alpha = leftLineWidth > 0 ? 1 : 0,
+                    Anchor = Anchor.TopLeft,
+                    Origin = Anchor.TopLeft,
                 },
-                new Box
+                new BmsColumnSeparator(rightLineWidth, lineColour)
                 {
                     Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,
-                    RelativeSizeAxes = Axes.Y,
-                    Scale = new Vector2(0.740f, 1),
-                    Width = rightLineWidth,
-                    Colour = lineColour,
-                    Alpha = rightLineWidth > 0 ? 1 : 0,
                 },
             ];
         }
@@ -569,6 +595,7 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
         public LegacyBmsStageBackground(BmsLegacySkinTransformer transformer)
         {
             RelativeSizeAxes = Axes.Both;
+            Masking = false;
 
             var images = transformer.getStageBackgroundImageNames();
 
@@ -577,14 +604,12 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
                 leftSprite = transformer.getAnimation(images[0])?.With(d =>
                 {
                     d.Anchor = Anchor.TopLeft;
-                    d.Origin = Anchor.CentreRight;
-                    d.X = 0.05f;
+                    d.Origin = Anchor.TopRight;
                 }) ?? Empty(),
                 rightSprite = transformer.getAnimation(images[1])?.With(d =>
                 {
                     d.Anchor = Anchor.TopRight;
-                    d.Origin = Anchor.CentreLeft;
-                    d.X = -0.05f;
+                    d.Origin = Anchor.TopLeft;
                 }) ?? Empty(),
             ];
         }
@@ -593,11 +618,40 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
         {
             base.Update();
 
-            if (leftSprite?.DrawHeight > 0)
-                leftSprite.Scale = new Vector2(1, DrawHeight / leftSprite.DrawHeight);
+            if (leftSprite != null)
+                scaleStageSide(leftSprite);
 
-            if (rightSprite?.DrawHeight > 0)
-                rightSprite.Scale = new Vector2(1, DrawHeight / rightSprite.DrawHeight);
+            if (rightSprite != null)
+                scaleStageSide(rightSprite);
+        }
+
+        private void scaleStageSide(Drawable sprite)
+        {
+            var height = sprite switch
+            {
+                Sprite s when s.Texture != null => s.Texture.DisplayHeight,
+                TextureAnimation a when a.CurrentFrame != null => a.CurrentFrame.DisplayHeight,
+                _ => sprite.Height,
+            };
+
+            if (height > 0)
+                sprite.Scale = new Vector2(1, DrawHeight / height);
+        }
+    }
+
+    private sealed partial class BmsColumnSeparator : CompositeDrawable
+    {
+        public BmsColumnSeparator(float width, Color4 colour)
+        {
+            RelativeSizeAxes = Axes.Y;
+            Width = width;
+            Alpha = width > 0 ? 1 : 0;
+
+            InternalChild = new Box
+            {
+                RelativeSizeAxes = Axes.Both,
+                Colour = colour,
+            };
         }
     }
 

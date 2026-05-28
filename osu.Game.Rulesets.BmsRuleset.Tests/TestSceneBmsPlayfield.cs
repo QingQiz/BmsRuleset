@@ -113,4 +113,22 @@ public partial class TestSceneBmsPlayfield : OsuTestScene
             return Precision.AlmostEquals(drawable.DrawWidth, column.DrawWidth, 0.5f);
         });
     }
+
+    [Test]
+    public void TestWideStageScalesToFit()
+    {
+        BmsPlayfield widePlayfield = null!;
+
+        AddStep("create narrow 18K playfield", () => Child = new Container
+        {
+            RelativeSizeAxes = Axes.Y,
+            Width = 320,
+            Clock = new FramedClock(clock = new ManualClock()),
+            Child = widePlayfield = new BmsPlayfield([], 18, BmsLayoutVariant.Pms9KDouble, true),
+        });
+
+        AddUntilStep("stage has width", () => widePlayfield.Stage.DrawWidth > 0);
+        AddAssert("stage scaled down", () => widePlayfield.Stage.Scale.X, () => Is.LessThan(1));
+        AddAssert("stage fits playfield", () => widePlayfield.Stage.ScreenSpaceDrawQuad.Width, () => Is.LessThanOrEqualTo(widePlayfield.ScreenSpaceDrawQuad.Width + 1));
+    }
 }

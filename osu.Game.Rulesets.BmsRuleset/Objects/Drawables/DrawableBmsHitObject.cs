@@ -27,20 +27,23 @@ namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObject>
 {
     private const float travel_distance = 560;
+    private const float default_note_height = 14;
 
     private Container noteContainer = null!;
     private Box? longNoteBody;
     private Box? longNoteTail;
     private SkinnableDrawable? note;
     private bool longNoteStarted;
+    private float currentNoteHeight = default_note_height;
     private int skinnedColumn = -1;
+    private BmsLayoutVariant? skinnedLayout;
     private BmsSkinComponents? skinnedComponent;
 
     public DrawableBmsHitObject()
         : base(null!)
     {
         Origin = Anchor.BottomLeft;
-        Size = new Vector2(40, DefaultBmsNotePiece.NOTE_HEIGHT);
+        Size = new Vector2(40, default_note_height);
     }
 
     public bool TryHit()
@@ -112,6 +115,8 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
         var playfield = Parent?.FindClosestParent<BmsPlayfield>();
         var stage = playfield?.Stage;
+        updateNotePiece(playfield?.LayoutVariant);
+
         var column = Math.Clamp(HitObject.Column, 0, playfield?.TotalColumns - 1 ?? 0);
         var columnContainer = stage != null && column < stage.Columns.Length ? stage.Columns[column].HitObjectArea : Parent;
         var parentWidth = columnContainer?.DrawWidth ?? Parent?.DrawWidth ?? 0;
@@ -137,8 +142,16 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         var y = parentHeight - hitTargetPosition - (float)(timeUntilHit / timeRange) * travel_distance;
         var tailY = parentHeight - hitTargetPosition - (float)(endTimeUntilHit / timeRange) * travel_distance;
         var position = columnContainer != null && Parent != null
-            ? Parent.ToLocalSpace(columnContainer.ToScreenSpace(new Vector2(0, y)))
+            ? columnContainer.ToSpaceOfOtherDrawable(new Vector2(0, y), Parent)
             : new Vector2(0, y);
+        var scaledParentWidth = parentWidth;
+
+        if (columnContainer != null && Parent != null)
+        {
+            var left = columnContainer.ToSpaceOfOtherDrawable(Vector2.Zero, Parent);
+            var right = columnContainer.ToSpaceOfOtherDrawable(new Vector2(parentWidth, 0), Parent);
+            scaledParentWidth = (right - left).Length;
+        }
 
         if (!float.IsFinite(position.X) || !float.IsFinite(position.Y))
         {
@@ -147,7 +160,10 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         }
 
         Position = position;
-        Size = new Vector2(Math.Max(1, parentWidth), Math.Max(DefaultBmsNotePiece.NOTE_HEIGHT, note?.DrawHeight ?? 0));
+        var columnScale = parentWidth > 0 ? scaledParentWidth / parentWidth : 1;
+        currentNoteHeight = Math.Max(1, default_note_height * Math.Min(1, columnScale));
+
+        Size = new Vector2(Math.Max(1, scaledParentWidth), currentNoteHeight);
         updateLongNotePieces(y, tailY);
 
         if (playfield?.IsAutoplay == true && HitObject.IsLongNote && Time.Current >= HitObject.StartTime)
@@ -252,7 +268,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             Anchor = Anchor.BottomLeft,
             Origin = Anchor.BottomLeft,
             RelativeSizeAxes = Axes.X,
-            Height = DefaultBmsNotePiece.NOTE_HEIGHT,
+            Height = default_note_height,
             Colour = Color4.Cyan,
             Alpha = 0,
         });
@@ -270,29 +286,31 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             return;
         }
 
-        var height = Math.Max(DefaultBmsNotePiece.NOTE_HEIGHT, Math.Abs(tailY - headY));
+        var height = Math.Max(currentNoteHeight, Math.Abs(tailY - headY));
         longNoteBody.Y = Math.Min(0, tailY - headY);
         longNoteBody.Height = height;
         longNoteBody.Alpha = 0.55f;
         longNoteTail.Y = tailY - headY;
+        longNoteTail.Height = currentNoteHeight;
         longNoteTail.Alpha = 1;
     }
 
-    private void updateNotePiece()
+    private void updateNotePiece(BmsLayoutVariant? layoutVariant = null)
     {
         var component = HitObject?.IsMine == true ? BmsSkinComponents.Mine : BmsSkinComponents.Note;
+        var resolvedLayoutVariant = layoutVariant ?? Parent?.FindClosestParent<BmsPlayfield>()?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
 
-        if (HitObject == null || skinnedColumn == HitObject.Column && skinnedComponent == component)
+        if (HitObject == null || skinnedColumn == HitObject.Column && skinnedLayout == resolvedLayoutVariant && skinnedComponent == component)
             return;
 
         skinnedColumn = HitObject.Column;
+        skinnedLayout = resolvedLayoutVariant;
         skinnedComponent = component;
 
-        var playfield = Parent?.FindClosestParent<BmsPlayfield>();
-        var lookup = new BmsSkinComponentLookup(component, playfield?.LayoutVariant ?? BmsLayoutVariant.Bme7K, HitObject.Column);
+        var lookup = new BmsSkinComponentLookup(component, resolvedLayoutVariant, HitObject.Column);
 
         noteContainer.Clear();
-        noteContainer.Add(note = new SkinnableDrawable(lookup, _ => new DefaultBmsNotePiece())
+        noteContainer.Add(note = new SkinnableDrawable(lookup)
         {
             Anchor = Anchor.BottomLeft,
             Origin = Anchor.BottomLeft,

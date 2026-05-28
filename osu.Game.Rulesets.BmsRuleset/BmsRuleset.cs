@@ -102,12 +102,7 @@ public class BmsRuleset : Ruleset
     };
 
     public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap) =>
-        skin switch
-        {
-            ArgonSkin or TrianglesSkin or DefaultLegacySkin or RetroSkin => new BmsBuiltInSkinTransformer(skin),
-            Skin => new BmsLegacySkinTransformer(skin, beatmap),
-            _ => null,
-        };
+        BmsEmbeddedSkinDefinition.TryGetKind(skin, out _) ? new BmsBuiltInSkinTransformer(skin) : skin is Skin ? new BmsLegacySkinTransformer(skin, beatmap) : null;
 
     /// <summary>
     ///     Single source of truth for BMS judgement label names.

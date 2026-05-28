@@ -6,6 +6,7 @@ using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
@@ -24,6 +25,7 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
@@ -37,6 +39,9 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 /// </remarks>
 public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
 {
+    private const float health_display_gap = 24;
+    private const float minimum_side_padding = 20;
+
     public int TotalColumns { get; }
 
     public BmsLayoutVariant LayoutVariant { get; }
@@ -44,6 +49,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public BmsStage Stage { get; }
 
     public bool IsAutoplay { get; }
+
+    public override Quad SkinnableComponentScreenSpaceDrawQuad => Stage.ScreenSpaceDrawQuad;
 
     public double TimeRange { get; set; } = BmsDrawableRuleset.ComputeScrollTime(8);
 
@@ -61,6 +68,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     // Off-screen container that keeps cached drawables loaded when not shown in JudgementArea.
     private readonly Container judgementDrawablePool;
+    private LegacyHealthDisplay? healthDisplay;
 
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
@@ -200,10 +208,29 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         }
     }
 
+    protected override void Update()
+    {
+        base.Update();
+
+        updateStageScale();
+        updateHealthDisplayLayout();
+    }
+
     [BackgroundDependencyLoader(true)]
     private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
     {
         RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, 512);
+
+        if (healthProcessor != null)
+        {
+            AddInternal(healthDisplay = new LegacyHealthDisplay
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopCentre,
+                Rotation = 90,
+                UsesFixedAnchor = true,
+            });
+        }
 
         if (samplePlaybackDisabler != null)
             samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
@@ -228,6 +255,34 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             fallback = new BmsLegacySkinTransformer(new BmsEmbeddedSkin(BmsEmbeddedSkinKind.Legacy, host.Renderer, audio), beatmap);
 
         activeSkin.SetSources(parentSkin, primary, fallback);
+    }
+
+    private void updateStageScale()
+    {
+        if (!Stage.IsLoaded || Stage.DrawWidth <= 0 || DrawWidth <= 0)
+            return;
+
+        var healthReserve = Math.Max(64, ((healthDisplay?.IsLoaded == true) ? healthDisplay.DrawHeight : 0) + health_display_gap + minimum_side_padding);
+        var availableWidth = Math.Max(1, DrawWidth - healthReserve * 2);
+        var scale = Math.Min(1, availableWidth / Stage.DrawWidth);
+
+        if (float.IsFinite(scale) && scale > 0)
+            Stage.Scale = new Vector2(scale, 1);
+    }
+
+    private void updateHealthDisplayLayout()
+    {
+        if (!Stage.IsLoaded || healthDisplay?.IsLoaded != true)
+            return;
+
+        var stageTopRight = ToLocalSpace(Stage.ScreenSpaceDrawQuad.TopRight);
+        var stageHeight = (Stage.ScreenSpaceDrawQuad.BottomRight - Stage.ScreenSpaceDrawQuad.TopRight).Length;
+        var healthScale = Math.Min(1, stageHeight / Math.Max(1, healthDisplay.DrawWidth));
+
+        if (float.IsFinite(healthScale) && healthScale > 0)
+            healthDisplay.Scale = new Vector2(healthScale);
+
+        healthDisplay.Position = new Vector2(stageTopRight.X + health_display_gap, stageTopRight.Y);
     }
 
     private void onNewResult(DrawableHitObject drawableHitObject, JudgementResult result)

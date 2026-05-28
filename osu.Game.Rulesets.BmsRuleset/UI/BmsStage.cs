@@ -17,7 +17,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 public sealed partial class BmsStage : CompositeDrawable
 {
     public const float HIT_TARGET_POSITION = 80;
-    public const float COLUMN_SPACING = 1;
+    public const float COLUMN_SPACING = 0;
 
     public BmsColumn[] Columns { get; }
 
@@ -26,7 +26,6 @@ public sealed partial class BmsStage : CompositeDrawable
     public float HitTargetPosition => hitTargetPosition.Value;
 
     private readonly BindableFloat hitTargetPosition = new(HIT_TARGET_POSITION);
-    private readonly Container borderContainer;
     private readonly Drawable topBorder;
     private readonly Drawable bottomBorder;
     private readonly Drawable leftBorder;
@@ -82,7 +81,7 @@ public sealed partial class BmsStage : CompositeDrawable
                 Anchor = Anchor.TopCentre,
                 Origin = Anchor.Centre,
             },
-            borderContainer = new Container
+            new Container
             {
                 RelativeSizeAxes = Axes.Both,
                 Children =
@@ -122,7 +121,7 @@ public sealed partial class BmsStage : CompositeDrawable
         leftBorder.Height = rightBorder.Height = DrawHeight;
 
         var nonScratchCentre = getNonScratchCentreX();
-        X = DrawWidth / 2 - nonScratchCentre;
+        X = (DrawWidth / 2 - nonScratchCentre) * Scale.X;
     }
 
     [BackgroundDependencyLoader]
@@ -142,15 +141,18 @@ public sealed partial class BmsStage : CompositeDrawable
 
         var lineColour = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnLineColour))?.Value
                          ?? Color4.White.Opacity(0.25f);
-        var lineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftLineWidth, columnIndex: 0))
-                            ?.Value
-                        ?? 1;
+        var leftLineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftLineWidth, columnIndex: 0))?.Value ?? 1;
+        var rightLineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightLineWidth, columnIndex: Columns.Length - 1))?.Value ?? 1;
 
         foreach (var border in new[] { topBorder, bottomBorder, leftBorder, rightBorder })
             border.Colour = lineColour;
 
-        topBorder.Height = bottomBorder.Height = leftBorder.Width = rightBorder.Width = lineWidth;
-        borderContainer.Alpha = lineWidth > 0 ? 1 : 0;
+        topBorder.Height = bottomBorder.Height = Math.Max(leftLineWidth, rightLineWidth);
+        leftBorder.Width = leftLineWidth;
+        rightBorder.Width = rightLineWidth;
+        leftBorder.Alpha = leftLineWidth > 0 ? 1 : 0;
+        rightBorder.Alpha = rightLineWidth > 0 ? 1 : 0;
+        topBorder.Alpha = bottomBorder.Alpha = Math.Max(leftLineWidth, rightLineWidth) > 0 ? 1 : 0;
 
         Padding = new MarginPadding
         {

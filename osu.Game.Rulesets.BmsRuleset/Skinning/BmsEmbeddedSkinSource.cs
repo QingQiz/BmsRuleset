@@ -5,6 +5,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
@@ -23,23 +24,14 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable
         {
             var skin = source is ISkinTransformer transformer ? transformer.Skin : source;
 
-            switch (skin)
-            {
-                case LegacyBeatmapSkin:
-                case BmsEmbeddedSkin:
-                    continue;
+            if (skin is LegacyBeatmapSkin or BmsEmbeddedSkin)
+                continue;
 
-                case ArgonSkin:
-                case TrianglesSkin:
-                    return BmsEmbeddedSkinKind.Modern;
+            if (BmsEmbeddedSkinDefinition.TryGetKind(skin, out var kind))
+                return kind;
 
-                case DefaultLegacySkin:
-                case RetroSkin:
-                    return BmsEmbeddedSkinKind.Legacy;
-
-                case Skin:
-                    return BmsEmbeddedSkinKind.Legacy;
-            }
+            if (skin is Skin)
+                return BmsEmbeddedSkinKind.Legacy;
         }
 
         return BmsEmbeddedSkinKind.Legacy;
@@ -56,10 +48,13 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable
     }
 
     public Drawable? GetDrawableComponent(ISkinComponentLookup lookup) =>
-        parent?.GetDrawableComponent(lookup) ?? primary?.GetDrawableComponent(lookup) ?? fallback?.GetDrawableComponent(lookup);
+        lookup is BmsSkinComponentLookup or SkinComponentLookup<HitResult> or GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null }
+            ? parent?.GetDrawableComponent(lookup) ?? primary?.GetDrawableComponent(lookup) ?? fallback?.GetDrawableComponent(lookup)
+            : parent?.GetDrawableComponent(lookup);
 
     public Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) =>
-        parent?.GetTexture(componentName, wrapModeS, wrapModeT) ?? primary?.GetTexture(componentName, wrapModeS, wrapModeT) ?? fallback?.GetTexture(componentName, wrapModeS, wrapModeT);
+        parent?.GetTexture(componentName, wrapModeS, wrapModeT)
+        ?? primary?.GetTexture(componentName, wrapModeS, wrapModeT) ?? fallback?.GetTexture(componentName, wrapModeS, wrapModeT);
 
     public ISample? GetSample(ISampleInfo sampleInfo) =>
         parent?.GetSample(sampleInfo) ?? primary?.GetSample(sampleInfo) ?? fallback?.GetSample(sampleInfo);
@@ -67,7 +62,9 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable
     public IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         where TLookup : notnull
         where TValue : notnull
-        => parent?.GetConfig<TLookup, TValue>(lookup) ?? primary?.GetConfig<TLookup, TValue>(lookup) ?? fallback?.GetConfig<TLookup, TValue>(lookup);
+        => lookup is BmsSkinConfigurationLookup
+            ? parent?.GetConfig<TLookup, TValue>(lookup) ?? primary?.GetConfig<TLookup, TValue>(lookup) ?? fallback?.GetConfig<TLookup, TValue>(lookup)
+            : parent?.GetConfig<TLookup, TValue>(lookup);
 
     public ISkin? FindProvider(Func<ISkin, bool> lookupFunction)
     {

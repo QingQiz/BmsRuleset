@@ -13,6 +13,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Rendering.Dummy;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Testing;
 using osu.Framework.IO.Stores;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
@@ -22,6 +23,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 
@@ -350,11 +352,27 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestLegacyHudDoesNotProvideHealthDisplay()
+    {
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+        };
+        var skin = new BmsLegacySkinTransformer(new TestLegacySkin(["mania-key1"]), beatmap);
+        var hud = skin.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new RulesetInfo("bms", "BMS", string.Empty, -1)));
+
+        Assert.That(hud, Is.Not.Null);
+        Assert.That(hud!.ChildrenOfType<HealthDisplay>(), Is.Empty);
+    }
+
+    [Test]
     public void TestDefaultSkinResourcesAreEmbedded()
     {
         var resources = typeof(BmsRuleset).Assembly.GetManifestResourceNames();
 
         Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.mania-key1@2x.png"));
+        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Skins.Modern.mania-key1.png"));
         Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.mania-hit300g-0@2x.png"));
         Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.lightingN@2x.png"));
         Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.scorebar-bg@2x.png"));
@@ -460,6 +478,7 @@ public class BmsLegacySkinTransformerTest
         Assert.That(transformer.GetDrawableComponent(lookup), Is.Null);
         Assert.That(transformer.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup)), Is.Null);
         Assert.That(transformer.GetDrawableComponent(new SkinComponentLookup<HitResult>(HitResult.Perfect)), Is.Null);
+        Assert.That(transformer.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo)), Is.Null);
     }
 
     [Test]
@@ -522,6 +541,22 @@ public class BmsLegacySkinTransformerTest
         Assert.That(source.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage,
                 new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)))?.Value,
             Is.EqualTo("parent-note"));
+    }
+
+    [Test]
+    public void TestEmbeddedSkinSourceUsesEmbeddedHudBeforeParentBuiltInHud()
+    {
+        var beatmap = createBeatmap();
+        using var source = new BmsEmbeddedSkinSource();
+        var parent = new TestSkinSource(new BmsBuiltInSkinTransformer(new ArgonSkin(ArgonSkin.CreateInfo(), storage_resources)));
+        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            """), beatmap);
+
+        source.SetSources(parent, primary, null);
+
+        Assert.That(source.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo)), Is.Not.Null);
     }
 
     [Test]

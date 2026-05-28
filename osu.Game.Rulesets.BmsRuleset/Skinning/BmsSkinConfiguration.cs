@@ -26,6 +26,7 @@ public sealed class BmsSkinConfiguration
     public int SpecialStyle { get; set; }
 
     public Dictionary<string, string> Values { get; } = new(StringComparer.Ordinal);
+
     public Dictionary<string, Color4> Colours { get; } = new(StringComparer.Ordinal);
 
     public bool TryGet<TValue>(LegacyManiaSkinConfigurationLookups lookup, int? column, out IBindable<TValue>? value)
@@ -45,8 +46,8 @@ public sealed class BmsSkinConfiguration
             LegacyManiaSkinConfigurationLookups.ExplosionImage => getImageValue("LightingN"),
             LegacyManiaSkinConfigurationLookups.ColumnLineColour => getColourValue("ColourColumnLine"),
             LegacyManiaSkinConfigurationLookups.JudgementLineColour => getColourValue("ColourJudgementLine"),
-            LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour => column == null ? null : getColourValue($"Colour{column.Value + 1}"),
-            LegacyManiaSkinConfigurationLookups.ColumnLightColour => column == null ? null : getColourValue($"ColourLight{column.Value + 1}"),
+            LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour => column == null ? null : getColumnColourValue("Colour", column.Value + 1),
+            LegacyManiaSkinConfigurationLookups.ColumnLightColour => column == null ? null : getColumnColourValue("ColourLight", column.Value + 1),
             LegacyManiaSkinConfigurationLookups.ComboBreakColour => getColourValue("ColourBreak"),
             LegacyManiaSkinConfigurationLookups.BarLineColour => getColourValue("ColourBarline"),
             LegacyManiaSkinConfigurationLookups.MinimumColumnWidth => getMinimumColumnWidth(),
@@ -96,7 +97,7 @@ public sealed class BmsSkinConfiguration
     }
 
     private string? getColumnImage(string prefix, int? column, string suffix = "")
-        => column == null ? null : getImageValue($"{prefix}{column.Value}{suffix}");
+        => column == null ? null : getImageValue($"{prefix}{column.Value}{suffix}") ?? getImageValue($"{prefix}{suffix}");
 
     private string? getImageValue(string key) => Values.TryGetValue(key, out var result) && !string.IsNullOrWhiteSpace(result) ? result : null;
 
@@ -131,6 +132,8 @@ public sealed class BmsSkinConfiguration
     }
 
     private Color4? getColourValue(string key) => Colours.TryGetValue(key, out var result) ? result : null;
+
+    private Color4? getColumnColourValue(string prefix, int column) => getColourValue($"{prefix}{column}") ?? getColourValue(prefix);
 
     private float? getArrayValue(string key, int? index, bool scale = true)
     {

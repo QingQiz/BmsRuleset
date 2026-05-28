@@ -39,8 +39,7 @@ public sealed partial class BmsColumn : CompositeDrawable
         RelativeSizeAxes = Axes.Y;
         Width = defaultColumnWidth(index, layoutVariant);
         Masking = true;
-        BorderThickness = IsScratch ? 2 : 1;
-        BorderColour = Color4.White.Opacity(IsScratch ? 0.12f : 0.06f);
+        BorderThickness = 0;
 
         InternalChildren =
         [
