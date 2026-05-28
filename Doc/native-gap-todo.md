@@ -321,13 +321,34 @@ Files:
 
 - `BmsRuleset.cs`
 - `UI/BmsPlayfield.cs`
+- `UI/BmsStage.cs`
 - `Objects/Drawables/DrawableBmsHitObject.cs`
+- `Skinning/BmsEmbeddedSkin.cs`
+- `Skinning/BmsEmbeddedSkinSource.cs`
+- `Skinning/BmsEmbeddedSkinDefinition.cs`
+- `Skinning/BmsLegacySkinTransformer.cs`
+- `Skinning/BmsBuiltInSkinTransformer.cs`
+- `Skinning/BmsSkinConfigurationDecoder.cs`
+- `Skinning/BmsSkinConfiguration.cs`
+- `Skinning/BmsSkinConfigurationLookup.cs`
+- `Skinning/BmsSkinComponentLookup.cs`
 
 Current state:
 
 - Ruleset icon still uses `OsuIcon.RulesetMania` as a placeholder.
-- `CreateSkinTransformer()` returns a BMS legacy skin transformer for `LegacySkin`.
+- `BmsEmbeddedSkin` implements `ISkin + IDisposable` directly (not inheriting `Skin`); exposes `internal IResourceStore<byte[]> Resources` for decoder use. Two built-in skin kinds: `LegacyOld` (original legacy style) and `LegacyModern` (modernised but still legacy format).
+- `BmsEmbeddedSkinSource` provides three-tier priority routing: beatmap skin → user skin → built-in embedded skin.
+- `BmsLegacySkinTransformer` inherits `LegacySkinTransformer`; `IsProvidingLegacyResources` is overridden via `Lazy<bool> hasBmsResources` (checks `#BMS` skin.ini section, `mania-keyS` animation, and `mania-key1` animation as a weak fallback).
+- `BmsBuiltInSkinTransformer` adapts built-in skins; passes through global HUD wrapped in `HealthFilteredHudContainer`; returns `null` for BMS-specific components, hit results, and ruleset HUD to let the built-in skin handle them.
+- `CreateSkinTransformer()` uses an explicit switch: built-in skins → `BmsBuiltInSkinTransformer`; other `Skin` instances → `BmsLegacySkinTransformer`; pure `ISkin` (including `BmsEmbeddedSkin`) → `null`.
+- `BmsSkinConfigurationDecoder` fully bypasses `LegacySkinDecoder` (no official `skin.ini` extension point); new `Decode(IResourceStore<byte[]>)` overload added as the preferred path; reflection-based `Decode(ISkin)` retains a TODO.
+- `BmsSkinConfigurationLookup` has two column index paths: `ComponentLookup` (carries both BMS and mania column indices) and bare `ColumnIndex` (no column context).
+- `BmsSkinConfiguration.TryGet` branches on lookup type: `[BMS]` section uses BMS column index; `[Mania]` section uses mania column index via `ManiaColumnIndex`.
+- `BmsSkinComponentLookup` provides `GetManiaKeyCount`, `MapToManiaColumn`, `IsScratchColumn`, and `ManiaColumnIndex` helpers.
 - Legacy mania skin compatibility exists for columns, notes, key areas, key-down pieces, hit target, hit explosions, judgements, and HUD pieces.
+- ~~Bug: `JudgementArea.X` not aligned to non-scratch column centre~~ ✓ Fixed. `BmsStage.Update()` now sets `JudgementArea.X = nonScratchCentre - DrawWidth / 2` each frame.
+- ~~Bug: `LeftLineWidth`/`RightLineWidth` query caused `IndexOutOfRangeException` on BME 7K / BMS 5K~~ ✓ Fixed. `BmsStage.updateFromSkin()` now queries `BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, column)` and uses `ManiaColumnIndex`, preventing OOB on `ColumnLineWidth[]`.
+- ~~Bug: Judgement drawable anchored `TopLeft/TopLeft`, image appeared at stage left edge~~ ✓ Fixed. `BmsPlayfield` now sets `Anchor = Anchor.TopCentre, Origin = Anchor.TopCentre` on all pre-cached judgement drawables so they centre inside `JudgementArea`.
 - No native BMS skin format, keybeam, or BGA skin support exists.
 
 TODO:
@@ -335,6 +356,8 @@ TODO:
 - Add BMS-specific icon.
 - Define native BMS skin format and defaults.
 - Add keybeam/BGA skin components and richer native note/LN skin support.
+- Implement Argon-native skin transformer once a native (non-legacy) skin format is defined.
+- Remove reflection from `BmsSkinConfigurationDecoder.Decode(ISkin)`; use `IResourceStore<byte[]>` path exclusively once all callers are migrated.
 
 ## Tests That Still Need Coverage
 

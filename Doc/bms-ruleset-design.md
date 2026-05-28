@@ -31,7 +31,7 @@
 | `Beatmaps/BmsBeatmapConverter.cs` | Pass-through native BMS converter，恢复 decoder sidecar timing/sample/layout data。 | 只保留非 BMS 来源转换需要的最小处理。 |
 | `Beatmaps/BmsFileImporter.cs` | Folder import 生成一个 set 多个 beatmap，single chart import 生成单 chart set，并导入引用资源。 | 实现完整 import planner、relative resource paths、stream/archive import。 |
 | `Objects/BmsHitObject.cs` | `Column`、`IsLongNote`、`Duration`、`SamplePath`、`TickInfo`。 | 增加 mine、invisible、native LN head/tail/body 等 BMS 数据。 |
-| `UI/*` / `Skinning/*` | Native playfield/stage/columns/note drawables，time-based render，legacy mania skin component compatibility。 | 补全 LN body、STOP freeze/soflan、BGA、key beams、native skin format。 |
+| `UI/*` / `Skinning/*` | Native playfield/stage/columns/note drawables，time-based render。`BmsEmbeddedSkin` 改为 `ISkin+IDisposable`，内置皮肤枚举 `LegacyOld`/`LegacyModern`。`BmsLegacySkinTransformer` 继承 `LegacySkinTransformer`；`BmsBuiltInSkinTransformer` 包装 HUD 为 `HealthFilteredHudContainer`。`CreateSkinTransformer` 使用显式 switch。`BmsSkinConfigurationDecoder` 独立解析 `[BMS]` skin.ini 节。三处 UI bug 已修复：`JudgementArea.X` 非 scratch 列居中；BME 7K/BMS 5K `ColumnLineWidth` OOB；判定 drawable `Anchor.TopCentre` 对齐。 | 补全 LN body、STOP freeze/soflan、BGA、key beams、native skin format、Argon-native transformer。 |
 | `Scoring/*` | Native BMS scoring: EX score (Perfect=2, Great=1, else 0), DJ LEVEL rank, combo reset on BAD/POOR, `RankFromScore` never returns F. Normal gauge via `BmsHealthProcessor` (`#TOTAL`-driven, starts at 20%, fails at gauge=0 or <80% at end). Empty POOR via `RegisterEmptyPoor` on both processors. | Implement clear lamp storage, results screen, `#EXRANK`, easy/hard gauge variants. |
 
 ## 总体架构

@@ -240,6 +240,14 @@ dotnet run --project "osu.Game.Rulesets.BmsRuleset.Tests"
 - [x] 实现 judgement line。
 - [x] 实现 native stage/column visuals and scratch-excluded centering。
 - [x] 实现 notes fill lane width and anchor at lane left-bottom。
+- [x] 重构 Skinning 层：`BmsEmbeddedSkin` 改为 `ISkin+IDisposable`，暴露 `internal IResourceStore<byte[]> Resources`；内置皮肤枚举 `LegacyOld`/`LegacyModern`。
+- [x] 新增 `BmsLegacySkinTransformer`：继承 `LegacySkinTransformer`，`override IsProvidingLegacyResources`，`Lazy<bool> hasBmsResources`，`UnsupportedSkinComponentException`。
+- [x] 新增 `BmsBuiltInSkinTransformer`：内置皮肤适配；全局 HUD 透传套 `HealthFilteredHudContainer`；BMS 专用组件/hit result/ruleset HUD 返回 `null`。
+- [x] 新增 `BmsSkinConfigurationDecoder`：自定义 `skin.ini` `[BMS]` 节解析，绕过 `LegacySkinDecoder`；新增 `Decode(IResourceStore<byte[]>)` 首选重载。
+- [x] `CreateSkinTransformer` 改为显式 switch：built-in → `BmsBuiltInSkinTransformer`，`Skin` → `BmsLegacySkinTransformer`，纯 `ISkin` → `null`。
+- [x] Bug fix：`BmsStage.Update()` 加入 `JudgementArea.X = nonScratchCentre - DrawWidth / 2`，修复判定容器未对齐非 scratch 列中心。
+- [x] Bug fix：`BmsStage.updateFromSkin()` 边框线宽查询改用 `BmsSkinComponentLookup(ColumnBackground, layoutVariant, column)` + `ManiaColumnIndex`，修复 BME 7K/BMS 5K 的 `IndexOutOfRangeException`。
+- [x] Bug fix：`BmsPlayfield` 判定 drawable 加入 `Anchor = Anchor.TopCentre, Origin = Anchor.TopCentre`，修复图像贴近舞台左边缘问题。
 - [ ] 实现 LN body render。
 - [ ] 实现 STOP freeze render。
 - [x] `BmsRuleset.CreateDrawableRulesetWith()` 改为返回 `BmsDrawableRuleset`。

@@ -31,6 +31,8 @@
 ## TODO
 
 - [ ] Mine
+- [ ] random/switch
+- [ ] ln render
 - [ ] health bar overflow
 - [ ] timing sys
 - [ ] measure line
@@ -45,6 +47,14 @@
   - [ ] auto scratch
   - [ ] hide scratch
   - [ ] mirror
+  - [ ] different health bar
 
 - ask
   - [ ] ask how to impl a new HUD element (e.g. combo, score, ...), and how to customize their position/size/skin
+
+- importer
+  - [ ] use a reference/symbolic link to the original bms file instead of copying it to the realm, to speed up the import.
+  
+- [ ] result screen
+
+- [ ] bga
