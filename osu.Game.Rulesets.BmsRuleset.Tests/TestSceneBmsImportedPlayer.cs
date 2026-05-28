@@ -188,10 +188,10 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene
         AddAssert("player loaded beatmap", () => Player.LoadedBeatmapSuccessfully);
         AddAssert("player has imported objects", () => Player.DrawableRuleset.Objects.Count(), () => Is.GreaterThan(100));
 
-        AddStep("seek to first key note", () =>
+        AddStep("seek before first key note", () =>
         {
             firstKeyNote = Player.DrawableRuleset.Objects.OfType<BmsHitObject>().First(o => o.Column == 1);
-            Player.GameplayClockContainer.Seek(firstKeyNote.StartTime);
+            Player.GameplayClockContainer.Seek(firstKeyNote.StartTime - 100);
         });
 
         AddUntilStep("target key note alive", () => Player.DrawableRuleset.Playfield.HitObjectContainer.AliveObjects.Any(d => d.HitObject == firstKeyNote));
