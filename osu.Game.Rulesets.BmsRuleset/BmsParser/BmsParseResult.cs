@@ -27,6 +27,7 @@ public readonly record struct BmsParsedHitObject(
     string SourceChannel,
     string SampleKey,
     string SamplePath,
-    bool IsLongNote);
+    bool IsLongNote,
+    bool IsMine);
 
 public sealed record BmsSampleEvent(double Time, long Tick, string SampleKey);

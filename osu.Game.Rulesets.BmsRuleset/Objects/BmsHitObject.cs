@@ -26,6 +26,8 @@ public class BmsHitObject : HitObject, IHasDuration
 
     public bool IsLongNote { get; set; }
 
+    public bool IsMine { get; set; }
+
     /// <summary>BMS #RANK value stamped from the beatmap during conversion. 0=Very Hard, 1=Hard, 2=Normal, 3=Easy, 4=Very Easy.</summary>
     public int BmsRank { get; set; } = 2;
 

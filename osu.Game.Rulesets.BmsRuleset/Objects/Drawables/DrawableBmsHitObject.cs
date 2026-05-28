@@ -34,6 +34,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     private SkinnableDrawable? note;
     private bool longNoteStarted;
     private int skinnedColumn = -1;
+    private BmsSkinComponents? skinnedComponent;
 
     public DrawableBmsHitObject()
         : base(null!)
@@ -93,7 +94,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         updateNotePiece();
 
         if (note != null)
-            note.Colour = HitObject.IsLongNote ? Color4.Cyan : Color4.White;
+            note.Colour = HitObject.IsMine ? Color4.OrangeRed : HitObject.IsLongNote ? Color4.Cyan : Color4.White;
 
         if (longNoteBody != null)
             longNoteBody.Alpha = HitObject.IsLongNote ? 0.55f : 0;
@@ -279,13 +280,16 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     private void updateNotePiece()
     {
-        if (HitObject == null || skinnedColumn == HitObject.Column)
+        var component = HitObject?.IsMine == true ? BmsSkinComponents.Mine : BmsSkinComponents.Note;
+
+        if (HitObject == null || skinnedColumn == HitObject.Column && skinnedComponent == component)
             return;
 
         skinnedColumn = HitObject.Column;
+        skinnedComponent = component;
 
         var playfield = Parent?.FindClosestParent<BmsPlayfield>();
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, playfield?.LayoutVariant ?? BmsLayoutVariant.Bme7K, HitObject.Column);
+        var lookup = new BmsSkinComponentLookup(component, playfield?.LayoutVariant ?? BmsLayoutVariant.Bme7K, HitObject.Column);
 
         noteContainer.Clear();
         noteContainer.Add(note = new SkinnableDrawable(lookup, _ => new DefaultBmsNotePiece())

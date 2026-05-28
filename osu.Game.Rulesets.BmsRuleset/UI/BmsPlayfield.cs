@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Framework.Platform;
 using osu.Game.Audio;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
@@ -45,6 +48,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public double TimeRange { get; set; } = BmsDrawableRuleset.ComputeScrollTime(8);
 
     private readonly IReadOnlyList<BmsHitObject> hitObjects;
+    private readonly BmsBeatmap? beatmap;
 
     private readonly Dictionary<int, int> nextSoundIndexByColumn = new();
 
@@ -60,14 +64,28 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
+    [Cached(typeof(ISkinSource))]
+    private readonly BmsEmbeddedSkinSource activeSkin;
+
     [Resolved(CanBeNull = true)]
     private BmsHealthProcessor? healthProcessor { get; set; }
 
     [Resolved(CanBeNull = true)]
     private BmsScoreProcessor? scoreProcessor { get; set; }
 
+    [Resolved]
+    private GameHost host { get; set; } = null!;
+
+    [Resolved(CanBeNull = true)]
+    private AudioManager? audio { get; set; }
+
+    [Resolved]
+    private ISkinSource parentSkin { get; set; } = null!;
+
     public BmsPlayfield(IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K, bool isAutoplay = false)
     {
+        activeSkin = new BmsEmbeddedSkinSource();
+
         this.hitObjects = hitObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
         TotalColumns = Math.Max(1, totalColumns);
         LayoutVariant = layoutVariant;
@@ -86,11 +104,20 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         ];
     }
 
+    public BmsPlayfield(BmsBeatmap beatmap, bool isAutoplay = false)
+        : this(beatmap.HitObjects, beatmap.TotalColumns, beatmap.LayoutVariant, isAutoplay)
+    {
+        this.beatmap = beatmap;
+    }
+
     #region Disposal
 
     protected override void Dispose(bool isDisposing)
     {
         NewResult -= onNewResult;
+        if (parentSkin != null)
+            parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
+        activeSkin.DisposeEmbeddedSkins();
         base.Dispose(isDisposing);
     }
 
@@ -180,6 +207,27 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         if (samplePlaybackDisabler != null)
             samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
+
+        parentSkin.SourceChanged += updateEmbeddedSkinFallback;
+        updateEmbeddedSkinFallback();
+    }
+
+    private void updateEmbeddedSkinFallback()
+    {
+        if (beatmap == null)
+        {
+            activeSkin.SetSources(parentSkin, null, null);
+            return;
+        }
+
+        var kind = BmsEmbeddedSkinSource.GetEmbeddedSkinKind(parentSkin.AllSources);
+        var primary = new BmsLegacySkinTransformer(new BmsEmbeddedSkin(kind, host.Renderer, audio), beatmap);
+        BmsLegacySkinTransformer? fallback = null;
+
+        if (kind != BmsEmbeddedSkinKind.Legacy)
+            fallback = new BmsLegacySkinTransformer(new BmsEmbeddedSkin(BmsEmbeddedSkinKind.Legacy, host.Renderer, audio), beatmap);
+
+        activeSkin.SetSources(parentSkin, primary, fallback);
     }
 
     private void onNewResult(DrawableHitObject drawableHitObject, JudgementResult result)

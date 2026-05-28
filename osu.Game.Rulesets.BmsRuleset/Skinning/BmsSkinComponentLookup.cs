@@ -82,6 +82,7 @@ public enum BmsSkinComponents
     ColumnBackground,
     HitTarget,
     KeyArea,
+    Mine,
     Note,
     HoldNoteHead,
     HoldNoteTail,

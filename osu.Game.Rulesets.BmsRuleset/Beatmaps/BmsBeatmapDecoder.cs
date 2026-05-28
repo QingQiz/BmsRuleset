@@ -62,6 +62,7 @@ public class BmsBeatmapDecoder : Decoder<Beatmap>
                 SampleKey = parsedObject.SampleKey,
                 SamplePath = parsedObject.SamplePath,
                 IsLongNote = parsedObject.IsLongNote,
+                IsMine = parsedObject.IsMine,
             });
         }
     }

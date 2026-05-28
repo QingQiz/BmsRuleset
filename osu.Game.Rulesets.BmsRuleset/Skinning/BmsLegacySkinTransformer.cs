@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -23,7 +24,6 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 
 // TODO remove osu native health bar, replace with bms native health bar, skinnable (only position)
-// TODO mine
 // TODO rank mark
 public partial class BmsLegacySkinTransformer : SkinTransformer
 {
@@ -32,6 +32,7 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
     private readonly BmsLayoutVariant layoutVariant;
     private readonly int maniaKeyCount;
     private readonly Lazy<bool> isLegacySkin;
+    private readonly Lazy<IReadOnlyList<BmsSkinConfiguration>> skinConfigurations;
 
     private static readonly (HitResult Result, LegacyManiaSkinConfigurationLookups Lookup, string Filename)[] hit_result_mappings =
     [
@@ -59,20 +60,21 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
         maniaKeyCount = BmsSkinComponentLookup.GetManiaKeyCount(layoutVariant);
 
         isLegacySkin = new Lazy<bool>(() => GetConfig<SkinConfiguration.LegacySetting, decimal>(SkinConfiguration.LegacySetting.Version) != null);
+        skinConfigurations = new Lazy<IReadOnlyList<BmsSkinConfiguration>>(() => BmsSkinConfigurationDecoder.Decode(Skin));
     }
 
     public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
     {
         if (lookup is GlobalSkinnableContainerLookup containerLookup && containerLookup.Lookup == GlobalSkinnableContainers.MainHUDComponents && containerLookup.Ruleset != null)
-            return createLegacyHud();
+            return isLegacySkin.Value ? createLegacyHud() : base.GetDrawableComponent(lookup);
 
-        if (lookup is SkinComponentLookup<HitResult> resultLookup && isLegacySkin.Value)
+        if (lookup is SkinComponentLookup<HitResult> resultLookup && hasLegacyResources())
             return getResult(resultLookup.Component) ?? base.GetDrawableComponent(lookup);
 
         if (lookup is not BmsSkinComponentLookup bmsLookup)
             return base.GetDrawableComponent(lookup);
 
-        if (!isLegacySkin.Value)
+        if (!hasLegacyResources())
             return null;
 
         return bmsLookup.Component switch
@@ -81,6 +83,7 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
             BmsSkinComponents.ColumnBackground => new LegacyBmsColumnBackground(this, bmsLookup),
             BmsSkinComponents.HitTarget when bmsLookup.ColumnIndex == null && hasAnimation(getHitTargetImageName()) => new LegacyBmsHitTarget(this),
             BmsSkinComponents.KeyArea when hasAnimation(getKeyImageName(bmsLookup, false)) => new LegacyBmsKeyArea(this, bmsLookup),
+            BmsSkinComponents.Mine when hasAnimation(getMineImageName(bmsLookup)) => new LegacyBmsNotePiece(this, bmsLookup),
             BmsSkinComponents.HitExplosion when hasAnimation(getHitExplosionImageName(bmsLookup)) => new LegacyBmsHitExplosion(this, bmsLookup),
             BmsSkinComponents.StageBackground when hasAnyAnimation(getStageBackgroundImageNames()) => new LegacyBmsStageBackground(this),
             BmsSkinComponents.StageForeground when hasAnimation(getStageForegroundImageName()) => new LegacyBmsStageForeground(this),
@@ -91,8 +94,18 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
     public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
     {
         if (lookup is BmsSkinConfigurationLookup bmsLookup)
+        {
+            foreach (var configuration in getConfigurations())
+            {
+                var column = getConfigurationColumn(configuration, bmsLookup);
+
+                if (configuration.TryGet<TValue>(bmsLookup.Lookup, column, out var value))
+                    return value;
+            }
+
             return Skin.GetConfig<LegacyManiaSkinConfigurationLookup, TValue>(new LegacyManiaSkinConfigurationLookup(maniaKeyCount, bmsLookup.Lookup,
                 bmsLookup.ComponentLookup?.ManiaColumnIndex ?? bmsLookup.ColumnIndex));
+        }
 
         return base.GetConfig<TLookup, TValue>(lookup);
     }
@@ -140,9 +153,62 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
 
     private bool hasAnyAnimation(params string[] names) => names.Any(hasAnimation);
 
+    private bool hasLegacyResources() => isLegacySkin.Value || skinConfigurations.Value.Count > 0 || hasAnimation("mania-key1") || hasAnimation("mania-keyS");
+
+    private IEnumerable<BmsSkinConfiguration> getConfigurations()
+    {
+        foreach (var configuration in skinConfigurations.Value.Where(c => c.Section == BmsSkinConfigurationSection.Bms && c.Layout == layoutVariant))
+            yield return configuration;
+
+        foreach (var configuration in getManiaFallbackConfigurations())
+            yield return configuration;
+    }
+
+    private IEnumerable<BmsSkinConfiguration> getManiaFallbackConfigurations()
+    {
+        var configurations = skinConfigurations.Value.Where(c => c.Section == BmsSkinConfigurationSection.Mania).ToArray();
+
+        foreach (var keys in getSpecialStyleManiaFallbackKeys())
+        {
+            foreach (var configuration in configurations.Where(c => c.Keys == keys && c.SpecialStyle == 1))
+                yield return configuration;
+        }
+
+        foreach (var configuration in configurations.Where(c => c.Keys == maniaKeyCount))
+            yield return configuration;
+    }
+
+    private IEnumerable<int> getSpecialStyleManiaFallbackKeys()
+    {
+        switch (layoutVariant)
+        {
+            case BmsLayoutVariant.Bms5K:
+                yield return 6;
+
+                break;
+
+            case BmsLayoutVariant.Bme7K:
+                yield return 8;
+
+                break;
+        }
+    }
+
+    private int? getConfigurationColumn(BmsSkinConfiguration configuration, BmsSkinConfigurationLookup lookup)
+    {
+        if (configuration.Section == BmsSkinConfigurationSection.Bms || configuration.Keys != maniaKeyCount)
+            return lookup.ComponentLookup?.ColumnIndex ?? lookup.ColumnIndex;
+
+        return lookup.ComponentLookup?.ManiaColumnIndex ?? lookup.ColumnIndex;
+    }
+
     private string getNoteImageName(BmsSkinComponentLookup lookup) =>
         getManiaConfig<string>(LegacyManiaSkinConfigurationLookups.NoteImage, lookup)?.Value
         ?? $"mania-note{fallbackColumnIndex(lookup)}";
+
+    private string getMineImageName(BmsSkinComponentLookup lookup) =>
+        getManiaConfig<string>(LegacyManiaSkinConfigurationLookups.Hit100, lookup)?.Value
+        ?? "mania-noteS";
 
     private string getKeyImageName(BmsSkinComponentLookup lookup, bool down) =>
         getManiaConfig<string>(down ? LegacyManiaSkinConfigurationLookups.KeyImageDown : LegacyManiaSkinConfigurationLookups.KeyImage, lookup)?.Value
@@ -350,7 +416,9 @@ public partial class BmsLegacySkinTransformer : SkinTransformer
         {
             base.LoadComplete();
 
-            InternalChild = noteAnimation = transformer.getAnimation(transformer.getNoteImageName(lookup))?.With(d =>
+            InternalChild = noteAnimation = transformer.getAnimation(lookup.Component == BmsSkinComponents.Mine
+                ? transformer.getMineImageName(lookup)
+                : transformer.getNoteImageName(lookup))?.With(d =>
             {
                 d.Anchor = Anchor.BottomLeft;
                 d.Origin = Anchor.BottomLeft;

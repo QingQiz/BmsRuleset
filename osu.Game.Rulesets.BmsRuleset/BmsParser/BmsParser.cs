@@ -424,7 +424,8 @@ static internal partial class BmsChartParser
             start.Channel,
             start.Value,
             sampleDefinitions.GetValueOrDefault(start.Value, string.Empty),
-            isLongNote);
+            isLongNote,
+            false);
     }
 
     private static IEnumerable<RawCell> expandCells(
