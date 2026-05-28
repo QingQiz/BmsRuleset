@@ -1,4 +1,4 @@
-using System.Reflection;
+using System;
 using System.IO;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
@@ -12,27 +12,80 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 
-public sealed class BmsEmbeddedSkin : Skin
+/// <summary>
+/// A lightweight DLL-embedded skin that provides BMS-specific fallback textures and samples.
+/// </summary>
+/// <remarks>
+/// This is the last-resort visual layer in the BMS skin source chain: it is only consulted
+/// after the user's selected skin, <see cref="LegacyBeatmapSkin"/>, and all other osu!
+/// skin sources have failed to satisfy a lookup.
+/// <para>
+/// Unlike the osu! built-in skins it deliberately does <em>not</em> inherit from
+/// <see cref="Skin"/>. This avoids reflection-based store access and prevents
+/// <see cref="BmsEmbeddedSkinSource.GetEmbeddedSkinKind"/> from misidentifying it as a
+/// user skin when scanning <c>AllSources</c>.
+/// </para>
+/// <para>
+/// The class is a pure resource provider: <see cref="GetDrawableComponent"/> and
+/// <see cref="GetConfig{TLookup,TValue}"/> always return <c>null</c>.
+/// Only textures and samples are served from the embedded store.
+/// </para>
+/// </remarks>
+public sealed class BmsEmbeddedSkin : ISkin, IDisposable
 {
-    private static readonly FieldInfo? skin_store_field = typeof(Skin).GetField("store", BindingFlags.Instance | BindingFlags.NonPublic);
+    /// <summary>
+    /// The raw byte store backing this skin, exposed so that callers such as
+    /// <see cref="BmsLegacySkinTransformer"/> can read <c>skin.ini</c> without reflection.
+    /// </summary>
+    internal readonly IResourceStore<byte[]> Resources;
 
     private readonly TextureStore textures;
     private readonly ISampleStore? samples;
 
-    public BmsEmbeddedSkin(BmsEmbeddedSkinKind skin, IRenderer renderer, AudioManager? audioManager)
-        : base(new SkinInfo($"BMS {skin}", "BMS Ruleset"), null, createStore(skin))
+    /// <param name="kind">Which embedded asset set to load.</param>
+    /// <param name="renderer">Renderer used to upload textures to the GPU.</param>
+    /// <param name="audioManager">
+    /// Audio manager used to open sample streams.
+    /// Pass <c>null</c> in headless / test contexts where audio is unavailable.
+    /// </param>
+    public BmsEmbeddedSkin(BmsEmbeddedSkinKind kind, IRenderer renderer, AudioManager? audioManager)
     {
-        var resources = (IResourceStore<byte[]>)skin_store_field!.GetValue(this)!;
+        Resources = createStore(kind);
 
-        textures = new TextureStore(renderer, new TextureLoaderStore(resources), scaleAdjust: 1);
-        samples = audioManager?.GetSampleStore(new NamespacedResourceStore<byte[]>(resources, @"Samples"));
+        textures = new TextureStore(renderer, new TextureLoaderStore(Resources), scaleAdjust: 1);
+        samples = audioManager?.GetSampleStore(new NamespacedResourceStore<byte[]>(Resources, "Samples"));
     }
 
-    public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup) => null;
+    #region Disposal
 
-    public override Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT)
+    /// <inheritdoc/>
+    public void Dispose()
     {
-        componentName = componentName.Replace(@"@2x", string.Empty);
+        textures.Dispose();
+        samples?.Dispose();
+        Resources.Dispose();
+    }
+
+    #endregion
+
+    /// <inheritdoc/>
+    /// <remarks>Always returns <c>null</c>; this skin provides no drawable components.</remarks>
+    public Drawable? GetDrawableComponent(ISkinComponentLookup lookup) => null;
+
+    /// <inheritdoc />
+    /// <summary>
+    /// Returns a texture from the embedded store, always treating assets as @2x source images.
+    /// </summary>
+    /// <remarks>
+    /// The embedded textures are authored at double resolution. Any <c>@2x</c> suffix in
+    /// <paramref name="componentName" /> is stripped first, then the method tries the
+    /// <c>@2x</c> variant (setting <see cref="F:osu.Framework.Graphics.Textures.Texture.ScaleAdjust">Texture.ScaleAdjust</see> = 2) before falling
+    /// back to the plain name. This mimics <see cref="T:osu.Game.Skinning.LegacySkin">LegacySkin</see> @2x resolution without
+    /// requiring <c>AllowHighResolutionSprites</c>.
+    /// </remarks>
+    public Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT)
+    {
+        componentName = componentName.Replace("@2x", string.Empty);
 
         var texture = textures.Get($"{Path.ChangeExtension(componentName, null)}@2x{Path.GetExtension(componentName)}", wrapModeS, wrapModeT);
 
@@ -45,7 +98,8 @@ public sealed class BmsEmbeddedSkin : Skin
         return textures.Get(componentName, wrapModeS, wrapModeT);
     }
 
-    public override ISample? GetSample(ISampleInfo sampleInfo)
+    /// <inheritdoc/>
+    public ISample? GetSample(ISampleInfo sampleInfo)
     {
         if (samples == null)
             return null;
@@ -61,36 +115,43 @@ public sealed class BmsEmbeddedSkin : Skin
         return null;
     }
 
-    public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
-    {
-        if (lookup is SkinConfiguration.LegacySetting legacy && legacy == SkinConfiguration.LegacySetting.Version)
-            return SkinUtils.As<TValue>(new Bindable<decimal>(2.7m));
+    /// <inheritdoc/>
+    /// <remarks>Always returns <c>null</c>; this skin provides no configuration values.</remarks>
+    public IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
+        where TLookup : notnull
+        where TValue : notnull
+        => null;
 
-        return null;
-    }
-
-    protected override void Dispose(bool isDisposing)
-    {
-        textures.Dispose();
-        samples?.Dispose();
-
-        base.Dispose(isDisposing);
-    }
-
-    private static IResourceStore<byte[]> createStore(BmsEmbeddedSkinKind skin)
+    private static IResourceStore<byte[]> createStore(BmsEmbeddedSkinKind kind)
     {
         var resources = new NamespacedResourceStore<byte[]>(new DllResourceStore(typeof(BmsRuleset).Assembly), "Resources");
 
-        return skin switch
+        return kind switch
         {
-            BmsEmbeddedSkinKind.Modern => new NamespacedResourceStore<byte[]>(resources, "Skins/Modern"),
+            BmsEmbeddedSkinKind.LegacyModern => new NamespacedResourceStore<byte[]>(resources, "Skins/Modern"),
             _ => new NamespacedResourceStore<byte[]>(resources, "Textures"),
         };
     }
 }
 
+/// <summary>
+/// Selects which set of BMS-ruleset-embedded fallback assets to use, based on
+/// the aesthetic style of the user's currently active skin.
+/// </summary>
 public enum BmsEmbeddedSkinKind
 {
-    Legacy,
-    Modern,
+    /// <summary>
+    /// Classic osu!stable-style assets (loaded from <c>Resources/Textures/</c>).
+    /// Used when the active user skin is <see cref="DefaultLegacySkin"/>,
+    /// <see cref="RetroSkin"/>, an unrecognised <see cref="Skin"/> subclass,
+    /// or when no skin is active.
+    /// </summary>
+    LegacyOld,
+
+    /// <summary>
+    /// Modern Argon-compatible assets (loaded from <c>Resources/Skins/Modern/</c>).
+    /// Used when the active user skin is <see cref="ArgonSkin"/>,
+    /// <see cref="ArgonProSkin"/>, or <see cref="TrianglesSkin"/>.
+    /// </summary>
+    LegacyModern,
 }

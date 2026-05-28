@@ -229,14 +229,14 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
                 previousTime = Time.Current;
             }
 
-            double delta = Time.Current - previousTime;
+            var delta = Time.Current - previousTime;
             previousTime = Time.Current;
 
             // ── Seek detection ───────────────────────────────────────────────────────
             // Large delta means the clock jumped (intro skip, replay scrub, etc.).
             // Stop any in-flight channels and rewind nextIndex to SEEK_LOOKBACK before
             // the new position so events near the target are replayed from their start.
-            bool seeked = Math.Abs(delta) > allowable_late_start;
+            var seeked = Math.Abs(delta) > allowable_late_start;
 
             if (seeked)
             {
@@ -251,7 +251,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             if (isPaused.Value)
                 return;
 
-            double tolerance = seeked ? seek_lookback : allowable_late_start;
+            var tolerance = seeked ? seek_lookback : allowable_late_start;
 
             while (nextIndex < sortedEvents.Count)
             {
@@ -396,7 +396,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
         private void cleanupFinishedChannels()
         {
-            for (int i = activeChannels.Count - 1; i >= 0; i--)
+            for (var i = activeChannels.Count - 1; i >= 0; i--)
             {
                 var ac = activeChannels[i];
 

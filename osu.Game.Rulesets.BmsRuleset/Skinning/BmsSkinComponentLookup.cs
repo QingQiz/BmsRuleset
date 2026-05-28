@@ -38,9 +38,9 @@ public class BmsSkinComponentLookup(
     {
         BmsLayoutVariant.Bms5K => 5,
         BmsLayoutVariant.Bme7K => 7,
+        BmsLayoutVariant.Pms9K => 9,
         BmsLayoutVariant.Bms5KDouble => 10,
         BmsLayoutVariant.Bme7KDouble => 14,
-        BmsLayoutVariant.Pms9K => 9,
         BmsLayoutVariant.Pms9KDouble => 18,
         _ => 7,
     };

@@ -25,9 +25,26 @@
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.PerformStep(Boolean userTriggered)
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.OnClick(ClickEvent e)
     ```
+- [ ] the empty poor seems not reduce the hp
+
 
 ## TODO
 
 - [ ] Mine
 - [ ] health bar overflow
+- [ ] timing sys
+- [ ] measure line
+- [ ] correct metadata display (title, artist, etc, rank, hp, ...)
 
+- skin
+  - [ ] column start : value or enum(leftN, rightN, center)
+  - [ ] bga position/size
+  - [ ] bms skin in none-legacy way, full configurable via skin editor
+
+- mod
+  - [ ] auto scratch
+  - [ ] hide scratch
+  - [ ] mirror
+
+- ask
+  - [ ] ask how to impl a new HUD element (e.g. combo, score, ...), and how to customize their position/size/skin

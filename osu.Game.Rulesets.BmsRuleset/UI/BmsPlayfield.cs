@@ -11,8 +11,8 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Game.Audio;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Audio;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
@@ -39,8 +39,6 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 /// </remarks>
 public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
 {
-    private const float health_display_gap = 24;
-    private const float minimum_side_padding = 20;
 
     public int TotalColumns { get; }
 
@@ -53,6 +51,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public override Quad SkinnableComponentScreenSpaceDrawQuad => Stage.ScreenSpaceDrawQuad;
 
     public double TimeRange { get; set; } = BmsDrawableRuleset.ComputeScrollTime(8);
+
+    private const float health_display_gap = 24;
+    private const float minimum_side_padding = 20;
 
     private readonly IReadOnlyList<BmsHitObject> hitObjects;
     private readonly BmsBeatmap? beatmap;
@@ -68,12 +69,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     // Off-screen container that keeps cached drawables loaded when not shown in JudgementArea.
     private readonly Container judgementDrawablePool;
-    private LegacyHealthDisplay? healthDisplay;
 
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
     [Cached(typeof(ISkinSource))]
     private readonly BmsEmbeddedSkinSource activeSkin;
+
+    private LegacyHealthDisplay? healthDisplay;
 
     [Resolved(CanBeNull = true)]
     private BmsHealthProcessor? healthProcessor { get; set; }
@@ -123,8 +125,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     protected override void Dispose(bool isDisposing)
     {
         NewResult -= onNewResult;
-        if (parentSkin != null)
-            parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
+        parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
         activeSkin.DisposeEmbeddedSkins();
         base.Dispose(isDisposing);
     }
@@ -193,14 +194,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         foreach (var result in BmsRuleset.STATIC_VALID_HIT_RESULTS)
         {
             var drawable = new SkinnableDrawable(
-                new SkinComponentLookup<HitResult>(result),
-                r => new BmsDefaultJudgementPiece(
-                    result == HitResult.Miss
-                        ? HitResult.Meh // empty POOR shows "POOR" text
-                        : ((SkinComponentLookup<HitResult>)r).Component))
+                new SkinComponentLookup<HitResult>(result))
             {
                 RelativeSizeAxes = Axes.None,
                 AutoSizeAxes = Axes.Both,
+                // Centre horizontally within JudgementArea so the image lands on the
+                // non-scratch column centre (JudgementArea itself is already positioned there).
+                Anchor = Anchor.TopCentre,
+                Origin = Anchor.TopCentre,
             };
 
             judgementDrawableCache[result] = drawable;
@@ -251,8 +252,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         var primary = new BmsLegacySkinTransformer(new BmsEmbeddedSkin(kind, host.Renderer, audio), beatmap);
         BmsLegacySkinTransformer? fallback = null;
 
-        if (kind != BmsEmbeddedSkinKind.Legacy)
-            fallback = new BmsLegacySkinTransformer(new BmsEmbeddedSkin(BmsEmbeddedSkinKind.Legacy, host.Renderer, audio), beatmap);
+        if (kind != BmsEmbeddedSkinKind.LegacyOld)
+            fallback = new BmsLegacySkinTransformer(new BmsEmbeddedSkin(BmsEmbeddedSkinKind.LegacyOld, host.Renderer, audio), beatmap);
 
         activeSkin.SetSources(parentSkin, primary, fallback);
     }

@@ -148,24 +148,16 @@ public sealed partial class BmsColumn : CompositeDrawable
         }
     }
 
+    /// <inheritdoc cref="CompositeDrawable" />
     /// <summary>
     ///     Default code-drawn key area that shows at the bottom of each column and
     ///     brightens briefly when the bound key is pressed.
     /// </summary>
-    private sealed partial class DefaultBmsKeyArea : CompositeDrawable, IKeyBindingHandler<BmsAction>
+    private sealed partial class DefaultBmsKeyArea(int columnIndex, BmsLayoutVariant layoutVariant, bool isScratch)
+        : CompositeDrawable, IKeyBindingHandler<BmsAction>
     {
-        private readonly int columnIndex;
-        private readonly BmsLayoutVariant layoutVariant;
-        private readonly bool isScratch;
 
         private Box light = null!;
-
-        public DefaultBmsKeyArea(int columnIndex, BmsLayoutVariant layoutVariant, bool isScratch)
-        {
-            this.columnIndex = columnIndex;
-            this.layoutVariant = layoutVariant;
-            this.isScratch = isScratch;
-        }
 
         public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
         {

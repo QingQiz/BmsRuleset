@@ -3,31 +3,26 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using osu.Framework.Bindables;
-using osu.Game.Beatmaps.Formats;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 
-public sealed class BmsSkinConfiguration
+public sealed class BmsSkinConfiguration(BmsSkinConfigurationSection section)
 {
-    public BmsSkinConfiguration(BmsSkinConfigurationSection section)
-    {
-        Section = section;
-    }
 
-    public BmsSkinConfigurationSection Section { get; }
+    public BmsSkinConfigurationSection Section { get; } = section;
+
+    public Dictionary<string, string> Values { get; } = new(StringComparer.Ordinal);
+
+    public Dictionary<string, Color4> Colours { get; } = new(StringComparer.Ordinal);
 
     public BmsLayoutVariant? Layout { get; set; }
 
     public int? Keys { get; set; }
 
     public int SpecialStyle { get; set; }
-
-    public Dictionary<string, string> Values { get; } = new(StringComparer.Ordinal);
-
-    public Dictionary<string, Color4> Colours { get; } = new(StringComparer.Ordinal);
 
     public bool TryGet<TValue>(LegacyManiaSkinConfigurationLookups lookup, int? column, out IBindable<TValue>? value)
         where TValue : notnull

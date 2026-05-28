@@ -4,21 +4,51 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 
+/// <summary>
+/// Static registry that maps known osu! built-in skin types to the
+/// <see cref="BmsEmbeddedSkinKind"/> whose asset set best matches their visual style.
+/// </summary>
+/// <remarks>
+/// Used by <see cref="BmsEmbeddedSkinSource.GetEmbeddedSkinKind"/> to decide which
+/// embedded texture pack to activate during gameplay.
+/// Lookups are exact-type matches (<c>GetType() == typeof(T)</c>); subclasses are
+/// not considered, so an unrecognised user skin falls through to the default.
+/// </remarks>
 public static class BmsEmbeddedSkinDefinition
 {
+    /// <summary>
+    /// Skins that use the <see cref="BmsEmbeddedSkinKind.LegacyOld"/> asset set —
+    /// classic osu!stable-style visuals.
+    /// </summary>
     public static readonly IReadOnlyDictionary<Type, BmsEmbeddedSkinKind> LEGACY_SKINS = new Dictionary<Type, BmsEmbeddedSkinKind>
     {
-        [typeof(DefaultLegacySkin)] = BmsEmbeddedSkinKind.Legacy,
-        [typeof(RetroSkin)] = BmsEmbeddedSkinKind.Legacy,
+        [typeof(DefaultLegacySkin)] = BmsEmbeddedSkinKind.LegacyOld,
+        [typeof(RetroSkin)] = BmsEmbeddedSkinKind.LegacyOld,
     };
 
+    /// <summary>
+    /// Skins that use the <see cref="BmsEmbeddedSkinKind.LegacyModern"/> asset set —
+    /// modern Argon-compatible visuals.
+    /// </summary>
     public static readonly IReadOnlyDictionary<Type, BmsEmbeddedSkinKind> MODERN_SKINS = new Dictionary<Type, BmsEmbeddedSkinKind>
     {
-        [typeof(ArgonSkin)] = BmsEmbeddedSkinKind.Modern,
-        [typeof(ArgonProSkin)] = BmsEmbeddedSkinKind.Modern,
-        [typeof(TrianglesSkin)] = BmsEmbeddedSkinKind.Modern,
+        [typeof(ArgonSkin)] = BmsEmbeddedSkinKind.LegacyModern,
+        [typeof(ArgonProSkin)] = BmsEmbeddedSkinKind.LegacyModern,
+        [typeof(TrianglesSkin)] = BmsEmbeddedSkinKind.LegacyModern,
     };
 
+    /// <summary>
+    /// Attempts to resolve the <see cref="BmsEmbeddedSkinKind"/> for a given skin.
+    /// Modern skins are checked first; legacy skins are checked as a fallback.
+    /// </summary>
+    /// <param name="skin">The skin to look up.</param>
+    /// <param name="kind">
+    /// When this method returns <c>true</c>, the matched <see cref="BmsEmbeddedSkinKind"/>.
+    /// </param>
+    /// <returns>
+    /// <c>true</c> if the skin's exact runtime type is in <see cref="MODERN_SKINS"/>
+    /// or <see cref="LEGACY_SKINS"/>; otherwise <c>false</c>.
+    /// </returns>
     public static bool TryGetKind(ISkin skin, out BmsEmbeddedSkinKind kind)
     {
         var type = skin.GetType();

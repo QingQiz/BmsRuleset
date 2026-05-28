@@ -13,8 +13,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Rendering.Dummy;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.Testing;
 using osu.Framework.IO.Stores;
+using osu.Framework.Testing;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -125,11 +125,8 @@ public class BmsLegacySkinTransformerTest
 
     private class TestSkinSource(params ISkin[] skins) : ISkinSource
     {
-        public event Action SourceChanged
-        {
-            add { }
-            remove { }
-        }
+
+        public IEnumerable<ISkin> AllSources => skins;
 
         public Drawable GetDrawableComponent(ISkinComponentLookup lookup)
         {
@@ -179,7 +176,11 @@ public class BmsLegacySkinTransformerTest
 
         public ISkin FindProvider(Func<ISkin, bool> lookupFunction) => skins.FirstOrDefault(lookupFunction);
 
-        public IEnumerable<ISkin> AllSources => skins;
+        public event Action SourceChanged
+        {
+            add { }
+            remove { }
+        }
     }
 
     private class TestStorageResourceProvider : IStorageResourceProvider
@@ -242,6 +243,14 @@ public class BmsLegacySkinTransformerTest
             this.resources = resources;
         }
 
+        #region Disposal
+
+        public void Dispose()
+        {
+        }
+
+        #endregion
+
         public byte[] Get(string name) => resources.GetValueOrDefault(name);
 
         public Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult(Get(name));
@@ -249,10 +258,6 @@ public class BmsLegacySkinTransformerTest
         public Stream GetStream(string name) => Get(name) is { } bytes ? new MemoryStream(bytes) : null;
 
         public IEnumerable<string> GetAvailableResources() => resources.Keys;
-
-        public void Dispose()
-        {
-        }
     }
 
     private static Texture createTexture()
@@ -261,6 +266,246 @@ public class BmsLegacySkinTransformerTest
             new MemoryStream(Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")));
         Assert.That(texture, Is.Not.Null);
         return texture!;
+    }
+
+    private static BmsLegacySkinTransformer createConfiguredSkin(string skinIni, IEnumerable<string> textures = null,
+                                                                 BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K, int totalColumns = 8)
+        => new(new TestSkinIniSkin(skinIni, textures), createBeatmap(layoutVariant, totalColumns));
+
+    private static IBeatmap createBeatmap(BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K, int totalColumns = 8)
+        => new BmsBeatmap
+        {
+            LayoutVariant = layoutVariant,
+            TotalColumns = totalColumns,
+        };
+
+    [Test]
+    public void TestBms5KFallsBackToSixKeySpecialStyleBeforeFiveKey()
+    {
+        var skin = createConfiguredSkin("""
+            [Mania]
+            Keys: 5
+            NoteImage0: plain-5k
+
+            [Mania]
+            Keys: 6
+            SpecialStyle: 1
+            NoteImage1: special-6k
+            """, layoutVariant: BmsLayoutVariant.Bms5K, totalColumns: 6);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bms5K, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("special-6k"));
+    }
+
+    [Test]
+    public void TestBms7KFallsBackToEightKeySpecialStyleBeforeSevenKey()
+    {
+        var skin = createConfiguredSkin("""
+            [Mania]
+            Keys: 7
+            NoteImage0: plain-7k
+
+            [Mania]
+            Keys: 8
+            SpecialStyle: 1
+            NoteImage1: special-8k
+            """);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("special-8k"));
+    }
+
+    [Test]
+    public void TestBmsSkinIniImageCreatesDrawable()
+    {
+        var skin = createConfiguredSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: custom-note
+            """, ["custom-note"]);
+
+        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
+    }
+
+    [Test]
+    public void TestBmsSkinIniMineImageCreatesDrawable()
+    {
+        var skin = createConfiguredSkin("""
+            [BMS]
+            Layout: 7K
+            MineImage1: custom-mine
+            """, ["custom-mine"]);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.Hit100,
+            new BmsSkinComponentLookup(BmsSkinComponents.Mine, BmsLayoutVariant.Bme7K, 1)))?.Value, Is.EqualTo("custom-mine"));
+        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Mine, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
+    }
+
+    [Test]
+    public void TestBmsSkinIniOverridesManiaSkinIni()
+    {
+        var skin = createConfiguredSkin("""
+            [Mania]
+            Keys: 8
+            SpecialStyle: 1
+            NoteImage1: mania-note
+
+            [BMS]
+            Layout: 7K
+            NoteImage1: bms-note
+            """);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("bms-note"));
+    }
+
+    [Test]
+    public void TestBuiltInTransformerDefersBmsComponentsToEmbeddedFallback()
+    {
+        var transformer = new BmsBuiltInSkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: built-in-note
+            """, ["built-in-note"]));
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(transformer.GetDrawableComponent(lookup), Is.Null);
+        Assert.That(transformer.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup)), Is.Null);
+        Assert.That(transformer.GetDrawableComponent(new SkinComponentLookup<HitResult>(HitResult.Perfect)), Is.Null);
+        Assert.That(transformer.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo)), Is.Null);
+    }
+
+    [Test]
+    public void TestCustomSkinStopsBeforeDefaultFallbackSkin()
+    {
+        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind(
+        [
+            new TestSkinIniSkin("""
+                [BMS]
+                Layout: 7K
+                NoteImage1: custom-note
+                """, ["custom-note"]),
+            new BmsBuiltInSkinTransformer(new TrianglesSkin(TrianglesSkin.CreateInfo(), storage_resources)),
+        ]), Is.EqualTo(BmsEmbeddedSkinKind.LegacyOld));
+    }
+
+    [Test]
+    public void TestDefaultSkinResourcesAreEmbedded()
+    {
+        var resources = typeof(BmsRuleset).Assembly.GetManifestResourceNames();
+
+        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.mania-key1@2x.png"));
+        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Skins.Modern.mania-key1.png"));
+        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.mania-hit300g-0@2x.png"));
+        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.lightingN@2x.png"));
+        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.scorebar-bg@2x.png"));
+    }
+
+    [Test]
+    public void TestEmbeddedFallbackUsesLegacyForLegacyBuiltInSkins()
+    {
+        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new DefaultLegacySkin(DefaultLegacySkin.CreateInfo(), storage_resources))]),
+            Is.EqualTo(BmsEmbeddedSkinKind.LegacyOld));
+        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new RetroSkin(RetroSkin.CreateInfo(), storage_resources))]),
+            Is.EqualTo(BmsEmbeddedSkinKind.LegacyOld));
+    }
+
+    [Test]
+    public void TestEmbeddedFallbackUsesModernForModernBuiltInSkins()
+    {
+        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new ArgonSkin(ArgonSkin.CreateInfo(), storage_resources))]),
+            Is.EqualTo(BmsEmbeddedSkinKind.LegacyModern));
+        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new ArgonProSkin(ArgonProSkin.CreateInfo(), storage_resources))]),
+            Is.EqualTo(BmsEmbeddedSkinKind.LegacyModern));
+        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new TrianglesSkin(TrianglesSkin.CreateInfo(), storage_resources))]),
+            Is.EqualTo(BmsEmbeddedSkinKind.LegacyModern));
+    }
+
+    [Test]
+    public void TestEmbeddedSkinSourceFallsBackFromModernToLegacy()
+    {
+        var beatmap = createBeatmap();
+        using var source = new BmsEmbeddedSkinSource();
+        var parent = new TestSkinSource();
+        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: missing-modern-note
+            """), beatmap);
+        var fallback = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: legacy-note
+            """, ["legacy-note"]), beatmap);
+
+        source.SetSources(parent, primary, fallback);
+
+        Assert.That(source.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage,
+                new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)))?.Value,
+            Is.EqualTo("missing-modern-note"));
+        Assert.That(source.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
+    }
+
+    [Test]
+    public void TestEmbeddedSkinSourceUsesEmbeddedHudBeforeParentBuiltInHud()
+    {
+        var beatmap = createBeatmap();
+        using var source = new BmsEmbeddedSkinSource();
+        var parent = new TestSkinSource(new BmsBuiltInSkinTransformer(new ArgonSkin(ArgonSkin.CreateInfo(), storage_resources)));
+        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            """), beatmap);
+
+        source.SetSources(parent, primary, null);
+
+        Assert.That(source.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo)), Is.Not.Null);
+    }
+
+    [Test]
+    public void TestEmbeddedSkinSourceUsesParentBeforeEmbeddedFallbacks()
+    {
+        var beatmap = createBeatmap();
+        using var source = new BmsEmbeddedSkinSource();
+        var parent = new TestSkinSource(new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: parent-note
+            """, ["parent-note"]), beatmap));
+        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: primary-note
+            """, ["primary-note"]), beatmap);
+        var fallback = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: fallback-note
+            """, ["fallback-note"]), beatmap);
+
+        source.SetSources(parent, primary, fallback);
+
+        Assert.That(source.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage,
+                new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)))?.Value,
+            Is.EqualTo("parent-note"));
+    }
+
+    [Test]
+    public void TestLegacyHudDoesNotProvideHealthDisplay()
+    {
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+        };
+        var skin = new BmsLegacySkinTransformer(new TestLegacySkin(["mania-key1"]), beatmap);
+        var hud = skin.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new RulesetInfo("bms", "BMS", string.Empty, -1)));
+
+        Assert.That(hud, Is.Not.Null);
+        Assert.That(hud!.ChildrenOfType<HealthDisplay>(), Is.Empty);
     }
 
     [Test]
@@ -329,6 +574,54 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestLongNoteImagesFallBackToShortNoteImage()
+    {
+        var skin = createConfiguredSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: bms-note
+            """);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup))?.Value,
+            Is.EqualTo("bms-note"));
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteBodyImage, lookup))?.Value,
+            Is.EqualTo("bms-note"));
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteTailImage, lookup))?.Value,
+            Is.EqualTo("bms-note"));
+    }
+
+    [Test]
+    public void TestMineUsesDefaultImageFallback()
+    {
+        var skin = new BmsLegacySkinTransformer(new TestResourceSkin(
+        [
+            "mania-key1",
+            "mania-noteS",
+        ]), new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+        });
+
+        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Mine, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
+    }
+
+    [Test]
+    public void TestPlainManiaFallbackUsesMappedColumn()
+    {
+        var skin = createConfiguredSkin("""
+            [Mania]
+            Keys: 7
+            NoteImage0: plain-7k
+            """);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("plain-7k"));
+    }
+
+    [Test]
     public void TestResourceBackedDefaultSkinDoesNotRequireLegacyConfig()
     {
         var beatmap = new BmsBeatmap
@@ -352,91 +645,16 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
-    public void TestLegacyHudDoesNotProvideHealthDisplay()
+    public void TestRulesetTransformsBuiltInSkins()
     {
-        var beatmap = new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-        };
-        var skin = new BmsLegacySkinTransformer(new TestLegacySkin(["mania-key1"]), beatmap);
-        var hud = skin.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new RulesetInfo("bms", "BMS", string.Empty, -1)));
+        var ruleset = new BmsRuleset();
+        var beatmap = createBeatmap();
 
-        Assert.That(hud, Is.Not.Null);
-        Assert.That(hud!.ChildrenOfType<HealthDisplay>(), Is.Empty);
-    }
-
-    [Test]
-    public void TestDefaultSkinResourcesAreEmbedded()
-    {
-        var resources = typeof(BmsRuleset).Assembly.GetManifestResourceNames();
-
-        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.mania-key1@2x.png"));
-        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Skins.Modern.mania-key1.png"));
-        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.mania-hit300g-0@2x.png"));
-        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.lightingN@2x.png"));
-        Assert.That(resources, Does.Contain("osu.Game.Rulesets.BmsRuleset.Resources.Textures.scorebar-bg@2x.png"));
-    }
-
-    [Test]
-    public void TestBmsSkinIniOverridesManiaSkinIni()
-    {
-        var skin = createConfiguredSkin("""
-            [Mania]
-            Keys: 8
-            SpecialStyle: 1
-            NoteImage1: mania-note
-
-            [BMS]
-            Layout: 7K
-            NoteImage1: bms-note
-            """);
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-
-        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
-            Is.EqualTo("bms-note"));
-    }
-
-    [Test]
-    public void TestBmsSkinIniImageCreatesDrawable()
-    {
-        var skin = createConfiguredSkin("""
-            [BMS]
-            Layout: 7K
-            NoteImage1: custom-note
-            """, ["custom-note"]);
-
-        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
-    }
-
-    [Test]
-    public void TestBmsSkinIniMineImageCreatesDrawable()
-    {
-        var skin = createConfiguredSkin("""
-            [BMS]
-            Layout: 7K
-            MineImage1: custom-mine
-            """, ["custom-mine"]);
-
-        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.Hit100,
-            new BmsSkinComponentLookup(BmsSkinComponents.Mine, BmsLayoutVariant.Bme7K, 1)))?.Value, Is.EqualTo("custom-mine"));
-        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Mine, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
-    }
-
-    [Test]
-    public void TestMineUsesDefaultImageFallback()
-    {
-        var skin = new BmsLegacySkinTransformer(new TestResourceSkin(
-        [
-            "mania-key1",
-            "mania-noteS",
-        ]), new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-        });
-
-        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Mine, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
+        Assert.That(ruleset.CreateSkinTransformer(new ArgonSkin(ArgonSkin.CreateInfo(), storage_resources), beatmap), Is.TypeOf<BmsBuiltInSkinTransformer>());
+        Assert.That(ruleset.CreateSkinTransformer(new ArgonProSkin(ArgonProSkin.CreateInfo(), storage_resources), beatmap), Is.TypeOf<BmsBuiltInSkinTransformer>());
+        Assert.That(ruleset.CreateSkinTransformer(new TrianglesSkin(TrianglesSkin.CreateInfo(), storage_resources), beatmap), Is.TypeOf<BmsBuiltInSkinTransformer>());
+        Assert.That(ruleset.CreateSkinTransformer(new DefaultLegacySkin(DefaultLegacySkin.CreateInfo(), storage_resources), beatmap), Is.TypeOf<BmsBuiltInSkinTransformer>());
+        Assert.That(ruleset.CreateSkinTransformer(new RetroSkin(RetroSkin.CreateInfo(), storage_resources), beatmap), Is.TypeOf<BmsBuiltInSkinTransformer>());
     }
 
     [Test]
@@ -451,217 +669,4 @@ public class BmsLegacySkinTransformerTest
         Assert.That(transformer, Is.Not.Null);
         Assert.That(transformer!.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
     }
-
-    [Test]
-    public void TestRulesetTransformsBuiltInSkins()
-    {
-        var ruleset = new BmsRuleset();
-        var beatmap = createBeatmap();
-
-        Assert.That(ruleset.CreateSkinTransformer(new ArgonSkin(ArgonSkin.CreateInfo(), storage_resources), beatmap), Is.TypeOf<BmsBuiltInSkinTransformer>());
-        Assert.That(ruleset.CreateSkinTransformer(new ArgonProSkin(ArgonProSkin.CreateInfo(), storage_resources), beatmap), Is.TypeOf<BmsBuiltInSkinTransformer>());
-        Assert.That(ruleset.CreateSkinTransformer(new TrianglesSkin(TrianglesSkin.CreateInfo(), storage_resources), beatmap), Is.TypeOf<BmsBuiltInSkinTransformer>());
-        Assert.That(ruleset.CreateSkinTransformer(new DefaultLegacySkin(DefaultLegacySkin.CreateInfo(), storage_resources), beatmap), Is.TypeOf<BmsBuiltInSkinTransformer>());
-        Assert.That(ruleset.CreateSkinTransformer(new RetroSkin(RetroSkin.CreateInfo(), storage_resources), beatmap), Is.TypeOf<BmsBuiltInSkinTransformer>());
-    }
-
-    [Test]
-    public void TestBuiltInTransformerDefersBmsComponentsToEmbeddedFallback()
-    {
-        var transformer = new BmsBuiltInSkinTransformer(new TestSkinIniSkin("""
-            [BMS]
-            Layout: 7K
-            NoteImage1: built-in-note
-            """, ["built-in-note"]));
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-
-        Assert.That(transformer.GetDrawableComponent(lookup), Is.Null);
-        Assert.That(transformer.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup)), Is.Null);
-        Assert.That(transformer.GetDrawableComponent(new SkinComponentLookup<HitResult>(HitResult.Perfect)), Is.Null);
-        Assert.That(transformer.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo)), Is.Null);
-    }
-
-    [Test]
-    public void TestEmbeddedFallbackUsesModernForModernBuiltInSkins()
-    {
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new ArgonSkin(ArgonSkin.CreateInfo(), storage_resources))]),
-            Is.EqualTo(BmsEmbeddedSkinKind.Modern));
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new ArgonProSkin(ArgonProSkin.CreateInfo(), storage_resources))]),
-            Is.EqualTo(BmsEmbeddedSkinKind.Modern));
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new TrianglesSkin(TrianglesSkin.CreateInfo(), storage_resources))]),
-            Is.EqualTo(BmsEmbeddedSkinKind.Modern));
-    }
-
-    [Test]
-    public void TestEmbeddedFallbackUsesLegacyForLegacyBuiltInSkins()
-    {
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new DefaultLegacySkin(DefaultLegacySkin.CreateInfo(), storage_resources))]),
-            Is.EqualTo(BmsEmbeddedSkinKind.Legacy));
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new RetroSkin(RetroSkin.CreateInfo(), storage_resources))]),
-            Is.EqualTo(BmsEmbeddedSkinKind.Legacy));
-    }
-
-    [Test]
-    public void TestCustomSkinStopsBeforeDefaultFallbackSkin()
-    {
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind(
-        [
-            new TestSkinIniSkin("""
-                [BMS]
-                Layout: 7K
-                NoteImage1: custom-note
-                """, ["custom-note"]),
-            new BmsBuiltInSkinTransformer(new TrianglesSkin(TrianglesSkin.CreateInfo(), storage_resources)),
-        ]), Is.EqualTo(BmsEmbeddedSkinKind.Legacy));
-    }
-
-    [Test]
-    public void TestEmbeddedSkinSourceUsesParentBeforeEmbeddedFallbacks()
-    {
-        var beatmap = createBeatmap();
-        using var source = new BmsEmbeddedSkinSource();
-        var parent = new TestSkinSource(new BmsLegacySkinTransformer(new TestSkinIniSkin("""
-            [BMS]
-            Layout: 7K
-            NoteImage1: parent-note
-            """, ["parent-note"]), beatmap));
-        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
-            [BMS]
-            Layout: 7K
-            NoteImage1: primary-note
-            """, ["primary-note"]), beatmap);
-        var fallback = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
-            [BMS]
-            Layout: 7K
-            NoteImage1: fallback-note
-            """, ["fallback-note"]), beatmap);
-
-        source.SetSources(parent, primary, fallback);
-
-        Assert.That(source.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage,
-                new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)))?.Value,
-            Is.EqualTo("parent-note"));
-    }
-
-    [Test]
-    public void TestEmbeddedSkinSourceUsesEmbeddedHudBeforeParentBuiltInHud()
-    {
-        var beatmap = createBeatmap();
-        using var source = new BmsEmbeddedSkinSource();
-        var parent = new TestSkinSource(new BmsBuiltInSkinTransformer(new ArgonSkin(ArgonSkin.CreateInfo(), storage_resources)));
-        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
-            [BMS]
-            Layout: 7K
-            """), beatmap);
-
-        source.SetSources(parent, primary, null);
-
-        Assert.That(source.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo)), Is.Not.Null);
-    }
-
-    [Test]
-    public void TestEmbeddedSkinSourceFallsBackFromModernToLegacy()
-    {
-        var beatmap = createBeatmap();
-        using var source = new BmsEmbeddedSkinSource();
-        var parent = new TestSkinSource();
-        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
-            [BMS]
-            Layout: 7K
-            NoteImage1: missing-modern-note
-            """), beatmap);
-        var fallback = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
-            [BMS]
-            Layout: 7K
-            NoteImage1: legacy-note
-            """, ["legacy-note"]), beatmap);
-
-        source.SetSources(parent, primary, fallback);
-
-        Assert.That(source.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage,
-                new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)))?.Value,
-            Is.EqualTo("missing-modern-note"));
-        Assert.That(source.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
-    }
-
-    [Test]
-    public void TestBms5KFallsBackToSixKeySpecialStyleBeforeFiveKey()
-    {
-        var skin = createConfiguredSkin("""
-            [Mania]
-            Keys: 5
-            NoteImage0: plain-5k
-
-            [Mania]
-            Keys: 6
-            SpecialStyle: 1
-            NoteImage1: special-6k
-            """, layoutVariant: BmsLayoutVariant.Bms5K, totalColumns: 6);
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bms5K, 1);
-
-        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
-            Is.EqualTo("special-6k"));
-    }
-
-    [Test]
-    public void TestBms7KFallsBackToEightKeySpecialStyleBeforeSevenKey()
-    {
-        var skin = createConfiguredSkin("""
-            [Mania]
-            Keys: 7
-            NoteImage0: plain-7k
-
-            [Mania]
-            Keys: 8
-            SpecialStyle: 1
-            NoteImage1: special-8k
-            """);
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-
-        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
-            Is.EqualTo("special-8k"));
-    }
-
-    [Test]
-    public void TestPlainManiaFallbackUsesMappedColumn()
-    {
-        var skin = createConfiguredSkin("""
-            [Mania]
-            Keys: 7
-            NoteImage0: plain-7k
-            """);
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-
-        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
-            Is.EqualTo("plain-7k"));
-    }
-
-    [Test]
-    public void TestLongNoteImagesFallBackToShortNoteImage()
-    {
-        var skin = createConfiguredSkin("""
-            [BMS]
-            Layout: 7K
-            NoteImage1: bms-note
-            """);
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-
-        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup))?.Value,
-            Is.EqualTo("bms-note"));
-        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteBodyImage, lookup))?.Value,
-            Is.EqualTo("bms-note"));
-        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteTailImage, lookup))?.Value,
-            Is.EqualTo("bms-note"));
-    }
-
-    private static BmsLegacySkinTransformer createConfiguredSkin(string skinIni, IEnumerable<string> textures = null,
-        BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K, int totalColumns = 8)
-        => new(new TestSkinIniSkin(skinIni, textures), createBeatmap(layoutVariant, totalColumns));
-
-    private static IBeatmap createBeatmap(BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K, int totalColumns = 8)
-        => new BmsBeatmap
-        {
-            LayoutVariant = layoutVariant,
-            TotalColumns = totalColumns,
-        };
 }

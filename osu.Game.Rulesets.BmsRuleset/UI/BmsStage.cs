@@ -113,17 +113,6 @@ public sealed partial class BmsStage : CompositeDrawable
 
     #endregion
 
-    protected override void Update()
-    {
-        base.Update();
-
-        topBorder.Width = bottomBorder.Width = DrawWidth;
-        leftBorder.Height = rightBorder.Height = DrawHeight;
-
-        var nonScratchCentre = getNonScratchCentreX();
-        X = (DrawWidth / 2 - nonScratchCentre) * Scale.X;
-    }
-
     [BackgroundDependencyLoader]
     private void load()
     {
@@ -141,8 +130,16 @@ public sealed partial class BmsStage : CompositeDrawable
 
         var lineColour = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnLineColour))?.Value
                          ?? Color4.White.Opacity(0.25f);
-        var leftLineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftLineWidth, columnIndex: 0))?.Value ?? 1;
-        var rightLineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightLineWidth, columnIndex: Columns.Length - 1))?.Value ?? 1;
+        // Use BmsSkinComponentLookup as the component context so that ManiaColumnIndex is
+        // computed from the BMS column index.  Passing a raw BMS column index (e.g. 7 for
+        // BME 7K) directly to the native mania skin would cause ColumnLineWidth[7+1] to go
+        // out of bounds on an 8-element array (keys+1 == 8, valid indices 0–7).
+        var leftLineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(
+            new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftLineWidth,
+                new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, 0)))?.Value ?? 1;
+        var rightLineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(
+            new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightLineWidth,
+                new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, Columns.Length - 1)))?.Value ?? 1;
 
         foreach (var border in new[] { topBorder, bottomBorder, leftBorder, rightBorder })
             border.Colour = lineColour;
@@ -159,6 +156,16 @@ public sealed partial class BmsStage : CompositeDrawable
             Top = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.StagePaddingTop))?.Value ?? 0,
             Bottom = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.StagePaddingBottom))?.Value ?? 0,
         };
+
+        topBorder.Width = bottomBorder.Width = DrawWidth;
+        leftBorder.Height = rightBorder.Height = DrawHeight;
+
+        var nonScratchCentre = getNonScratchCentreX();
+        X = (DrawWidth / 2 - nonScratchCentre) * Scale.X;
+
+        // Keep the judgement area centred over the non-scratch columns, not the
+        // stage's geometric centre (which includes the scratch lane).
+        JudgementArea.X = nonScratchCentre - DrawWidth / 2;
     }
 
     private float getNonScratchCentreX()
