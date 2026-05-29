@@ -12,22 +12,23 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 
+/// <inheritdoc cref="ISkin" />
 /// <summary>
 /// A lightweight DLL-embedded skin that provides BMS-specific fallback textures and samples.
 /// </summary>
 /// <remarks>
 /// This is the last-resort visual layer in the BMS skin source chain: it is only consulted
-/// after the user's selected skin, <see cref="LegacyBeatmapSkin"/>, and all other osu!
+/// after the user's selected skin, <see cref="T:osu.Game.Skinning.LegacyBeatmapSkin">LegacyBeatmapSkin</see>, and all other osu!
 /// skin sources have failed to satisfy a lookup.
 /// <para>
 /// Unlike the osu! built-in skins it deliberately does <em>not</em> inherit from
-/// <see cref="Skin"/>. This avoids reflection-based store access and prevents
-/// <see cref="BmsEmbeddedSkinSource.GetEmbeddedSkinKind"/> from misidentifying it as a
+/// <see cref="T:osu.Game.Skinning.Skin">Skin</see>. This avoids reflection-based store access and prevents
+/// <see cref="M:osu.Game.Rulesets.BmsRuleset.Skinning.BmsEmbeddedSkinSource.GetEmbeddedSkinKind(System.Collections.Generic.IEnumerable{osu.Game.Skinning.ISkin})">BmsEmbeddedSkinSource.GetEmbeddedSkinKind</see> from misidentifying it as a
 /// user skin when scanning <c>AllSources</c>.
 /// </para>
 /// <para>
-/// The class is a pure resource provider: <see cref="GetDrawableComponent"/> and
-/// <see cref="GetConfig{TLookup,TValue}"/> always return <c>null</c>.
+/// The class is a pure resource provider: <see cref="M:osu.Game.Rulesets.BmsRuleset.Skinning.BmsEmbeddedSkin.GetDrawableComponent(osu.Game.Skinning.ISkinComponentLookup)">GetDrawableComponent</see> and
+/// <see cref="M:osu.Game.Rulesets.BmsRuleset.Skinning.BmsEmbeddedSkin.GetConfig``2(``0)">GetConfig{TLookup,TValue}</see> always return <c>null</c>.
 /// Only textures and samples are served from the embedded store.
 /// </para>
 /// </remarks>
