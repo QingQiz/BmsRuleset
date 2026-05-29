@@ -87,7 +87,9 @@ public class BmsBeatmapDecoder : Decoder<Beatmap>
         if (!string.IsNullOrWhiteSpace(parseResult.Title))
         {
             output.Metadata.Title = parseResult.Title;
-            output.BeatmapInfo.DifficultyName = parseResult.Title;
+            output.BeatmapInfo.DifficultyName = parseResult.PlayLevel != null
+                ? $"{parseResult.Title} [{parseResult.PlayLevel}]"
+                : parseResult.Title;
         }
 
         if (parseResult.Artist != null)
@@ -95,9 +97,6 @@ public class BmsBeatmapDecoder : Decoder<Beatmap>
 
         if (parseResult.Source != null)
             output.Metadata.Source = parseResult.Source;
-
-        if (parseResult.OverallDifficulty != null)
-            output.Difficulty.OverallDifficulty = parseResult.OverallDifficulty.Value;
 
         output.Difficulty.CircleSize = parseResult.TotalColumns;
         output.BeatmapInfo.Difficulty.CircleSize = parseResult.TotalColumns;

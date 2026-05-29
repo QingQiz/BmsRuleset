@@ -10,7 +10,7 @@ Native osu! ruleset plugin for BMS-family charts. Do not reintroduce `ppy.osu.Ga
 
 ## Ruleset Rules
 
-- Background Sample and KeySound volumes should NOT be effected by the effect volume of global volume settings.
+- Background Sample and KeySound volumes should NOT be affected by the effect volume of global volume settings.
 
 ## Commands
 
@@ -54,7 +54,15 @@ Native osu! ruleset plugin for BMS-family charts. Do not reintroduce `ppy.osu.Ga
 ## Native Gaps To Check Before Feature Work
 
 - Read `Doc/native-gap-todo.md` before touching gameplay, timing, scoring, gauge, input, renderer, mods, skinning, or import. It lists intentional skeletons and placeholders.
-- High-risk placeholders: input does not judge notes; rendering is time-based and assumes 8 columns; LN body/release judgement is missing; hit windows ignore `#RANK/#EXRANK`; gauge and difficulty are shells.
+- High-risk placeholders: LN body/tail rendering not implemented (colour-only); `#EXRANK` channel `A0` not yet parsed; difficulty calculator returns 0 stars; control flow (`#RANDOM/#IF`) is not runtime-resolved (Aleph-0 passes by coincidence because it uses `#random 1`); `BmsPlayer` is deleted — failed-score saving is a `BmsDrawableRuleset` hack.
+
+## Settled BMS Semantic Decisions
+
+- `#PLAYLEVEL` is a display label only. It is appended to `DifficultyName` as `"Title [12]"` and never mapped to `OverallDifficulty` or any difficulty attribute.
+- `#PLAYER` is silently ignored. Layout (5K/7K/DP/PMS) is inferred solely from channel presence (`18`/`19` → 7K; `21`/`26`–`29` → DP) and file extension (`.pms` → PMS variants).
+- E-POOR (`RegisterEmptyPoor`) does **not** break combo via a judgement result. It calls `RegisterEmptyPoor` on both processors directly: score processor applies statisic, health processor applies −2% gauge. `HitResult.Miss` is reserved as the **Empty POOR counter** in `Statistics`; it is never emitted as a note judgement result (`IsHitResultAllowed` returns false for it).
+- BAD → `HitResult.Ok`, POOR → `HitResult.Meh`. `BmsScoreProcessor.ApplyScoreChange` overrides `Ok.IsHit()` by resetting `Combo.Value = 0` after any `Ok` or `Meh`.
+- Normal gauge deltas (fractions of 1.0): PGREAT/GREAT `+total/100/N`, GOOD `+total/100/N × 0.5`, BAD −4%, POOR −6%, E-POOR −2%.
 
 ## UI/Test Harness Gotchas
 

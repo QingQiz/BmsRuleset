@@ -18,7 +18,7 @@ static internal class BmsLayout
     private static readonly string[] second_player_channels = ["21", "22", "23", "24", "25", "26", "28", "29"];
     private static readonly string[] seven_key_only_channels = ["18", "19"];
 
-    public static BmsLayoutVariant InferVariant(IEnumerable<string> channels, string? pathOrExtension = null, int? playerMode = null)
+    public static BmsLayoutVariant InferVariant(IEnumerable<string> channels, string? pathOrExtension = null)
     {
         var visibleChannels = channels.Select(normalisePlayableChannel)
             .Where(c => c != null)
@@ -31,7 +31,7 @@ static internal class BmsLayout
             extension = pathOrExtension;
 
         if (extension.Equals(".pms", StringComparison.OrdinalIgnoreCase))
-            return playerMode is 3 or 4 || visibleChannels.Overlaps(pms_double_play_only_channels) ? BmsLayoutVariant.Pms9KDouble : BmsLayoutVariant.Pms9K;
+            return visibleChannels.Overlaps(pms_double_play_only_channels) ? BmsLayoutVariant.Pms9KDouble : BmsLayoutVariant.Pms9K;
 
         if (visibleChannels.Overlaps(second_player_channels))
             return visibleChannels.Overlaps(seven_key_only_channels) ? BmsLayoutVariant.Bme7KDouble : BmsLayoutVariant.Bms5KDouble;
@@ -39,8 +39,8 @@ static internal class BmsLayout
         return visibleChannels.Overlaps(seven_key_only_channels) ? BmsLayoutVariant.Bme7K : BmsLayoutVariant.Bms5K;
     }
 
-    public static int InferTotalColumns(IEnumerable<string> channels, string? pathOrExtension = null, int? playerMode = null)
-        => GetTotalColumns(InferVariant(channels, pathOrExtension, playerMode));
+    public static int InferTotalColumns(IEnumerable<string> channels, string? pathOrExtension = null)
+        => GetTotalColumns(InferVariant(channels, pathOrExtension));
 
     public static int GetTotalColumns(BmsLayoutVariant variant) => variant switch
     {

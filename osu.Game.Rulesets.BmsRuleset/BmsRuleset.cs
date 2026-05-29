@@ -125,7 +125,6 @@ public class BmsRuleset : Ruleset
             Description = "Affects the number of key columns on the playfield.",
         };
 
-        yield return new RulesetBeatmapAttribute(SongSelectStrings.Accuracy, "OD", originalDifficulty.OverallDifficulty, adjustedDifficulty.OverallDifficulty, 10);
         yield return new RulesetBeatmapAttribute(SongSelectStrings.HPDrain, "HP", originalDifficulty.DrainRate, adjustedDifficulty.DrainRate, 10);
     }
 

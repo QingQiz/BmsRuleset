@@ -38,7 +38,7 @@ internal static partial class BmsChartParser
             timingEvents.Select(e => new BmsBpmEvent(e.Tick, e.Bpm, e.Time, e.Sequence)),
             stopEvents.Select(e => new BmsStopEvent(e.Tick, e.Duration, e.StopValue, e.Bpm, e.Sequence)));
 
-        var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path, state.PlayerMode);
+        var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
         var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
         var sampleDefinitions = new Dictionary<string, string>(state.SampleDefinitions, StringComparer.OrdinalIgnoreCase);
         var hitObjects = collectHitObjects(state, totalColumns, measureStarts, tickResolution, timingEvents, stopEvents)
@@ -55,7 +55,7 @@ internal static partial class BmsChartParser
             state.Title,
             state.Artist,
             state.Source,
-            state.OverallDifficulty,
+            state.PlayLevel,
             state.Rank,
             state.Total,
             tickResolution,
@@ -122,7 +122,7 @@ internal static partial class BmsChartParser
 
             case "PLAYLEVEL":
                 if (tryParseDouble(value, out var difficulty))
-                    state.OverallDifficulty = (float)Math.Clamp(difficulty, 0, 10);
+                    state.PlayLevel = (float)difficulty;
                 break;
 
             case "BPM":
@@ -143,11 +143,6 @@ internal static partial class BmsChartParser
             case "TOTAL":
                 if (tryParseDouble(value, out var total) && total > 0)
                     state.Total = total;
-                break;
-
-            case "PLAYER":
-                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var playerMode))
-                    state.PlayerMode = playerMode;
                 break;
 
             case "LNOBJ":
@@ -636,7 +631,7 @@ internal static partial class BmsChartParser
 
         public string? Source { get; set; }
 
-        public float? OverallDifficulty { get; set; }
+        public float? PlayLevel { get; set; }
 
         public double InitialBpm { get; set; } = 130;
 

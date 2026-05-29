@@ -1145,7 +1145,7 @@ sealed class BmsParseState
     public string Genre = string.Empty;
     public string PlayLevel = string.Empty;
     public int? Difficulty;
-    public int Player = 1;
+    // #PLAYER is silently ignored; layout is inferred from channel presence and file extension only.
     public int LnType = 1;
 
     public readonly Dictionary<string, string> Wav = new();

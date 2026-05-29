@@ -113,10 +113,10 @@ Files:
 Current state:
 
 - Passive drain is disabled (`ComputeDrainRate()` returns 0).
-- `BmsHealthProcessor` implements the BMS Normal gauge: starts at 20%, discrete hit deltas driven by `#TOTAL`. PGREAT +`total/100/N`, GREAT ×0.5 of that, GOOD ×0.2, BAD (Ok) −3.2%, POOR (Meh) −4.8%.
+- `BmsHealthProcessor` implements the BMS Normal gauge: starts at 20%, discrete hit deltas driven by `#TOTAL`. PGREAT +`total/100/N`, GREAT same as PGREAT (×1.0), GOOD ×0.5 of PGREAT, BAD (Ok) −4%, POOR (Meh) −6%.
 - Default `#TOTAL` formula `max(7.605×N/(0.01×N+6.5), 160)` used when `#TOTAL` is absent from chart.
 - `#TOTAL` parsing pipeline is complete: BmsParser → BmsParseResult → IBmsBeatmap → BmsBeatmap → BmsDecodedBeatmap.
-- Empty POOR gauge drain implemented via `RegisterEmptyPoor` (−4.8%, no note consumed).
+- Empty POOR gauge drain implemented via `RegisterEmptyPoor` (−2%, no note consumed).
 - Landmine gauge damage is implemented as base36 channel value / 2 percentage points. `ZZ` produces 647.5% damage, clamping gauge to 0 and immediately failing.
 - `CheckDefaultFailCondition` triggers failure when gauge hits 0 mid-song, or when `JudgedHits >= MaxHits && Health < 0.8` at song end (Normal gauge clear condition).
 - Long-note drop records `HitResult.Meh` (POOR) and passive normal-note misses also record `HitResult.Meh` (POOR). `HitResult.Miss` is the Empty POOR counter; it is not emitted as a note judgement result.

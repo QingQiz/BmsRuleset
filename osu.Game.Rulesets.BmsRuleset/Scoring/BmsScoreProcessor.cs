@@ -108,7 +108,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     ///     Increments the Empty POOR counter stored under
     ///     <see cref="HitResult.Miss"/> in the score statistics so it
     ///     appears in the results-screen statistics and the live HUD judgement counter.
-    ///     Empty POORs do not affect EX-score or accuracy.
+    ///     Empty POORs do not affect EX-score, accuracy, or combo.
     /// </summary>
     public void RegisterEmptyPoor()
     {

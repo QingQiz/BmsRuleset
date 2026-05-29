@@ -121,7 +121,7 @@ public class BmsScoreProcessorTest
     }
 
     [Test]
-    public void TestRegisterEmptyPoorBreaksCombo()
+    public void TestRegisterEmptyPoorDoesNotBreakCombo()
     {
         var processor = new BmsScoreProcessor();
         var beatmap = new BmsBeatmap
@@ -134,10 +134,10 @@ public class BmsScoreProcessorTest
 
         processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
             { Type = HitResult.Perfect });
-        Assert.That(processor.Combo.Value, Is.GreaterThan(0));
+        Assert.That(processor.Combo.Value, Is.EqualTo(1));
 
         processor.RegisterEmptyPoor();
-        Assert.That(processor.Combo.Value, Is.GreaterThan(0));
+        Assert.That(processor.Combo.Value, Is.EqualTo(1), "E-POOR must not break combo");
     }
 
     [Test]

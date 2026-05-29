@@ -6,7 +6,7 @@ public sealed record BmsParseResult(
     string? Title,
     string? Artist,
     string? Source,
-    float? OverallDifficulty,
+    float? PlayLevel,
     int Rank,
     double Total,
     int TickResolution,

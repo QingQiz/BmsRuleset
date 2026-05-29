@@ -20,8 +20,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 ///         <list type="table">
 ///             <listheader><term>Judgement</term><description>Gauge delta</description></listheader>
 ///             <item><term>PGREAT</term><description>+(<c>#TOTAL</c> / N) %</description></item>
-///             <item><term>GREAT</term><description>+(<c>#TOTAL</c> / N × 0.5) %</description></item>
-///             <item><term>GOOD</term><description>+(<c>#TOTAL</c> / N × 0.2) %</description></item>
+///             <item><term>GREAT</term><description>+(<c>#TOTAL</c> / N) %</description></item>
+///             <item><term>GOOD</term><description>+(<c>#TOTAL</c> / N × 0.5) %</description></item>
 ///             <item><term>BAD</term><description>−4 %</description></item>
 ///             <item><term>POOR / MISS</term><description>−6 %</description></item>
 ///         </list>

@@ -10,14 +10,14 @@ BMS ruleset 的皮肤系统在 osu! 标准皮肤链的基础上增加了一个�
 
 ## 关键类
 
-| 类 | 职责 |
-|---|---|
-| `BmsEmbeddedSkinSource` | 三层查找的入口，`[Cached]` 到 DI 树 |
-| `BmsBuiltInSkinTransformer` | 包装 osu! 内置皮肤，屏蔽 BMS 特定 lookup，剥离 global HUD 中的血条 |
-| `BmsLegacySkinTransformer` | 包装任意皮肤，提供 BMS 特定 drawable 和 config |
-| `BmsEmbeddedSkin` | 从 ruleset DLL 内嵌资源加载贴图/音效的最小 ISkin |
-| `BmsEmbeddedSkinDefinition` | 用户皮肤类型 → `BmsEmbeddedSkinKind` 的映射注册表 |
-| `rulesetResourcesSkin` | osu! 框架创建的 `ResourceStoreBackedSkin`，服务于通用贴图/音效 lookup |
+| 类                           | 职责                                                     |
+|-----------------------------|--------------------------------------------------------|
+| `BmsEmbeddedSkinSource`     | 三层查找的入口，`[Cached]` 到 DI 树                              |
+| `BmsBuiltInSkinTransformer` | 包装 osu! 内置皮肤，屏蔽 BMS 特定 lookup，剥离 global HUD 中的血条       |
+| `BmsLegacySkinTransformer`  | 包装任意皮肤，提供 BMS 特定 drawable 和 config                     |
+| `BmsEmbeddedSkin`           | 从 ruleset DLL 内嵌资源加载贴图/音效的最小 ISkin                     |
+| `BmsEmbeddedSkinDefinition` | 用户皮肤类型 → `BmsEmbeddedSkinKind` 的映射注册表                  |
+| `rulesetResourcesSkin`      | osu! 框架创建的 `ResourceStoreBackedSkin`，服务于通用贴图/音效 lookup |
 
 ---
 
@@ -56,9 +56,9 @@ ArgonSkin / ArgonProSkin / TrianglesSkin / DefaultLegacySkin / RetroSkin
 1. 调用 `BmsEmbeddedSkinSource.GetEmbeddedSkinKind(parentSkin.AllSources)`
    （`BmsEmbeddedSkinSource.cs:100`），通过 `BmsEmbeddedSkinDefinition.TryGetKind`
    识别当前用户皮肤对应的内嵌资源风格：
-   - `ArgonSkin / ArgonProSkin / TrianglesSkin` → `LegacyModern`
-   - `DefaultLegacySkin / RetroSkin` → `LegacyOld`
-   - 其他 → `LegacyOld`
+    - `ArgonSkin / ArgonProSkin / TrianglesSkin` → `LegacyModern`
+    - `DefaultLegacySkin / RetroSkin` → `LegacyOld`
+    - 其他 → `LegacyOld`
 
 2. 创建 `primary`：`BmsLegacySkinTransformer(BmsEmbeddedSkin(kind), beatmap)`
 3. 若 `kind != LegacyOld`，创建 `fallback`：`BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyOld), beatmap)`
@@ -120,14 +120,14 @@ lookup is BmsSkinComponentLookup
 
 ### BMS 特定 lookup 的命中层
 
-| lookup 类型 | 内置皮肤（Argon 等）下的实际命中 | 用户 legacy 皮肤下的实际命中 |
-|---|---|---|
-| `BmsSkinComponentLookup` | parent 全部 null → **primary** | 有对应贴图时 **parent**，否则 primary |
-| `SkinComponentLookup<HitResult>` | parent 全部 null → **primary** | 有对应贴图时 **parent**，否则 primary |
-| ruleset HUD | parent 全部 null → **primary**（`createLegacyHud()`） | `IsProvidingLegacyResources` 时 **parent**，否则 primary |
-| global HUD | **parent**（内置皮肤的 HUD，blood 已剥离） | **parent** |
-| `GetTexture`（通用） | parent 链依次查找，`rulesetResourcesSkin` 兜底 | 同左 |
-| `BmsSkinConfigurationLookup` | parent 全部 null → **primary**（内嵌 skin.ini） | 用户 skin.ini 优先，否则 primary |
+| lookup 类型                        | 内置皮肤（Argon 等）下的实际命中                               | 用户 legacy 皮肤下的实际命中                                   |
+|----------------------------------|---------------------------------------------------|------------------------------------------------------|
+| `BmsSkinComponentLookup`         | parent 全部 null → **primary**                      | 有对应贴图时 **parent**，否则 primary                         |
+| `SkinComponentLookup<HitResult>` | parent 全部 null → **primary**                      | 有对应贴图时 **parent**，否则 primary                         |
+| ruleset HUD                      | parent 全部 null → **primary**（`createLegacyHud()`） | `IsProvidingLegacyResources` 时 **parent**，否则 primary |
+| global HUD                       | **parent**（内置皮肤的 HUD，blood 已剥离）                   | **parent**                                           |
+| `GetTexture`（通用）                 | parent 链依次查找，`rulesetResourcesSkin` 兜底            | 同左                                                   |
+| `BmsSkinConfigurationLookup`     | parent 全部 null → **primary**（内嵌 skin.ini）         | 用户 skin.ini 优先，否则 primary                            |
 
 ---
 
@@ -202,3 +202,75 @@ true  如果满足以下任一条件：
 `BmsEmbeddedSkin` 始终满足条件（DLL 内嵌贴图保证存在），
 用户皮肤若不满足则所有 `BmsSkinComponentLookup` 返回 null，
 控制权落到 primary。
+
+---
+
+## Q&A
+
+### Are beatmap resources (samples, music, etc.) provided through the skin system?
+
+Yes. This is fully intentional osu! design, not an accident.
+
+`WorkingBeatmapCache.GetSkin()` constructs a `LegacyBeatmapSkin` backed by a
+`RealmBackedResourceStore` — every file in the beatmap folder. That skin is passed to
+`RulesetSkinProvidingContainer` at `Player.cs:289` and inserted as the first (highest
+priority) source in `BeatmapSkinProvidingContainer`. All children of the playfield see
+beatmap files as the top of the `ISkinSource` chain.
+
+`LegacyBeatmapSkin.GetSample()` serves those files directly:
+
+```csharp
+// LegacyBeatmapSkin.cs:92
+public override ISample? GetSample(ISampleInfo sampleInfo)
+{
+    if (sampleInfo is HitSampleInfo hitSampleInfo && !hitSampleInfo.UseBeatmapSamples)
+        return null;  // block standard hitsounds unless they are explicit per-note overrides
+
+    return base.GetSample(sampleInfo);  // opens the .wav/.ogg from the beatmap folder
+}
+```
+
+The gate is `HitSampleInfo.UseBeatmapSamples` — `true` only when a hitobject has an
+explicit custom sample override (e.g. `0:0:0:0:kick.wav` in the `.osu`). Normal bank
+hitsounds (`normal-hitnormal`, etc.) never reach the beatmap skin; they fall through to
+the user skin or defaults.
+
+There is a second gate at the container level: `BeatmapSkinProvidingContainer`
+short-circuits the entire `LegacyBeatmapSkin` source when the user has the
+"Beatmap Hitsounds" setting disabled (`OsuSetting.BeatmapHitsounds`).
+
+### Why skin.ini cannot be officially extended by a ruleset plugin
+
+`LegacySkinDecoder` detects section headers by matching against the `LegacyDecoder.Section`
+enum: `General`, `Editor`, `Metadata`, `Difficulty`, `Events`, `TimingPoints`, `Colours`,
+`Fonts`, `CatchTheBeat`, `Mania`. Any `[SectionName]` not in that enum is logged as a
+warning and its lines continue to be parsed under the **previous** section.
+
+`[Mania]` works because `Section.Mania` is in the core enum and `LegacySkin.ParseConfigurationStream`
+runs a dedicated second-pass decoder (`LegacyManiaSkinDecoder`). Both of those are core
+modifications — not a plugin API.
+
+What the osu! core actually provides:
+
+| Mechanism                             | Type                        | What it offers                                                                                                                             |
+|---------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| `Ruleset.CreateSkinTransformer`       | `public virtual`            | Query-time interception only; parsing is already done                                                                                      |
+| `LegacySkin.ParseConfigurationStream` | `protected virtual`         | Only reachable by subclassing `LegacySkin` — a ruleset plugin cannot do that                                                               |
+| `SkinConfiguration.ConfigDictionary`  | `Dictionary<string,string>` | Flat catch-all for unhandled keys from recognised sections; no section prefix, same-name keys from different sections overwrite each other |
+
+**Conclusion:** A ruleset plugin cannot hook into skin.ini parsing without reflection.
+The only sanctioned runtime hook is `CreateSkinTransformer`, which operates at query time
+after parsing is complete.
+
+#### How BmsRuleset works around this
+
+`BmsSkinConfigurationDecoder` bypasses `LegacySkinDecoder` entirely. It opens `skin.ini`
+directly from the raw `IResourceStore<byte[]>` and parses `[BMS]` and `[Mania]` sections
+in a single custom pass. For user skins (concrete `Skin` subclasses), the store is
+obtained via reflection on the private `store` field — ugly but load-bearing until osu!
+exposes a first-class `Resources` property on `Skin`. The TODO tracking this is in
+`BmsSkinConfigurationDecoder.cs`.
+
+For `BmsEmbeddedSkin`, no reflection is needed — `BmsEmbeddedSkin.Resources` is
+`internal` and accessible directly.
+

@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
-static internal partial class BmsChartParser
+internal static partial class BmsChartParser
 {
     private static readonly Encoding shift_jis_encoding =
         CodePagesEncodingProvider.Instance.GetEncoding(932)
@@ -40,7 +40,6 @@ static internal partial class BmsChartParser
         var artist = string.Empty;
         var subtitle = string.Empty;
         var channels = new List<string>();
-        int? playerMode = null;
 
         foreach (var rawLine in lines)
         {
@@ -78,17 +77,13 @@ static internal partial class BmsChartParser
                 case "SUBTITLE":
                     subtitle = value;
                     break;
-
-                case "PLAYER" when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedPlayerMode):
-                    playerMode = parsedPlayerMode;
-                    break;
             }
         }
 
         var setTitle = inferSetTitle(title);
         var difficultyName = inferDifficultyName(title, subtitle, path);
 
-        return new BmsChartMetadata(setTitle, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path, playerMode));
+        return new BmsChartMetadata(setTitle, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path));
     }
 
     private static string decodeText(byte[] content)
