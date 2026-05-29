@@ -22,6 +22,7 @@ using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
+using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
@@ -506,6 +507,12 @@ public class BmsLegacySkinTransformerTest
 
         Assert.That(hud, Is.Not.Null);
         Assert.That(hud!.ChildrenOfType<HealthDisplay>(), Is.Empty);
+    }
+
+    [Test]
+    public void TestBmsHealthDisplayDoesNotInheritOsuHealthDisplay()
+    {
+        Assert.That(new BmsHealthDisplay(), Is.Not.InstanceOf<HealthDisplay>());
     }
 
     [Test]

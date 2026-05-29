@@ -137,7 +137,7 @@ public class BmsScoreProcessorTest
         Assert.That(processor.Combo.Value, Is.GreaterThan(0));
 
         processor.RegisterEmptyPoor();
-        Assert.That(processor.Combo.Value, Is.EqualTo(0));
+        Assert.That(processor.Combo.Value, Is.GreaterThan(0));
     }
 
     [Test]

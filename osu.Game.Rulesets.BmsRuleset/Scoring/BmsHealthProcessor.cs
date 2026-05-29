@@ -20,8 +20,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 ///             <item><term>PGREAT</term><description>+(<c>#TOTAL</c> / N) %</description></item>
 ///             <item><term>GREAT</term><description>+(<c>#TOTAL</c> / N × 0.5) %</description></item>
 ///             <item><term>GOOD</term><description>+(<c>#TOTAL</c> / N × 0.2) %</description></item>
-///             <item><term>BAD</term><description>−3.2 %</description></item>
-///             <item><term>POOR / MISS</term><description>−4.8 %</description></item>
+///             <item><term>BAD</term><description>−4 %</description></item>
+///             <item><term>POOR / MISS</term><description>−6 %</description></item>
 ///         </list>
 ///         Starting gauge: 20 %.
 ///         Clear condition: ≥ 80 % at song end.
@@ -33,9 +33,10 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 /// </remarks>
 public partial class BmsHealthProcessor(double drainStartTime) : LegacyDrainingHealthProcessor(drainStartTime)
 {
-    // Gauge deltas as fractions of 1.0 (100%).
-    private const double bad_delta = -0.032;  // −3.2 %
-    private const double miss_delta = -0.048; // −4.8 %
+    // Gauge deltas as fractions of 1.0 (100%). see https://iidx.org/misc/iidx_lr2_beatoraja_diff
+    private const double bad_delta = -0.04;  // 4%
+    private const double miss_delta = -0.06; // 6%
+    private const double empty_poor_delta = -0.02;
 
     // BMS Normal gauge starts at 20%.
     private const double initial_health = 0.2;
@@ -52,7 +53,7 @@ public partial class BmsHealthProcessor(double drainStartTime) : LegacyDrainingH
     public void RegisterEmptyPoor()
     {
         ensureInitialized();
-        Health.Value = Math.Max(0, Health.Value + miss_delta);
+        Health.Value = Math.Max(0, Health.Value + empty_poor_delta);
     }
 
     protected override double ComputeDrainRate()
@@ -105,10 +106,10 @@ public partial class BmsHealthProcessor(double drainStartTime) : LegacyDrainingH
         return result switch
         {
             HitResult.Perfect => pgreatGain,
-            HitResult.Great => pgreatGain * 0.5, // GREAT
-            HitResult.Good => pgreatGain * 0.2,  // GOOD
-            HitResult.Ok => bad_delta,           // BAD
-            HitResult.Meh => miss_delta,         // POOR (passive miss or in-range-early-press)
+            HitResult.Great => pgreatGain,      // GREAT
+            HitResult.Good => pgreatGain * 0.5, // GOOD
+            HitResult.Ok => bad_delta,          // BAD
+            HitResult.Meh => miss_delta,        // POOR (passive miss or in-range-early-press)
             _ => 0,
         };
     }

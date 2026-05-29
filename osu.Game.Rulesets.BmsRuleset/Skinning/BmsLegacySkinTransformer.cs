@@ -138,10 +138,12 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
     public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
     {
         if (lookup is GlobalSkinnableContainerLookup containerLookup
-            && containerLookup.Lookup == GlobalSkinnableContainers.MainHUDComponents
-            && containerLookup.Ruleset != null)
+            && containerLookup.Lookup == GlobalSkinnableContainers.MainHUDComponents)
         {
-            return IsProvidingLegacyResources ? createLegacyHud() : base.GetDrawableComponent(lookup);
+            if (containerLookup.Ruleset != null)
+                return IsProvidingLegacyResources ? createLegacyHud() : BmsBuiltInSkinTransformer.WithoutHealthDisplay(base.GetDrawableComponent(lookup));
+
+            return BmsBuiltInSkinTransformer.WithoutHealthDisplay(base.GetDrawableComponent(lookup));
         }
 
         if (lookup is SkinComponentLookup<HitResult> resultLookup && IsProvidingLegacyResources)

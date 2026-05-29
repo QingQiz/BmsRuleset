@@ -149,8 +149,9 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable
     /// through <b>parent → primary → fallback</b>.
     /// All other lookups are forwarded to the <b>parent only</b>.
     /// </remarks>
-    public Drawable? GetDrawableComponent(ISkinComponentLookup lookup) =>
-        lookup is
+    public Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
+    {
+        var drawable = lookup is
             BmsSkinComponentLookup or
             SkinComponentLookup<HitResult> or
             GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null }
@@ -158,6 +159,11 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable
               ?? primary?.GetDrawableComponent(lookup)
               ?? fallback?.GetDrawableComponent(lookup)
             : parent?.GetDrawableComponent(lookup);
+
+        return lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents }
+            ? BmsBuiltInSkinTransformer.WithoutHealthDisplay(drawable)
+            : drawable;
+    }
 
     /// <summary>Looks up a texture, falling through parent → primary → fallback.</summary>
     public Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) =>

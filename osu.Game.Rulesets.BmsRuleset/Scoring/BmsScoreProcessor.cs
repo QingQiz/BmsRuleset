@@ -25,11 +25,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 ///         We surface the following approximation using EX-score accuracy:
 ///         <list type="table">
 ///             <item><term>X (rainbow S)</term><description>100 % (all PGREAT)</description></item>
-///             <item><term>S</term><description>≥ 2/3 accuracy (≥ AAA in BMS parlance)</description></item>
-///             <item><term>A</term><description>≥ 8/9</description></item>
-///             <item><term>B</term><description>≥ 7/9</description></item>
-///             <item><term>C</term><description>≥ 6/9</description></item>
-///             <item><term>D</term><description>anything below</description></item>
+///             <item><term>S/AAA</term><description>≥ 8/9 accuracy (≥ AAA in BMS parlance)</description></item>
+///             <item><term>A/AA</term><description>≥ 7/9</description></item>
+///             <item><term>B/A</term><description>≥ 6/9</description></item>
+///             <item><term>C/B</term><description>≥ 5/9</description></item>
+///             <item><term>D/CDEF</term><description>anything below</description></item>
 ///         </list>
 ///         These thresholds mirror the traditional BMS DJ LEVEL scale (AAA = 8/9 → 2/3 accuracy).
 ///     </para>
@@ -101,14 +101,13 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     /// <summary>
     ///     Records an Empty POOR: a keypress that found no note to consume.
-    ///     Breaks combo and increments the Empty POOR counter stored under
+    ///     Increments the Empty POOR counter stored under
     ///     <see cref="HitResult.Miss"/> in the score statistics so it
     ///     appears in the results-screen statistics and the live HUD judgement counter.
     ///     Empty POORs do not affect EX-score or accuracy.
     /// </summary>
     public void RegisterEmptyPoor()
     {
-        Combo.Value = 0;
         ScoreResultCounts[HitResult.Miss] = ScoreResultCounts.GetValueOrDefault(HitResult.Miss) + 1;
     }
 

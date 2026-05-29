@@ -35,7 +35,7 @@ public class BmsHealthProcessorTest
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
             TotalColumns = 8,
-            Total = 200,
+            Total = 80,
             HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
         };
         processor.ApplyBeatmap(beatmap);
@@ -49,7 +49,35 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
-    public void TestGaugePoorReducesHealthByFourPointEightPercent()
+    public void TestGaugeIsCappedAtOneHundredPercent()
+    {
+        var processor = new BmsHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            Total = 100,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+                new BmsHitObject { StartTime = 2000, Column = 2 },
+            },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        foreach (var hitObject in beatmap.HitObjects)
+        {
+            processor.ApplyResult(new JudgementResult(hitObject, hitObject.CreateJudgement())
+            {
+                Type = HitResult.Perfect,
+            });
+        }
+
+        Assert.That(processor.Health.Value, Is.EqualTo(1.0).Within(0.001));
+    }
+
+    [Test]
+    public void TestGaugePoorReducesHealthBySixPercent()
     {
         var processor = new BmsHealthProcessor(0);
         var beatmap = new BmsBeatmap
@@ -71,12 +99,12 @@ public class BmsHealthProcessorTest
             Type = HitResult.Meh,
         });
 
-        var expectedHealth = Math.Max(0.0, initialHealth - 0.048);
+        var expectedHealth = Math.Max(0.0, initialHealth - 0.06);
         Assert.That(processor.Health.Value, Is.EqualTo(expectedHealth).Within(0.001));
     }
 
     [Test]
-    public void TestGaugeBadReducesHealthByThreePointTwoPercent()
+    public void TestGaugeBadReducesHealthByFourPercent()
     {
         var processor = new BmsHealthProcessor(0);
         var beatmap = new BmsBeatmap
@@ -98,7 +126,7 @@ public class BmsHealthProcessorTest
             Type = HitResult.Ok,
         });
 
-        var expectedHealth = Math.Max(0.0, initialHealth - 0.032);
+        var expectedHealth = Math.Max(0.0, initialHealth - 0.04);
         Assert.That(processor.Health.Value, Is.EqualTo(expectedHealth).Within(0.001));
     }
 

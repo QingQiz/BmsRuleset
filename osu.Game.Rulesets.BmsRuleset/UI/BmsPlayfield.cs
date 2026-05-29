@@ -75,13 +75,17 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [Cached(typeof(ISkinSource))]
     private readonly BmsEmbeddedSkinSource activeSkin;
 
-    private LegacyHealthDisplay? healthDisplay;
+    [Resolved(CanBeNull = true)]
+    private HealthProcessor? resolvedHealthProcessor { get; set; }
 
     [Resolved(CanBeNull = true)]
-    private BmsHealthProcessor? healthProcessor { get; set; }
+    private ScoreProcessor? resolvedScoreProcessor { get; set; }
 
-    [Resolved(CanBeNull = true)]
-    private BmsScoreProcessor? scoreProcessor { get; set; }
+    private BmsHealthDisplay? healthDisplay;
+
+    private BmsHealthProcessor? healthProcessor => resolvedHealthProcessor as BmsHealthProcessor;
+
+    private BmsScoreProcessor? scoreProcessor => resolvedScoreProcessor as BmsScoreProcessor;
 
     [Resolved]
     private GameHost host { get; set; } = null!;
@@ -224,12 +228,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         if (healthProcessor != null)
         {
-            AddInternal(healthDisplay = new LegacyHealthDisplay
+            AddInternal(healthDisplay = new BmsHealthDisplay
             {
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopCentre,
-                Rotation = 90,
-                UsesFixedAnchor = true,
             });
         }
 
@@ -263,7 +265,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (!Stage.IsLoaded || Stage.DrawWidth <= 0 || DrawWidth <= 0)
             return;
 
-        var healthReserve = Math.Max(64, ((healthDisplay?.IsLoaded == true) ? healthDisplay.DrawHeight : 0) + health_display_gap + minimum_side_padding);
+        var healthReserve = Math.Max(64, ((healthDisplay?.IsLoaded == true) ? healthDisplay.DrawWidth : 0) + health_display_gap + minimum_side_padding);
         var availableWidth = Math.Max(1, DrawWidth - healthReserve * 2);
         var scale = Math.Min(1, availableWidth / Stage.DrawWidth);
 
@@ -278,7 +280,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         var stageTopRight = ToLocalSpace(Stage.ScreenSpaceDrawQuad.TopRight);
         var stageHeight = (Stage.ScreenSpaceDrawQuad.BottomRight - Stage.ScreenSpaceDrawQuad.TopRight).Length;
-        var healthScale = Math.Min(1, stageHeight / Math.Max(1, healthDisplay.DrawWidth));
+        var healthScale = Math.Min(1, stageHeight / Math.Max(1, healthDisplay.DrawHeight));
 
         if (float.IsFinite(healthScale) && healthScale > 0)
             healthDisplay.Scale = new Vector2(healthScale);

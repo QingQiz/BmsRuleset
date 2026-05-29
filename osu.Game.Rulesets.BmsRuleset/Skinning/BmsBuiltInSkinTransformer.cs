@@ -49,7 +49,7 @@ public partial class BmsBuiltInSkinTransformer(ISkin skin) : SkinTransformer(ski
     {
         // Global (non-ruleset) HUD: pass through but strip the health bar, which BMS doesn't use.
         if (lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: null })
-            return withoutHealthDisplay(base.GetDrawableComponent(lookup));
+            return WithoutHealthDisplay(base.GetDrawableComponent(lookup));
 
         // BMS playfield components, hit results, and the ruleset-scoped HUD are handled
         // by BmsEmbeddedSkinSource — the built-in skin must not answer these.
@@ -69,7 +69,7 @@ public partial class BmsBuiltInSkinTransformer(ISkin skin) : SkinTransformer(ski
         return base.GetConfig<TLookup, TValue>(lookup);
     }
 
-    private static Drawable? withoutHealthDisplay(Drawable? drawable) => drawable is Container container
+    internal static Drawable? WithoutHealthDisplay(Drawable? drawable) => drawable is Container container
         ? new HealthFilteredHudContainer(container)
         : drawable;
 

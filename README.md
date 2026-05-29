@@ -42,6 +42,7 @@
   - [ ] column start : value or enum(leftN, rightN, center)
   - [ ] bga position/size
   - [ ] bms skin in none-legacy way, full configurable via skin editor
+  - [ ] hitGreat -> hitGreatLate/hitGreatEarly, ... (`HitGreat: imgearly,imglate` or `HitGreatLate: imglate\nHitGreatEarly:imgearly`)
 
 - mod
   - [ ] auto scratch
@@ -58,3 +59,12 @@
 - [ ] result screen
 
 - [ ] bga
+
+
+- audio
+  - [ ] #WAVCMD (MacBeat) — Sets pitch (00), volume (01), or playback time (02) per WAV slot. Format: #WAVCMD <commandID> <WAV-index> <value>. Default pitch=60 (C6), volume=100%.
+  - [ ] #EXWAVxx (nanasi) — Defines a WAV file with pan (-10000 to 10000), volume (-10000 to 0), and frequency/pitch (100–100000 Hz). Format: #EXWAVxx <flags> <pan> <volume> <freq> <filename>.
+  - [ ] #VOLWAV n (BM98) — Global volume scalar for all sounds as a percentage. #VOLWAV 100 = original, #VOLWAV 200 = 200%.
+  - [ ] #xxx97 (fgt) — Dynamic BGM volume change channel. Range [01-FF] (hex), e.g. #00197:003C sets volume to 60 at measure 1.
+
+- [ ] Exrank
