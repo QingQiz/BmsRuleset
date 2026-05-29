@@ -31,6 +31,11 @@
 - [ ] the empty poor seems not reduce the hp
 
 
+- skin
+  - [ ] morden 皮肤里 有一个奇怪的组件，并且缺少了很多默认的组件
+  - [ ] 血条的位置不对，而且需要调整一下风格
+  - [ ] legacy 的 mod 部分和分数显示重叠了
+
 ## TODO
 
 

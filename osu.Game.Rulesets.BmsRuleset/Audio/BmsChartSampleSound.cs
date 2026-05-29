@@ -11,6 +11,7 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
 
+/// <inheritdoc />
 /// <summary>
 ///     BMS chart sample playback. Samples are defined by the chart resources, not by the user skin.
 /// </summary>
