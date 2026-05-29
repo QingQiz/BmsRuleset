@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
-using osu.Framework.Audio.Sample;
+using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
+using osu.Framework.IO.Stores;
+using osu.Game.Audio;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
@@ -17,28 +18,31 @@ namespace osu.Game.Rulesets.BmsRuleset.Audio;
 public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPlayer.BgmEvent> sortedEvents, Bindable<bool> sourcePaused)
     : SkinReloadableDrawable
 {
+
+    public readonly record struct BgmEvent(double Time, string SampleKey, BmsSampleInfo SampleInfo);
+
     /// <summary>Maximum age of a BGM event that will still be played on a normal (non-seek) frame.</summary>
     private const double allowable_late_start = 100;
 
-    /// <summary>
-    ///     On a seek (clock jumped by more than <see cref="allowable_late_start"/>), rewind
-    ///     <see cref="nextIndex"/> this many ms before the target time so events near the
-    ///     seek destination are replayed from their beginning (SampleChannel cannot seek).
-    /// </summary>
-    private const double seek_lookback = 3000;
+    /// <summary>Maximum number of previous events to inspect when reconstructing seek state.</summary>
+    private const int max_seek_event_scan = 32;
 
-    private readonly BindableBool isPaused = new();
-    private readonly BindableDouble pauseFrequency = new(1);
+    private readonly BindableBool sourceIsPaused = new();
+    private readonly IBindable<bool> samplePlaybackDisabled = new BindableBool();
     private readonly BindableDouble requestedVolume = new(1);
 
-    // One ISample per unique sample key - resolved lazily on first play.
-    // Null value means "looked up but not found in the beatmap skin".
-    private readonly Dictionary<string, ISample?> samples = new();
-    private readonly List<ActiveBgmChannel> activeChannels = [];
+    // One resolved lookup name per unique sample key - resolved lazily on first play.
+    // Null value means "looked up but not found in the beatmap resources".
+    private readonly Dictionary<string, string?> trackNames = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, double> trackLengths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<ActiveBgmTrack> activeTracks = [];
 
     private int nextIndex;
     private double previousTime;
     private bool hasSeenFrame;
+    private bool playbackBlocked;
+
+    private ITrackStore? beatmapTrackStore;
 
     [Resolved(CanBeNull = true)]
     private AudioManager? audioManager { get; set; }
@@ -48,7 +52,9 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
     protected override void Dispose(bool isDisposing)
     {
         stopAll();
-        samples.Clear();
+        trackNames.Clear();
+        trackLengths.Clear();
+        beatmapTrackStore?.Dispose();
         base.Dispose(isDisposing);
     }
 
@@ -58,23 +64,22 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
     {
         base.SkinChanged(skin);
 
-        // Invalidate the sample cache so stale ISample references aren't used after a skin change.
-        // Actual audio loading is deferred to the first time each event fires.
-        samples.Clear();
+        stopAll();
+        trackNames.Clear();
+        beatmapTrackStore?.Dispose();
+        beatmapTrackStore = null;
+        nextIndex = 0;
+        hasSeenFrame = false;
+
+        ensureTrackStore();
     }
 
     protected override void LoadAsyncComplete()
     {
         base.LoadAsyncComplete();
 
-        isPaused.BindTo(sourcePaused);
-        isPaused.BindValueChanged(v =>
-        {
-            if (v.NewValue)
-                pauseAll();
-            else
-                resumeAll();
-        }, true);
+        sourceIsPaused.BindTo(sourcePaused);
+        sourceIsPaused.BindValueChanged(_ => updatePlaybackBlocked(), true);
     }
 
     protected override void LoadComplete()
@@ -88,44 +93,38 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
     {
         base.Update();
 
+        if (playbackBlocked)
+            return;
+
         if (!hasSeenFrame)
         {
             hasSeenFrame = true;
             previousTime = Time.Current;
+            handleSeek(Time.Current);
+            cleanupFinishedTracks();
+            return;
         }
 
         var delta = Time.Current - previousTime;
-        previousTime = Time.Current;
-
         var seeked = Math.Abs(delta) > allowable_late_start;
 
         if (seeked)
-        {
-            stopAll();
-            nextIndex = 0;
+            handleSeek(Time.Current);
 
-            while (nextIndex < sortedEvents.Count
-                   && sortedEvents[nextIndex].Time < Time.Current - seek_lookback)
-                nextIndex++;
-        }
-
-        if (isPaused.Value)
-            return;
-
-        var tolerance = seeked ? seek_lookback : allowable_late_start;
+        previousTime = Time.Current;
 
         while (nextIndex < sortedEvents.Count)
         {
             var evt = sortedEvents[nextIndex];
             if (Time.Current < evt.Time) break;
 
-            if (Time.Current - evt.Time < tolerance)
-                playEvent(evt);
+            if (Time.Current - evt.Time < allowable_late_start)
+                playEvent(evt, 0);
 
             nextIndex++;
         }
 
-        cleanupFinishedChannels();
+        cleanupFinishedTracks();
     }
 
     private static LegacyBeatmapSkin? extractBeatmapSkin(ISkin skin) => skin switch
@@ -135,47 +134,186 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
         _ => null,
     };
 
-    private ISample? resolveSample(BgmEvent evt)
+    [BackgroundDependencyLoader(true)]
+    private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
     {
-        if (samples.TryGetValue(evt.SampleKey, out var cached))
-            return cached;
-
-        ISample? sample = null;
-
-        foreach (var source in CurrentSkin.AllSources.Select(extractBeatmapSkin).Where(s => s != null))
-        {
-            sample = source!.GetSample(evt.SampleInfo);
-            if (sample != null) break;
-        }
-
-        samples[evt.SampleKey] = sample;
-        return sample;
-    }
-
-    private void playEvent(BgmEvent evt)
-    {
-        var sample = resolveSample(evt);
-        if (sample == null)
+        if (samplePlaybackDisabler == null)
             return;
 
-        var channel = sample.GetChannel();
-        channel.ManualFree = true;
-        channel.AddAdjustment(AdjustableProperty.Frequency, pauseFrequency);
+        samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
+        samplePlaybackDisabled.BindValueChanged(_ => updatePlaybackBlocked(), true);
+    }
 
-        // Play() enqueues framework volume bindings, so strip sample/effect volume after it.
-        channel.Play();
+    private string? resolveTrackName(BgmEvent evt)
+    {
+        if (trackNames.TryGetValue(evt.SampleKey, out var cached))
+            return cached;
 
-        bindBgmVolumeAdjustments(channel);
+        ensureTrackStore();
 
-        Action<ValueChangedEvent<double>>? isolateOnBind = null;
-        isolateOnBind = _ =>
+        if (beatmapTrackStore == null)
+            return null;
+
+        foreach (var lookup in evt.SampleInfo.LookupNames)
         {
-            channel.AggregateVolume.ValueChanged -= isolateOnBind!;
-            bindBgmVolumeAdjustments(channel);
-        };
-        channel.AggregateVolume.ValueChanged += isolateOnBind;
+            using var stream = beatmapTrackStore.GetStream(lookup);
 
-        activeChannels.Add(new ActiveBgmChannel(channel));
+            if (stream != null)
+                return trackNames[evt.SampleKey] = lookup;
+        }
+
+        return trackNames[evt.SampleKey] = null;
+    }
+
+    private void ensureTrackStore()
+    {
+        if (beatmapTrackStore != null || audioManager == null)
+            return;
+
+        var beatmapResources = CurrentSkin.AllSources
+            .Select(extractBeatmapSkin)
+            .FirstOrDefault(s => s?.BeatmapSetResources != null)
+            ?.BeatmapSetResources;
+
+        if (beatmapResources == null)
+            return;
+
+        var resources = new ResourceStore<byte[]>(beatmapResources);
+        resources.AddExtension("wav");
+        resources.AddExtension("mp3");
+        resources.AddExtension("ogg");
+
+        beatmapTrackStore = audioManager.GetTrackStore(resources);
+    }
+
+    private void playEvent(BgmEvent evt, double offset)
+    {
+        var trackName = resolveTrackName(evt);
+        if (trackName == null || beatmapTrackStore == null)
+            return;
+
+        var track = beatmapTrackStore.Get(trackName);
+        if (track == null)
+            return;
+
+        if (offset > 0 && !track.Seek(offset))
+        {
+            track.Dispose();
+            return;
+        }
+
+        if (track.Length > 0)
+            trackLengths[evt.SampleKey] = track.Length;
+
+        if (track.Length > 0 && offset >= track.Length)
+        {
+            track.Dispose();
+            return;
+        }
+
+        bindBgmVolumeAdjustments(track);
+        track.Start();
+
+        activeTracks.Add(new ActiveBgmTrack(evt, track));
+    }
+
+    private void handleSeek(double currentTime)
+    {
+        seekExistingTracks(currentTime);
+
+        nextIndex = findFirstEventAfter(currentTime);
+
+        for (var i = nextIndex - 1; i >= 0 && nextIndex - i <= max_seek_event_scan; i--)
+        {
+            var evt = sortedEvents[i];
+
+            if (activeTracks.Any(t => t.Event.Equals(evt)))
+                continue;
+
+            var offset = currentTime - evt.Time;
+
+            if (offset < 0)
+                continue;
+
+            if (trackLengths.TryGetValue(evt.SampleKey, out var length) && length > 0 && offset >= length)
+                continue;
+
+            playEvent(evt, offset);
+        }
+    }
+
+    private int findFirstEventAfter(double time)
+    {
+        var low = 0;
+        var high = sortedEvents.Count;
+
+        while (low < high)
+        {
+            var middle = low + (high - low) / 2;
+
+            if (sortedEvents[middle].Time <= time)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
+    }
+
+    private void seekExistingTracks(double currentTime)
+    {
+        for (var i = activeTracks.Count - 1; i >= 0; i--)
+        {
+            var activeTrack = activeTracks[i];
+            var offset = currentTime - activeTrack.Event.Time;
+
+            if (activeTrack.Track.IsDisposed || offset < 0 || activeTrack.Track.Length > 0 && offset >= activeTrack.Track.Length)
+            {
+                if (!activeTrack.Track.IsDisposed)
+                {
+                    activeTrack.Track.Stop();
+                    activeTrack.Track.Dispose();
+                }
+
+                activeTracks.RemoveAt(i);
+                continue;
+            }
+
+            if (!activeTrack.Track.Seek(offset))
+            {
+                activeTrack.Track.Dispose();
+                activeTracks.RemoveAt(i);
+                continue;
+            }
+
+            if (activeTrack.Track.Length > 0)
+                trackLengths[activeTrack.Event.SampleKey] = activeTrack.Track.Length;
+
+            activeTrack.Track.Start();
+            activeTrack.Paused = false;
+        }
+    }
+
+    private void updatePlaybackBlocked()
+    {
+        var blocked = sourceIsPaused.Value || samplePlaybackDisabled.Value;
+
+        if (blocked == playbackBlocked)
+            return;
+
+        playbackBlocked = blocked;
+
+        if (playbackBlocked)
+        {
+            pauseAll();
+            return;
+        }
+
+        // Let Update() re-seed from the new gameplay time instead of briefly resuming stale audio.
+        if (!hasSeenFrame || Math.Abs(Time.Current - previousTime) > allowable_late_start)
+            return;
+
+        resumeAll();
     }
 
     private void bindBgmVolumeAdjustments(IAdjustableAudioComponent component)
@@ -192,69 +330,69 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
 
     private void stopAll()
     {
-        foreach (var ac in activeChannels)
+        foreach (var activeTrack in activeTracks)
         {
-            if (!ac.Channel.IsDisposed)
+            if (!activeTrack.Track.IsDisposed)
             {
-                ac.Channel.Stop();
-                ac.Channel.Dispose();
+                activeTrack.Track.Stop();
+                activeTrack.Track.Dispose();
             }
         }
 
-        activeChannels.Clear();
-        pauseFrequency.Value = 1;
+        activeTracks.Clear();
     }
 
     private void pauseAll()
     {
-        pauseFrequency.Value = 0;
+        foreach (var activeTrack in activeTracks)
+        {
+            if (!activeTrack.Track.IsDisposed)
+                activeTrack.Track.Stop();
 
-        foreach (var ac in activeChannels)
-            ac.Paused = true;
+            activeTrack.Paused = true;
+        }
     }
 
     private void resumeAll()
     {
-        pauseFrequency.Value = 1;
-
-        foreach (var ac in activeChannels)
+        foreach (var activeTrack in activeTracks)
         {
-            if (ac.Paused && !ac.Channel.IsDisposed)
+            if (activeTrack.Paused && !activeTrack.Track.IsDisposed)
             {
-                ac.Channel.Play();
-                ac.Paused = false;
+                activeTrack.Track.Start();
+                activeTrack.Paused = false;
             }
         }
     }
 
-    private void cleanupFinishedChannels()
+    private void cleanupFinishedTracks()
     {
-        for (var i = activeChannels.Count - 1; i >= 0; i--)
+        for (var i = activeTracks.Count - 1; i >= 0; i--)
         {
-            var ac = activeChannels[i];
+            var activeTrack = activeTracks[i];
 
-            if (ac.Channel.IsDisposed)
+            if (activeTrack.Track.IsDisposed)
             {
-                activeChannels.RemoveAt(i);
+                activeTracks.RemoveAt(i);
                 continue;
             }
 
-            if (ac.Paused)
+            if (activeTrack.Paused)
                 continue;
 
-            if (ac.Channel.Played && !ac.Channel.Playing)
+            if (activeTrack.Track.HasCompleted || (!activeTrack.Track.IsRunning && activeTrack.Track.Length > 0 && activeTrack.Track.CurrentTime >= activeTrack.Track.Length))
             {
-                ac.Channel.Dispose();
-                activeChannels.RemoveAt(i);
+                activeTrack.Track.Dispose();
+                activeTracks.RemoveAt(i);
             }
         }
     }
 
-    public readonly record struct BgmEvent(double Time, string SampleKey, BmsSampleInfo SampleInfo);
-
-    private sealed class ActiveBgmChannel(SampleChannel channel)
+    private sealed class ActiveBgmTrack(BgmEvent evt, Track track)
     {
-        public SampleChannel Channel { get; } = channel;
+        public BgmEvent Event { get; } = evt;
+
+        public Track Track { get; } = track;
 
         public bool Paused { get; set; }
     }

@@ -394,9 +394,7 @@ The full built-in skin (covering all 6 layouts) is at
 
 ## FIXME
 
-- [ ] 游戏在autoplay时，切到后台，hitsound 的播放会乱掉。切到后台再切到前台游戏会卡死
-- [ ] 游戏在 autoplay 暂停时， background sample 会继续播放
-
+- [ ] autoplay random，到后半会卡死
 - [ ] test 步骤里的 import real bms 步骤总是会失败
     ```
       [runtime] 2026-05-27 18:19:42 [error]: Step "import real bms" SingleStepButton triggered error
@@ -418,7 +416,7 @@ The full built-in skin (covering all 6 layouts) is at
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.PerformStep(Boolean userTriggered)
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.OnClick(ClickEvent e)
     ```
-- [ ] the empty poor seems not reduce the hp
+- [x] the empty poor seems not reduce the hp
 
 
 - skin
@@ -446,7 +444,10 @@ The full built-in skin (covering all 6 layouts) is at
   - [ ] auto scratch
   - [ ] hide scratch
   - [ ] mirror
+  - [ ] 2p mod
   - [ ] different health bar
+  - [ ] random
+  - [ ] remember the last used mod combination
 
 - ask
   - [ ] ask how to impl a new HUD element (e.g. combo, score, ...), and how to customize their position/size/skin

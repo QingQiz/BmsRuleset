@@ -34,6 +34,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     private Box? longNoteTail;
     private SkinnableDrawable? note;
     private bool longNoteStarted;
+    private BmsPlayfield? playfield;
     private float currentNoteHeight = default_note_height;
     private int skinnedColumn = -1;
     private BmsLayoutVariant? skinnedLayout;
@@ -113,7 +114,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (HitObject == null)
             return;
 
-        var playfield = Parent?.FindClosestParent<BmsPlayfield>();
+        playfield ??= Parent?.FindClosestParent<BmsPlayfield>();
         var stage = playfield?.Stage;
         updateNotePiece(playfield?.LayoutVariant);
 

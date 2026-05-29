@@ -59,6 +59,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     private readonly BmsBeatmap? beatmap;
 
     private readonly Dictionary<int, int> nextSoundIndexByColumn = new();
+    private readonly Dictionary<int, double> lastSoundSearchTimeByColumn = new();
     private readonly HashSet<int> pressedColumns = [];
 
     private readonly BmsChartSampleSound keySound = new();
@@ -77,17 +78,17 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [Cached(typeof(ISkinSource))]
     private readonly BmsEmbeddedSkinSource activeSkin;
 
+    private BmsHealthProcessor? healthProcessor => resolvedHealthProcessor as BmsHealthProcessor;
+
+    private BmsScoreProcessor? scoreProcessor => resolvedScoreProcessor as BmsScoreProcessor;
+
+    private BmsHealthDisplay? healthDisplay;
+
     [Resolved(CanBeNull = true)]
     private HealthProcessor? resolvedHealthProcessor { get; set; }
 
     [Resolved(CanBeNull = true)]
     private ScoreProcessor? resolvedScoreProcessor { get; set; }
-
-    private BmsHealthDisplay? healthDisplay;
-
-    private BmsHealthProcessor? healthProcessor => resolvedHealthProcessor as BmsHealthProcessor;
-
-    private BmsScoreProcessor? scoreProcessor => resolvedScoreProcessor as BmsScoreProcessor;
 
     [Resolved]
     private GameHost host { get; set; } = null!;
@@ -192,8 +193,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             ?.TryRelease();
     }
 
-    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
-
     public bool IsColumnPressedForLandmine(int column) => pressedColumns.Contains(column);
 
     public void DetonateLandmine(BmsHitObject hitObject)
@@ -204,6 +203,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         landmineSound.SampleInfo = new BmsSampleInfo(hitObject.LandmineExplosionSamplePath);
         landmineSound.Play();
     }
+
+    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
 
     protected override void LoadComplete()
     {
@@ -238,6 +239,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         updateStageScale();
         updateHealthDisplayLayout();
     }
+
+    private static bool isFinite(Vector2 value) => float.IsFinite(value.X) && float.IsFinite(value.Y);
 
     [BackgroundDependencyLoader(true)]
     private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
@@ -283,7 +286,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (!Stage.IsLoaded || Stage.DrawWidth <= 0 || DrawWidth <= 0)
             return;
 
-        var healthReserve = Math.Max(64, ((healthDisplay?.IsLoaded == true) ? healthDisplay.DrawWidth : 0) + health_display_gap + minimum_side_padding);
+        var healthReserve = Math.Max(64, (healthDisplay?.IsLoaded == true ? healthDisplay.DrawWidth : 0) + health_display_gap + minimum_side_padding);
         var availableWidth = Math.Max(1, DrawWidth - healthReserve * 2);
         var scale = Math.Min(1, availableWidth / Stage.DrawWidth);
 
@@ -296,14 +299,23 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (!Stage.IsLoaded || healthDisplay?.IsLoaded != true)
             return;
 
-        var stageTopRight = ToLocalSpace(Stage.ScreenSpaceDrawQuad.TopRight);
-        var stageHeight = (Stage.ScreenSpaceDrawQuad.BottomRight - Stage.ScreenSpaceDrawQuad.TopRight).Length;
+        var stageQuad = Stage.ScreenSpaceDrawQuad;
+
+        if (!isFinite(stageQuad.TopRight) || !isFinite(stageQuad.BottomRight))
+            return;
+
+        var stageTopRight = ToLocalSpace(stageQuad.TopRight);
+        var stageHeight = (stageQuad.BottomRight - stageQuad.TopRight).Length;
         var healthScale = Math.Min(1, stageHeight / Math.Max(1, healthDisplay.DrawHeight));
+        var position = new Vector2(stageTopRight.X + health_display_gap, stageTopRight.Y);
 
-        if (float.IsFinite(healthScale) && healthScale > 0)
-            healthDisplay.Scale = new Vector2(healthScale);
+        if (!isFinite(stageTopRight) || !float.IsFinite(stageHeight) ||
+            stageHeight <= 0 || !float.IsFinite(healthScale) ||
+            healthScale <= 0 || !isFinite(position))
+            return;
 
-        healthDisplay.Position = new Vector2(stageTopRight.X + health_display_gap, stageTopRight.Y);
+        healthDisplay.Scale = new Vector2(healthScale);
+        healthDisplay.Position = position;
     }
 
     private void onNewResult(DrawableHitObject drawableHitObject, JudgementResult result)
@@ -397,11 +409,18 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private BmsHitObject? findNextSoundHitObject(int column)
     {
+        var currentTime = Time.Current;
+
         var index = nextSoundIndexByColumn.GetValueOrDefault(column);
+
+        if (!lastSoundSearchTimeByColumn.TryGetValue(column, out var lastSearchTime) || currentTime < lastSearchTime || currentTime - lastSearchTime > 5000)
+            index = findFirstSoundCandidateIndex(currentTime - BmsHitWindows.BAD_WINDOW);
+
+        lastSoundSearchTimeByColumn[column] = currentTime;
 
         // Skip notes that are definitely past all hit windows. Use the full BAD window (the widest
         // late window) so we never jump over a note that is still judgeable on a late keypress.
-        while (index < hitObjects.Count && hitObjects[index].StartTime < Time.Current - BmsHitWindows.BAD_WINDOW)
+        while (index < hitObjects.Count && hitObjects[index].StartTime < currentTime - BmsHitWindows.BAD_WINDOW)
             index++;
 
         while (index < hitObjects.Count)
@@ -420,6 +439,24 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         nextSoundIndexByColumn[column] = index;
         return null;
+    }
+
+    private int findFirstSoundCandidateIndex(double time)
+    {
+        var low = 0;
+        var high = hitObjects.Count;
+
+        while (low < high)
+        {
+            var middle = low + (high - low) / 2;
+
+            if (hitObjects[middle].StartTime < time)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
     }
 
     private bool hasNoteFinished(BmsHitObject hitObject)

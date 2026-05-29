@@ -112,15 +112,16 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable
         if (health == null)
             return;
 
-        displayedHealth = Interpolation.DampContinuously(displayedHealth, Math.Max(0, health.Value), 35, Time.Elapsed);
+        displayedHealth = Interpolation.DampContinuously(displayedHealth, health.Value, 35, Time.Elapsed);
         updateDisplay();
     }
 
     private void updateDisplay()
     {
-        normalFill.Height = (float)Math.Clamp(displayedHealth, 0, 1);
+        var clampedHealth = double.IsFinite(displayedHealth) ? Math.Clamp(displayedHealth, 0, 1) : 0;
+        normalFill.Height = (float)clampedHealth;
 
-        var fillColour = displayedHealth switch
+        var fillColour = clampedHealth switch
         {
             < 0.2 => new Color4(255, 45, 40, 255),
             < clear_border => new Color4(255, 190, 45, 255),
@@ -128,9 +129,9 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable
         };
 
         normalFill.Colour = fillColour;
-        clearLine.Alpha = displayedHealth >= clear_border ? 0.85f : 1;
+        clearLine.Alpha = clampedHealth >= clear_border ? 0.85f : 1;
 
-        percentageText.Text = $"{displayedHealth * 100:0.0}%";
+        percentageText.Text = $"{clampedHealth * 100:0.0}%";
     }
 
     private sealed partial class GaugeSegment : Box
