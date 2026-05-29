@@ -63,6 +63,8 @@ public class BmsBeatmapDecoder : Decoder<Beatmap>
                 SamplePath = parsedObject.SamplePath,
                 IsLongNote = parsedObject.IsLongNote,
                 IsMine = parsedObject.IsMine,
+                LandmineDamagePercent = parsedObject.LandmineDamagePercent,
+                LandmineExplosionSamplePath = parsedObject.LandmineExplosionSamplePath,
             });
         }
     }

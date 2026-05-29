@@ -162,11 +162,11 @@ public partial class TestSceneBmsSkins : PlayerTestScene, IStorageResourceProvid
         beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 8500, Column = 5, IsLongNote = true, Duration = 875 });
         beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 10000, Column = 2, IsLongNote = true, Duration = 1000 });
 
-        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 6000, Column = 6, IsMine = true });
-        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 7000, Column = 1, IsMine = true });
-        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 8250, Column = 4, IsMine = true });
-        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 9500, Column = 0, IsMine = true });
-        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 11000, Column = 7, IsMine = true });
+        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 6000, Column = 6, IsMine = true, LandmineDamagePercent = 2.5 });
+        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 7000, Column = 1, IsMine = true, LandmineDamagePercent = 2.5 });
+        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 8250, Column = 4, IsMine = true, LandmineDamagePercent = 2.5 });
+        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 9500, Column = 0, IsMine = true, LandmineDamagePercent = 2.5 });
+        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 11000, Column = 7, IsMine = true, LandmineDamagePercent = 2.5 });
 
         return beatmap;
     }

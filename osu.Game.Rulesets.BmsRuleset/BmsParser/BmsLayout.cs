@@ -192,6 +192,8 @@ static internal class BmsLayout
             '1' or '2' => channel,
             '5' => $"1{channel[1]}",
             '6' => $"2{channel[1]}",
+            'D' => $"1{channel[1]}",
+            'E' => $"2{channel[1]}",
             _ => null,
         };
     }

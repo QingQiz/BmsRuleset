@@ -24,8 +24,9 @@ Current state:
 - `BmsInputManager` provides native action binding infrastructure.
 - `BmsPlayfield` routes layout-specific actions for 5K, 7K, 5K DP, 7K DP, PMS 9K, and PMS DP to columns and can judge top-level visible tap notes.
 - `DrawableBmsHitObject.TryHit()` applies user-triggered timing-window results; passive misses still apply after the miss window.
-- `OnPressed` now selects the earliest unjudged in-window note in the column (by `StartTime`), ensuring strict sequential ordering and preventing a later note from being hit before an earlier one.
+- `OnPressed` now selects the earliest unjudged in-window non-mine note in the column (by `StartTime`), ensuring strict sequential ordering and preventing a later note from being hit before an earlier one.
 - `OnReleased` similarly selects the earliest held LN in the release window (by `EndTime`).
+- Landmine channels `D1-D9`/`E1-E9` are parsed. Mines have no timing windows: they detonate only if the mapped column is held as the mine crosses the judgement line; otherwise they are silently ignored. A detonation applies POOR display/stat semantics, key-up for that column, `#WAV00` explosion playback when defined, and gauge damage from the mine value.
 - `CheckForResult` now anchors the LN release-miss to `EndTime` (not `StartTime`), fixing a bug where long notes would be passively failed during their body duration. LN drop (held but never released past `EndTime + missWindow`) correctly applies `HitResult.Meh` (POOR). Passive misses on normal notes also apply `HitResult.Meh` (POOR). `HitResult.Miss` is not used for note results; it is the Empty POOR counter in `Statistics`.
 - Key sound on press plays the note whose keysound is most relevant: `findNextSoundHitObject` skips only notes whose `StartTime < Time.Current − BmsHitWindows.BadWindow` (200 ms), so a late keypress within the BAD window still triggers the correct note's keysound rather than the next note.
 - There is no full key state handling or key beams. Scratch/turntable semantics are column-routing only.
@@ -83,6 +84,7 @@ Current state:
 - DJ LEVEL rank mapping: X (all Perfect), S≥8/9 EX, A≥7/9, B≥6/9, C≥5/9, D otherwise.
 - `GetValidHitResults()` returns all 6: Perfect/Great/Good/Ok/Meh/Miss mapping to BMS PGREAT/GREAT/GOOD/BAD/POOR/E-POOR. `HitResult.Miss` is repurposed as the **Empty POOR counter** in `Statistics`; it is not a note judgement result (`IsHitResultAllowed` returns false for it, `WindowFor(Miss)` returns 0).
 - Empty POOR (press outside all note windows) breaks combo and drains gauge via `RegisterEmptyPoor` on both processors. `BmsPlayfield.registerEmptyPoor()` also displays the POOR image in `JudgementArea` by looking up `SkinComponentLookup<HitResult>(HitResult.Miss)`.
+- Landmine detonations use `HitResult.Meh` (POOR); `HitResult.Miss` remains reserved for Empty POOR. Ignored mines produce no judgement and do not affect score, accuracy, combo, gauge, or Empty POOR statistics.
 - `BmsRuleset.HIT_RESULT_LABELS` is the single source of truth for BMS judgement label strings (PGREAT/GREAT/GOOD/BAD/POOR/E-POOR). Both `GetDisplayNameForHitResult` and `BmsDefaultJudgementPiece` read from it.
 - Judgement drawables are pre-built once per result type at `LoadComplete` (one `SkinnableDrawable` per `HitResult` in `judgementDrawableCache`) and reused on every hit by moving them between a hidden pool container and `JudgementArea`. No `SkinnableDrawable` is allocated during gameplay.
 
@@ -115,6 +117,7 @@ Current state:
 - Default `#TOTAL` formula `max(7.605×N/(0.01×N+6.5), 160)` used when `#TOTAL` is absent from chart.
 - `#TOTAL` parsing pipeline is complete: BmsParser → BmsParseResult → IBmsBeatmap → BmsBeatmap → BmsDecodedBeatmap.
 - Empty POOR gauge drain implemented via `RegisterEmptyPoor` (−4.8%, no note consumed).
+- Landmine gauge damage is implemented as base36 channel value / 2 percentage points. `ZZ` produces 647.5% damage, clamping gauge to 0 and immediately failing.
 - `CheckDefaultFailCondition` triggers failure when gauge hits 0 mid-song, or when `JudgedHits >= MaxHits && Health < 0.8` at song end (Normal gauge clear condition).
 - Long-note drop records `HitResult.Meh` (POOR) and passive normal-note misses also record `HitResult.Meh` (POOR). `HitResult.Miss` is the Empty POOR counter; it is not emitted as a note judgement result.
 

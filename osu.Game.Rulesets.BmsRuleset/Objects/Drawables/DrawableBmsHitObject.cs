@@ -166,6 +166,25 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         Size = new Vector2(Math.Max(1, scaledParentWidth), currentNoteHeight);
         updateLongNotePieces(y, tailY);
 
+        // The execution of the Update function is frame-by-frame.
+        // Therefore, when the execution finds that the current time is
+        // greater than the trigger time of the hitobject,
+        // it means it is being triggered in the current or next frame.
+        // At this point, the mine is processed:
+        // if it is held down, trigger the mine; otherwise, let it expire immediately.
+        if (HitObject.IsMine && !Judged && Time.Current >= HitObject.StartTime)
+        {
+            if (playfield?.IsColumnPressedForLandmine(HitObject.Column) == true)
+            {
+                playfield.DetonateLandmine(HitObject);
+                ApplyResult(HitResult.Meh);
+            }
+            else
+                Expire();
+
+            return;
+        }
+
         if (playfield?.IsAutoplay == true && HitObject.IsLongNote && Time.Current >= HitObject.StartTime)
             longNoteStarted = true;
 
@@ -181,7 +200,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     protected override void CheckForResult(bool userTriggered, double timeOffset)
     {
-        if (userTriggered || HitObject.HitWindows == null)
+        if (userTriggered || HitObject.HitWindows == null || HitObject.IsMine)
             return;
 
         var missWindow = HitObject.HitWindows.WindowFor(HitResult.Ok); // BAD is the passive-miss boundary

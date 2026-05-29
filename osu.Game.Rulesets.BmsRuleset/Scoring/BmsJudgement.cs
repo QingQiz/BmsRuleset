@@ -17,7 +17,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 ///     (both passive miss and in-range early keypress that consumes the note).
 ///     Empty POOR (keypress outside all note windows) produces no <see cref="T:osu.Game.Rulesets.Judgements.JudgementResult"/>.
 /// </remarks>
-public class BmsJudgement : Judgement
+public class BmsJudgement(bool isMine = false) : Judgement
 {
-    public override HitResult MaxResult => HitResult.Perfect;
+    public bool IsMine { get; } = isMine;
+
+    public override HitResult MaxResult => IsMine ? HitResult.Meh : HitResult.Perfect;
+
+    public override HitResult MinResult => HitResult.Miss;
 }

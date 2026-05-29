@@ -93,6 +93,44 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestDecoderParsesLandmineChannels()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAV00 bomb.wav
+                             #001D3:0000001E
+                             """);
+
+        var mine = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(mine.IsMine, Is.True);
+        Assert.That(mine.Column, Is.EqualTo(3));
+        Assert.That(mine.SourceChannel, Is.EqualTo("D3"));
+        Assert.That(mine.SampleKey, Is.EqualTo("1E"));
+        Assert.That(mine.SamplePath, Is.Empty);
+        Assert.That(mine.LandmineDamagePercent, Is.EqualTo(25));
+        Assert.That(mine.LandmineExplosionSamplePath, Is.EqualTo("bomb.wav"));
+    }
+
+    [Test]
+    public void TestDecoderParsesSecondPlayerLandmineChannels()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #00129:01
+                             #001E1:0A
+                             """);
+
+        var mine = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(beatmap.HitObjects, Has.Count.EqualTo(1));
+        Assert.That(mine.IsMine, Is.True);
+        Assert.That(mine.Column, Is.EqualTo(6));
+        Assert.That(mine.SourceChannel, Is.EqualTo("E1"));
+        Assert.That(mine.LandmineDamagePercent, Is.EqualTo(5));
+    }
+
+    [Test]
     public void TestExtendedBpmChangesProjectTimes()
     {
         var beatmap = decode("""

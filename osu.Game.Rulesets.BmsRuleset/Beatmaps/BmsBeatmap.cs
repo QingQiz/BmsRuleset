@@ -33,8 +33,9 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public override IEnumerable<BeatmapStatistic> GetStatistics()
     {
-        var notes = HitObjects.Count;
+        var notes = HitObjects.Count(h => !h.IsMine);
         var holdNotes = HitObjects.Count(h => h.IsLongNote);
+        var mines = HitObjects.Count(h => h.IsMine);
 
         return
         [
@@ -49,6 +50,12 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
                 Name = "Hold Notes",
                 CreateIcon = () => new BeatmapStatisticIcon(BeatmapStatisticsIconType.Sliders),
                 Content = holdNotes.ToString(),
+            },
+            new BeatmapStatistic
+            {
+                Name = "Mines",
+                CreateIcon = () => new BeatmapStatisticIcon(BeatmapStatisticsIconType.Spinners),
+                Content = mines.ToString(),
             },
         ];
     }

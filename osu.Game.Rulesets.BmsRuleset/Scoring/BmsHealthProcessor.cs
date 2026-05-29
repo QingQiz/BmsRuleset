@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -99,9 +101,24 @@ public partial class BmsHealthProcessor(double drainStartTime) : LegacyDrainingH
 
     protected override IEnumerable<HitObject> EnumerateNestedHitObjects(HitObject hitObject) => hitObject.NestedHitObjects;
 
+    protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement is BmsJudgement { IsMine: true }
+        ? HitResult.IgnoreMiss
+        : base.GetSimulatedHitResult(judgement);
+
     protected override double GetHealthIncreaseFor(HitObject hitObject, HitResult result)
     {
         ensureInitialized();
+
+        if (hitObject is BmsHitObject { IsMine: true } mine)
+        {
+            if (result != HitResult.Meh)
+                return 0;
+
+            if (mine.LandmineDamagePercent >= max_landmine_damage_percent)
+                return -1;
+
+            return -mine.LandmineDamagePercent / 100d;
+        }
 
         return result switch
         {
@@ -114,12 +131,14 @@ public partial class BmsHealthProcessor(double drainStartTime) : LegacyDrainingH
         };
     }
 
+    private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
+
     private void ensureInitialized()
     {
         if (initialized) return;
 
         initialized = true;
-        var noteCount = Beatmap.HitObjects.Count;
+        var noteCount = Beatmap.HitObjects.Count(h => h is not BmsHitObject { IsMine: true });
         if (noteCount == 0) noteCount = 1; // Avoid division by zero.
 
         double total = 0;

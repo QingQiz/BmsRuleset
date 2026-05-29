@@ -1,4 +1,7 @@
 
+<details>
+  <summary>dev road. Click to expand!</summary>
+
 ## FIXME
 
 - [ ] 游戏在autoplay时，切到后台，hitsound 的播放会乱掉。切到后台再切到前台游戏会卡死
@@ -30,10 +33,10 @@
 
 ## TODO
 
-- [ ] Mine
+
+- [x] Mine
 - [ ] random/switch
 - [ ] ln render
-- [ ] health bar overflow
 - [ ] timing sys
 - [ ] measure line
 - [ ] correct metadata display (title, artist, etc, rank, hp, ...)
@@ -68,3 +71,5 @@
   - [ ] #xxx97 (fgt) — Dynamic BGM volume change channel. Range [01-FF] (hex), e.g. #00197:003C sets volume to 60 at measure 1.
 
 - [ ] Exrank
+
+</details>

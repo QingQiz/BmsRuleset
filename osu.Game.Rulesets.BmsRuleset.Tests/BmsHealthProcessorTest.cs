@@ -131,6 +131,146 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
+    public void TestEmptyPoorReducesHealthByTwoPercent()
+    {
+        var processor = new BmsHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        processor.Health.Value = 0.8;
+        processor.RegisterEmptyPoor();
+
+        Assert.That(processor.Health.Value, Is.EqualTo(0.78).Within(0.001));
+        Assert.That(processor.HasFailed, Is.False);
+    }
+
+    [Test]
+    public void TestEmptyPoorClampsAtZero()
+    {
+        var processor = new BmsHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        processor.Health.Value = 0.01;
+        processor.RegisterEmptyPoor();
+
+        Assert.That(processor.Health.Value, Is.Zero);
+    }
+
+    [Test]
+    public void TestLandmineReducesHealthByDamagePercent()
+    {
+        var processor = new BmsHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1, IsMine = true, LandmineDamagePercent = 25 },
+                new BmsHitObject { StartTime = 2000, Column = 2 },
+            },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        processor.Health.Value = 0.8;
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        {
+            Type = HitResult.Meh,
+        });
+
+        Assert.That(processor.Health.Value, Is.EqualTo(0.55).Within(0.001));
+        Assert.That(processor.HasFailed, Is.False);
+    }
+
+    [Test]
+    public void TestIgnoredLandmineDoesNotChangeHealth()
+    {
+        var processor = new BmsHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1, IsMine = true, LandmineDamagePercent = 25 },
+                new BmsHitObject { StartTime = 2000, Column = 2 },
+            },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        processor.Health.Value = 0.8;
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        {
+            Type = HitResult.IgnoreMiss,
+        });
+
+        Assert.That(processor.Health.Value, Is.EqualTo(0.8).Within(0.001));
+        Assert.That(processor.HasFailed, Is.False);
+    }
+
+    [Test]
+    public void TestLandmineZzForcesFailure()
+    {
+        var processor = new BmsHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1, IsMine = true, LandmineDamagePercent = 647.5 },
+                new BmsHitObject { StartTime = 2000, Column = 2 },
+            },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        processor.Health.Value = 1;
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        {
+            Type = HitResult.Meh,
+        });
+
+        Assert.That(processor.Health.Value, Is.Zero);
+        Assert.That(processor.HasFailed, Is.True);
+    }
+
+    [Test]
+    public void TestLandminesDoNotCountTowardsTotalGaugeRecovery()
+    {
+        var processor = new BmsHealthProcessor(0);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            Total = 80,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+                new BmsHitObject { StartTime = 1500, Column = 2, IsMine = true, LandmineDamagePercent = 25 },
+            },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        {
+            Type = HitResult.Perfect,
+        });
+
+        Assert.That(processor.Health.Value, Is.EqualTo(1.0).Within(0.001));
+    }
+
+    [Test]
     public void TestGaugeClearConditionPassesAtEightyPercent()
     {
         var processor = new BmsHealthProcessor(0);

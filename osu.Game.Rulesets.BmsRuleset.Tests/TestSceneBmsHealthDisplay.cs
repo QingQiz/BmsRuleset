@@ -3,8 +3,12 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
@@ -14,6 +18,7 @@ public partial class TestSceneBmsHealthDisplay : OsuTestScene
 {
     private BmsHealthProcessor healthProcessor = null!;
     private BmsHealthDisplay healthDisplay = null!;
+    private BmsBeatmap beatmap = null!;
 
     [SetUpSteps]
     public void SetUpSteps()
@@ -21,7 +26,16 @@ public partial class TestSceneBmsHealthDisplay : OsuTestScene
         AddStep("create display", () =>
         {
             healthProcessor = new BmsHealthProcessor(0);
-            healthProcessor.ApplyBeatmap(new BmsBeatmap());
+            healthProcessor.ApplyBeatmap(beatmap = new BmsBeatmap
+            {
+                LayoutVariant = BmsLayoutVariant.Bme7K,
+                TotalColumns = 8,
+                HitObjects =
+                {
+                    new BmsHitObject { StartTime = 1000, Column = 1 },
+                    new BmsHitObject { StartTime = 2000, Column = 2, IsMine = true, LandmineDamagePercent = 25 },
+                },
+            });
 
             Child = new DependencyProvidingContainer
             {
@@ -29,6 +43,7 @@ public partial class TestSceneBmsHealthDisplay : OsuTestScene
                 CachedDependencies =
                 [
                     (typeof(BmsHealthProcessor), healthProcessor),
+                    (typeof(HealthProcessor), healthProcessor),
                 ],
                 Child = new Container
                 {
@@ -83,5 +98,24 @@ public partial class TestSceneBmsHealthDisplay : OsuTestScene
         AddStep("set health to 100%", () => healthProcessor.Health.Value = 1.0);
         AddStep("drain to 10%", () => healthProcessor.Health.Value = 0.10);
         AddStep("recover to 85%", () => healthProcessor.Health.Value = 0.85);
+    }
+
+    [Test]
+    public void TestEmptyPoorDrain()
+    {
+        AddStep("set health to 80%", () => healthProcessor.Health.Value = 0.80);
+        AddStep("register empty poor", () => healthProcessor.RegisterEmptyPoor());
+        AddUntilStep("health display drained", () => healthProcessor.Health.Value, () => Is.EqualTo(0.78).Within(0.001));
+    }
+
+    [Test]
+    public void TestLandmineDrain()
+    {
+        AddStep("set health to 80%", () => healthProcessor.Health.Value = 0.80);
+        AddStep("detonate landmine", () => healthProcessor.ApplyResult(new JudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
+        {
+            Type = HitResult.Meh,
+        }));
+        AddUntilStep("health display drained", () => healthProcessor.Health.Value, () => Is.EqualTo(0.55).Within(0.001));
     }
 }

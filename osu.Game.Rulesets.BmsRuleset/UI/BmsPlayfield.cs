@@ -59,8 +59,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     private readonly BmsBeatmap? beatmap;
 
     private readonly Dictionary<int, int> nextSoundIndexByColumn = new();
+    private readonly HashSet<int> pressedColumns = [];
 
     private readonly BmsChartSampleSound keySound = new();
+    private readonly BmsChartSampleSound landmineSound = new();
 
     // Pre-built SkinnableDrawable per HitResult — created once at load, reused on every judgement
     // display by removing from the pool container and adding to JudgementArea, then restoring on
@@ -114,6 +116,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             Stage = new BmsStage(TotalColumns, LayoutVariant),
             HitObjectContainer,
             keySound,
+            landmineSound,
             judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both },
         ];
     }
@@ -143,6 +146,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (column == null || column.Value >= TotalColumns)
             return false;
 
+        pressedColumns.Add(column.Value);
         playNextKeySound(column.Value);
 
         // Use the earliest unjudged note in this column that is within a hit window.
@@ -151,6 +155,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         var target = HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
             .Where(d => !d.Judged &&
+                        !d.HitObject.IsMine &&
                         d.HitObject.Column == column.Value &&
                         d.HitObject.HitWindows is BmsHitWindows w &&
                         w.BmsResultFor(Time.Current - d.HitObject.StartTime) != HitResult.None)
@@ -176,6 +181,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (column == null || column.Value >= TotalColumns)
             return;
 
+        pressedColumns.Remove(column.Value);
+
         // Release: find the earliest LN in this column that is held and within the release window.
         HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
@@ -186,6 +193,17 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     }
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
+
+    public bool IsColumnPressedForLandmine(int column) => pressedColumns.Contains(column);
+
+    public void DetonateLandmine(BmsHitObject hitObject)
+    {
+        if (string.IsNullOrEmpty(hitObject.LandmineExplosionSamplePath))
+            return;
+
+        landmineSound.SampleInfo = new BmsSampleInfo(hitObject.LandmineExplosionSamplePath);
+        landmineSound.Play();
+    }
 
     protected override void LoadComplete()
     {
@@ -292,6 +310,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         if (drawableHitObject is not DrawableBmsHitObject bmsHitObject)
             return;
+
+        if (bmsHitObject.HitObject.IsMine)
+        {
+            showJudgement(HitResult.Meh);
+            return;
+        }
 
         // Hit explosion only on hits (not misses).
         if (result.IsHit)

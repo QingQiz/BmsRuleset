@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
-static internal partial class BmsChartParser
+internal static partial class BmsChartParser
 {
     private const int base_tick_resolution = 192;
 
@@ -301,6 +301,7 @@ static internal partial class BmsChartParser
     {
         var notes = new List<RawCell>();
         var lnCells = new List<RawCell>();
+        var mines = new List<RawCell>();
 
         foreach (var line in state.ChannelLines)
         {
@@ -314,6 +315,12 @@ static internal partial class BmsChartParser
             {
                 var includeZeroCells = state.LnType == 2;
                 lnCells.AddRange(expandCells(line, measureStarts, includeZeroCells).Select(c => c with { Column = column }));
+                continue;
+            }
+
+            if (tryMapLandmineChannel(line.Channel, totalColumns, out column))
+            {
+                mines.AddRange(expandCells(line, measureStarts, false).Select(c => c with { Column = column }));
             }
         }
 
@@ -326,6 +333,9 @@ static internal partial class BmsChartParser
 
         foreach (var hitObject in collectVisibleObjects(notes, state, tickResolution, timingEvents, stopEvents))
             yield return hitObject;
+
+        foreach (var mine in mines.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
+            yield return createMineHitObject(mine, tickResolution, timingEvents, stopEvents, state.SampleDefinitions);
     }
 
     private static IEnumerable<BmsParsedHitObject> collectVisibleObjects(
@@ -425,7 +435,30 @@ static internal partial class BmsChartParser
             start.Value,
             sampleDefinitions.GetValueOrDefault(start.Value, string.Empty),
             isLongNote,
-            false);
+            false,
+            0,
+            string.Empty);
+    }
+
+    private static BmsParsedHitObject createMineHitObject(
+        RawCell mine, int tickResolution,
+        List<TimingEvent> timingEvents, List<StopEvent> stopEvents, IReadOnlyDictionary<string, string> sampleDefinitions)
+    {
+        var startTime = projectTickToTime(mine.Tick, timingEvents, stopEvents, tickResolution);
+
+        return new BmsParsedHitObject(
+            mine.Tick,
+            mine.Tick,
+            startTime,
+            0,
+            mine.Column,
+            mine.Channel,
+            mine.Value,
+            string.Empty,
+            false,
+            true,
+            parseBase36(mine.Value) / 2d,
+            sampleDefinitions.GetValueOrDefault("00", string.Empty));
     }
 
     private static IEnumerable<RawCell> expandCells(
@@ -459,6 +492,18 @@ static internal partial class BmsChartParser
         }
 
         var visibleChannel = channel[0] == '5' ? $"1{channel[1]}" : $"2{channel[1]}";
+        return BmsLayout.TryMapVisibleChannel(visibleChannel, totalColumns, out column);
+    }
+
+    private static bool tryMapLandmineChannel(string channel, int totalColumns, out int column)
+    {
+        if (channel.Length != 2 || channel[0] is not ('D' or 'E'))
+        {
+            column = -1;
+            return false;
+        }
+
+        var visibleChannel = channel[0] == 'D' ? $"1{channel[1]}" : $"2{channel[1]}";
         return BmsLayout.TryMapVisibleChannel(visibleChannel, totalColumns, out column);
     }
 
@@ -500,6 +545,25 @@ static internal partial class BmsChartParser
 
     private static double? parseHexBpm(string value) =>
         int.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var bpm) ? bpm : null;
+
+    private static int parseBase36(string value)
+    {
+        var result = 0;
+
+        foreach (var c in value.ToUpperInvariant())
+        {
+            var digit = c switch
+            {
+                >= '0' and <= '9' => c - '0',
+                >= 'A' and <= 'Z' => c - 'A' + 10,
+                _ => 0,
+            };
+
+            result = result * 36 + digit;
+        }
+
+        return result;
+    }
 
     private static string stripComments(string line)
     {

@@ -99,6 +99,10 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
         => base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
 
+    protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement is BmsJudgement { IsMine: true }
+        ? HitResult.IgnoreMiss
+        : base.GetSimulatedHitResult(judgement);
+
     /// <summary>
     ///     Records an Empty POOR: a keypress that found no note to consume.
     ///     Increments the Empty POOR counter stored under

@@ -28,6 +28,8 @@ public readonly record struct BmsParsedHitObject(
     string SampleKey,
     string SamplePath,
     bool IsLongNote,
-    bool IsMine);
+    bool IsMine,
+    double LandmineDamagePercent,
+    string LandmineExplosionSamplePath);
 
 public sealed record BmsSampleEvent(double Time, long Tick, string SampleKey);
