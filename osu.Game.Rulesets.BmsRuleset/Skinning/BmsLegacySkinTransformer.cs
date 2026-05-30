@@ -173,8 +173,11 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
                 => new LegacyBmsStageBackground(this),
             BmsSkinComponents.StageForeground when hasAnimation(getStageForegroundImageName())
                 => new LegacyBmsStageForeground(this),
-            BmsSkinComponents.HoldNoteHead or BmsSkinComponents.HoldNoteTail or BmsSkinComponents.HoldNoteBody
-                or BmsSkinComponents.BarLine
+            BmsSkinComponents.HoldNoteHead when hasAnyAnimation(getHoldNoteHeadImageNames(bmsLookup))
+                => new LegacyBmsNotePiece(this, bmsLookup),
+            BmsSkinComponents.HoldNoteTail when hasAnyAnimation(getHoldNoteTailImageNames(bmsLookup))
+                => new LegacyBmsNotePiece(this, bmsLookup),
+            BmsSkinComponents.HoldNoteBody or BmsSkinComponents.BarLine
                 => throw new UnsupportedSkinComponentException(lookup),
             _ => null,
         };
@@ -292,6 +295,28 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
     private string getNoteImageName(BmsSkinComponentLookup lookup) =>
         getManiaConfig<string>(LegacyManiaSkinConfigurationLookups.NoteImage, lookup)?.Value
         ?? $"mania-note{fallbackColumnIndex(lookup)}";
+
+    private string getHoldNoteHeadImageName(BmsSkinComponentLookup lookup) =>
+        getFirstAnimationName(getHoldNoteHeadImageNames(lookup)) ?? getNoteImageName(lookup);
+
+    private string getHoldNoteTailImageName(BmsSkinComponentLookup lookup) =>
+        getFirstAnimationName(getHoldNoteTailImageNames(lookup)) ?? getHoldNoteHeadImageName(lookup);
+
+    private string[] getHoldNoteHeadImageNames(BmsSkinComponentLookup lookup) =>
+    [
+        getManiaConfig<string>(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup)?.Value ?? string.Empty,
+        getNoteImageName(lookup),
+    ];
+
+    private string[] getHoldNoteTailImageNames(BmsSkinComponentLookup lookup) =>
+    [
+        getManiaConfig<string>(LegacyManiaSkinConfigurationLookups.HoldNoteTailImage, lookup)?.Value ?? string.Empty,
+        getManiaConfig<string>(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup)?.Value ?? string.Empty,
+        getNoteImageName(lookup),
+    ];
+
+    private string? getFirstAnimationName(IEnumerable<string> names)
+        => names.FirstOrDefault(name => !string.IsNullOrWhiteSpace(name) && hasAnimation(name));
 
     private string getMineImageName(BmsSkinComponentLookup lookup) =>
         getManiaConfig<string>(LegacyManiaSkinConfigurationLookups.Hit100, lookup)?.Value
@@ -487,7 +512,6 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
         private readonly BmsLegacySkinTransformer transformer;
         private readonly BmsSkinComponentLookup lookup;
         private readonly float? widthForNoteHeightScale;
-        private readonly float columnWidthForNoteHeightScale;
         private Drawable? noteAnimation;
 
         public LegacyBmsNotePiece(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup)
@@ -495,12 +519,10 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
             this.transformer = transformer;
             this.lookup = lookup;
             widthForNoteHeightScale = transformer.getManiaConfig<float>(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale)?.Value;
-            columnWidthForNoteHeightScale = transformer.getManiaConfig<float>(LegacyManiaSkinConfigurationLookups.ColumnWidth, lookup)?.Value
-                                            ?? (lookup.IsScratch ? 42 : 48);
 
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
-            Origin = Anchor.BottomLeft;
+            Origin = Anchor.TopLeft;
         }
 
         protected override void LoadComplete()
@@ -509,8 +531,8 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
 
             InternalChild = noteAnimation = transformer.getAnimation(getImageName())?.With(d =>
             {
-                d.Anchor = Anchor.BottomLeft;
-                d.Origin = Anchor.BottomLeft;
+                d.Anchor = Anchor.TopLeft;
+                d.Origin = Anchor.TopLeft;
             }) ?? Empty();
         }
 
@@ -531,15 +553,15 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
             if (texture == null)
                 return;
 
-            var noteHeight = widthForNoteHeightScale == null
-                ? DrawWidth
-                : widthForNoteHeightScale.Value * DrawWidth / Math.Max(1, columnWidthForNoteHeightScale);
-            noteAnimation.Scale = Vector2.Divide(new Vector2(DrawWidth, noteHeight), texture.DisplayWidth);
+            var noteWidth = widthForNoteHeightScale ?? DrawWidth;
+            noteAnimation.Scale = Vector2.Divide(new Vector2(DrawWidth, noteWidth), Math.Max(1, texture.DisplayWidth));
         }
 
         private string getImageName() => lookup.Component switch
         {
             BmsSkinComponents.Mine => transformer.getMineImageName(lookup),
+            BmsSkinComponents.HoldNoteHead => transformer.getHoldNoteHeadImageName(lookup),
+            BmsSkinComponents.HoldNoteTail => transformer.getHoldNoteTailImageName(lookup),
             _ => transformer.getNoteImageName(lookup),
         };
     }

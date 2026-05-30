@@ -53,7 +53,7 @@ public sealed class BmsEmbeddedSkin : ISkin, IDisposable
     {
         Resources = createStore(kind);
 
-        textures = new TextureStore(renderer, new TextureLoaderStore(Resources), scaleAdjust: 1);
+        textures = new TextureStore(renderer, new MaxDimensionLimitedTextureLoaderStore(new TextureLoaderStore(Resources)), scaleAdjust: 1);
         samples = audioManager?.GetSampleStore(new NamespacedResourceStore<byte[]>(Resources, "Samples"));
     }
 

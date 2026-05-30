@@ -92,8 +92,6 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
         requestedVolume.Value = Math.Max(0, resolved.Info.Volume) / 100.0;
         channel.Play();
 
-        // TODO FIXME 开头的sample 快进/skip时会停止播放，另外 review 快进到 某个 sample 的中间部分，sample是否会播放
-
         // channel.Play() enqueues two BindAdjustments calls on the audio thread via
         // AudioCollectionManager.AddItem: one that binds channel ← sampleBass, and one
         // that binds sampleBass ← factory (which carries VolumeSample / effect-volume).

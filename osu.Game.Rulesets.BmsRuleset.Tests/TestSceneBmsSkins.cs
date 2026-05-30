@@ -34,8 +34,9 @@ public partial class TestSceneBmsSkins : PlayerTestScene, IStorageResourceProvid
 {
     private const double initial_health = 0.2;
     private const double first_note_time = 2500;
-    private const double ln_scenario_start_time = first_note_time + 12000;
-    private const double ln_scenario_spacing = 1400;
+    private const double norm_scenario_start_time = first_note_time + 6000;
+    private const double ln_scenario_start_time = first_note_time;
+    private const double ln_scenario_spacing = 700;
     private const double ln_scenario_duration = 800;
 
     private SkinDefinition skinDefinition;
@@ -139,7 +140,7 @@ public partial class TestSceneBmsSkins : PlayerTestScene, IStorageResourceProvid
         {
             beatmap.HitObjects.Add(new BmsHitObject
             {
-                StartTime = first_note_time + i * 125,
+                StartTime = norm_scenario_start_time + i * 125,
                 Column = pattern[i],
             });
         }
