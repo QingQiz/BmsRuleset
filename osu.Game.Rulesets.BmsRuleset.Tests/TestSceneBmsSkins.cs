@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using NUnit.Framework.Constraints;
 using NUnit.Framework;
+using NUnit.Framework.Constraints;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Graphics.Rendering;
@@ -12,20 +12,17 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Framework.Testing.Drawables.Steps;
-using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.IO;
+using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Replays;
 using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
@@ -37,6 +34,9 @@ public partial class TestSceneBmsSkins : PlayerTestScene, IStorageResourceProvid
 {
     private const double initial_health = 0.2;
     private const double first_note_time = 2500;
+    private const double ln_scenario_start_time = first_note_time + 12000;
+    private const double ln_scenario_spacing = 1400;
+    private const double ln_scenario_duration = 800;
 
     private SkinDefinition skinDefinition;
 
@@ -48,18 +48,6 @@ public partial class TestSceneBmsSkins : PlayerTestScene, IStorageResourceProvid
     protected override double TimePerAction => 0;
 
     protected override Ruleset CreatePlayerRuleset() => new BmsRuleset();
-
-    [Test]
-    public void TestArgonSkin()
-    {
-        createSkinScene(new SkinDefinition("Argon", resources => new ArgonSkin(resources)));
-    }
-
-    [Test]
-    public void TestClassicSkin()
-    {
-        createSkinScene(new SkinDefinition("Classic", resources => new DefaultLegacySkin(resources)));
-    }
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
         => new SkinProvidingPlayer(new SkinProvidingContainer(skinDefinition.CreateSkin(this)));
@@ -156,11 +144,18 @@ public partial class TestSceneBmsSkins : PlayerTestScene, IStorageResourceProvid
             });
         }
 
-        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 5500, Column = 0, IsLongNote = true, Duration = 875 });
-        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 6500, Column = 7, IsLongNote = true, Duration = 750 });
-        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 7500, Column = 3, IsLongNote = true, Duration = 625 });
-        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 8500, Column = 5, IsLongNote = true, Duration = 875 });
-        beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 10000, Column = 2, IsLongNote = true, Duration = 1000 });
+        int[] lnScenarioColumns = [0, 7, 3, 5, 2, 6, 1];
+
+        for (var i = 0; i < lnScenarioColumns.Length; i++)
+        {
+            beatmap.HitObjects.Add(new BmsHitObject
+            {
+                StartTime = ln_scenario_start_time + i * ln_scenario_spacing,
+                Column = lnScenarioColumns[i],
+                IsLongNote = true,
+                Duration = ln_scenario_duration,
+            });
+        }
 
         beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 6000, Column = 6, IsMine = true, LandmineDamagePercent = 2.5 });
         beatmap.HitObjects.Add(new BmsHitObject { StartTime = first_note_time + 7000, Column = 1, IsMine = true, LandmineDamagePercent = 2.5 });
@@ -189,6 +184,8 @@ public partial class TestSceneBmsSkins : PlayerTestScene, IStorageResourceProvid
     {
         [Cached(typeof(ISkinSource))]
         private readonly ISkinSource skinSource = skinSource;
+
+        private readonly record struct ActionPoint(double Time, BmsAction Action, bool Press);
 
         protected override void PrepareReplay()
         {
@@ -228,6 +225,9 @@ public partial class TestSceneBmsSkins : PlayerTestScene, IStorageResourceProvid
                 if (action == null)
                     continue;
 
+                if (hitObject.IsLongNote && tryAddLongNoteScenario(actionPoints, hitObject, action.Value))
+                    continue;
+
                 var time = hitObject.StartTime + offsets[i % offsets.Length];
 
                 actionPoints.Add(new ActionPoint(time, action.Value, true));
@@ -261,8 +261,80 @@ public partial class TestSceneBmsSkins : PlayerTestScene, IStorageResourceProvid
                 actionPoints.Add(new ActionPoint(time, action, true));
                 actionPoints.Add(new ActionPoint(time + 20, action, false));
             }
+
+            static bool tryAddLongNoteScenario(List<ActionPoint> actionPoints, BmsHitObject hitObject, BmsAction action)
+            {
+                var index = (int)Math.Round((hitObject.StartTime - ln_scenario_start_time) / ln_scenario_spacing);
+
+                if (index < 0 || index > (int)LnScenario.EarlyRelease)
+                    return false;
+
+                var expectedStartTime = ln_scenario_start_time + index * ln_scenario_spacing;
+
+                if (Math.Abs(hitObject.StartTime - expectedStartTime) > 0.001)
+                    return false;
+
+                switch ((LnScenario)index)
+                {
+                    case LnScenario.EarlyPress:
+                        addHold(actionPoints, action, hitObject.StartTime - 150, hitObject.EndTime + 20);
+                        break;
+
+                    case LnScenario.LatePress:
+                        addHold(actionPoints, action, hitObject.StartTime + 150, hitObject.EndTime + 20);
+                        break;
+
+                    case LnScenario.NoPress:
+                        break;
+
+                    case LnScenario.MidRelease:
+                        addHold(actionPoints, action, hitObject.StartTime, hitObject.StartTime + hitObject.Duration / 2);
+                        break;
+
+                    case LnScenario.NoRelease:
+                        actionPoints.Add(new ActionPoint(hitObject.StartTime, action, true));
+                        break;
+
+                    case LnScenario.LateRelease:
+                        addHold(actionPoints, action, hitObject.StartTime, hitObject.EndTime + 150);
+                        break;
+
+                    case LnScenario.EarlyRelease:
+                        addHold(actionPoints, action, hitObject.StartTime, hitObject.EndTime - 150);
+                        break;
+                }
+
+                return true;
+            }
+
+            static void addHold(List<ActionPoint> actionPoints, BmsAction action, double pressTime, double releaseTime)
+            {
+                actionPoints.Add(new ActionPoint(pressTime, action, true));
+                actionPoints.Add(new ActionPoint(releaseTime, action, false));
+            }
         }
 
-        private readonly record struct ActionPoint(double Time, BmsAction Action, bool Press);
+        private enum LnScenario
+        {
+            EarlyPress,
+            LatePress,
+            NoPress,
+            MidRelease,
+            NoRelease,
+            LateRelease,
+            EarlyRelease,
+        }
+    }
+
+    [Test]
+    public void TestArgonSkin()
+    {
+        createSkinScene(new SkinDefinition("Argon", resources => new ArgonSkin(resources)));
+    }
+
+    [Test]
+    public void TestClassicSkin()
+    {
+        createSkinScene(new SkinDefinition("Classic", resources => new DefaultLegacySkin(resources)));
     }
 }

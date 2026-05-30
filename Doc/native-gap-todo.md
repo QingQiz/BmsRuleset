@@ -53,7 +53,7 @@ Current state:
 - Object Y-position is based on `HitObject.StartTime - Time.Current`, configurable mania-style `ScrollSpeed`, and fixed `travel_distance = 560`.
 - STOP/soflan visual behaviour is not native. STOP affects decoded `StartTime`, but rendering remains projected-time based.
 - `BmsDrawableRuleset.CreateDrawableRepresentation()` returns `null`; rendering currently relies on pool registration rather than explicit representation creation.
-- LN body rendering does not exist. Long notes only change note colour to cyan.
+- LN head/body/tail render through native BMS skin components, with mania-style body/tail overlap and basic masking while held. Rendering is still projected-time based, not native tick-scroll based.
 - BGA, layer, poor-layer, movie, stagefile, banner, and background rendering do not exist.
 - `#WAVxx` key sounds and BGM channel `01` autoplay samples are parsed and played through BMS sample lookup. They ignore osu! global Effect volume while following universal volume. BGA sync polish is still incomplete.
 
@@ -63,7 +63,7 @@ TODO:
 - Decide future native scroll model; current gameplay intentionally renders by projected time.
 - Implement STOP freeze and BPM/scroll semantics from BMS timing.
 - Continue expanding selected BMS layout metadata, including special spacing, scratch side variations, PMS, and DP stage separation.
-- Implement LN head/body/tail rendering from `Tick` and `EndTick`.
+- Move LN head/body/tail rendering from projected time to native `Tick`/`EndTick` scroll projection.
 - Add BGA/movie/stagefile layers and resource lookup.
 
 ### Judgement/Scoring Is Generic osu!-Style, Not BMS-Specific
@@ -217,7 +217,7 @@ TODO:
 
 - Model native LN head/body/tail and release semantics.
 - Implement LN-specific judgement, score, gauge, and replay events.
-- Add visual LN body rendering and tests for all LN styles.
+- Add visual tests for all LN styles.
 
 ## Import Gaps
 

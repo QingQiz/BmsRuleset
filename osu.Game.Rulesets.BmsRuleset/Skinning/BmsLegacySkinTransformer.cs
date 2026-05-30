@@ -507,9 +507,7 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
         {
             base.LoadComplete();
 
-            InternalChild = noteAnimation = transformer.getAnimation(lookup.Component == BmsSkinComponents.Mine
-                ? transformer.getMineImageName(lookup)
-                : transformer.getNoteImageName(lookup))?.With(d =>
+            InternalChild = noteAnimation = transformer.getAnimation(getImageName())?.With(d =>
             {
                 d.Anchor = Anchor.BottomLeft;
                 d.Origin = Anchor.BottomLeft;
@@ -538,6 +536,12 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
                 : widthForNoteHeightScale.Value * DrawWidth / Math.Max(1, columnWidthForNoteHeightScale);
             noteAnimation.Scale = Vector2.Divide(new Vector2(DrawWidth, noteHeight), texture.DisplayWidth);
         }
+
+        private string getImageName() => lookup.Component switch
+        {
+            BmsSkinComponents.Mine => transformer.getMineImageName(lookup),
+            _ => transformer.getNoteImageName(lookup),
+        };
     }
 
     private sealed partial class LegacyBmsColumnBackground : CompositeDrawable, IKeyBindingHandler<BmsAction>
