@@ -470,4 +470,7 @@ The full built-in skin (covering all 6 layouts) is at
 
 - [ ] Delete all imported BMS files confirm window
 - [ ] in game scroll speed adjust
+- [ ] ln tail 的打击音
+- [ ] 把我们的血条注册为 两个内置 皮肤的默认血条，其余用户自定义皮肤仍可使用 mania 风格的血条
+  - [ ] 把我们的血条注册为可配置的HUD
 </details>

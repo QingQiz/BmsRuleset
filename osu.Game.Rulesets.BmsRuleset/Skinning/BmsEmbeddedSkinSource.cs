@@ -131,6 +131,10 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable
     /// </param>
     public void SetSources(ISkinSource parent, BmsLegacySkinTransformer? primary, BmsLegacySkinTransformer? fallback)
     {
+        // A source switch may replace the user skin, embedded fallback kind, renderer-backed texture
+        // stores, or all of the above. Invalidate raw LN body slices once per source switch rather
+        // than from every active drawable's SourceChanged handler.
+        BmsLongNoteBodySource.ClearCache();
         DisposeEmbeddedSkins();
 
         this.parent = parent;
