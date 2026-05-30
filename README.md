@@ -370,7 +370,6 @@ The full built-in skin (covering all 6 layouts) is at
 | **Parser** | `#SUBTITLE`, `#SUBARTIST`, `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — silently ignored |
 | **Parser** | `#PATH_WAV` / `#PATH_BMP` resource path prefixes |
 | **Parser** | Channel `17` / `27` (free-zone keys) — notes on these channels are dropped |
-| **Renderer** | LN body / tail visual — currently a plain coloured box, not skinnable |
 | **Renderer** | Measure bar lines |
 | **Renderer** | BGA / movie / stagefile / background image |
 | **Renderer** | Key beams (column light during hold) |
@@ -416,8 +415,6 @@ The full built-in skin (covering all 6 layouts) is at
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.PerformStep(Boolean userTriggered)
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.OnClick(ClickEvent e)
     ```
-- [x] the empty poor seems not reduce the hp
-
 
 - skin
   - [ ] morden 皮肤里 有一个奇怪的组件，并且缺少了很多默认的组件
@@ -427,9 +424,7 @@ The full built-in skin (covering all 6 layouts) is at
 ## TODO
 
 
-- [x] Mine
 - [ ] random/switch
-- [ ] ln render
 - [ ] timing sys
 - [ ] measure line
 - [ ] correct metadata display (title, artist, etc, rank, hp, ...)
