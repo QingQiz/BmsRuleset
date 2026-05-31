@@ -22,7 +22,12 @@ public sealed class BmsTimingMap
 
     private readonly record struct ScrollSegment(double StartTime, double EndTime, double StartTick, double Bpm, bool IsStop);
 
-    private readonly IReadOnlyList<ScrollSegment> scrollSegments;
+    private readonly ScrollSegment[] scrollSegments;
+
+    private readonly double[] cumulativeStopDurations;
+
+    private int cachedScrollSegmentIndex;
+    private double cachedScrollSegmentEndTime = double.MinValue;
 
     public BmsTimingMap(int tickResolution, IEnumerable<BmsMeasureInfo> measures, IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents)
     {
@@ -32,6 +37,7 @@ public sealed class BmsTimingMap
         StopEvents = stopEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
         ScrollReferenceBpm = initialBpm();
         scrollSegments = buildScrollSegments();
+        cumulativeStopDurations = buildCumulativeStops();
     }
 
     /// <summary>
@@ -46,7 +52,7 @@ public sealed class BmsTimingMap
     /// </summary>
     public double GetScrollPositionAtTime(double time)
     {
-        if (scrollSegments.Count == 0)
+        if (scrollSegments.Length == 0)
             return time;
 
         if (time < scrollSegments[0].StartTime)
@@ -56,11 +62,20 @@ public sealed class BmsTimingMap
             if (initialBpm <= 0)
                 initialBpm = ScrollReferenceBpm;
 
+            cachedScrollSegmentIndex = 0;
+            cachedScrollSegmentEndTime = scrollSegments[0].EndTime;
             return GetScrollPositionAtTick(millisecondsToTicks(time - scrollSegments[0].StartTime, initialBpm) + scrollSegments[0].StartTick);
         }
 
+        var seg = scrollSegments[cachedScrollSegmentIndex];
+
+        if (time >= seg.StartTime && time < cachedScrollSegmentEndTime)
+            return seg.IsStop
+                ? GetScrollPositionAtTick(seg.StartTick)
+                : GetScrollPositionAtTick(seg.StartTick + millisecondsToTicks(time - seg.StartTime, seg.Bpm));
+
         var low = 0;
-        var high = scrollSegments.Count - 1;
+        var high = scrollSegments.Length - 1;
 
         while (low <= high)
         {
@@ -79,12 +94,16 @@ public sealed class BmsTimingMap
                 continue;
             }
 
+            cachedScrollSegmentIndex = middle;
+            cachedScrollSegmentEndTime = segment.EndTime;
             return segment.IsStop
                 ? GetScrollPositionAtTick(segment.StartTick)
                 : GetScrollPositionAtTick(segment.StartTick + millisecondsToTicks(time - segment.StartTime, segment.Bpm));
         }
 
         var last = scrollSegments[^1];
+        cachedScrollSegmentIndex = scrollSegments.Length - 1;
+        cachedScrollSegmentEndTime = last.EndTime;
         return last.IsStop
             ? GetScrollPositionAtTick(last.StartTick)
             : GetScrollPositionAtTick(last.StartTick + millisecondsToTicks(time - last.StartTime, last.Bpm));
@@ -109,7 +128,93 @@ public sealed class BmsTimingMap
         return bpm;
     }
 
-    private IReadOnlyList<ScrollSegment> buildScrollSegments()
+    /// <summary>
+    ///     Returns the projected osu! time in milliseconds for a native BMS tick,
+    ///     accounting for all BPM changes and STOP segments.
+    /// </summary>
+    public double ProjectTickToTime(long tick)
+    {
+        var bpmEvent = BpmEvents[findLastBpmIndex(tick)];
+
+        var firstStop = findFirstStopIndex(bpmEvent.Tick);
+        var pastStop = findFirstStopIndex(tick);
+
+        var stopOffset = 0d;
+
+        if (firstStop < pastStop)
+        {
+            stopOffset = cumulativeStopDurations[pastStop - 1];
+
+            if (firstStop > 0)
+                stopOffset -= cumulativeStopDurations[firstStop - 1];
+        }
+
+        return bpmEvent.Time + ticksToMilliseconds(tick - bpmEvent.Tick, bpmEvent.Bpm) + stopOffset;
+    }
+
+    private double[] buildCumulativeStops()
+    {
+        var prefix = new double[StopEvents.Count];
+        double cumulative = 0;
+
+        for (var i = 0; i < StopEvents.Count; i++)
+        {
+            cumulative += StopEvents[i].Duration;
+            prefix[i] = cumulative;
+        }
+
+        return prefix;
+    }
+
+    private int findLastBpmIndex(long tick)
+    {
+        var lo = 0;
+        var hi = BpmEvents.Count - 1;
+        var result = 0;
+
+        while (lo <= hi)
+        {
+            var mid = lo + (hi - lo) / 2;
+
+            if (BpmEvents[mid].Tick <= tick)
+            {
+                result = mid;
+                lo = mid + 1;
+            }
+            else
+            {
+                hi = mid - 1;
+            }
+        }
+
+        return result;
+    }
+
+    private int findFirstStopIndex(long tick)
+    {
+        var lo = 0;
+        var hi = StopEvents.Count - 1;
+        var result = StopEvents.Count;
+
+        while (lo <= hi)
+        {
+            var mid = lo + (hi - lo) / 2;
+
+            if (StopEvents[mid].Tick >= tick)
+            {
+                result = mid;
+                hi = mid - 1;
+            }
+            else
+            {
+                lo = mid + 1;
+            }
+        }
+
+        return result;
+    }
+
+    private ScrollSegment[] buildScrollSegments()
     {
         var result = new List<ScrollSegment>();
         var eventTicks = BpmEvents.Select(e => e.Tick).Concat(StopEvents.Select(e => e.Tick)).Distinct().OrderBy(t => t).ToArray();
@@ -157,7 +262,7 @@ public sealed class BmsTimingMap
         }
 
         result.Add(new ScrollSegment(currentTime, double.PositiveInfinity, currentTick, currentBpm, false));
-        return result;
+        return result.ToArray();
     }
 
     private double initialBpm()

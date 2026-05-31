@@ -41,7 +41,7 @@ internal static partial class BmsChartParser
         var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
         var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
         var sampleDefinitions = new Dictionary<string, string>(state.SampleDefinitions, StringComparer.OrdinalIgnoreCase);
-        var hitObjects = collectHitObjects(state, totalColumns, measureStarts, tickResolution, timingEvents, stopEvents)
+        var hitObjects = collectHitObjects(state, totalColumns, measureStarts, timingMap)
             .OrderBy(h => h.StartTime)
             .ThenBy(h => h.Tick)
             .ThenBy(h => h.Column)
@@ -63,7 +63,7 @@ internal static partial class BmsChartParser
             layoutVariant,
             totalColumns,
             sampleDefinitions,
-            collectBackgroundSampleEvents(state, measureStarts, tickResolution, timingEvents, stopEvents).ToArray(),
+            collectBackgroundSampleEvents(state, measureStarts, timingMap).ToArray(),
             longNoteTailSampleEvents,
             hitObjects);
     }
@@ -173,12 +173,11 @@ internal static partial class BmsChartParser
     }
 
     private static IEnumerable<BmsSampleEvent> collectBackgroundSampleEvents(
-        ParseState state, IReadOnlyDictionary<int, long> measureStarts, int tickResolution,
-        List<TimingEvent> timingEvents, List<StopEvent> stopEvents)
+        ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
     {
         return from line in state.ChannelLines.Where(l => l.Channel == "01")
                from cell in expandCells(line, measureStarts, false)
-               select new BmsSampleEvent(projectTickToTime(cell.Tick, timingEvents, stopEvents, tickResolution), cell.Tick, cell.Value);
+               select new BmsSampleEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, cell.Value);
     }
 
     private static IEnumerable<BmsSampleEvent> collectLongNoteTailSampleEvents(IEnumerable<BmsParsedHitObject> hitObjects)
@@ -291,8 +290,7 @@ internal static partial class BmsChartParser
     }
 
     private static IEnumerable<BmsParsedHitObject> collectHitObjects(
-        ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts, int tickResolution,
-        List<TimingEvent> timingEvents, List<StopEvent> stopEvents)
+        ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
     {
         var notes = new List<RawCell>();
         var lnCells = new List<RawCell>();
@@ -320,27 +318,26 @@ internal static partial class BmsChartParser
         }
 
         foreach (var hitObject in state.LnType == 2
-                     ? collectLnType2Objects(lnCells, tickResolution, timingEvents, stopEvents, state.SampleDefinitions)
-                     : collectLnType1Objects(lnCells, tickResolution, timingEvents, stopEvents, state.SampleDefinitions))
+                     ? collectLnType2Objects(lnCells, timingMap, state.SampleDefinitions)
+                     : collectLnType1Objects(lnCells, timingMap, state.SampleDefinitions))
         {
             yield return hitObject;
         }
 
-        foreach (var hitObject in collectVisibleObjects(notes, state, tickResolution, timingEvents, stopEvents))
+        foreach (var hitObject in collectVisibleObjects(notes, state, timingMap))
             yield return hitObject;
 
         foreach (var mine in mines.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-            yield return createMineHitObject(mine, tickResolution, timingEvents, stopEvents, state.SampleDefinitions);
+            yield return createMineHitObject(mine, timingMap, state.SampleDefinitions);
     }
 
     private static IEnumerable<BmsParsedHitObject> collectVisibleObjects(
-        IEnumerable<RawCell> notes, ParseState state, int tickResolution,
-        List<TimingEvent> timingEvents, List<StopEvent> stopEvents)
+        IEnumerable<RawCell> notes, ParseState state, BmsTimingMap timingMap)
     {
         if (state.LnObjValues.Count == 0)
         {
             foreach (var note in notes.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-                yield return createHitObject(note, note.Tick, false, tickResolution, timingEvents, stopEvents, state.SampleDefinitions);
+                yield return createHitObject(note, note.Tick, false, timingMap, state.SampleDefinitions);
 
             yield break;
         }
@@ -352,24 +349,23 @@ internal static partial class BmsChartParser
             if (state.LnObjValues.Contains(note.Value))
             {
                 if (pendingByColumn.Remove(note.Column, out var start) && note.Tick > start.Tick)
-                    yield return createHitObject(start, note.Tick, true, tickResolution, timingEvents, stopEvents, state.SampleDefinitions);
+                    yield return createHitObject(start, note.Tick, true, timingMap, state.SampleDefinitions);
 
                 continue;
             }
 
             if (pendingByColumn.TryGetValue(note.Column, out var previous))
-                yield return createHitObject(previous, previous.Tick, false, tickResolution, timingEvents, stopEvents, state.SampleDefinitions);
+                yield return createHitObject(previous, previous.Tick, false, timingMap, state.SampleDefinitions);
 
             pendingByColumn[note.Column] = note;
         }
 
         foreach (var pending in pendingByColumn.Values.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-            yield return createHitObject(pending, pending.Tick, false, tickResolution, timingEvents, stopEvents, state.SampleDefinitions);
+            yield return createHitObject(pending, pending.Tick, false, timingMap, state.SampleDefinitions);
     }
 
     private static IEnumerable<BmsParsedHitObject> collectLnType1Objects(
-        IEnumerable<RawCell> lnCells, int tickResolution, List<TimingEvent> timingEvents, List<StopEvent> stopEvents,
-        IReadOnlyDictionary<string, string> sampleDefinitions)
+        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<string, string> sampleDefinitions)
     {
         var openByColumn = new Dictionary<int, RawCell>();
 
@@ -378,7 +374,7 @@ internal static partial class BmsChartParser
             if (openByColumn.Remove(cell.Column, out var start))
             {
                 if (cell.Tick > start.Tick)
-                    yield return createHitObject(start, cell.Tick, true, tickResolution, timingEvents, stopEvents, sampleDefinitions);
+                    yield return createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions);
             }
             else
             {
@@ -388,8 +384,7 @@ internal static partial class BmsChartParser
     }
 
     private static IEnumerable<BmsParsedHitObject> collectLnType2Objects(
-        IEnumerable<RawCell> lnCells, int tickResolution, List<TimingEvent> timingEvents, List<StopEvent> stopEvents,
-        IReadOnlyDictionary<string, string> sampleDefinitions)
+        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<string, string> sampleDefinitions)
     {
         foreach (var channelGroup in lnCells.GroupBy(c => c.Channel))
         {
@@ -405,7 +400,7 @@ internal static partial class BmsChartParser
 
                 if (openRun is { } start && cell.Tick > start.Tick)
                 {
-                    yield return createHitObject(start, cell.Tick, true, tickResolution, timingEvents, stopEvents, sampleDefinitions);
+                    yield return createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions);
 
                     openRun = null;
                 }
@@ -414,11 +409,11 @@ internal static partial class BmsChartParser
     }
 
     private static BmsParsedHitObject createHitObject(
-        RawCell start, long endTick, bool isLongNote, int tickResolution,
-        List<TimingEvent> timingEvents, List<StopEvent> stopEvents, IReadOnlyDictionary<string, string> sampleDefinitions)
+        RawCell start, long endTick, bool isLongNote, BmsTimingMap timingMap,
+        IReadOnlyDictionary<string, string> sampleDefinitions)
     {
-        var startTime = projectTickToTime(start.Tick, timingEvents, stopEvents, tickResolution);
-        var endTime = projectTickToTime(endTick, timingEvents, stopEvents, tickResolution);
+        var startTime = timingMap.ProjectTickToTime(start.Tick);
+        var endTime = timingMap.ProjectTickToTime(endTick);
 
         return new BmsParsedHitObject(
             start.Tick,
@@ -436,10 +431,9 @@ internal static partial class BmsChartParser
     }
 
     private static BmsParsedHitObject createMineHitObject(
-        RawCell mine, int tickResolution,
-        List<TimingEvent> timingEvents, List<StopEvent> stopEvents, IReadOnlyDictionary<string, string> sampleDefinitions)
+        RawCell mine, BmsTimingMap timingMap, IReadOnlyDictionary<string, string> sampleDefinitions)
     {
-        var startTime = projectTickToTime(mine.Tick, timingEvents, stopEvents, tickResolution);
+        var startTime = timingMap.ProjectTickToTime(mine.Tick);
 
         return new BmsParsedHitObject(
             mine.Tick,
@@ -500,24 +494,6 @@ internal static partial class BmsChartParser
 
         var visibleChannel = channel[0] == 'D' ? $"1{channel[1]}" : $"2{channel[1]}";
         return BmsLayout.TryMapVisibleChannel(visibleChannel, totalColumns, out column);
-    }
-
-    private static double projectTickToTime(
-        long tick, IReadOnlyList<TimingEvent> timingEvents, IReadOnlyList<StopEvent> stopEvents, int tickResolution)
-    {
-        var current = timingEvents[0];
-
-        for (var i = 1; i < timingEvents.Count; i++)
-        {
-            if (timingEvents[i].Tick > tick)
-                break;
-
-            current = timingEvents[i];
-        }
-
-        var stopOffset = stopEvents.Where(s => s.Tick >= current.Tick && s.Tick < tick).Sum(s => s.Duration);
-
-        return current.Time + ticksToMilliseconds(tick - current.Tick, current.Bpm, tickResolution) + stopOffset;
     }
 
     private static double bpmAtTick(long tick, IReadOnlyList<TimingEvent> timingEvents)

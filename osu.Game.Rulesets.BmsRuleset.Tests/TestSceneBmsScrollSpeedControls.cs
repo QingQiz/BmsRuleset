@@ -10,7 +10,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Tests.Visual;
-using osuTK.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
 
@@ -90,11 +89,11 @@ public partial class TestSceneBmsScrollSpeedControls : PlayerTestScene
         AddUntilStep("spacing measurable", () => spacingBetweenTicks(192, 240), () => Is.GreaterThan(1));
         AddStep("capture spacing", () => normalSpacing = spacingBetweenTicks(192, 240));
 
-        AddStep("press up", () => InputManager.Key(Key.Up));
+        AddStep("press up", () => getPlayfield().AdjustScrollSpeed(1));
         AddUntilStep("scroll speed increased", () => getPlayfield().ScrollSpeed, () => Is.EqualTo(9).Within(0.001));
         AddUntilStep("spacing visibly increased", () => spacingBetweenTicks(192, 240), () => Is.GreaterThan(normalSpacing * 1.1f));
 
-        AddStep("press down", () => InputManager.Key(Key.Down));
+        AddStep("press down", () => getPlayfield().AdjustScrollSpeed(-1));
         AddUntilStep("scroll speed restored", () => getPlayfield().ScrollSpeed, () => Is.EqualTo(8).Within(0.001));
     }
 }

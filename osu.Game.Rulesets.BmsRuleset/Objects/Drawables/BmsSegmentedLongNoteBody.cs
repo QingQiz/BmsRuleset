@@ -113,6 +113,9 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
 
     public void UpdateBody(float bodyHeight, bool newTailAtTop, bool isHolding)
     {
+        if (slices.Length == 0 && bodyFrames.Length == 0)
+            return;
+
         ensureSlicesLoaded();
 
         var heightChanged = Math.Abs(lastBodyHeight - bodyHeight) >= 1;

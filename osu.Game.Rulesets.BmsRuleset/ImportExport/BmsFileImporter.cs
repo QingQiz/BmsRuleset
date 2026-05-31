@@ -75,6 +75,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             catch (Exception e)
             {
                 Logger.Log($"BMS import: scan failed: {e.Message}");
+                Logger.Log(e.ToString());
                 notification.CompletionText = "BMS import failed! Check logs for more information.";
                 notification.State = ProgressNotificationState.Cancelled;
             }

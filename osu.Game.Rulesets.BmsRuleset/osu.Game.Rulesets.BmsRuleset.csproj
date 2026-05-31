@@ -12,6 +12,6 @@
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="ppy.osu.Game" Version="2026.518.0"/>
-        <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.5"/>
+        <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0"/>
     </ItemGroup>
 </Project>

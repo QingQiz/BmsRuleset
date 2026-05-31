@@ -24,7 +24,6 @@ using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -303,8 +302,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     }
 
     public void AdjustScrollSpeed(double delta) => SetScrollSpeed(ScrollSpeed + delta);
-
-    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject, this);
 
     protected override void LoadComplete()
     {
@@ -613,25 +610,5 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             return true;
 
         return Time.Current > hitObject.StartTime + hitObject.HitWindows.WindowFor(HitResult.Ok);
-    }
-
-    private sealed class BmsHitObjectLifetimeEntry : HitObjectLifetimeEntry
-    {
-
-        public BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfield playfield)
-            : base(hitObject)
-        {
-            LifetimeStart = hitObject.StartTime - computeLifetimeOffset(playfield);
-            LifetimeEnd = hitObject.GetEndTime() + 1000;
-        }
-
-        private static double computeLifetimeOffset(BmsPlayfield? playfield)
-        {
-            var timeRange = playfield?.TimeRange ?? 15000;
-            if (timeRange <= 0)
-                return 8000;
-
-            return Math.Clamp(timeRange * 4, 4000, 15000);
-        }
     }
 }
