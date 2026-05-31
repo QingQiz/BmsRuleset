@@ -170,7 +170,7 @@ Easy / Hard / Ex-Hard / Hazard gauge variants are not yet implemented.
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| Scroll Speed | 8.0 | 1.0–60.0 | Note fall speed |
+| Scroll Speed | 8.0 | 1.0–60.0 | Note fall speed. In-game: `Up`/`Down` keys adjust temporarily. Keys are rebindable under Settings → Key Bindings → osu!BMS.
 
 ---
 

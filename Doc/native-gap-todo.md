@@ -36,33 +36,35 @@ TODO:
 - Add scratch turntable semantics beyond column routing.
 - Extend replay/autoplay for LN releases and future branch decisions.
 
-### Renderer Is Time-Based Placeholder, Not Tick-Based BMS
+### Renderer Is Tick-Based BMS Scroll
 
 Files:
 
+- `BmsParser/BmsTimingMap.cs`
 - `UI/BmsPlayfield.cs`
 - `UI/BmsDrawableRuleset.cs`
+- `UI/BmsMeasureLine.cs`
+- `UI/BmsStage.cs`
 - `Objects/Drawables/DrawableBmsHitObject.cs`
 
 Current state:
 
-- Playfield lane backgrounds use `BmsBeatmap.TotalColumns` and `BmsLayoutVariant`.
-- Stage columns support scratch widths and centre the non-scratch key area on the playfield.
-- Drawable notes fill the full lane width and anchor at lane left-bottom.
-- Drawable objects use the containing `BmsPlayfield.TotalColumns` and clamp invalid columns, so DP columns no longer wrap into the first bank.
-- Object Y-position is based on `HitObject.StartTime - Time.Current`, configurable mania-style `ScrollSpeed`, and fixed `travel_distance = 560`.
-- STOP/soflan visual behaviour is not native. STOP affects decoded `StartTime`, but rendering remains projected-time based.
-- `BmsDrawableRuleset.CreateDrawableRepresentation()` returns `null`; rendering currently relies on pool registration rather than explicit representation creation.
-- LN head/body/tail render through native BMS skin components, with mania-style body/tail overlap and basic masking while held. Rendering is still projected-time based, not native tick-scroll based.
-- BGA, layer, poor-layer, movie, stagefile, banner, and background rendering do not exist.
-- `#WAVxx` key sounds and BGM channel `01` autoplay samples are parsed and played through BMS sample lookup. They ignore osu! global Effect volume while following universal volume. BGA sync polish is still incomplete.
+- `BmsTimingMap` provides native scroll coordinate projection via `GetScrollPositionAtTick` / `GetScrollPositionAtTime`.
+- Scroll segments are built from BPM and STOP events. Equal tick distances produce equal visual distances.
+- BPM changes adjust how fast the scroll coordinate advances over real time; STOP segments freeze it.
+- `ScrollReferenceBpm` uses the chart's header `#BPM` (Tick=0, Sequence=0). Sub-1 BPM and extreme BPM (1,000,000) are supported; zero-BPM events are ignored without affecting current BPM.
+- `DrawableBmsHitObject` computes Y-position from `TickInfo + BmsTimingMap` for charts with native ticks; falls back to time-based projection for charts without tick data.
+- LN head/tail clamp to the judgement line when held, preventing body rendering below the line during BPM changes.
+- `BmsMeasureLine` renders measure boundaries using the same native timing projection, with `BarLineHeight` and `ColourBarline` read from legacy mania/BMS skin config.
+- `BmsStage` exposes `MeasureLineArea`, `BarLineHeight`, `BarLineColour` and reads them from skin config at `updateFromSkin()`.
+- In-game scroll speed adjustment: `Up`/`Down` (configurable via key bindings) adjust a `ScrollSpeedMultiplier` that overlays on top of timing projection, independent of BPM/STOP. Works in both normal and autoplay modes. Temporary speed changes are not written back to settings.
+- Speed change HUD: shows current speed with arrow indicator (`>>` / `<<`) coloured by direction relative to configured speed.
+- Preload offset increased to 15s to reduce stutter during high-speed BPM segments.
 
 TODO:
 
-- Keep `BmsTimingMap` / native tick-time projection data available for parser semantics.
-- Decide future native scroll model; current gameplay intentionally renders by projected time.
-- Implement STOP freeze and BPM/scroll semantics from BMS timing.
-- Continue expanding selected BMS layout metadata, including special spacing, scratch side variations, PMS, and DP stage separation.
+- BGA, layer, poor-layer, movie, stagefile, banner, and background rendering do not exist.
+- `#WAVxx` key sounds and BGM channel `01` autoplay samples are parsed and played through BMS sample lookup. They ignore osu! global Effect volume while following universal volume.
 - Move LN head/body/tail rendering from projected time to native `Tick`/`EndTick` scroll projection.
 - Add BGA/movie/stagefile layers and resource lookup.
 
@@ -131,28 +133,35 @@ TODO:
 
 ## Parser And Timing Gaps
 
-### Native Timing Is Still Stored Mostly As osu! `StartTime`
+### Native Timing Implemented
 
 Files:
 
+- `BmsParser/BmsTimingMap.cs`
 - `Beatmaps/BmsBeatmapDecoder.cs`
 - `Objects/BmsHitObject.cs`
 - `Beatmaps/BmsBeatmap.cs`
 
 Current state:
 
-- `BmsHitObject.TickInfo` stores `Tick`, `EndTick`, and `TickResolution`; `BmsHitObject` itself only keeps projected osu! time fields.
-- The decoder still projects ticks into `StartTime`/`Duration` immediately for osu! compatibility.
+- `BmsHitObject.TickInfo` stores `Tick`, `EndTick`; `BmsHitObject` itself also keeps projected osu! time fields.
+- The decoder projects ticks into `StartTime`/`Duration` for osu! compatibility.
 - `BmsBeatmap.TimingMap` preserves measure lengths, BPM events, STOP events, tick resolution, and tick-to-time projection data.
-- `TimingControlPoint` cannot faithfully expose extreme BMS BPM such as Aleph-0's `#BPM01 0.2441406` because osu! control points clamp beat length.
-- STOP timing is applied to projected object times and preserved in `BmsTimingMap`; gameplay rendering consumes the projected `StartTime` only.
+- `TimingControlPoint` is still used for osu! compatibility metadata; cannot faithfully expose extreme BMS BPM (e.g. 0.2441406).
+- `BmsTimingMap.GetScrollPositionAtTime` / `GetScrollPositionAtTick` provide native scroll coordinate projection used by renderer.
+- `ScrollReferenceBpm` keys off header `#BPM` (Tick=0, Sequence=0).
+- BPM ≤0 events are ignored; sub-1 and extreme (1,000,000) BPM values work correctly.
+- STOP timing is applied to projected object times and preserved in `BmsTimingMap` scroll segments.
+
+Tests:
+
+- Unit tests cover: tick spacing across BPM changes, BPM effect on scroll speed, STOP freeze, sub-1 BPM, zero BPM fallback, extreme high BPM, header BPM as scroll reference.
+- Visual test (`TestSceneBmsArgonTiming`) covers Argon skin with BPM changes, STOP, LN, and extreme BPM segments.
+- Visual test (`TestSceneBmsScrollSpeedControls`) covers autoplay scroll speed adjustment via key input.
 
 TODO:
 
-- Keep `BmsTimingMap` as parser/projection data; gameplay currently uses projected object times.
-- Extend `BmsTimingMap` with raw tick/time segments as needed for reverse projection and soflan rendering.
 - Use osu! `ControlPointInfo` only as compatibility metadata, not the source of BMS timing truth.
-- Add tests for sub-1 BPM, huge BPM, STOP-at-same-tick ordering, and BPM/STOP interactions.
 
 ### Control Flow Is Not Truly Runtime-Resolved
 
