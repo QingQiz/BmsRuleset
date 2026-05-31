@@ -90,6 +90,25 @@ public sealed class BmsTimingMap
             : GetScrollPositionAtTick(last.StartTick + millisecondsToTicks(time - last.StartTime, last.Bpm));
     }
 
+    /// <summary>
+    ///     Returns the BPM value active at the given tick position.
+    /// </summary>
+    public double GetBpmAtTick(long tick)
+    {
+        var bpm = ScrollReferenceBpm;
+
+        foreach (var evt in BpmEvents)
+        {
+            if (evt.Tick > tick)
+                break;
+
+            if (evt.Bpm > 0)
+                bpm = evt.Bpm;
+        }
+
+        return bpm;
+    }
+
     private IReadOnlyList<ScrollSegment> buildScrollSegments()
     {
         var result = new List<ScrollSegment>();

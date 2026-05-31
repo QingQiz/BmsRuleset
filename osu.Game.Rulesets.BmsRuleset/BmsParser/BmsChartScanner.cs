@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -10,14 +9,11 @@ namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 internal static partial class BmsChartParser
 {
+    private static readonly bool encoding_provider_registered = registerEncodingProvider();
+
     private static readonly Encoding shift_jis_encoding =
         CodePagesEncodingProvider.Instance.GetEncoding(932)
         ?? throw new InvalidOperationException("Shift-JIS encoding is not available.");
-
-    static BmsChartParser()
-    {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-    }
 
     public static IEnumerable<string> ScanResourceReferences(IEnumerable<string> lines) =>
         from rawLine in lines
@@ -84,6 +80,12 @@ internal static partial class BmsChartParser
         var difficultyName = inferDifficultyName(title, subtitle, path);
 
         return new BmsChartMetadata(setTitle, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path));
+    }
+
+    private static bool registerEncodingProvider()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        return true;
     }
 
     private static string decodeText(byte[] content)

@@ -69,6 +69,12 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     private BmsLayoutVariant? cachedNoteHeightLayout;
     private BmsSkinComponents? cachedNoteHeightComponent;
 
+    private float cachedScaledParentWidth = -1;
+    private float cachedParentWidthForTransform;
+    private float cachedParentHeightForTransform;
+
+    private bool longNotePiecesApplied;
+
     [Resolved(CanBeNull = true)]
     private ISkinSource? skin { get; set; }
 
@@ -128,11 +134,15 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
         Alpha = 1;
         longNoteStarted = false;
+        longNotePiecesApplied = false;
         longNoteHeadResult = null;
         longNoteHeadFixedY = null;
         playfield = null;
         layoutReferences = null;
         latestLayout = null;
+        cachedScaledParentWidth = -1;
+        cachedParentWidthForTransform = 0;
+        cachedParentHeightForTransform = 0;
         skinnedColumn = -1;
         skinnedLayout = null;
         skinnedComponent = null;
@@ -144,10 +154,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     {
         var result = base.OnInvalidate(invalidation, source);
 
-        // Parent/layout invalidation is the signal that cached references may point at the wrong
-        // column container after pooling, stage rebuilds, or layout changes. Do not redo reference
-        // lookup every Update(); just invalidate here and let the next frame resolve once.
-        if ((invalidation & (Invalidation.Parent | Invalidation.DrawSize | Invalidation.RequiredParentSizeToFit)) != 0)
+        if ((invalidation & Invalidation.Parent) != 0)
             invalidateLayoutReferences();
 
         return result;
@@ -304,8 +311,6 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             base.LoadSamples();
     }
 
-    private static double scrollRangeFor(BmsTimingMap? timingMap, double timeRange) => timeRange;
-
     private bool ensureLayoutReferences()
     {
         if (layoutReferences != null)
@@ -350,15 +355,21 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         }
 
         var scaledParentWidth = parentWidth;
+        var transformChanged = Math.Abs(parentWidth - cachedParentWidthForTransform) >= 1
+                               || Math.Abs(parentHeight - cachedParentHeightForTransform) >= 1;
 
-        // Keep this per-frame but lightweight: stage scale can change during resize/replay UI layout.
-        // Skin lookup and texture reloads are handled by updateLayoutReferences() only on reference
-        // changes; this path should just refresh geometry numbers.
-        if (columnContainer != null && Parent != null)
+        if (transformChanged && columnContainer != null && Parent != null)
         {
             var left = columnContainer.ToSpaceOfOtherDrawable(Vector2.Zero, Parent);
             var right = columnContainer.ToSpaceOfOtherDrawable(new Vector2(parentWidth, 0), Parent);
             scaledParentWidth = (right - left).Length;
+            cachedScaledParentWidth = scaledParentWidth;
+            cachedParentWidthForTransform = parentWidth;
+            cachedParentHeightForTransform = parentHeight;
+        }
+        else if (!transformChanged && cachedScaledParentWidth > 0)
+        {
+            scaledParentWidth = cachedScaledParentWidth;
         }
 
         layout = new LayoutMetrics(
@@ -373,8 +384,8 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(8),
             playfield?.ScrollSpeedMultiplier ?? 1,
             playfield?.TimingMap,
-            playfield?.TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current,
-            scrollRangeFor(playfield?.TimingMap, playfield?.BaseScrollRange ?? BmsDrawableRuleset.ComputeScrollTime(8)));
+            playfield?.CurrentScrollPosition ?? Time.Current,
+            playfield?.ScrollRange ?? (playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(8)));
 
         latestLayout = layout;
         updateNoteHeight(layout);
@@ -394,6 +405,9 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     {
         layoutReferences = null;
         latestLayout = null;
+        cachedScaledParentWidth = -1;
+        cachedParentWidthForTransform = 0;
+        cachedParentHeightForTransform = 0;
         invalidateNoteHeightCache();
     }
 
@@ -502,34 +516,49 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     {
         if (!HitObject.IsLongNote)
         {
-            noteContainer.Y = 0;
-            noteContainer.Height = currentNoteHeight;
-            longNoteBody.Alpha = 0;
-            longNoteTailContainer.Alpha = 0;
+            if (!longNotePiecesApplied)
+            {
+                noteContainer.Y = 0;
+                noteContainer.Height = currentNoteHeight;
+                longNoteBody.Alpha = 0;
+                longNoteTailContainer.Alpha = 0;
+                longNotePiecesApplied = true;
+            }
+
             return;
         }
 
-        noteContainer.Y = headOffset;
-        noteContainer.Height = currentNoteHeight;
+        longNotePiecesApplied = true;
 
-        // The body is allowed to render underneath the caps. Classic body[0] includes the tail-side
-        // rounded end, so clipping at cap edges flattens that end before the cap can overlay it.
+        if (Math.Abs(noteContainer.Y - headOffset) > 0.5f)
+            noteContainer.Y = headOffset;
+
+        if (Math.Abs(noteContainer.Height - currentNoteHeight) > 0.5f)
+            noteContainer.Height = currentNoteHeight;
+
         var tailAtTop = tailOffset < headOffset;
         var bodyTop = Math.Min(headOffset, tailOffset);
         var bodyBottom = Math.Max(headOffset, tailOffset) + currentNoteHeight;
 
-        // Clamp to within one screen-length of the head so that super-long BMS LNs
-        // (where the tail is thousands of pixels away) don't produce enormous geometry.
         var visibleTop = Math.Max(bodyTop, headOffset - max_long_note_piece_height);
         var visibleBottom = Math.Min(bodyBottom, headOffset + max_long_note_piece_height);
         var bodyHeight = Math.Max(0, visibleBottom - visibleTop);
 
-        longNoteBody.Y = visibleTop;
-        longNoteBody.Height = Math.Max(1, bodyHeight);
+        if (Math.Abs(longNoteBody.Y - visibleTop) > 0.5f)
+            longNoteBody.Y = visibleTop;
+
+        if (Math.Abs(longNoteBody.Height - bodyHeight) > 0.5f)
+            longNoteBody.Height = Math.Max(1, bodyHeight);
+
         longNoteBody.UpdateBody(bodyHeight, tailAtTop, longNoteStarted);
         longNoteBody.Alpha = bodyHeight > 0 ? 1 : 0;
-        longNoteTailContainer.Y = tailOffset;
-        longNoteTailContainer.Height = currentNoteHeight;
+
+        if (Math.Abs(longNoteTailContainer.Y - tailOffset) > 0.5f)
+            longNoteTailContainer.Y = tailOffset;
+
+        if (Math.Abs(longNoteTailContainer.Height - currentNoteHeight) > 0.5f)
+            longNoteTailContainer.Height = currentNoteHeight;
+
         longNoteTailContainer.Alpha = 1;
     }
 

@@ -57,15 +57,19 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public double ConfiguredScrollSpeed => configuredScrollSpeed.Value;
 
-    public double BaseScrollRange => BmsDrawableRuleset.ComputeScrollTime(default_scroll_speed);
-
-    public double ScrollSpeedMultiplier => ScrollSpeed / default_scroll_speed;
-
-    public double TimeRange => BaseScrollRange / ScrollSpeedMultiplier;
-
     public BmsTimingMap? TimingMap { get; }
 
+    public double BaseScrollRange { get; private set; }
+
+    public double ScrollSpeedMultiplier { get; private set; }
+
+    public double TimeRange { get; private set; }
+
     public double ScrollSpeed { get; private set; } = default_scroll_speed;
+
+    public double CurrentScrollPosition { get; private set; }
+
+    public double ScrollRange { get; private set; }
 
     private const double default_scroll_speed = BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED;
     private const double min_scroll_speed = 1;
@@ -287,6 +291,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public void SetScrollSpeed(double scrollSpeed)
     {
         ScrollSpeed = Math.Clamp(scrollSpeed, min_scroll_speed, max_scroll_speed);
+        recalculateSpeedFields();
         showScrollSpeedText();
     }
 
@@ -294,11 +299,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         configuredScrollSpeed.Value = speed;
         ScrollSpeed = speed;
+        recalculateSpeedFields();
     }
 
     public void AdjustScrollSpeed(double delta) => SetScrollSpeed(ScrollSpeed + delta);
 
-    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
+    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject, this);
 
     protected override void LoadComplete()
     {
@@ -332,11 +338,22 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         base.Update();
 
+        CurrentScrollPosition = TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current;
+        ScrollRange = BaseScrollRange;
+
         updateStageScale();
         updateHealthDisplayLayout();
     }
 
     private static bool isFinite(Vector2 value) => float.IsFinite(value.X) && float.IsFinite(value.Y);
+
+    private void recalculateSpeedFields()
+    {
+        BaseScrollRange = BmsDrawableRuleset.ComputeScrollTime(default_scroll_speed);
+        ScrollSpeedMultiplier = ScrollSpeed / default_scroll_speed;
+        TimeRange = BaseScrollRange / ScrollSpeedMultiplier;
+        ScrollRange = BaseScrollRange;
+    }
 
     private void showScrollSpeedText()
     {
@@ -356,6 +373,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [BackgroundDependencyLoader(true)]
     private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
     {
+        recalculateSpeedFields();
+
         RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, 512);
 
         if (healthProcessor != null)
@@ -599,15 +618,20 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     private sealed class BmsHitObjectLifetimeEntry : HitObjectLifetimeEntry
     {
 
-        // High-BPM BMS charts can move objects across the whole playfield in a few frames.
-        // Preload well before visual entry so skin lookup, texture upload, and LN body setup do
-        // not happen exactly when the object appears.
-        protected override double InitialLifetimeOffset => 15000;
-
-        public BmsHitObjectLifetimeEntry(HitObject hitObject)
+        public BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfield playfield)
             : base(hitObject)
         {
+            LifetimeStart = hitObject.StartTime - computeLifetimeOffset(playfield);
             LifetimeEnd = hitObject.GetEndTime() + 1000;
+        }
+
+        private static double computeLifetimeOffset(BmsPlayfield? playfield)
+        {
+            var timeRange = playfield?.TimeRange ?? 15000;
+            if (timeRange <= 0)
+                return 8000;
+
+            return Math.Clamp(timeRange * 4, 4000, 15000);
         }
     }
 }

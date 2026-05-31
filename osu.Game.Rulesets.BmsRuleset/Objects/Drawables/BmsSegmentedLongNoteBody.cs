@@ -41,6 +41,9 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
     private readonly Container segmentContainer;
     private readonly List<Sprite> spritePool = [];
 
+    private readonly List<(int SegmentIndex, float Height)> reusablePartSizes = new();
+    private readonly List<BmsLongNoteSegmentComposer.Part> reusableParts = new();
+
     // Animation frames are time-varying images (for example classic mania-note1L-0..5).
     // They are not spatial segments. We choose one frame, then split that frame spatially if needed.
     private Texture[] bodyFrames = [];
@@ -158,6 +161,8 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         slices = [];
         naturalHeights = [];
         parts = [];
+        reusablePartSizes.Clear();
+        reusableParts.Clear();
         segmentContainer.Clear(disposeChildren: true);
         spritePool.Clear();
         fallback.Alpha = 1;
@@ -256,9 +261,14 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
             return;
         }
 
-        naturalHeights = slices.Select(displayHeightFor).ToArray();
+        if (naturalHeights.Length != slices.Length)
+            naturalHeights = new float[slices.Length];
+
+        for (var i = 0; i < slices.Length; i++)
+            naturalHeights[i] = displayHeightFor(slices[i]);
+
         fallback.Alpha = 0;
-        parts = BmsLongNoteSegmentComposer.Compose(naturalHeights, lastBodyHeight, tailAtTop);
+        parts = BmsLongNoteSegmentComposer.ComposeInto(naturalHeights, lastBodyHeight, tailAtTop, reusablePartSizes, reusableParts);
         syncSprites();
     }
 

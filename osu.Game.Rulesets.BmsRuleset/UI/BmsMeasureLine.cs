@@ -14,6 +14,7 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
     private readonly BmsPlayfield playfield;
     private readonly BmsStage stage;
     private readonly Box line;
+    private readonly double scrollAtTick;
 
     public BmsMeasureLine(long tick, BmsTimingMap timingMap, BmsPlayfield playfield, BmsStage stage)
     {
@@ -21,6 +22,7 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
         this.timingMap = timingMap;
         this.playfield = playfield;
         this.stage = stage;
+        scrollAtTick = timingMap.GetScrollPositionAtTick(tick);
 
         Anchor = Anchor.TopLeft;
         Origin = Anchor.TopLeft;
@@ -41,11 +43,12 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
             return;
         }
 
-        var currentScroll = timingMap.GetScrollPositionAtTime(Time.Current);
-        var scrollUntilLine = timingMap.GetScrollPositionAtTick(Tick) - currentScroll;
-        var scrollRange = Math.Max(1, playfield.BaseScrollRange);
+        var currentScroll = playfield.CurrentScrollPosition;
+        var scrollUntilLine = scrollAtTick - currentScroll;
+        var scrollRange = Math.Max(1, playfield.ScrollRange);
         var travelDistance = Math.Max(1, stage.DrawHeight - stage.HitTargetPosition);
         var y = stage.DrawHeight - stage.HitTargetPosition - (float)(scrollUntilLine * playfield.ScrollSpeedMultiplier / scrollRange) * travelDistance;
+
         if (!float.IsFinite(y))
         {
             Alpha = 0;

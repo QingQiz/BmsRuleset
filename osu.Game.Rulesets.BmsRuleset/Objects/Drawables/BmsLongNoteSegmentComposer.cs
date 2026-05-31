@@ -34,16 +34,28 @@ public static class BmsLongNoteSegmentComposer
     public static IReadOnlyList<Part> Compose(IReadOnlyList<float> naturalHeights, float targetHeight, bool tailAtTop)
     {
         var parts = new List<(int SegmentIndex, float Height)>();
+        composeParts(naturalHeights, targetHeight, parts);
+        return positionParts(parts, targetHeight, tailAtTop);
+    }
 
+    public static IReadOnlyList<Part> ComposeInto(IReadOnlyList<float> naturalHeights, float targetHeight, bool tailAtTop,
+                                                  List<(int SegmentIndex, float Height)> reusableParts, List<Part> reusableResult)
+    {
+        reusableParts.Clear();
+        composeParts(naturalHeights, targetHeight, reusableParts);
+        positionPartsInto(reusableParts, targetHeight, tailAtTop, reusableResult);
+        return reusableResult;
+    }
+
+    private static void composeParts(IReadOnlyList<float> naturalHeights, float targetHeight, List<(int SegmentIndex, float Height)> parts)
+    {
         if (naturalHeights.Count == 0 || targetHeight <= 0)
-            return [];
+            return;
 
         if (naturalHeights.Count == 1)
             addRepeatedSingleSlice(parts, naturalHeights[0], targetHeight);
         else
             addMultiSliceBody(parts, naturalHeights, targetHeight);
-
-        return positionParts(parts, Math.Max(1, targetHeight), tailAtTop);
     }
 
     private static void addRepeatedSingleSlice(List<(int SegmentIndex, float Height)> parts, float sourceHeight, float targetHeight)
@@ -63,7 +75,6 @@ public static class BmsLongNoteSegmentComposer
         var tailHeight = Math.Max(1, naturalHeights[0]);
         var covered = tailHeight;
 
-        // body[0] is special: it is always included exactly once and placed on the tail side.
         parts.Add((0, tailHeight));
 
         for (var i = 1; i < naturalHeights.Count && covered < targetHeight; i++)
@@ -73,7 +84,6 @@ public static class BmsLongNoteSegmentComposer
             covered += height;
         }
 
-        // If one full pass is insufficient, repeat only body[1..N-1]. body[0] is never repeated.
         while (covered < targetHeight)
         {
             var before = covered;
@@ -98,20 +108,25 @@ public static class BmsLongNoteSegmentComposer
         foreach (var part in parts)
         {
             var y = tailAtTop ? prefix : targetHeight - prefix - part.Height;
-
-            // Source body slices are stored in tail-to-head order for the normal case where the tail
-            // is above the head. In Argon and many stable-style skins, body[0] contains a tail cap:
-            // its top edge is rounded and its bottom edge is the flat/interior continuation edge.
-            //
-            // When the tail is below the head, the correct visual operation is to mirror the whole
-            // assembled body strip. Flipping only body[0] preserves the rounded tail cap but can make
-            // body[0] -> body[1] discontinuous for textured bodies. Flipping every slice keeps each
-            // slice's orientation consistent with the mirrored strip and avoids that seam mismatch.
             var flipY = !tailAtTop;
             result.Add(new Part(part.SegmentIndex, flipY ? y + part.Height : y, part.Height, flipY));
             prefix += part.Height;
         }
 
         return result;
+    }
+
+    private static void positionPartsInto(List<(int SegmentIndex, float Height)> parts, float targetHeight, bool tailAtTop, List<Part> result)
+    {
+        result.Clear();
+        var prefix = 0f;
+
+        foreach (var part in parts)
+        {
+            var y = tailAtTop ? prefix : targetHeight - prefix - part.Height;
+            var flipY = !tailAtTop;
+            result.Add(new Part(part.SegmentIndex, flipY ? y + part.Height : y, part.Height, flipY));
+            prefix += part.Height;
+        }
     }
 }

@@ -87,6 +87,8 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
         base.LoadComplete();
         LifetimeStart = double.MinValue;
         LifetimeEnd = double.MaxValue;
+
+        preWarmTracks();
     }
 
     protected override void Update()
@@ -133,6 +135,21 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
         SkinTransformer t => t.Skin as LegacyBeatmapSkin,
         _ => null,
     };
+
+    private void preWarmTracks()
+    {
+        ensureTrackStore();
+        if (beatmapTrackStore == null)
+            return;
+
+        foreach (var evt in sortedEvents)
+        {
+            if (trackNames.ContainsKey(evt.SampleKey))
+                continue;
+
+            resolveTrackName(evt);
+        }
+    }
 
     [BackgroundDependencyLoader(true)]
     private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
