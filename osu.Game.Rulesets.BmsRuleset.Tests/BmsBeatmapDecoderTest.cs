@@ -239,6 +239,66 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestNativeTimingMapBpmChangesScrollSpeed()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 130, 0), new BmsBpmEvent(192, 260, 0)],
+            []);
+
+        var oneMeasureAt130 = 60000d / 130 * 4;
+        var halfMeasureAt130Scroll = timingMap.GetScrollPositionAtTime(oneMeasureAt130 / 2) - timingMap.GetScrollPositionAtTime(0);
+        var oneMeasureAt260Scroll = timingMap.GetScrollPositionAtTime(oneMeasureAt130 + oneMeasureAt130 / 2) - timingMap.GetScrollPositionAtTime(oneMeasureAt130);
+
+        Assert.That(oneMeasureAt260Scroll, Is.EqualTo(halfMeasureAt130Scroll * 2).Within(0.001));
+    }
+
+    [Test]
+    public void TestNativeTimingMapHandlesExtremeHighBpmScrollSpeed()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 1_000_000, 0)],
+            []);
+
+        var oneMeasureAtExtremeBpm = 60000d / 1_000_000 * 4;
+
+        Assert.That(timingMap.GetScrollPositionAtTime(oneMeasureAtExtremeBpm), Is.EqualTo(timingMap.GetScrollPositionAtTick(192)).Within(0.001));
+    }
+
+    [Test]
+    public void TestNativeTimingMapIgnoresZeroBpmEventForScrollSpeed()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 120, 0), new BmsBpmEvent(192, 0, 2000)],
+            []);
+
+        var scrollBeforeZero = timingMap.GetScrollPositionAtTime(3000) - timingMap.GetScrollPositionAtTime(2000);
+        var expectedAt120Bpm = timingMap.GetScrollPositionAtTick(288) - timingMap.GetScrollPositionAtTick(192);
+
+        Assert.That(scrollBeforeZero, Is.EqualTo(expectedAt120Bpm).Within(0.001));
+    }
+
+    [Test]
+    public void TestNativeTimingMapKeepsTickSpacingAcrossBpmChanges()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 130, 0), new BmsBpmEvent(192, 260, 0)],
+            []);
+
+        var firstMeasureDistance = timingMap.GetScrollPositionAtTick(192) - timingMap.GetScrollPositionAtTick(0);
+        var secondMeasureDistance = timingMap.GetScrollPositionAtTick(384) - timingMap.GetScrollPositionAtTick(192);
+
+        Assert.That(secondMeasureDistance, Is.EqualTo(firstMeasureDistance).Within(0.001));
+    }
+
+    [Test]
     public void TestNativeTimingMapPreservesStopsAndMeasureLengths()
     {
         var beatmap = decode("""
@@ -262,6 +322,50 @@ public class BmsBeatmapDecoderTest
         Assert.That(timingMap.StopEvents[0].Duration, Is.EqualTo(2000).Within(0.001));
         Assert.That(note.TickInfo.Tick, Is.EqualTo(288));
         Assert.That(note.StartTime, Is.EqualTo(5000).Within(0.001));
+    }
+
+    [Test]
+    public void TestNativeTimingMapPreservesSubOneBpmScrollSpeed()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 130, 0), new BmsBpmEvent(0, 0.25, 0, 1)],
+            []);
+
+        var oneBeatAtQuarterBpm = 60000d / 0.25;
+
+        Assert.That(timingMap.ScrollReferenceBpm, Is.EqualTo(130).Within(0.000001));
+        Assert.That(timingMap.GetScrollPositionAtTime(oneBeatAtQuarterBpm), Is.EqualTo(timingMap.GetScrollPositionAtTick(48)).Within(0.001));
+    }
+
+    [Test]
+    public void TestNativeTimingMapStopFreezesScrollPosition()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 120, 0)],
+            [new BmsStopEvent(192, 2000, 192, 120, 0)]);
+
+        var stoppedPosition = timingMap.GetScrollPositionAtTick(192);
+
+        Assert.That(timingMap.GetScrollPositionAtTime(2500), Is.EqualTo(stoppedPosition).Within(0.001));
+        Assert.That(timingMap.GetScrollPositionAtTime(3999), Is.EqualTo(stoppedPosition).Within(0.001));
+        Assert.That(timingMap.GetScrollPositionAtTime(4500), Is.GreaterThan(stoppedPosition));
+    }
+
+    [Test]
+    public void TestNativeTimingMapUsesHeaderBpmAsScrollReference()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 120, 0), new BmsBpmEvent(0, 240, 0, 1)],
+            []);
+
+        Assert.That(timingMap.ScrollReferenceBpm, Is.EqualTo(120));
+        Assert.That(timingMap.GetScrollPositionAtTick(192), Is.EqualTo(2000).Within(0.001));
     }
 
     [Test]
@@ -311,6 +415,48 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestRankDefaultsToNormalWhenAbsent()
+    {
+        var beatmap = decode("""
+                             #TITLE Test
+                             #BPM 130
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Rank, Is.EqualTo(2)); // NORMAL
+        Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void TestRankParsedFromChart()
+    {
+        var beatmap = decode("""
+                             #RANK 1
+                             #TITLE Test
+                             #BPM 130
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Rank, Is.EqualTo(1));
+        Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(1));
+    }
+
+    [Test]
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(3)]
+    [TestCase(4)]
+    public void TestRankPreservedForAllValidValues(int rank)
+    {
+        var beatmap = decode($"#RANK {rank}\n#BPM 130\n#00111:01");
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Rank, Is.EqualTo(rank));
+    }
+
+    [Test]
     public void TestSparseSevenKeyChartStoresKeyCountMetadata()
     {
         var beatmap = decode("""
@@ -347,6 +493,40 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestTotalDefaultsToZeroWhenAbsent()
+    {
+        var beatmap = decode("""
+                             #BPM 130
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Total, Is.EqualTo(0).Within(0.001));
+    }
+
+    [Test]
+    public void TestTotalParsedFromChart()
+    {
+        var beatmap = decode("""
+                             #TOTAL 250
+                             #BPM 130
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Total, Is.EqualTo(250).Within(0.001));
+    }
+
+    [Test]
+    public void TestTotalPreservesDecimalValue()
+    {
+        var beatmap = decode($"#TOTAL 160.5\n#BPM 130\n#00111:01");
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Total, Is.EqualTo(160.5).Within(0.001));
+    }
+
+    [Test]
     public void TestVisibleNotesDecodeToNativeObjects()
     {
         var beatmap = decode("""
@@ -373,81 +553,5 @@ public class BmsBeatmapDecoderTest
         Assert.That(second.SampleKey, Is.EqualTo("02"));
         Assert.That(second.TickInfo.Tick, Is.EqualTo(288));
         Assert.That(second.StartTime, Is.EqualTo(3000).Within(0.001));
-    }
-
-    [Test]
-    public void TestRankParsedFromChart()
-    {
-        var beatmap = decode("""
-                             #RANK 1
-                             #TITLE Test
-                             #BPM 130
-                             #00111:01
-                             """);
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-
-        Assert.That(converted.Rank, Is.EqualTo(1));
-        Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(1));
-    }
-
-    [Test]
-    public void TestRankDefaultsToNormalWhenAbsent()
-    {
-        var beatmap = decode("""
-                             #TITLE Test
-                             #BPM 130
-                             #00111:01
-                             """);
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-
-        Assert.That(converted.Rank, Is.EqualTo(2)); // NORMAL
-        Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(2));
-    }
-
-    [Test]
-    [TestCase(0)]
-    [TestCase(1)]
-    [TestCase(3)]
-    [TestCase(4)]
-    public void TestRankPreservedForAllValidValues(int rank)
-    {
-        var beatmap = decode($"#RANK {rank}\n#BPM 130\n#00111:01");
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-
-        Assert.That(converted.Rank, Is.EqualTo(rank));
-    }
-
-    [Test]
-    public void TestTotalParsedFromChart()
-    {
-        var beatmap = decode("""
-                             #TOTAL 250
-                             #BPM 130
-                             #00111:01
-                             """);
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-
-        Assert.That(converted.Total, Is.EqualTo(250).Within(0.001));
-    }
-
-    [Test]
-    public void TestTotalDefaultsToZeroWhenAbsent()
-    {
-        var beatmap = decode("""
-                             #BPM 130
-                             #00111:01
-                             """);
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-
-        Assert.That(converted.Total, Is.EqualTo(0).Within(0.001));
-    }
-
-    [Test]
-    public void TestTotalPreservesDecimalValue()
-    {
-        var beatmap = decode($"#TOTAL 160.5\n#BPM 130\n#00111:01");
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-
-        Assert.That(converted.Total, Is.EqualTo(160.5).Within(0.001));
     }
 }

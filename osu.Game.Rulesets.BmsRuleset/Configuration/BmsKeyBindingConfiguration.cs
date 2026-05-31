@@ -51,6 +51,7 @@ public static class BmsKeyBindingConfiguration
 
     private static KeyBinding[] bindings5K() =>
     [
+        ..scrollSpeedBindings(),
         new(InputKey.LShift, BmsAction.Scratch),
         new(InputKey.Z, BmsAction.Key1),
         new(InputKey.S, BmsAction.Key2),
@@ -61,6 +62,7 @@ public static class BmsKeyBindingConfiguration
 
     private static KeyBinding[] bindings7K() =>
     [
+        ..scrollSpeedBindings(),
         new(InputKey.LShift, BmsAction.Scratch),
         new(InputKey.Z, BmsAction.Key1),
         new(InputKey.S, BmsAction.Key2),
@@ -97,6 +99,7 @@ public static class BmsKeyBindingConfiguration
 
     private static KeyBinding[] bindings9K() =>
     [
+        ..scrollSpeedBindings(),
         new(InputKey.A, BmsAction.PmsKey1),
         new(InputKey.S, BmsAction.PmsKey2),
         new(InputKey.D, BmsAction.PmsKey3),
@@ -106,6 +109,12 @@ public static class BmsKeyBindingConfiguration
         new(InputKey.K, BmsAction.PmsKey7),
         new(InputKey.L, BmsAction.PmsKey8),
         new(InputKey.Semicolon, BmsAction.PmsKey9),
+    ];
+
+    private static KeyBinding[] scrollSpeedBindings() =>
+    [
+        new(InputKey.Up, BmsAction.IncreaseScrollSpeed),
+        new(InputKey.Down, BmsAction.DecreaseScrollSpeed),
     ];
 
     private static KeyBinding[] bindings9KDouble() =>

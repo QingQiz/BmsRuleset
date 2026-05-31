@@ -112,4 +112,10 @@ public enum BmsAction
 
     [Description("P2 PMS Key 9")]
     P2PmsKey9,
+
+    [Description("Increase Scroll Speed")]
+    IncreaseScrollSpeed,
+
+    [Description("Decrease Scroll Speed")]
+    DecreaseScrollSpeed,
 }

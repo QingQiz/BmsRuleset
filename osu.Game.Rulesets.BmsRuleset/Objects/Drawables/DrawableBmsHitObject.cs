@@ -38,7 +38,11 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         float ScaledParentWidth,
         float TravelDistance,
         float HitTargetPosition,
-        double TimeRange);
+        double TimeRange,
+        double ScrollSpeedMultiplier,
+        BmsTimingMap? TimingMap,
+        double CurrentScrollPosition,
+        double ScrollRange);
 
     private readonly record struct LayoutReferences(
         BmsPlayfield? Playfield,
@@ -178,8 +182,8 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         var tailY = yForTimeOffset(endTimeUntilHit, layout);
         var judgementHeadY = judgementHeadYFor(layout);
 
-        var visualHeadY = visualHeadYFor(y);
-        var visualTailY = HitObject.IsLongNote && longNoteStarted && Time.Current >= HitObject.EndTime
+        var visualHeadY = visualHeadYFor(y, judgementHeadY);
+        var visualTailY = HitObject.IsLongNote && longNoteStarted
             ? Math.Min(tailY, judgementHeadY)
             : tailY;
 
@@ -300,6 +304,8 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             base.LoadSamples();
     }
 
+    private static double scrollRangeFor(BmsTimingMap? timingMap, double timeRange) => timeRange;
+
     private bool ensureLayoutReferences()
     {
         if (layoutReferences != null)
@@ -364,7 +370,11 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             Math.Max(1, scaledParentWidth),
             Math.Max(1f, parentHeight - (stage?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION)),
             stage?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION,
-            playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(8));
+            playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(8),
+            playfield?.ScrollSpeedMultiplier ?? 1,
+            playfield?.TimingMap,
+            playfield?.TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current,
+            scrollRangeFor(playfield?.TimingMap, playfield?.BaseScrollRange ?? BmsDrawableRuleset.ComputeScrollTime(8)));
 
         latestLayout = layout;
         updateNoteHeight(layout);
@@ -405,17 +415,37 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     }
 
     private float yForTimeOffset(double timeUntilHit, LayoutMetrics layout)
-        => layout.ParentHeight - layout.HitTargetPosition - (float)(timeUntilHit / layout.TimeRange) * layout.TravelDistance - currentNoteHeight;
+    {
+        var progressUntilHit = layout.TimingMap == null || HitObject.TickInfo.Tick == HitObject.TickInfo.EndTick && HitObject.TickInfo.Tick == 0 && HitObject.StartTime != 0
+            ? timeUntilHit
+            : scrollPositionFor(timeUntilHit, layout) - layout.CurrentScrollPosition;
+
+        return layout.ParentHeight - layout.HitTargetPosition - (float)(progressUntilHit * layout.ScrollSpeedMultiplier / layout.ScrollRange) * layout.TravelDistance - currentNoteHeight;
+    }
+
+    private double scrollPositionFor(double timeUntilHit, LayoutMetrics layout)
+    {
+        if (layout.TimingMap == null)
+            return Time.Current + timeUntilHit;
+
+        if (Math.Abs(timeUntilHit - (HitObject.StartTime - Time.Current)) < 0.001)
+            return layout.TimingMap.GetScrollPositionAtTick(HitObject.TickInfo.Tick);
+
+        if (HitObject.IsLongNote && Math.Abs(timeUntilHit - (HitObject.EndTime - Time.Current)) < 0.001)
+            return layout.TimingMap.GetScrollPositionAtTick(HitObject.TickInfo.EndTick);
+
+        return layout.TimingMap.GetScrollPositionAtTime(Time.Current + timeUntilHit);
+    }
 
     private float judgementHeadYFor(LayoutMetrics layout)
         => layout.ParentHeight - layout.HitTargetPosition - currentNoteHeight;
 
-    private float visualHeadYFor(float naturalY)
+    private float visualHeadYFor(float naturalY, float judgementHeadY)
     {
         if (!HitObject.IsLongNote || !longNoteStarted)
             return naturalY;
 
-        return longNoteHeadFixedY ?? naturalY;
+        return Math.Min(longNoteHeadFixedY ?? naturalY, judgementHeadY);
     }
 
     private void tryResolveLongNoteHeadFixedY(HitResult? result)

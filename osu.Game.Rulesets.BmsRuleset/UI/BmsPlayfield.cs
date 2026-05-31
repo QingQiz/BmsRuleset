@@ -4,13 +4,17 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
+using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Game.Audio;
+using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -26,6 +30,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
@@ -50,7 +55,24 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public override Quad SkinnableComponentScreenSpaceDrawQuad => Stage.ScreenSpaceDrawQuad;
 
-    public double TimeRange { get; set; } = BmsDrawableRuleset.ComputeScrollTime(8);
+    public double ConfiguredScrollSpeed => configuredScrollSpeed.Value;
+
+    public double BaseScrollRange => BmsDrawableRuleset.ComputeScrollTime(default_scroll_speed);
+
+    public double ScrollSpeedMultiplier => ScrollSpeed / default_scroll_speed;
+
+    public double TimeRange => BaseScrollRange / ScrollSpeedMultiplier;
+
+    public BmsTimingMap? TimingMap { get; }
+
+    public double ScrollSpeed { get; private set; } = default_scroll_speed;
+
+    private const double default_scroll_speed = BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED;
+    private const double min_scroll_speed = 1;
+    private const double max_scroll_speed = BmsRulesetConfigManager.MAX_SCROLL_SPEED;
+    private const double scroll_speed_delta = 1;
+
+    private readonly BindableDouble configuredScrollSpeed = new(default_scroll_speed);
 
     private const float health_display_gap = 24;
     private const float minimum_side_padding = 20;
@@ -69,6 +91,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     // display by removing from the pool container and adding to JudgementArea, then restoring on
     // the next clear. This avoids a full skin lookup + child construction on every hit.
     private readonly Dictionary<HitResult, SkinnableDrawable> judgementDrawableCache = new();
+
+    private readonly Container scrollSpeedHud;
+    private readonly SpriteText scrollSpeedText;
+    private readonly SpriteText scrollSpeedArrow;
 
     // Off-screen container that keeps cached drawables loaded when not shown in JudgementArea.
     private readonly Container judgementDrawablePool;
@@ -99,7 +125,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [Resolved]
     private ISkinSource parentSkin { get; set; } = null!;
 
-    public BmsPlayfield(IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K, bool isAutoplay = false)
+    public BmsPlayfield(IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K, bool isAutoplay = false, BmsTimingMap? timingMap = null)
     {
         activeSkin = new BmsEmbeddedSkinSource();
 
@@ -107,6 +133,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         TotalColumns = Math.Max(1, totalColumns);
         LayoutVariant = layoutVariant;
         IsAutoplay = isAutoplay;
+        TimingMap = timingMap;
 
         Anchor = Anchor.Centre;
         Origin = Anchor.Centre;
@@ -118,12 +145,47 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             HitObjectContainer,
             keySound,
             landmineSound,
+            scrollSpeedHud = new Container
+            {
+                Anchor = Anchor.TopCentre,
+                Origin = Anchor.TopCentre,
+                Y = 36,
+                AutoSizeAxes = Axes.Both,
+                Alpha = 0,
+                Children =
+                [
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Color4.Black.Opacity(0.55f),
+                    },
+                    new FillFlowContainer
+                    {
+                        AutoSizeAxes = Axes.Both,
+                        Direction = FillDirection.Horizontal,
+                        Padding = new MarginPadding { Horizontal = 10, Vertical = 4 },
+                        Children =
+                        [
+                            scrollSpeedArrow = new SpriteText
+                            {
+                                Font = OsuFont.Default.With(size: 24, weight: FontWeight.Bold),
+                                Colour = Color4.White,
+                            },
+                            scrollSpeedText = new SpriteText
+                            {
+                                Font = OsuFont.Default.With(size: 24, weight: FontWeight.Bold),
+                                Colour = Color4.White,
+                            },
+                        ],
+                    },
+                ],
+            },
             judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both },
         ];
     }
 
     public BmsPlayfield(BmsBeatmap beatmap, bool isAutoplay = false)
-        : this(beatmap.HitObjects, beatmap.TotalColumns, beatmap.LayoutVariant, isAutoplay)
+        : this(beatmap.HitObjects, beatmap.TotalColumns, beatmap.LayoutVariant, isAutoplay, beatmap.TimingMap)
     {
         this.beatmap = beatmap;
     }
@@ -142,6 +204,17 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
     {
+        switch (e.Action)
+        {
+            case BmsAction.IncreaseScrollSpeed:
+                AdjustScrollSpeed(scroll_speed_delta);
+                return true;
+
+            case BmsAction.DecreaseScrollSpeed:
+                AdjustScrollSpeed(-scroll_speed_delta);
+                return true;
+        }
+
         var column = BmsKeyBindingConfiguration.ActionToColumn(e.Action, LayoutVariant);
 
         if (column == null || column.Value >= TotalColumns)
@@ -177,6 +250,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
     {
+        switch (e.Action)
+        {
+            case BmsAction.IncreaseScrollSpeed:
+            case BmsAction.DecreaseScrollSpeed:
+                return;
+        }
+
         var column = BmsKeyBindingConfiguration.ActionToColumn(e.Action, LayoutVariant);
 
         if (column == null || column.Value >= TotalColumns)
@@ -204,11 +284,27 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         landmineSound.Play();
     }
 
+    public void SetScrollSpeed(double scrollSpeed)
+    {
+        ScrollSpeed = Math.Clamp(scrollSpeed, min_scroll_speed, max_scroll_speed);
+        showScrollSpeedText();
+    }
+
+    public void SetConfiguredScrollSpeed(double speed)
+    {
+        configuredScrollSpeed.Value = speed;
+        ScrollSpeed = speed;
+    }
+
+    public void AdjustScrollSpeed(double delta) => SetScrollSpeed(ScrollSpeed + delta);
+
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
 
     protected override void LoadComplete()
     {
         base.LoadComplete();
+
+        populateMeasureLines();
 
         NewResult += onNewResult;
 
@@ -241,6 +337,21 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     }
 
     private static bool isFinite(Vector2 value) => float.IsFinite(value.X) && float.IsFinite(value.Y);
+
+    private void showScrollSpeedText()
+    {
+        var configured = configuredScrollSpeed.Value;
+        var delta = ScrollSpeed - configured;
+        var colour = delta > 0 ? new Color4(255, 200, 0, 255)
+            : delta < 0 ? new Color4(100, 180, 255, 255) : Color4.White;
+
+        scrollSpeedArrow.Text = delta > 0 ? ">>" : delta < 0 ? "<<" : "";
+        scrollSpeedArrow.Colour = colour;
+        scrollSpeedText.Text = $"{ScrollSpeed:0.0}";
+        scrollSpeedText.Colour = colour;
+        scrollSpeedHud.ClearTransforms();
+        scrollSpeedHud.FadeIn(80).Delay(1000).FadeOut(300);
+    }
 
     [BackgroundDependencyLoader(true)]
     private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
@@ -279,6 +390,17 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             fallback = new BmsLegacySkinTransformer(new BmsEmbeddedSkin(BmsEmbeddedSkinKind.LegacyOld, host.Renderer, audio), beatmap);
 
         activeSkin.SetSources(parentSkin, primary, fallback);
+    }
+
+    private void populateMeasureLines()
+    {
+        if (TimingMap == null)
+            return;
+
+        Stage.MeasureLineArea.Clear();
+
+        foreach (var measure in TimingMap.Measures.Where(m => m.Index > 0))
+            Stage.MeasureLineArea.Add(new BmsMeasureLine(measure.StartTick, TimingMap, this, Stage));
     }
 
     private void updateStageScale()
@@ -476,11 +598,15 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private sealed class BmsHitObjectLifetimeEntry : HitObjectLifetimeEntry
     {
+
+        // High-BPM BMS charts can move objects across the whole playfield in a few frames.
+        // Preload well before visual entry so skin lookup, texture upload, and LN body setup do
+        // not happen exactly when the object appears.
+        protected override double InitialLifetimeOffset => 15000;
+
         public BmsHitObjectLifetimeEntry(HitObject hitObject)
             : base(hitObject)
         {
-            // The native BMS renderer currently uses a generous fixed lifetime until BMS-specific
-            // scroll timing and LN rendering are implemented.
             LifetimeEnd = hitObject.GetEndTime() + 1000;
         }
     }

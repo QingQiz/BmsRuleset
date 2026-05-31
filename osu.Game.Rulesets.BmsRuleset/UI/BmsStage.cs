@@ -23,9 +23,17 @@ public sealed partial class BmsStage : CompositeDrawable
 
     public Container JudgementArea { get; }
 
+    public Container MeasureLineArea { get; }
+
     public float HitTargetPosition => hitTargetPosition.Value;
 
+    public float BarLineHeight => barLineHeight.Value;
+
+    public Color4 BarLineColour => barLineColour.Value;
+
     private readonly BindableFloat hitTargetPosition = new(HIT_TARGET_POSITION);
+    private readonly BindableFloat barLineHeight = new(1);
+    private readonly Bindable<Color4> barLineColour = new(Color4.White.Opacity(0.35f));
     private readonly Drawable topBorder;
     private readonly Drawable bottomBorder;
     private readonly Drawable leftBorder;
@@ -62,6 +70,10 @@ public sealed partial class BmsStage : CompositeDrawable
                 RelativeSizeAxes = Axes.Both,
             },
             columnFlow,
+            MeasureLineArea = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+            },
             hitTarget = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, layoutVariant), _ => Empty())
             {
                 RelativeSizeAxes = Axes.X,
@@ -127,6 +139,10 @@ public sealed partial class BmsStage : CompositeDrawable
         hitTarget.Y = -hitTargetPosition.Value;
         JudgementArea.Y = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ScorePosition))?.Value
                           ?? 300 * 1.6f;
+        barLineHeight.Value = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineHeight))?.Value
+                              ?? 1;
+        barLineColour.Value = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineColour))?.Value
+                              ?? Color4.White.Opacity(0.35f);
 
         var lineColour = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnLineColour))?.Value
                          ?? Color4.White.Opacity(0.25f);

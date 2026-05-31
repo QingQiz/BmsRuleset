@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Input;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
@@ -38,8 +37,6 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     public const double MAX_TIME_RANGE = 11485;
 
     public override int Variant => (int)((BmsBeatmap)Beatmap).LayoutVariant;
-
-    private readonly BindableDouble configScrollSpeed = new(8);
 
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
     [Resolved(CanBeNull = true)]
@@ -77,9 +74,10 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         base.LoadComplete();
 
         if (Config is BmsRulesetConfigManager config)
-            config.BindWith(BmsRulesetSetting.ScrollSpeed, configScrollSpeed);
-
-        configScrollSpeed.BindValueChanged(speed => ((BmsPlayfield)Playfield).TimeRange = ComputeScrollTime(speed.NewValue), true);
+        {
+            var speed = config.Get<double>(BmsRulesetSetting.ScrollSpeed);
+            ((BmsPlayfield)Playfield).SetConfiguredScrollSpeed(speed);
+        }
 
         // BMS convention: save every play to the local DB, including failed ones.
         // Player hard-codes SoloPlayer and has no Ruleset.CreatePlayer() hook, so we

@@ -25,6 +25,18 @@ public class BmsKeyBindingConfigurationTest
     }
 
     [Test]
+    public void TestDefaultKeyBindingsIncludeScrollSpeedActions()
+    {
+        var bindings = BmsKeyBindingConfiguration.GetDefaultKeyBindings((int)BmsLayoutVariant.Bme7K).ToArray();
+
+        Assert.That(bindings.Select(b => b.Action).Cast<BmsAction>(), Is.SupersetOf(new object[]
+        {
+            BmsAction.IncreaseScrollSpeed,
+            BmsAction.DecreaseScrollSpeed,
+        }));
+    }
+
+    [Test]
     public void TestDoublePlayActionsMapToSecondColumnBank()
     {
         Assert.That(BmsKeyBindingConfiguration.ActionToColumn(BmsAction.Scratch, BmsLayoutVariant.Bme7KDouble), Is.EqualTo(0));

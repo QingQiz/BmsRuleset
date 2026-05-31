@@ -98,6 +98,8 @@ The scratch column is visually narrower and darker than regular key columns.
 
 Default bindings (all rebindable in **Settings → Key Bindings → osu!BMS**):
 
+**ingame controls:** `Up` / `Down` increase/decrease scroll speed temporarily
+
 **5K SP:** `LShift` Scratch · `Z` `S` `X` `D` `C` Keys 1–5
 
 **7K SP:** same as 5K plus `F` Key 6 · `V` Key 7
@@ -370,10 +372,8 @@ The full built-in skin (covering all 6 layouts) is at
 | **Parser** | `#SUBTITLE`, `#SUBARTIST`, `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — silently ignored |
 | **Parser** | `#PATH_WAV` / `#PATH_BMP` resource path prefixes |
 | **Parser** | Channel `17` / `27` (free-zone keys) — notes on these channels are dropped |
-| **Renderer** | Measure bar lines |
 | **Renderer** | BGA / movie / stagefile / background image |
 | **Renderer** | Key beams (column light during hold) |
-| **Renderer** | STOP / soflan scroll freeze — timing is correct but the renderer does not change scroll speed |
 | **Scoring** | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown |
 | **Scoring** | LN tail sample playback — data is parsed and stored but not played during gameplay |
 | **Gauge** | Easy / Hard / Ex-Hard / Hazard gauge variants |
@@ -425,8 +425,6 @@ The full built-in skin (covering all 6 layouts) is at
 
 
 - [ ] random/switch
-- [ ] timing sys
-- [ ] measure line
 - [ ] correct metadata display (title, artist, etc, rank, hp, ...)
 
 - skin
@@ -464,7 +462,6 @@ The full built-in skin (covering all 6 layouts) is at
 - [ ] Exrank
 
 - [ ] Delete all imported BMS files confirm window
-- [ ] in game scroll speed adjust
 - [ ] ln tail 的打击音
 - [ ] 把我们的血条注册为 两个内置 皮肤的默认血条，其余用户自定义皮肤仍可使用 mania 风格的血条
   - [ ] 把我们的血条注册为可配置的HUD
