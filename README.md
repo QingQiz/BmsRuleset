@@ -393,6 +393,7 @@ The full built-in skin (covering all 6 layouts) is at
 
 ## FIXME
 
+- [ ] **高BPM段帧率骤降 (~1000fps → ~200fps)** — 通过分别屏蔽key-sound和BGM定位：仅key-sound时，加速段帧率缓慢平滑下降至较低值后突然恢复1000fps；仅BGM时，加速段某时刻突然暴跌至低帧率后迅速回升。详见 `BmsBackgroundAudioPlayer.cs` 和 `BmsChartSampleSound.cs`。
 - [ ] autoplay random，到后半会卡死
 - [ ] test 步骤里的 import real bms 步骤总是会失败
     ```

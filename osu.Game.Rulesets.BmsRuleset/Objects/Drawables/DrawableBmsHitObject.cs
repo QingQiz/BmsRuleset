@@ -2,7 +2,6 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
 using osu.Framework.Layout;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -19,64 +18,27 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 
 /// <summary>
-///     Placeholder drawable for native BMS notes.
+///     Drawable for a single BMS note (normal, long-note, or landmine).  Handles
+///     user hit/release judgement, scroll-position projection through
+///     <see cref="BmsTimingMap" />, and long-note body/tail layout.
 /// </summary>
-/// <remarks>
-///     This intentionally favours clarity over final gameplay fidelity. The object is rendered in a
-///     lane determined by <see cref="BmsHitObject.Column" /> and scrolls by projected osu! time.
-/// </remarks>
 public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObject>
 {
+
+    #region Constants
+
     private const float max_long_note_piece_height = 4096;
 
-    private readonly record struct LayoutMetrics(
-        int Column,
-        BmsLayoutVariant LayoutVariant,
-        Drawable? ColumnContainer,
-        float ParentWidth,
-        float ParentHeight,
-        float ScaledParentWidth,
-        float TravelDistance,
-        float HitTargetPosition,
-        double TimeRange,
-        double ScrollSpeedMultiplier,
-        BmsTimingMap? TimingMap,
-        double CurrentScrollPosition,
-        double ScrollRange);
+    #endregion
 
-    private readonly record struct LayoutReferences(
-        BmsPlayfield? Playfield,
-        BmsStage? Stage,
-        Drawable? ColumnContainer,
-        int Column,
-        BmsLayoutVariant LayoutVariant);
-
-    private Container noteContainer = null!;
-    private BmsSegmentedLongNoteBody longNoteBody = null!;
-    private Container longNoteTailContainer = null!;
-    private bool longNoteStarted;
-    private HitResult? longNoteHeadResult;
-    private float? longNoteHeadFixedY;
-    private BmsPlayfield? playfield;
-    private float currentNoteHeight = BmsNoteSizing.DEFAULT_NOTE_HEIGHT;
-    private int skinnedColumn = -1;
-    private BmsLayoutVariant? skinnedLayout;
-    private BmsSkinComponents? skinnedComponent;
-    private LayoutReferences? layoutReferences;
-    private LayoutMetrics? latestLayout;
-    private float cachedNoteHeightWidth = -1;
-    private int cachedNoteHeightColumn = -1;
-    private BmsLayoutVariant? cachedNoteHeightLayout;
-    private BmsSkinComponents? cachedNoteHeightComponent;
-
-    private float cachedScaledParentWidth = -1;
-    private float cachedParentWidthForTransform;
-    private float cachedParentHeightForTransform;
-
-    private bool longNotePiecesApplied;
+    #region DI
 
     [Resolved(CanBeNull = true)]
     private ISkinSource? skin { get; set; }
+
+    #endregion
+
+    #region Construction
 
     public DrawableBmsHitObject()
         : base(null!)
@@ -85,6 +47,127 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         Size = new Vector2(40, BmsNoteSizing.DEFAULT_NOTE_HEIGHT);
     }
 
+    #endregion
+
+    #region Skin
+
+    private void updateSkinPieces(BmsLayoutVariant? layoutVariant = null, int? column = null)
+    {
+        if (HitObject == null)
+            return;
+
+        var resolvedLayoutVariant = layoutVariant ?? Parent?.FindClosestParent<BmsPlayfield>()?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
+        var resolvedColumn = column ?? HitObject.Column;
+        var component = HitObject.IsMine ? BmsSkinComponents.Mine : HitObject.IsLongNote ? BmsSkinComponents.HoldNoteHead : BmsSkinComponents.Note;
+
+        if (skinnedColumn == resolvedColumn && skinnedLayout == resolvedLayoutVariant && skinnedComponent == component)
+            return;
+
+        skinnedColumn = resolvedColumn;
+        skinnedLayout = resolvedLayoutVariant;
+        skinnedComponent = component;
+
+        longNoteBody.BodyColour = Color4.Cyan;
+        longNoteBody.Alpha = HitObject.IsLongNote ? 0.65f : 0;
+        longNoteTailContainer.Alpha = HitObject.IsLongNote ? 1 : 0;
+
+        noteContainer.Clear();
+        longNoteTailContainer.Clear();
+
+        noteContainer.Add(new SkinnableDrawable(new BmsSkinComponentLookup(component, resolvedLayoutVariant, resolvedColumn))
+        {
+            RelativeSizeAxes = Axes.Both,
+            CentreComponent = false, // legacy BMS pieces use top-left anchoring
+        });
+
+        if (!HitObject.IsLongNote)
+            return;
+
+        longNoteTailContainer.Add(new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, resolvedLayoutVariant, resolvedColumn))
+        {
+            RelativeSizeAxes = Axes.Both,
+            // See noteContainer above: cap geometry uses top-left coordinates.
+            CentreComponent = false,
+        });
+    }
+
+    #endregion
+
+    #region Nested types
+
+    private readonly record struct LayoutMetrics(
+        int Column,
+        BmsLayoutVariant LayoutVariant,
+        Drawable? ColumnContainer,
+        float ParentHeight,
+        float ScaledParentWidth,
+        float TravelDistance,
+        float HitTargetPosition,
+        double ScrollSpeedMultiplier,
+        BmsTimingMap? TimingMap,
+        double CurrentScrollPosition,
+        double ScrollRange);
+
+    private readonly record struct LayoutReferences(
+        BmsStage? Stage,
+        Drawable? ColumnContainer,
+        int Column,
+        BmsLayoutVariant LayoutVariant);
+
+    #endregion
+
+    #region Core drawable fields
+
+    private Container noteContainer = null!;
+    private BmsSegmentedLongNoteBody longNoteBody = null!;
+    private Container longNoteTailContainer = null!;
+
+    #endregion
+
+    #region Judgement / long-note state
+
+    private bool longNoteStarted;
+    private HitResult? longNoteHeadResult;
+    private float? longNoteHeadFixedY;
+    private BmsPlayfield? playfield;
+
+    #endregion
+
+    #region Sizing state
+
+    private float currentNoteHeight = BmsNoteSizing.DEFAULT_NOTE_HEIGHT;
+    private float cachedNoteHeightWidth = -1;
+    private int cachedNoteHeightColumn = -1;
+    private BmsLayoutVariant? cachedNoteHeightLayout;
+    private BmsSkinComponents? cachedNoteHeightComponent;
+
+    #endregion
+
+    #region Layout / transform cache
+
+    private LayoutReferences? layoutReferences;
+    private LayoutMetrics? latestLayout;
+    private float cachedScaledParentWidth = -1;
+    private float cachedParentWidthForTransform;
+    private float cachedParentHeightForTransform;
+    private bool longNotePiecesApplied;
+
+    #endregion
+
+    #region Skin cache
+
+    private int skinnedColumn = -1;
+    private BmsLayoutVariant? skinnedLayout;
+    private BmsSkinComponents? skinnedComponent;
+
+    #endregion
+
+    #region Public API
+
+    /// <summary>
+    ///     Attempts a key-down judgement on this note.  Returns <c>true</c> if the
+    ///     note was in a valid hit window and was consumed.
+    /// </summary>
     public bool TryHit()
     {
         if (Judged || HitObject?.HitWindows == null)
@@ -109,6 +192,10 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         return true;
     }
 
+    /// <summary>
+    ///     Attempts a key-up judgement on a held long-note.  Returns <c>true</c> if
+    ///     the release was within the tail hit window.
+    /// </summary>
     public bool TryRelease()
     {
         if (Judged || HitObject?.HitWindows == null || !HitObject.IsLongNote || !longNoteStarted)
@@ -127,6 +214,10 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     public override void PlaySamples()
     {
     }
+
+    #endregion
+
+    #region Framework overrides
 
     protected override void OnApply()
     {
@@ -164,9 +255,8 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     {
         base.Update();
 
-        // HitObject may not be set yet during early pool lifecycle; bail out.
         if (HitObject == null)
-            return;
+            return; // HitObject may not be set yet during early pool lifecycle
 
         if (!tryRefreshLayoutMetrics(out var layout))
         {
@@ -178,11 +268,10 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         var timeUntilHit = HitObject.StartTime - Time.Current;
         var endTimeUntilHit = HitObject.EndTime - Time.Current;
 
-        // NaN/Infinity can occur before timing is initialised; bail out safely.
         if (!double.IsFinite(timeUntilHit))
         {
             UpdateResult(false);
-            return;
+            return; // NaN/Infinity before timing is initialised
         }
 
         var y = yForTimeOffset(timeUntilHit, layout);
@@ -206,7 +295,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (!float.IsFinite(position.X) || !float.IsFinite(position.Y))
         {
             UpdateResult(false);
-            return;
+            return; // coordinate transform not ready yet
         }
 
         Position = position;
@@ -248,7 +337,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (userTriggered || HitObject.HitWindows == null || HitObject.IsMine)
             return;
 
-        var missWindow = HitObject.HitWindows.WindowFor(HitResult.Ok); // BAD is the passive-miss boundary
+        var missWindow = HitObject.HitWindows.WindowFor(HitResult.Ok);
 
         if (HitObject.IsLongNote)
         {
@@ -311,6 +400,14 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             base.LoadSamples();
     }
 
+    #endregion
+
+    #region Layout
+
+    /// <summary>
+    ///     Walks up the parent hierarchy to find the enclosing <see cref="BmsPlayfield" />
+    ///     and stage, then caches the column container and associated metadata.
+    /// </summary>
     private bool ensureLayoutReferences()
     {
         if (layoutReferences != null)
@@ -325,7 +422,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (columnContainer == null)
             return false;
 
-        layoutReferences = new LayoutReferences(playfield, stage, columnContainer, column, layoutVariant);
+        layoutReferences = new LayoutReferences(stage, columnContainer, column, layoutVariant);
 
         // These operations depend only on column/layout/component/skin lookup. They are comparatively
         // expensive and should not be part of the per-frame metrics refresh path.
@@ -335,6 +432,10 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         return true;
     }
 
+    /// <summary>
+    ///     Rebuilds the per-frame layout snapshot.  Computes scaled column width,
+    ///     travel distance, hit-target position, and timing-derived scroll fields.
+    /// </summary>
     private bool tryRefreshLayoutMetrics(out LayoutMetrics layout)
     {
         if (!ensureLayoutReferences() || layoutReferences is not { } references)
@@ -376,12 +477,10 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             references.Column,
             references.LayoutVariant,
             columnContainer,
-            parentWidth,
             parentHeight,
             Math.Max(1, scaledParentWidth),
             Math.Max(1f, parentHeight - (stage?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION)),
             stage?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION,
-            playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(8),
             playfield?.ScrollSpeedMultiplier ?? 1,
             playfield?.TimingMap,
             playfield?.CurrentScrollPosition ?? Time.Current,
@@ -393,14 +492,6 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         return true;
     }
 
-    private void invalidateNoteHeightCache()
-    {
-        cachedNoteHeightWidth = -1;
-        cachedNoteHeightColumn = -1;
-        cachedNoteHeightLayout = null;
-        cachedNoteHeightComponent = null;
-    }
-
     private void invalidateLayoutReferences()
     {
         layoutReferences = null;
@@ -409,6 +500,92 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         cachedParentWidthForTransform = 0;
         cachedParentHeightForTransform = 0;
         invalidateNoteHeightCache();
+    }
+
+    #endregion
+
+    #region Position math
+
+    /// <summary>
+    ///     Converts a time offset (<paramref name="timeUntilHit" />, where negative means past)
+    ///     into a vertical pixel position relative to the column container's top.  For charts
+    ///     with tick-based timing, the scroll coordinate is projected through
+    ///     <see cref="scrollPositionFor" />; otherwise a simple linear time-to-pixel scaling
+    ///     is used.
+    /// </summary>
+    private float yForTimeOffset(double timeUntilHit, LayoutMetrics layout)
+    {
+        var progressUntilHit = layout.TimingMap == null || HitObject.TickInfo.Tick == HitObject.TickInfo.EndTick && HitObject.TickInfo.Tick == 0 && HitObject.StartTime != 0
+            ? timeUntilHit
+            : scrollPositionFor(timeUntilHit, layout) - layout.CurrentScrollPosition;
+
+        return layout.ParentHeight - layout.HitTargetPosition - (float)(progressUntilHit * layout.ScrollSpeedMultiplier / layout.ScrollRange) * layout.TravelDistance - currentNoteHeight;
+    }
+
+    /// <summary>
+    ///     Resolves the scroll-position value (in the coordinate space of
+    ///     <see cref="BmsTimingMap" />) for the time <c>Time.Current + timeUntilHit</c>.
+    ///     When the offset matches a known tick boundary (start or end of the note), the
+    ///     per-tick position is used directly to avoid floating-point drift.
+    /// </summary>
+    private double scrollPositionFor(double timeUntilHit, LayoutMetrics layout)
+    {
+        if (layout.TimingMap == null)
+            return Time.Current + timeUntilHit;
+
+        if (Math.Abs(timeUntilHit - (HitObject.StartTime - Time.Current)) < 0.001)
+            return layout.TimingMap.GetScrollPositionAtTick(HitObject.TickInfo.Tick);
+
+        if (HitObject.IsLongNote && Math.Abs(timeUntilHit - (HitObject.EndTime - Time.Current)) < 0.001)
+            return layout.TimingMap.GetScrollPositionAtTick(HitObject.TickInfo.EndTick);
+
+        return layout.TimingMap.GetScrollPositionAtTime(Time.Current + timeUntilHit);
+    }
+
+    /// <summary>
+    ///     Y coordinate of the judgement line in the column container's local space.
+    /// </summary>
+    private float judgementHeadYFor(LayoutMetrics layout)
+        => layout.ParentHeight - layout.HitTargetPosition - currentNoteHeight;
+
+    /// <summary>
+    ///     Returns the visual head Y for a held long-note.  While the head has a fixed Y
+    ///     (determined by <see cref="tryResolveLongNoteHeadFixedY" />), it is clamped
+    ///     to the judgement line so the head never drifts below it.  For normal notes
+    ///     this simply returns the natural Y.
+    /// </summary>
+    private float visualHeadYFor(float naturalY, float judgementHeadY)
+    {
+        if (!HitObject.IsLongNote || !longNoteStarted)
+            return naturalY;
+
+        return Math.Min(longNoteHeadFixedY ?? naturalY, judgementHeadY);
+    }
+
+    /// <summary>
+    ///     Snaps the LN head Y to the judgement line when the head hit was perfect/great,
+    ///     otherwise holds it at the actual press position so the visual offset is preserved.
+    /// </summary>
+    private void tryResolveLongNoteHeadFixedY(HitResult? result)
+    {
+        if (result == null || longNoteHeadFixedY != null || latestLayout is not { } layout)
+            return;
+
+        longNoteHeadFixedY = result is HitResult.Perfect or HitResult.Great
+            ? judgementHeadYFor(layout)
+            : yForTimeOffset(HitObject.StartTime - Time.Current, layout);
+    }
+
+    #endregion
+
+    #region Note sizing
+
+    private void invalidateNoteHeightCache()
+    {
+        cachedNoteHeightWidth = -1;
+        cachedNoteHeightColumn = -1;
+        cachedNoteHeightLayout = null;
+        cachedNoteHeightComponent = null;
     }
 
     private void updateNoteHeight(LayoutMetrics layout)
@@ -428,53 +605,6 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         currentNoteHeight = getCurrentNoteHeight(layout.ScaledParentWidth, layout.LayoutVariant, layout.Column);
     }
 
-    private float yForTimeOffset(double timeUntilHit, LayoutMetrics layout)
-    {
-        var progressUntilHit = layout.TimingMap == null || HitObject.TickInfo.Tick == HitObject.TickInfo.EndTick && HitObject.TickInfo.Tick == 0 && HitObject.StartTime != 0
-            ? timeUntilHit
-            : scrollPositionFor(timeUntilHit, layout) - layout.CurrentScrollPosition;
-
-        return layout.ParentHeight - layout.HitTargetPosition - (float)(progressUntilHit * layout.ScrollSpeedMultiplier / layout.ScrollRange) * layout.TravelDistance - currentNoteHeight;
-    }
-
-    private double scrollPositionFor(double timeUntilHit, LayoutMetrics layout)
-    {
-        if (layout.TimingMap == null)
-            return Time.Current + timeUntilHit;
-
-        if (Math.Abs(timeUntilHit - (HitObject.StartTime - Time.Current)) < 0.001)
-            return layout.TimingMap.GetScrollPositionAtTick(HitObject.TickInfo.Tick);
-
-        if (HitObject.IsLongNote && Math.Abs(timeUntilHit - (HitObject.EndTime - Time.Current)) < 0.001)
-            return layout.TimingMap.GetScrollPositionAtTick(HitObject.TickInfo.EndTick);
-
-        return layout.TimingMap.GetScrollPositionAtTime(Time.Current + timeUntilHit);
-    }
-
-    private float judgementHeadYFor(LayoutMetrics layout)
-        => layout.ParentHeight - layout.HitTargetPosition - currentNoteHeight;
-
-    private float visualHeadYFor(float naturalY, float judgementHeadY)
-    {
-        if (!HitObject.IsLongNote || !longNoteStarted)
-            return naturalY;
-
-        return Math.Min(longNoteHeadFixedY ?? naturalY, judgementHeadY);
-    }
-
-    private void tryResolveLongNoteHeadFixedY(HitResult? result)
-    {
-        if (result == null || longNoteHeadFixedY != null || latestLayout is not { } layout)
-            return;
-
-        // PGREAT/GREAT are visually accepted as “on the line”. Lower but still valid head hits are
-        // held at the actual press position so the skin test shows the timing offset instead of
-        // correcting it back to the judgement line.
-        longNoteHeadFixedY = result is HitResult.Perfect or HitResult.Great
-            ? judgementHeadYFor(layout)
-            : yForTimeOffset(HitObject.StartTime - Time.Current, layout);
-    }
-
     private float getCurrentNoteHeight(float drawWidth, BmsLayoutVariant layoutVariant, int column)
         => BmsNoteSizing.GetNoteHeight(skin, new BmsSkinComponentLookup(
             currentSkinComponent(),
@@ -482,6 +612,10 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     private BmsSkinComponents currentSkinComponent()
         => HitObject.IsMine ? BmsSkinComponents.Mine : HitObject.IsLongNote ? BmsSkinComponents.HoldNoteHead : BmsSkinComponents.Note;
+
+    #endregion
+
+    #region Long-note rendering
 
     [BackgroundDependencyLoader]
     private void load()
@@ -512,6 +646,11 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         ]);
     }
 
+    /// <summary>
+    ///     Positions the LN head container, body, and tail container to match the
+    ///     current visual head/tail Y offsets.  Clamps the body to
+    ///     <see cref="max_long_note_piece_height" /> above and below the head.
+    /// </summary>
     private void updateLongNotePieces(float headOffset, float tailOffset)
     {
         if (!HitObject.IsLongNote)
@@ -562,66 +701,6 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         longNoteTailContainer.Alpha = 1;
     }
 
-    private void updateSkinPieces(BmsLayoutVariant? layoutVariant = null, int? column = null)
-    {
-        if (HitObject == null)
-            return;
+    #endregion
 
-        var resolvedLayoutVariant = layoutVariant ?? Parent?.FindClosestParent<BmsPlayfield>()?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
-        var resolvedColumn = column ?? HitObject.Column;
-        var component = HitObject.IsMine ? BmsSkinComponents.Mine : HitObject.IsLongNote ? BmsSkinComponents.HoldNoteHead : BmsSkinComponents.Note;
-
-        if (skinnedColumn == resolvedColumn && skinnedLayout == resolvedLayoutVariant && skinnedComponent == component)
-            return;
-
-        skinnedColumn = resolvedColumn;
-        skinnedLayout = resolvedLayoutVariant;
-        skinnedComponent = component;
-
-        longNoteBody.BodyColour = Color4.Cyan;
-        longNoteBody.Alpha = HitObject.IsLongNote ? 0.65f : 0;
-        longNoteTailContainer.Alpha = HitObject.IsLongNote ? 1 : 0;
-
-        noteContainer.Clear();
-        longNoteTailContainer.Clear();
-
-        noteContainer.Add(new SkinnableDrawable(new BmsSkinComponentLookup(component, resolvedLayoutVariant, resolvedColumn), _ => new DefaultBmsNotePiece(defaultColourFor(component)))
-        {
-            RelativeSizeAxes = Axes.Both,
-            // Legacy BMS note pieces are normalised to top-left anchoring. Do not centre them,
-            // otherwise judgement alignment shifts by roughly one cap height.
-            CentreComponent = false,
-        });
-
-        if (!HitObject.IsLongNote)
-            return;
-
-        longNoteTailContainer.Add(new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, resolvedLayoutVariant, resolvedColumn), _ => Empty())
-        {
-            RelativeSizeAxes = Axes.Both,
-            // See noteContainer above: cap geometry uses top-left coordinates.
-            CentreComponent = false,
-        });
-
-        static Color4 defaultColourFor(BmsSkinComponents component) => component switch
-        {
-            BmsSkinComponents.Mine => Color4.OrangeRed,
-            BmsSkinComponents.HoldNoteHead => Color4.Cyan,
-            _ => Color4.White,
-        };
-    }
-
-    private sealed partial class DefaultBmsNotePiece : CompositeDrawable
-    {
-        public DefaultBmsNotePiece(Color4 colour)
-        {
-            RelativeSizeAxes = Axes.Both;
-
-            InternalChild = new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-                Colour = colour,
-            };
-        }
-    }
 }
