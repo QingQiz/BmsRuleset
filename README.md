@@ -407,19 +407,26 @@ The full built-in skin (covering all 6 layouts) is at
 
 | Area           | What is missing                                                                             |
 |----------------|---------------------------------------------------------------------------------------------|
-| **Parser**     | `#EXRANK` — extended rank definition, not parsed                                            |
-| **Parser**     | `#SUBTITLE`, `#SUBARTIST`, `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — silently ignored |
-| **Parser**     | `#PATH_WAV` / `#PATH_BMP` resource path prefixes                                            |
-| **Parser**     | Channel `17` / `27` (free-zone keys) — notes on these channels are dropped                  |
+| **Parser**     | `#EXRANK` / channel `A0` — extended rank definition                                         |
+| **Parser**     | `#SUBTITLE`, `#SUBARTIST`, `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — metadata only    |
+| **Parser**     | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                          |
+| **Parser**     | `#EXWAVxx`, `#WAVCMD`, `#VOLWAV` — advanced audio controls                                  |
+| **Parser**     | `#STP` — absolute STOP sequence                                                             |
+| **Parser**     | `#DEFEXRANK`, `#BASEBPM`, `#MAKER`, `%URL`, `%EMAIL`, `#COMMENT`, `#DIFFICULTY` — metadata  |
+| **Parser**     | Channel `04`/`06`/`07`/`0A`–`0E` — BGA layers                                               |
+| **Parser**     | Channel `17` / `27` — free-zone keys                                                        |
+| **Parser**     | Channel `31`–`49` — invisible notes                                                         |
+| **Parser**     | Channel `99` / `#TEXTxx` — text events                                                      |
+| **Parser**     | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                   |
 | **Renderer**   | BGA / movie / stagefile / background image                                                  |
 | **Renderer**   | Key beams (column light during hold)                                                        |
 | **Scoring**    | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown                  |
 | **Scoring**    | LN tail sample playback — data is parsed and stored but not played during gameplay          |
 | **Gauge**      | Easy / Hard / Ex-Hard / Hazard gauge variants                                               |
 | **Gauge**      | LN-specific gauge events (head miss ≠ body drop ≠ tail miss)                                |
-| **Mods**       | Random / Mirror / S-Random / H-Random column shuffle                                        |
+| **Mods**       | Random / S-Random / H-Random column shuffle                                                 |
 | **Mods**       | Gauge-selection mods                                                                        |
-| **Mods**       | Auto-scratch, hide scratch, assist options                                                  |
+| **Mods**       | assist options                                                                              |
 | **Input**      | Scratch turntable semantics — scratch is routed as a plain column key                       |
 | **Difficulty** | Star rating is always 0; no performance calculator                                          |
 | **Import**     | Resource files in subdirectories — only the filename is used, relative paths are unresolved |
@@ -479,6 +486,39 @@ The full built-in skin (covering all 6 layouts) is at
 - [ ] 血量过低导致的失败不会更新结果为F
 
 ## TODO
+
+- parser 未实现 command（参考 https://hitkey.nekokan.dyndns.info/cmds.htm）
+    - [ ] `#SUBTITLE` / `#SUBARTIST` / `#MAKER` / `%URL` / `%EMAIL` — 元数据
+    - [ ] `#DIFFICULTY` — 难度分类
+    - [ ] `#DEFEXRANK` / `#EXRANKxx` / channel `A0` — 判定 rank
+    - [ ] `#GENLE` — `#GENRE` 的 typo 容错
+    - [ ] `#BASEBPM` — 视觉 BPM
+    - [ ] `#EXBPMxx` — `#BPMxx` 的别名（规避 BMSC 解析 bug）
+    - [ ] `#STP` — 绝对 STOP 序列
+    - [ ] `#VOLWAV` — 全局音量
+    - [ ] `#WAVCMD` — MacBeat 音高/音量/时间
+    - [ ] `#EXWAVxx` — 扩展音频定义（pan/volume/freq）
+    - [ ] `#PATH_WAV` — 资源路径前缀（WAV/BMP 共用）
+    - [ ] `#BGAxx` / `#POORBGA` / `#SWBGAxx` / `#@BGAxx` / `#ARGBxx` — BGA 定义
+    - [ ] `#BMPxx` / `#EXBMPxx` — 图像定义（非资源扫描）
+    - [ ] `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — 视频
+    - [ ] `#STAGEFILE` / `#BANNER` / `#BACKBMP` — 界面图像（非资源扫描）
+    - [ ] `#CHARFILE` / `#ExtChr` — 角色/皮肤
+    - [ ] `#TEXTxx` / channel `99` — 文本事件
+    - [ ] `#CHANGEOPTIONxx` / channel `A6` — 动态 option
+    - [ ] `#OPTION` — 强制 option
+    - [ ] `#OCT/FP` — 八度/踏板
+    - [ ] `#SONGxx` — PMS 备用音频
+    - [ ] `#CDDA` / `#MIDIFILE` — CD / MIDI
+    - [ ] `#COMMENT` — 选歌注释
+    - [ ] `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — 资源组
+    - [ ] ~~`#CHARSET` — 编码声明~~
+    - [ ] `#END IF`（带空格）、`#END`、`#IFEND` — `#ENDIF` 的 typo 容错
+    - [ ] channel `04` / `06` / `07` / `0A`–`0E` — BGA 层
+    - [ ] channel `17` / `27` — free-zone 键
+    - [ ] channel `31`–`49` — 隐形音符
+    - [ ] channel `97` — 动态 BGM 音量
+    - [ ] channel `98` — 动态 KEY 音量（channel `97` 的对应）
 
 - [ ] correct metadata display (title, artist, etc, rank, hp, ...)
 
