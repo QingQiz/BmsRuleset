@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,18 +7,13 @@ using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Extensions;
-using osu.Framework.Graphics.Rendering;
-using osu.Framework.Graphics.Textures;
-using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
-using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Mods;
@@ -30,22 +26,43 @@ using osuTK.Input;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [TestFixture]
-public partial class TestSceneBmsImportedPlayer : PlayerTestScene, IStorageResourceProvider
+public partial class TestSceneBmsImportedPlayer : BmsPlayerTestScene
 {
     private BeatmapManager beatmapManager = null!;
     private RealmRulesetStore rulesets = null!;
     private BeatmapInfo importedBeatmap = null!;
     private BmsHitObject firstKeyNote = null!;
     private BmsHitObject offsetTarget = null!;
-    private GameHost gameHost = null!;
+    private double initialHealth;
 
+    protected override bool UseFreshStoragePerRun => true;
+
+    [BackgroundDependencyLoader]
+    private void load(GameHost host, AudioManager audio)
+    {
+        Dependencies.Cache(rulesets = new RealmRulesetStore(Realm));
+        Dependencies.Cache(beatmapManager = new BeatmapManager(LocalStorage, Realm, null, audio, Resources, host, Beatmap.Default));
+        Dependencies.Cache(new ScoreManager(rulesets, () => beatmapManager, LocalStorage, Realm, API));
+        Dependencies.Cache(Realm);
+    }
+
+    /// <summary>
+    /// Locates the embedded <c>bms_test_songs</c> root by trusting
+    /// <see cref="BmsEmbeddedSongDecoderTest.TestSongsRoot"/> first and falling back
+    /// to a parent-walk if that path no longer holds the canonical Aleph-0 chart.
+    /// </summary>
     private static string testSongsRoot
     {
         get
         {
-            foreach (var root in candidateTestSongRoots())
+            const string canary = @"Aleph-0 (by LeaF)\_7NORMAL.bms";
+
+            if (File.Exists(Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, canary)))
+                return BmsEmbeddedSongDecoderTest.TestSongsRoot;
+
+            foreach (var root in candidateRoots())
             {
-                if (File.Exists(Path.Combine(root, "Aleph-0 (by LeaF)", "_7NORMAL.bms")))
+                if (File.Exists(Path.Combine(root, canary)))
                     return root;
             }
 
@@ -53,61 +70,33 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene, IStorageResou
         }
     }
 
-    private static string[] candidateTestSongRoots()
+    private static IEnumerable<string> candidateRoots()
     {
-        var roots = new[]
+        var seeds = new[]
         {
-            BmsEmbeddedSongDecoderTest.TestSongsRoot,
             TestContext.CurrentContext.WorkDirectory,
             AppContext.BaseDirectory,
             Directory.GetCurrentDirectory(),
         };
 
-        return roots.SelectMany(candidateRootsFrom).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-    }
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-    private static string[] candidateRootsFrom(string start)
-    {
-        var candidates = new List<string>();
-        var directory = new DirectoryInfo(Path.GetFullPath(start));
-
-        while (directory != null)
+        foreach (var seed in seeds)
         {
-            candidates.Add(Path.Combine(directory.FullName, "bms_test_songs"));
-            candidates.Add(Path.Combine(directory.FullName, "osu.Game.Rulesets.BmsRuleset.Tests", "bms_test_songs"));
-            directory = directory.Parent;
+            for (var dir = new DirectoryInfo(Path.GetFullPath(seed)); dir != null; dir = dir.Parent)
+            {
+                foreach (var candidate in new[]
+                         {
+                             Path.Combine(dir.FullName, "bms_test_songs"),
+                             Path.Combine(dir.FullName, "osu.Game.Rulesets.BmsRuleset.Tests", "bms_test_songs"),
+                         })
+                {
+                    if (seen.Add(candidate))
+                        yield return candidate;
+                }
+            }
         }
-
-        return candidates.ToArray();
     }
-
-    protected override bool HasCustomSteps => true;
-
-    protected override bool UseFreshStoragePerRun => true;
-
-    protected override Ruleset CreatePlayerRuleset() => new BmsRuleset();
-
-    [BackgroundDependencyLoader]
-    private void load(GameHost host, AudioManager audio)
-    {
-        gameHost = host;
-        Dependencies.Cache(rulesets = new RealmRulesetStore(Realm));
-        Dependencies.Cache(beatmapManager = new BeatmapManager(LocalStorage, Realm, null, audio, Resources, host, Beatmap.Default));
-        Dependencies.Cache(new ScoreManager(rulesets, () => beatmapManager, LocalStorage, Realm, API));
-        Dependencies.Cache(Realm);
-    }
-
-    public IRenderer Renderer => gameHost.Renderer;
-
-    public AudioManager AudioManager => Audio;
-
-    public IResourceStore<byte[]> Files => null!;
-
-    public new IResourceStore<byte[]> Resources => base.Resources;
-
-    public IResourceStore<TextureUpload> CreateTextureLoaderStore(IResourceStore<byte[]> underlyingStore) => gameHost.CreateTextureLoaderStore(underlyingStore);
-
-    RealmAccess IStorageResourceProvider.RealmAccess => null!;
 
     private void addBmsRuleset()
     {
@@ -141,7 +130,7 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene, IStorageResou
         new BmsFileImporter(Realm, LocalStorage).Import(chartPath).WaitSafely();
     }
 
-    private void selectImportedBeatmap(Mod[] mods = null)
+    private void selectImportedBeatmap(Mod[]? mods = null)
     {
         importedBeatmap = Realm.Run(r => r.All<BeatmapSetInfo>()
             .AsEnumerable()
@@ -154,8 +143,25 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene, IStorageResou
         SelectedMods.Value = mods ?? Array.Empty<Mod>();
     }
 
-    private TestPlayFieldCreator.SkinnedTestPlayer createArgonPlayer(Func<BmsBeatmap, IList<ReplayFrame>> createReplay)
-        => new(TestPlayFieldCreator.CreateSkinSource(TestPlayFieldCreator.SkinKind.Argon, this),createReplay);
+    /// <summary>
+    /// Resolves the physical key bound by default to the given column of the given layout,
+    /// so input simulation is not tied to a particular keyboard layout hardcoded into a test.
+    /// </summary>
+    private static Key defaultKeyForColumn(BmsLayoutVariant variant, int column)
+    {
+        var action = BmsKeyBindingConfiguration.ActionForColumn(variant, column)
+                     ?? throw new InvalidOperationException($"Column {column} of {variant} has no action mapping.");
+
+        var binding = BmsKeyBindingConfiguration.GetDefaultKeyBindings((int)variant)
+            .First(b => b.Action is BmsAction a && a == action);
+
+        var inputKey = binding.KeyCombination.Keys.Single();
+
+        // The InputKey enum mirrors the underlying osuTK Key values for the keyboard
+        // range the BMS bindings live in (letters, keypad, arrows, modifiers); a direct
+        // numeric cast is reliable here and avoids string parsing.
+        return (Key)(int)inputKey;
+    }
 
     [Test]
     public void TestAutoplayWithJudgementsAndHealth()
@@ -163,14 +169,15 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene, IStorageResou
         AddStep("register bms ruleset", addBmsRuleset);
         AddStep("import real bms", importRealBms);
         AddStep("select imported beatmap", () => selectImportedBeatmap());
-        AddStep("load player", () => LoadScreen(Player = createArgonPlayer(TestPlayFieldCreator.CreateAutoPlayFrames)));
+        AddStep("load player", () => LoadScreen(Player = CreateBmsPlayer(BmsTestReplays.CreateAutoPlayFrames)));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("player loaded beatmap", () => Player.LoadedBeatmapSuccessfully);
 
+        AddStep("capture initial health", () => initialHealth = Player.HealthProcessor.Health.Value);
         AddStep("seek to gameplay", () => Player.GameplayClockContainer.Seek(Player.DrawableRuleset.Objects.First().StartTime - 250));
         AddUntilStep("judgements produced", () => Player.Results.Count, () => Is.GreaterThanOrEqualTo(10));
         AddAssert("autoplay produces perfects", () => Player.Results.Count(r => r.Type == HitResult.Perfect), () => Is.GreaterThanOrEqualTo(10));
-        AddAssert("health increased", () => Player.HealthProcessor.Health.Value, () => Is.GreaterThan(0.2));
+        AddAssert("health increased from initial", () => Player.HealthProcessor.Health.Value, () => Is.GreaterThan(initialHealth));
     }
 
     [Test]
@@ -184,7 +191,7 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene, IStorageResou
         AddAssert("stored file resolves", () => Beatmap.Value.BeatmapInfo.BeatmapSet?.GetPathForFile(Beatmap.Value.BeatmapInfo.Path!), () => Is.Not.Null.And.Not.Empty);
         AddAssert("working beatmap decodes", () => Beatmap.Value.Beatmap.HitObjects.OfType<BmsHitObject>().Count(), () => Is.GreaterThan(100));
 
-        AddStep("load player", () => LoadScreen(Player = createArgonPlayer(TestPlayFieldCreator.CreateAutoPlayFrames)));
+        AddStep("load player", () => LoadScreen(Player = CreateBmsPlayer(BmsTestReplays.CreateAutoPlayFrames)));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("player loaded beatmap", () => Player.LoadedBeatmapSuccessfully);
         AddAssert("player has imported objects", () => Player.DrawableRuleset.Objects.Count(), () => Is.GreaterThan(100));
@@ -196,7 +203,11 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene, IStorageResou
         });
 
         AddUntilStep("target key note alive", () => Player.DrawableRuleset.Playfield.HitObjectContainer.AliveObjects.Any(d => d.HitObject == firstKeyNote));
-        AddStep("press key 1", () => InputManager.Key(Key.Z));
+        AddStep("press key for column 1", () =>
+        {
+            var variant = (BmsLayoutVariant)((BmsDrawableRuleset)Player.DrawableRuleset).Variant;
+            InputManager.Key(defaultKeyForColumn(variant, 1));
+        });
         AddUntilStep("hit judgement produced", () => Player.Results.Any(r => r.IsHit && r.Type != HitResult.Miss));
     }
 
@@ -207,7 +218,7 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene, IStorageResou
         AddStep("import real bms", importRealBms);
         AddStep("select imported beatmap", () => selectImportedBeatmap());
 
-        AddStep("load player with offset replay", () => LoadScreen(Player = createArgonPlayer(beatmap => TestPlayFieldCreator.CreateOffsetAutoPlayFrames(beatmap, 25))));
+        AddStep("load player with offset replay", () => LoadScreen(Player = CreateBmsPlayer(beatmap => BmsTestReplays.CreateOffsetAutoPlayFrames(beatmap, 25))));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("player loaded beatmap", () => Player.LoadedBeatmapSuccessfully);
 
