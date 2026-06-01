@@ -1,7 +1,5 @@
 using System;
-using System.IO;
 using System.Linq;
-using System.Text;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
@@ -13,21 +11,17 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.IO;
-using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
-using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI;
-using osu.Game.Rulesets.Replays;
-using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
 using osuTK;
 
-namespace osu.Game.Rulesets.BmsRuleset.Tests;
+namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [TestFixture]
-public partial class TestSceneBmsArgonTiming : PlayerTestScene, IStorageResourceProvider
+public partial class TestBmsSceneTiming : PlayerTestScene, IStorageResourceProvider
 {
     private float normalSpeedSpacing;
 
@@ -41,19 +35,14 @@ public partial class TestSceneBmsArgonTiming : PlayerTestScene, IStorageResource
     protected override Ruleset CreatePlayerRuleset() => new BmsRuleset();
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
-        => new ArgonTimingPlayer(new SkinProvidingContainer(new ArgonSkin(this)));
+        => new TestPlayFieldCreator.SkinnedTestPlayer(
+            TestPlayFieldCreator.CreateSkinSource(TestPlayFieldCreator.SkinKind.Argon, this),
+            TestPlayFieldCreator.CreateAutoPlayFrames);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
-        var beatmap = createBeatmap();
-
-        beatmap.BeatmapInfo.Ruleset = ruleset;
-        beatmap.BeatmapInfo.Difficulty.CircleSize = beatmap.TotalColumns;
-        beatmap.BeatmapInfo.Difficulty.OverallDifficulty = 6;
-        beatmap.BeatmapInfo.Difficulty.DrainRate = 5;
-        beatmap.BeatmapInfo.BPM = 130;
-        beatmap.BeatmapInfo.Length = (int)(beatmap.HitObjects.Max(h => h.EndTime) + 3000);
-
+        var beatmap = TestPlayFieldCreator.CreateBeatmapFromChart(timing_chart);
+        TestPlayFieldCreator.SetupBeatmapInfo(beatmap, ruleset, endPadding: 3000);
         return beatmap;
     }
 
@@ -97,79 +86,71 @@ public partial class TestSceneBmsArgonTiming : PlayerTestScene, IStorageResource
         Player.GameplayClockContainer.Seek(target.StartTime - leadTime);
     }
 
-    private static BmsBeatmap createBeatmap()
-    {
-        const string chart = """
-                             #TITLE Argon Timing Visual
-                             #ARTIST BMS Ruleset Test
-                             #BPM 130
-                             #BPM01 260
-                             #BPM02 65
-                             #BPM03 0.25
-                             #BPM04 1000000
-                             #BPM05 0
-                             #STOP01 384
-                             #LNTYPE 1
+    private const string timing_chart =
+        """
+        #TITLE Argon Timing Visual
+        #ARTIST BMS Ruleset Test
+        #BPM 130
+        #BPM01 260
+        #BPM02 65
+        #BPM03 0.25
+        #BPM04 1000000
+        #BPM05 0
+        #STOP01 384
+        #LNTYPE 1
 
-                             #00111:01000000
-                             #00112:00010000
-                             #00113:00000100
-                             #00114:00000001
-                             #00118:00000100
-                             #00119:00000001
+        #00111:01000000
+        #00112:00010000
+        #00113:00000100
+        #00114:00000001
+        #00118:00000100
+        #00119:00000001
 
-                             #00208:01
-                             #00251:01000001
-                             #00213:00010000
-                             #00214:00000100
-                             #00215:00000001
-                             #00218:01000100
+        #00208:01
+        #00251:01000001
+        #00213:00010000
+        #00214:00000100
+        #00215:00000001
+        #00218:01000100
 
-                             #00309:01
-                             #00311:01000000
-                             #00312:00010000
-                             #00313:00000100
-                             #00314:00000001
-                             #00319:00000100
+        #00309:01
+        #00311:01000000
+        #00312:00010000
+        #00313:00000100
+        #00314:00000001
+        #00319:00000100
 
-                             #00408:02
-                             #00458:01000001
-                             #00411:01000000
-                             #00412:00010000
-                             #00413:00000100
-                             #00414:00000001
-                             #00415:01000100
+        #00408:02
+        #00458:01000001
+        #00411:01000000
+        #00412:00010000
+        #00413:00000100
+        #00414:00000001
+        #00415:01000100
 
-                             #00511:01000100
-                             #00512:00010001
-                             #00513:00000100
-                             #00514:00000001
-                             #00518:01000100
-                             #00519:00010001
+        #00511:01000100
+        #00512:00010001
+        #00513:00000100
+        #00514:00000001
+        #00518:01000100
+        #00519:00010001
 
-                             #00608:04
-                             #00611:01000100
-                             #00612:00010001
-                             #00618:01000100
+        #00608:04
+        #00611:01000100
+        #00612:00010001
+        #00618:01000100
 
-                             #00708:05
-                             #00713:01000100
-                             #00714:00010001
-                             #00719:01000100
+        #00708:05
+        #00713:01000100
+        #00714:00010001
+        #00719:01000100
 
-                             #00808:03
-                             #00811:01000000
-                             #00812:00010000
-                             #00813:00000100
-                             #00814:00000001
-                             """;
-
-        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(chart));
-        using var reader = new LineBufferedReader(stream);
-        var decoded = new BmsBeatmapDecoder().Decode(reader);
-
-        return (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
-    }
+        #00808:03
+        #00811:01000000
+        #00812:00010000
+        #00813:00000100
+        #00814:00000001
+        """;
 
     public IRenderer Renderer => host.Renderer;
 
@@ -179,26 +160,9 @@ public partial class TestSceneBmsArgonTiming : PlayerTestScene, IStorageResource
 
     public new IResourceStore<byte[]> Resources => base.Resources;
 
+    public RealmAccess RealmAccess => null!;
+
     public IResourceStore<TextureUpload> CreateTextureLoaderStore(IResourceStore<byte[]> underlyingStore) => host.CreateTextureLoaderStore(underlyingStore);
-
-    RealmAccess IStorageResourceProvider.RealmAccess => null!;
-
-    private partial class ArgonTimingPlayer(ISkinSource skinSource) : TestPlayer(false, false)
-    {
-        [Cached(typeof(ISkinSource))]
-        private readonly ISkinSource skinSource = skinSource;
-
-        protected override void PrepareReplay()
-        {
-            var beatmap = (BmsBeatmap)GameplayState.Beatmap;
-            var replay = new BmsAutoGenerator(beatmap).Generate();
-
-            DrawableRuleset?.SetReplayScore(new Score
-            {
-                Replay = new Replay { Frames = replay.Frames.Cast<ReplayFrame>().ToList() },
-            });
-        }
-    }
 
     [Test]
     public void TestArgonTimingScroll()
@@ -206,8 +170,8 @@ public partial class TestSceneBmsArgonTiming : PlayerTestScene, IStorageResource
         AddStep("load Argon player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
-        AddAssert("loaded bms drawable ruleset", () => Player.DrawableRuleset, () => Is.TypeOf<BmsDrawableRuleset>());
-        AddAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, () => Is.TypeOf<BmsPlayfield>());
+        AddAssert("loaded bms drawable ruleset", () => Player.DrawableRuleset, Is.TypeOf<BmsDrawableRuleset>);
+        AddAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>);
         AddUntilStep("bms stage loaded", () => ((BmsPlayfield)Player.DrawableRuleset.Playfield).Stage.IsLoaded);
         AddAssert("measure lines added", () => getPlayfield().Stage.MeasureLineArea.Count, () => Is.GreaterThan(0));
         AddStep("seek normal BPM", () => seekToTick(192));

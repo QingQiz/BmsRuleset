@@ -110,7 +110,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     {
         base.SetReplayScore(replayScore);
 
-        if (replayScore != null && Beatmap is BmsBeatmap bmsBeatmap)
+        if (Beatmap is BmsBeatmap bmsBeatmap)
             BmsBranchReplayState.EnsureBranchReplayMod(replayScore, bmsBeatmap.BranchDecisions);
     }
 

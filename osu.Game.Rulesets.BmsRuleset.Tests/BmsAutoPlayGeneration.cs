@@ -12,7 +12,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests;
 
 [TestFixture]
 [HeadlessTest]
-public partial class TestSceneAutoGeneration : OsuTestScene
+public partial class BmsAutoPlayGeneration : OsuTestScene
 {
     [Test]
     public void TestSingleNote()

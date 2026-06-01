@@ -1,34 +1,44 @@
 using System;
-using System.IO;
 using System.Linq;
-using System.Text;
 using NUnit.Framework;
+using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Textures;
+using osu.Framework.IO.Stores;
+using osu.Framework.Platform;
 using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.IO;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Tests.Visual;
 
-namespace osu.Game.Rulesets.BmsRuleset.Tests;
+namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [TestFixture]
-public partial class TestSceneBmsScrollSpeedControls : PlayerTestScene
+public partial class TestSceneBmsScrollSpeedControls : PlayerTestScene, IStorageResourceProvider
 {
     private float normalSpacing;
+
+    [Resolved]
+    private GameHost host { get; set; } = null!;
 
     protected override bool HasCustomSteps => true;
 
     protected override double TimePerAction => 0;
 
-    protected override bool Autoplay => true;
-
     protected override Ruleset CreatePlayerRuleset() => new BmsRuleset();
+
+    protected override TestPlayer CreatePlayer(Ruleset ruleset)
+        => new TestPlayFieldCreator.SkinnedTestPlayer(
+            TestPlayFieldCreator.CreateSkinSource(TestPlayFieldCreator.SkinKind.Argon, this),
+            TestPlayFieldCreator.CreateAutoPlayFrames);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
-        var beatmap = createBeatmap();
+        var beatmap = TestPlayFieldCreator.CreateBeatmap();
 
         beatmap.BeatmapInfo.Ruleset = ruleset;
         beatmap.BeatmapInfo.Difficulty.CircleSize = beatmap.TotalColumns;
@@ -37,6 +47,16 @@ public partial class TestSceneBmsScrollSpeedControls : PlayerTestScene
 
         return beatmap;
     }
+
+    private const string scroll_chart =
+        """
+        #TITLE Scroll Speed Controls
+        #ARTIST BMS Ruleset Test
+        #BPM 120
+        #00111:0100010000000000
+        #00112:0000000001000100
+        #00213:0100010001000100
+        """;
 
     private BmsPlayfield getPlayfield() => (BmsPlayfield)Player.DrawableRuleset.Playfield;
 
@@ -57,34 +77,26 @@ public partial class TestSceneBmsScrollSpeedControls : PlayerTestScene
 
     private static float topOf(Drawable drawable) => drawable.ScreenSpaceDrawQuad.TopLeft.Y;
 
-    private static BmsBeatmap createBeatmap()
-    {
-        const string chart = """
-                             #TITLE Scroll Speed Controls
-                             #ARTIST BMS Ruleset Test
-                             #BPM 120
-                             #00111:0100010000000000
-                             #00112:0000000001000100
-                             #00213:0100010001000100
-                             """;
+    public IRenderer Renderer => host.Renderer;
 
-        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(chart));
-        using var reader = new LineBufferedReader(stream);
-        var decoded = new BmsBeatmapDecoder().Decode(reader);
+    public AudioManager AudioManager => Audio;
 
-        return (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
-    }
+    public IResourceStore<byte[]> Files => null!;
+
+    public new IResourceStore<byte[]> Resources => base.Resources;
+
+    public IResourceStore<TextureUpload> CreateTextureLoaderStore(IResourceStore<byte[]> underlyingStore) => host.CreateTextureLoaderStore(underlyingStore);
+
+    RealmAccess IStorageResourceProvider.RealmAccess => null!;
 
     [Test]
     public void TestKeyboardScrollSpeedControlsAffectSpacing()
     {
-        AddStep("load autoplay player", LoadPlayer);
-        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        AddAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
-        AddAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, () => Is.TypeOf<BmsPlayfield>());
-        AddAssert("autoplay playfield", () => getPlayfield().IsAutoplay, () => Is.True);
+        this.AddSetupStep("load Argon player", LoadPlayer);
+        this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
 
-        AddStep("seek before notes", () => Player.GameplayClockContainer.Seek(1000));
+        AddStep("seek before notes", () => Player.GameplayClockContainer.Seek(0));
         AddUntilStep("two notes alive", () => getNoteAtTick(192) != null && getNoteAtTick(240) != null);
         AddUntilStep("spacing measurable", () => spacingBetweenTicks(192, 240), () => Is.GreaterThan(1));
         AddStep("capture spacing", () => normalSpacing = spacingBetweenTicks(192, 240));

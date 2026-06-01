@@ -11,13 +11,12 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
-namespace osu.Game.Rulesets.BmsRuleset.Tests;
+namespace osu.Game.Rulesets.BmsRuleset.Tests.Components;
 
 [TestFixture]
-public partial class TestSceneBmsHealthDisplay : OsuTestScene
+public partial class TestSceneBmsHealthBar : OsuTestScene
 {
     private BmsHealthProcessor healthProcessor = null!;
-    private BmsHealthDisplay healthDisplay = null!;
     private BmsBeatmap beatmap = null!;
 
     [SetUpSteps]
@@ -50,7 +49,7 @@ public partial class TestSceneBmsHealthDisplay : OsuTestScene
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     AutoSizeAxes = Axes.Both,
-                    Child = healthDisplay = new BmsHealthDisplay(),
+                    Child = new BmsHealthDisplay(),
                 },
             };
         });

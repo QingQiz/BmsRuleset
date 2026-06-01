@@ -7,7 +7,7 @@ using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Screens;
 using osu.Game.Tests.Visual;
 
-namespace osu.Game.Rulesets.BmsRuleset.Tests;
+namespace osu.Game.Rulesets.BmsRuleset.Tests.Components;
 
 [TestFixture]
 public partial class TestSceneBmsSettings : OsuTestScene

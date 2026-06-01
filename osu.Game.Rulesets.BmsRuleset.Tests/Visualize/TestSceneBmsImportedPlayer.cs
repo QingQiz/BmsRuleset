@@ -6,17 +6,19 @@ using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Extensions;
+using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Textures;
+using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.Replays;
+using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
-using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays;
@@ -25,16 +27,17 @@ using osu.Game.Scoring;
 using osu.Game.Tests.Visual;
 using osuTK.Input;
 
-namespace osu.Game.Rulesets.BmsRuleset.Tests;
+namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [TestFixture]
-public partial class TestSceneBmsImportedPlayer : PlayerTestScene
+public partial class TestSceneBmsImportedPlayer : PlayerTestScene, IStorageResourceProvider
 {
     private BeatmapManager beatmapManager = null!;
     private RealmRulesetStore rulesets = null!;
     private BeatmapInfo importedBeatmap = null!;
     private BmsHitObject firstKeyNote = null!;
     private BmsHitObject offsetTarget = null!;
+    private GameHost gameHost = null!;
 
     private static string testSongsRoot
     {
@@ -87,11 +90,24 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene
     [BackgroundDependencyLoader]
     private void load(GameHost host, AudioManager audio)
     {
+        gameHost = host;
         Dependencies.Cache(rulesets = new RealmRulesetStore(Realm));
         Dependencies.Cache(beatmapManager = new BeatmapManager(LocalStorage, Realm, null, audio, Resources, host, Beatmap.Default));
         Dependencies.Cache(new ScoreManager(rulesets, () => beatmapManager, LocalStorage, Realm, API));
         Dependencies.Cache(Realm);
     }
+
+    public IRenderer Renderer => gameHost.Renderer;
+
+    public AudioManager AudioManager => Audio;
+
+    public IResourceStore<byte[]> Files => null!;
+
+    public new IResourceStore<byte[]> Resources => base.Resources;
+
+    public IResourceStore<TextureUpload> CreateTextureLoaderStore(IResourceStore<byte[]> underlyingStore) => gameHost.CreateTextureLoaderStore(underlyingStore);
+
+    RealmAccess IStorageResourceProvider.RealmAccess => null!;
 
     private void addBmsRuleset()
     {
@@ -138,31 +154,16 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene
         SelectedMods.Value = mods ?? Array.Empty<Mod>();
     }
 
-    private partial class OffsetReplayPlayer(double offset) : TestPlayer(false, false)
-    {
-        protected override void PrepareReplay()
-        {
-            var beatmap = (BmsBeatmap)GameplayState.Beatmap;
-            var frames = new BmsAutoGenerator(beatmap).Generate().Frames
-                .OfType<BmsReplayFrame>()
-                .Select(f => new BmsReplayFrame(f.Time + offset, f.Actions.ToArray()))
-                .Cast<ReplayFrame>()
-                .ToList();
-
-            DrawableRuleset?.SetReplayScore(new Score
-            {
-                Replay = new Replay { Frames = frames },
-            });
-        }
-    }
+    private TestPlayFieldCreator.SkinnedTestPlayer createArgonPlayer(Func<BmsBeatmap, IList<ReplayFrame>> createReplay)
+        => new(TestPlayFieldCreator.CreateSkinSource(TestPlayFieldCreator.SkinKind.Argon, this),createReplay);
 
     [Test]
     public void TestAutoplayWithJudgementsAndHealth()
     {
         AddStep("register bms ruleset", addBmsRuleset);
         AddStep("import real bms", importRealBms);
-        AddStep("select imported beatmap with autoplay", () => selectImportedBeatmap([new BmsModAutoplay()]));
-        AddStep("load player", () => LoadScreen(Player = new TestPlayer(false, false)));
+        AddStep("select imported beatmap", () => selectImportedBeatmap());
+        AddStep("load player", () => LoadScreen(Player = createArgonPlayer(TestPlayFieldCreator.CreateAutoPlayFrames)));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("player loaded beatmap", () => Player.LoadedBeatmapSuccessfully);
 
@@ -183,7 +184,7 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene
         AddAssert("stored file resolves", () => Beatmap.Value.BeatmapInfo.BeatmapSet?.GetPathForFile(Beatmap.Value.BeatmapInfo.Path!), () => Is.Not.Null.And.Not.Empty);
         AddAssert("working beatmap decodes", () => Beatmap.Value.Beatmap.HitObjects.OfType<BmsHitObject>().Count(), () => Is.GreaterThan(100));
 
-        AddStep("load player", () => LoadScreen(Player = new TestPlayer(false, false)));
+        AddStep("load player", () => LoadScreen(Player = createArgonPlayer(TestPlayFieldCreator.CreateAutoPlayFrames)));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("player loaded beatmap", () => Player.LoadedBeatmapSuccessfully);
         AddAssert("player has imported objects", () => Player.DrawableRuleset.Objects.Count(), () => Is.GreaterThan(100));
@@ -206,7 +207,7 @@ public partial class TestSceneBmsImportedPlayer : PlayerTestScene
         AddStep("import real bms", importRealBms);
         AddStep("select imported beatmap", () => selectImportedBeatmap());
 
-        AddStep("load player with offset replay", () => LoadScreen(Player = new OffsetReplayPlayer(25)));
+        AddStep("load player with offset replay", () => LoadScreen(Player = createArgonPlayer(beatmap => TestPlayFieldCreator.CreateOffsetAutoPlayFrames(beatmap, 25))));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("player loaded beatmap", () => Player.LoadedBeatmapSuccessfully);
 

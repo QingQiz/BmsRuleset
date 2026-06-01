@@ -27,6 +27,10 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     public Func<int, int>? BranchRandomValueSelector { get; init; }
 
+    public bool Mirror { get; set; }
+
+    public bool TwoPlayerMode { get; set; }
+
     public override bool CanConvert() =>
         Beatmap is BmsDecodedBeatmap { RawLines.Length: > 0 }
         || Beatmap.HitObjects.Any() && Beatmap.HitObjects.All(h => h is BmsHitObject);
@@ -61,6 +65,12 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
         // Stamp the chart-level #RANK onto every hit object so CreateHitWindows() has it.
         stampRankOnHitObjects(converted);
+
+        if (TwoPlayerMode)
+            applyTwoPlayerConversion(converted);
+
+        if (Mirror)
+            applyMirrorConversion(converted);
 
         return converted;
     }
@@ -165,6 +175,61 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
         converted.CopyBmsDataFrom(bmsSource);
         return true;
+    }
+
+    private static void applyMirrorConversion(BmsBeatmap beatmap)
+    {
+        foreach (var hitObject in beatmap.HitObjects)
+            hitObject.Column = mirrorColumn(hitObject.Column, beatmap.LayoutVariant);
+    }
+
+    private static int mirrorColumn(int column, BmsLayoutVariant layoutVariant) => layoutVariant switch
+    {
+        BmsLayoutVariant.Bms5K => column switch
+        {
+            0 => 0,
+            1 => 5, 2 => 4, 3 => 3, 4 => 2, 5 => 1,
+            _ => column,
+        },
+        BmsLayoutVariant.Bme7K => column switch
+        {
+            0 => 0,
+            1 => 7, 2 => 6, 3 => 5, 4 => 4, 5 => 3, 6 => 2, 7 => 1,
+            _ => column,
+        },
+        BmsLayoutVariant.Bms5KDouble => column switch
+        {
+            0 => 0, 1 => 5, 2 => 4, 3 => 3, 4 => 2, 5 => 1,
+            6 => 11, 7 => 10, 8 => 9, 9 => 8, 10 => 7, 11 => 6,
+            _ => column,
+        },
+        BmsLayoutVariant.Bme7KDouble => column switch
+        {
+            0 => 0, 1 => 7, 2 => 6, 3 => 5, 4 => 4, 5 => 3, 6 => 2, 7 => 1,
+            8 => 15, 9 => 14, 10 => 13, 11 => 12, 12 => 11, 13 => 10, 14 => 9, 15 => 8,
+            _ => column,
+        },
+        BmsLayoutVariant.Pms9K => 8 - column,
+        BmsLayoutVariant.Pms9KDouble => column <= 8 ? 8 - column : 26 - column,
+        _ => column,
+    };
+
+    private static void applyTwoPlayerConversion(BmsBeatmap beatmap)
+    {
+        // Disabled for DP layouts
+        if (beatmap.LayoutVariant is BmsLayoutVariant.Bms5KDouble or BmsLayoutVariant.Bme7KDouble or BmsLayoutVariant.Pms9KDouble)
+            return;
+
+        // PMS has no scratch
+        if (beatmap.LayoutVariant is BmsLayoutVariant.Pms9K)
+            return;
+
+        int totalColumns = beatmap.TotalColumns;
+
+        // Move scratch from leftmost (column 0) to rightmost (last column).
+        // Shift all key columns one position to the left.
+        foreach (var hitObject in beatmap.HitObjects)
+            hitObject.Column = hitObject.Column == 0 ? totalColumns - 1 : hitObject.Column - 1;
     }
 
     private bool tryMaterialiseDecodedBeatmap(IBeatmap original, out IBeatmap materialised)
