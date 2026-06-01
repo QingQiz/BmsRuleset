@@ -29,7 +29,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     public bool Mirror { get; set; }
 
-    public bool TwoPlayerMode { get; set; }
+    public bool SecondPlayerMode { get; set; }
 
     public override bool CanConvert() =>
         Beatmap is BmsDecodedBeatmap { RawLines.Length: > 0 }
@@ -66,8 +66,8 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         // Stamp the chart-level #RANK onto every hit object so CreateHitWindows() has it.
         stampRankOnHitObjects(converted);
 
-        if (TwoPlayerMode)
-            applyTwoPlayerConversion(converted);
+        if (SecondPlayerMode)
+            applySecondPlayerConversion(converted);
 
         if (Mirror)
             applyMirrorConversion(converted);
@@ -185,13 +185,13 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     private static int mirrorColumn(int column, BmsLayoutVariant layoutVariant) => layoutVariant switch
     {
-        BmsLayoutVariant.Bms5K => column switch
+        BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => column switch
         {
             0 => 0,
             1 => 5, 2 => 4, 3 => 3, 4 => 2, 5 => 1,
             _ => column,
         },
-        BmsLayoutVariant.Bme7K => column switch
+        BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => column switch
         {
             0 => 0,
             1 => 7, 2 => 6, 3 => 5, 4 => 4, 5 => 3, 6 => 2, 7 => 1,
@@ -214,22 +214,25 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         _ => column,
     };
 
-    private static void applyTwoPlayerConversion(BmsBeatmap beatmap)
+    private static void applySecondPlayerConversion(BmsBeatmap beatmap)
     {
         // Disabled for DP layouts
         if (beatmap.LayoutVariant is BmsLayoutVariant.Bms5KDouble or BmsLayoutVariant.Bme7KDouble or BmsLayoutVariant.Pms9KDouble)
             return;
 
-        // PMS has no scratch
+        // PMS has no scratch, no layout change needed
         if (beatmap.LayoutVariant is BmsLayoutVariant.Pms9K)
             return;
 
-        int totalColumns = beatmap.TotalColumns;
-
-        // Move scratch from leftmost (column 0) to rightmost (last column).
-        // Shift all key columns one position to the left.
-        foreach (var hitObject in beatmap.HitObjects)
-            hitObject.Column = hitObject.Column == 0 ? totalColumns - 1 : hitObject.Column - 1;
+        // HitObject.Column is NOT remapped — scratch remains column 0, keys remain 1..N.
+        // The skin's ColumnWidth[0] always defines the scratch lane width regardless of
+        // visual position. Only the visual column order changes in BmsStage.
+        beatmap.LayoutVariant = beatmap.LayoutVariant switch
+        {
+            BmsLayoutVariant.Bms5K => BmsLayoutVariant.Bms5K2P,
+            BmsLayoutVariant.Bme7K => BmsLayoutVariant.Bme7K2P,
+            _ => beatmap.LayoutVariant,
+        };
     }
 
     private bool tryMaterialiseDecodedBeatmap(IBeatmap original, out IBeatmap materialised)

@@ -11,6 +11,8 @@ public static class BmsKeyBindingConfiguration
         (int)BmsLayoutVariant.Bms5K,
         (int)BmsLayoutVariant.Bme7K,
         (int)BmsLayoutVariant.Pms9K,
+        (int)BmsLayoutVariant.Bms5K2P,
+        (int)BmsLayoutVariant.Bme7K2P,
         (int)BmsLayoutVariant.Bms5KDouble,
         (int)BmsLayoutVariant.Bme7KDouble,
         (int)BmsLayoutVariant.Pms9KDouble,
@@ -19,7 +21,9 @@ public static class BmsKeyBindingConfiguration
     public static KeyBinding[] GetDefaultKeyBindings(int variant) => (BmsLayoutVariant)variant switch
     {
         BmsLayoutVariant.Bms5K => bindings5K(),
+        BmsLayoutVariant.Bms5K2P => bindings5K2P(),
         BmsLayoutVariant.Bme7K => bindings7K(),
+        BmsLayoutVariant.Bme7K2P => bindings7K2P(),
         BmsLayoutVariant.Pms9K => bindings9K(),
         BmsLayoutVariant.Bms5KDouble => bindings5KDouble(),
         BmsLayoutVariant.Bme7KDouble => bindings7KDouble(),
@@ -29,8 +33,8 @@ public static class BmsKeyBindingConfiguration
 
     public static int? ActionToColumn(BmsAction action, BmsLayoutVariant variant = BmsLayoutVariant.Bme7K) => variant switch
     {
-        BmsLayoutVariant.Bms5K => map5K(action),
-        BmsLayoutVariant.Bme7K => map7K(action),
+        BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => map5K(action),
+        BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => map7K(action),
         BmsLayoutVariant.Pms9K => map9K(action),
         BmsLayoutVariant.Bms5KDouble => map5KDouble(action),
         BmsLayoutVariant.Bme7KDouble => map7KDouble(action),
@@ -40,8 +44,8 @@ public static class BmsKeyBindingConfiguration
 
     public static BmsAction? ActionForColumn(BmsLayoutVariant layout, int column) => layout switch
     {
-        BmsLayoutVariant.Bms5K => actionFor5K(column),
-        BmsLayoutVariant.Bme7K => actionFor7K(column),
+        BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => actionFor5K(column),
+        BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => actionFor7K(column),
         BmsLayoutVariant.Pms9K => actionFor9K(column),
         BmsLayoutVariant.Bms5KDouble => actionFor5KDouble(column),
         BmsLayoutVariant.Bme7KDouble => actionFor7KDouble(column),
@@ -280,4 +284,28 @@ public static class BmsKeyBindingConfiguration
         17 => BmsAction.P2PmsKey9,
         _ => null,
     };
+
+    private static KeyBinding[] bindings5K2P() =>
+    [
+        ..scrollSpeedBindings(),
+        new(InputKey.Z, BmsAction.Key1),
+        new(InputKey.S, BmsAction.Key2),
+        new(InputKey.X, BmsAction.Key3),
+        new(InputKey.D, BmsAction.Key4),
+        new(InputKey.C, BmsAction.Key5),
+        new(InputKey.RShift, BmsAction.Scratch),
+    ];
+
+    private static KeyBinding[] bindings7K2P() =>
+    [
+        ..scrollSpeedBindings(),
+        new(InputKey.Z, BmsAction.Key1),
+        new(InputKey.S, BmsAction.Key2),
+        new(InputKey.X, BmsAction.Key3),
+        new(InputKey.D, BmsAction.Key4),
+        new(InputKey.C, BmsAction.Key5),
+        new(InputKey.F, BmsAction.Key6),
+        new(InputKey.V, BmsAction.Key7),
+        new(InputKey.RShift, BmsAction.Scratch),
+    ];
 }

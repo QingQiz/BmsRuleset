@@ -91,12 +91,14 @@ public class BmsRuleset : Ruleset
 
     public override LocalisableString GetVariantName(int variant) => (BmsLayoutVariant)variant switch
     {
-        BmsLayoutVariant.Bms5K => "5K",
-        BmsLayoutVariant.Bme7K => "7K",
-        BmsLayoutVariant.Pms9K => "9K",
-        BmsLayoutVariant.Bms5KDouble => "10K",
-        BmsLayoutVariant.Bme7KDouble => "14K",
-        BmsLayoutVariant.Pms9KDouble => "18K",
+        BmsLayoutVariant.Bms5K => "5K (1P)",
+        BmsLayoutVariant.Bms5K2P => "5K (2P)",
+        BmsLayoutVariant.Bme7K => "7K (1P)",
+        BmsLayoutVariant.Bme7K2P => "7K (2P)",
+        BmsLayoutVariant.Pms9K => "9K (1P)",
+        BmsLayoutVariant.Bms5KDouble => "5K (DP)",
+        BmsLayoutVariant.Bme7KDouble => "7K (DP)",
+        BmsLayoutVariant.Pms9KDouble => "9K (DP)",
         _ => string.Empty,
     };
 
@@ -133,7 +135,7 @@ public class BmsRuleset : Ruleset
         ModType.DifficultyReduction => [new BmsModNoFail(), new BmsModHalfTime(), new BmsModAutoScratch()],
         ModType.DifficultyIncrease => [new BmsModDoubleTime()],
         ModType.Automation => [new BmsModAutoplay(), new BmsModCinema()],
-        ModType.Conversion => [new BmsModMirror()],
+        ModType.Conversion => [new BmsModMirror(), new BmsModSecondPlayer()],
         ModType.System => [new BmsModBranchReplay()],
         _ => [],
     };

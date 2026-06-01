@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -108,12 +109,21 @@ public sealed partial class BmsStage : CompositeDrawable
 
         for (var i = 0; i < totalColumns; i++)
         {
-            var column = Columns[i] = new BmsColumn(i, layoutVariant);
+            Columns[i] = new BmsColumn(i, layoutVariant);
+        }
 
-            if (hideScratch && column.IsScratch)
-                column.Hidden = true;
+        // For 2P variants, render scratch column last so visual order becomes
+        // [keys…, scratch] while ColumnWidth[0] still defines the scratch lane width.
+        var addOrder = layoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P
+            ? Enumerable.Range(0, totalColumns).OrderBy(col => Columns[col].IsScratch ? 1 : 0).ThenBy(col => col)
+            : Enumerable.Range(0, totalColumns);
 
-            columnFlow.Add(column);
+        foreach (var i in addOrder)
+        {
+            if (hideScratch && Columns[i].IsScratch)
+                Columns[i].Hidden = true;
+
+            columnFlow.Add(Columns[i]);
         }
     }
 

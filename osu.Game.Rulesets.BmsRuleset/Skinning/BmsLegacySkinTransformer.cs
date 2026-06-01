@@ -271,6 +271,22 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
         foreach (var configuration in skinConfigurations.Value.Where(c => c.Section == BmsSkinConfigurationSection.Bms && c.Layout == layoutVariant))
             yield return configuration;
 
+        // 2P variants (5K2P, 7K2P) share the same column semantics as their 1P counterparts
+        // (scratch=0, keys=1..N) — only visual column order differs. Fall back to the 1P
+        // skin.ini section so NoteImage*, KeyImage*, ColumnWidth etc. still apply.
+        var layout1P = layoutVariant switch
+        {
+            BmsLayoutVariant.Bms5K2P => BmsLayoutVariant.Bms5K,
+            BmsLayoutVariant.Bme7K2P => BmsLayoutVariant.Bme7K,
+            _ => (BmsLayoutVariant?)null,
+        };
+
+        if (layout1P != null)
+        {
+            foreach (var configuration in skinConfigurations.Value.Where(c => c.Section == BmsSkinConfigurationSection.Bms && c.Layout == layout1P))
+                yield return configuration;
+        }
+
         foreach (var configuration in getManiaFallbackConfigurations())
             yield return configuration;
     }
@@ -296,13 +312,13 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
         switch (layoutVariant)
         {
             case BmsLayoutVariant.Bms5K:
+            case BmsLayoutVariant.Bms5K2P:
                 yield return 6;
-
                 break;
 
             case BmsLayoutVariant.Bme7K:
+            case BmsLayoutVariant.Bme7K2P:
                 yield return 8;
-
                 break;
         }
     }

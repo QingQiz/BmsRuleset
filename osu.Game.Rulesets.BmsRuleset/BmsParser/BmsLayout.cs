@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
-static internal class BmsLayout
+internal static class BmsLayout
 {
     public const int BMS5_KEY_COLUMNS = 6;
     public const int BME7_KEY_COLUMNS = 8;
@@ -44,8 +44,8 @@ static internal class BmsLayout
 
     public static int GetTotalColumns(BmsLayoutVariant variant) => variant switch
     {
-        BmsLayoutVariant.Bms5K => BMS5_KEY_COLUMNS,
-        BmsLayoutVariant.Bme7K => BME7_KEY_COLUMNS,
+        BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => BMS5_KEY_COLUMNS,
+        BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => BME7_KEY_COLUMNS,
         BmsLayoutVariant.Pms9K => PMS_COLUMNS,
         BmsLayoutVariant.Bms5KDouble => BMS5_DOUBLE_PLAY_COLUMNS,
         BmsLayoutVariant.Bme7KDouble => DOUBLE_PLAY_COLUMNS,

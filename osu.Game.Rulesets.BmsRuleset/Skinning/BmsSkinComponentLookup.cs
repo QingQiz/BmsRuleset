@@ -24,11 +24,9 @@ public class BmsSkinComponentLookup(
 
     public int? ManiaColumnIndex => ColumnIndex == null ? null : MapToManiaColumn(ColumnIndex.Value, LayoutVariant);
 
-    public int? StageColumnIndex => ColumnIndex == null ? null : MapToStageColumn(ColumnIndex.Value, LayoutVariant);
-
     public static bool IsScratchColumn(int column, BmsLayoutVariant layoutVariant) => layoutVariant switch
     {
-        BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bme7K => column == 0,
+        BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P => column == 0,
         BmsLayoutVariant.Bms5KDouble => column is 0 or 11,
         BmsLayoutVariant.Bme7KDouble => column is 0 or 15,
         _ => false,
@@ -36,8 +34,8 @@ public class BmsSkinComponentLookup(
 
     public static int GetManiaKeyCount(BmsLayoutVariant layoutVariant) => layoutVariant switch
     {
-        BmsLayoutVariant.Bms5K => 5,
-        BmsLayoutVariant.Bme7K => 7,
+        BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => 5,
+        BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => 7,
         BmsLayoutVariant.Pms9K => 9,
         BmsLayoutVariant.Bms5KDouble => 10,
         BmsLayoutVariant.Bme7KDouble => 14,
@@ -47,8 +45,8 @@ public class BmsSkinComponentLookup(
 
     public static int MapToManiaColumn(int column, BmsLayoutVariant layoutVariant) => layoutVariant switch
     {
-        BmsLayoutVariant.Bms5K => Math.Clamp(column - 1, 0, 4),
-        BmsLayoutVariant.Bme7K => Math.Clamp(column - 1, 0, 6),
+        BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P => Math.Clamp(column - 1, 0, 4),
+        BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P => Math.Clamp(column - 1, 0, 6),
         BmsLayoutVariant.Bms5KDouble => column switch
         {
             0 => 0,
@@ -65,14 +63,6 @@ public class BmsSkinComponentLookup(
             15 => 13,
             _ => Math.Clamp(column, 0, 13),
         },
-        _ => column,
-    };
-
-    public static int MapToStageColumn(int column, BmsLayoutVariant layoutVariant) => layoutVariant switch
-    {
-        BmsLayoutVariant.Bms5KDouble => column < 6 ? column : column - 6,
-        BmsLayoutVariant.Bme7KDouble => column < 8 ? column : column - 8,
-        BmsLayoutVariant.Pms9KDouble => column < 9 ? column : column - 9,
         _ => column,
     };
 }

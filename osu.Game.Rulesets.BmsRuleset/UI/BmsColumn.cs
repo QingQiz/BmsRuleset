@@ -16,8 +16,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 
 public sealed partial class BmsColumn : CompositeDrawable
 {
-    public const float COLUMN_WIDTH = 48;
-    public const float SCRATCH_COLUMN_WIDTH = 42;
+    public const float COLUMN_WIDTH = 42;
+    public const float SCRATCH_COLUMN_WIDTH = 50;
 
     public readonly int Index;
     public readonly bool IsScratch;
@@ -126,10 +126,44 @@ public sealed partial class BmsColumn : CompositeDrawable
         Width = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, lookup))?.Value
                 ?? defaultColumnWidth(Index, layoutVariant);
 
+        // For 2P variants, ColumnSpacing indices must be remapped to follow visual
+        // column order [keys…, scratch] rather than BMS index order.
+        int? spacingLeftCol;
+        int? spacingRightCol;
+
+        if (layoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P)
+        {
+            var totalCols = BmsLayout.GetTotalColumns(layoutVariant);
+            var v = Index == 0 ? totalCols - 1 : Index - 1;
+
+            // Spacing gap index in ColumnSpacing[] for 2P:
+            //   gap 0..N-3 (keys) → v+1,  last gap (key-scratch) → 0
+            // Left: gap = v-1 → ColumnSpacing[leftCol-1], Right: gap = v → ColumnSpacing[rightCol]
+            spacingLeftCol = v == 0 ? null : v == totalCols - 1 ? 1 : v + 1;
+            spacingRightCol = v == totalCols - 1 ? null : v == totalCols - 2 ? 0 : v + 1;
+        }
+        else
+        {
+            spacingLeftCol = lookup.ColumnIndex;
+            spacingRightCol = lookup.ColumnIndex;
+        }
+
+        var spacingLookupLeft = spacingLeftCol != null
+            ? new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, spacingLeftCol.Value)
+            : null;
+
+        var spacingLookupRight = spacingRightCol != null
+            ? new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, spacingRightCol.Value)
+            : null;
+
         Margin = new MarginPadding
         {
-            Left = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftColumnSpacing, lookup))?.Value ?? 0,
-            Right = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightColumnSpacing, lookup))?.Value ?? 0,
+            Left = spacingLookupLeft != null
+                ? skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftColumnSpacing, spacingLookupLeft))?.Value ?? 0
+                : 0,
+            Right = spacingLookupRight != null
+                ? skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightColumnSpacing, spacingLookupRight))?.Value ?? 0
+                : 0,
         };
 
         hitTarget.Y = -(skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
