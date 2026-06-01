@@ -63,6 +63,14 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     public override DrawableHitObject<BmsHitObject>? CreateDrawableRepresentation(BmsHitObject h) => null;
 
+    public override void SetReplayScore(Score replayScore)
+    {
+        base.SetReplayScore(replayScore);
+
+        if (Beatmap is BmsBeatmap bmsBeatmap)
+            BmsBranchReplayState.EnsureBranchReplayMod(replayScore, bmsBeatmap.BranchDecisions);
+    }
+
     protected override Playfield CreatePlayfield()
     {
         var beatmap = (BmsBeatmap)Beatmap;
@@ -88,7 +96,16 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         // hook the HealthProcessor.Failed event from inside DrawableRuleset instead.
         // We defer import by 500 ms so that Player.ConcludeFailedScore (which stamps
         // ScoreInfo.Rank = F) has already run by the time we read the score.
-        if (healthProcessor != null && gameplayState != null && scoreManager != null && ReplayScore == null)
+        //
+        // Only hook this when failure is actually permitted. If a fail-override mod
+        // (e.g. No Fail) is active, HealthProcessor.Failed still fires when the gauge
+        // bottoms out, but the failure must be blocked. Our handler returning true would
+        // override the mod and force HasFailed = true (freezing the gauge at zero so it
+        // can never recover) and would import a failed score that the normal completion
+        // path later re-imports with the same ID (duplicate primary key).
+        bool failureAllowed = Mods.OfType<IApplicableFailOverride>().All(m => m.PerformFail());
+
+        if (failureAllowed && healthProcessor != null && gameplayState != null && scoreManager != null && ReplayScore == null)
         {
             healthProcessor.Failed += onHealthFailed;
         }
@@ -104,14 +121,6 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             BmsBranchReplayState.EnsureBranchReplayMod(score, bmsBeatmap.BranchDecisions);
 
         return new BmsReplayRecorder(score);
-    }
-
-    public override void SetReplayScore(Score replayScore)
-    {
-        base.SetReplayScore(replayScore);
-
-        if (Beatmap is BmsBeatmap bmsBeatmap)
-            BmsBranchReplayState.EnsureBranchReplayMod(replayScore, bmsBeatmap.BranchDecisions);
     }
 
     private bool onHealthFailed()

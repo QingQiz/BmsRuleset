@@ -456,28 +456,11 @@ The full built-in skin (covering all 6 layouts) is at
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.PerformStep(Boolean userTriggered)
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.OnClick(ClickEvent e)
     ```
-- [ ] 似乎时自定义结算和自动结算冲突了
-    ```
-    2026-06-01 13:42:43 [error]: Score import failed!
-    2026-06-01 13:42:43 [error]: Realms.Exceptions.RealmDuplicatePrimaryKeyValueException: A Score object already exists with primary key property ID == 'uuid(c5fb41cb-1159-4644-a604-d54a38df2f0d)'
-    2026-06-01 13:42:43 [error]: at Realms.NativeException.ThrowIfNecessary()
-    2026-06-01 13:42:43 [error]: at Realms.SharedRealmHandle.CreateObjectWithPrimaryKey(Property pkProperty, RealmValue& primaryKey, TableKey tableKey, String parentType, Boolean update, Boolean& isNew)
-    2026-06-01 13:42:43 [error]: at Realms.Realm.AddInternal[T](T obj, Type objectType, Boolean update)
-    2026-06-01 13:42:43 [error]: at Realms.Realm.Add[T](T obj, Boolean update)
-    2026-06-01 13:42:43 [error]: at osu.Game.Database.RealmArchiveModelImporter`1.<>c__DisplayClass28_0.<ImportModel>b__0(Realm realm)
-    2026-06-01 13:42:43 [error]: at osu.Game.Database.RealmAccess.Run[T](Func`2 action)
-    2026-06-01 13:42:43 [error]: at osu.Game.Database.RealmArchiveModelImporter`1.ImportModel(TModel item, ArchiveReader archive, ImportParameters parameters, CancellationToken cancellationToken)
-    2026-06-01 13:42:43 [error]: at osu.Game.Scoring.ScoreManager.Import(ScoreInfo item, ArchiveReader archive, ImportParameters parameters, CancellationToken cancellationToken)
-    2026-06-01 13:42:43 [error]: at osu.Game.Screens.Play.Player.ImportScore(Score score)
-    2026-06-01 13:42:43 [error]: at osu.Game.Screens.Play.Player.<>c__DisplayClass134_0.<<prepareAndImportScoreAsync>b__0>d.MoveNext()
-    ```
 - skin
     - [ ] morden 皮肤里 有一个奇怪的组件，并且缺少了很多默认的组件
     - [ ] 血条的位置不对，而且需要调整一下风格
     - [ ] legacy 的 mod 部分和分数显示重叠了
 
-- [ ] Hide Scratch mod，中间没有在中间，而是在第3列的最右边（7k）
-- [ ] 提前按 ln head， 但松手晚，会导致，ln 在松晚的过程中反转
 - [ ] on changing ruleset from bms to any or from any to bms
 
   ```
@@ -492,6 +475,8 @@ The full built-in skin (covering all 6 layouts) is at
   2026-06-01 15:13:14 [error]: at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
   2026-06-01 15:13:14 [error]: at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
   ```
+- [ ] column line 在 2p 下渲染不对，7k 倒数俩 column line 没有渲染
+- [ ] 血量过低导致的失败不会更新结果为F
 
 ## TODO
 
@@ -508,6 +493,8 @@ The full built-in skin (covering all 6 layouts) is at
     - [ ] different health bar
     - [ ] random
     - [ ] remember the last used mod combination
+    - [ ] BG: make keysound to background samples. so the hit result will not effect the music
+    - [ ] CS: remove the SV. add options for SV multiplier, default by 0, 1 without the mod
 
 - ask
     - [ ] ask how to impl a new HUD element (e.g. combo, score, ...), and how to customize their position/size/skin
@@ -537,5 +524,7 @@ The full built-in skin (covering all 6 layouts) is at
 - [ ] ln tail 的打击音
 - [ ] 把我们的血条注册为 两个内置 皮肤的默认血条，其余用户自定义皮肤仍可使用 mania 风格的血条
     - [ ] 把我们的血条注册为可配置的HUD
+
+- [ ] 误差条现在不更新
 
 </details>

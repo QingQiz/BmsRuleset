@@ -147,6 +147,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     private LayoutReferences? layoutReferences;
     private LayoutMetrics? latestLayout;
+    private bool? hiddenScratchNote;
     private float cachedScaledParentWidth = -1;
     private float cachedParentWidthForTransform;
     private float cachedParentHeightForTransform;
@@ -196,8 +197,17 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     }
 
     /// <summary>
-    ///     Attempts a key-up judgement on a held long-note.  Returns <c>true</c> if
-    ///     the release was within the tail hit window.
+    ///     Whether this drawable is a long-note whose head has been pressed and is still
+    ///     being held (not yet judged). Used by the playfield to route key-up events.
+    /// </summary>
+    public bool IsHoldingLongNote => HitObject is { IsLongNote: true } && longNoteStarted && !Judged;
+
+    /// <summary>
+    ///     Attempts a key-up judgement on a held long-note.  Returns <c>true</c> if the
+    ///     release consumed the note. A release inside the tail window scores normally;
+    ///     a release earlier than the tail window is treated as a drop and scores POOR
+    ///     (so the note is judged immediately instead of staying frozen at the judgement
+    ///     line until its tail time passes).
     /// </summary>
     public bool TryRelease()
     {
@@ -208,7 +218,16 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         var result = bmsWindows.BmsResultFor(Time.Current - HitObject.EndTime);
 
         if (result == HitResult.None)
-            return false;
+        {
+            // Released after the tail window already closed: the passive drop in
+            // CheckForResult handles this; ignore the key-up.
+            if (Time.Current > HitObject.EndTime + bmsWindows.WindowFor(HitResult.Ok))
+                return false;
+
+            // Released before the tail window opened: the long note is dropped → POOR.
+            ApplyResult(HitResult.Meh);
+            return true;
+        }
 
         ApplyResult(result);
         return true;
@@ -234,6 +253,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         playfield = null;
         layoutReferences = null;
         latestLayout = null;
+        hiddenScratchNote = null;
         cachedScaledParentWidth = -1;
         cachedParentWidthForTransform = 0;
         cachedParentHeightForTransform = 0;
@@ -261,6 +281,14 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (HitObject == null)
             return; // HitObject may not be set yet during early pool lifecycle
 
+        // Hidden scratch notes (AutoScratch + hide scratch) live in a zero-width column, so the
+        // layout refresh below early-returns and they never reposition. They are auto-judged and
+        // must stay invisible. Enforcing Alpha here every frame (after the framework has applied
+        // the FadeInFromZero transform earlier in the subtree update) reliably keeps them hidden;
+        // a one-shot Alpha=0 during apply is otherwise overwritten by that fade transform.
+        if (isHiddenScratchNote() && Alpha != 0)
+            Alpha = 0;
+
         if (!tryRefreshLayoutMetrics(out var layout))
         {
             UpdateResult(false);
@@ -282,8 +310,12 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         var judgementHeadY = judgementHeadYFor(layout);
 
         var visualHeadY = visualHeadYFor(y, judgementHeadY);
+        // While a long note is held, clamp the tail so it can never travel below the
+        // (pinned) head. Clamping to the judgement line instead of the head caused the
+        // body to flip/reverse when the head was pressed early (pinned above the line)
+        // and the tail then scrolled past it during a late release.
         var visualTailY = HitObject.IsLongNote && longNoteStarted
-            ? Math.Min(tailY, judgementHeadY)
+            ? Math.Min(tailY, visualHeadY)
             : tailY;
 
         // Map the column-local Y into the parent drawable's coordinate space.
@@ -373,7 +405,42 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     protected override void UpdateInitialTransforms()
     {
         base.UpdateInitialTransforms();
+
+        // Hidden scratch notes (AutoScratch + hide scratch) must stay invisible. The base
+        // fade-in would otherwise animate Alpha back to 1, making the auto-judged note pop
+        // into view and freeze at (0,0) (its scratch column has zero width, so the per-frame
+        // layout refresh bails and never repositions it).
+        if (isHiddenScratchNote())
+        {
+            Alpha = 0;
+            return;
+        }
+
         this.FadeInFromZero(100);
+    }
+
+    /// <summary>
+    ///     Whether this note belongs to a scratch column that is currently hidden
+    ///     (AutoScratch with hide-scratch enabled).  Resolves the playfield lazily and
+    ///     caches the result so it is valid even before the layout references are built.
+    /// </summary>
+    private bool isHiddenScratchNote()
+    {
+        if (hiddenScratchNote is { } cached)
+            return cached;
+
+        if (HitObject == null)
+            return false;
+
+        var pf = playfield ?? Parent?.FindClosestParent<BmsPlayfield>();
+
+        if (pf == null)
+            return false;
+
+        var layoutVariant = pf.LayoutVariant;
+        var column = Math.Clamp(HitObject.Column, 0, pf.TotalColumns - 1);
+        hiddenScratchNote = pf.HideScratch && BmsSkinComponentLookup.IsScratchColumn(column, layoutVariant);
+        return hiddenScratchNote.Value;
     }
 
     protected override void UpdateHitStateTransforms(ArmedState state)
@@ -427,7 +494,9 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
         layoutReferences = new LayoutReferences(stage, columnContainer, column, layoutVariant);
 
-        if (playfield is { HideScratch: true } && BmsSkinComponentLookup.IsScratchColumn(column, layoutVariant))
+        hiddenScratchNote = playfield is { HideScratch: true } && BmsSkinComponentLookup.IsScratchColumn(column, layoutVariant);
+
+        if (hiddenScratchNote == true)
             Alpha = 0;
 
         // These operations depend only on column/layout/component/skin lookup. They are comparatively

@@ -9,10 +9,10 @@ public static class BmsKeyBindingConfiguration
     public static IEnumerable<int> AvailableVariants =>
     [
         (int)BmsLayoutVariant.Bms5K,
-        (int)BmsLayoutVariant.Bme7K,
-        (int)BmsLayoutVariant.Pms9K,
         (int)BmsLayoutVariant.Bms5K2P,
+        (int)BmsLayoutVariant.Bme7K,
         (int)BmsLayoutVariant.Bme7K2P,
+        (int)BmsLayoutVariant.Pms9K,
         (int)BmsLayoutVariant.Bms5KDouble,
         (int)BmsLayoutVariant.Bme7KDouble,
         (int)BmsLayoutVariant.Pms9KDouble,

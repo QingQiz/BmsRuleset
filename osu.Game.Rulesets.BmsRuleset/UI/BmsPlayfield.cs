@@ -306,11 +306,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         pressedColumns.Remove(column.Value);
 
-        // Release: find the earliest LN in this column that is held and within the release window.
+        // Release: find the earliest held LN in this column and let it judge the key-up.
+        // We must include LNs released before the tail window (an early release is a drop,
+        // scored as POOR) — filtering by the release window here would leave the note
+        // frozen at the judgement line until its tail time passed.
         HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
-            .Where(d => !d.Judged && d.HitObject.IsLongNote && d.HitObject.Column == column.Value
-                        && d.HitObject.HitWindows.ResultFor(Time.Current - d.HitObject.EndTime) != HitResult.None)
+            .Where(d => d.IsHoldingLongNote && d.HitObject.Column == column.Value)
             .MinBy(d => d.HitObject.EndTime)
             ?.TryRelease();
     }

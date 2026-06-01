@@ -139,6 +139,18 @@ public sealed partial class BmsStage : CompositeDrawable
 
     #endregion
 
+    protected override void Update()
+    {
+        base.Update();
+
+        // Column draw positions are only valid after layout, and the playfield rescales
+        // the stage every frame. Recompute the centring here so the non-scratch columns
+        // stay centred regardless of layout timing or current scale (important for the
+        // Hide Scratch mod, where computing this once during skin load left the columns
+        // off-centre by half a column width).
+        updateStageCentre();
+    }
+
     [BackgroundDependencyLoader]
     private void load()
     {
@@ -190,6 +202,11 @@ public sealed partial class BmsStage : CompositeDrawable
         topBorder.Width = bottomBorder.Width = DrawWidth;
         leftBorder.Height = rightBorder.Height = DrawHeight;
 
+        updateStageCentre();
+    }
+
+    private void updateStageCentre()
+    {
         var nonScratchCentre = getNonScratchCentreX();
         X = (DrawWidth / 2 - nonScratchCentre) * Scale.X;
 
