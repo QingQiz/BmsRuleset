@@ -123,7 +123,7 @@ internal static partial class BmsChartParser
         command = string.Empty;
         value = string.Empty;
 
-        var line = stripComments(rawLine).Trim();
+        var line = rawLine.Trim();
 
         if (line.Length == 0 || line[0] != '#')
             return false;

@@ -103,8 +103,8 @@ public static partial class BmsTestReplays
             if (hitObject.IsLongNote && tryAddLongNoteScenario(actionPoints, hitObject, action.Value))
                 continue;
 
-            double time = hitObject.StartTime + judgement_offsets[i % judgement_offsets.Length];
-            double releaseTime = (hitObject.IsLongNote ? hitObject.EndTime : time) + RELEASE_PADDING_MS;
+            var time = hitObject.StartTime + judgement_offsets[i % judgement_offsets.Length];
+            var releaseTime = (hitObject.IsLongNote ? hitObject.EndTime : time) + RELEASE_PADDING_MS;
 
             actionPoints.Add(new ActionPoint(time, action.Value, true));
             actionPoints.Add(new ActionPoint(releaseTime, action.Value, false));

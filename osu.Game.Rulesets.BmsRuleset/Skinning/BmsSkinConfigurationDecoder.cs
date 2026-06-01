@@ -87,7 +87,7 @@ public static class BmsSkinConfigurationDecoder
 
         while (reader.ReadLine() is { } rawLine)
         {
-            var line = stripComments(rawLine).Trim();
+            var line = stripSkinIniComments(rawLine).Trim();
 
             if (line.Length == 0)
                 continue;
@@ -158,10 +158,11 @@ public static class BmsSkinConfigurationDecoder
         }
     }
 
-    private static string stripComments(string line)
+    private static string stripSkinIniComments(string line)
     {
-        var index = line.AsSpan().IndexOf("//".AsSpan());
-        return index >= 0 ? line[..index] : line;
+        // Only // comments are valid in skin.ini, and they can appear anywhere on the line.
+        var commentIndex = line.IndexOf("//", StringComparison.Ordinal);
+        return commentIndex >= 0 ? line[..commentIndex] : line;
     }
 
     private static KeyValuePair<string, string> splitKeyValue(string line)

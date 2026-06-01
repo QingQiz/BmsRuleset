@@ -46,7 +46,7 @@ public static class BmsPlayfieldAssertions
     /// </summary>
     public static float JudgementLineY(this BmsPlayfield playfield)
     {
-        float lineLocalY = playfield.Stage.DrawHeight - playfield.Stage.HitTargetPosition;
+        var lineLocalY = playfield.Stage.DrawHeight - playfield.Stage.HitTargetPosition;
         return playfield.Stage.ToScreenSpace(new Vector2(0, lineLocalY)).Y;
     }
 

@@ -17,7 +17,7 @@ internal static partial class BmsChartParser
 
     public static IEnumerable<string> ScanResourceReferences(IEnumerable<string> lines) =>
         from rawLine in lines
-        select stripComments(rawLine).Trim()
+        select BmsCommentStripper.StripAll(rawLine).Trim()
         into line
         where line.Length != 0 && line.StartsWith('#')
         select resourceDefinitionRegex().Match(line)
@@ -39,7 +39,7 @@ internal static partial class BmsChartParser
 
         foreach (var rawLine in lines)
         {
-            var line = stripComments(rawLine).Trim();
+            var line = BmsCommentStripper.StripAll(rawLine).Trim();
 
             if (line.Length == 0 || !line.StartsWith('#'))
                 continue;

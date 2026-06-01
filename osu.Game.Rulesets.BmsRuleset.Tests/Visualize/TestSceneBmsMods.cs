@@ -255,7 +255,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
 
             for (var i = 0; i < originalPattern.Length && i < normalNotes.Count; i++)
             {
-                int expected = mirroredColumn(originalPattern[i]);
+                var expected = mirroredColumn(originalPattern[i]);
                 if (normalNotes[i].Column != expected)
                     return false;
             }

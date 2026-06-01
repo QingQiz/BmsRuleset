@@ -1,0 +1,215 @@
+using System;
+using System.Text;
+
+namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
+
+/// <summary>
+/// Strips BMS comment syntax from lines: //, ;, /* */, with "..." quote protection
+/// and \ escape sequences. Maintains /* */ block comment state across lines.
+/// </summary>
+internal class BmsCommentStripper
+{
+    private bool inBlockComment;
+
+    /// <summary>
+    /// Processes a raw BMS line and returns the content with all comments removed.
+    /// Returns <c>null</c> if the entire line is inside a /* */ block.
+    /// Returns <see cref="string.Empty"/> if the line becomes empty after stripping.
+    /// </summary>
+    public string? ProcessLine(string line)
+    {
+        if (inBlockComment)
+        {
+            var idx = indexOfOutsideQuotes(line, "*/");
+            if (idx >= 0)
+            {
+                inBlockComment = false;
+                return ProcessLine(line[(idx + 2)..]);
+            }
+
+            // Lines inside a block comment become empty (preserving newline structure).
+            return string.Empty;
+        }
+
+        var stripped = removeBlockComments(line, ref inBlockComment);
+
+        if (stripped == null)
+            return null;
+
+        return stripLineComments(stripped);
+    }
+
+    /// <summary>
+    /// Static one-shot: strips all comments from a single line without maintaining
+    /// block comment state. Use for independent scanning passes where block comments
+    /// spanning lines are not expected.
+    /// </summary>
+    public static string StripAll(string line)
+    {
+        var inBlock = false;
+        var stripped = removeBlockComments(line, ref inBlock);
+
+        if (stripped == null)
+            return string.Empty;
+
+        return stripLineComments(stripped);
+    }
+
+    /// <summary>
+    /// Removes /* */ block comments from a line. If the block is not closed,
+    /// sets <paramref name="inBlock"/> to true and returns content before /*.
+    /// </summary>
+    private static string? removeBlockComments(string line, ref bool inBlock)
+    {
+        var sb = new StringBuilder(line.Length);
+        var i = 0;
+
+        while (i < line.Length)
+        {
+            var charsLeft = line.Length - i;
+
+            if (inBlock)
+            {
+                var closeIdx = indexOfOutsideQuotes(line, "*/", i);
+
+                if (closeIdx < 0)
+                    return null;
+
+                inBlock = false;
+                i = closeIdx + 2;
+                continue;
+            }
+
+            // Check for // line comments before /* so that /* inside // is not treated as a block comment.
+            if (charsLeft >= 2 && line[i] == '/' && line[i + 1] == '/' && !isInsideQuotes(line, i))
+            {
+                break;
+            }
+
+            // Check for /* only outside quotes
+            if (charsLeft >= 2 && line[i] == '/' && line[i + 1] == '*' && !isInsideQuotes(line, i))
+            {
+                var closeIdx = indexOfOutsideQuotes(line, "*/", i + 2);
+
+                if (closeIdx >= 0)
+                {
+                    sb.Append(line.AsSpan(i, 0)); // nothing between /* and */
+                    i = closeIdx + 2;
+                    continue;
+                }
+
+                // Block continues to next line
+                inBlock = true;
+                break;
+            }
+
+            sb.Append(line[i]);
+            i++;
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Removes // and ; line comments, with "..." quote protection and \ escape
+    /// for comment-related characters only (\, ", ;, /). Other \ sequences (e.g.
+    /// file paths) pass through unchanged.
+    /// </summary>
+    private static string stripLineComments(string s)
+    {
+        var sb = new StringBuilder(s.Length);
+        var inQuote = false;
+
+        for (var i = 0; i < s.Length; i++)
+        {
+            var c = s[i];
+
+            // Only treat \ as escape when followed by a comment-relevant character.
+            if (c == '\\' && i + 1 < s.Length && isEscapeChar(s[i + 1]))
+            {
+                sb.Append(s[i + 1]);
+                i++;
+                continue;
+            }
+
+            // Toggle quote state (only outside escaped sequences)
+            if (c == '"')
+            {
+                inQuote = !inQuote;
+                sb.Append(c);
+                continue;
+            }
+
+            // Line comments (only outside quotes)
+            if (!inQuote)
+            {
+                if (c == ';')
+                    break;
+
+                if (c == '/' && i + 1 < s.Length && s[i + 1] == '/')
+                    break;
+            }
+
+            sb.Append(c);
+        }
+
+        return sb.ToString();
+    }
+
+    private static bool isEscapeChar(char c) => c is '"' or ';' or '\\' or '/';
+
+    /// <summary>
+    /// Finds the first occurrence of <paramref name="substring"/> in <paramref name="line"/>
+    /// starting at <paramref name="startIndex"/> that is NOT inside a quoted string.
+    /// Returns -1 if not found.
+    /// </summary>
+    private static int indexOfOutsideQuotes(string line, string substring, int startIndex = 0)
+    {
+        if (string.IsNullOrEmpty(substring))
+            return -1;
+
+        for (var i = startIndex; i <= line.Length - substring.Length; i++)
+        {
+            if (isInsideQuotes(line, i))
+                continue;
+
+            var match = true;
+            for (var j = 0; j < substring.Length; j++)
+            {
+                if (line[i + j] != substring[j])
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match)
+                return i;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Checks if the position at <paramref name="index"/> in <paramref name="line"/>
+    /// is inside a quoted string ("..."). Handles \ escaping of comment-relevant chars.
+    /// </summary>
+    private static bool isInsideQuotes(string line, int index)
+    {
+        var inQuote = false;
+
+        for (var i = 0; i < index && i < line.Length; i++)
+        {
+            if (line[i] == '\\' && i + 1 < line.Length && isEscapeChar(line[i + 1]))
+            {
+                i++; // skip escaped char
+                continue;
+            }
+
+            if (line[i] == '"')
+                inQuote = !inQuote;
+        }
+
+        return inQuote;
+    }
+}

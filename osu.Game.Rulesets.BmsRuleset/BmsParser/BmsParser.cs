@@ -21,8 +21,13 @@ internal static partial class BmsChartParser
     public static BmsParseResult Parse(IEnumerable<string> lines, string? path = null, Func<int, int>? randomValueSelector = null)
     {
         var state = new ParseState();
+        var commentStripper = new BmsCommentStripper();
 
-        foreach (var line in MaterializeControlFlow(lines, randomValueSelector, state.BranchDecisions))
+        var strippedLines = lines
+            .Select(commentStripper.ProcessLine)
+            .OfType<string>();
+
+        foreach (var line in MaterializeControlFlow(strippedLines, randomValueSelector, state.BranchDecisions))
             parseLine(line, state);
 
         var tickResolution = calculateTickResolution(state);
@@ -71,7 +76,7 @@ internal static partial class BmsChartParser
 
     private static void parseLine(string line, ParseState state)
     {
-        line = stripComments(line).Trim();
+        line = line.Trim();
 
         if (line.Length == 0 || !line.StartsWith('#'))
             return;
@@ -535,12 +540,6 @@ internal static partial class BmsChartParser
         }
 
         return result;
-    }
-
-    private static string stripComments(string line)
-    {
-        var commentIndex = line.IndexOf("//", StringComparison.Ordinal);
-        return commentIndex >= 0 ? line[..commentIndex] : line;
     }
 
     private static bool tryParseDouble(string value, out double result) =>
