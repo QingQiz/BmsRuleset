@@ -66,7 +66,11 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     protected override Playfield CreatePlayfield()
     {
         var beatmap = (BmsBeatmap)Beatmap;
-        return new BmsPlayfield(beatmap, Mods.OfType<BmsModAutoplay>().Any());
+        var autoScratch = Mods.OfType<BmsModAutoScratch>().FirstOrDefault();
+        return new BmsPlayfield(beatmap,
+            Mods.OfType<BmsModAutoplay>().Any(),
+            autoScratch != null,
+            autoScratch?.HideScratch.Value ?? false);
     }
 
     protected override void LoadComplete()

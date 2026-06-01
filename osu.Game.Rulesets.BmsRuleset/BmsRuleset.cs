@@ -130,7 +130,7 @@ public class BmsRuleset : Ruleset
 
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
     {
-        ModType.DifficultyReduction => [new BmsModNoFail(), new BmsModHalfTime()],
+        ModType.DifficultyReduction => [new BmsModNoFail(), new BmsModHalfTime(), new BmsModAutoScratch()],
         ModType.DifficultyIncrease => [new BmsModDoubleTime()],
         ModType.Automation => [new BmsModAutoplay(), new BmsModCinema()],
         ModType.System => [new BmsModBranchReplay()],

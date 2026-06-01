@@ -21,6 +21,32 @@ public sealed partial class BmsColumn : CompositeDrawable
 
     public readonly int Index;
     public readonly bool IsScratch;
+
+    /// <summary>
+    ///     When <c>true</c>, this column is hidden from layout — zero width, zero
+    ///     alpha, and <see cref="updateFromSkin"/> will not restore visual properties.
+    /// </summary>
+    public bool Hidden
+    {
+        get => hidden;
+        set
+        {
+            if (hidden == value)
+                return;
+
+            hidden = value;
+
+            if (value)
+            {
+                Width = 0;
+                Alpha = 0;
+                Margin = new MarginPadding();
+            }
+        }
+    }
+
+    private bool hidden;
+
     public readonly Container HitObjectArea;
     public readonly Container HitExplosionArea;
 
@@ -93,6 +119,9 @@ public sealed partial class BmsColumn : CompositeDrawable
 
     private void updateFromSkin()
     {
+        if (Hidden)
+            return;
+
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, Index);
         Width = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, lookup))?.Value
                 ?? defaultColumnWidth(Index, layoutVariant);

@@ -147,6 +147,16 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #endregion
 
+    #region Mod fields
+
+    public bool IsAutoScratch { get; }
+
+    public bool HideScratch { get; }
+
+    private readonly HashSet<DrawableBmsHitObject> autoScratchLnHeads = [];
+
+    #endregion
+
     #region Skin / DI
 
     [Cached(typeof(ISkinSource))]
@@ -185,7 +195,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     ///     Creates a playfield from raw hit objects.  Objects are sorted by
     ///     start time then column.
     /// </summary>
-    public BmsPlayfield(IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K, bool isAutoplay = false, BmsTimingMap? timingMap = null)
+    public BmsPlayfield(
+        IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K,
+        bool isAutoplay = false, BmsTimingMap? timingMap = null, bool isAutoScratch = false, bool hideScratch = false
+    )
     {
         activeSkin = new BmsEmbeddedSkinSource();
 
@@ -193,6 +206,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         TotalColumns = Math.Max(1, totalColumns);
         LayoutVariant = layoutVariant;
         IsAutoplay = isAutoplay;
+        IsAutoScratch = isAutoScratch;
+        HideScratch = hideScratch;
         TimingMap = timingMap;
 
         Anchor = Anchor.Centre;
@@ -204,7 +219,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         InternalChildren =
         [
-            Stage = new BmsStage(TotalColumns, LayoutVariant),
+            Stage = new BmsStage(TotalColumns, LayoutVariant, HideScratch),
             HitObjectContainer,
             keySound,
             landmineSound,
@@ -217,8 +232,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// <summary>
     ///     Creates a playfield from a decoded <see cref="T:osu.Game.Rulesets.BmsRuleset.Beatmaps.BmsBeatmap">BmsBeatmap</see>.
     /// </summary>
-    public BmsPlayfield(BmsBeatmap beatmap, bool isAutoplay = false)
-        : this(beatmap.HitObjects, beatmap.TotalColumns, beatmap.LayoutVariant, isAutoplay, beatmap.TimingMap)
+    public BmsPlayfield(BmsBeatmap beatmap, bool isAutoplay = false, bool isAutoScratch = false, bool hideScratch = false)
+        : this(beatmap.HitObjects, beatmap.TotalColumns, beatmap.LayoutVariant, isAutoplay, beatmap.TimingMap, isAutoScratch, hideScratch)
     {
         this.beatmap = beatmap;
     }
@@ -243,6 +258,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         var column = BmsKeyBindingConfiguration.ActionToColumn(e.Action, LayoutVariant);
 
         if (column == null || column.Value >= TotalColumns)
+            return false;
+
+        if (IsAutoScratch && BmsSkinComponentLookup.IsScratchColumn(column.Value, LayoutVariant))
             return false;
 
         pressedColumns.Add(column.Value);
@@ -283,6 +301,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (column == null || column.Value >= TotalColumns)
             return;
 
+        if (IsAutoScratch && BmsSkinComponentLookup.IsScratchColumn(column.Value, LayoutVariant))
+            return;
+
         pressedColumns.Remove(column.Value);
 
         // Release: find the earliest LN in this column that is held and within the release window.
@@ -302,6 +323,64 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             return;
 
         keySoundPlayer.PlayLandmineSound(hitObject.LandmineExplosionSamplePath);
+    }
+
+    private void processAutoScratch()
+    {
+        if (!IsAutoScratch)
+            return;
+
+        var now = Time.Current;
+
+        autoScratchLnHeads.RemoveWhere(d => d.Judged);
+
+        foreach (var drawable in HitObjectContainer.AliveObjects.OfType<DrawableBmsHitObject>())
+        {
+            if (drawable.Judged || drawable.HitObject.IsMine)
+                continue;
+
+            if (!BmsSkinComponentLookup.IsScratchColumn(drawable.HitObject.Column, LayoutVariant))
+                continue;
+
+            var note = drawable.HitObject;
+
+            if (note.IsLongNote)
+            {
+                // not press ln head yet
+                if (!autoScratchLnHeads.Contains(drawable))
+                {
+                    if (now >= note.StartTime)
+                    {
+                        playScratchSample(note);
+                        if (drawable.TryHit())
+                            autoScratchLnHeads.Add(drawable);
+                    }
+                }
+                else if (now >= note.EndTime)
+                {
+                    drawable.TryRelease();
+                }
+            }
+            else
+            {
+                if (now >= note.StartTime)
+                {
+                    playScratchSample(note);
+                    drawable.TryHit();
+                }
+            }
+        }
+
+        return;
+
+        void playScratchSample(BmsHitObject note)
+        {
+            if (string.IsNullOrEmpty(note.SamplePath))
+                return;
+
+            keySound.SampleInfo = new BmsSampleInfo(note.SamplePath);
+            keySound.Play();
+        }
     }
 
     #endregion
@@ -391,6 +470,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         CurrentScrollPosition = TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current;
         ScrollRange = BaseScrollRange;
+
+        processAutoScratch();
 
         updateStageScale();
         updateHealthDisplayLayout();

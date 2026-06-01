@@ -173,6 +173,9 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (Judged || HitObject?.HitWindows == null)
             return false;
 
+        if (HitObject.IsLongNote && longNoteStarted)
+            return false;
+
         var bmsWindows = (BmsHitWindows)HitObject.HitWindows;
         var result = bmsWindows.BmsResultFor(Time.Current - HitObject.StartTime);
 
@@ -423,6 +426,9 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             return false;
 
         layoutReferences = new LayoutReferences(stage, columnContainer, column, layoutVariant);
+
+        if (playfield is { HideScratch: true } && BmsSkinComponentLookup.IsScratchColumn(column, layoutVariant))
+            Alpha = 0;
 
         // These operations depend only on column/layout/component/skin lookup. They are comparatively
         // expensive and should not be part of the per-frame metrics refresh path.

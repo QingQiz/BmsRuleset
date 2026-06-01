@@ -44,7 +44,7 @@ public sealed partial class BmsStage : CompositeDrawable
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
 
-    public BmsStage(int totalColumns, BmsLayoutVariant layoutVariant)
+    public BmsStage(int totalColumns, BmsLayoutVariant layoutVariant, bool hideScratch = false)
     {
         this.layoutVariant = layoutVariant;
 
@@ -109,6 +109,10 @@ public sealed partial class BmsStage : CompositeDrawable
         for (var i = 0; i < totalColumns; i++)
         {
             var column = Columns[i] = new BmsColumn(i, layoutVariant);
+
+            if (hideScratch && column.IsScratch)
+                column.Hidden = true;
+
             columnFlow.Add(column);
         }
     }
