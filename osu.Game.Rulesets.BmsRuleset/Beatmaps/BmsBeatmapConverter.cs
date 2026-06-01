@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Objects;
@@ -22,15 +23,23 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 /// </remarks>
 public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapConverter<BmsHitObject>(beatmap, ruleset)
 {
+    public string? BranchReplayDecisions { get; set; }
+
+    public Func<int, int>? BranchRandomValueSelector { get; init; }
+
     public override bool CanConvert() =>
-        Beatmap.HitObjects.Any() && Beatmap.HitObjects.All(h => h is BmsHitObject);
+        Beatmap is BmsDecodedBeatmap { RawLines.Length: > 0 }
+        || Beatmap.HitObjects.Any() && Beatmap.HitObjects.All(h => h is BmsHitObject);
 
     protected override Beatmap<BmsHitObject> CreateBeatmap() => new BmsBeatmap();
 
     protected override Beatmap<BmsHitObject> ConvertBeatmap(IBeatmap original, CancellationToken cancellationToken)
     {
-        var converted = (BmsBeatmap)base.ConvertBeatmap(original, cancellationToken);
-        var hasBmsData = tryCopyBmsData(converted);
+        if (tryMaterialiseDecodedBeatmap(original, out var materialised))
+            original = materialised;
+
+        var converted = convertToBmsBeatmap(original, cancellationToken);
+        var hasBmsData = tryCopyBmsData(converted, original);
 
         if (!hasBmsData)
             populateFallbackSampleDefinitions(converted);
@@ -121,12 +130,86 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             hitObject.BmsRank = beatmap.Rank;
     }
 
-    private bool tryCopyBmsData(BmsBeatmap converted)
+    private static BmsBeatmap convertToBmsBeatmap(IBeatmap original, CancellationToken cancellationToken)
     {
-        if (Beatmap is not IBmsBeatmap bmsSource)
+        var converted = new BmsBeatmap
+        {
+            BeatmapInfo = original.BeatmapInfo,
+            ControlPointInfo = original.ControlPointInfo,
+            HitObjects = original.HitObjects.OfType<BmsHitObject>().OrderBy(h => h.StartTime).ToList(),
+            Breaks = original.Breaks,
+            AudioLeadIn = original.AudioLeadIn,
+            StackLeniency = original.StackLeniency,
+            SpecialStyle = original.SpecialStyle,
+            LetterboxInBreaks = original.LetterboxInBreaks,
+            WidescreenStoryboard = original.WidescreenStoryboard,
+            EpilepsyWarning = original.EpilepsyWarning,
+            SamplesMatchPlaybackRate = original.SamplesMatchPlaybackRate,
+            DistanceSpacing = original.DistanceSpacing,
+            GridSize = original.GridSize,
+            TimelineZoom = original.TimelineZoom,
+            Countdown = original.Countdown,
+            CountdownOffset = original.CountdownOffset,
+            Bookmarks = original.Bookmarks,
+            BeatmapVersion = original.BeatmapVersion,
+        };
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return converted;
+    }
+
+    private static bool tryCopyBmsData(BmsBeatmap converted, IBeatmap source)
+    {
+        if (source is not IBmsBeatmap bmsSource)
             return false;
 
         converted.CopyBmsDataFrom(bmsSource);
         return true;
     }
+
+    private bool tryMaterialiseDecodedBeatmap(IBeatmap original, out IBeatmap materialised)
+    {
+        materialised = original;
+
+        if (original is not BmsDecodedBeatmap { RawLines.Length: > 0 } decoded)
+            return false;
+
+        var selector = BranchRandomValueSelector;
+
+        if (!string.IsNullOrWhiteSpace(BranchReplayDecisions))
+            selector = BmsChartParser.CreateReplayDecisionSelector(BmsChartParser.DeserialiseBranchDecisions(BranchReplayDecisions));
+
+        var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector);
+        var beatmap = new BmsDecodedBeatmap
+        {
+            BeatmapInfo = decoded.BeatmapInfo,
+            ControlPointInfo = new ControlPointInfo(),
+            Breaks = decoded.Breaks,
+            AudioLeadIn = decoded.AudioLeadIn,
+            StackLeniency = decoded.StackLeniency,
+            SpecialStyle = decoded.SpecialStyle,
+            LetterboxInBreaks = decoded.LetterboxInBreaks,
+            WidescreenStoryboard = decoded.WidescreenStoryboard,
+            EpilepsyWarning = decoded.EpilepsyWarning,
+            SamplesMatchPlaybackRate = decoded.SamplesMatchPlaybackRate,
+            DistanceSpacing = decoded.DistanceSpacing,
+            GridSize = decoded.GridSize,
+            TimelineZoom = decoded.TimelineZoom,
+            Countdown = decoded.Countdown,
+            CountdownOffset = decoded.CountdownOffset,
+            Bookmarks = decoded.Bookmarks,
+            BeatmapVersion = decoded.BeatmapVersion,
+            RawLines = decoded.RawLines,
+        };
+
+        beatmap.CopyFrom(parseResult);
+        BmsBeatmapDecoder.PopulateTiming(beatmap, parseResult.TimingMap.BpmEvents);
+
+        foreach (var parsedObject in parseResult.HitObjects)
+            beatmap.HitObjects.Add(BmsBeatmapDecoder.CreateHitObject(parsedObject));
+
+        materialised = beatmap;
+        return true;
+    }
+
 }

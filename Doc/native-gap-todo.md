@@ -163,25 +163,30 @@ TODO:
 
 - Use osu! `ControlPointInfo` only as compatibility metadata, not the source of BMS timing truth.
 
-### Control Flow Is Not Truly Runtime-Resolved
+### Control Flow Is Play-Time Materialised
 
 Files:
 
 - `Beatmaps/BmsBeatmapDecoder.cs`
+- `Beatmaps/BmsBeatmapConverter.cs`
+- `BmsParser/BmsControlFlowResolver.cs`
+- `BmsParser/BmsParser.cs`
+- `Mods/BmsModBranchReplay.cs`
 
 Current state:
 
-- The parser currently treats `#random`, `#if`, `#else`, and `#endif` lines as normal unknown commands.
-- Because Aleph-0 uses `#random 1` / `#if 1`, current parser happens to include the active block and tests pass.
-- General BMS random branches are not represented as an AST and are not resolved per play/replay.
-- Inactive branches are not separated from active branches.
+- Playable conversion materialises an active command stream for `#RANDOM`, `#RONDAM`, `#SETRANDOM`, `#IF`, `#ELSEIF`, `#ELSE`, `#ENDIF`, `#ENDRANDOM`, `#SWITCH`, `#SETSWITCH`, `#CASE`, `#SKIP`, `#DEF`, and `#ENDSW`.
+- Random and switch values are selected per playable conversion from a cryptographic RNG; different plays can choose different branches.
+- Nested random/switch blocks are supported. Inactive nested random/switch blocks do not consume RNG decisions.
+- Lines inside `#RANDOM` but outside an `#IF`/`#ELSEIF`/`#ELSE` branch remain active within that random scope.
+- `#SWITCH` supports BMS-style fallthrough until `#SKIP`; `#DEF` runs when no case has matched.
+- Import resource scanning remains conservative by scanning raw chart lines, so resources from inactive branches are still included.
+- Selected branch decisions are serialized into `ScoreInfo.Mods` via the hidden `BmsModBranchReplay` system mod; replay conversion reuses those decisions before hit objects are materialised.
+- Branches are not yet preserved as an AST in `BmsBeatmap`.
 
 TODO:
 
-- Implement Control Flow AST import for `#RANDOM`, `#IF`, `#ELSEIF`, `#ELSE`, `#ENDIF`, `#ENDRANDOM` variants.
-- Resolve branches at runtime/play start with replay-stored RNG decisions.
-- Include resources from all possible branches in import manifests.
-- Add tests with multiple branches where only one branch is active per replay.
+- Implement Control Flow AST import for random/switch blocks instead of raw-line stream materialisation.
 
 ### Layout Inference Is Simplified
 

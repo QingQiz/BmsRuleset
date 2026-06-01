@@ -18,11 +18,11 @@ internal static partial class BmsChartParser
 
     private readonly record struct StopEvent(long Tick, double Duration, double StopValue, double Bpm, int Sequence);
 
-    public static BmsParseResult Parse(IEnumerable<string> lines, string? path = null)
+    public static BmsParseResult Parse(IEnumerable<string> lines, string? path = null, Func<int, int>? randomValueSelector = null)
     {
         var state = new ParseState();
 
-        foreach (var line in lines)
+        foreach (var line in MaterializeControlFlow(lines, randomValueSelector, state.BranchDecisions))
             parseLine(line, state);
 
         var tickResolution = calculateTickResolution(state);
@@ -65,7 +65,8 @@ internal static partial class BmsChartParser
             sampleDefinitions,
             collectBackgroundSampleEvents(state, measureStarts, timingMap).ToArray(),
             longNoteTailSampleEvents,
-            hitObjects);
+            hitObjects,
+            state.BranchDecisions.ToArray());
     }
 
     private static void parseLine(string line, ParseState state)
@@ -617,12 +618,12 @@ internal static partial class BmsChartParser
         public int Rank { get; set; } = 2;
 
         /// <summary>BMS #TOTAL value: gauge recovery coefficient. Zero means use the default formula.</summary>
-        public double Total { get; set; } = 0;
-
-        public int? PlayerMode { get; set; }
+        public double Total { get; set; }
 
         public int MaxMeasure { get; set; }
 
         public int NextSequence { get; set; }
+
+        public List<BmsBranchDecision> BranchDecisions { get; } = [];
     }
 }

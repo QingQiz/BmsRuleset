@@ -1084,6 +1084,20 @@ BMS supports conditional command blocks:
 
 Control flow can affect any line, including headers, definitions, channels, metadata, samples, and BGA. BmsRuleset must preserve control flow at import time and choose branches at play time. Branch selection is a runtime event, not an import-time preprocessing step.
 
+Current implementation status:
+
+```text
+1. Decode keeps raw BMS lines so playable conversion can materialise an active command stream for random/switch blocks.
+2. #RANDOM/#SWITCH use fresh random decisions per playable conversion, so different plays can choose different branches.
+3. #SETRANDOM/#SETSWITCH use fixed branch values.
+4. Nested random/switch blocks are supported; inactive nested blocks do not consume random decisions.
+5. Lines inside #RANDOM but outside #IF/#ELSEIF/#ELSE are unconditional within that random scope.
+6. #SWITCH falls through from the matched #CASE until #SKIP; #DEF runs if no case matched.
+7. Import resource scanning is conservative and scans raw lines, so resources from all branches are included.
+8. Selected branch decisions are stored in replay scores through the hidden BMS system mod `BR` (`BmsModBranchReplay`) and reused during replay conversion.
+9. Full AST preservation is still pending.
+```
+
 Import-time responsibilities:
 
 ```text

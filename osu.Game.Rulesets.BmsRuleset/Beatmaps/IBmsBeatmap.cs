@@ -27,9 +27,11 @@ public interface IBmsBeatmap
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; }
 
     IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; }
+
+    IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; }
 }
 
-static internal class BmsBeatmapExtensions
+internal static class BmsBeatmapExtensions
 {
     public static void CopyBmsDataFrom(this IBmsBeatmap target, IBmsBeatmap source)
     {
@@ -42,5 +44,6 @@ static internal class BmsBeatmapExtensions
         target.SampleDefinitions = source.SampleDefinitions;
         target.BackgroundSampleEvents = source.BackgroundSampleEvents;
         target.LongNoteTailSampleEvents = source.LongNoteTailSampleEvents;
+        target.BranchDecisions = source.BranchDecisions;
     }
 }

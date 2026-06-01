@@ -16,7 +16,10 @@ public sealed record BmsParseResult(
     IReadOnlyDictionary<string, string> SampleDefinitions,
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents,
     IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents,
-    IReadOnlyList<BmsParsedHitObject> HitObjects);
+    IReadOnlyList<BmsParsedHitObject> HitObjects,
+    IReadOnlyList<BmsBranchDecision> BranchDecisions);
+
+public readonly record struct BmsBranchDecision(int MaxValue, int SelectedValue);
 
 public readonly record struct BmsParsedHitObject(
     long Tick,

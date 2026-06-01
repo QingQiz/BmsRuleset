@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -11,10 +12,21 @@ using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
-public class BmsBeatmapDecoder : Decoder<Beatmap>
+/// <summary>
+/// The decoder is a lightweight beatmap parser that does not require the beatmap to be fully parsed
+/// it is only for filtering/display purposes. For actual gameplay, a converter is needed to complete the remaining tasks.
+/// Decoder does not preserve all branches as an AST.
+/// Decoder keeps RawLines, so all original branch text is still available for later playable conversion.
+/// Decoder also does a deterministic branch-1 materialisation to create a usable cached BmsDecodedBeatmap preview/metadata objec
+/// </summary>
+/// <param name="randomValueSelector"></param>
+public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Decoder<Beatmap>
 {
     private static readonly object registration_lock = new();
     private static bool registered;
+
+    // The decoded beatmap is cached before play starts; only playable conversion should roll runtime branches.
+    private Func<int, int> decodeBranchSelector => randomValueSelector ?? (_ => 1);
 
     public static void Register()
     {
@@ -32,42 +44,46 @@ public class BmsBeatmapDecoder : Decoder<Beatmap>
 #pragma warning disable CA2255 // Ruleset assemblies are discovered before beatmap decode; register BMS formats as soon as the plugin loads.
     [ModuleInitializer]
 #pragma warning restore CA2255
-    static internal void RegisterOnAssemblyLoad() => Register();
+    internal static void RegisterOnAssemblyLoad() => Register();
 
     protected override Beatmap CreateTemplateObject() => new BmsDecodedBeatmap();
 
     protected override void ParseStreamInto(LineBufferedReader stream, Beatmap output)
     {
-        var parseResult = BmsChartParser.Parse(readLines(stream, output.BeatmapInfo?.Path), output.BeatmapInfo?.Path);
+        var lines = readLines(stream, output.BeatmapInfo.Path);
+        var parseResult = BmsChartParser.Parse(lines, output.BeatmapInfo.Path, decodeBranchSelector);
 
         applyMetadata(output, parseResult);
-        populateTiming(output, parseResult.TimingMap.BpmEvents);
+        PopulateTiming(output, parseResult.TimingMap.BpmEvents);
 
         if (output is BmsDecodedBeatmap bmsOutput)
+        {
             bmsOutput.CopyFrom(parseResult);
+            bmsOutput.RawLines = lines;
+        }
 
         foreach (var parsedObject in parseResult.HitObjects)
-        {
-            output.HitObjects.Add(new BmsHitObject
-            {
-                TickInfo = new BmsTickInfo
-                {
-                    Tick = parsedObject.Tick,
-                    EndTick = parsedObject.EndTick,
-                },
-                StartTime = parsedObject.StartTime,
-                Duration = parsedObject.Duration,
-                Column = parsedObject.Column,
-                SourceChannel = parsedObject.SourceChannel,
-                SampleKey = parsedObject.SampleKey,
-                SamplePath = parsedObject.SamplePath,
-                IsLongNote = parsedObject.IsLongNote,
-                IsMine = parsedObject.IsMine,
-                LandmineDamagePercent = parsedObject.LandmineDamagePercent,
-                LandmineExplosionSamplePath = parsedObject.LandmineExplosionSamplePath,
-            });
-        }
+            output.HitObjects.Add(CreateHitObject(parsedObject));
     }
+
+    internal static BmsHitObject CreateHitObject(BmsParsedHitObject parsedObject) => new()
+    {
+        TickInfo = new BmsTickInfo
+        {
+            Tick = parsedObject.Tick,
+            EndTick = parsedObject.EndTick,
+        },
+        StartTime = parsedObject.StartTime,
+        Duration = parsedObject.Duration,
+        Column = parsedObject.Column,
+        SourceChannel = parsedObject.SourceChannel,
+        SampleKey = parsedObject.SampleKey,
+        SamplePath = parsedObject.SamplePath,
+        IsLongNote = parsedObject.IsLongNote,
+        IsMine = parsedObject.IsMine,
+        LandmineDamagePercent = parsedObject.LandmineDamagePercent,
+        LandmineExplosionSamplePath = parsedObject.LandmineExplosionSamplePath,
+    };
 
     private static string[] readLines(LineBufferedReader stream, string? path)
     {
@@ -102,7 +118,7 @@ public class BmsBeatmapDecoder : Decoder<Beatmap>
         output.BeatmapInfo.Difficulty.CircleSize = parseResult.TotalColumns;
     }
 
-    private static void populateTiming(Beatmap output, IEnumerable<BmsBpmEvent> timingEvents)
+    internal static void PopulateTiming(Beatmap output, IEnumerable<BmsBpmEvent> timingEvents)
     {
         output.ControlPointInfo.Clear();
 

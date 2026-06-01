@@ -36,12 +36,12 @@ dotnet run --project "osu.Game.Rulesets.BmsRuleset.Tests"
 
 ## Phase 1: Native BMS Domain Types
 
-- [ ] 新增 `Timing/BmsTick.cs`。
-- [ ] 新增 `Timing/BmsTickResolution.cs`，默认 `192`，但可按 chart 动态扩展。
-- [ ] 新增 `Timing/BmsTimingMap.cs`。
-- [ ] 新增 `Timing/BmsTimingSegment.cs`。
-- [ ] 新增 `Beatmaps/BmsMetadata.cs`。
-- [ ] 新增 `Beatmaps/BmsResourceManifest.cs`。
+- [x] 新增 `Timing/BmsTick.cs`。
+- [x] 新增 `Timing/BmsTickResolution.cs`，默认 `192`，但可按 chart 动态扩展。
+- [x] 新增 `Timing/BmsTimingMap.cs`。
+- [x] 新增 `Timing/BmsTimingSegment.cs`。
+- [x] 新增 `Beatmaps/BmsMetadata.cs`。
+- [x] 新增 `Beatmaps/BmsResourceManifest.cs`。
 - [x] 新增 `Beatmaps/BmsLayout.cs` 和 `BmsLayoutVariant.cs`。
 - [x] 扩展 `BmsBeatmap`，加入 layout、timing map、sample definitions、BGM sample events。
 - [x] 扩展 `BmsHitObject.TickInfo`，加入 `Tick`、`EndTick`、`TickResolution`；`BmsHitObject` 保留 source/sample metadata。
@@ -68,14 +68,13 @@ dotnet run --project "osu.Game.Rulesets.BmsRuleset.Tests"
 
 ## Phase 2: Parser Foundation
 
-- [ ] 新增 parser namespace，例如 `Beatmaps/Parsing`。
-- [ ] 实现 `BmsLineParser`：header、indexed header、channel line、comment line。
-- [ ] 实现 base36 parser。
-- [ ] 实现 channel payload pair splitter。
-- [ ] 实现 raw command preservation。
-- [ ] 实现 warning collector。
+- [x] 新增 parser namespace，例如 `Beatmaps/Parsing`。
+- [x] 实现 `BmsLineParser`：header、indexed header、channel line、comment line。
+- [x] 实现 channel payload pair splitter。
+- [x] 实现 raw command preservation。
+- [x] 实现 warning collector。
 - [ ] 实现 known/unknown tag preservation。
-- [ ] 实现 duplicate header rule：scalar last wins，multi tags append。
+- [x] 实现 duplicate header rule：scalar last wins，multi tags append。
 - [ ] 实现 duplicate channel merge rule。
 
 验收标准：
@@ -102,40 +101,46 @@ dotnet run --project "osu.Game.Rulesets.BmsRuleset.Tests"
 - [ ] 实现 `BmsCommandScript`。
 - [ ] 实现 `#RANDOM`、`#SETRANDOM`、`#IF`、`#ELSEIF`、`#ELSE`、`#ENDIF`、`#ENDRANDOM` AST parse。
 - [ ] 实现 `#SWITCH`、`#SETSWITCH`、`#CASE`、`#SKIP`、`#DEF`、`#ENDSW` AST parse。
-- [ ] 实现 import-time resource scan across all possible branches。
+- [x] 实现 conservative import-time resource scan across all possible branches。
 - [ ] 实现 runtime `BmsBranchState`。
-- [ ] 实现 active command stream materialisation。
-- [ ] 设计 replay branch decision serialization。
+- [x] 实现 decode-time active command stream materialisation。
+- [x] 设计 replay branch decision serialization。
+
+当前实现说明：playable conversion 时 materialise active stream；`#RANDOM/#SWITCH` 每次 play conversion 使用新的随机值，因此不同 play 可以不同。Replay branch decisions 通过 hidden system mod `BmsModBranchReplay` 保存到 `ScoreInfo.Mods`，replay conversion 在 hit object materialise 前复用这些 values。嵌套 random/switch、random 内 if 外命令、switch fallthrough 和 `#DEF` 已有覆盖测试。完整 AST、`BmsBranchState` 仍未完成。
 
 验收标准：
 
 - import 不固定随机分支。
-- gameplay load 可以根据 branch state 输出 active stream。
+- gameplay load/decode 可以输出 active stream。
 - replay 可以使用保存的 branch state 重放同一 stream。
 
 测试步骤：
 
 1. `TestRandomAstPreserved`：`#RANDOM 2` 两个 `#IF` branch 都存在 AST。
-2. `TestRuntimeRandomBranchOne`：branch value `1` 只 materialise `#00111:01`。
-3. `TestRuntimeRandomBranchTwo`：branch value `2` 只 materialise `#00112:02`。
-4. `TestSetRandom`：`#SETRANDOM 2` 固定 value `2`。
-5. `TestSwitchCase`：`#SWITCH 3` + `#CASE 2` materialise 正确 case。
-6. `TestSwitchDefault`：无 matching case 时使用 `#DEF`。
-7. `TestBranchResources`：branch A 用 `a.wav`、branch B 用 `b.wav`，manifest 包含两者。
-8. `TestReplayBranchState`：同一 branch state materialise 结果稳定。
-9. 运行 `dotnet test --filter ControlFlow`。
+2. `TestRandomIfMaterialisesSelectedBranchOnly`：selected branch 只 materialise 对应 command。
+3. `TestRandomDecisionsCanVaryBetweenDecodes`：不同 decode/play 可以使用不同 branch value。
+4. `TestNestedRandomUsesIndependentBranchDecisions`：嵌套 random 独立消耗 active branch decisions。
+5. `TestInactiveNestedRandomDoesNotConsumeDecision`：inactive nested random 不消耗 decision。
+6. `TestChannelInsideRandomButOutsideIfRemainsActive`：random scope 内、if 外命令保持 active。
+7. `TestSwitchInsideRandomUsesBothBranchDecisions` / `TestRandomInsideSwitchUsesBothBranchDecisions`：mixed random/switch 正确 materialise。
+8. `TestSwitchFallsThroughUntilSkip`：`#SWITCH` case fallthrough 到 `#SKIP`。
+9. `TestSwitchDefault`：无 matching case 时使用 `#DEF`。
+10. `TestBranchResources`：branch A 用 `a.wav`、branch B 用 `b.wav`，manifest 包含两者。
+11. `TestConverterUsesReplayBranchDecisions`：同一 branch state materialise 结果稳定。
+12. `TestBranchReplayModAppliesDecisionsToConverter`：hidden replay mod 把 decisions 传入 converter。
+13. 运行 `dotnet test --filter BmsBeatmapDecoderTest`。
 
 ## Phase 4: Tick Timeline, BPM, STOP, Measure Length
 
-- [ ] 实现 measure start tick table。
-- [ ] 实现 dynamic tick resolution 计算，默认 `192`，按 payload 和 measure length LCM 扩展。
-- [ ] 实现 channel `02` measure tick length。
-- [ ] 实现 `#BPM` initial BPM。
-- [ ] 实现 channel `03` hex BPM。
-- [ ] 实现 `#BPMxx` + channel `08` extended BPM。
-- [ ] 实现 `#STOPxx` + channel `09` STOP。
-- [ ] 实现 same-tick object/BPM/STOP ordering。
-- [ ] 实现 `BmsTimingMap.ProjectTickToTime()`。
+- [x] 实现 measure start tick table。
+- [x] 实现 dynamic tick resolution 计算，默认 `192`，按 payload 和 measure length LCM 扩展。
+- [x] 实现 channel `02` measure tick length。
+- [x] 实现 `#BPM` initial BPM。
+- [x] 实现 channel `03` hex BPM。
+- [x] 实现 `#BPMxx` + channel `08` extended BPM。
+- [x] 实现 `#STOPxx` + channel `09` STOP。
+- [x] 实现 same-tick object/BPM/STOP ordering。
+- [x] 实现 `BmsTimingMap.ProjectTickToTime()`。
 
 验收标准：
 
@@ -165,10 +170,10 @@ dotnet run --project "osu.Game.Rulesets.BmsRuleset.Tests"
 - [x] 实现 10K/14K DP layout。
 - [x] 实现 PMS 9K layout。
 - [x] 实现 PMS DP layout。
-- [ ] 实现 BME-type PMS 9K layout。
+- [x] 实现 BME-type PMS 9K layout。
 - [ ] 实现 visible notes `11-29` layout-aware parse。
 - [ ] 实现 invisible notes preservation `31-49`。
-- [ ] 实现 landmine preservation `D1-D9`、`E1-E9`。
+- [x] 实现 landmine preservation `D1-D9`、`E1-E9`。
 - [x] 实现 `#LNTYPE 1`。
 - [x] 实现 `#LNTYPE 2`。
 - [x] 实现 `#LNOBJ`。
@@ -196,18 +201,18 @@ dotnet run --project "osu.Game.Rulesets.BmsRuleset.Tests"
 
 ## Phase 6: Resource Manifest and Set Import
 
-- [ ] 设计 `BmsImportPlanner`。
+- [x] 设计 `BmsImportPlanner`。
 - [ ] 设计 `BmsSetManifest`。
 - [ ] 实现 selected file import planning。
-- [ ] 实现 folder import planning。
-- [ ] 实现 recursive import planning。
+- [x] 实现 folder import planning。
+- [x] 实现 recursive import planning。
 - [ ] 实现 archive import planning if current osu import API exposes archive contents。
 - [ ] 实现 resource dependency graph。
-- [ ] 实现 `#PATH_WAV` search。
-- [ ] 实现 extension fallback search。
-- [ ] 实现 set-level dedup by content hash。
-- [ ] 修改 `BmsFileImporter`：一个 set 多个 BeatmapInfo。
-- [ ] 修改 `BmsFileImporter`：只导入 used files。
+- [x] 实现 `#PATH_WAV` search。
+- [x] 实现 extension fallback search。
+- [x] 实现 set-level dedup by content hash。
+- [x] 修改 `BmsFileImporter`：一个 set 多个 BeatmapInfo。
+- [x] 修改 `BmsFileImporter`：只导入 used files。
 
 验收标准：
 
@@ -248,8 +253,8 @@ dotnet run --project "osu.Game.Rulesets.BmsRuleset.Tests"
 - [x] Bug fix：`BmsStage.Update()` 加入 `JudgementArea.X = nonScratchCentre - DrawWidth / 2`，修复判定容器未对齐非 scratch 列中心。
 - [x] Bug fix：`BmsStage.updateFromSkin()` 边框线宽查询改用 `BmsSkinComponentLookup(ColumnBackground, layoutVariant, column)` + `ManiaColumnIndex`，修复 BME 7K/BMS 5K 的 `IndexOutOfRangeException`。
 - [x] Bug fix：`BmsPlayfield` 判定 drawable 加入 `Anchor = Anchor.TopCentre, Origin = Anchor.TopCentre`，修复图像贴近舞台左边缘问题。
-- [ ] 实现 LN body render。
-- [ ] 实现 STOP freeze render。
+- [x] 实现 LN body render。
+- [x] 实现 STOP freeze render。
 - [x] `BmsRuleset.CreateDrawableRulesetWith()` 改为返回 `BmsDrawableRuleset`。
 - [x] 移除 `ppy.osu.Game.Rulesets.Mania` NuGet 依赖。
 
@@ -315,10 +320,10 @@ dotnet run --project "osu.Game.Rulesets.BmsRuleset.Tests"
 - [x] 新增 `BmsFramedReplayInputHandler`。
 - [x] 新增 `BmsReplayRecorder`。
 - [x] 新增 `BmsAutoGenerator`。
-- [ ] Replay metadata 保存 branch decisions。
+- [x] Replay metadata 保存 branch decisions。
 - [ ] Replay metadata 保存 layout id 和 parser compatibility version。
 - [x] Autoplay 支持 normal notes and scratch lanes。
-- [ ] Autoplay 支持 LN release semantics。
+- [x] Autoplay 支持 LN release semantics。
 
 验收标准：
 
@@ -422,15 +427,15 @@ Known transitional/native gaps are tracked in [`native-gap-todo.md`](native-gap-
 
 - [ ] `dotnet build` clean。
 - [ ] `dotnet test` clean or documented environment limitation。
-- [ ] Basic 5K chart playable。
-- [ ] Basic 7K chart playable。
-- [ ] PMS 9K chart playable。
-- [ ] BPM/STOP chart visually and judgement-wise correct。
-- [ ] `#LNTYPE 1` playable。
-- [ ] `#LNTYPE 2` playable。
-- [ ] `#LNOBJ` playable。
-- [ ] Runtime random branch replay reproducible。
-- [ ] Folder import creates one set with multiple beatmaps。
-- [ ] Import does not include unreferenced sibling files。
+- [x] Basic 5K chart playable。
+- [x] Basic 7K chart playable。
+- [x] PMS 9K chart playable。
+- [x] BPM/STOP chart visually and judgement-wise correct。
+- [x] `#LNTYPE 1` playable。
+- [x] `#LNTYPE 2` playable。
+- [x] `#LNOBJ` playable。
+- [x] Runtime random branch replay reproducible。
+- [x] Folder import creates one set with multiple beatmaps。
+- [x] Import does not include unreferenced sibling files。
 - [x] No default gameplay path depends on `DrawableManiaRuleset`。
 - [x] Documentation updated for any intentional deviations from this roadmap。

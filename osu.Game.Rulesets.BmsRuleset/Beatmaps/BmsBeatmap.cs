@@ -31,6 +31,8 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; } = [];
 
+    public IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; } = [];
+
     public override IEnumerable<BeatmapStatistic> GetStatistics()
     {
         var notes = HitObjects.Count(h => !h.IsMine);

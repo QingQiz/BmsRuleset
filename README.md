@@ -63,7 +63,7 @@ To remove all imported BMS content, use the **"Delete all imported BMS files"** 
 | `5x` / `6x` | Long note channels — P1 / P2 |
 | `Dx` / `Ex` | Landmine channels — P1 / P2 |
 
-**Not parsed / not functional:** `#RANDOM` / `#IF` branching (only `#RANDOM 1` accidentally works), `#EXRANK`, `#SUBTITLE`, `#STAGEFILE`, `#BANNER`, BGA/image channels (`04`, `06`, `07`, …).
+**Not parsed / not functional:** `#EXRANK`, `#SUBTITLE`, `#STAGEFILE`, `#BANNER`, BGA/image channels (`04`, `06`, `07`, …).
 
 ---
 
@@ -367,7 +367,6 @@ The full built-in skin (covering all 6 layouts) is at
 
 | Area | What is missing |
 |---|---|
-| **Parser** | `#RANDOM` / `#IF` branching — only `#RANDOM 1` accidentally works; general branching produces wrong charts |
 | **Parser** | `#EXRANK` — extended rank definition, not parsed |
 | **Parser** | `#SUBTITLE`, `#SUBARTIST`, `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — silently ignored |
 | **Parser** | `#PATH_WAV` / `#PATH_BMP` resource path prefixes |
@@ -383,7 +382,6 @@ The full built-in skin (covering all 6 layouts) is at
 | **Mods** | Auto-scratch, hide scratch, assist options |
 | **Input** | Scratch turntable semantics — scratch is routed as a plain column key |
 | **Difficulty** | Star rating is always 0; no performance calculator |
-| **Import** | `#RANDOM` branch resources are not included in the import manifest |
 | **Import** | Resource files in subdirectories — only the filename is used, relative paths are unresolved |
 
 ---
@@ -424,8 +422,6 @@ The full built-in skin (covering all 6 layouts) is at
 
 ## TODO
 
-
-- [ ] random/switch
 - [ ] correct metadata display (title, artist, etc, rank, hp, ...)
 
 - skin

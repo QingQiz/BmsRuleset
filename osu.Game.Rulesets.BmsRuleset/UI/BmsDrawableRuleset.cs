@@ -94,7 +94,21 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     protected override ReplayInputHandler CreateReplayInputHandler(Replay replay) => new BmsFramedReplayInputHandler(replay);
 
-    protected override ReplayRecorder CreateReplayRecorder(Score score) => new BmsReplayRecorder(score);
+    protected override ReplayRecorder CreateReplayRecorder(Score score)
+    {
+        if (Beatmap is BmsBeatmap bmsBeatmap)
+            BmsBranchReplayState.EnsureBranchReplayMod(score, bmsBeatmap.BranchDecisions);
+
+        return new BmsReplayRecorder(score);
+    }
+
+    public override void SetReplayScore(Score replayScore)
+    {
+        base.SetReplayScore(replayScore);
+
+        if (replayScore != null && Beatmap is BmsBeatmap bmsBeatmap)
+            BmsBranchReplayState.EnsureBranchReplayMod(replayScore, bmsBeatmap.BranchDecisions);
+    }
 
     private bool onHealthFailed()
     {
