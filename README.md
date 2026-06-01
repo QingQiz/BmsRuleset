@@ -456,11 +456,42 @@ The full built-in skin (covering all 6 layouts) is at
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.PerformStep(Boolean userTriggered)
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.OnClick(ClickEvent e)
     ```
-
+- [ ] 似乎时自定义结算和自动结算冲突了
+    ```
+    2026-06-01 13:42:43 [error]: Score import failed!
+    2026-06-01 13:42:43 [error]: Realms.Exceptions.RealmDuplicatePrimaryKeyValueException: A Score object already exists with primary key property ID == 'uuid(c5fb41cb-1159-4644-a604-d54a38df2f0d)'
+    2026-06-01 13:42:43 [error]: at Realms.NativeException.ThrowIfNecessary()
+    2026-06-01 13:42:43 [error]: at Realms.SharedRealmHandle.CreateObjectWithPrimaryKey(Property pkProperty, RealmValue& primaryKey, TableKey tableKey, String parentType, Boolean update, Boolean& isNew)
+    2026-06-01 13:42:43 [error]: at Realms.Realm.AddInternal[T](T obj, Type objectType, Boolean update)
+    2026-06-01 13:42:43 [error]: at Realms.Realm.Add[T](T obj, Boolean update)
+    2026-06-01 13:42:43 [error]: at osu.Game.Database.RealmArchiveModelImporter`1.<>c__DisplayClass28_0.<ImportModel>b__0(Realm realm)
+    2026-06-01 13:42:43 [error]: at osu.Game.Database.RealmAccess.Run[T](Func`2 action)
+    2026-06-01 13:42:43 [error]: at osu.Game.Database.RealmArchiveModelImporter`1.ImportModel(TModel item, ArchiveReader archive, ImportParameters parameters, CancellationToken cancellationToken)
+    2026-06-01 13:42:43 [error]: at osu.Game.Scoring.ScoreManager.Import(ScoreInfo item, ArchiveReader archive, ImportParameters parameters, CancellationToken cancellationToken)
+    2026-06-01 13:42:43 [error]: at osu.Game.Screens.Play.Player.ImportScore(Score score)
+    2026-06-01 13:42:43 [error]: at osu.Game.Screens.Play.Player.<>c__DisplayClass134_0.<<prepareAndImportScoreAsync>b__0>d.MoveNext()
+    ```
 - skin
     - [ ] morden 皮肤里 有一个奇怪的组件，并且缺少了很多默认的组件
     - [ ] 血条的位置不对，而且需要调整一下风格
     - [ ] legacy 的 mod 部分和分数显示重叠了
+
+- [ ] Hide Scratch mod，中间没有在中间，而是在第3列的最右边（7k）
+- [ ] 提前按 ln head， 但松手晚，会导致，ln 在松晚的过程中反转
+- [ ] on changing ruleset from bms to any or from any to bms
+
+  ```
+  2026-06-01 15:13:14 [verbose]: This error has been automatically reported to the dev team.
+  2026-06-01 15:13:14 [error]: An unobserved error has occurred.
+  2026-06-01 15:13:14 [error]: osu.Game.Rulesets.UI.BeatmapInvalidForRulesetException: Beatmap can not be converted for the ruleset (ruleset: osu.Game.Rulesets.Mania.ManiaRuleset, osu.Game.Rulesets.Mania, converter: osu.Game.Rulesets.Mania.Beatmaps.ManiaBeatmapConverter).
+  2026-06-01 15:13:14 [error]: at osu.Game.Beatmaps.WorkingBeatmap.GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList`1 mods, CancellationToken token)
+  2026-06-01 15:13:14 [error]: at osu.Game.Beatmaps.WorkingBeatmap.GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList`1 mods)
+  2026-06-01 15:13:14 [error]: at osu.Game.Screens.Select.BeatmapTitleWedge.DifficultyDisplay.<>c__DisplayClass36_0.<updateCountStatistics>b__0()
+  2026-06-01 15:13:14 [error]: at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+  2026-06-01 15:13:14 [error]: --- End of stack trace from previous location ---
+  2026-06-01 15:13:14 [error]: at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+  2026-06-01 15:13:14 [error]: at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+  ```
 
 ## TODO
 

@@ -5,7 +5,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
 
-public class BmsModAutoScratch : Mod
+public class BmsModAutoScratch : Mod, IApplicableMod
 {
     public override string Name => "Auto Scratch";
 

@@ -91,14 +91,14 @@ public class BmsRuleset : Ruleset
 
     public override LocalisableString GetVariantName(int variant) => (BmsLayoutVariant)variant switch
     {
-        BmsLayoutVariant.Bms5K => "5K (1P)",
+        BmsLayoutVariant.Bms5K => "5K",
         BmsLayoutVariant.Bms5K2P => "5K (2P)",
-        BmsLayoutVariant.Bme7K => "7K (1P)",
+        BmsLayoutVariant.Bme7K => "7K",
         BmsLayoutVariant.Bme7K2P => "7K (2P)",
-        BmsLayoutVariant.Pms9K => "9K (1P)",
-        BmsLayoutVariant.Bms5KDouble => "5K (DP)",
-        BmsLayoutVariant.Bme7KDouble => "7K (DP)",
-        BmsLayoutVariant.Pms9KDouble => "9K (DP)",
+        BmsLayoutVariant.Pms9K => "9K",
+        BmsLayoutVariant.Bms5KDouble => "DP 5K",
+        BmsLayoutVariant.Bme7KDouble => "DP 7K",
+        BmsLayoutVariant.Pms9KDouble => "DP 9K",
         _ => string.Empty,
     };
 
