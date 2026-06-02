@@ -5,12 +5,19 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Graphics;
+using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Skinning;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 
-public sealed partial class BmsTextHud : CompositeDrawable
+public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawable
 {
+    public bool UsesFixedAnchor { get; set; }
+
+    [Resolved]
+    private BmsPlayfield playfield { get; set; } = null!;
+
     private SpriteText mainText = null!;
     private SpriteText arrowText = null!;
 
@@ -21,6 +28,13 @@ public sealed partial class BmsTextHud : CompositeDrawable
         Y = 36;
         AutoSizeAxes = Axes.Both;
         Alpha = 0;
+    }
+
+    protected override void LoadComplete()
+    {
+        base.LoadComplete();
+        playfield.TextEvent += ShowText;
+        playfield.ScrollSpeedChangeEvent += x => ShowScrollSpeed(x, playfield.ConfiguredScrollSpeed.Value);
     }
 
     [BackgroundDependencyLoader]

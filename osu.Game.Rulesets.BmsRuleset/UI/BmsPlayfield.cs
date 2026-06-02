@@ -4,17 +4,13 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
-using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Game.Audio;
-using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -23,13 +19,14 @@ using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
+using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
@@ -117,9 +114,22 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region HUD fields
 
-    private readonly BindableDouble configuredScrollSpeed = new(default_scroll_speed);
-    private readonly BmsTextHud textHud;
+    public readonly BindableDouble ConfiguredScrollSpeed = new(default_scroll_speed);
     private readonly BmsTextEventManager textEventManager = null!;
+
+    #endregion
+
+    #region Events
+
+    /// <summary>
+    /// BMS text event
+    /// </summary>
+    public event Action<string>? TextEvent;
+
+    /// <summary>
+    /// BMS scroll speed changed
+    /// </summary>
+    public event Action<double>? ScrollSpeedChangeEvent;
 
     #endregion
 
@@ -188,6 +198,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region Construction
 
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+    public BmsPlayfield()
+    {
+    }
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+
     /// <inheritdoc />
     /// <summary>
     ///     Creates a playfield from raw hit objects.  Objects are sorted by
@@ -212,7 +228,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         Origin = Anchor.Centre;
         RelativeSizeAxes = Axes.Both;
 
-        textHud = new BmsTextHud();
         judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both };
 
         InternalChildren =
@@ -221,7 +236,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             HitObjectContainer,
             keySound,
             landmineSound,
-            textHud,
             judgementDrawablePool,
         ];
     }
@@ -392,12 +406,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         ScrollSpeed = Math.Clamp(scrollSpeed, min_scroll_speed, max_scroll_speed);
         recalculateSpeedFields();
-        textHud.ShowScrollSpeed(ScrollSpeed, configuredScrollSpeed.Value);
+        ScrollSpeedChangeEvent?.Invoke(scrollSpeed);
     }
 
     public void SetConfiguredScrollSpeed(double speed)
     {
-        configuredScrollSpeed.Value = speed;
+        ConfiguredScrollSpeed.Value = speed;
         ScrollSpeed = speed;
         recalculateSpeedFields();
     }
@@ -414,7 +428,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private void updateHud()
     {
-        textEventManager.Update(Time.Current, text => textHud.ShowText(text));
+        textEventManager.Update(Time.Current, text => TextEvent?.Invoke(text));
     }
 
     #endregion
@@ -586,7 +600,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         if (result == HitResult.Meh && textEventManager.Mistake != null)
         {
-            textHud.ShowText(textEventManager.Mistake);
+            TextEvent?.Invoke(textEventManager.Mistake);
         }
 
         var evicted = Stage.JudgementArea.ToArray();

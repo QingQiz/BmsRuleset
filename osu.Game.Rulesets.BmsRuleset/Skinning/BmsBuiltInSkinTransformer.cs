@@ -1,7 +1,6 @@
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
 
@@ -45,19 +44,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 public partial class BmsBuiltInSkinTransformer(ISkin skin) : SkinTransformer(skin)
 {
     /// <inheritdoc/>
-    public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
-    {
-        // Global (non-ruleset) HUD: pass through but strip the health bar, which BMS doesn't use.
-        if (lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: null })
-            return WithoutHealthDisplay(base.GetDrawableComponent(lookup));
-
-        // BMS playfield components, hit results, and the ruleset-scoped HUD are handled
-        // by BmsEmbeddedSkinSource — the built-in skin must not answer these.
-        if (lookup is BmsSkinComponentLookup or SkinComponentLookup<HitResult> or GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null })
-            return null;
-
-        return base.GetDrawableComponent(lookup);
-    }
+    public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup) =>
+        BmsDefaultHud.GetDrawableComponent(lookup) ?? base.GetDrawableComponent(lookup);
 
     /// <inheritdoc/>
     public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)

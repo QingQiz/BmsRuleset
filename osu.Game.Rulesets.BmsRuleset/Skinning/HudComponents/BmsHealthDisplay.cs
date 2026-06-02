@@ -8,16 +8,19 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Utils;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 
 /// <summary>
 ///     BMS-style groove gauge display that replaces osu!'s native health bar UI.
 /// </summary>
-public sealed partial class BmsHealthDisplay : CompositeDrawable
+public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableDrawable
 {
+    public bool UsesFixedAnchor { get; set; }
+
     private const float bar_width = 30;
     private const float bar_height = 360;
     private const float clear_border = 0.8f;

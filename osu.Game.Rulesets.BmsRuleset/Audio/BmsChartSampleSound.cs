@@ -52,8 +52,8 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
     [Resolved(CanBeNull = true)]
     private AudioManager? audioManager { get; set; }
 
-    [Resolved(CanBeNull = true)]
-    private BmsSampleStore? sampleCache { get; set; }
+    [Resolved]
+    private BmsSampleStore sampleCache { get; set; } = null!;
 
     public BmsChartSampleSound()
     {
@@ -217,7 +217,7 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
         // Pull the already-decoded sample from the in-memory preload cache. Do NOT bind any
         // adjustments to the sample itself: the cache instance is shared across every playback,
         // so volume/frequency isolation is applied per-channel in Play() instead.
-        var sample = sampleCache?.Get(sampleInfo);
+        var sample = sampleCache.Get(sampleInfo);
 
         if (sample == null)
             return;

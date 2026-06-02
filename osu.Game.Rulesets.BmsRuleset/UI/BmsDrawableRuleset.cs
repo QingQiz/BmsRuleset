@@ -48,20 +48,11 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     [Resolved(CanBeNull = true)]
     private ScoreManager? scoreManager { get; set; }
 
-    private BmsSampleStore sampleStore = null!;
+    [Cached]
+    private BmsSampleStore sampleStore = new(((BmsBeatmap)beatmap).SampleDefinitions.Values);
 
-    protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
-    {
-        // Cached here (before base.load → CreatePlayfield) so the key-sound player created inside
-        // the playfield can [Resolved] the same shared sample cache. The actual disk read + decode
-        // is kicked off later when the component is added to the tree and async-loaded.
-        var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
-
-        sampleStore = new BmsSampleStore(((BmsBeatmap)Beatmap).SampleDefinitions.Values);
-        dependencies.CacheAs(sampleStore);
-
-        return dependencies;
-    }
+    [Cached]
+    private BmsPlayfield playfield { get; set; } = new();
 
     #region Disposal
 
@@ -90,7 +81,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     {
         var beatmap = (BmsBeatmap)Beatmap;
         var autoScratch = Mods.OfType<BmsModAutoScratch>().FirstOrDefault();
-        return new BmsPlayfield(beatmap,
+        return playfield = new BmsPlayfield(beatmap,
             Mods.OfType<BmsModAutoplay>().Any(),
             autoScratch != null,
             autoScratch?.HideScratch.Value ?? false);
@@ -118,7 +109,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         // override the mod and force HasFailed = true (freezing the gauge at zero so it
         // can never recover) and would import a failed score that the normal completion
         // path later re-imports with the same ID (duplicate primary key).
-        bool failureAllowed = Mods.OfType<IApplicableFailOverride>().All(m => m.PerformFail());
+        var failureAllowed = Mods.OfType<IApplicableFailOverride>().All(m => m.PerformFail());
 
         if (failureAllowed && healthProcessor != null && gameplayState != null && scoreManager != null && ReplayScore == null)
         {

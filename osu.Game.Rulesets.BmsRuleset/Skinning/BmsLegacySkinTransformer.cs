@@ -128,17 +128,8 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
 
     public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
     {
-        // The playfield asks for the whole HUD container using osu!'s global lookup. Legacy BMS
-        // skins should receive the minimal native HUD we can safely provide, but health display is
-        // intentionally excluded because BMS gauge is implemented separately from osu!'s HP bar.
-        if (lookup is GlobalSkinnableContainerLookup containerLookup
-            && containerLookup.Lookup == GlobalSkinnableContainers.MainHUDComponents)
-        {
-            if (containerLookup.Ruleset != null)
-                return IsProvidingLegacyResources ? createLegacyHud() : BmsBuiltInSkinTransformer.WithoutHealthDisplay(base.GetDrawableComponent(lookup));
-
-            return BmsBuiltInSkinTransformer.WithoutHealthDisplay(base.GetDrawableComponent(lookup));
-        }
+        var hud = BmsDefaultHud.GetDrawableComponent(lookup);
+        if (hud != null) return hud;
 
         // Judgement lookups are not BMS-specific lookup objects; osu! asks by HitResult. Map them
         // to BMS judgement assets only when this transformer is actually active for legacy resources.
@@ -314,11 +305,13 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
             case BmsLayoutVariant.Bms5K:
             case BmsLayoutVariant.Bms5K2P:
                 yield return 6;
+
                 break;
 
             case BmsLayoutVariant.Bme7K:
             case BmsLayoutVariant.Bme7K2P:
                 yield return 8;
+
                 break;
         }
     }

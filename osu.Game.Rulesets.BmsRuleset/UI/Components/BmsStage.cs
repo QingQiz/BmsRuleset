@@ -13,7 +13,7 @@ using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 
 public sealed partial class BmsStage : CompositeDrawable
 {

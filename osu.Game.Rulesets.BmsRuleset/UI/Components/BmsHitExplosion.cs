@@ -6,7 +6,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 
 public sealed partial class BmsHitExplosion : CompositeDrawable
 {
