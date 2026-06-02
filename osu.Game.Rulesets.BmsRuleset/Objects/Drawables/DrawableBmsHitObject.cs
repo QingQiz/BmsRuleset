@@ -3,7 +3,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Layout;
-using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
@@ -463,12 +462,11 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     protected override JudgementResult CreateResult(Judgement judgement) => new(HitObject, judgement);
 
+    /// <summary>
+    /// the key sound is proceeded by the play filed, so the sample is no need to load.
+    /// </summary>
     protected override void LoadSamples()
     {
-        if (!string.IsNullOrEmpty(HitObject.SamplePath))
-            Samples.Samples = [new BmsSampleInfo(HitObject.SamplePath)];
-        else
-            base.LoadSamples();
     }
 
     #endregion
@@ -560,7 +558,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             playfield?.ScrollSpeedMultiplier ?? 1,
             playfield?.TimingMap,
             playfield?.CurrentScrollPosition ?? Time.Current,
-            playfield?.ScrollRange ?? (playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(8)));
+            playfield?.ScrollRange ?? playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(8));
 
         latestLayout = layout;
         updateNoteHeight(layout);
