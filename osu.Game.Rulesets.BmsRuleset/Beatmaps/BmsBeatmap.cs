@@ -37,8 +37,9 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public override IEnumerable<BeatmapStatistic> GetStatistics()
     {
-        var notes = HitObjects.Count(h => !h.IsMine);
-        var holdNotes = HitObjects.Count(h => h.IsLongNote);
+        var notes = HitObjects.Count(h => !h.IsMine && !isScratch(h));
+        var holdNotes = HitObjects.Count(h => h.IsLongNote && !isScratch(h));
+        var scratch = HitObjects.Count(isScratch);
         var mines = HitObjects.Count(h => h.IsMine);
 
         return
@@ -57,10 +58,24 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
             },
             new BeatmapStatistic
             {
-                Name = "Mines",
+                Name = "Scratches",
                 CreateIcon = () => new BeatmapStatisticIcon(BeatmapStatisticsIconType.Spinners),
+                Content = scratch.ToString(),
+            },
+            new BeatmapStatistic
+            {
+                Name = "Mines",
+                CreateIcon = () => new BeatmapStatisticIcon(BeatmapStatisticsIconType.Circles),
                 Content = mines.ToString(),
             },
         ];
+
+        bool isScratch(BmsHitObject h) => LayoutVariant switch
+        {
+            BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P => h.Column == 0,
+            BmsLayoutVariant.Bms5KDouble => h.Column is 0 or 11,
+            BmsLayoutVariant.Bme7KDouble => h.Column is 0 or 15,
+            _ => false,
+        };
     }
 }
