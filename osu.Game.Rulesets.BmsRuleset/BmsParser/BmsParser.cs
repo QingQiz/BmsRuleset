@@ -55,6 +55,10 @@ internal static partial class BmsChartParser
             .OrderBy(e => e.Time)
             .ThenBy(e => e.Tick)
             .ToArray();
+        var textEvents = collectTextEvents(state, measureStarts, timingMap)
+            .OrderBy(e => e.Time)
+            .ThenBy(e => e.Tick)
+            .ToArray();
 
         return new BmsParseResult(
             state.Title,
@@ -71,7 +75,8 @@ internal static partial class BmsChartParser
             collectBackgroundSampleEvents(state, measureStarts, timingMap).ToArray(),
             longNoteTailSampleEvents,
             hitObjects,
-            state.BranchDecisions.ToArray());
+            state.BranchDecisions.ToArray(),
+            textEvents);
     }
 
     private static void parseLine(string line, ParseState state)
@@ -175,6 +180,11 @@ internal static partial class BmsChartParser
                         && stopValue > 0:
                 state.StopDefinitions[command[4..6]] = stopValue;
                 break;
+
+            case 6 when command.StartsWith("TEXT", StringComparison.OrdinalIgnoreCase)
+                        && value.Length > 0:
+                state.TextDefinitions[command[4..6]] = value;
+                break;
         }
     }
 
@@ -184,6 +194,19 @@ internal static partial class BmsChartParser
         return from line in state.ChannelLines.Where(l => l.Channel == "01")
                from cell in expandCells(line, measureStarts, false)
                select new BmsSampleEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, cell.Value);
+    }
+
+    private static IEnumerable<BmsTextEvent> collectTextEvents(
+        ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
+    {
+        return state.ChannelLines
+            .Where(l => l.Channel == "99")
+            .SelectMany(line => expandCells(line, measureStarts, false))
+            .Where(cell => state.TextDefinitions.ContainsKey(cell.Value))
+            .Select(cell => new BmsTextEvent(
+                timingMap.ProjectTickToTime(cell.Tick),
+                cell.Tick,
+                state.TextDefinitions[cell.Value]));
     }
 
     private static IEnumerable<BmsSampleEvent> collectLongNoteTailSampleEvents(IEnumerable<BmsParsedHitObject> hitObjects)
@@ -596,6 +619,8 @@ internal static partial class BmsChartParser
         public Dictionary<string, double> StopDefinitions { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public Dictionary<string, string> SampleDefinitions { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public Dictionary<string, string> TextDefinitions { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public HashSet<string> LnObjValues { get; } = new(StringComparer.OrdinalIgnoreCase);
 

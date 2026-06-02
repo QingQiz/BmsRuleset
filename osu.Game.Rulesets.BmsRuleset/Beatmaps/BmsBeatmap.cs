@@ -21,7 +21,7 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
     ///     BMS #TOTAL value: gauge recovery coefficient.
     ///     Zero means the default formula applies.
     /// </summary>
-    public double Total { get; set; } = 0;
+    public double Total { get; set; }
 
     public BmsTimingMap? TimingMap { get; set; }
 
@@ -32,6 +32,8 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
     public IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; } = [];
 
     public IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; } = [];
+
+    public IReadOnlyList<BmsTextEvent> TextEvents { get; set; } = [];
 
     public override IEnumerable<BeatmapStatistic> GetStatistics()
     {

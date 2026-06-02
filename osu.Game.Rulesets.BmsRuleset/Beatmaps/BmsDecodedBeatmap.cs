@@ -26,6 +26,8 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 
     public IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; } = [];
 
+    public IReadOnlyList<BmsTextEvent> TextEvents { get; set; } = [];
+
     public string[] RawLines { get; set; } = [];
 
     public void CopyFrom(BmsParseResult parseResult)
@@ -40,5 +42,6 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
         BackgroundSampleEvents = parseResult.BackgroundSampleEvents;
         LongNoteTailSampleEvents = parseResult.LongNoteTailSampleEvents;
         BranchDecisions = parseResult.BranchDecisions;
+        TextEvents = parseResult.TextEvents;
     }
 }

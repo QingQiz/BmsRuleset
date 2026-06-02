@@ -29,6 +29,8 @@ public interface IBmsBeatmap
     IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; }
 
     IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; }
+
+    IReadOnlyList<BmsTextEvent> TextEvents { get; set; }
 }
 
 internal static class BmsBeatmapExtensions
@@ -45,5 +47,6 @@ internal static class BmsBeatmapExtensions
         target.BackgroundSampleEvents = source.BackgroundSampleEvents;
         target.LongNoteTailSampleEvents = source.LongNoteTailSampleEvents;
         target.BranchDecisions = source.BranchDecisions;
+        target.TextEvents = source.TextEvents;
     }
 }

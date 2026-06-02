@@ -17,7 +17,8 @@ public sealed record BmsParseResult(
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents,
     IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents,
     IReadOnlyList<BmsParsedHitObject> HitObjects,
-    IReadOnlyList<BmsBranchDecision> BranchDecisions);
+    IReadOnlyList<BmsBranchDecision> BranchDecisions,
+    IReadOnlyList<BmsTextEvent> TextEvents);
 
 public readonly record struct BmsBranchDecision(int MaxValue, int SelectedValue);
 
@@ -36,3 +37,5 @@ public readonly record struct BmsParsedHitObject(
     string LandmineExplosionSamplePath);
 
 public sealed record BmsSampleEvent(double Time, long Tick, string SampleKey);
+
+public sealed record BmsTextEvent(double Time, long Tick, string Text);
