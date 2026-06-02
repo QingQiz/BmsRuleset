@@ -19,7 +19,6 @@ using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
-using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -85,7 +84,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     private const double max_scroll_speed = BmsRulesetConfigManager.MAX_SCROLL_SPEED;
     private const double scroll_speed_delta = 1;
 
-    private const float health_display_gap = 24;
     private const float minimum_side_padding = 20;
 
     #endregion
@@ -157,8 +155,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private readonly IReadOnlyList<BmsHitObject> hitObjects;
     private readonly BmsBeatmap? beatmap;
-
-    private BmsHealthDisplay? healthDisplay;
 
     private BmsHealthProcessor? healthProcessor => resolvedHealthProcessor as BmsHealthProcessor;
 
@@ -423,15 +419,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, 512);
 
-        if (healthProcessor != null)
-        {
-            AddInternal(healthDisplay = new BmsHealthDisplay
-            {
-                Anchor = Anchor.TopLeft,
-                Origin = Anchor.TopCentre,
-            });
-        }
-
         if (samplePlaybackDisabler != null)
             samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
 
@@ -474,7 +461,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         updateHud();
 
         updateStageScale();
-        updateHealthDisplayLayout();
     }
 
     #endregion
@@ -497,39 +483,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (!Stage.IsLoaded || Stage.DrawWidth <= 0 || DrawWidth <= 0)
             return;
 
-        var healthReserve = Math.Max(64, (healthDisplay?.IsLoaded == true ? healthDisplay.DrawWidth : 0) + health_display_gap + minimum_side_padding);
+        var healthReserve = Math.Max(64, minimum_side_padding);
         var availableWidth = Math.Max(1, DrawWidth - healthReserve * 2);
         var scale = Math.Min(1, availableWidth / Stage.DrawWidth);
 
         if (float.IsFinite(scale) && scale > 0)
             Stage.Scale = new Vector2(scale, 1);
     }
-
-    private void updateHealthDisplayLayout()
-    {
-        if (!Stage.IsLoaded || healthDisplay?.IsLoaded != true)
-            return;
-
-        var stageQuad = Stage.ScreenSpaceDrawQuad;
-
-        if (!isFinite(stageQuad.TopRight) || !isFinite(stageQuad.BottomRight))
-            return;
-
-        var stageTopRight = ToLocalSpace(stageQuad.TopRight);
-        var stageHeight = (stageQuad.BottomRight - stageQuad.TopRight).Length;
-        var healthScale = Math.Min(1, stageHeight / Math.Max(1, healthDisplay.DrawHeight));
-        var position = new Vector2(stageTopRight.X + health_display_gap, stageTopRight.Y);
-
-        if (!isFinite(stageTopRight) || !float.IsFinite(stageHeight) ||
-            stageHeight <= 0 || !float.IsFinite(healthScale) ||
-            healthScale <= 0 || !isFinite(position))
-            return;
-
-        healthDisplay.Scale = new Vector2(healthScale);
-        healthDisplay.Position = position;
-    }
-
-    private static bool isFinite(Vector2 value) => float.IsFinite(value.X) && float.IsFinite(value.Y);
 
     #endregion
 

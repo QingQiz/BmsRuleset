@@ -33,6 +33,7 @@ public static class BmsDefaultHud
             Children =
             [
                 new BmsTextHud(),
+                new BmsHealthDisplay(),
                 new LegacyScoreCounter(),
             ],
         };

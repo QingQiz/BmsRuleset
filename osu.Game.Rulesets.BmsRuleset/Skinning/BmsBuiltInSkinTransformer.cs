@@ -1,6 +1,7 @@
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
 
@@ -45,7 +46,9 @@ public partial class BmsBuiltInSkinTransformer(ISkin skin) : SkinTransformer(ski
 {
     /// <inheritdoc/>
     public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup) =>
-        BmsDefaultHud.GetDrawableComponent(lookup) ?? base.GetDrawableComponent(lookup);
+        lookup is BmsSkinComponentLookup or SkinComponentLookup<HitResult>
+            ? null
+            : BmsDefaultHud.GetDrawableComponent(lookup) ?? base.GetDrawableComponent(lookup);
 
     /// <inheritdoc/>
     public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)

@@ -9,7 +9,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
@@ -239,21 +238,6 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
     private bool hasAnimation(string name) => GetLegacyAnimation(name) != null;
 
     private bool hasAnyAnimation(params string[] names) => names.Any(hasAnimation);
-
-    private Drawable createLegacyHud() => new DefaultSkinComponentsContainer(container =>
-    {
-        foreach (var d in container.OfType<ISerialisableDrawable>())
-            d.UsesFixedAnchor = true;
-    })
-    {
-        Children =
-        [
-            new LegacyScoreCounter(),
-            new LegacyAccuracyCounter(),
-            new LegacySongProgress(),
-            new BarHitErrorMeter { Anchor = Anchor.BottomCentre, Origin = Anchor.CentreLeft, Rotation = -90 },
-        ],
-    };
 
     private IEnumerable<BmsSkinConfiguration> getConfigurations()
     {
