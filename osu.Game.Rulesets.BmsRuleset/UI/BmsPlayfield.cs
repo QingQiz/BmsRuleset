@@ -38,6 +38,12 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
 {
 
+    #region HUD fields
+
+    private readonly BmsTextEventManager textEventManager = null!;
+
+    #endregion
+
     #region Disposal
 
     protected override void Dispose(bool isDisposing)
@@ -112,27 +118,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #endregion
 
-    #region HUD fields
-
-    public readonly BindableDouble ConfiguredScrollSpeed = new(default_scroll_speed);
-    private readonly BmsTextEventManager textEventManager = null!;
-
-    #endregion
-
-    #region Events
-
-    /// <summary>
-    /// BMS text event
-    /// </summary>
-    public event Action<string>? TextEvent;
-
-    /// <summary>
-    /// BMS scroll speed changed
-    /// </summary>
-    public event Action<double>? ScrollSpeedChangeEvent;
-
-    #endregion
-
     #region Judgement display fields
 
     private readonly Dictionary<HitResult, SkinnableDrawable> judgementDrawableCache = new();
@@ -197,12 +182,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     #endregion
 
     #region Construction
-
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
-    public BmsPlayfield()
-    {
-    }
-#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
     /// <inheritdoc />
     /// <summary>
@@ -406,12 +385,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         ScrollSpeed = Math.Clamp(scrollSpeed, min_scroll_speed, max_scroll_speed);
         recalculateSpeedFields();
-        ScrollSpeedChangeEvent?.Invoke(scrollSpeed);
+        BmsEventBus.OnScrollSpeedChangeEvent(scrollSpeed);
     }
 
     public void SetConfiguredScrollSpeed(double speed)
     {
-        ConfiguredScrollSpeed.Value = speed;
+        BmsPlayerShared.ConfiguredScrollSpeed = speed;
         ScrollSpeed = speed;
         recalculateSpeedFields();
     }
@@ -428,7 +407,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private void updateHud()
     {
-        textEventManager.Update(Time.Current, text => TextEvent?.Invoke(text));
+        textEventManager.Update(Time.Current, BmsEventBus.OnTextEvent);
     }
 
     #endregion
@@ -600,7 +579,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         if (result == HitResult.Meh && textEventManager.Mistake != null)
         {
-            TextEvent?.Invoke(textEventManager.Mistake);
+            BmsEventBus.OnTextEvent(textEventManager.Mistake);
         }
 
         var evicted = Stage.JudgementArea.ToArray();

@@ -23,19 +23,20 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 /// </summary>
 public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageResourceProvider
 {
-    [Resolved]
-    protected GameHost Host { get; private set; } = null!;
 
     protected override bool HasCustomSteps => true;
 
     protected override double TimePerAction => 0;
 
-    protected override Ruleset CreatePlayerRuleset() => new BmsRuleset();
-
     /// <summary>
     /// The currently-loaded <see cref="BmsPlayfield"/>. Must be called after the player is loaded.
     /// </summary>
     protected BmsPlayfield Playfield => (BmsPlayfield)Player.DrawableRuleset.Playfield;
+
+    [Resolved]
+    protected GameHost Host { get; private set; } = null!;
+
+    protected override Ruleset CreatePlayerRuleset() => new BmsRuleset();
 
     /// <summary>
     /// Creates a <see cref="BmsTestSkins.SkinnedTestPlayer"/> backed by the requested skin.
@@ -63,4 +64,5 @@ public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageReso
         Host.CreateTextureLoaderStore(underlyingStore);
 
     #endregion
+
 }

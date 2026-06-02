@@ -38,6 +38,9 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     public override int Variant => (int)((BmsBeatmap)Beatmap).LayoutVariant;
 
+    [Cached]
+    private BmsSampleStore sampleStore = new(((BmsBeatmap)beatmap).SampleDefinitions.Values);
+
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
     [Resolved(CanBeNull = true)]
     private HealthProcessor? healthProcessor { get; set; }
@@ -47,12 +50,6 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     [Resolved(CanBeNull = true)]
     private ScoreManager? scoreManager { get; set; }
-
-    [Cached]
-    private BmsSampleStore sampleStore = new(((BmsBeatmap)beatmap).SampleDefinitions.Values);
-
-    [Cached]
-    private BmsPlayfield playfield { get; set; } = new();
 
     #region Disposal
 
@@ -81,7 +78,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     {
         var beatmap = (BmsBeatmap)Beatmap;
         var autoScratch = Mods.OfType<BmsModAutoScratch>().FirstOrDefault();
-        return playfield = new BmsPlayfield(beatmap,
+        return new BmsPlayfield(beatmap,
             Mods.OfType<BmsModAutoplay>().Any(),
             autoScratch != null,
             autoScratch?.HideScratch.Value ?? false);

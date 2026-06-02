@@ -1,5 +1,4 @@
 using osu.Framework.Allocation;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -15,9 +14,6 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
 {
     public bool UsesFixedAnchor { get; set; }
 
-    [Resolved]
-    private BmsPlayfield playfield { get; set; } = null!;
-
     private SpriteText mainText = null!;
     private SpriteText arrowText = null!;
 
@@ -27,14 +23,15 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
         Origin = Anchor.TopCentre;
         Y = 36;
         AutoSizeAxes = Axes.Both;
-        Alpha = 0;
     }
 
     protected override void LoadComplete()
     {
         base.LoadComplete();
-        playfield.TextEvent += ShowText;
-        playfield.ScrollSpeedChangeEvent += x => ShowScrollSpeed(x, playfield.ConfiguredScrollSpeed.Value);
+        BmsEventBus.TextEvent += showText;
+        BmsEventBus.ScrollSpeedChangeEvent += x => showScrollSpeed(x, BmsPlayerShared.ConfiguredScrollSpeed);
+        mainText.Text = "Game Start";
+        this.Delay(1000).FadeOut(1000);
     }
 
     [BackgroundDependencyLoader]
@@ -45,7 +42,8 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
             new Box
             {
                 RelativeSizeAxes = Axes.Both,
-                Colour = Color4.Black.Opacity(0.55f),
+                Colour = Color4.Black,
+                Alpha = 0.55f,
             },
             new FillFlowContainer
             {
@@ -69,7 +67,7 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
         ];
     }
 
-    public void ShowScrollSpeed(double speed, double configured)
+    private void showScrollSpeed(double speed, double configured)
     {
         var delta = speed - configured;
         var colour = delta > 0 ? new Color4(255, 200, 0, 255)
@@ -83,7 +81,7 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
         animateShow(1000);
     }
 
-    public void ShowText(string text)
+    private void showText(string text)
     {
         arrowText.Text = string.Empty;
         mainText.Text = text;

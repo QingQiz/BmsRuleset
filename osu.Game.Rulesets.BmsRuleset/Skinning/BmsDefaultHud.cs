@@ -1,7 +1,6 @@
 ﻿using System.Linq;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
-using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
@@ -16,14 +15,14 @@ public static class BmsDefaultHud
         if (containerLookup.Lookup != GlobalSkinnableContainers.MainHUDComponents)
             return null;
 
-        return containerLookup.Ruleset == null ? globalHud() : rulesetHud();
+        return containerLookup.Ruleset == null ? gHud() : bmsHud();
     }
 
     /// <summary>
-    /// play field
+    /// playfield, etc. hud in this can resolve DI in BmsDrawableRuleset
     /// </summary>
     /// <returns></returns>
-    private static Drawable rulesetHud()
+    private static Drawable bmsHud()
     {
         return new DefaultSkinComponentsContainer(container =>
         {
@@ -33,24 +32,17 @@ public static class BmsDefaultHud
         {
             Children =
             [
-                // new ArgonSongProgress(),
                 new BmsTextHud(),
-
-                new BarHitErrorMeter
-                {
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.CentreLeft,
-                    Rotation = -90,
-                },
+                new LegacyScoreCounter(),
             ],
         };
     }
 
     /// <summary>
-    /// score, acc, combo, etc
+    /// hud. hud in this can NOT resolve DI in BmsDrawableRuleset
     /// </summary>
     /// <returns></returns>
-    private static Drawable globalHud()
+    private static Drawable gHud()
     {
         return new DefaultSkinComponentsContainer(container =>
         {
@@ -58,10 +50,7 @@ public static class BmsDefaultHud
                 d.UsesFixedAnchor = true;
         })
         {
-            Children =
-            [
-                new LegacyScoreCounter(),
-            ],
+            Children = [],
         };
     }
 }
