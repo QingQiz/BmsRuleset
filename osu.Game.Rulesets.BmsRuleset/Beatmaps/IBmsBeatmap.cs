@@ -30,7 +30,7 @@ public interface IBmsBeatmap
 
     IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; }
 
-    IReadOnlyList<BmsTextEvent> TextEvents { get; set; }
+    BmsTextEvents TextEvents { get; set; }
 }
 
 internal static class BmsBeatmapExtensions

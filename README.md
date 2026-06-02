@@ -36,19 +36,21 @@ To remove all imported BMS content, use the **"Delete all imported BMS files"** 
 
 **Header fields decoded:**
 
-| Field                | Command                                                     |
-|----------------------|-------------------------------------------------------------|
+| Field                | Command                                                     | Description                                                                       |
+|----------------------|-------------------------------------------------------------|-----------------------------------------------------------------------------------|
 | Title, Artist, Genre | `#TITLE`, `#ARTIST`, `#GENRE`                               |
-| Play level           | `#PLAYLEVEL` (appended to difficulty name as display label) |
-| Initial BPM          | `#BPM`                                                      |
-| Extended BPM table   | `#BPMxx`                                                    |
-| STOP table           | `#STOPxx`                                                   |
-| Sample definitions   | `#WAVxx`                                                    |
-| Long-note type       | `#LNTYPE 1` / `#LNTYPE 2` / `#LNOBJ`                        |
-| Judge rank           | `#RANK` (0–4, affects hit windows)                          |
-| Gauge total          | `#TOTAL`                                                    |
-| Player mode          | `#PLAYER`                                                   | **ignored** — layout is inferred from channel presence and file extension only |
-| Measure length       | channel `02`                                                |
+| Play level           | `#PLAYLEVEL` (appended to difficulty name as display label) |                                                                                   |
+| Initial BPM          | `#BPM`                                                      |                                                                                   |
+| Extended BPM table   | `#BPMxx`                                                    |                                                                                   |
+| STOP table           | `#STOPxx`                                                   |                                                                                   |
+| Sample definitions   | `#WAVxx`                                                    |                                                                                   |
+| Long-note type       | `#LNTYPE 1` / `#LNTYPE 2` / `#LNOBJ`                        |                                                                                   |
+| Judge rank           | `#RANK` (0–4, affects hit windows)                          |                                                                                   |
+| Gauge total          | `#TOTAL`                                                    |                                                                                   |
+| Player mode          | `#PLAYER`                                                   | **ignored** — layout is inferred from channel presence and file extension only    |
+| Measure length       | channel `02`                                                |                                                                                   |
+| Text events          | `#TEXTxx`, `#SONGxx`, channel `99`                          |                                                                                   |
+| Random               | `#IF`, `#SWITCH`, and related commands                      | game play supported, but metadata display for different branch is not implemented |
 
 **Channels parsed:**
 
@@ -59,6 +61,7 @@ To remove all imported BMS content, use the **"Delete all imported BMS files"** 
 | `03`        | Inline hex BPM change                   |
 | `08`        | Extended BPM change (`#BPMxx` lookup)   |
 | `09`        | STOP event (`#STOPxx` lookup)           |
+| `99`        | TEXT event (`#TEXTxx`/`#SONGxx` lookup) |
 | `1x` / `2x` | Playable notes — P1 / P2                |
 | `5x` / `6x` | Long note channels — P1 / P2            |
 | `Dx` / `Ex` | Landmine channels — P1 / P2             |
@@ -161,13 +164,16 @@ Easy / Hard / Ex-Hard / Hazard gauge variants are not yet implemented.
 
 ### Mods
 
-| Mod                          | Status                |
-|------------------------------|-----------------------|
-| Autoplay                     | Working               |
-| Double Time / Half Time      | Working (rate change) |
-| No Fail                      | Working               |
-| Cinema                       | Working               |
-| Random / Mirror / gauge mods | Not implemented       |
+| Mod                        | Description                            |                 |
+|----------------------------|----------------------------------------|-----------------|
+| Autoplay                   | auto play                              |                 |
+| Double Time / Half Time    |                                        | Not Tested      |
+| No Fail                    |                                        |                 |
+| Cinema                     |                                        | Working         |
+| Random / gauge mods        |                                        | Not implemented |
+| Mirror                     |                                        |                 |
+| 2P                         | change the player layout from 1P to 2P |                 |
+| Auto Scratch /Hide Scratch | auto play/hide scratch lane            |                 |
 
 ---
 
@@ -416,7 +422,6 @@ The full built-in skin (covering all 6 layouts) is at
 | **Parser**     | Channel `04`/`06`/`07`/`0A`–`0E` — BGA layers                                               |
 | **Parser**     | Channel `17` / `27` — free-zone keys                                                        |
 | **Parser**     | Channel `31`–`49` — invisible notes                                                         |
-| **Parser**     | Channel `99` / `#TEXTxx` — text events                                                      |
 | **Parser**     | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                   |
 | **Renderer**   | BGA / movie / stagefile / background image                                                  |
 | **Renderer**   | Key beams (column light during hold)                                                        |
@@ -434,11 +439,11 @@ The full built-in skin (covering all 6 layouts) is at
 ---
 
 <details>
-  <summary>dev road. Click to expand!</summary>
+  <summary>dev...</summary>
 
 ## FIXME
 
-- [ ] **高BPM段帧率骤降 (~1000fps → ~200fps)** —
+- [-] **高BPM段帧率骤降 (~1000fps → ~200fps)** —
   通过分别屏蔽key-sound和BGM定位：仅key-sound时，加速段帧率缓慢平滑下降至较低值后突然恢复1000fps；仅BGM时，加速段某时刻突然暴跌至低帧率后迅速回升。详见
   `BmsBackgroundAudioPlayer.cs` 和 `BmsChartSampleSound.cs`。
 - [ ] autoplay random，到后半会卡死
@@ -504,11 +509,9 @@ The full built-in skin (covering all 6 layouts) is at
     - [ ] `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — 视频
     - [ ] `#STAGEFILE` / `#BANNER` / `#BACKBMP` — 界面图像（非资源扫描）
     - [ ] `#CHARFILE` / `#ExtChr` — 角色/皮肤
-    - [ ] `#TEXTxx` / channel `99` — 文本事件
     - [ ] `#CHANGEOPTIONxx` / channel `A6` — 动态 option
     - [ ] `#OPTION` — 强制 option
     - [ ] `#OCT/FP` — 八度/踏板
-    - [ ] `#SONGxx` — PMS 备用音频
     - [ ] `#CDDA` / `#MIDIFILE` — CD / MIDI
     - [ ] `#COMMENT` — 选歌注释
     - [ ] `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — 资源组
@@ -566,5 +569,7 @@ The full built-in skin (covering all 6 layouts) is at
     - [ ] 把我们的血条注册为可配置的HUD
 
 - [ ] 误差条现在不更新
+
+- [ ] 结算时不同判定的文字颜色
 
 </details>

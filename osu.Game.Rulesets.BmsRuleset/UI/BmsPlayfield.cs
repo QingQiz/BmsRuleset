@@ -115,13 +115,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #endregion
 
-    #region Scroll speed fields
+    #region HUD fields
 
     private readonly BindableDouble configuredScrollSpeed = new(default_scroll_speed);
-
-    private readonly Container scrollSpeedHud;
-    private SpriteText scrollSpeedText = null!;
-    private SpriteText scrollSpeedArrow = null!;
+    private readonly BmsTextHud textHud;
+    private readonly BmsTextEventManager textEventManager = null!;
 
     #endregion
 
@@ -214,7 +212,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         Origin = Anchor.Centre;
         RelativeSizeAxes = Axes.Both;
 
-        scrollSpeedHud = createScrollSpeedHud();
+        textHud = new BmsTextHud();
         judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both };
 
         InternalChildren =
@@ -223,7 +221,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             HitObjectContainer,
             keySound,
             landmineSound,
-            scrollSpeedHud,
+            textHud,
             judgementDrawablePool,
         ];
     }
@@ -236,6 +234,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         : this(beatmap.HitObjects, beatmap.TotalColumns, beatmap.LayoutVariant, isAutoplay, beatmap.TimingMap, isAutoScratch, hideScratch)
     {
         this.beatmap = beatmap;
+        textEventManager = new BmsTextEventManager(beatmap.TextEvents);
     }
 
     #endregion
@@ -387,13 +386,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #endregion
 
-    #region Scroll speed
+    #region HUD
 
     public void SetScrollSpeed(double scrollSpeed)
     {
         ScrollSpeed = Math.Clamp(scrollSpeed, min_scroll_speed, max_scroll_speed);
         recalculateSpeedFields();
-        showScrollSpeedText();
+        textHud.ShowScrollSpeed(ScrollSpeed, configuredScrollSpeed.Value);
     }
 
     public void SetConfiguredScrollSpeed(double speed)
@@ -411,6 +410,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         ScrollSpeedMultiplier = ScrollSpeed / default_scroll_speed;
         TimeRange = BaseScrollRange / ScrollSpeedMultiplier;
         ScrollRange = BaseScrollRange;
+    }
+
+    private void updateHud()
+    {
+        textEventManager.Update(Time.Current, text => textHud.ShowText(text));
     }
 
     #endregion
@@ -474,6 +478,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         ScrollRange = BaseScrollRange;
 
         processAutoScratch();
+        updateHud();
 
         updateStageScale();
         updateHealthDisplayLayout();
@@ -579,6 +584,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (!judgementDrawableCache.TryGetValue(result, out var drawable))
             return;
 
+        if (result == HitResult.Meh && textEventManager.Mistake != null)
+        {
+            textHud.ShowText(textEventManager.Mistake);
+        }
+
         var evicted = Stage.JudgementArea.ToArray();
         Stage.JudgementArea.Clear(false);
 
@@ -594,62 +604,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             drawable.ResetAnimation();
             animatable.PlayAnimation();
         }
-    }
-
-    #endregion
-
-    #region Scroll speed HUD
-
-    private Container createScrollSpeedHud() => new()
-    {
-        Anchor = Anchor.TopCentre,
-        Origin = Anchor.TopCentre,
-        Y = 36,
-        AutoSizeAxes = Axes.Both,
-        Alpha = 0,
-        Children =
-        [
-            new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-                Colour = Color4.Black.Opacity(0.55f),
-            },
-            new FillFlowContainer
-            {
-                AutoSizeAxes = Axes.Both,
-                Direction = FillDirection.Horizontal,
-                Padding = new MarginPadding { Horizontal = 10, Vertical = 4 },
-                Children =
-                [
-                    scrollSpeedArrow = new SpriteText
-                    {
-                        Font = OsuFont.Default.With(size: 24, weight: FontWeight.Bold),
-                        Colour = Color4.White,
-                    },
-                    scrollSpeedText = new SpriteText
-                    {
-                        Font = OsuFont.Default.With(size: 24, weight: FontWeight.Bold),
-                        Colour = Color4.White,
-                    },
-                ],
-            },
-        ],
-    };
-
-    private void showScrollSpeedText()
-    {
-        var configured = configuredScrollSpeed.Value;
-        var delta = ScrollSpeed - configured;
-        var colour = delta > 0 ? new Color4(255, 200, 0, 255)
-            : delta < 0 ? new Color4(100, 180, 255, 255)
-            : Color4.White;
-
-        scrollSpeedArrow.Text = delta > 0 ? ">>" : delta < 0 ? "<<" : "";
-        scrollSpeedArrow.Colour = colour;
-        scrollSpeedText.Text = $"{ScrollSpeed:0.0}";
-        scrollSpeedText.Colour = colour;
-        scrollSpeedHud.ClearTransforms();
-        scrollSpeedHud.FadeIn(80).Delay(1000).FadeOut(300);
     }
 
     #endregion

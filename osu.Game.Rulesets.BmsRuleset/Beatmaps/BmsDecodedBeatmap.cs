@@ -14,7 +14,7 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 
     public int Rank { get; set; } = 2;
 
-    public double Total { get; set; } = 0;
+    public double Total { get; set; }
 
     public BmsTimingMap? TimingMap { get; set; }
 
@@ -26,7 +26,7 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 
     public IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; } = [];
 
-    public IReadOnlyList<BmsTextEvent> TextEvents { get; set; } = [];
+    public BmsTextEvents TextEvents { get; set; } = new(string.Empty, []);
 
     public string[] RawLines { get; set; } = [];
 

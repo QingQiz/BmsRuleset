@@ -18,7 +18,7 @@ public sealed record BmsParseResult(
     IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents,
     IReadOnlyList<BmsParsedHitObject> HitObjects,
     IReadOnlyList<BmsBranchDecision> BranchDecisions,
-    IReadOnlyList<BmsTextEvent> TextEvents);
+    BmsTextEvents TextEvents);
 
 public readonly record struct BmsBranchDecision(int MaxValue, int SelectedValue);
 
@@ -39,3 +39,5 @@ public readonly record struct BmsParsedHitObject(
 public sealed record BmsSampleEvent(double Time, long Tick, string SampleKey);
 
 public sealed record BmsTextEvent(double Time, long Tick, string Text);
+
+public sealed record BmsTextEvents(string? MistakeText, BmsTextEvent[] TextEvents);

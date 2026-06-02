@@ -55,10 +55,7 @@ internal static partial class BmsChartParser
             .OrderBy(e => e.Time)
             .ThenBy(e => e.Tick)
             .ToArray();
-        var textEvents = collectTextEvents(state, measureStarts, timingMap)
-            .OrderBy(e => e.Time)
-            .ThenBy(e => e.Tick)
-            .ToArray();
+        var textEvents = collectTextEvents(state, measureStarts, timingMap);
 
         return new BmsParseResult(
             state.Title,
@@ -185,6 +182,16 @@ internal static partial class BmsChartParser
                         && value.Length > 0:
                 state.TextDefinitions[command[4..6]] = value;
                 break;
+
+            case 6 when command.StartsWith("SONG", StringComparison.OrdinalIgnoreCase)
+                        && value.Length > 0:
+            {
+                var key = command[4..6];
+
+                state.TextDefinitions.TryAdd(key, value);
+
+                break;
+            }
         }
     }
 
@@ -196,17 +203,27 @@ internal static partial class BmsChartParser
                select new BmsSampleEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, cell.Value);
     }
 
-    private static IEnumerable<BmsTextEvent> collectTextEvents(
+    /// <summary>
+    /// ordered
+    /// </summary>
+    /// <param name="state"></param>
+    /// <param name="measureStarts"></param>
+    /// <param name="timingMap"></param>
+    /// <returns></returns>
+    private static BmsTextEvents collectTextEvents(
         ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
     {
-        return state.ChannelLines
+        var events = state.ChannelLines
             .Where(l => l.Channel == "99")
             .SelectMany(line => expandCells(line, measureStarts, false))
             .Where(cell => state.TextDefinitions.ContainsKey(cell.Value))
             .Select(cell => new BmsTextEvent(
                 timingMap.ProjectTickToTime(cell.Tick),
                 cell.Tick,
-                state.TextDefinitions[cell.Value]));
+                state.TextDefinitions[cell.Value]))
+            .OrderBy(e => e.Time);
+        state.TextDefinitions.TryGetValue("00", out var mistake);
+        return new BmsTextEvents(mistake, events.ToArray());
     }
 
     private static IEnumerable<BmsSampleEvent> collectLongNoteTailSampleEvents(IEnumerable<BmsParsedHitObject> hitObjects)

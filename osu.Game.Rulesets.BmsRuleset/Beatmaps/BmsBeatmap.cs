@@ -33,7 +33,7 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; } = [];
 
-    public IReadOnlyList<BmsTextEvent> TextEvents { get; set; } = [];
+    public BmsTextEvents TextEvents { get; set; } = new(string.Empty, []);
 
     public override IEnumerable<BeatmapStatistic> GetStatistics()
     {
