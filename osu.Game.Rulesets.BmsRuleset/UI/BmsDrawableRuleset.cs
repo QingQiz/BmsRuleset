@@ -48,6 +48,21 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     [Resolved(CanBeNull = true)]
     private ScoreManager? scoreManager { get; set; }
 
+    private BmsSampleStore sampleStore = null!;
+
+    protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+    {
+        // Cached here (before base.load → CreatePlayfield) so the key-sound player created inside
+        // the playfield can [Resolved] the same shared sample cache. The actual disk read + decode
+        // is kicked off later when the component is added to the tree and async-loaded.
+        var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+
+        sampleStore = new BmsSampleStore(((BmsBeatmap)Beatmap).SampleDefinitions.Values);
+        dependencies.CacheAs(sampleStore);
+
+        return dependencies;
+    }
+
     #region Disposal
 
     protected override void Dispose(bool isDisposing)
@@ -147,10 +162,14 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     {
         var beatmap = (BmsBeatmap)Beatmap;
 
+        // Add the shared sample cache to the tree so it async-loads (and pre-decodes every chart
+        // sample) during the gameplay loading phase.
+        FrameStableComponents.Add(sampleStore);
+
         var events = beatmap.BackgroundSampleEvents
             .OrderBy(e => e.Time)
             .Where(e => beatmap.SampleDefinitions.ContainsKey(e.SampleKey))
-            .Select(e => new BmsBackgroundAudioPlayer.BgmEvent(e.Time, e.SampleKey, new BmsSampleInfo(beatmap.SampleDefinitions[e.SampleKey])))
+            .Select(e => new BmsBackgroundAudioPlayer.BgmEvent(e.Time, beatmap.SampleDefinitions[e.SampleKey]))
             .ToList();
 
         if (events.Count > 0)

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
@@ -52,6 +51,9 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
 
     [Resolved(CanBeNull = true)]
     private AudioManager? audioManager { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private BmsSampleStore? sampleCache { get; set; }
 
     public BmsChartSampleSound()
     {
@@ -189,13 +191,6 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
         cleanupStoppedChannels();
     }
 
-    private static LegacyBeatmapSkin? extractBeatmapSkin(ISkin skin) => skin switch
-    {
-        LegacyBeatmapSkin beatmapSkin => beatmapSkin,
-        SkinTransformer transformer => transformer.Skin as LegacyBeatmapSkin,
-        _ => null,
-    };
-
     [BackgroundDependencyLoader(true)]
     private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
     {
@@ -219,26 +214,15 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
         if (sampleInfo == null)
             return;
 
-        var sample = getBeatmapSample(sampleInfo);
+        // Pull the already-decoded sample from the in-memory preload cache. Do NOT bind any
+        // adjustments to the sample itself: the cache instance is shared across every playback,
+        // so volume/frequency isolation is applied per-channel in Play() instead.
+        var sample = sampleCache?.Get(sampleInfo);
 
         if (sample == null)
             return;
 
-        bindChartAudioAdjustments(sample);
         resolvedSample = new ResolvedSample(sampleInfo, sample);
-    }
-
-    private ISample? getBeatmapSample(ISampleInfo info)
-    {
-        foreach (var skin in CurrentSkin.AllSources.Select(extractBeatmapSkin).Where(s => s != null))
-        {
-            var sample = skin!.GetSample(info);
-
-            if (sample != null)
-                return sample;
-        }
-
-        return null;
     }
 
     private void cleanupStoppedChannels()
