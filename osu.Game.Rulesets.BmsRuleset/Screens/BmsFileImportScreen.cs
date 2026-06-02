@@ -115,7 +115,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
                     TooltipText = "Imports all BMS files from the selected directory and subdirectories",
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
-                    Action = () => startDirectoryImport(true),
+                    Action = () => Task.Run(() => startDirectoryImport(true)),
                 },
             ],
         };
