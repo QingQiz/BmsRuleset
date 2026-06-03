@@ -1,7 +1,10 @@
 ﻿using System.Linq;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
+using osu.Game.Screens.Play.HUD;
+using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 
@@ -34,7 +37,24 @@ public static class BmsDefaultHud
             [
                 new BmsTextHud(),
                 new BmsHealthDisplay(),
-                new LegacyScoreCounter(),
+                new BarHitErrorMeter
+                {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.CentreRight,
+                    Rotation = 90,
+                    Scale = new Vector2(2),
+                },
+                new ArgonScoreCounter
+                {
+                    Anchor = Anchor.TopRight,
+                    Origin = Anchor.TopRight,
+                },
+                new ArgonAccuracyCounter
+                {
+                    Anchor = Anchor.TopRight,
+                    Origin = Anchor.TopRight,
+                    Margin = new MarginPadding { Top = 60 },
+                },
             ],
         };
     }

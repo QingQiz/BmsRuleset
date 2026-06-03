@@ -5,6 +5,10 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 
 public class BmsHitWindows(int rank = 2) : HitWindows
 {
+
+    /// <summary>Fallback BAD window (ms) used when <see cref="HitWindows" /> is unavailable.</summary>
+    public const double FALLBACK_BAD_WINDOW = 200;
+
     // ── LR2 windows (default, symmetric) ────────────────────────────────────
     // Indexed by RANK 0-4: (pgreat, great, good, badEarly, badLate, poorEarly, poorLate, emptyPoorEarly).
     // poorEarly = badEarly (=200) → no POOR hit gap → BmsResultFor never returns
@@ -35,9 +39,6 @@ public class BmsHitWindows(int rank = 2) : HitWindows
         (25, 75, 187, 275, 350, 500, 150, 500),   // RANK 4 - Very Easy (125%)
     ];
 
-    /// <summary>Fallback BAD window (ms) used when <see cref="HitWindows" /> is unavailable.</summary>
-    public const double FALLBACK_BAD_WINDOW = 200;
-
     private readonly int rank = Math.Clamp(rank, 0, 4);
 
     private double pgreatEarly, pgreatLate;
@@ -58,18 +59,6 @@ public class BmsHitWindows(int rank = 2) : HitWindows
     {
         // Swap rank_windows_lr2 → rank_windows_beatoraja to switch implementations.
         loadWindows(rank_windows_lr2[rank]);
-    }
-
-    private void loadWindows((double pgreat, double great, double good, double badEarly, double badLate, double poorEarly, double poorLate, double emptyPoorEarly) w)
-    {
-        pgreatEarly = pgreatLate = w.pgreat;
-        greatEarly = greatLate = w.great;
-        goodEarly = goodLate = w.good;
-        badEarly = w.badEarly;
-        badLate = w.badLate;
-        poorEarly = w.poorEarly;
-        poorLate = w.poorLate;
-        emptyPoorEarly = w.emptyPoorEarly;
     }
 
     /// <inheritdoc />
@@ -103,6 +92,7 @@ public class BmsHitWindows(int rank = 2) : HitWindows
         HitResult.Good => Math.Min(goodEarly, goodLate),
         HitResult.Ok => badLate,
         HitResult.Meh => badLate,
+        HitResult.Miss => badLate,
         _ => 0,
     };
 
@@ -149,5 +139,17 @@ public class BmsHitWindows(int rank = 2) : HitWindows
         if (timeOffset <= poorLate) return HitResult.Meh;
 
         return HitResult.None;
+    }
+
+    private void loadWindows((double pgreat, double great, double good, double badEarly, double badLate, double poorEarly, double poorLate, double emptyPoorEarly) w)
+    {
+        pgreatEarly = pgreatLate = w.pgreat;
+        greatEarly = greatLate = w.great;
+        goodEarly = goodLate = w.good;
+        badEarly = w.badEarly;
+        badLate = w.badLate;
+        poorEarly = w.poorEarly;
+        poorLate = w.poorLate;
+        emptyPoorEarly = w.emptyPoorEarly;
     }
 }
