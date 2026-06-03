@@ -36,7 +36,12 @@ public static class BmsDefaultHud
             Children =
             [
                 new BmsTextHud(),
-                new BmsHealthDisplay(),
+                new BmsHealthDisplay
+                {
+                    Anchor = Anchor.BottomLeft,
+                    Origin = Anchor.BottomLeft,
+                    Margin = new MarginPadding { Horizontal = 10, Vertical = 20 },
+                },
                 new BarHitErrorMeter
                 {
                     Anchor = Anchor.BottomCentre,

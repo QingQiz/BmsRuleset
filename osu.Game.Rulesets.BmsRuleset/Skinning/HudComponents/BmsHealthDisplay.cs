@@ -4,9 +4,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Utils;
-using osu.Game.Graphics;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
@@ -22,12 +20,11 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
     public bool UsesFixedAnchor { get; set; }
 
     private const float bar_width = 30;
-    private const float bar_height = 360;
+    private const float bar_height = 400;
     private const float clear_border = 0.8f;
 
     private readonly Box normalFill;
     private readonly Box clearLine;
-    private readonly SpriteText percentageText;
 
     private BindableNumber<double>? health;
     private double displayedHealth;
@@ -37,23 +34,14 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
 
     public BmsHealthDisplay()
     {
-        Size = new Vector2(58, 430);
+        Size = new Vector2(58, bar_height);
 
         InternalChildren =
         [
-            new SpriteText
-            {
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-                Text = "GROOVE",
-                Font = OsuFont.Default.With(size: 11, weight: FontWeight.Bold),
-                Colour = new Color4(220, 235, 255, 255),
-            },
             new Container
             {
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-                Position = new Vector2(0, 22),
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
                 Size = new Vector2(bar_width, bar_height),
                 Children =
                 [
@@ -88,13 +76,6 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
                     new GaugeTicks(),
                     new GaugeBorder(),
                 ],
-            },
-            percentageText = new SpriteText
-            {
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
-                Font = OsuFont.Numeric.With(size: 14),
-                Colour = Color4.White,
             },
         ];
     }
@@ -133,8 +114,6 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
 
         normalFill.Colour = fillColour;
         clearLine.Alpha = clampedHealth >= clear_border ? 0.85f : 1;
-
-        percentageText.Text = $"{clampedHealth * 100:0.0}%";
     }
 
     private sealed partial class GaugeSegment : Box
