@@ -48,6 +48,20 @@ internal class BmsKeySoundPlayer(
         return currentTime > hitObject.StartTime + hitObject.HitWindows.WindowFor(HitResult.Ok);
     }
 
+    /// <summary>
+    ///     Whether <paramref name="hitObject"/>'s late BAD window has fully expired
+    ///     at <paramref name="currentTime"/>.
+    /// </summary>
+    private static bool isPastBadWindow(BmsHitObject hitObject, double currentTime)
+        => currentTime > hitObject.StartTime + (hitObject.HitWindows?.WindowFor(HitResult.Ok) ?? BmsHitWindows.FALLBACK_BAD_WINDOW);
+
+    /// <summary>
+    ///     Generous lookahead for the binary-search cursor reset, covering the
+    ///     widest possible late BAD window across all supported window implementations.
+    ///     A larger value is safe — the linear scan advances past finished notes anyway.
+    /// </summary>
+    private static double maxLookAhead() => 1000;
+
     #endregion
 
     #region Fields
@@ -113,14 +127,14 @@ internal class BmsKeySoundPlayer(
             || currentTime < lastSearchTime
             || currentTime - lastSearchTime > 5000)
         {
-            nextSoundIndexByColumn[column] = findFirstSoundCandidateIndex(currentTime - BmsHitWindows.BAD_WINDOW);
+            nextSoundIndexByColumn[column] = findFirstSoundCandidateIndex(currentTime - maxLookAhead());
         }
 
         lastSoundSearchTimeByColumn[column] = currentTime;
 
         var index = nextSoundIndexByColumn.GetValueOrDefault(column);
 
-        while (index < hitObjects.Count && hitObjects[index].StartTime < currentTime - BmsHitWindows.BAD_WINDOW)
+        while (index < hitObjects.Count && isPastBadWindow(hitObjects[index], currentTime))
             index++;
 
         while (index < hitObjects.Count)

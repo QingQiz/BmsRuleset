@@ -49,7 +49,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     ///     Total score = accuracy × 1 000 000; bonus portion carries over from base.
     /// </summary>
     protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
-        => 1_000_000 * Accuracy.Value * accuracyProgress + bonusPortion;
+        => 1_000_000 * Accuracy.Value * accuracyProgress;
 
     // EX-score has no combo multiplier — every PGREAT is always worth exactly 2.
     protected override double GetComboScoreChange(JudgementResult result) => 0;

@@ -254,9 +254,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         pressedColumns.Add(column.Value);
         keySoundPlayer.PlayKeySound(column.Value);
 
-        // Use the earliest unjudged note in this column that is within a hit window.
-        // Picking by StartTime (not by distance) ensures strict sequential ordering:
-        // a later note can never be hit before an earlier one in the same column.
+        // Pass 1: find a hittable note — earliest unjudged note whose timing falls within
+        // a judgement window (PGREAT … BAD, or the POOR hit zone).  Picking by StartTime
+        // ensures strict sequential ordering within a column.
         var target = HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
             .Where(d => !d.Judged &&
@@ -269,8 +269,25 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (target?.TryHit() == true)
             return true;
 
+        // Pass 2: no note was consumed — check whether the key press falls in the E-POOR
+        // zone (outside the BAD window but within the EP boundary) of the nearest note.
+        // If so, register an E-POOR; otherwise silently ignore (too early / too late).
         if (!IsAutoplay)
-            registerEmptyPoor();
+        {
+            var nearestUnjudged = HitObjectContainer.AliveObjects
+                .OfType<DrawableBmsHitObject>()
+                .Where(d => !d.Judged &&
+                            !d.HitObject.IsMine &&
+                            d.HitObject.Column == column.Value &&
+                            d.HitObject.HitWindows is BmsHitWindows)
+                .MinBy(d => Math.Abs(Time.Current - d.HitObject.StartTime));
+
+            if (nearestUnjudged?.HitObject.HitWindows is BmsHitWindows epoWindows &&
+                epoWindows.IsEpoZone(Time.Current - nearestUnjudged.HitObject.StartTime))
+            {
+                registerEmptyPoor();
+            }
+        }
 
         return false;
     }
