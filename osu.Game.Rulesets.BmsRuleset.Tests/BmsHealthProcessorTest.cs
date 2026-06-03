@@ -15,7 +15,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestGaugeInitialHealthIsTwentyPercent()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -30,7 +30,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestGaugePgreatGainDrivenByTotal()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -51,7 +51,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestGaugeIsCappedAtOneHundredPercent()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -79,7 +79,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestGaugePoorReducesHealthBySixPercent()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -106,7 +106,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestGaugeBadReducesHealthByFourPercent()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -133,7 +133,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestEmptyPoorReducesHealthByTwoPercent()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -152,7 +152,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestEmptyPoorClampsAtZero()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -170,7 +170,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestLandmineReducesHealthByDamagePercent()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -196,7 +196,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestIgnoredLandmineDoesNotChangeHealth()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -222,7 +222,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestLandmineZzForcesFailure()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -248,7 +248,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestLandminesDoNotCountTowardsTotalGaugeRecovery()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -273,7 +273,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestGaugeClearConditionPassesAtEightyPercent()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -293,7 +293,7 @@ public class BmsHealthProcessorTest
     [Test]
     public void TestGaugeClearConditionFailsBelowEightyPercent()
     {
-        var processor = new BmsHealthProcessor(0);
+        var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,

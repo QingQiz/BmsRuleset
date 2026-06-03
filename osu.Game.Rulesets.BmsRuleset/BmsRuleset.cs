@@ -115,7 +115,7 @@ public class BmsRuleset : Ruleset
         new BmsScoreProcessor();
 
     public override HealthProcessor CreateHealthProcessor(double drainStartTime) =>
-        new BmsHealthProcessor(drainStartTime);
+        new BmsHealthProcessor();
 
     public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
     {

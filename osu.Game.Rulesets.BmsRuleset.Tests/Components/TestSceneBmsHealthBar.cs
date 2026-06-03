@@ -25,7 +25,7 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     {
         AddStep("create display", () =>
         {
-            healthProcessor = new BmsHealthProcessor(0);
+            healthProcessor = new BmsHealthProcessor();
             healthProcessor.ApplyBeatmap(beatmap = new BmsBeatmap
             {
                 LayoutVariant = BmsLayoutVariant.Bme7K,
