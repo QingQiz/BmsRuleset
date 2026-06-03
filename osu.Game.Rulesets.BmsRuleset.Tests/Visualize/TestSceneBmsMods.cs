@@ -29,7 +29,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
     private DrawableBmsHitObject? firstAliveScratchNote()
         => Playfield.HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
-            .FirstOrDefault(d => BmsSkinComponentLookup.IsScratchColumn(d.HitObject.Column, Playfield.LayoutVariant));
+            .FirstOrDefault(d => BmsLayout.IsScratchColumn(d.HitObject.Column, Playfield.LayoutVariant));
 
     [Test]
     public void TestAutoScratch()

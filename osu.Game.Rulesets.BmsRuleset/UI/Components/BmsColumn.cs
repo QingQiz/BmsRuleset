@@ -60,7 +60,7 @@ public sealed partial class BmsColumn : CompositeDrawable
     {
         Index = index;
         this.layoutVariant = layoutVariant;
-        IsScratch = BmsSkinComponentLookup.IsScratchColumn(index, layoutVariant);
+        IsScratch = BmsLayout.IsScratchColumn(index, layoutVariant);
 
         RelativeSizeAxes = Axes.Y;
         Width = defaultColumnWidth(index, layoutVariant);
@@ -108,7 +108,7 @@ public sealed partial class BmsColumn : CompositeDrawable
         : Color4.White.Opacity(0.05f);
 
     private static float defaultColumnWidth(int index, BmsLayoutVariant layoutVariant) =>
-        BmsSkinComponentLookup.IsScratchColumn(index, layoutVariant) ? SCRATCH_COLUMN_WIDTH : COLUMN_WIDTH;
+        BmsLayout.IsScratchColumn(index, layoutVariant) ? SCRATCH_COLUMN_WIDTH : COLUMN_WIDTH;
 
     [BackgroundDependencyLoader]
     private void load()

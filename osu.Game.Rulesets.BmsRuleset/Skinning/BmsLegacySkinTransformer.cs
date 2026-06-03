@@ -103,7 +103,7 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
             layoutVariant = BmsLayout.VariantFromTotalColumns(Math.Max(1, (int)Math.Round(beatmap.BeatmapInfo.Difficulty.CircleSize)));
         }
 
-        maniaKeyCount = BmsSkinComponentLookup.GetManiaKeyCount(layoutVariant);
+        maniaKeyCount = BmsLayout.GetManiaKeyCount(layoutVariant);
 
         skinConfigurations = new Lazy<IReadOnlyList<BmsSkinConfiguration>>(() =>
             Skin is BmsEmbeddedSkin embedded

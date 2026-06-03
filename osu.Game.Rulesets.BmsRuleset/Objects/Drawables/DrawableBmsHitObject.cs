@@ -439,7 +439,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
         var layoutVariant = pf.LayoutVariant;
         var column = Math.Clamp(HitObject.Column, 0, pf.TotalColumns - 1);
-        hiddenScratchNote = pf.HideScratch && BmsSkinComponentLookup.IsScratchColumn(column, layoutVariant);
+        hiddenScratchNote = pf.HideScratch && BmsLayout.IsScratchColumn(column, layoutVariant);
         return hiddenScratchNote.Value;
     }
 
@@ -493,7 +493,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
         layoutReferences = new LayoutReferences(stage, columnContainer, column, layoutVariant);
 
-        hiddenScratchNote = playfield is { HideScratch: true } && BmsSkinComponentLookup.IsScratchColumn(column, layoutVariant);
+        hiddenScratchNote = playfield is { HideScratch: true } && BmsLayout.IsScratchColumn(column, layoutVariant);
 
         if (hiddenScratchNote == true)
             Alpha = 0;

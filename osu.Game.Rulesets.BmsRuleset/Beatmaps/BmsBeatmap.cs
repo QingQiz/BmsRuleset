@@ -70,12 +70,6 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
             },
         ];
 
-        bool isScratch(BmsHitObject h) => LayoutVariant switch
-        {
-            BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P => h.Column == 0,
-            BmsLayoutVariant.Bms5KDouble => h.Column is 0 or 11,
-            BmsLayoutVariant.Bme7KDouble => h.Column is 0 or 15,
-            _ => false,
-        };
+        bool isScratch(BmsHitObject h) => BmsLayout.IsScratchColumn(h.Column, LayoutVariant);
     }
 }

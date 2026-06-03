@@ -222,7 +222,7 @@ public sealed partial class BmsStage : CompositeDrawable
 
         foreach (var column in Columns)
         {
-            if (BmsSkinComponentLookup.IsScratchColumn(column.Index, layoutVariant))
+            if (BmsLayout.IsScratchColumn(column.Index, layoutVariant))
                 continue;
 
             min = Math.Min(min, column.DrawPosition.X);

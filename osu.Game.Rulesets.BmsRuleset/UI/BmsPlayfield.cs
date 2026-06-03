@@ -248,7 +248,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (column == null || column.Value >= TotalColumns)
             return false;
 
-        if (IsAutoScratch && BmsSkinComponentLookup.IsScratchColumn(column.Value, LayoutVariant))
+        if (IsAutoScratch && BmsLayout.IsScratchColumn(column.Value, LayoutVariant))
             return false;
 
         pressedColumns.Add(column.Value);
@@ -306,7 +306,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (column == null || column.Value >= TotalColumns)
             return;
 
-        if (IsAutoScratch && BmsSkinComponentLookup.IsScratchColumn(column.Value, LayoutVariant))
+        if (IsAutoScratch && BmsLayout.IsScratchColumn(column.Value, LayoutVariant))
             return;
 
         pressedColumns.Remove(column.Value);
@@ -346,7 +346,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             if (drawable.Judged || drawable.HitObject.IsMine)
                 continue;
 
-            if (!BmsSkinComponentLookup.IsScratchColumn(drawable.HitObject.Column, LayoutVariant))
+            if (!BmsLayout.IsScratchColumn(drawable.HitObject.Column, LayoutVariant))
                 continue;
 
             var note = drawable.HitObject;
