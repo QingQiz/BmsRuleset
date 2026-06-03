@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -112,14 +111,17 @@ public sealed partial class BmsStage : CompositeDrawable
             Columns[i] = new BmsColumn(i, layoutVariant);
         }
 
-        // For 2P variants, render scratch column last so visual order becomes
-        // [keys…, scratch] while ColumnWidth[0] still defines the scratch lane width.
-        var addOrder = layoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P
-            ? Enumerable.Range(0, totalColumns).OrderBy(col => Columns[col].IsScratch ? 1 : 0).ThenBy(col => col)
-            : Enumerable.Range(0, totalColumns);
-
-        foreach (var i in addOrder)
-            columnFlow.Add(Columns[i]);
+        if (BmsLayout.Is2P(layoutVariant))
+        {
+            for (var i = 1; i < totalColumns; i++)
+                columnFlow.Add(Columns[i]);
+            columnFlow.Add(Columns[0]);
+        }
+        else
+        {
+            for (var i = 0; i < totalColumns; i++)
+                columnFlow.Add(Columns[i]);
+        }
     }
 
     #region Disposal
@@ -167,10 +169,7 @@ public sealed partial class BmsStage : CompositeDrawable
 
         var lineColour = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnLineColour))?.Value
                          ?? Color4.White.Opacity(0.25f);
-        // Use BmsSkinComponentLookup as the component context so that ManiaColumnIndex is
-        // computed from the BMS column index.  Passing a raw BMS column index (e.g. 7 for
-        // BME 7K) directly to the native mania skin would cause ColumnLineWidth[7+1] to go
-        // out of bounds on an 8-element array (keys+1 == 8, valid indices 0–7).
+
         var leftLineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(
             new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftLineWidth,
                 new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, 0)))?.Value ?? 1;

@@ -443,28 +443,6 @@ The full built-in skin (covering all 6 layouts) is at
 
 ## FIXME
 
-- [ ] autoplay random，到后半会卡死
-- [ ] test 步骤里的 import real bms 步骤总是会失败
-    ```
-      [runtime] 2026-05-27 18:19:42 [error]: Step "import real bms" SingleStepButton triggered error
-      [runtime] 2026-05-27 18:19:42 [error]: System.InvalidOperationException: TestContext.WorkDirectory must not be accessed before DefaultTestAssemblyBuilder.Build runs.
-      [runtime] 2026-05-27 18:19:42 [error]: at NUnit.Framework.TestContext.get_WorkDirectory()
-      [runtime] 2026-05-27 18:19:42 [error]: at osu.Game.Rulesets.BmsRuleset.Tests.TestSceneBmsVisualPlayer.candidateTestSongRoots() in C:\Users\kali\RiderProjects\ruleset-dev\BmsRuleset\osu.Game.Rulesets.BmsRuleset.Tests\TestSceneBmsVisualPlayer.cs:line 43
-      [runtime] 2026-05-27 18:19:42 [error]: at osu.Game.Rulesets.BmsRuleset.Tests.TestSceneBmsVisualPlayer.get_testSongsRoot() in C:\Users\kali\RiderProjects\ruleset-dev\BmsRuleset\osu.Game.Rulesets.BmsRuleset.Tests\TestSceneBmsVisualPlayer.cs:line 31
-      [runtime] 2026-05-27 18:19:42 [error]: at osu.Game.Rulesets.BmsRuleset.Tests.TestSceneBmsVisualPlayer.<TestImportedRealBmsAutoplayWithBeatmapSkin>b__13_0() in C:\Users\kali\RiderProjects\ruleset-dev\BmsRuleset\osu.Game.Rulesets.BmsRuleset.Tests\TestSceneBmsVisualPlayer.cs:line 90
-      [runtime] 2026-05-27 18:19:42 [error]: at osu.Framework.Testing.Drawables.Steps.SingleStepButton.clickAction()
-      [runtime] 2026-05-27 18:19:42 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.PerformStep(Boolean userTriggered)
-      [runtime] 2026-05-27 18:19:42 [error]: at osu.Framework.Testing.TestScene.runNextStep(Action onCompletion, Action`2 onError, Func`2 stopCondition)
-      [runtime] 2026-05-27 18:19:44 [error]: Step "import real bms" SingleStepButton triggered an error
-      [runtime] 2026-05-27 18:19:44 [error]: System.InvalidOperationException: TestContext.WorkDirectory must not be accessed before DefaultTestAssemblyBuilder.Build runs.
-      [runtime] 2026-05-27 18:19:44 [error]: at NUnit.Framework.TestContext.get_WorkDirectory()
-      [runtime] 2026-05-27 18:19:44 [error]: at osu.Game.Rulesets.BmsRuleset.Tests.TestSceneBmsVisualPlayer.candidateTestSongRoots() in C:\Users\kali\RiderProjects\ruleset-dev\BmsRuleset\osu.Game.Rulesets.BmsRuleset.Tests\TestSceneBmsVisualPlayer.cs:line 43
-      [runtime] 2026-05-27 18:19:44 [error]: at osu.Game.Rulesets.BmsRuleset.Tests.TestSceneBmsVisualPlayer.get_testSongsRoot() in C:\Users\kali\RiderProjects\ruleset-dev\BmsRuleset\osu.Game.Rulesets.BmsRuleset.Tests\TestSceneBmsVisualPlayer.cs:line 31
-      [runtime] 2026-05-27 18:19:44 [error]: at osu.Game.Rulesets.BmsRuleset.Tests.TestSceneBmsVisualPlayer.<TestImportedRealBmsAutoplayWithBeatmapSkin>b__13_0() in C:\Users\kali\RiderProjects\ruleset-dev\BmsRuleset\osu.Game.Rulesets.BmsRuleset.Tests\TestSceneBmsVisualPlayer.cs:line 90
-      [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.SingleStepButton.clickAction()
-      [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.PerformStep(Boolean userTriggered)
-      [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.OnClick(ClickEvent e)
-    ```
 - skin
     - [ ] legacy 的 mod 部分和分数显示重叠了
 
@@ -482,7 +460,6 @@ The full built-in skin (covering all 6 layouts) is at
   2026-06-01 15:13:14 [error]: at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
   2026-06-01 15:13:14 [error]: at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
   ```
-- [ ] column line 在 2p 下渲染不对，7k 倒数俩 column line 没有渲染
 - [ ] 血量过低导致的失败不会更新结果为F
 
 ## TODO

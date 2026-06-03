@@ -25,7 +25,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         return beatmap;
     }
 
-    private DrawableBmsHitObject? firstAliveScratchNote()
+    private DrawableBmsHitObject firstAliveScratchNote()
         => Playfield.HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
             .FirstOrDefault(d => BmsLayout.IsScratchColumn(d.HitObject.Column, Playfield.LayoutVariant));
@@ -100,11 +100,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
 
-        AddAssert("layout variant switched to 2P", () =>
-        {
-            var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
-            return beatmap.LayoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P;
-        });
+        AddAssert("stage scratch on right", () => BmsLayout.Is2P(Playfield.LayoutVariant));
 
         AddAssert("hit object columns unchanged (scratch=0, keys=1..N)", () =>
         {
@@ -170,11 +166,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
 
-        AddAssert("layout variant switched to 2P", () =>
-        {
-            var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
-            return beatmap.LayoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P;
-        });
+        AddAssert("stage scratch on right", () => BmsLayout.Is2P(Playfield.LayoutVariant));
 
         AddAssert("scratch hidden", () => Playfield.Stage.Columns[0].Hidden);
 
@@ -207,11 +199,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
 
-        AddAssert("layout variant switched to 2P", () =>
-        {
-            var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
-            return beatmap.LayoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P;
-        });
+        AddAssert("stage scratch on right", () => BmsLayout.Is2P(Playfield.LayoutVariant));
 
         AddAssert("scratch not hidden", () => !Playfield.Stage.Columns[0].Hidden);
         AddAssert("scratch column index 0 is scratch", () => Playfield.Stage.Columns[0].IsScratch);
@@ -227,11 +215,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
 
-        AddAssert("layout variant switched to 2P", () =>
-        {
-            var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
-            return beatmap.LayoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P;
-        });
+        AddAssert("stage scratch on right", () => BmsLayout.Is2P(Playfield.LayoutVariant));
 
         AddAssert("scratch hidden", () => Playfield.Stage.Columns[0].Hidden);
     }
@@ -244,16 +228,11 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
 
-        AddAssert("layout variant switched to 2P", () =>
-        {
-            var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
-            return beatmap.LayoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P;
-        });
+        AddAssert("stage scratch on right", () => BmsLayout.Is2P(Playfield.LayoutVariant));
 
         AddAssert("hit object columns mirrored with 2P variant", () =>
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
-            var variant = beatmap.LayoutVariant;
             var normalNotes = beatmap.HitObjects
                 .Where(h => !h.IsLongNote && !h.IsMine)
                 .OrderBy(h => h.StartTime)

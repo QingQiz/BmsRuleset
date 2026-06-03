@@ -27,8 +27,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     public Func<int, int>? BranchRandomValueSelector { get; init; }
 
-    public bool SecondPlayerMode { get; set; }
-
     public override bool CanConvert() =>
         Beatmap is BmsDecodedBeatmap { RawLines.Length: > 0 }
         || Beatmap.HitObjects.Any() && Beatmap.HitObjects.All(h => h is BmsHitObject);
@@ -63,9 +61,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
         // Stamp the chart-level #RANK onto every hit object so CreateHitWindows() has it.
         stampRankOnHitObjects(converted);
-
-        if (SecondPlayerMode)
-            applySecondPlayerConversion(converted);
 
         return converted;
     }
@@ -172,27 +167,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         return true;
     }
 
-    private static void applySecondPlayerConversion(BmsBeatmap beatmap)
-    {
-        // Disabled for DP layouts
-        if (beatmap.LayoutVariant is BmsLayoutVariant.Bms5KDouble or BmsLayoutVariant.Bme7KDouble or BmsLayoutVariant.Pms9KDouble)
-            return;
-
-        // PMS has no scratch, no layout change needed
-        if (beatmap.LayoutVariant is BmsLayoutVariant.Pms9K)
-            return;
-
-        // HitObject.Column is NOT remapped — scratch remains column 0, keys remain 1..N.
-        // The skin's ColumnWidth[0] always defines the scratch lane width regardless of
-        // visual position. Only the visual column order changes in BmsStage.
-        beatmap.LayoutVariant = beatmap.LayoutVariant switch
-        {
-            BmsLayoutVariant.Bms5K => BmsLayoutVariant.Bms5K2P,
-            BmsLayoutVariant.Bme7K => BmsLayoutVariant.Bme7K2P,
-            _ => beatmap.LayoutVariant,
-        };
-    }
-
     private bool tryMaterialiseDecodedBeatmap(IBeatmap original, out IBeatmap materialised)
     {
         materialised = original;
@@ -237,5 +211,4 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         materialised = beatmap;
         return true;
     }
-
 }

@@ -11,7 +11,6 @@ using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.Mods;
@@ -76,10 +75,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             BmsBranchReplayState.EnsureBranchReplayMod(replayScore, bmsBeatmap.BranchDecisions);
     }
 
-    protected override Playfield CreatePlayfield()
-    {
-        return new BmsPlayfield((BmsBeatmap)Beatmap, Mods.OfType<BmsModAutoplay>().Any());
-    }
+    protected override Playfield CreatePlayfield() => new BmsPlayfield((BmsBeatmap)Beatmap);
 
     protected override void LoadComplete()
     {

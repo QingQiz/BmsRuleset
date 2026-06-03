@@ -106,8 +106,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public BmsStage Stage { get; }
 
-    public bool IsAutoplay { get; }
-
     public override Quad SkinnableComponentScreenSpaceDrawQuad => Stage.ScreenSpaceDrawQuad;
 
     public BmsTimingMap? TimingMap { get; }
@@ -170,7 +168,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// </summary>
     public BmsPlayfield(
         IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K,
-        bool isAutoplay = false, BmsTimingMap? timingMap = null
+        BmsTimingMap? timingMap = null
     )
     {
         activeSkin = new BmsEmbeddedSkinSource();
@@ -179,7 +177,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             .OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
         TotalColumns = Math.Max(1, totalColumns);
         LayoutVariant = layoutVariant;
-        IsAutoplay = isAutoplay;
         TimingMap = timingMap;
 
         Anchor = Anchor.Centre;
@@ -205,8 +202,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// <summary>
     ///     Creates a playfield from a decoded <see cref="T:osu.Game.Rulesets.BmsRuleset.Beatmaps.BmsBeatmap">BmsBeatmap</see>.
     /// </summary>
-    public BmsPlayfield(BmsBeatmap beatmap, bool isAutoplay = false)
-        : this(beatmap.HitObjects, beatmap.TotalColumns, beatmap.LayoutVariant, isAutoplay, beatmap.TimingMap)
+    public BmsPlayfield(BmsBeatmap beatmap)
+        : this(beatmap.HitObjects, beatmap.TotalColumns, beatmap.LayoutVariant, beatmap.TimingMap)
     {
         this.beatmap = beatmap;
         textEventManager = new BmsTextEventManager(beatmap.TextEvents);
@@ -255,21 +252,18 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // Pass 2: no note was consumed — check whether the key press falls in the E-POOR
         // zone (outside the BAD window but within the EP boundary) of the nearest note.
         // If so, register an E-POOR; otherwise silently ignore (too early / too late).
-        if (!IsAutoplay)
-        {
-            var nearestUnjudged = HitObjectContainer.AliveObjects
-                .OfType<DrawableBmsHitObject>()
-                .Where(d => !d.Judged &&
-                            !d.HitObject.IsMine &&
-                            d.HitObject.Column == column.Value &&
-                            d.HitObject.HitWindows is BmsHitWindows)
-                .MinBy(d => Math.Abs(Time.Current - d.HitObject.StartTime));
+        var nearestUnjudged = HitObjectContainer.AliveObjects
+            .OfType<DrawableBmsHitObject>()
+            .Where(d => !d.Judged &&
+                        !d.HitObject.IsMine &&
+                        d.HitObject.Column == column.Value &&
+                        d.HitObject.HitWindows is BmsHitWindows)
+            .MinBy(d => Math.Abs(Time.Current - d.HitObject.StartTime));
 
-            if (nearestUnjudged?.HitObject.HitWindows is BmsHitWindows epoWindows &&
-                epoWindows.IsEpoZone(Time.Current - nearestUnjudged.HitObject.StartTime))
-            {
-                registerEmptyPoor();
-            }
+        if (nearestUnjudged?.HitObject.HitWindows is BmsHitWindows epoWindows &&
+            epoWindows.IsEpoZone(Time.Current - nearestUnjudged.HitObject.StartTime))
+        {
+            registerEmptyPoor();
         }
 
         return false;

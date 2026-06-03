@@ -36,46 +36,24 @@ internal sealed partial class LegacyBmsColumnBackground : CompositeDrawable, IKe
         var lightPosition = transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.LightPosition, lookup)?.Value ?? 0;
         var lightFramePerSecond = transformer.GetManiaConfig<int>(LegacyManiaSkinConfigurationLookups.LightFramePerSecond, lookup)?.Value ?? 60;
 
-        // For 2P variants, the visual column order is [keys…, scratch]. ColumnLineWidth
-        // indices must be remapped so the separator lines follow visual adjacency, not
-        // BMS index order.
-        var is2P = lookup.LayoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P;
         var totalColumns = BmsLayout.GetTotalColumns(lookup.LayoutVariant);
 
         float leftLineWidth;
         float rightLineWidth;
 
-        if (is2P && lookup.ColumnIndex is int colIdx)
+        if (BmsLayout.Is2P(lookup.LayoutVariant) && lookup.ColumnIndex is int colIdx)
         {
-            // Visual position in the reordered layout: scratch (BMS 0) is last, keys shift left.
-            var v = colIdx == 0 ? totalColumns - 1 : colIdx - 1;
+            var (lIdx, rIdx) = BmsLayout.RemapColum2PGapIdx(colIdx, totalColumns);
 
-            // Left edge index in ColumnLineWidth[]:
-            //   v=0 (stage left)       → 0
-            //   v=N-1 (scratch)        → 1 (between BMS 0 and 1)
-            //   otherwise              → v+1 (maps to same as original right-edge of preceding col)
-            var lineLeft = v == 0 ? 0 : v == totalColumns - 1 ? 1 : v + 1;
-
-            // Right edge index:
-            //   v=N-1 (scratch, rightmost) → N (stage right border)
-            //   v=N-2 (last key)           → 1 (between BMS 0 and 1, now adjacent to scratch)
-            //   otherwise                   → v+2
-            var lineRight = v == totalColumns - 1 ? totalColumns : v == totalColumns - 2 ? 1 : v + 2;
-
-            leftLineWidth = colIdx == 0
-                ? transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.LeftLineWidth,
-                    new BmsSkinComponentLookup(lookup.Component, lookup.LayoutVariant, lineLeft))?.Value ?? 1
-                : 0;
+            leftLineWidth = transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.LeftLineWidth,
+                new BmsSkinComponentLookup(lookup.Component, lookup.LayoutVariant, lIdx))?.Value ?? 1;
 
             rightLineWidth = transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.RightLineWidth,
-                new BmsSkinComponentLookup(lookup.Component, lookup.LayoutVariant, lineRight))?.Value ?? 1;
+                new BmsSkinComponentLookup(lookup.Component, lookup.LayoutVariant, rIdx))?.Value ?? 1;
         }
         else
         {
-            leftLineWidth = lookup.ColumnIndex == 0
-                ? transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.LeftLineWidth, lookup)?.Value ?? 1
-                : 0;
-
+            leftLineWidth = transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.LeftLineWidth, lookup)?.Value ?? 1;
             rightLineWidth = transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.RightLineWidth, lookup)?.Value ?? 1;
         }
 

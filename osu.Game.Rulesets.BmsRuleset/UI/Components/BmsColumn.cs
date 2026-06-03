@@ -22,6 +22,9 @@ public sealed partial class BmsColumn : CompositeDrawable
     public readonly int Index;
     public readonly bool IsScratch;
 
+    public readonly Container HitObjectArea;
+    public readonly Container HitExplosionArea;
+
     /// <summary>
     ///     When <c>true</c>, this column is hidden from layout — zero width, zero
     ///     alpha, and <see cref="updateFromSkin"/> will not restore visual properties.
@@ -45,13 +48,10 @@ public sealed partial class BmsColumn : CompositeDrawable
         }
     }
 
-    private bool hidden;
-
-    public readonly Container HitObjectArea;
-    public readonly Container HitExplosionArea;
-
     private readonly BmsLayoutVariant layoutVariant;
     private readonly SkinnableDrawable hitTarget;
+
+    private bool hidden;
 
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
@@ -126,21 +126,15 @@ public sealed partial class BmsColumn : CompositeDrawable
         Width = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, lookup))?.Value
                 ?? defaultColumnWidth(Index, layoutVariant);
 
-        // For 2P variants, ColumnSpacing indices must be remapped to follow visual
-        // column order [keys…, scratch] rather than BMS index order.
+        // For 2P/scratch-on-right, ColumnSpacing indices must be remapped to follow
+        // visual column order [keys…, scratch] rather than BMS index order.
         int? spacingLeftCol;
         int? spacingRightCol;
 
-        if (layoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P)
+        if (BmsLayout.Is2P(lookup.LayoutVariant) && lookup.ColumnIndex is int colIdx)
         {
             var totalCols = BmsLayout.GetTotalColumns(layoutVariant);
-            var v = Index == 0 ? totalCols - 1 : Index - 1;
-
-            // Spacing gap index in ColumnSpacing[] for 2P:
-            //   gap 0..N-3 (keys) → v+1,  last gap (key-scratch) → 0
-            // Left: gap = v-1 → ColumnSpacing[leftCol-1], Right: gap = v → ColumnSpacing[rightCol]
-            spacingLeftCol = v == 0 ? null : v == totalCols - 1 ? 1 : v + 1;
-            spacingRightCol = v == totalCols - 1 ? null : v == totalCols - 2 ? 0 : v + 1;
+            (spacingLeftCol, spacingRightCol) = BmsLayout.RemapColum2PGapIdx(colIdx, totalCols);
         }
         else
         {
@@ -172,11 +166,6 @@ public sealed partial class BmsColumn : CompositeDrawable
 
     private partial class DefaultBmsColumnBackground(int index, bool isScratch) : CompositeDrawable
     {
-        public DefaultBmsColumnBackground()
-            : this(0, false)
-        {
-        }
-
         protected override void LoadComplete()
         {
             base.LoadComplete();
@@ -224,7 +213,7 @@ public sealed partial class BmsColumn : CompositeDrawable
 
         public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
         {
-            if (BmsKeyBindingConfiguration.ActionToColumn(e.Action, layoutVariant) != (int?)columnIndex)
+            if (BmsKeyBindingConfiguration.ActionToColumn(e.Action, layoutVariant) != columnIndex)
                 return false;
 
             light.FadeIn(10);
@@ -233,7 +222,7 @@ public sealed partial class BmsColumn : CompositeDrawable
 
         public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
         {
-            if (BmsKeyBindingConfiguration.ActionToColumn(e.Action, layoutVariant) != (int?)columnIndex)
+            if (BmsKeyBindingConfiguration.ActionToColumn(e.Action, layoutVariant) != columnIndex)
                 return;
 
             light.FadeOut(120);
