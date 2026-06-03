@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.BmsRuleset;
 
 public class BmsRuleset : Ruleset
 {
-    public override string Description => "BMS Ruleset";
+    public override string Description => "BMS";
 
     public override string ShortName => "bms";
 

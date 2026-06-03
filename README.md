@@ -495,7 +495,7 @@ The full built-in skin (covering all 6 layouts) is at
     - [ ] channel `97` — 动态 BGM 音量
     - [ ] channel `98` — 动态 KEY 音量（channel `97` 的对应）
 
-- [ ] correct metadata display (title, artist, etc, rank, hp, ...)
+- [ ] correct metadata display (title, artist, etc, rank, hp, ..., length)
 
 - skin
     - [ ] column start : value or enum(leftN, rightN, center)
@@ -503,6 +503,7 @@ The full built-in skin (covering all 6 layouts) is at
     - [ ] bms skin in none-legacy way, full configurable via skin editor
     - [ ] hitGreat -> hitGreatLate/hitGreatEarly, ... (`HitGreat: imgearly,imglate` or
       `HitGreatLate: imglate\nHitGreatEarly:imgearly`)
+    - [ ] e-poor image
 
 - mod
     - [ ] different health bar
@@ -539,4 +540,12 @@ The full built-in skin (covering all 6 layouts) is at
 - [ ] 结算时不同判定的文字颜色
 - [ ] beatmap  statisitc  展示更多信息，比如 random 分支数
 - [ ] combo 显示
+- [ ] 选歌界面的筛选。放在选歌界面/设置界面，指定要显示的 Layout。不然混一块太乱
+- [ ] 挡板，挡板皮肤， 挡板移动
+- [ ] 难度表，向皮肤选择那样搞
+- [ ] mania 7k 转谱
+- [ ] reply not available
+- [ ] import screen 点了按钮后给禁用掉，不然没反应以为没点
+- [ ] 调整判定偏移的能力
+- [ ] 同样的速度下 bms 下落比 mania 快
 </details>
