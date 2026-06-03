@@ -572,5 +572,5 @@ The full built-in skin (covering all 6 layouts) is at
 
 - [ ] 结算时不同判定的文字颜色
 - [ ] beatmap  statisitc  展示更多信息，比如 random 分支数
-
+- [ ] combo 显示
 </details>
