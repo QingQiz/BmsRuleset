@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Judgements;
@@ -10,33 +11,17 @@ using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 
-/// <summary>
-///     BMS-native score processor.
-/// </summary>
-/// <remarks>
-///     <para>
-///         <b>EX-score</b>: The primary BMS scoring metric is EX-score = PGREAT×2 + GREAT×1.
-///         The maximum EX-score for a chart with <i>N</i> notes is 2×N.
-///         Accuracy reports <c>EXScore / MaxEXScore</c> (i.e. 1.0 = all PGREATs).
-///         Total score is scaled to 0–1 000 000 using the EX-score ratio.
-///     </para>
-///     <para>
-///         <b>Rank mapping</b>: BMS uses gauge-based clear/fail rather than osu!-style letter ranks.
-///         We surface the following approximation using EX-score accuracy:
-///         <list type="table">
-///             <item><term>X (rainbow S)</term><description>100 % (all PGREAT)</description></item>
-///             <item><term>S/AAA</term><description>≥ 8/9 accuracy (≥ AAA in BMS parlance)</description></item>
-///             <item><term>A/AA</term><description>≥ 7/9</description></item>
-///             <item><term>B/A</term><description>≥ 6/9</description></item>
-///             <item><term>C/B</term><description>≥ 5/9</description></item>
-///             <item><term>D/CDEF</term><description>anything below</description></item>
-///         </list>
-///         These thresholds mirror the traditional BMS DJ LEVEL scale (AAA = 8/9 → 2/3 accuracy).
-///     </para>
-/// </remarks>
 public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 {
-    // EX-score weights: PGREAT = 2, GREAT = 1, everything else = 0.
+    private static readonly Action<JudgementResult, int> set_combo_after = createComboAfterSetter();
+
+    private static Action<JudgementResult, int> createComboAfterSetter()
+    {
+        var field = typeof(JudgementResult).GetField("<ComboAfterJudgement>k__BackingField",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        return (r, v) => field!.SetValue(r, v);
+    }
+
     public override int GetBaseScoreForResult(HitResult result) => result switch
     {
         HitResult.Perfect => 2,
@@ -58,18 +43,16 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     ///     BMS BAD (Ok) and POOR (Meh) must break combo, but osu!'s framework considers them
     ///     "hit" results (<c>HitResult.IsHit()</c> = <c>true</c>) so <c>IncreasesCombo()</c>
     ///     fires instead of <c>BreaksCombo()</c> in the sealed <c>ApplyResultInternal</c>.
-    ///     We force-reset the combo here after the framework has already stamped it.
+    ///     We force-reset both <c>Combo.Value</c> and the already-stamped
+    ///     <c>ComboAfterJudgement</c> (via reflection) so that revert arithmetic stays correct.
     /// </summary>
-    /// <remarks>
-    ///     Note: the stamped <c>result.ComboAfterJudgement</c> will reflect the pre-reset
-    ///     (incremented) value because it is assigned before <c>ApplyScoreChange</c> is called.
-    ///     This means revert arithmetic will be incorrect (combo would go negative).
-    ///     BMS gameplay does not support rewind, so this is an accepted trade-off.
-    /// </remarks>
     protected override void ApplyScoreChange(JudgementResult result)
     {
         if (result.Type is HitResult.Ok or HitResult.Meh)
+        {
             Combo.Value = 0;
+            set_combo_after(result, 0);
+        }
     }
 
     public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
