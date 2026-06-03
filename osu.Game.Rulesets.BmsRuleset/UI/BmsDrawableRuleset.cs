@@ -34,6 +34,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 /// </remarks>
 public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) : DrawableRuleset<BmsHitObject>(ruleset, beatmap, mods)
 {
+    public new PassThroughInputManager KeyBindingInputManager => base.KeyBindingInputManager;
+
     public const double MAX_TIME_RANGE = 11485;
 
     public override int Variant => (int)((BmsBeatmap)Beatmap).LayoutVariant;
@@ -76,12 +78,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     protected override Playfield CreatePlayfield()
     {
-        var beatmap = (BmsBeatmap)Beatmap;
-        var autoScratch = Mods.OfType<BmsModAutoScratch>().FirstOrDefault();
-        return new BmsPlayfield(beatmap,
-            Mods.OfType<BmsModAutoplay>().Any(),
-            autoScratch != null,
-            autoScratch?.HideScratch.Value ?? false);
+        return new BmsPlayfield((BmsBeatmap)Beatmap, Mods.OfType<BmsModAutoplay>().Any());
     }
 
     protected override void LoadComplete()

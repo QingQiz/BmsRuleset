@@ -45,7 +45,7 @@ public sealed partial class BmsStage : CompositeDrawable
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
 
-    public BmsStage(int totalColumns, BmsLayoutVariant layoutVariant, bool hideScratch = false)
+    public BmsStage(int totalColumns, BmsLayoutVariant layoutVariant)
     {
         this.layoutVariant = layoutVariant;
 
@@ -119,12 +119,7 @@ public sealed partial class BmsStage : CompositeDrawable
             : Enumerable.Range(0, totalColumns);
 
         foreach (var i in addOrder)
-        {
-            if (hideScratch && Columns[i].IsScratch)
-                Columns[i].Hidden = true;
-
             columnFlow.Add(Columns[i]);
-        }
     }
 
     #region Disposal

@@ -7,7 +7,6 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI;
-using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -28,6 +27,12 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     #region Constants
 
     private const float max_long_note_piece_height = 4096;
+
+    #endregion
+
+    #region Cache
+
+    private readonly DrawableCache cache = new();
 
     #endregion
 
@@ -60,12 +65,12 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         var resolvedColumn = column ?? HitObject.Column;
         var component = HitObject.IsMine ? BmsSkinComponents.Mine : HitObject.IsLongNote ? BmsSkinComponents.HoldNoteHead : BmsSkinComponents.Note;
 
-        if (skinnedColumn == resolvedColumn && skinnedLayout == resolvedLayoutVariant && skinnedComponent == component)
+        if (cache.IsSkinValid(resolvedColumn, resolvedLayoutVariant, component))
             return;
 
-        skinnedColumn = resolvedColumn;
-        skinnedLayout = resolvedLayoutVariant;
-        skinnedComponent = component;
+        cache.SkinnedColumn = resolvedColumn;
+        cache.SkinnedLayout = resolvedLayoutVariant;
+        cache.SkinnedComponent = component;
 
         longNoteBody.BodyColour = Color4.Cyan;
         longNoteBody.Alpha = HitObject.IsLongNote ? 0.65f : 0;
@@ -93,29 +98,6 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     #endregion
 
-    #region Nested types
-
-    private readonly record struct LayoutMetrics(
-        int Column,
-        BmsLayoutVariant LayoutVariant,
-        Drawable? ColumnContainer,
-        float ParentHeight,
-        float ScaledParentWidth,
-        float TravelDistance,
-        float HitTargetPosition,
-        double ScrollSpeedMultiplier,
-        BmsTimingMap? TimingMap,
-        double CurrentScrollPosition,
-        double ScrollRange);
-
-    private readonly record struct LayoutReferences(
-        BmsStage? Stage,
-        Drawable? ColumnContainer,
-        int Column,
-        BmsLayoutVariant LayoutVariant);
-
-    #endregion
-
     #region Core drawable fields
 
     private Container noteContainer = null!;
@@ -129,37 +111,13 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     private bool longNoteStarted;
     private HitResult? longNoteHeadResult;
     private float? longNoteHeadFixedY;
-    private BmsPlayfield? playfield;
 
     #endregion
 
     #region Sizing state
 
     private float currentNoteHeight = BmsNoteSizing.DEFAULT_NOTE_HEIGHT;
-    private float cachedNoteHeightWidth = -1;
-    private int cachedNoteHeightColumn = -1;
-    private BmsLayoutVariant? cachedNoteHeightLayout;
-    private BmsSkinComponents? cachedNoteHeightComponent;
-
-    #endregion
-
-    #region Layout / transform cache
-
-    private LayoutReferences? layoutReferences;
-    private LayoutMetrics? latestLayout;
-    private bool? hiddenScratchNote;
-    private float cachedScaledParentWidth = -1;
-    private float cachedParentWidthForTransform;
-    private float cachedParentHeightForTransform;
     private bool longNotePiecesApplied;
-
-    #endregion
-
-    #region Skin cache
-
-    private int skinnedColumn = -1;
-    private BmsLayoutVariant? skinnedLayout;
-    private BmsSkinComponents? skinnedComponent;
 
     #endregion
 
@@ -250,17 +208,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         longNotePiecesApplied = false;
         longNoteHeadResult = null;
         longNoteHeadFixedY = null;
-        playfield = null;
-        layoutReferences = null;
-        latestLayout = null;
-        hiddenScratchNote = null;
-        cachedScaledParentWidth = -1;
-        cachedParentWidthForTransform = 0;
-        cachedParentHeightForTransform = 0;
-        skinnedColumn = -1;
-        skinnedLayout = null;
-        skinnedComponent = null;
-        invalidateNoteHeightCache();
+        cache.InvalidateAll();
         updateSkinPieces();
     }
 
@@ -269,7 +217,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         var result = base.OnInvalidate(invalidation, source);
 
         if ((invalidation & Invalidation.Parent) != 0)
-            invalidateLayoutReferences();
+            cache.InvalidateAll();
 
         return result;
     }
@@ -286,7 +234,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         // must stay invisible. Enforcing Alpha here every frame (after the framework has applied
         // the FadeInFromZero transform earlier in the subtree update) reliably keeps them hidden;
         // a one-shot Alpha=0 during apply is otherwise overwritten by that fade transform.
-        if (isHiddenScratchNote() && Alpha != 0)
+        if (isColumnHidden() && Alpha != 0)
             Alpha = 0;
 
         if (!tryRefreshLayoutMetrics(out var layout))
@@ -352,9 +300,9 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         // if it is held down, trigger the mine; otherwise, let it expire immediately.
         if (HitObject.IsMine && !Judged && Time.Current >= HitObject.StartTime)
         {
-            if (playfield?.IsColumnPressedForLandmine(HitObject.Column) == true)
+            if (cache.Playfield?.IsColumnPressedForLandmine(HitObject.Column) == true)
             {
-                playfield.DetonateLandmine(HitObject);
+                cache.Playfield.DetonateLandmine(HitObject);
                 ApplyResult(HitResult.Meh);
             }
             else
@@ -410,7 +358,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         // fade-in would otherwise animate Alpha back to 1, making the auto-judged note pop
         // into view and freeze at (0,0) (its scratch column has zero width, so the per-frame
         // layout refresh bails and never repositions it).
-        if (isHiddenScratchNote())
+        if (isColumnHidden())
         {
             Alpha = 0;
             return;
@@ -424,23 +372,15 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     ///     (AutoScratch with hide-scratch enabled).  Resolves the playfield lazily and
     ///     caches the result so it is valid even before the layout references are built.
     /// </summary>
-    private bool isHiddenScratchNote()
+    private bool isColumnHidden()
     {
-        if (hiddenScratchNote is { } cached)
+        if (cache.ColumnHidden is { } cached)
             return cached;
 
-        if (HitObject == null)
+        if (HitObject == null || !ensureLayoutReferences())
             return false;
 
-        var pf = playfield ?? Parent?.FindClosestParent<BmsPlayfield>();
-
-        if (pf == null)
-            return false;
-
-        var layoutVariant = pf.LayoutVariant;
-        var column = Math.Clamp(HitObject.Column, 0, pf.TotalColumns - 1);
-        hiddenScratchNote = pf.HideScratch && BmsLayout.IsScratchColumn(column, layoutVariant);
-        return hiddenScratchNote.Value;
+        return cache.ColumnHidden == true;
     }
 
     protected override void UpdateHitStateTransforms(ArmedState state)
@@ -479,30 +419,29 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     /// </summary>
     private bool ensureLayoutReferences()
     {
-        if (layoutReferences != null)
+        if (cache.HasLayout)
             return true;
 
-        playfield = Parent?.FindClosestParent<BmsPlayfield>();
-        var stage = playfield?.Stage;
-        var column = Math.Clamp(HitObject.Column, 0, playfield?.TotalColumns - 1 ?? 0);
-        var layoutVariant = playfield?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
+        cache.Playfield = Parent?.FindClosestParent<BmsPlayfield>();
+        var stage = cache.Playfield?.Stage;
+        var column = Math.Clamp(HitObject.Column, 0, cache.Playfield?.TotalColumns - 1 ?? 0);
+        var layoutVariant = cache.Playfield?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
         var columnContainer = stage != null && column < stage.Columns.Length ? stage.Columns[column].HitObjectArea : Parent;
 
         if (columnContainer == null)
             return false;
 
-        layoutReferences = new LayoutReferences(stage, columnContainer, column, layoutVariant);
+        cache.ApplyLayout(stage, columnContainer, column, layoutVariant);
+        cache.ComputeColumnHidden();
 
-        hiddenScratchNote = playfield is { HideScratch: true } && BmsLayout.IsScratchColumn(column, layoutVariant);
-
-        if (hiddenScratchNote == true)
+        if (cache.ColumnHidden == true)
             Alpha = 0;
 
         // These operations depend only on column/layout/component/skin lookup. They are comparatively
         // expensive and should not be part of the per-frame metrics refresh path.
         longNoteBody.SetSkinLookup(layoutVariant, column);
         updateSkinPieces(layoutVariant, column);
-        invalidateNoteHeightCache();
+        cache.InvalidateNoteHeight();
         return true;
     }
 
@@ -512,13 +451,12 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     /// </summary>
     private bool tryRefreshLayoutMetrics(out LayoutMetrics layout)
     {
-        if (!ensureLayoutReferences() || layoutReferences is not { } references)
+        if (!ensureLayoutReferences() || !cache.TryGetLayout(out var references))
         {
             layout = default;
             return false;
         }
 
-        var stage = references.Stage;
         var columnContainer = references.ColumnContainer;
         var parentWidth = columnContainer?.DrawWidth ?? Parent?.DrawWidth ?? 0;
         var parentHeight = columnContainer?.DrawHeight ?? Parent?.DrawHeight ?? 0;
@@ -530,50 +468,26 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         }
 
         var scaledParentWidth = parentWidth;
-        var transformChanged = Math.Abs(parentWidth - cachedParentWidthForTransform) >= 1
-                               || Math.Abs(parentHeight - cachedParentHeightForTransform) >= 1;
+        var transformChanged = cache.TransformChanged(parentWidth, parentHeight);
 
         if (transformChanged && columnContainer != null && Parent != null)
         {
             var left = columnContainer.ToSpaceOfOtherDrawable(Vector2.Zero, Parent);
             var right = columnContainer.ToSpaceOfOtherDrawable(new Vector2(parentWidth, 0), Parent);
             scaledParentWidth = (right - left).Length;
-            cachedScaledParentWidth = scaledParentWidth;
-            cachedParentWidthForTransform = parentWidth;
-            cachedParentHeightForTransform = parentHeight;
+            cache.ApplyTransform(parentWidth, parentHeight, scaledParentWidth);
         }
-        else if (!transformChanged && cachedScaledParentWidth > 0)
+        else if (!transformChanged && cache.ScaledParentWidth > 0)
         {
-            scaledParentWidth = cachedScaledParentWidth;
+            scaledParentWidth = cache.ScaledParentWidth;
         }
 
-        layout = new LayoutMetrics(
-            references.Column,
-            references.LayoutVariant,
-            columnContainer,
-            parentHeight,
-            Math.Max(1, scaledParentWidth),
-            Math.Max(1f, parentHeight - (stage?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION)),
-            stage?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION,
-            playfield?.ScrollSpeedMultiplier ?? 1,
-            playfield?.TimingMap,
-            playfield?.CurrentScrollPosition ?? Time.Current,
-            playfield?.ScrollRange ?? playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(8));
+        layout = cache.CreateLayoutMetrics(parentHeight, Math.Max(1, scaledParentWidth), Time.Current);
 
-        latestLayout = layout;
+        cache.LatestLayout = layout;
         updateNoteHeight(layout);
         tryResolveLongNoteHeadFixedY(longNoteHeadResult);
         return true;
-    }
-
-    private void invalidateLayoutReferences()
-    {
-        layoutReferences = null;
-        latestLayout = null;
-        cachedScaledParentWidth = -1;
-        cachedParentWidthForTransform = 0;
-        cachedParentHeightForTransform = 0;
-        invalidateNoteHeightCache();
     }
 
     #endregion
@@ -642,7 +556,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     /// </summary>
     private void tryResolveLongNoteHeadFixedY(HitResult? result)
     {
-        if (result == null || longNoteHeadFixedY != null || latestLayout is not { } layout)
+        if (result == null || longNoteHeadFixedY != null || cache.LatestLayout is not { } layout)
             return;
 
         longNoteHeadFixedY = result is HitResult.Perfect or HitResult.Great
@@ -654,28 +568,17 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     #region Note sizing
 
-    private void invalidateNoteHeightCache()
-    {
-        cachedNoteHeightWidth = -1;
-        cachedNoteHeightColumn = -1;
-        cachedNoteHeightLayout = null;
-        cachedNoteHeightComponent = null;
-    }
-
     private void updateNoteHeight(LayoutMetrics layout)
     {
         var component = currentSkinComponent();
 
-        if (Math.Abs(cachedNoteHeightWidth - layout.ScaledParentWidth) < 1
-            && cachedNoteHeightColumn == layout.Column
-            && cachedNoteHeightLayout == layout.LayoutVariant
-            && cachedNoteHeightComponent == component)
+        if (cache.IsNoteHeightValid(layout, component))
             return;
 
-        cachedNoteHeightWidth = layout.ScaledParentWidth;
-        cachedNoteHeightColumn = layout.Column;
-        cachedNoteHeightLayout = layout.LayoutVariant;
-        cachedNoteHeightComponent = component;
+        cache.NoteHeightWidth = layout.ScaledParentWidth;
+        cache.NoteHeightColumn = layout.Column;
+        cache.NoteHeightLayout = layout.LayoutVariant;
+        cache.NoteHeightComponent = component;
         currentNoteHeight = getCurrentNoteHeight(layout.ScaledParentWidth, layout.LayoutVariant, layout.Column);
     }
 

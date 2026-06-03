@@ -6,7 +6,6 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
-using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Tests.Visual;
@@ -39,8 +38,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
 
-        AddAssert("auto scratch enabled", () => Playfield.IsAutoScratch);
-        AddAssert("scratch not hidden", () => !Playfield.HideScratch);
+        AddAssert("scratch not hidden", () => !Playfield.Stage.Columns[0].Hidden);
         AddAssert("judgement area visible", () => Playfield.Stage.JudgementArea.Count, () => Is.GreaterThan(0));
     }
 
@@ -54,8 +52,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
 
-        AddAssert("auto scratch enabled", () => Playfield.IsAutoScratch);
-        AddAssert("scratch hidden", () => Playfield.HideScratch);
+        AddAssert("scratch hidden", () => Playfield.Stage.Columns[0].Hidden);
 
         // Regression (issue 4): hidden scratch notes live in a zero-width column and are
         // auto-judged. They must never become visible/freeze on screen. Alpha is enforced in
@@ -179,8 +176,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
             return beatmap.LayoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P;
         });
 
-        AddAssert("auto scratch enabled", () => Playfield.IsAutoScratch);
-        AddAssert("scratch hidden", () => Playfield.HideScratch);
+        AddAssert("scratch hidden", () => Playfield.Stage.Columns[0].Hidden);
 
         AddAssert("hit object columns mirrored with 2P variant", () =>
         {
@@ -217,8 +213,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
             return beatmap.LayoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P;
         });
 
-        AddAssert("auto scratch enabled", () => Playfield.IsAutoScratch);
-        AddAssert("scratch not hidden", () => !Playfield.HideScratch);
+        AddAssert("scratch not hidden", () => !Playfield.Stage.Columns[0].Hidden);
         AddAssert("scratch column index 0 is scratch", () => Playfield.Stage.Columns[0].IsScratch);
     }
 
@@ -238,8 +233,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
             return beatmap.LayoutVariant is BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bme7K2P;
         });
 
-        AddAssert("auto scratch enabled", () => Playfield.IsAutoScratch);
-        AddAssert("scratch hidden", () => Playfield.HideScratch);
+        AddAssert("scratch hidden", () => Playfield.Stage.Columns[0].Hidden);
     }
 
     [Test]
