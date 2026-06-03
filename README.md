@@ -443,9 +443,6 @@ The full built-in skin (covering all 6 layouts) is at
 
 ## FIXME
 
-- [-] **高BPM段帧率骤降 (~1000fps → ~200fps)** —
-  通过分别屏蔽key-sound和BGM定位：仅key-sound时，加速段帧率缓慢平滑下降至较低值后突然恢复1000fps；仅BGM时，加速段某时刻突然暴跌至低帧率后迅速回升。详见
-  `BmsBackgroundAudioPlayer.cs` 和 `BmsChartSampleSound.cs`。
 - [ ] autoplay random，到后半会卡死
 - [ ] test 步骤里的 import real bms 步骤总是会失败
     ```
@@ -469,8 +466,6 @@ The full built-in skin (covering all 6 layouts) is at
       [runtime] 2026-05-27 18:19:44 [error]: at osu.Framework.Testing.Drawables.Steps.StepButton.OnClick(ClickEvent e)
     ```
 - skin
-    - [ ] morden 皮肤里 有一个奇怪的组件，并且缺少了很多默认的组件
-    - [ ] 血条的位置不对，而且需要调整一下风格
     - [ ] legacy 的 mod 部分和分数显示重叠了
 
 - [ ] on changing ruleset from bms to any or from any to bms
@@ -539,9 +534,6 @@ The full built-in skin (covering all 6 layouts) is at
     - [ ] BG: make keysound to background samples. so the hit result will not effect the music
     - [ ] CS: remove the SV. add options for SV multiplier, default by 0, 1 without the mod
 
-- ask
-    - [ ] ask how to impl a new HUD element (e.g. combo, score, ...), and how to customize their position/size/skin
-
 - importer
     - [ ] use a reference/symbolic link to the original bms file instead of copying it to the realm, to speed up the
       import.
@@ -566,9 +558,6 @@ The full built-in skin (covering all 6 layouts) is at
 - [ ] Delete all imported BMS files confirm window
 - [ ] ln tail 的打击音
 - [ ] 把我们的血条注册为 两个内置 皮肤的默认血条，其余用户自定义皮肤仍可使用 mania 风格的血条
-    - [ ] 把我们的血条注册为可配置的HUD
-
-- [ ] 误差条现在不更新
 
 - [ ] 结算时不同判定的文字颜色
 - [ ] beatmap  statisitc  展示更多信息，比如 random 分支数

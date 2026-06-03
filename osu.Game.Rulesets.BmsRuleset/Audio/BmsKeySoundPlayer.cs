@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Containers;
+using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
@@ -10,19 +13,63 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
 
+/// <inheritdoc />
 /// <summary>
 ///     Drives key-sound and landmine-sound lookup and playback for a BMS playfield.
 ///     Maintains per-column search state so that successive key presses scan forward
 ///     through the sorted hit-object list without restarting from the beginning.
 /// </summary>
-internal class BmsKeySoundPlayer(
-    IReadOnlyList<BmsHitObject> hitObjects,
-    HitObjectContainer hitObjectContainer,
-    Func<double> getCurrentTime,
-    IBindable<bool> samplePlaybackDisabled,
-    BmsChartSampleSound keySound,
-    BmsChartSampleSound landmineSound)
+public sealed partial class BmsKeySoundPlayer : CompositeDrawable
 {
+    public override bool IsPresent => false;
+
+    public BmsKeySoundPlayer(IReadOnlyList<BmsHitObject> hitObjects, HitObjectContainer hitObjectContainer, Func<double> getCurrentTime, int totalColumns)
+    {
+        this.hitObjects = hitObjects;
+        this.hitObjectContainer = hitObjectContainer;
+        this.getCurrentTime = getCurrentTime;
+        keySounds = new BmsChartSampleSound[totalColumns];
+
+        for (var i = 0; i < totalColumns; i++)
+        {
+            keySounds[i] = new BmsChartSampleSound();
+            AddInternal(keySounds[i]);
+        }
+
+        AddInternal(landmineSound);
+    }
+
+    [BackgroundDependencyLoader(true)]
+    private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
+    {
+        if (samplePlaybackDisabler == null)
+            return;
+
+        samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
+    }
+
+    #region Fields
+
+    private readonly IReadOnlyList<BmsHitObject> hitObjects;
+    private readonly HitObjectContainer hitObjectContainer;
+    private readonly Func<double> getCurrentTime;
+    private readonly BmsChartSampleSound[] keySounds;
+    private readonly BmsChartSampleSound landmineSound = new();
+    private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
+
+    /// <summary>
+    ///     Per-column cursor into the sorted hit-object list.  Advances forward on each
+    ///     key press so we never re-scan already-skipped notes.
+    /// </summary>
+    private readonly Dictionary<int, int> nextSoundIndexByColumn = new();
+
+    /// <summary>
+    ///     Tracks the last seek time per column.  When the current time jumps backwards
+    ///     or forwards more than 5 s we reset the per-column cursor via binary search.
+    /// </summary>
+    private readonly Dictionary<int, double> lastSoundSearchTimeByColumn = new();
+
+    #endregion
 
     #region Helpers
 
@@ -64,29 +111,18 @@ internal class BmsKeySoundPlayer(
 
     #endregion
 
-    #region Fields
-
-    /// <summary>
-    ///     Per-column cursor into the sorted hit-object list.  Advances forward on each
-    ///     key press so we never re-scan already-skipped notes.
-    /// </summary>
-    private readonly Dictionary<int, int> nextSoundIndexByColumn = new();
-
-    /// <summary>
-    ///     Tracks the last seek time per column.  When the current time jumps backwards
-    ///     or forwards more than 5 s we reset the per-column cursor via binary search.
-    /// </summary>
-    private readonly Dictionary<int, double> lastSoundSearchTimeByColumn = new();
-
-    #endregion
-
     #region Public methods
 
-    /// <summary>
-    ///     Finds the next unjudged note in <paramref name="column" /> that is still
-    ///     within a playable window, then plays its declared key sound.  Returns
-    ///     <c>true</c> when a sound was triggered.
-    /// </summary>
+    public void PlaySample(int column, string samplePath)
+    {
+        if (string.IsNullOrEmpty(samplePath))
+            return;
+
+        var col = Math.Clamp(column, 0, keySounds.Length - 1);
+        keySounds[col].SampleInfo = new BmsSampleInfo(samplePath);
+        keySounds[col].Play();
+    }
+
     public bool PlayKeySound(int column)
     {
         if (samplePlaybackDisabled.Value)
@@ -95,8 +131,7 @@ internal class BmsKeySoundPlayer(
         if (findNextSoundHitObject(column) is not { } hitObject || string.IsNullOrEmpty(hitObject.SamplePath))
             return false;
 
-        keySound.SampleInfo = new BmsSampleInfo(hitObject.SamplePath);
-        keySound.Play();
+        PlaySample(column, hitObject.SamplePath);
         return true;
     }
 

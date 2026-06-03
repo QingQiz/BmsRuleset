@@ -73,7 +73,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                 {
                     if (now >= note.StartTime)
                     {
-                        playfield.PlayScratchSample(note);
+                        playfield.KeySoundPlayer.PlaySample(note.Column, note.SamplePath);
                         if (drawable.TryHit())
                             autoScratchLnHeads.Add(drawable);
                     }
@@ -87,7 +87,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
             {
                 if (now >= note.StartTime)
                 {
-                    playfield.PlayScratchSample(note);
+                    playfield.KeySoundPlayer.PlaySample(note.Column, note.SamplePath);
                     drawable.TryHit();
                 }
             }

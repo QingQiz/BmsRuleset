@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
@@ -14,15 +15,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Audio;
 /// <summary>
 ///     BMS chart sample playback. Samples are defined by the chart resources, not by the user skin.
 /// </summary>
-public partial class BmsChartSampleSound : SkinReloadableDrawable
+public sealed partial class BmsChartSampleSound : SkinReloadableDrawable
 {
     public override bool RemoveWhenNotAlive => false;
 
-    public double Length => resolvedSample?.Sample.Length ?? 0;
-
     public ISampleInfo? SampleInfo
     {
-        get => sampleInfo;
         set
         {
             if (ReferenceEquals(sampleInfo, value))
@@ -35,10 +33,6 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
         }
     }
 
-    public bool RequestedPlaying { get; private set; }
-
-    protected bool HasActiveChannels => activeChannels.Count > 0;
-
     private readonly List<ActiveChannel> activeChannels = [];
     private readonly IBindable<bool> samplePlaybackDisabled = new BindableBool();
     private readonly BindableDouble pauseFrequency = new(1);
@@ -48,6 +42,8 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
 
     private ISampleInfo? sampleInfo;
     private ResolvedSample? resolvedSample;
+
+    private bool requestedPlaying { get; set; }
 
     [Resolved(CanBeNull = true)]
     private AudioManager? audioManager { get; set; }
@@ -76,9 +72,9 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
 
     public void ClearSample() => SampleInfo = null;
 
-    public virtual void Play()
+    public void Play()
     {
-        RequestedPlaying = true;
+        requestedPlaying = true;
 
         if (samplePlaybackDisabled.Value)
             return;
@@ -124,7 +120,7 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
         activeChannels.Add(new ActiveChannel(channel));
     }
 
-    public virtual void Pause()
+    public void Pause()
     {
         foreach (var activeChannel in activeChannels)
         {
@@ -136,9 +132,9 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
         }
     }
 
-    public virtual void Resume()
+    public void Resume()
     {
-        if (!RequestedPlaying || samplePlaybackDisabled.Value)
+        if (!requestedPlaying || samplePlaybackDisabled.Value)
             return;
 
         FlushPendingSkinChanges();
@@ -150,26 +146,22 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
             return;
         }
 
-        foreach (var activeChannel in activeChannels)
+        foreach (var activeChannel in activeChannels
+                     .Where(activeChannel => !activeChannel.Channel.IsDisposed && activeChannel.Paused))
         {
-            if (activeChannel.Channel.IsDisposed || !activeChannel.Paused)
-                continue;
-
             activeChannel.Channel.Play();
             bindChartAudioAdjustments(activeChannel.Channel);
             activeChannel.Paused = false;
         }
     }
 
-    public virtual void Stop()
+    public void Stop()
     {
-        RequestedPlaying = false;
+        requestedPlaying = false;
 
-        foreach (var activeChannel in activeChannels)
+        foreach (var activeChannel in activeChannels
+                     .Where(activeChannel => !activeChannel.Channel.IsDisposed))
         {
-            if (activeChannel.Channel.IsDisposed)
-                continue;
-
             activeChannel.Channel.Stop();
             activeChannel.Channel.Dispose();
         }
@@ -248,7 +240,7 @@ public partial class BmsChartSampleSound : SkinReloadableDrawable
         }
 
         if (activeChannels.Count == 0)
-            RequestedPlaying = false;
+            requestedPlaying = false;
     }
 
     private void bindChartAudioAdjustments(IAdjustableAudioComponent component)

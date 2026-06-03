@@ -3,14 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
-using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -37,9 +35,21 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
 {
 
+    #region Key-sound fields
+
+    public BmsKeySoundPlayer KeySoundPlayer { get; }
+
+    #endregion
+
     #region HUD fields
 
     private readonly BmsTextEventManager textEventManager = null!;
+
+    #endregion
+
+    #region Input fields
+
+    private readonly HashSet<int> pressedColumns = [];
 
     #endregion
 
@@ -123,27 +133,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #endregion
 
-    #region Key-sound fields
-
-    private readonly BmsChartSampleSound keySound = new();
-    private readonly BmsChartSampleSound landmineSound = new();
-    private BmsKeySoundPlayer keySoundPlayer = null!;
-
-    #endregion
-
-    #region Input fields
-
-    private readonly HashSet<int> pressedColumns = [];
-    private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
-
-    #endregion
-
     #region Skin / DI
 
     [Cached(typeof(ISkinSource))]
     private readonly BmsEmbeddedSkinSource activeSkin;
 
-    private readonly IReadOnlyList<BmsHitObject> hitObjects;
     private readonly BmsBeatmap? beatmap;
 
     private BmsHealthProcessor? healthProcessor => resolvedHealthProcessor as BmsHealthProcessor;
@@ -181,7 +175,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         activeSkin = new BmsEmbeddedSkinSource();
 
-        this.hitObjects = hitObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
+        IReadOnlyList<BmsHitObject> hitObjectsOrdered = hitObjects
+            .OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
         TotalColumns = Math.Max(1, totalColumns);
         LayoutVariant = layoutVariant;
         IsAutoplay = isAutoplay;
@@ -193,12 +188,15 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both };
 
+        Stage = new BmsStage(TotalColumns, LayoutVariant);
+
+        KeySoundPlayer = new BmsKeySoundPlayer(hitObjectsOrdered, HitObjectContainer, () => Time.Current, TotalColumns);
+
         InternalChildren =
         [
-            Stage = new BmsStage(TotalColumns, LayoutVariant),
+            Stage,
             HitObjectContainer,
-            keySound,
-            landmineSound,
+            KeySoundPlayer,
             judgementDrawablePool,
         ];
     }
@@ -237,7 +235,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             return false;
 
         pressedColumns.Add(column.Value);
-        keySoundPlayer.PlayKeySound(column.Value);
+        KeySoundPlayer.PlayKeySound(column.Value);
 
         // Pass 1: find a hittable note — earliest unjudged note whose timing falls within
         // a judgement window (PGREAT … BAD, or the POOR hit zone).  Picking by StartTime
@@ -314,16 +312,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (string.IsNullOrEmpty(hitObject.LandmineExplosionSamplePath))
             return;
 
-        keySoundPlayer.PlayLandmineSound(hitObject.LandmineExplosionSamplePath);
-    }
-
-    public void PlayScratchSample(BmsHitObject note)
-    {
-        if (string.IsNullOrEmpty(note.SamplePath))
-            return;
-
-        keySound.SampleInfo = new BmsSampleInfo(note.SamplePath);
-        keySound.Play();
+        KeySoundPlayer.PlayLandmineSound(hitObject.LandmineExplosionSamplePath);
     }
 
     #endregion
@@ -364,16 +353,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     #region Lifecycle
 
     [BackgroundDependencyLoader(true)]
-    private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
+    private void load()
     {
         recalculateSpeedFields();
 
-        keySoundPlayer = new BmsKeySoundPlayer(hitObjects, HitObjectContainer, () => Time.Current, samplePlaybackDisabled, keySound, landmineSound);
-
         RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, 512);
-
-        if (samplePlaybackDisabler != null)
-            samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
 
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
         updateEmbeddedSkinFallback();
