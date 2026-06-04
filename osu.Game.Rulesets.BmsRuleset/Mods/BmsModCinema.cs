@@ -3,6 +3,4 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
 
-public class BmsModCinema : ModCinema<BmsHitObject>
-{
-}
+public class BmsModCinema : ModCinema<BmsHitObject>;
