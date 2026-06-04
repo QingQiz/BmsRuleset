@@ -6,6 +6,7 @@ using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
+using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -48,6 +49,9 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     [Resolved(CanBeNull = true)]
     private IPerformFromScreenRunner? performer { get; set; }
 
+    [Resolved(CanBeNull = true)]
+    private IBeatmapUpdater? beatmapUpdater { get; set; }
+
     #region Disposal
 
     protected override void Dispose(bool isDisposing)
@@ -81,7 +85,10 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     {
         if (bmsImporter == null && realm != null && storage != null && game != null)
         {
-            bmsImporter = new BmsFileImporter(realm, storage, notifications);
+            bmsImporter = new BmsFileImporter(realm, storage, notifications)
+            {
+                OnImportCompleted = (beatmapSet, scope) => beatmapUpdater?.Queue(beatmapSet, scope),
+            };
             game.RegisterImportHandler(bmsImporter);
         }
 

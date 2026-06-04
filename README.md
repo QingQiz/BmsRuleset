@@ -551,6 +551,5 @@ The full built-in skin (covering all 6 layouts) is at
 - [ ] import screen 点了按钮后给禁用掉，不然没反应以为没点
 - [ ] 调整判定偏移的能力
 - [x] 同样的速度下 bms 下落比 mania 快
-- [ ] 选歌界面的按难度排序并不会排序
 
 </details>

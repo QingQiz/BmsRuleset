@@ -10,6 +10,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
+using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -57,6 +58,9 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     [Resolved(CanBeNull = true)]
     private INotificationOverlay notifications { get; set; }
 
+    [Resolved(CanBeNull = true)]
+    private IBeatmapUpdater beatmapUpdater { get; set; }
+
     public override void OnEntering(ScreenTransitionEvent e)
     {
         base.OnEntering(e);
@@ -81,6 +85,12 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
         importer = realm != null && storage != null
             ? new BmsFileImporter(realm, storage, notifications)
+            {
+                // Persist star ratings (and other cached stats) after import so song-select
+                // sort/group by difficulty work. Without this, BeatmapInfo.StarRating stays 0
+                // even though the live difficulty cache still shows correct stars on panels.
+                OnImportCompleted = (beatmapSet, scope) => beatmapUpdater?.Queue(beatmapSet, scope),
+            }
             : null!;
 
         buttonGroup = new FillFlowContainer
