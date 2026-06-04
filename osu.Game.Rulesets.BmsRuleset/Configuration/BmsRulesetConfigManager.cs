@@ -16,6 +16,13 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
 
         SetDefault(BmsRulesetSetting.LastImportPath, "C:\\");
         SetDefault(BmsRulesetSetting.ScrollSpeed, DEFAULT_SCROLL_SPEED, 1.0, MAX_SCROLL_SPEED, 0.1);
+
+        SetDefault(BmsRulesetSetting.ShowBms5K, true);
+        SetDefault(BmsRulesetSetting.ShowBme7K, true);
+        SetDefault(BmsRulesetSetting.ShowPms9K, true);
+        SetDefault(BmsRulesetSetting.ShowBms5KDouble, true);
+        SetDefault(BmsRulesetSetting.ShowBme7KDouble, true);
+        SetDefault(BmsRulesetSetting.ShowPms9KDouble, true);
     }
 }
 
@@ -23,4 +30,10 @@ public enum BmsRulesetSetting
 {
     LastImportPath,
     ScrollSpeed,
+    ShowBms5K,
+    ShowBme7K,
+    ShowPms9K,
+    ShowBms5KDouble,
+    ShowBme7KDouble,
+    ShowPms9KDouble,
 }

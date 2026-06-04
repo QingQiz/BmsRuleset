@@ -179,9 +179,15 @@ Easy / Hard / Ex-Hard / Hazard gauge variants are not yet implemented.
 
 ### Settings
 
-| Setting      | Default | Range    | Description                                                                                                                 |
-|--------------|---------|----------|-----------------------------------------------------------------------------------------------------------------------------|
-| Scroll Speed | 8.0     | 1.0–60.0 | Note fall speed. In-game: `Up`/`Down` keys adjust temporarily. Keys are rebindable under Settings → Key Bindings → osu!BMS. 
+| Setting              | Default | Range    | Description                                                                                                                |
+|----------------------|---------|----------|----------------------------------------------------------------------------------------------------------------------------|
+| Scroll Speed         | 8.0     | 1.0–60.0 | Note fall speed. In-game `Up`/`Down` keys adjust temporarily. Keys are rebindable under Settings → Key Bindings → osu!BMS. |
+| Show 5K / 7K / 9K    | ✓       | on/off   | Toggle visibility of single-play layouts in song select                                                                    |
+| Show DP 5K / 7K / 9K | ✓       | on/off   | Toggle visibility of double-play layouts in song select                                                                    |
+
+Layout visibility filters are applied live in song select — uncheck a layout to hide all beatmaps of that type.
+
+You can also filter by key count from the search box using `k=`, `key=` or `keys=` (supports operators `=`, `!=`, `<`, `<=`, `>`, `>=` and comma-separated values, e.g. `keys=7` or `k>5`).
 
 ---
 
@@ -535,12 +541,10 @@ The full built-in skin (covering all 6 layouts) is at
 
 - [ ] Delete all imported BMS files confirm window
 - [ ] ln tail 的打击音
-- [ ] 把我们的血条注册为 两个内置 皮肤的默认血条，其余用户自定义皮肤仍可使用 mania 风格的血条
 
 - [ ] 结算时不同判定的文字颜色
-- [ ] beatmap  statisitc  展示更多信息，比如 random 分支数
+- [ ] beatmap statisitc 展示更多信息，比如 random 分支数
 - [ ] combo 显示
-- [ ] 选歌界面的筛选。放在选歌界面/设置界面，指定要显示的 Layout。不然混一块太乱
 - [ ] 挡板，挡板皮肤， 挡板移动
 - [ ] 难度表，向皮肤选择那样搞
 - [ ] mania 7k 转谱
@@ -548,4 +552,5 @@ The full built-in skin (covering all 6 layouts) is at
 - [ ] import screen 点了按钮后给禁用掉，不然没反应以为没点
 - [ ] 调整判定偏移的能力
 - [ ] 同样的速度下 bms 下落比 mania 快
+
 </details>

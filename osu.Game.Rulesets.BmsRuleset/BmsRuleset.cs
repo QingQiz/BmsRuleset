@@ -20,6 +20,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Rulesets.Difficulty;
+using osu.Game.Rulesets.Filter;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -152,11 +153,20 @@ public class BmsRuleset : Ruleset
     public override LocalisableString GetDisplayNameForHitResult(HitResult result) =>
         HIT_RESULT_LABELS.TryGetValue(result, out var label) ? label : base.GetDisplayNameForHitResult(result);
 
-    public override IRulesetConfigManager CreateConfig(SettingsStore? settings) =>
-        new BmsRulesetConfigManager(settings, RulesetInfo);
+    private static BmsRulesetConfigManager? sharedConfigManager;
+
+    public override IRulesetConfigManager CreateConfig(SettingsStore? settings)
+    {
+        var config = new BmsRulesetConfigManager(settings, RulesetInfo);
+        sharedConfigManager = config;
+        return config;
+    }
 
     public override RulesetSettingsSubsection CreateSettings() =>
         new BmsSettingsSubsection(this);
+
+    public override IRulesetFilterCriteria CreateRulesetFilterCriteria() =>
+        new BmsFilterCriteria(sharedConfigManager);
 
     public override Drawable CreateIcon() => new SpriteIcon
     {

@@ -1,8 +1,11 @@
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
+using osu.Framework.Testing;
 using osu.Game.Database;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -14,6 +17,7 @@ using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Rulesets.BmsRuleset.Screens;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Screens;
+using osu.Game.Screens.Select;
 
 namespace osu.Game.Rulesets.BmsRuleset.Settings;
 
@@ -56,6 +60,22 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
     #endregion
 
+    private void onLayoutSettingChanged()
+    {
+        Scheduler.AddOnce(() =>
+        {
+            if (game == null) return;
+
+            var filterControl = game.ChildrenOfType<FilterControl>().FirstOrDefault();
+            var carousel = game.ChildrenOfType<BeatmapCarousel>().FirstOrDefault();
+
+            if (filterControl == null || carousel == null) return;
+
+            var criteria = filterControl.CreateCriteria();
+            carousel.Filter(criteria);
+        });
+    }
+
     [BackgroundDependencyLoader]
     private void load()
     {
@@ -68,6 +88,20 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         if (Config is not BmsRulesetConfigManager manager)
             return;
 
+        var bindable5K = manager.GetBindable<bool>(BmsRulesetSetting.ShowBms5K);
+        var bindable7K = manager.GetBindable<bool>(BmsRulesetSetting.ShowBme7K);
+        var bindable9K = manager.GetBindable<bool>(BmsRulesetSetting.ShowPms9K);
+        var bindable5KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowBms5KDouble);
+        var bindable7KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowBme7KDouble);
+        var bindable9KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowPms9KDouble);
+
+        bindable5K.BindValueChanged(_ => onLayoutSettingChanged());
+        bindable7K.BindValueChanged(_ => onLayoutSettingChanged());
+        bindable9K.BindValueChanged(_ => onLayoutSettingChanged());
+        bindable5KDp.BindValueChanged(_ => onLayoutSettingChanged());
+        bindable7KDp.BindValueChanged(_ => onLayoutSettingChanged());
+        bindable9KDp.BindValueChanged(_ => onLayoutSettingChanged());
+
         Children =
         [
             new SettingsItemV2(new FormSliderBar<double>
@@ -76,6 +110,36 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Current = manager.GetBindable<double>(BmsRulesetSetting.ScrollSpeed),
                 KeyboardStep = 0.1f,
                 LabelFormat = v => RulesetSettingsStrings.ScrollSpeedTooltip((int)BmsDrawableRuleset.ComputeScrollTime(v), v),
+            }),
+            new SettingsItemV2(new FormCheckBox
+            {
+                Caption = "Show BMS 5K",
+                Current = bindable5K,
+            }),
+            new SettingsItemV2(new FormCheckBox
+            {
+                Caption = "Show BME 7K",
+                Current = bindable7K,
+            }),
+            new SettingsItemV2(new FormCheckBox
+            {
+                Caption = "Show PMS 9K",
+                Current = bindable9K,
+            }),
+            new SettingsItemV2(new FormCheckBox
+            {
+                Caption = "Show BMS 5K DP",
+                Current = bindable5KDp,
+            }),
+            new SettingsItemV2(new FormCheckBox
+            {
+                Caption = "Show BME 7K DP",
+                Current = bindable7KDp,
+            }),
+            new SettingsItemV2(new FormCheckBox
+            {
+                Caption = "Show PMS 9K DP",
+                Current = bindable9KDp,
             }),
             new RoundedButton
             {
