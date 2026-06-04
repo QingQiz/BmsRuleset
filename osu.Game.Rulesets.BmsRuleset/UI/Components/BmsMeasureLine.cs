@@ -8,21 +8,18 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 
 public sealed partial class BmsMeasureLine : CompositeDrawable
 {
-    public long Tick { get; }
-
-    private readonly BmsTimingMap timingMap;
     private readonly BmsPlayfield playfield;
     private readonly BmsStage stage;
     private readonly Box line;
     private readonly double scrollAtTick;
+    private readonly double timeAtTick;
 
     public BmsMeasureLine(long tick, BmsTimingMap timingMap, BmsPlayfield playfield, BmsStage stage)
     {
-        Tick = tick;
-        this.timingMap = timingMap;
         this.playfield = playfield;
         this.stage = stage;
         scrollAtTick = timingMap.GetScrollPositionAtTick(tick);
+        timeAtTick = timingMap.ProjectTickToTime(tick);
 
         Anchor = Anchor.TopLeft;
         Origin = Anchor.TopLeft;
@@ -43,11 +40,12 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
             return;
         }
 
-        var currentScroll = playfield.CurrentScrollPosition;
-        var scrollUntilLine = scrollAtTick - currentScroll;
         var scrollRange = Math.Max(1, playfield.ScrollRange);
         var travelDistance = Math.Max(1, stage.DrawHeight - stage.HitTargetPosition);
-        var y = stage.DrawHeight - stage.HitTargetPosition - (float)(scrollUntilLine * playfield.ScrollSpeedMultiplier / scrollRange) * travelDistance;
+        var progress = playfield.ConstantScrollActive
+            ? timeAtTick - playfield.Time.Current
+            : scrollAtTick - playfield.CurrentScrollPosition;
+        var y = stage.DrawHeight - stage.HitTargetPosition - (float)(progress * playfield.ScrollSpeedMultiplier / scrollRange) * travelDistance;
 
         if (!float.IsFinite(y))
         {

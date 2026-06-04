@@ -110,6 +110,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public BmsTimingMap? TimingMap { get; }
 
+    public bool ConstantScrollActive { get; set; }
+
     public double BaseScrollRange { get; private set; }
 
     public double ScrollSpeedMultiplier { get; private set; }
@@ -394,7 +396,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         base.Update();
 
-        CurrentScrollPosition = TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current;
+        CurrentScrollPosition = ConstantScrollActive
+            ? Time.Current
+            : TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current;
         ScrollRange = BaseScrollRange;
 
         updateHud();

@@ -76,6 +76,8 @@ public class BmsRuleset : Ruleset
         HitResult.Miss, // Empty POOR counter (keypress with no note to consume)
     ];
 
+    private static BmsRulesetConfigManager? sharedConfigManager;
+
     static BmsRuleset()
     {
         BmsBeatmapDecoder.Register();
@@ -133,7 +135,7 @@ public class BmsRuleset : Ruleset
 
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
     {
-        ModType.DifficultyReduction => [new BmsModNoFail(), new BmsModHalfTime(), new BmsModAutoScratch()],
+        ModType.DifficultyReduction => [new BmsModNoFail(), new BmsModHalfTime(), new BmsModConstant(), new BmsModAutoScratch()],
         ModType.DifficultyIncrease => [new BmsModDoubleTime()],
         ModType.Automation => [new BmsModAutoplay(), new BmsModCinema()],
         ModType.Conversion => [new BmsModMirror(), new BmsModSecondPlayer()],
@@ -152,8 +154,6 @@ public class BmsRuleset : Ruleset
 
     public override LocalisableString GetDisplayNameForHitResult(HitResult result) =>
         HIT_RESULT_LABELS.TryGetValue(result, out var label) ? label : base.GetDisplayNameForHitResult(result);
-
-    private static BmsRulesetConfigManager? sharedConfigManager;
 
     public override IRulesetConfigManager CreateConfig(SettingsStore? settings)
     {

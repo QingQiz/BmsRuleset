@@ -503,7 +503,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     /// </summary>
     private float yForTimeOffset(double timeUntilHit, LayoutMetrics layout)
     {
-        var progressUntilHit = layout.TimingMap == null || HitObject.TickInfo.Tick == HitObject.TickInfo.EndTick && HitObject.TickInfo.Tick == 0 && HitObject.StartTime != 0
+        var progressUntilHit = layout.TimingMap == null || cache.Playfield?.ConstantScrollActive == true || HitObject.TickInfo.Tick == HitObject.TickInfo.EndTick && HitObject.TickInfo.Tick == 0 && HitObject.StartTime != 0
             ? timeUntilHit
             : scrollPositionFor(timeUntilHit, layout) - layout.CurrentScrollPosition;
 
