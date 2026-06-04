@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty.Skills;
@@ -8,19 +10,34 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
 
-/// <summary>
-///     Minimal BMS difficulty calculator.
-/// </summary>
-/// <remarks>
-///     This removes the dependency on osu!mania's calculator. It intentionally reports only basic
-///     attributes until native BMS strain, scratch, LN, STOP, and soflan(SV) skills are implemented.
-/// </remarks>
 public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatmap) : DifficultyCalculator(ruleset, beatmap)
 {
-    protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate) => new(mods, 0)
+    public BmsStarRatingProcessor StarRatingProcessor { get; } = new();
+
+    protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate)
     {
-        MaxCombo = beatmap.HitObjects.Count,
-    };
+        var bmsBeatmap = beatmap as BmsBeatmap;
+
+        var totalColumns = bmsBeatmap?.TotalColumns ?? 6;
+        var rank = bmsBeatmap?.Rank ?? 2;
+
+        var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().ToList();
+
+        double sr = 0;
+
+        if (hitObjects.Count > 0)
+        {
+            var effectiveClockRate = clockRate;
+
+            var result = StarRatingProcessor.Compute(hitObjects, totalColumns, rank, effectiveClockRate);
+            sr = result.StarRating;
+        }
+
+        return new DifficultyAttributes(mods, sr)
+        {
+            MaxCombo = beatmap.HitObjects.Count,
+        };
+    }
 
     protected override IEnumerable<DifficultyHitObject> CreateDifficultyHitObjects(IBeatmap beatmap, double clockRate)
     {

@@ -5,6 +5,7 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Objects;
 
@@ -55,6 +56,10 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
         converted.Difficulty.CircleSize = converted.TotalColumns;
         converted.BeatmapInfo.Difficulty.CircleSize = converted.TotalColumns;
+
+        var od = BmsStarRatingProcessor.RankToOd(converted.Rank);
+        converted.Difficulty.OverallDifficulty = od;
+        converted.BeatmapInfo.Difficulty.OverallDifficulty = od;
 
         if (!hasBmsData)
             remapColumns(converted);
