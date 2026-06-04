@@ -551,6 +551,6 @@ The full built-in skin (covering all 6 layouts) is at
 - [ ] reply not available
 - [ ] import screen 点了按钮后给禁用掉，不然没反应以为没点
 - [ ] 调整判定偏移的能力
-- [ ] 同样的速度下 bms 下落比 mania 快
+- [x] 同样的速度下 bms 下落比 mania 快
 
 </details>

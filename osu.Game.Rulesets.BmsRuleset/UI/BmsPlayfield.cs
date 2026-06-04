@@ -335,6 +335,15 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         ScrollSpeedMultiplier = ScrollSpeed / default_scroll_speed;
         TimeRange = BaseScrollRange / ScrollSpeedMultiplier;
         ScrollRange = BaseScrollRange;
+
+        // Apply the same TimeRange normalization that osu!mania uses.
+        // This ensures visual scroll speed is independent of hit position
+        // and matches mania's speed at the same numeric scroll speed setting.
+        const float reference_scroll_distance = 768f - 124.8f; // 768 - legacy DEFAULT_HIT_POSITION
+        var actualScrollDistance = 768f - Stage.HitTargetPosition;
+        var scale = actualScrollDistance / reference_scroll_distance;
+        TimeRange *= scale;
+        ScrollRange *= scale;
     }
 
     private void updateHud()
