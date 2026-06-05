@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
+using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Settings;
@@ -77,6 +78,17 @@ public class BmsRuleset : Ruleset
     ];
 
     private static BmsRulesetConfigManager? sharedConfigManager;
+
+    private static DifficultyTableStore? sharedDifficultyTableStore;
+
+    /// <summary>
+    /// Shared difficulty table store, set by <see cref="Settings.BmsSettingsSubsection"/> on creation.
+    /// </summary>
+    internal static DifficultyTableStore? DifficultyTableStore
+    {
+        get => sharedDifficultyTableStore;
+        set => sharedDifficultyTableStore = value;
+    }
 
     static BmsRuleset()
     {

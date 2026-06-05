@@ -23,6 +23,8 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
         SetDefault(BmsRulesetSetting.ShowBms5KDouble, true);
         SetDefault(BmsRulesetSetting.ShowBme7KDouble, true);
         SetDefault(BmsRulesetSetting.ShowPms9KDouble, true);
+        SetDefault(BmsRulesetSetting.DifficultyTableSources, string.Empty);
+        SetDefault(BmsRulesetSetting.DifficultyTableHistory, string.Empty);
     }
 }
 
@@ -36,4 +38,6 @@ public enum BmsRulesetSetting
     ShowBms5KDouble,
     ShowBme7KDouble,
     ShowPms9KDouble,
+    DifficultyTableSources,
+    DifficultyTableHistory,
 }

@@ -191,6 +191,47 @@ You can also filter by key count from the search box using `k=`, `key=` or `keys
 
 ---
 
+---
+
+## Difficulty Tables
+
+Difficulty tables (LR2/beatoraja format) provide difficulty ratings and markers for BMS charts. The ruleset supports
+importing tables from a JSON file or URL, and automatically matches charts by MD5 hash.
+
+### Importing a Table
+
+1. Open **Settings → BMS** → scroll to **Difficulty Tables**.
+2. Paste a URL (e.g. `http://zris.work/bmstable/turbow/header.json`) or a local file path into the text box.
+3. Click **Import** (or press Enter).
+
+The importer supports three JSON formats:
+
+- **Separate files** — `header.json` + `data.json` linked by `data_url`
+- **Combined file** — a single JSON with both header fields (name, symbol, level_order) and `"charts": [...]`
+- **HTML page** — a web page with `<meta name="bmstable" content="URL">` pointing to the JSON
+
+### How Markers Work
+
+After import, every beatmap whose MD5 matches a table entry gets a **marker** appended to its difficulty name:
+
+```
+DP ☆NOTHER [TT★1 TT★2]
+```
+
+The marker shows the table symbol and the entry's level. Markers update automatically when tables are added or removed.
+
+### Collections
+
+Each table also creates a **BeatmapCollection** named `"BMS: {table.Name}"` containing all matched charts. This lets you
+browse the table's songs directly from the song select collection list.
+
+### Subdivide
+
+Click **Subdivide** to split a table's collection into per-level collections (e.g., `"BMS: Table ★1"`, `"BMS: Table ★2"`).
+Click **Unsubdivide** to merge them back into one.
+
+---
+
 ## Skin System
 
 ### How It Works
@@ -545,7 +586,6 @@ The full built-in skin (covering all 6 layouts) is at
 - [ ] beatmap statisitc 展示更多信息，比如 random 分支数
 - [ ] combo 显示
 - [ ] 挡板，挡板皮肤， 挡板移动
-- [ ] 难度表，向皮肤选择那样搞
 - [ ] mania 7k 转谱
 - [ ] reply not available
 - [ ] 调整判定偏移的能力

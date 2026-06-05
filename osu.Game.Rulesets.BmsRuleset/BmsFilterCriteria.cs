@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
@@ -15,6 +16,8 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 {
     private readonly HashSet<BmsLayoutVariant> enabledVariants;
     private HashSet<BmsLayoutVariant>? keyRestrictedVariants;
+    private string? selectedTableName;
+    private string? selectedLevel;
 
     private static readonly Dictionary<int, BmsLayoutVariant> column_to_variant = new()
     {
@@ -58,7 +61,7 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 
     public bool Matches(BeatmapInfo beatmapInfo, FilterCriteria criteria)
     {
-        var keyCount = (int)System.Math.Round(beatmapInfo.Difficulty.CircleSize);
+        var keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
         var variant = variantFromColumns(keyCount);
 
         if (!enabledVariants.Contains(variant))
@@ -66,6 +69,26 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 
         if (keyRestrictedVariants != null && !keyRestrictedVariants.Contains(variant))
             return false;
+
+        var store = BmsRuleset.DifficultyTableStore;
+        if (store != null && (!string.IsNullOrEmpty(selectedTableName) || !string.IsNullOrEmpty(selectedLevel)))
+        {
+            var markers = store.GetMarkers(beatmapInfo.MD5Hash);
+
+            if (!string.IsNullOrEmpty(selectedTableName))
+            {
+                if (!markers.Any(m => m.table.Name.Contains(selectedTableName, StringComparison.OrdinalIgnoreCase)
+                                      || m.table.Symbol.Contains(selectedTableName, StringComparison.OrdinalIgnoreCase)))
+                    return false;
+            }
+
+            if (!string.IsNullOrEmpty(selectedLevel))
+            {
+                if (!markers.Any(m => $"{m.table.Symbol}{m.entry.Level}".Equals(selectedLevel, StringComparison.OrdinalIgnoreCase)
+                                      || m.entry.Level.Equals(selectedLevel, StringComparison.Ordinal)))
+                    return false;
+            }
+        }
 
         return true;
     }
@@ -78,6 +101,16 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
             case "key":
             case "keys":
                 return tryParseKeyCount(op, strValues);
+
+            case "tb":
+            case "table":
+                selectedTableName = strValues;
+                return true;
+
+            case "lv":
+            case "level":
+                selectedLevel = strValues;
+                return true;
         }
 
         return false;
