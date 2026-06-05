@@ -15,7 +15,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 
-public partial class DifficultyTableAutocomplete : CompositeDrawable
+public sealed partial class DifficultyTableAutocomplete : CompositeDrawable
 {
     public Action<string>? OnImport { get; init; }
 
@@ -36,6 +36,7 @@ public partial class DifficultyTableAutocomplete : CompositeDrawable
     private List<ImportOption> allPresets = [];
     private List<ImportOption> allHistory = [];
     private bool hasFocus;
+    private bool suppressAutoHide;
 
     public DifficultyTableAutocomplete()
     {
@@ -104,6 +105,16 @@ public partial class DifficultyTableAutocomplete : CompositeDrawable
     /// </summary>
     public void RefreshFilter() => updateFilter();
 
+    /// <summary>
+    /// Prevents the dropdown from auto-hiding on the next focus-loss detection,
+    /// so a delete-button click (which steals focus from the textbox) doesn't
+    /// collapse the dropdown before the item list can be rebuilt.
+    /// </summary>
+    public void SuppressAutoHide()
+    {
+        suppressAutoHide = true;
+    }
+
     protected override void Update()
     {
         base.Update();
@@ -112,6 +123,9 @@ public partial class DifficultyTableAutocomplete : CompositeDrawable
         if (focused != hasFocus)
         {
             hasFocus = focused;
+            if (hasFocus)
+                // User refocused the textbox — back to normal auto-hide behaviour.
+                suppressAutoHide = false;
             updateFilter();
         }
     }
@@ -129,10 +143,13 @@ public partial class DifficultyTableAutocomplete : CompositeDrawable
         var matchedPresets = allPresets.Where(match).ToList();
         var matchedHistory = allHistory.Where(match).ToList();
 
-        if (hasFocus && (matchedPresets.Count > 0 || matchedHistory.Count > 0))
+        if ((hasFocus || suppressAutoHide) && (matchedPresets.Count > 0 || matchedHistory.Count > 0))
             dropdown.Show(matchedPresets, matchedHistory);
         else
+        {
             dropdown.Hide();
+            suppressAutoHide = false;
+        }
     }
 
     private sealed partial class DropdownContainer : CompositeDrawable
@@ -148,17 +165,11 @@ public partial class DifficultyTableAutocomplete : CompositeDrawable
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
 
-            InternalChild = new BasicScrollContainer
+            InternalChild = list = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
-                ScrollbarVisible = false,
-                Child = list = new FillFlowContainer
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Direction = FillDirection.Vertical,
-                },
+                Direction = FillDirection.Vertical,
             };
         }
 
@@ -208,10 +219,17 @@ public partial class DifficultyTableAutocomplete : CompositeDrawable
 
     private partial class DropdownItemRow : Container
     {
-        private readonly Action onClick;
-        private readonly Box background;
 
         public override bool HandlePositionalInput => true;
+
+        public sealed override Axes RelativeSizeAxes
+        {
+            get => base.RelativeSizeAxes;
+            set => base.RelativeSizeAxes = value;
+        }
+
+        private readonly Action onClick;
+        private readonly Box background;
 
         public DropdownItemRow(ImportOption item, Action onClick, bool showDelete = false, Action? onDelete = null)
         {
@@ -256,12 +274,6 @@ public partial class DifficultyTableAutocomplete : CompositeDrawable
                 : new Drawable[] { background, content };
         }
 
-        public sealed override Axes RelativeSizeAxes
-        {
-            get => base.RelativeSizeAxes;
-            set => base.RelativeSizeAxes = value;
-        }
-
         protected override bool OnClick(ClickEvent e)
         {
             onClick();
@@ -282,10 +294,11 @@ public partial class DifficultyTableAutocomplete : CompositeDrawable
 
     private sealed partial class DeleteButton : Container
     {
-        private readonly Action onDelete;
-        private readonly SpriteText text;
 
         public override bool HandlePositionalInput => true;
+
+        private readonly Action onDelete;
+        private readonly SpriteText text;
 
         public DeleteButton(Action onDelete)
         {
@@ -293,7 +306,8 @@ public partial class DifficultyTableAutocomplete : CompositeDrawable
 
             Anchor = Anchor.CentreRight;
             Origin = Anchor.CentreRight;
-            Margin = new MarginPadding { Right = -4 };
+            Width = 28;
+            Height = 28;
 
             Children =
             [
@@ -307,7 +321,7 @@ public partial class DifficultyTableAutocomplete : CompositeDrawable
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     Text = "×",
-                    Font = OsuFont.Default.With(size: 12),
+                    Font = OsuFont.Default.With(size: 18),
                     Colour = Color4.Gray,
                 },
             ];

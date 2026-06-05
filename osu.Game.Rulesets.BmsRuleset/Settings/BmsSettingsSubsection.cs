@@ -5,10 +5,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
@@ -16,6 +14,7 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
@@ -24,13 +23,10 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.Settings.Sections.Maintenance;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Rulesets.BmsRuleset.Screens;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
-using DifficultyTable = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.UI;
-using osu.Framework.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Screens;
 using osu.Game.Screens.Select;
 using osuTK;
@@ -42,6 +38,13 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 {
     protected override LocalisableString Header => "BMS";
 
+    private static readonly ImportOption[] preset_tables =
+    [
+        new("turbow (zris.work)", "http://zris.work/bmstable/turbow/header.json"),
+    ];
+
+    private const int max_history = 20;
+
     [Cached]
     private OverlayColourProvider colourProvider = new(OverlayColourScheme.Purple);
 
@@ -52,12 +55,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     private BmsRulesetConfigManager? configManager;
     private DifficultyTableAutocomplete? autocomplete;
 
-    private static readonly ImportOption[] preset_tables =
-    [
-        new("turbow (zris.work)", "http://zris.work/bmstable/turbow/header.json"),
-    ];
-
-    private const int max_history = 20;
+    private CancellationTokenSource? importCancellation;
 
     [Resolved(CanBeNull = true)]
     private RealmAccess? realm { get; set; }
@@ -97,6 +95,36 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     }
 
     #endregion
+
+    private static string friendlyName(string url)
+    {
+        try
+        {
+            var name = Path.GetFileNameWithoutExtension(new Uri(url).LocalPath);
+            return !string.IsNullOrEmpty(name) ? $"{name} ({url})" : url;
+        }
+        catch
+        {
+            return url;
+        }
+    }
+
+    /// <summary>
+    /// Parse a history entry in "name|url|symbol" format (symbol is optional).
+    /// Falls back to treating the whole string as a URL for backward compatibility.
+    /// </summary>
+    private static ImportOption parseHistoryEntry(string entry)
+    {
+        var parts = entry.Split('|', 3);
+        if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[0]) && !string.IsNullOrEmpty(parts[1]))
+        {
+            var symbol = parts.Length >= 3 ? parts[2] : null;
+            var display = !string.IsNullOrEmpty(symbol) ? $"{parts[0]} ({symbol})" : parts[0];
+            return new ImportOption(display, parts[1]);
+        }
+
+        return new ImportOption(friendlyName(entry), entry);
+    }
 
     private void onLayoutSettingChanged()
     {
@@ -248,19 +276,6 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         Add(autocomplete);
     }
 
-    private static string friendlyName(string url)
-    {
-        try
-        {
-            var name = Path.GetFileNameWithoutExtension(new Uri(url).LocalPath);
-            return !string.IsNullOrEmpty(name) ? $"{name} ({url})" : url;
-        }
-        catch
-        {
-            return url;
-        }
-    }
-
     /// <summary>
     /// Whether the given URL matches a built-in preset table.
     /// </summary>
@@ -270,7 +285,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     /// Add or update history for a successfully imported table.
     /// Skips presets entirely.
     /// </summary>
-    private void addToHistory(string url, string name)
+    private void addToHistory(string url, string name, string symbol)
     {
         if (isPreset(url)) return;
 
@@ -284,15 +299,15 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         // Remove any existing entry with the same URL.
         var existingIndex = entries.FindIndex(e =>
         {
-            var parts = e.Split('|', 2);
+            var parts = e.Split('|', 3);
             return parts.Length > 1 && parts[1] == url;
         });
 
         if (existingIndex >= 0)
             entries.RemoveAt(existingIndex);
 
-        // Insert at front with the (possibly updated) name from the table header.
-        entries.Insert(0, $"{name}|{url}");
+        // Insert at front with the (possibly updated) name from the table header and its symbol.
+        entries.Insert(0, $"{name}|{url}|{symbol}");
 
         if (entries.Count > max_history)
             entries = entries.Take(max_history).ToList();
@@ -309,16 +324,15 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(e =>
             {
-                var parts = e.Split('|', 2);
+                var parts = e.Split('|', 3);
                 var entryUrl = parts.Length > 1 ? parts[1] : parts[0];
                 return entryUrl != url;
             })
             .ToList();
 
         bindable.Value = string.Join(";", entries);
+        autocomplete?.SuppressAutoHide();
         autocomplete?.SetItems(buildPresetItems(), buildHistoryItems());
-        // Ensure the dropdown stays open (SetItems only updates the display if hasFocus is true,
-        // but during the delete click focus state may be transient).
         Schedule(() => autocomplete?.RefreshFilter());
     }
 
@@ -331,18 +345,6 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(parseHistoryEntry)
             .ToList();
-    }
-
-    /// <summary>
-    /// Parse a history entry in "name|url" format.
-    /// Falls back to treating the whole string as a URL for backward compatibility.
-    /// </summary>
-    private static ImportOption parseHistoryEntry(string entry)
-    {
-        var parts = entry.Split('|', 2);
-        if (parts.Length == 2 && !string.IsNullOrEmpty(parts[0]) && !string.IsNullOrEmpty(parts[1]))
-            return new ImportOption(parts[0], parts[1]);
-        return new ImportOption(friendlyName(entry), entry);
     }
 
     private void confirmDeleteAllBmsFiles()
@@ -363,74 +365,92 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             bmsImporter.DeleteAllBmsFilesAsync();
     }
 
-    private readonly Bindable<string> importPathUrl = new(string.Empty);
-    private CancellationTokenSource? importCancellation;
-
     private async void importFromPathUrl(string pathOrUrl)
     {
-        if (difficultyTableStore == null || string.IsNullOrWhiteSpace(pathOrUrl)) return;
-
-        var isUrl = pathOrUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-                    || pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
-        var isFile = File.Exists(pathOrUrl);
-
-        if (!isUrl && !isFile) return;
-
-        // Show immediate feedback that import has started.
-        Schedule(() => notifications?.Post(new SimpleNotification
-        {
-            Text = $"Importing difficulty table from: {pathOrUrl}",
-            Icon = FontAwesome.Solid.Spinner,
-        }));
-
-        // Dedup: skip if already imported.
-        if (difficultyTableStore.Tables.Any(t => t.SourcePath == pathOrUrl))
-        {
-            Schedule(() => notifications?.Post(new SimpleNotification
-            {
-                Text = $"Difficulty table already imported: {pathOrUrl}",
-            }));
-            return;
-        }
-
-        // Debounce: cancel any previous pending import.
-        importCancellation?.Cancel();
-        importCancellation = new CancellationTokenSource();
-        var ct = importCancellation.Token;
+        ProgressNotification? notification = null;
 
         try
         {
-            await Task.Delay(300, ct).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
+            if (difficultyTableStore == null || string.IsNullOrWhiteSpace(pathOrUrl)) return;
 
-        var result = isUrl
-            ? await difficultyTableStore.LoadFromUrlAsync(pathOrUrl).ConfigureAwait(false)
-            : await difficultyTableStore.LoadFromFileAsync(pathOrUrl).ConfigureAwait(false);
+            var isUrl = pathOrUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                        || pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+            var isFile = File.Exists(pathOrUrl);
 
-        // Post result notification on the update thread.
-        Schedule(() =>
-        {
-            if (result != null)
+            if (!isUrl && !isFile) return;
+
+            // Single stateful notification — updated as the import progresses.
+            Schedule(() =>
             {
-                addToHistory(pathOrUrl, result.Name);
-                autocomplete?.SetItems(buildPresetItems(), buildHistoryItems());
-                notifications?.Post(new SimpleNotification
+                notification = new ProgressNotification
                 {
-                    Text = $"Loaded table: {result.Name} ({result.Entries.Count} charts)",
-                    Icon = FontAwesome.Solid.CheckCircle,
+                    Text = "Importing difficulty table…",
+                    Progress = 0,
+                    State = ProgressNotificationState.Active,
+                };
+                notifications?.Post(notification);
+            });
+
+            // Dedup: skip if already imported.
+            if (difficultyTableStore.Tables.Any(t => t.SourcePath == pathOrUrl))
+            {
+                Schedule(() =>
+                {
+                    if (notification == null) return;
+
+                    notification.CompletionText = $"Difficulty table already imported: {pathOrUrl}";
+                    notification.State = ProgressNotificationState.Completed;
                 });
+                return;
             }
-            else
-                notifications?.Post(new SimpleNotification
+
+            // Debounce: cancel any previous pending import.
+            // ReSharper disable once MethodHasAsyncOverload
+            importCancellation?.Cancel();
+            importCancellation = new CancellationTokenSource();
+            var ct = importCancellation.Token;
+
+            try
+            {
+                await Task.Delay(300, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            var result = isUrl
+                ? await difficultyTableStore.LoadFromUrlAsync(pathOrUrl).ConfigureAwait(false)
+                : await difficultyTableStore.LoadFromFileAsync(pathOrUrl).ConfigureAwait(false);
+
+            // Update the existing notification with the final result.
+            Schedule(() =>
+            {
+                if (notification == null) return;
+
+                if (result != null)
                 {
-                    Text = $"Failed to load difficulty table from: {pathOrUrl}",
-                    Icon = FontAwesome.Solid.ExclamationTriangle,
-                });
-        });
+                    addToHistory(pathOrUrl, result.Name, result.Symbol);
+                    autocomplete?.SetItems(buildPresetItems(), buildHistoryItems());
+                    notification.CompletionText = $"Loaded table: {result.Name} ({result.Entries.Count} charts)";
+                    notification.Progress = 1;
+                    notification.State = ProgressNotificationState.Completed;
+                }
+                else
+                {
+                    notification.CompletionText = $"Failed to load difficulty table from: {pathOrUrl}";
+                    notification.State = ProgressNotificationState.Cancelled;
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            if (notification != null)
+            {
+                notification.CompletionText = $"Failed to load difficulty table from: {pathOrUrl}. {e.Message}";
+                notification.State = ProgressNotificationState.Cancelled;
+            }
+        }
     }
 
     private partial class TableListContainer : FillFlowContainer
@@ -447,17 +467,21 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             RelativeSizeAxes = Axes.X;
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-            store.TablesChanged += onTablesChanged;
-            rebuild();
-        }
+        #region Disposal
 
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
             store.TablesChanged -= onTablesChanged;
+        }
+
+        #endregion
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            store.TablesChanged += onTablesChanged;
+            rebuild();
         }
 
         private void onTablesChanged() => Schedule(rebuild);
@@ -474,6 +498,13 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
         private partial class TableRowContainer : Container
         {
+
+            public sealed override Axes RelativeSizeAxes
+            {
+                get => base.RelativeSizeAxes;
+                set => base.RelativeSizeAxes = value;
+            }
+
             [Resolved(CanBeNull = true)]
             private IDialogOverlay? dialogOverlay { get; set; }
 
@@ -484,8 +515,8 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 AutoSizeAxes = Axes.Y;
                 Padding = new MarginPadding { Vertical = 3 };
 
-                Children = new Drawable[]
-                {
+                Children =
+                [
                     new FillFlowContainer
                     {
                         Anchor = Anchor.CentreLeft,
@@ -493,20 +524,24 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                         Direction = FillDirection.Horizontal,
                         AutoSizeAxes = Axes.Both,
                         Spacing = new Vector2(5),
-                        Children = new Drawable[]
-                        {
+                        Children =
+                        [
                             new OsuSpriteText
                             {
+                                Anchor = Anchor.CentreLeft,
+                                Origin = Anchor.CentreLeft,
                                 Text = $"{table.Name} ({table.Symbol})",
                                 Font = OsuFont.Default.With(size: 16),
                             },
                             new OsuSpriteText
                             {
+                                Anchor = Anchor.CentreLeft,
+                                Origin = Anchor.CentreLeft,
                                 Text = $"{table.Entries.Count} charts",
                                 Font = OsuFont.Default.With(size: 12),
                                 Colour = Color4.Gray,
                             },
-                        },
+                        ],
                     },
                     new FillFlowContainer
                     {
@@ -515,14 +550,14 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                         Direction = FillDirection.Horizontal,
                         AutoSizeAxes = Axes.Both,
                         Spacing = new Vector2(3),
-                        Children = new Drawable[]
-                        {
+                        Children =
+                        [
                             new RoundedButton
                             {
                                 Text = isSubdivided ? "Unsubdivide" : "Subdivide",
                                 Height = 25,
                                 Width = 100,
-                                Action = () => confirmSubdivide(table, store, syncManager, isSubdivided),
+                                Action = () => confirmSubdivide(table, syncManager, isSubdivided),
                             },
                             new DangerousRoundedButton
                             {
@@ -531,9 +566,9 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                                 Width = 35,
                                 Action = () => confirmDelete(table, store),
                             },
-                        },
+                        ],
                     },
-                };
+                ];
             }
 
             private void confirmDelete(DifficultyTable.DifficultyTable table, DifficultyTableStore store)
@@ -546,7 +581,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                     store.RemoveTable(table);
             }
 
-            private void confirmSubdivide(DifficultyTable.DifficultyTable table, DifficultyTableStore store,
+            private void confirmSubdivide(DifficultyTable.DifficultyTable table,
                                           CollectionSyncManager? syncManager, bool isSubdivided)
             {
                 if (dialogOverlay != null)
