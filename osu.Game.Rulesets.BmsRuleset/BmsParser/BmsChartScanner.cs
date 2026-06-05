@@ -15,10 +15,16 @@ internal static partial class BmsChartParser
         CodePagesEncodingProvider.Instance.GetEncoding(932)
         ?? throw new InvalidOperationException("Shift-JIS encoding is not available.");
 
+    /// <summary>
+    /// Strips comments from raw BMS lines in a single pass. Use before calling
+    /// <see cref="ScanMetadata"/> and <see cref="ScanResourceReferences"/> to avoid
+    /// redundant stripping in each method.
+    /// </summary>
+    public static string[] PreprocessLines(IEnumerable<string> lines) =>
+        lines.Select(l => BmsCommentStripper.StripAll(l).Trim()).ToArray();
+
     public static IEnumerable<string> ScanResourceReferences(IEnumerable<string> lines) =>
-        from rawLine in lines
-        select BmsCommentStripper.StripAll(rawLine).Trim()
-        into line
+        from line in lines
         where line.Length != 0 && line.StartsWith('#')
         select resourceDefinitionRegex().Match(line)
         into match
@@ -37,10 +43,8 @@ internal static partial class BmsChartParser
         var subtitle = string.Empty;
         var channels = new List<string>();
 
-        foreach (var rawLine in lines)
+        foreach (var line in lines)
         {
-            var line = BmsCommentStripper.StripAll(rawLine).Trim();
-
             if (line.Length == 0 || !line.StartsWith('#'))
                 continue;
 

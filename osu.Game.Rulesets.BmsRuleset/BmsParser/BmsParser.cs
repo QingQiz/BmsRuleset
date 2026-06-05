@@ -346,20 +346,23 @@ internal static partial class BmsChartParser
         {
             if (BmsLayout.TryMapVisibleChannel(line.Channel, totalColumns, out var column))
             {
-                notes.AddRange(expandCells(line, measureStarts, false).Select(c => c with { Column = column }));
+                foreach (var cell in expandCells(line, measureStarts, false))
+                    notes.Add(cell with { Column = column });
                 continue;
             }
 
             if (tryMapLongNoteChannel(line.Channel, totalColumns, out column))
             {
                 var includeZeroCells = state.LnType == 2;
-                lnCells.AddRange(expandCells(line, measureStarts, includeZeroCells).Select(c => c with { Column = column }));
+                foreach (var cell in expandCells(line, measureStarts, includeZeroCells))
+                    lnCells.Add(cell with { Column = column });
                 continue;
             }
 
             if (tryMapLandmineChannel(line.Channel, totalColumns, out column))
             {
-                mines.AddRange(expandCells(line, measureStarts, false).Select(c => c with { Column = column }));
+                foreach (var cell in expandCells(line, measureStarts, false))
+                    mines.Add(cell with { Column = column });
             }
         }
 
@@ -509,7 +512,7 @@ internal static partial class BmsChartParser
 
         for (var i = 0; i < pairCount; i++)
         {
-            var value = line.Payload.Substring(i * 2, 2).ToUpperInvariant();
+            var value = line.Payload.Substring(i * 2, 2);
 
             if (!includeZeroCells && value == "00")
                 continue;
@@ -544,17 +547,20 @@ internal static partial class BmsChartParser
 
     private static double bpmAtTick(long tick, IReadOnlyList<TimingEvent> timingEvents)
     {
-        var current = timingEvents[0];
+        var lo = 0;
+        var hi = timingEvents.Count - 1;
 
-        for (var i = 1; i < timingEvents.Count; i++)
+        while (lo < hi)
         {
-            if (timingEvents[i].Tick > tick)
-                break;
+            var mid = (lo + hi + 1) / 2;
 
-            current = timingEvents[i];
+            if (timingEvents[mid].Tick <= tick)
+                lo = mid;
+            else
+                hi = mid - 1;
         }
 
-        return current.Bpm;
+        return timingEvents[lo].Bpm;
     }
 
     private static double ticksToMilliseconds(long ticks, double bpm, int tickResolution) =>

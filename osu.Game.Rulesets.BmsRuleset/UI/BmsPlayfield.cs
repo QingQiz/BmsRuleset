@@ -399,7 +399,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         CurrentScrollPosition = ConstantScrollActive
             ? Time.Current
             : TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current;
-        ScrollRange = BaseScrollRange;
+
+        // NOTE: ScrollRange must NOT be reset here. recalculateSpeedFields() applies the
+        // mania-matching distance normalization (scale) to ScrollRange; overwriting it with the
+        // unscaled BaseScrollRange every frame discarded that normalization and made BMS notes
+        // fall ~7% faster than mania at the same numeric scroll speed.
 
         updateHud();
 

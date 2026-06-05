@@ -467,27 +467,6 @@ The full built-in skin (covering all 6 layouts) is at
   ```
 - [ ] 血量过低导致的失败不会更新结果为F
 
-- [ ] 11
-  ```
-  2026-06-04 16:20:31 [error]: An unobserved error has occurred.
-  2026-06-04 16:20:31 [error]: System.IndexOutOfRangeException: Index was outside the bounds of the array.
-  2026-06-04 16:20:31 [error]: at osu.Game.Rulesets.BmsRuleset.Difficulty.BmsStarRatingProcessor.computeJbar()
-  2026-06-04 16:20:31 [error]: at osu.Game.Rulesets.BmsRuleset.Difficulty.BmsStarRatingProcessor.Compute(IReadOnlyList`1 hitObjects, Int32 totalColumns, Int32 rank, Double clockRate)
-  2026-06-04 16:20:31 [error]: at osu.Game.Rulesets.BmsRuleset.Difficulty.BmsDifficultyCalculator.CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills, Double clockRate)
-  2026-06-04 16:20:31 [error]: at osu.Game.Rulesets.Difficulty.DifficultyCalculator.Calculate(IEnumerable`1 mods, CancellationToken cancellationToken)
-  2026-06-04 16:20:31 [error]: at osu.Game.Beatmaps.BeatmapUpdater.<>c__DisplayClass7_0.<Process>b__0(Realm _)
-  2026-06-04 16:20:31 [error]: at osu.Game.Database.RealmExtensions.Write(Realm realm, Action`1 function)
-  2026-06-04 16:20:31 [error]: at osu.Game.Beatmaps.BeatmapUpdater.Process(BeatmapSetInfo beatmapSet, MetadataLookupScope lookupScope)
-  2026-06-04 16:20:31 [error]: at osu.Game.Beatmaps.BeatmapUpdater.<>c__DisplayClass6_0.<Queue>b__1(BeatmapSetInfo b)
-  2026-06-04 16:20:31 [error]: at osu.Game.Database.RealmLive`1.<>c__DisplayClass6_0.<PerformRead>b__0(Realm r)
-  2026-06-04 16:20:31 [error]: at osu.Game.Database.RealmAccess.Run(Action`1 action)
-  2026-06-04 16:20:31 [error]: at osu.Game.Database.RealmLive`1.PerformRead(Action`1 perform)
-  2026-06-04 16:20:31 [error]: at osu.Game.Beatmaps.BeatmapUpdater.<>c__DisplayClass6_0.<Queue>b__0()
-  2026-06-04 16:20:31 [error]: at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
-  2026-06-04 16:20:31 [error]: --- End of stack trace from previous location ---
-  2026-06-04 16:20:31 [error]: at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
-  2026-06-04 16:20:31 [error]: at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
-  ```
 
 ## TODO
 
@@ -560,7 +539,6 @@ The full built-in skin (covering all 6 layouts) is at
 
 - [ ] Exrank
 
-- [ ] Delete all imported BMS files confirm window
 - [ ] ln tail 的打击音
 
 - [ ] 结算时不同判定的文字颜色
@@ -571,10 +549,10 @@ The full built-in skin (covering all 6 layouts) is at
 - [ ] mania 7k 转谱
 - [ ] reply not available
 - [ ] 调整判定偏移的能力
-- [-] 同样的速度下 bms 下落比 mania 快
+- [x] 同样的速度下 bms 下落比 mania 快
 
 - [ ] BMS import: reading charts 很慢，另外会导致大量内存占用。并行似乎也没生效。创建一个池子，read完写进去，导入进程从这里拿
-- [ ] 一次性删很多图，完成后会卡很长时间
+- [x] 一次性删很多图，完成后会卡很长时间
 - [ ] rewrite 血条，红黄绿三色渐变，不改变整体颜色，去掉边框
 - [ ] GetBeatmapAttributesForDisplay 显示sr难度分量 和 rank
 - [ ] 选择 AS 时，计算难度忽略 scratch

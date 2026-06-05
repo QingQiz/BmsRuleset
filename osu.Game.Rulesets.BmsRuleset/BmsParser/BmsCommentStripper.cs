@@ -58,16 +58,16 @@ internal class BmsCommentStripper
     /// <summary>
     /// Removes /* */ block comments from a line. If the block is not closed,
     /// sets <paramref name="inBlock"/> to true and returns content before /*.
+    /// Maintains quote state inline to avoid O(n²) rescans.
     /// </summary>
     private static string? removeBlockComments(string line, ref bool inBlock)
     {
         var sb = new StringBuilder(line.Length);
+        var inQuote = false;
         var i = 0;
 
         while (i < line.Length)
         {
-            var charsLeft = line.Length - i;
-
             if (inBlock)
             {
                 var closeIdx = indexOfOutsideQuotes(line, "*/", i);
@@ -80,20 +80,33 @@ internal class BmsCommentStripper
                 continue;
             }
 
+            // Track quote/escape state before checking comment tokens at this position.
+            if (line[i] == '\\' && i + 1 < line.Length && isEscapeChar(line[i + 1]))
+            {
+                sb.Append(line[i]);
+                sb.Append(line[i + 1]);
+                i += 2;
+                continue;
+            }
+
+            if (line[i] == '"')
+                inQuote = !inQuote;
+
+            var charsLeft = line.Length - i;
+
             // Check for // line comments before /* so that /* inside // is not treated as a block comment.
-            if (charsLeft >= 2 && line[i] == '/' && line[i + 1] == '/' && !isInsideQuotes(line, i))
+            if (!inQuote && charsLeft >= 2 && line[i] == '/' && line[i + 1] == '/')
             {
                 break;
             }
 
             // Check for /* only outside quotes
-            if (charsLeft >= 2 && line[i] == '/' && line[i + 1] == '*' && !isInsideQuotes(line, i))
+            if (!inQuote && charsLeft >= 2 && line[i] == '/' && line[i + 1] == '*')
             {
                 var closeIdx = indexOfOutsideQuotes(line, "*/", i + 2);
 
                 if (closeIdx >= 0)
                 {
-                    sb.Append(line.AsSpan(i, 0)); // nothing between /* and */
                     i = closeIdx + 2;
                     continue;
                 }
@@ -161,16 +174,29 @@ internal class BmsCommentStripper
     /// <summary>
     /// Finds the first occurrence of <paramref name="substring"/> in <paramref name="line"/>
     /// starting at <paramref name="startIndex"/> that is NOT inside a quoted string.
+    /// Tracks quote state inline (O(n)) rather than rescaling from the start per position (O(n²)).
     /// Returns -1 if not found.
     /// </summary>
     private static int indexOfOutsideQuotes(string line, string substring, int startIndex = 0)
     {
-        if (string.IsNullOrEmpty(substring))
+        if (string.IsNullOrEmpty(substring) || startIndex > line.Length - substring.Length)
             return -1;
 
-        for (var i = startIndex; i <= line.Length - substring.Length; i++)
+        var inQuote = false;
+
+        for (var i = 0; i <= line.Length - substring.Length; i++)
         {
-            if (isInsideQuotes(line, i))
+            // Track quote/escape state at this position before checking the match.
+            if (line[i] == '\\' && i + 1 < line.Length && isEscapeChar(line[i + 1]))
+            {
+                i++;
+                continue;
+            }
+
+            if (line[i] == '"')
+                inQuote = !inQuote;
+
+            if (i < startIndex || inQuote)
                 continue;
 
             var match = true;
@@ -190,26 +216,4 @@ internal class BmsCommentStripper
         return -1;
     }
 
-    /// <summary>
-    /// Checks if the position at <paramref name="index"/> in <paramref name="line"/>
-    /// is inside a quoted string ("..."). Handles \ escaping of comment-relevant chars.
-    /// </summary>
-    private static bool isInsideQuotes(string line, int index)
-    {
-        var inQuote = false;
-
-        for (var i = 0; i < index && i < line.Length; i++)
-        {
-            if (line[i] == '\\' && i + 1 < line.Length && isEscapeChar(line[i + 1]))
-            {
-                i++; // skip escaped char
-                continue;
-            }
-
-            if (line[i] == '"')
-                inQuote = !inQuote;
-        }
-
-        return inQuote;
-    }
 }

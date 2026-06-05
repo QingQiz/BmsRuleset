@@ -13,6 +13,7 @@ using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
+using osu.Game.Overlays.Settings.Sections.Maintenance;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Rulesets.BmsRuleset.Screens;
@@ -41,6 +42,9 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     private INotificationOverlay? notifications { get; set; }
 
     [Resolved(CanBeNull = true)]
+    private IDialogOverlay? dialogOverlay { get; set; }
+
+    [Resolved(CanBeNull = true)]
     private OsuGameBase? game { get; set; }
 
     [Resolved(CanBeNull = true)]
@@ -51,6 +55,9 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
     [Resolved(CanBeNull = true)]
     private IBeatmapUpdater? beatmapUpdater { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private BeatmapManager? beatmapManager { get; set; }
 
     #region Disposal
 
@@ -85,7 +92,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     {
         if (bmsImporter == null && realm != null && storage != null && game != null)
         {
-            bmsImporter = new BmsFileImporter(realm, storage, notifications)
+            bmsImporter = new BmsFileImporter(realm, storage, notifications, beatmapManager)
             {
                 OnImportCompleted = (beatmapSet, scope) => beatmapUpdater?.Queue(beatmapSet, scope),
             };
@@ -161,9 +168,27 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Text = "Delete all imported BMS files",
                 RelativeSizeAxes = Axes.X,
                 Height = 36,
-                Action = () => bmsImporter?.DeleteAllBmsFilesAsync(),
+                Action = confirmDeleteAllBmsFiles,
                 Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
             },
         ];
+    }
+
+    private void confirmDeleteAllBmsFiles()
+    {
+        if (bmsImporter == null)
+            return;
+
+        // Mirror osu!'s maintenance mass-delete flow: require an explicit (hold-to-)confirm before
+        // irreversibly removing every imported BMS beatmap.
+        var dialog = new MassDeleteConfirmationDialog(
+            () => bmsImporter.DeleteAllBmsFilesAsync(),
+            "All imported BMS beatmaps will be permanently deleted. This cannot be undone!");
+
+        if (dialogOverlay != null)
+            dialogOverlay.Push(dialog);
+        else
+            // No dialog overlay available (e.g. isolated test harness): fall back to direct deletion.
+            bmsImporter.DeleteAllBmsFilesAsync();
     }
 }
