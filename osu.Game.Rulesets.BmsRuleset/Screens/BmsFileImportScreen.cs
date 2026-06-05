@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -14,6 +15,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
@@ -35,8 +37,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     private Container contentContainer = null!;
     private TextFlowContainer currentFileText = null!;
 
-    private RoundedButton importButton = null!;
-    private RoundedButton importFolderButton = null!;
+    private readonly RoundedButton[] buttons = [null!, null!, null!];
 
     [Cached]
     private OverlayColourProvider colourProvider = new(OverlayColourScheme.Purple);
@@ -45,6 +46,8 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     private Bindable<string> lastImportPath;
 
     private BmsFileImporter importer;
+    private LoadingLayer loadingLayer = null!;
+    private bool isImporting;
 
     [Resolved(CanBeNull = true)]
     private BmsRulesetConfigManager resolvedConfig { get; set; }
@@ -105,27 +108,27 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
             Padding = new MarginPadding { Bottom = 2 * button_vertical_margin },
             Children =
             [
-                importButton = new RoundedButton
+                buttons[0] = new RoundedButton
                 {
                     Text = "Import selected file",
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
                     Action = () => startImport(fileSelector.CurrentFile.Value?.FullName),
                 },
-                importFolderButton = new RoundedButton
+                buttons[1] = new RoundedButton
                 {
                     Text = "Import all in current folder",
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
                     Action = () => startDirectoryImport(false),
                 },
-                new RoundedButton
+                buttons[2] = new RoundedButton
                 {
                     Text = "Import all from directory (recursive)",
                     TooltipText = "Imports all BMS files from the selected directory and subdirectories",
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
-                    Action = () => Task.Run(() => startDirectoryImport(true)),
+                    Action = () => startDirectoryImport(true),
                 },
             ],
         };
@@ -186,6 +189,11 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
                         buttonGroup,
                     ],
                 },
+                loadingLayer = new LoadingLayer(dimBackground: true)
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Alpha = 0f,
+                },
             ],
         };
 
@@ -202,7 +210,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
                           && newDirectory.Exists
                           && newDirectory.EnumerateFiles().Any(f => Constant.BMS_EXTENSIONS.Contains(f.Extension));
 
-        importFolderButton.Enabled.Value = hasBmsFiles;
+        buttons[1].Enabled.Value = hasBmsFiles;
 
         if (newDirectory != null)
         {
@@ -213,24 +221,34 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
     private void fileChanged(ValueChangedEvent<FileInfo> selectedFile)
     {
-        importButton.Enabled.Value = selectedFile.NewValue != null;
+        buttons[0].Enabled.Value = selectedFile.NewValue != null;
         currentFileText.Text = selectedFile.NewValue?.Name ?? "Select a file/folder";
     }
 
     private void startImport(params string[] paths)
     {
-        if (paths.Length == 0)
+        if (paths.Length == 0 || isImporting)
             return;
 
-        // Bypass game.Import() which groups paths by extension (see OsuGameBase.Importing.cs:33).
-        // A BMS directory typically contains .bms, .bme, .bml, and .pms files side by side;
-        // per-extension dispatch would split them into separate import calls, producing
-        // multiple notifications and potentially fragmenting charts across multiple beatmap sets.
-        // Calling the importer directly processes all chart files as one atomic batch.
+        // Schedule the UI setup (FadeIn + flag) on the update thread so this method is safe to
+        // call from button actions, directory-change handlers, or thread-pool continuations.
+        Schedule(() =>
+        {
+            if (isImporting) return;
+
+            isImporting = true;
+            loadingLayer.FadeIn(duration);
+        });
+
         Task.Run(async () =>
         {
             await importer.Import(paths).ConfigureAwait(false);
-            Schedule(() => { fileSelector.CurrentPath.TriggerChange(); });
+            Schedule(() =>
+            {
+                loadingLayer.FadeOut(duration);
+                fileSelector.CurrentPath.TriggerChange();
+                isImporting = false;
+            });
         });
     }
 
