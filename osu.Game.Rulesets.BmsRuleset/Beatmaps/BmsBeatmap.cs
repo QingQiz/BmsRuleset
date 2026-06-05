@@ -42,8 +42,7 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
         var scratch = HitObjects.Count(isScratch);
         var mines = HitObjects.Count(h => h.IsMine);
 
-        return
-        [
+        return filterStatistics([
             new BeatmapStatistic
             {
                 Name = "Notes",
@@ -68,8 +67,13 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
                 CreateIcon = () => new BeatmapStatisticIcon(BeatmapStatisticsIconType.Circles),
                 Content = mines.ToString(),
             },
-        ];
+        ]);
 
         bool isScratch(BmsHitObject h) => BmsLayout.IsScratchColumn(h.Column, LayoutVariant);
+    }
+
+    private IEnumerable<BeatmapStatistic> filterStatistics(IEnumerable<BeatmapStatistic> statistics)
+    {
+        return statistics.Where(x => !string.IsNullOrWhiteSpace(x.Content) && x.Content != "0");
     }
 }

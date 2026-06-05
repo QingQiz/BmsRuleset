@@ -132,7 +132,9 @@ public class BmsStarRatingProcessor
             list.Add(n);
         }
 
-        noteSeqByColumn = noteDict.OrderBy(kv => kv.Key).Select(kv => kv.Value).ToArray();
+        noteSeqByColumn = new List<(int column, double head, double tail)>[TotalColumns];
+        for (var k = 0; k < TotalColumns; k++)
+            noteSeqByColumn[k] = noteDict.TryGetValue(k, out var list) ? list : [];
 
         // Long notes (LN) are those with a tail (t>=0)
         lnSeq = noteSeq.Where(n => n.tail >= 0).ToList();
