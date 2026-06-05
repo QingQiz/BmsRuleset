@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -15,9 +16,6 @@ namespace osu.Game.Rulesets.BmsRuleset;
 public class BmsFilterCriteria : IRulesetFilterCriteria
 {
     private readonly HashSet<BmsLayoutVariant> enabledVariants;
-    private HashSet<BmsLayoutVariant>? keyRestrictedVariants;
-    private string? selectedTableName;
-    private string? selectedLevel;
 
     private static readonly Dictionary<int, BmsLayoutVariant> column_to_variant = new()
     {
@@ -29,9 +27,12 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
         [BmsLayout.PMS_DOUBLE_PLAY_COLUMNS] = BmsLayoutVariant.Pms9KDouble,
     };
 
+    private HashSet<BmsLayoutVariant>? keyRestrictedVariants;
+    private string? selectedTableName;
+    private string? selectedLevel;
+
     public BmsFilterCriteria(BmsRulesetConfigManager? config)
     {
-
         if (config != null)
         {
             enabledVariants = new HashSet<BmsLayoutVariant>(6);
@@ -84,8 +85,7 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 
             if (!string.IsNullOrEmpty(selectedLevel))
             {
-                if (!markers.Any(m => $"{m.table.Symbol}{m.entry.Level}".Equals(selectedLevel, StringComparison.OrdinalIgnoreCase)
-                                      || m.entry.Level.Equals(selectedLevel, StringComparison.Ordinal)))
+                if (!markers.Any(m => fuzzyLevelMatch(selectedLevel, m.table.Symbol, m.entry.Level)))
                     return false;
             }
         }
@@ -114,6 +114,65 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
         }
 
         return false;
+    }
+
+    public bool FilterMayChangeFromMods(FilterCriteria criteria, ValueChangedEvent<IReadOnlyList<Mod>> mods) => false;
+
+    private static BmsLayoutVariant variantFromColumns(int columns) => column_to_variant.GetValueOrDefault(columns, BmsLayoutVariant.Bms5K);
+
+    /// <summary>
+    /// Fuzzy-match a user-typed level filter against a table entry's level.
+    /// Tries several strategies in order of precision:
+    /// <list type="number">
+    ///   <item>Exact match on the combined symbol+level string.</item>
+    ///   <item>Exact match on just the level string.</item>
+    ///   <item>Containment: the entry level contains the filter text.</item>
+    ///   <item>Numeric match: if both are numbers, compare numerically.</item>
+    /// </list>
+    /// </summary>
+    private static bool fuzzyLevelMatch(string filter, string tableSymbol, string entryLevel)
+    {
+        // 1) Exact match on combined "{symbol}{level}" (e.g. "IT★1")
+        if ($"{tableSymbol}{entryLevel}".Equals(filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // 2) Exact match on the level alone
+        if (entryLevel.Equals(filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // 3) Contains/substring match (the core "fuzzy" behaviour)
+        if (entryLevel.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // 4) If the filter is a plain number, try extracting the numeric portion
+        //    from the entry level (stripping non-numeric prefix like ★ / ☆ / ◆)
+        //    and compare as integers.
+        if (int.TryParse(filter, out var filterNum))
+        {
+            var numericPart = extractNumericPart(entryLevel);
+            if (numericPart == filterNum)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Extract the trailing numeric value from a level string.
+    /// "★12" → 12, "☆03" → 3, "12" → 12, "★★★" → null.
+    /// </summary>
+    private static int? extractNumericPart(string level)
+    {
+        var digits = new StringBuilder();
+        foreach (var c in level)
+        {
+            if (c >= '0' && c <= '9')
+                digits.Append(c);
+        }
+
+        return digits.Length > 0 && int.TryParse(digits.ToString(), out var result)
+            ? result
+            : null;
     }
 
     private bool tryParseKeyCount(Operator op, string strValues)
@@ -170,8 +229,4 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
         keyRestrictedVariants = new HashSet<BmsLayoutVariant>(allowedKeys.Select(k => column_to_variant[k]));
         return true;
     }
-
-    public bool FilterMayChangeFromMods(FilterCriteria criteria, ValueChangedEvent<IReadOnlyList<Mod>> mods) => false;
-
-    private static BmsLayoutVariant variantFromColumns(int columns) => column_to_variant.GetValueOrDefault(columns, BmsLayoutVariant.Bms5K);
 }

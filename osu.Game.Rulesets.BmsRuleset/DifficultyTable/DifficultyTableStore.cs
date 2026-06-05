@@ -3,187 +3,324 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
+using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 
-public class DifficultyTableStore
+/// <summary>
+/// Result of an import operation.
+/// </summary>
+public record ImportResult(DifficultyTable Table);
+
+public partial class DifficultyTableStore
 {
-    public event Action<DifficultyTable>? TableLoaded;
+
+    public IReadOnlyList<DifficultyTable> Tables => tables;
+
+    private static readonly HttpClient http_client = new();
+
+    private readonly List<DifficultyTable> tables = [];
+
+    private readonly BmsRulesetConfigManager? config;
+    private readonly string cacheDirectory;
+    private readonly CollectionSyncManager? syncManager;
+    private readonly RealmAccess? realm;
+
+    private readonly Dictionary<string, List<(DifficultyTable table, TableEntry entry)>> md5Index
+        = new(StringComparer.OrdinalIgnoreCase);
+
+    public DifficultyTableStore(
+        BmsRulesetConfigManager? config, string cacheDirectory,
+        CollectionSyncManager? syncManager = null,
+        RealmAccess? realm = null)
+    {
+        this.config = config;
+        this.cacheDirectory = cacheDirectory;
+        this.syncManager = syncManager;
+        this.realm = realm;
+        Directory.CreateDirectory(cacheDirectory);
+    }
+
+    /// <summary>
+    /// Reload all persisted table sources into memory index only.
+    /// Does NOT trigger TableLoaded / TableRemoved.
+    /// Remote URLs read from local cache if available; no HTTP unless cache is missing.
+    /// </summary>
+    public void LoadPersistedTables()
+    {
+        tables.Clear();
+        md5Index.Clear();
+
+        var sources = config?.Get<string>(BmsRulesetSetting.DifficultyTableSources) ?? string.Empty;
+        if (string.IsNullOrEmpty(sources)) return;
+
+        foreach (var source in sources.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (string.IsNullOrEmpty(source)) continue;
+
+            DifficultyTable? table = null;
+
+            if (source.StartsWith("http://", StringComparison.Ordinal) || source.StartsWith("https://", StringComparison.Ordinal))
+            {
+                // Restore from cache if present; no HTTP at startup
+                var cachePath = cacheFileForUrl(source);
+                if (File.Exists(cachePath))
+                    table = loadFromCache(cachePath, source);
+            }
+            else if (File.Exists(source))
+            {
+                table = loadFromCache(source, source);
+            }
+
+            if (table != null)
+                RestoreTable(table);
+        }
+    }
+
+    /// <summary>
+    /// User-initiated import: download/read, parse, index, update markers + collections.
+    /// </summary>
+    public async Task<ImportResult?> ImportAsync(string source, IProgress<float>? progress = null)
+    {
+        if (string.IsNullOrWhiteSpace(source)) return null;
+
+        progress?.Report(0f);
+
+        // ── Stage 1: Read + Parse ──
+        string json;
+        string effectiveSource;
+
+        var isUrl = source.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    || source.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+
+        if (isUrl)
+        {
+            effectiveSource = source;
+            var body = await http_client.GetStringAsync(source).ConfigureAwait(false);
+
+            var trimmed = body.TrimStart();
+            if (trimmed.Length > 0 && (trimmed[0] == '{' || trimmed[0] == '['))
+            {
+                json = body;
+            }
+            else
+            {
+                // HTML — look for bmstable meta tag
+                var jsonUrl = resolveUrlFromHtml(body, source);
+                if (jsonUrl == null)
+                {
+                    Logger.Log($"Page at {source} does not contain a bmstable meta tag");
+                    return null;
+                }
+
+                json = await http_client.GetStringAsync(jsonUrl).ConfigureAwait(false);
+            }
+
+            // Write to cache
+            var cachePath = cacheFileForUrl(source);
+            await File.WriteAllTextAsync(cachePath, json).ConfigureAwait(false);
+        }
+        else
+        {
+            if (!File.Exists(source)) return null;
+
+            effectiveSource = source;
+            json = await File.ReadAllTextAsync(source).ConfigureAwait(false);
+        }
+
+        progress?.Report(0.05f);
+
+        var parsed = BmsTableJsonParser.Parse(json);
+        if (parsed == null)
+        {
+            Logger.Log($"Failed to parse difficulty table from {source}");
+            return null;
+        }
+
+        // ── Stage 2: Merge + Index ──
+        var tableSource = isUrl ? TableSource.RemoteUrl : TableSource.LocalFile;
+        var table = BmsTableJsonParser.Merge(effectiveSource, tableSource, parsed.Header, parsed.Charts);
+
+        if (table == null)
+        {
+            Logger.Log($"No valid entries found in difficulty table from {source}");
+            return null;
+        }
+
+        AddTable(table);
+        progress?.Report(0.1f);
+
+        // ── Stage 3: Apply (single realm.Write) ──
+        realm?.Write(r =>
+        {
+            applyMarkersInTransaction(r, table);
+            syncManager?.SyncInTransaction(r, table);
+            progress?.Report(0.9f);
+        });
+
+        progress?.Report(1.0f);
+        return new ImportResult(table);
+    }
+
+    [GeneratedRegex(@"\s\[[^\]]*\]$", RegexOptions.Compiled)]
+    private static partial Regex markerSuffixRegex();
+
+    private void applyMarkersInTransaction(Realm r, DifficultyTable table)
+    {
+        foreach (var entry in table.Entries)
+        {
+            var beatmap = r.All<BeatmapInfo>()
+                .Filter("Ruleset.ShortName == 'bms' AND MD5Hash == $0", entry.Md5Hash)
+                .FirstOrDefault();
+
+            if (beatmap == null) continue;
+
+            var clean = markerSuffixRegex().Replace(beatmap.DifficultyName, string.Empty);
+            var markers = GetMarkers(beatmap.MD5Hash);
+
+            if (markers.Count == 0)
+                beatmap.DifficultyName = clean;
+            else
+            {
+                var markerStr = string.Join(" ", markers.Select(m => $"{m.table.Symbol}{m.entry.Level}"));
+                beatmap.DifficultyName = $"{clean} [{markerStr}]";
+            }
+        }
+    }
+
+    #region Persistence
+
+    private void persistTableList()
+    {
+        if (config == null) return;
+
+        var sources = string.Join(";", tables.Select(t => t.SourcePath));
+        config.SetValue(BmsRulesetSetting.DifficultyTableSources, sources);
+    }
+
+    #endregion
 
     public event Action<DifficultyTable>? TableRemoved;
 
     public event Action? TablesChanged;
 
-    public IReadOnlyList<DifficultyTable> Tables => tables;
-
-    private readonly List<DifficultyTable> tables = [];
+    #region Public CRUD
 
     /// <summary>
-    /// Fire <see cref="TablesChanged"/> so the UI rebuilds (used after subdivision toggle).
+    /// Add a newly-imported table. Fires events for UI updates.
     /// </summary>
-    public void NotifyTablesChanged() => TablesChanged?.Invoke();
-
-    /// <summary>
-    /// MD5 → list of (table, entry) for O(1) lookup.
-    /// </summary>
-    private Dictionary<string, List<(DifficultyTable table, TableEntry entry)>> md5Index = new(StringComparer.OrdinalIgnoreCase);
-
-    private readonly BmsRulesetConfigManager? config;
-    private readonly string cacheDirectory;
-
-    /// <summary>
-    /// Create the store. Call <see cref="LoadPersistedTables"/> after construction to reload persisted sources.
-    /// </summary>
-    public DifficultyTableStore(BmsRulesetConfigManager? config, string cacheDirectory)
+    public void AddTable(DifficultyTable table)
     {
-        this.config = config;
-        this.cacheDirectory = cacheDirectory;
-        Directory.CreateDirectory(cacheDirectory);
+        tables.Add(table);
+        addToIndex(table);
+        TablesChanged?.Invoke();
+        persistTableList();
     }
 
     /// <summary>
-    /// Reload all tables from persisted source list.
+    /// Restore a table at startup. No events fired — markers and collections are in Realm already.
     /// </summary>
-    public void LoadPersistedTables()
+    public void RestoreTable(DifficultyTable table)
     {
-        tables.Clear();
-        rebuildIndex();
+        tables.Add(table);
+        addToIndex(table);
+        // No events
+    }
 
-        var sources = config?.Get<string>(BmsRulesetSetting.DifficultyTableSources) ?? string.Empty;
-        if (!string.IsNullOrEmpty(sources))
+    /// <summary>
+    /// Remove a table and trigger cleanup events.
+    /// </summary>
+    public void RemoveTable(DifficultyTable table)
+    {
+        tables.Remove(table);
+        removeFromIndex(table);
+        TableRemoved?.Invoke(table);
+        TablesChanged?.Invoke();
+        persistTableList();
+    }
+
+    public List<(DifficultyTable table, TableEntry entry)> GetMarkers(string md5Hash)
+        => md5Index.TryGetValue(md5Hash, out var markers)
+            ? markers
+            : [];
+
+    #endregion
+
+    #region Index management
+
+    private void addToIndex(DifficultyTable table)
+    {
+        foreach (var entry in table.Entries)
         {
-            foreach (var source in sources.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            if (!md5Index.TryGetValue(entry.Md5Hash, out var list))
+                md5Index[entry.Md5Hash] = list = [];
+            list.Add((table, entry));
+        }
+    }
+
+    private void removeFromIndex(DifficultyTable table)
+    {
+        foreach (var entry in table.Entries)
+        {
+            if (md5Index.TryGetValue(entry.Md5Hash, out var list))
             {
-                if (!string.IsNullOrEmpty(source))
-                    loadFromSource(source);
+                list.RemoveAll(t => t.table == table);
+                if (list.Count == 0)
+                    md5Index.Remove(entry.Md5Hash);
             }
         }
     }
 
-    /// <summary>
-    /// Load a table from a local JSON file path.
-    /// Supports combined JSON (header+data in one file) and separate files (header.json + data.json).
-    /// </summary>
-    public async Task<DifficultyTable?> LoadFromFileAsync(string path)
-    {
-        if (!File.Exists(path)) return null;
+    #endregion
 
+    #region Cache
+
+    private string cacheFileForUrl(string url)
+    {
+        var hash = Convert.ToHexString(SHA256.HashData(
+            Encoding.UTF8.GetBytes(url))).ToLowerInvariant();
+        return Path.Combine(cacheDirectory, $"{hash}.json");
+    }
+
+    private DifficultyTable? loadFromCache(string cachePath, string sourcePath)
+    {
         try
         {
-            var json = await File.ReadAllTextAsync(path).ConfigureAwait(false);
-            var parser = new BmsTableJsonParser();
+            var json = File.ReadAllText(cachePath);
+            var parsed = BmsTableJsonParser.Parse(json);
+            if (parsed == null) return null;
 
-            var header = parser.ParseHeader(json);
-            var charts = parser.ParseData(json);
+            var source = sourcePath.StartsWith("http", StringComparison.Ordinal)
+                ? TableSource.RemoteUrl
+                : TableSource.LocalFile;
 
-            if (charts == null)
-            {
-                var dir = Path.GetDirectoryName(path) ?? ".";
-                var dataPath = header?.DataUrl != null
-                    ? Path.Combine(dir, Path.GetFileName(header.DataUrl))
-                    : findDataFile(dir, path);
-
-                if (dataPath != null && File.Exists(dataPath))
-                {
-                    var dataJson = await File.ReadAllTextAsync(dataPath).ConfigureAwait(false);
-                    charts = parser.ParseData(dataJson);
-                }
-            }
-
-            var table = parser.Merge(path, TableSource.LocalFile, header, charts);
-            if (table != null)
-                addTable(table);
-
-            return table;
+            return BmsTableJsonParser.Merge(sourcePath, source, parsed.Header, parsed.Charts);
         }
         catch (Exception e)
         {
-            Logger.Log($"Failed to load difficulty table from {path}: {e.Message}");
+            Logger.Log($"Failed to read cached difficulty table {cachePath}: {e.Message}");
             return null;
         }
     }
 
-    /// <summary>
-    /// Load a table from a URL. Downloads and caches locally.
-    /// Detects HTML vs JSON by inspecting the response body content,
-    /// not by URL extension or Content-Type header.
-    /// </summary>
-    public async Task<DifficultyTable?> LoadFromUrlAsync(string url)
-    {
-        try
-        {
-            using var client = new HttpClient();
-            var body = await client.GetStringAsync(url).ConfigureAwait(false);
+    #endregion
 
-            // Content-based detection: JSON objects/arrays start with { or [.
-            var trimmed = body.TrimStart();
-            if (trimmed.Length > 0 && (trimmed[0] == '{' || trimmed[0] == '['))
-            {
-                return await loadJsonContent(body, url, url, client).ConfigureAwait(false);
-            }
+    #region HTML parsing (unchanged)
 
-            // Not JSON — treat as HTML and look for a bmstable meta tag.
-            var jsonUrl = resolveUrlFromHtml(body, url);
-            if (jsonUrl == null)
-            {
-                Logger.Log($"Page at {url} does not appear to be JSON and contains no bmstable meta tag");
-                return null;
-            }
-
-            var json = await client.GetStringAsync(jsonUrl).ConfigureAwait(false);
-            return await loadJsonContent(json, url, jsonUrl, client).ConfigureAwait(false);
-        }
-        catch (Exception e)
-        {
-            Logger.Log($"Failed to load difficulty table from {url}: {e.Message}");
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Process a JSON body: parse header/charts, fetch separate data if needed, cache, and register.
-    /// </summary>
-    private async Task<DifficultyTable?> loadJsonContent(string json, string cacheKey, string jsonUrl, HttpClient client)
-    {
-        var parser = new BmsTableJsonParser();
-
-        var header = parser.ParseHeader(json);
-        var charts = parser.ParseData(json);
-
-        if (charts == null && header?.DataUrl != null)
-        {
-            var dataUrl = header.DataUrl.StartsWith("http", StringComparison.Ordinal)
-                ? header.DataUrl
-                : new Uri(new Uri(jsonUrl), header.DataUrl).ToString();
-            var dataJson = await client.GetStringAsync(dataUrl).ConfigureAwait(false);
-            charts = parser.ParseData(dataJson);
-        }
-
-        // Cache locally (keyed by original page URL, not the resolved JSON URL)
-        var cachePath = cacheFileForUrl(cacheKey);
-        await File.WriteAllTextAsync(cachePath, json).ConfigureAwait(false);
-
-        var table = parser.Merge(cacheKey, TableSource.RemoteUrl, header, charts);
-        if (table != null)
-            addTable(table);
-
-        return table;
-    }
-
-    /// <summary>
-    /// Parse an HTML page for a <c>&lt;meta name="bmstable" content="URL"&gt;</c> tag
-    /// and return the resolved JSON URL. Falls back to <c>bmstable-alt</c> if the primary is not found.
-    /// </summary>
     private static string? resolveUrlFromHtml(string html, string pageUrl)
     {
         var content = extractMetaContent(html, "bmstable")
                       ?? extractMetaContent(html, "bmstable-alt");
 
-        if (string.IsNullOrWhiteSpace(content))
-            return null;
+        if (string.IsNullOrWhiteSpace(content)) return null;
 
         if (content.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             content.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
@@ -192,9 +329,6 @@ public class DifficultyTableStore
         return new Uri(new Uri(pageUrl), content).ToString();
     }
 
-    /// <summary>
-    /// Extract the <c>content</c> attribute value from <c>&lt;meta name="X" content="..."&gt;</c>.
-    /// </summary>
     private static string? extractMetaContent(string html, string name)
     {
         var pattern = $"<meta name=\"{name}\" content=\"";
@@ -206,84 +340,6 @@ public class DifficultyTableStore
         return end < 0 ? null : html[start..end];
     }
 
-    /// <summary>
-    /// Remove a table and trigger cleanup.
-    /// </summary>
-    public void RemoveTable(DifficultyTable table)
-    {
-        tables.Remove(table);
-        rebuildIndex();
-        TableRemoved?.Invoke(table);
-        TablesChanged?.Invoke();
-        persistTableList();
-    }
+    #endregion
 
-    /// <summary>
-    /// Get all markers for a given MD5 hash.
-    /// </summary>
-    public List<(DifficultyTable table, TableEntry entry)> GetMarkers(string md5Hash)
-        => md5Index.TryGetValue(md5Hash, out var markers)
-            ? markers
-            : [];
-
-    private void addTable(DifficultyTable table)
-    {
-        tables.Add(table);
-        rebuildIndex();
-        TableLoaded?.Invoke(table);
-        TablesChanged?.Invoke();
-        persistTableList();
-    }
-
-    private void rebuildIndex()
-    {
-        var newIndex = new Dictionary<string, List<(DifficultyTable, TableEntry)>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var table in tables)
-        {
-            foreach (var entry in table.Entries)
-            {
-                if (!newIndex.TryGetValue(entry.Md5Hash, out var list))
-                    newIndex[entry.Md5Hash] = list = [];
-                list.Add((table, entry));
-            }
-        }
-
-        md5Index = newIndex;
-    }
-
-    private void loadFromSource(string source)
-    {
-        if (source.StartsWith("http://", StringComparison.Ordinal) || source.StartsWith("https://", StringComparison.Ordinal))
-            _ = LoadFromUrlAsync(source);
-        else if (File.Exists(source))
-            _ = LoadFromFileAsync(source);
-    }
-
-    private void persistTableList()
-    {
-        if (config == null) return;
-
-        var sources = string.Join(";", tables.Select(t => t.SourcePath));
-        config.SetValue(BmsRulesetSetting.DifficultyTableSources, sources);
-    }
-
-    private static string? findDataFile(string dir, string headerPath)
-    {
-        var headerName = Path.GetFileNameWithoutExtension(headerPath);
-        var candidates = new[] { "data.json", "charts.json", $"{headerName}_data.json" };
-        foreach (var c in candidates)
-        {
-            var full = Path.Combine(dir, c);
-            if (File.Exists(full)) return full;
-        }
-
-        return null;
-    }
-
-    private string cacheFileForUrl(string url)
-    {
-        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(url))).ToLowerInvariant();
-        return Path.Combine(cacheDirectory, $"{hash}.json");
-    }
 }

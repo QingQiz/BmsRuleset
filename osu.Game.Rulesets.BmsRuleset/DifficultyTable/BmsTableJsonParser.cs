@@ -2,119 +2,63 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 
-public class BmsTableJsonParser
+public static class BmsTableJsonParser
 {
-    private static readonly JsonSerializerOptions json_options = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-    };
 
-    /// <summary>
-    /// Returns true if the string looks like a valid MD5 hash (32 lowercase hex chars).
-    /// </summary>
-    private static bool isHexOfLength(string? s, int len) =>
-        s != null && s.Length == len && s.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
-
-    /// <summary>
-    /// Returns true if the string looks like a valid MD5 hash (32 hex chars).
-    /// </summary>
     public static bool IsValidMd5(string? s) => isHexOfLength(s, 32);
 
-    /// <summary>
-    /// Returns true if the string looks like a valid SHA256 hash (64 hex chars).
-    /// </summary>
     public static bool IsValidSha256(string? s) => isHexOfLength(s, 64);
 
-    /// <summary>
-    /// Pick the best available hash: prefer md5 if valid, fall back to sha256.
-    /// Returns null if neither is valid, lowercased otherwise.
-    /// </summary>
     public static string? PickHash(string? md5, string? sha256)
     {
-        if (IsValidMd5(md5)) return md5.ToLowerInvariant();
-        if (IsValidSha256(sha256)) return sha256.ToLowerInvariant();
+        if (IsValidMd5(md5)) return md5!.ToLowerInvariant();
+        if (IsValidSha256(sha256)) return sha256!.ToLowerInvariant();
+
         return null;
     }
 
     /// <summary>
-    /// Parse a header JSON string. Returns null if required fields are missing.
+    /// Parse JSON once, returning header + data in one pass.
     /// </summary>
-    public RawTableData? ParseHeader(string json)
+    public static ParseResult? Parse(string json)
     {
-        using var doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
-        var root = doc.RootElement;
-
-        var name = root.TryGetProperty("name", out var n) ? n.GetString() : null;
-        var symbol = root.TryGetProperty("symbol", out var s) ? s.GetString() : null;
-        var dataUrl = root.TryGetProperty("data_url", out var d) ? d.GetString() : null;
-
-        string[]? levelOrder = null;
-        if (root.TryGetProperty("level_order", out var lo) && lo.ValueKind == JsonValueKind.Array)
+        JsonDocument doc;
+        try
         {
-            var list = new List<string>();
-            foreach (var item in lo.EnumerateArray())
-                list.Add(item.GetString() ?? string.Empty);
-            levelOrder = list.ToArray();
+            doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
         }
-
-        return new RawTableData
+        catch (JsonException)
         {
-            Name = name,
-            Symbol = symbol,
-            DataUrl = dataUrl,
-            LevelOrder = levelOrder,
-        };
-    }
-
-    /// <summary>
-    /// Parse a data JSON string (either a plain array or wrapped in { "charts": [...] }).
-    /// </summary>
-    public List<RawChartItem>? ParseData(string json)
-    {
-        using var doc = JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
-        var root = doc.RootElement;
-
-        JsonElement array;
-        if (root.ValueKind == JsonValueKind.Array)
-            array = root;
-        else if (root.TryGetProperty("charts", out var c) && c.ValueKind == JsonValueKind.Array)
-            array = c;
-        else
             return null;
-
-        var charts = new List<RawChartItem>();
-        foreach (var item in array.EnumerateArray())
-        {
-            charts.Add(new RawChartItem
-            {
-                Level = item.TryGetProperty("level", out var l) ? l.GetString() : null,
-                Md5 = item.TryGetProperty("md5", out var m) ? m.GetString() : null,
-                Sha256 = item.TryGetProperty("sha256", out var sh) ? sh.GetString() : null,
-                Title = item.TryGetProperty("title", out var t) ? t.GetString() : null,
-                Artist = item.TryGetProperty("artist", out var a) ? a.GetString() : null,
-            });
         }
 
-        return charts;
+        using (doc)
+        {
+            var root = doc.RootElement;
+
+            // Avoid calling TryGetProperty on non-object types (e.g. plain arrays)
+            RawTableData? header = root.ValueKind == JsonValueKind.Object ? parseHeader(root) : null;
+            var charts = parseData(root);
+
+            if (charts == null && header?.DataUrl != null)
+                return new ParseResult(header, null);
+
+            if (header == null && charts == null)
+                return null;
+
+            return new ParseResult(header, charts);
+        }
     }
 
-    /// <summary>
-    /// Merge header + charts into a DifficultyTable.
-    /// header and/or charts may come from the same file (combined JSON).
-    /// </summary>
-    public DifficultyTable? Merge(string sourcePath, TableSource source, RawTableData? header, List<RawChartItem>? charts)
+    public static DifficultyTable? Merge(string sourcePath, TableSource source, RawTableData? header, List<RawChartItem>? charts)
     {
         var name = header?.Name;
         var symbol = header?.Symbol;
 
-        // If no header, try to infer name/symbol from source path.
         if (string.IsNullOrEmpty(name))
             name = Path.GetFileNameWithoutExtension(sourcePath);
         if (string.IsNullOrEmpty(symbol))
@@ -160,4 +104,62 @@ public class BmsTableJsonParser
             Entries = entries,
         };
     }
+
+    private static bool isHexOfLength(string? s, int len) =>
+        s != null && s.Length == len && s.All(static c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
+
+    private static RawTableData parseHeader(JsonElement root)
+    {
+        var name = root.TryGetProperty("name", out var n) ? n.GetString() : null;
+        var symbol = root.TryGetProperty("symbol", out var s) ? s.GetString() : null;
+        var dataUrl = root.TryGetProperty("data_url", out var d) ? d.GetString() : null;
+
+        string[]? levelOrder = null;
+        if (root.TryGetProperty("level_order", out var lo) && lo.ValueKind == JsonValueKind.Array)
+            levelOrder = lo.EnumerateArray().Select(item => item.GetString() ?? string.Empty).ToArray();
+
+        return new RawTableData
+        {
+            Name = name,
+            Symbol = symbol,
+            DataUrl = dataUrl,
+            LevelOrder = levelOrder,
+        };
+    }
+
+    private static List<RawChartItem>? parseData(JsonElement root)
+    {
+        JsonElement array;
+        if (root.ValueKind == JsonValueKind.Array)
+            array = root;
+        else if (root.TryGetProperty("charts", out var c) && c.ValueKind == JsonValueKind.Array)
+            array = c;
+        else
+            return null;
+
+        var charts = new List<RawChartItem>();
+        foreach (var item in array.EnumerateArray())
+        {
+            charts.Add(new RawChartItem
+            {
+                Level = item.TryGetProperty("level", out var l) ? l.GetString() : null,
+                Md5 = item.TryGetProperty("md5", out var m) ? m.GetString() : null,
+                Sha256 = item.TryGetProperty("sha256", out var sh) ? sh.GetString() : null,
+                Title = item.TryGetProperty("title", out var t) ? t.GetString() : null,
+                Artist = item.TryGetProperty("artist", out var a) ? a.GetString() : null,
+            });
+        }
+
+        return charts;
+    }
+}
+
+/// <summary>
+/// Result of a single-pass JSON parse, containing both header and chart data.
+/// </summary>
+public class ParseResult(RawTableData? header, List<RawChartItem>? charts)
+{
+    public RawTableData? Header { get; } = header;
+
+    public List<RawChartItem>? Charts { get; } = charts;
 }

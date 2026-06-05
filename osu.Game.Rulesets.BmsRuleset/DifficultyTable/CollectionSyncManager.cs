@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Collections;
-using osu.Game.Database;
+using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 
@@ -10,14 +10,11 @@ namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 /// Syncs DifficultyTable entries to/from Realm BeatmapCollection objects.
 /// Each table becomes a collection named "BMS: {table.Name}".
 /// When subdivided, becomes "BMS: {table.Name} {level}".
-/// Created and owned by BmsSettingsSubsection, which provides RealmAccess.
+/// Stateless helper — called by DifficultyTableStore.ImportAsync within a realm.Write.
 /// </summary>
 public class CollectionSyncManager
 {
     public const string COLLECTION_PREFIX = "BMS: ";
-
-    private readonly RealmAccess realm;
-    private readonly DifficultyTableStore store;
 
     /// <summary>
     /// Tracks which tables are currently subdivided.
@@ -25,103 +22,118 @@ public class CollectionSyncManager
     /// </summary>
     private readonly HashSet<string> subdividedTables = [];
 
-    public CollectionSyncManager(RealmAccess realm, DifficultyTableStore store)
-    {
-        this.realm = realm;
-        this.store = store;
-        store.TableLoaded += onTableLoaded;
-        store.TableRemoved += onTableRemoved;
-    }
-
-    /// <summary>
-    /// Create or update collections for a newly loaded table.
-    /// </summary>
-    private void onTableLoaded(DifficultyTable table)
-    {
-        var key = table.SourcePath ?? table.Name;
-        var isSubdivided = subdividedTables.Contains(key);
-        syncCollections(table, isSubdivided);
-    }
-
-    /// <summary>
-    /// Remove collections when a table is removed.
-    /// </summary>
-    private void onTableRemoved(DifficultyTable table)
-    {
-        var prefix = collectionPrefixFor(table);
-        realm.Write(r =>
-        {
-            var toRemove = r.All<BeatmapCollection>()
-                .Where(c => c.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            foreach (var c in toRemove)
-                r.Remove(c);
-        });
-    }
-
     /// <summary>
     /// Toggle subdivide state for a table.
     /// </summary>
     public void ToggleSubdivide(DifficultyTable table)
     {
         var key = table.SourcePath ?? table.Name;
-        var currentlySubdivided = subdividedTables.Contains(key);
-
-        if (currentlySubdivided)
-            subdividedTables.Remove(key);
-        else
+        if (!subdividedTables.Remove(key))
             subdividedTables.Add(key);
-
-        syncCollections(table, !currentlySubdivided);
-        store.NotifyTablesChanged();
     }
 
-    /// <summary>
-    /// Whether a table is currently subdivided.
-    /// </summary>
     public bool IsSubdivided(DifficultyTable table)
     {
         var key = table.SourcePath ?? table.Name;
         return subdividedTables.Contains(key);
     }
 
-    private void syncCollections(DifficultyTable table, bool subdivided)
+    /// <summary>
+    /// Sync collections inside an active realm write transaction.
+    /// Uses diff-based updates (not delete + recreate).
+    /// </summary>
+    public void SyncInTransaction(Realm r, DifficultyTable table)
     {
-        var prefix = collectionPrefixFor(table);
+        var prefix = $"{COLLECTION_PREFIX}{table.Name} ";
+        var baseName = prefix.TrimEnd(' ');
+        var subdivided = IsSubdivided(table);
 
-        realm.Write(r =>
+        // Find all existing collections that belong to this table
+        var existing = r.All<BeatmapCollection>()
+            .Where(c => c.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                        || c.Name.Equals(baseName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (subdivided)
         {
-            var existing = r.All<BeatmapCollection>()
-                .Where(c => c.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            foreach (var c in existing)
-                r.Remove(c);
+            var desiredLevels = new HashSet<string>(table.LevelOrder);
 
-            if (subdivided)
+            // Remove levels that no longer exist in the table
+            foreach (var col in existing)
             {
-                foreach (var level in table.LevelOrder)
+                var colName = col.Name;
+                if (colName.Equals(baseName, StringComparison.OrdinalIgnoreCase))
+                    r.Remove(col); // base collection should not exist when subdivided
+                else if (colName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 {
-                    var entries = table.Entries.Where(e => e.Level == level).ToList();
-                    if (entries.Count == 0) continue;
-
-                    var collection = new BeatmapCollection(
-                        $"{prefix}{level}",
-                        entries.Select(e => e.Md5Hash).ToList());
-                    r.Add(collection);
+                    var level = colName[prefix.Length..];
+                    if (!desiredLevels.Contains(level))
+                        r.Remove(col);
                 }
             }
-            else
+
+            // Create or update per-level collections
+            foreach (var level in table.LevelOrder)
             {
-                var allMd5 = table.Entries.Select(e => e.Md5Hash).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                if (allMd5.Count > 0)
+                var entries = table.Entries
+                    .Where(e => e.Level == level)
+                    .Select(e => e.Md5Hash)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (entries.Count == 0) continue;
+
+                var collectionName = $"{prefix}{level}";
+                var existingCol = r.All<BeatmapCollection>()
+                    .FirstOrDefault(c => c.Name == collectionName);
+
+                if (existingCol != null)
                 {
-                    var collection = new BeatmapCollection(prefix.TrimEnd(' '), allMd5);
-                    r.Add(collection);
+                    // Diff-based update
+                    var currentSet = new HashSet<string>(existingCol.BeatmapMD5Hashes, StringComparer.OrdinalIgnoreCase);
+                    var newSet = new HashSet<string>(entries, StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var toRemove in currentSet.Except(newSet).ToList())
+                        existingCol.BeatmapMD5Hashes.Remove(toRemove);
+                    foreach (var toAdd in newSet.Except(currentSet))
+                        existingCol.BeatmapMD5Hashes.Add(toAdd);
+                }
+                else
+                {
+                    r.Add(new BeatmapCollection(collectionName, entries));
                 }
             }
-        });
+        }
+        else
+        {
+            // Not subdivided: merge into a single collection
+            var allMd5 = table.Entries.Select(e => e.Md5Hash)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+            // Remove per-level collections
+            foreach (var col in existing)
+            {
+                if (col.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !col.Name.Equals(baseName, StringComparison.OrdinalIgnoreCase))
+                    r.Remove(col);
+            }
+
+            var baseCol = r.All<BeatmapCollection>()
+                .FirstOrDefault(c => c.Name == baseName);
+
+            if (baseCol != null)
+            {
+                var currentSet = new HashSet<string>(baseCol.BeatmapMD5Hashes, StringComparer.OrdinalIgnoreCase);
+                var newSet = new HashSet<string>(allMd5, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var toRemove in currentSet.Except(newSet).ToList())
+                    baseCol.BeatmapMD5Hashes.Remove(toRemove);
+                foreach (var toAdd in newSet.Except(currentSet))
+                    baseCol.BeatmapMD5Hashes.Add(toAdd);
+            }
+            else if (allMd5.Count > 0)
+            {
+                r.Add(new BeatmapCollection(baseName, allMd5));
+            }
+        }
     }
-
-    private static string collectionPrefixFor(DifficultyTable table) => $"{COLLECTION_PREFIX}{table.Name} ";
 }

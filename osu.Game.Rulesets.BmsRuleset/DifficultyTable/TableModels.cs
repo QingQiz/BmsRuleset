@@ -37,7 +37,7 @@ public class TableEntry
 }
 
 /// <summary>
-/// Stores header+data before merging into a DifficultyTable.
+/// Stores header data before merging into a DifficultyTable.
 /// </summary>
 public class RawTableData
 {
@@ -48,8 +48,6 @@ public class RawTableData
     public string? DataUrl { get; init; }
 
     public string[]? LevelOrder { get; init; }
-
-    public List<RawChartItem>? Charts { get; init; }
 }
 
 public class RawChartItem

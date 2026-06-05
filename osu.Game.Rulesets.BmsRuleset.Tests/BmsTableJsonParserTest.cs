@@ -1,4 +1,3 @@
-using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 
@@ -24,37 +23,86 @@ public class BmsTableJsonParserTest
   { ""level"": ""★1"", ""md5"": ""bad"", ""title"": ""Song E"", ""artist"": ""Artist E"" }
 ]";
 
-    [Test]
-    public void TestParseHeader()
-    {
-        var parser = new BmsTableJsonParser();
-        var header = parser.ParseHeader(sample_header);
+    private const string combined_json = @"
+{
+  ""name"": ""Combined"",
+  ""symbol"": ""CB"",
+  ""level_order"": [""★1""],
+  ""charts"": [
+    { ""level"": ""★1"", ""md5"": ""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"", ""title"": ""Combined Song"" }
+  ]
+}";
 
-        Assert.That(header, Is.Not.Null);
-        Assert.That(header!.Name, Is.EqualTo("Test Table"));
-        Assert.That(header.Symbol, Is.EqualTo("TT"));
-        Assert.That(header.DataUrl, Is.EqualTo("data.json"));
-        Assert.That(header.LevelOrder, Is.EquivalentTo(new[] { "☆1", "☆2", "★1", "★2" }));
+    [Test]
+    public void TestIsValidMd5()
+    {
+        Assert.That(BmsTableJsonParser.IsValidMd5("6940ad2ab7812fcbc1a26b83035b49f6"), Is.True);
+        Assert.That(BmsTableJsonParser.IsValidMd5("ABCDEFabcdef0123456789abcdef0123"), Is.True);
+        Assert.That(BmsTableJsonParser.IsValidMd5("#N/A"), Is.False);
+        Assert.That(BmsTableJsonParser.IsValidMd5(""), Is.False);
+        Assert.That(BmsTableJsonParser.IsValidMd5(null), Is.False);
+        Assert.That(BmsTableJsonParser.IsValidMd5("too-short"), Is.False);
+        Assert.That(BmsTableJsonParser.IsValidMd5("not-a-valid-md5-hash-at-all-12345678"), Is.False);
     }
 
     [Test]
-    public void TestParseData()
+    public void TestIsValidSha256()
     {
-        var parser = new BmsTableJsonParser();
-        var data = parser.ParseData(sample_data);
+        Assert.That(BmsTableJsonParser.IsValidSha256("130e67bfdbb1e1abd60d74b5a71466bd83c1c07127410114e8e18df572dee10a"), Is.True);
+        Assert.That(BmsTableJsonParser.IsValidSha256("#N/A"), Is.False);
+        Assert.That(BmsTableJsonParser.IsValidSha256(null), Is.False);
+    }
 
-        Assert.That(data, Is.Not.Null);
-        Assert.That(data, Has.Count.EqualTo(5));
+    [Test]
+    public void TestMergeWithChartsWrapper()
+    {
+        var result = BmsTableJsonParser.Parse(combined_json);
+
+        Assert.That(result, Is.Not.Null);
+        var table = BmsTableJsonParser.Merge("combined", TableSource.LocalFile, result!.Header, result.Charts);
+
+        Assert.That(table, Is.Not.Null);
+        Assert.That(table!.Name, Is.EqualTo("Combined"));
+        Assert.That(table.Entries, Has.Count.EqualTo(1));
+        Assert.That(table.Entries[0].Md5Hash, Is.EqualTo("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    }
+
+    [Test]
+    public void TestMergeWithEmptyDataReturnsNull()
+    {
+        var headerResult = BmsTableJsonParser.Parse(sample_header);
+
+        var table = BmsTableJsonParser.Merge("test", TableSource.RemoteUrl, headerResult!.Header, null);
+
+        Assert.That(table, Is.Null);
+    }
+
+    [Test]
+    public void TestMergeWithNoValidHashesReturnsEmptyTable()
+    {
+        const string bad_data = @"
+[
+  { ""level"": ""★1"", ""md5"": ""#N/A"", ""title"": ""A"" },
+  { ""level"": ""★2"", ""md5"": """", ""sha256"": ""not-a-hex"", ""title"": ""B"" }
+]";
+
+        var headerResult = BmsTableJsonParser.Parse(sample_header);
+        var dataResult = BmsTableJsonParser.Parse(bad_data);
+
+        var table = BmsTableJsonParser.Merge("test", TableSource.RemoteUrl, headerResult!.Header, dataResult!.Charts);
+
+        // Table is created with 0 entries because no valid hashes
+        Assert.That(table, Is.Not.Null);
+        Assert.That(table!.Entries, Is.Empty);
     }
 
     [Test]
     public void TestMergeWithValidMd5()
     {
-        var parser = new BmsTableJsonParser();
-        var header = parser.ParseHeader(sample_header);
-        var data = parser.ParseData(sample_data);
+        var headerResult = BmsTableJsonParser.Parse(sample_header);
+        var dataResult = BmsTableJsonParser.Parse(sample_data);
 
-        var table = parser.Merge("test", TableSource.RemoteUrl, header, data);
+        var table = BmsTableJsonParser.Merge("test", TableSource.RemoteUrl, headerResult!.Header, dataResult!.Charts);
 
         Assert.That(table, Is.Not.Null);
         Assert.That(table!.Name, Is.EqualTo("Test Table"));
@@ -80,64 +128,85 @@ public class BmsTableJsonParserTest
     }
 
     [Test]
-    public void TestMergeWithEmptyDataReturnsNull()
+    public void TestParseChartsFromCombined()
     {
-        var parser = new BmsTableJsonParser();
-        var header = parser.ParseHeader(sample_header);
+        var result = BmsTableJsonParser.Parse(combined_json);
 
-        var table = parser.Merge("test", TableSource.RemoteUrl, header, null);
-
-        Assert.That(table, Is.Null);
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Charts, Is.Not.Null);
+        Assert.That(result.Charts, Has.Count.EqualTo(1));
+        Assert.That(result.Charts![0].Title, Is.EqualTo("Combined Song"));
     }
 
     [Test]
-    public void TestMergeWithNoValidHashesReturnsEmptyTable()
+    public void TestParseDataWithChartsWrapper()
     {
-        const string bad_data = @"
-[
-  { ""level"": ""★1"", ""md5"": ""#N/A"", ""title"": ""A"" },
-  { ""level"": ""★2"", ""md5"": """", ""sha256"": ""not-a-hex"", ""title"": ""B"" }
-]";
+        const string wrapped = @"
+{
+  ""charts"": [
+    { ""level"": ""★1"", ""md5"": ""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"", ""title"": ""Wrapped"" }
+  ]
+}";
 
-        var parser = new BmsTableJsonParser();
-        var header = parser.ParseHeader(sample_header);
-        var data = parser.ParseData(bad_data);
+        var result = BmsTableJsonParser.Parse(wrapped);
 
-        var table = parser.Merge("test", TableSource.RemoteUrl, header, data);
-
-        // Table is created with 0 entries because no valid hashes
-        Assert.That(table, Is.Not.Null);
-        Assert.That(table!.Entries, Is.Empty);
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Charts, Is.Not.Null);
+        Assert.That(result.Charts, Has.Count.EqualTo(1));
+        Assert.That(result.Charts![0].Title, Is.EqualTo("Wrapped"));
     }
 
     [Test]
-    public void TestIsValidMd5()
+    public void TestParseHeaderFromCombined()
     {
-        Assert.That(BmsTableJsonParser.IsValidMd5("6940ad2ab7812fcbc1a26b83035b49f6"), Is.True);
-        Assert.That(BmsTableJsonParser.IsValidMd5("ABCDEFabcdef0123456789abcdef0123"), Is.True);
-        Assert.That(BmsTableJsonParser.IsValidMd5("#N/A"), Is.False);
-        Assert.That(BmsTableJsonParser.IsValidMd5(""), Is.False);
-        Assert.That(BmsTableJsonParser.IsValidMd5(null), Is.False);
-        Assert.That(BmsTableJsonParser.IsValidMd5("too-short"), Is.False);
-        Assert.That(BmsTableJsonParser.IsValidMd5("not-a-valid-md5-hash-at-all-12345678"), Is.False);
+        var result = BmsTableJsonParser.Parse(combined_json);
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Header, Is.Not.Null);
+        Assert.That(result.Header!.Name, Is.EqualTo("Combined"));
+        Assert.That(result.Header.Symbol, Is.EqualTo("CB"));
+        Assert.That(result.Header.LevelOrder, Is.EquivalentTo(["★1"]));
     }
 
     [Test]
-    public void TestIsValidSha256()
+    public void TestParseInvalidJsonReturnsNull()
     {
-        Assert.That(BmsTableJsonParser.IsValidSha256("130e67bfdbb1e1abd60d74b5a71466bd83c1c07127410114e8e18df572dee10a"), Is.True);
-        Assert.That(BmsTableJsonParser.IsValidSha256("#N/A"), Is.False);
-        Assert.That(BmsTableJsonParser.IsValidSha256(null), Is.False);
+        var result = BmsTableJsonParser.Parse("not json");
+        Assert.That(result, Is.Null);
     }
 
     [Test]
-    public void TestPickHashPrefersMd5OverSha256()
+    public void TestParseOnlyDataReturnsNoHeader()
     {
-        var hash = BmsTableJsonParser.PickHash(
-            "6940ad2ab7812fcbc1a26b83035b49f6",
-            "130e67bfdbb1e1abd60d74b5a71466bd83c1c07127410114e8e18df572dee10a");
+        var result = BmsTableJsonParser.Parse(sample_data);
 
-        Assert.That(hash, Is.EqualTo("6940ad2ab7812fcbc1a26b83035b49f6"));
+        // Plain array JSON: header is null, charts are parsed
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Header, Is.Null);
+        Assert.That(result.Charts, Is.Not.Null);
+        Assert.That(result.Charts, Has.Count.EqualTo(5));
+    }
+
+    [Test]
+    public void TestParseOnlyHeaderReturnsNoCharts()
+    {
+        var result = BmsTableJsonParser.Parse(sample_header);
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Header, Is.Not.Null);
+        Assert.That(result.Header!.Name, Is.EqualTo("Test Table"));
+        // No charts array, header has data_url -> charts null is expected
+        Assert.That(result.Charts, Is.Null);
+    }
+
+    [Test]
+    public void TestParseResultProperties()
+    {
+        var result = BmsTableJsonParser.Parse(combined_json);
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Header, Is.Not.Null);
+        Assert.That(result.Charts, Is.Not.Null);
     }
 
     [Test]
@@ -151,51 +220,19 @@ public class BmsTableJsonParserTest
     }
 
     [Test]
+    public void TestPickHashPrefersMd5OverSha256()
+    {
+        var hash = BmsTableJsonParser.PickHash(
+            "6940ad2ab7812fcbc1a26b83035b49f6",
+            "130e67bfdbb1e1abd60d74b5a71466bd83c1c07127410114e8e18df572dee10a");
+
+        Assert.That(hash, Is.EqualTo("6940ad2ab7812fcbc1a26b83035b49f6"));
+    }
+
+    [Test]
     public void TestPickHashReturnsNullWhenBothInvalid()
     {
         Assert.That(BmsTableJsonParser.PickHash(null, null), Is.Null);
         Assert.That(BmsTableJsonParser.PickHash("#N/A", ""), Is.Null);
-    }
-
-    [Test]
-    public void TestParseDataWithChartsWrapper()
-    {
-        const string wrapped = @"
-{
-  ""charts"": [
-    { ""level"": ""★1"", ""md5"": ""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"", ""title"": ""Wrapped"" }
-  ]
-}";
-
-        var parser = new BmsTableJsonParser();
-        var data = parser.ParseData(wrapped);
-
-        Assert.That(data, Has.Count.EqualTo(1));
-        Assert.That(data![0].Title, Is.EqualTo("Wrapped"));
-    }
-
-    [Test]
-    public void TestMergeWithChartsWrapper()
-    {
-        const string combined = @"
-{
-  ""name"": ""Combined"",
-  ""symbol"": ""CB"",
-  ""level_order"": [""★1""],
-  ""charts"": [
-    { ""level"": ""★1"", ""md5"": ""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"", ""title"": ""Combined Song"" }
-  ]
-}";
-
-        var parser = new BmsTableJsonParser();
-        var header = parser.ParseHeader(combined);
-        var data = parser.ParseData(combined);
-
-        var table = parser.Merge("combined", TableSource.LocalFile, header, data);
-
-        Assert.That(table, Is.Not.Null);
-        Assert.That(table!.Name, Is.EqualTo("Combined"));
-        Assert.That(table.Entries, Has.Count.EqualTo(1));
-        Assert.That(table.Entries[0].Md5Hash, Is.EqualTo("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
     }
 }

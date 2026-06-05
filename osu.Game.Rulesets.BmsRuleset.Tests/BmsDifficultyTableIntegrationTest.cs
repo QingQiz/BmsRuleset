@@ -131,10 +131,10 @@ public partial class BmsDifficultyTableIntegrationTest
             // Load the table through DifficultyTableStore.
             var cacheDir = Path.Combine(storage.GetFullPath(string.Empty), "dt-cache");
             var store = new DifficultyTableStore(null, cacheDir);
-            var table = await store.LoadFromFileAsync(tablePath).ConfigureAwait(false);
+            var result = await store.ImportAsync(tablePath).ConfigureAwait(false);
 
-            Assert.That(table, Is.Not.Null, "Table should load successfully");
-            Assert.That(table!.Entries, Has.Count.EqualTo(3));
+            Assert.That(result, Is.Not.Null, "Table should load successfully");
+            Assert.That(result!.Table.Entries, Has.Count.EqualTo(3));
 
             // Set up the DifficultyNameUpdater and refresh markers.
             var updater = new DifficultyNameUpdater(realm, store);
@@ -199,8 +199,8 @@ public partial class BmsDifficultyTableIntegrationTest
 
             var cacheDir = Path.Combine(storage.GetFullPath(string.Empty), "dt-cache");
             var store = new DifficultyTableStore(null, cacheDir);
-            var table = await store.LoadFromFileAsync(tablePath).ConfigureAwait(false);
-            Assert.That(table, Is.Not.Null);
+            var importResult = await store.ImportAsync(tablePath).ConfigureAwait(false);
+            Assert.That(importResult, Is.Not.Null);
 
             var updater = new DifficultyNameUpdater(realm, store);
             updater.RefreshAllMarkers();
@@ -215,7 +215,7 @@ public partial class BmsDifficultyTableIntegrationTest
             });
 
             // Remove the table — markers should vanish.
-            store.RemoveTable(table!);
+            store.RemoveTable(importResult!.Table);
             updater.RefreshAllMarkers();
 
             realm.Run(r =>

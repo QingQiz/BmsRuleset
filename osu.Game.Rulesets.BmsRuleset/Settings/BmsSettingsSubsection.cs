@@ -31,6 +31,7 @@ using osu.Game.Screens;
 using osu.Game.Screens.Select;
 using osuTK;
 using osuTK.Graphics;
+using DT = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.Settings;
 
@@ -182,12 +183,20 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         if (BmsRuleset.DifficultyTableStore == null && host != null)
         {
             var cacheDir = Path.Combine(host.Storage.GetFullPath(string.Empty), "difficulty-tables");
-            var store = new DifficultyTableStore(manager, cacheDir);
+            collectionSyncManager = new CollectionSyncManager();
+            var store = new DifficultyTableStore(manager, cacheDir, collectionSyncManager, realm);
             BmsRuleset.DifficultyTableStore = store;
 
             difficultyTableStore = store;
-            collectionSyncManager = new CollectionSyncManager(realm!, store);
             difficultyNameUpdater = new DifficultyNameUpdater(realm!, store);
+
+            // When a table is removed, refresh markers on background thread
+            store.TableRemoved += _ =>
+            {
+                if (difficultyNameUpdater == null) return;
+
+                Task.Run(() => difficultyNameUpdater.RefreshAllMarkers());
+            };
 
             store.LoadPersistedTables();
         }
@@ -419,29 +428,32 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 return;
             }
 
-            var result = isUrl
-                ? await difficultyTableStore.LoadFromUrlAsync(pathOrUrl).ConfigureAwait(false)
-                : await difficultyTableStore.LoadFromFileAsync(pathOrUrl).ConfigureAwait(false);
+            var importResult = await difficultyTableStore.ImportAsync(pathOrUrl).ConfigureAwait(false);
 
-            // Update the existing notification with the final result.
-            Schedule(() =>
+            if (importResult != null)
             {
-                if (notification == null) return;
-
-                if (result != null)
+                Schedule(() =>
                 {
-                    addToHistory(pathOrUrl, result.Name, result.Symbol);
+                    addToHistory(pathOrUrl, importResult.Table.Name, importResult.Table.Symbol);
                     autocomplete?.SetItems(buildPresetItems(), buildHistoryItems());
-                    notification.CompletionText = $"Loaded table: {result.Name} ({result.Entries.Count} charts)";
-                    notification.Progress = 1;
-                    notification.State = ProgressNotificationState.Completed;
-                }
-                else
+                    if (notification != null)
+                    {
+                        notification.CompletionText = $"Loaded table: {importResult.Table.Name} ({importResult.Table.Entries.Count} charts)";
+                        notification.Progress = 1;
+                        notification.State = ProgressNotificationState.Completed;
+                    }
+                });
+            }
+            else
+            {
+                Schedule(() =>
                 {
+                    if (notification == null) return;
+
                     notification.CompletionText = $"Failed to load difficulty table from: {pathOrUrl}";
                     notification.State = ProgressNotificationState.Cancelled;
-                }
-            });
+                });
+            }
         }
         catch (Exception e)
         {
@@ -453,7 +465,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         }
     }
 
-    private partial class TableListContainer : FillFlowContainer
+    private sealed partial class TableListContainer : FillFlowContainer
     {
         private readonly DifficultyTableStore store;
         private readonly CollectionSyncManager? syncManager;
@@ -508,7 +520,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             [Resolved(CanBeNull = true)]
             private IDialogOverlay? dialogOverlay { get; set; }
 
-            public TableRowContainer(DifficultyTable.DifficultyTable table, DifficultyTableStore store,
+            public TableRowContainer(DT table, DifficultyTableStore store,
                                      CollectionSyncManager? syncManager, bool isSubdivided)
             {
                 RelativeSizeAxes = Axes.X;
@@ -571,7 +583,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 ];
             }
 
-            private void confirmDelete(DifficultyTable.DifficultyTable table, DifficultyTableStore store)
+            private void confirmDelete(DT table, DifficultyTableStore store)
             {
                 if (dialogOverlay != null)
                     dialogOverlay.Push(new MassDeleteConfirmationDialog(
@@ -581,7 +593,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                     store.RemoveTable(table);
             }
 
-            private void confirmSubdivide(DifficultyTable.DifficultyTable table,
+            private void confirmSubdivide(DT table,
                                           CollectionSyncManager? syncManager, bool isSubdivided)
             {
                 if (dialogOverlay != null)
