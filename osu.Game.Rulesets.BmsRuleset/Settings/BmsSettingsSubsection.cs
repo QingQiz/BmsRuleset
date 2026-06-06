@@ -42,7 +42,15 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
     private static readonly ImportOption[] preset_tables =
     [
-        new("turbow (zris.work)", "http://zris.work/bmstable/turbow/header.json"),
+        new("Satellite (sl)", "http://zris.work/bmstable/satellite/header.json"),
+        new("Stella (st)", "http://zris.work/bmstable/stella/header.json"),
+        new("発狂BMS難易度表 (★)", "http://zris.work/bmstable/insane/insane_header.json"),
+        new("通常難易度表 (☆)", "http://zris.work/bmstable/normal/normal_header.json"),
+        new("NEW GENERATION 発狂 (▼)", "http://zris.work/bmstable/insane2/insane_header.json"),
+        new("第三期Overjoy (★★)", "http://zris.work/bmstable/overjoy/header.json"),
+        new("Scramble (SB)", "http://zris.work/bmstable/scramble/header.json"),
+        new("Luminous (ln)", "http://zris.work/bmstable/luminous/header.json"),
+        new("BMS図書館 (T)", "http://zris.work/bmstable/turbow/header.json"),
     ];
 
     private const int max_history = 20;
