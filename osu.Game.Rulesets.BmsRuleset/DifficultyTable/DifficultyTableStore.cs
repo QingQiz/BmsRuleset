@@ -237,6 +237,19 @@ public partial class DifficultyTableStore
     /// </summary>
     public void RestoreTable(DifficultyTable table)
     {
+        // var entries = new List<TableEntry>();
+        // DifficultyTable[] dts =
+        // [
+        //     new() { Name = "A", Symbol = "#", LevelOrder = ["★1", "★2", "★3"], Source = TableSource.RemoteUrl, SourcePath = "http://x/a", Entries = entries },
+        //     new() { Name = "Normal Table", Symbol = "★", LevelOrder = ["★1", "★2", "★3"], Source = TableSource.RemoteUrl, SourcePath = "http://x/n", Entries = entries },
+        //     new() { Name = "Turbow Difficulty Table (2024 Edition)", Symbol = "TT", LevelOrder = ["★1", "★2", "★3"], Source = TableSource.RemoteUrl, SourcePath = "http://x/t", Entries = entries },
+        //     new() { Name = "超絶技巧的難易度表: The Ultimate BMS Difficulty Reference Collection", Symbol = "ULT", LevelOrder = ["★1", "★2", "★3"], Source = TableSource.RemoteUrl, SourcePath = "http://x/u", Entries = entries },
+        //     new() { Name = "ThisIsAVeryLongTableNameWithoutAnySpacesThatShouldWrapAtTheContainerEdge", Symbol = "LNG", LevelOrder = ["★1", "★2", "★3"], Source = TableSource.LocalFile, SourcePath = "C:\\t\\l.json", Entries = entries },
+        //     new() { Name = "Short last line — this name wraps around but ends early", Symbol = "END", LevelOrder = ["★1", "★2", "★3"], Source = TableSource.LocalFile, SourcePath = "C:\\t\\e.json", Entries = entries },
+        //     new() { Name = "This table name wraps perfectly to fill nearly the entire available container width", Symbol = "FULL", LevelOrder = ["★1", "★2", "★3"], Source = TableSource.LocalFile, SourcePath = "C:\\t\\f.json", Entries = entries },
+        // ];
+        // foreach (var dt in dts)
+        //     tables.Add(dt);
         tables.Add(table);
         addToIndex(table);
     }

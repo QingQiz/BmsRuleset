@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -31,7 +32,6 @@ using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Screens;
 using osu.Game.Screens.Select;
 using osuTK;
-using osuTK.Graphics;
 using DT = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.Settings;
@@ -127,6 +127,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
         return new ImportOption(friendlyName(entry), entry);
     }
+
 
     private void onLayoutSettingChanged()
     {
@@ -619,7 +620,29 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 AutoSizeAxes = Axes.Y;
                 Padding = new MarginPadding { Vertical = 3 };
 
-                var rightButtons = new List<Drawable>
+                var buttons = createButtons(
+                    table, isSubdivided,
+                    () => confirmSubdivide(table, syncManager, isSubdivided),
+                    () => confirmUpdate(table),
+                    () => confirmDelete(table));
+
+                Children =
+                [
+                    new ResponsiveTableRowLayout(
+                        $"{table.Name} ({table.Symbol})",
+                        buttons,
+                        table)
+                    {
+                        RelativeSizeAxes = Axes.X,
+                    },
+                ];
+            }
+
+            private static List<Drawable> createButtons(
+                DT table, bool isSubdivided,
+                Action confirmSubdivide, Action confirmUpdate, Action confirmDelete)
+            {
+                var buttons = new List<Drawable>
                 {
                     new RoundedButton
                     {
@@ -629,72 +652,32 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                             : "Split into per-level collections",
                         Height = 25,
                         Width = 100,
-                        Action = () => confirmSubdivide(table, syncManager, isSubdivided),
+                        Action = confirmSubdivide,
                     },
                 };
 
-                // Only show Update for remote tables (re-fetchable).
                 if (table.Source == TableSource.RemoteUrl)
                 {
-                    rightButtons.Add(new RoundedButton
+                    buttons.Add(new RoundedButton
                     {
                         Text = "Upd",
                         TooltipText = "Re-fetch table from source",
                         Height = 25,
                         Width = 40,
-                        Action = () => confirmUpdate(table),
+                        Action = confirmUpdate,
                     });
                 }
 
-                rightButtons.Add(new DangerousRoundedButton
+                buttons.Add(new DangerousRoundedButton
                 {
                     Text = "X",
                     TooltipText = "Delete table",
                     Height = 25,
                     Width = 35,
-                    Action = () => confirmDelete(table),
+                    Action = confirmDelete,
                 });
 
-                Children =
-                [
-                    new FillFlowContainer
-                    {
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                        Direction = FillDirection.Horizontal,
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Padding = new MarginPadding { Right = 190 },
-                        Spacing = new Vector2(5),
-                        Children =
-                        [
-                            new TruncatingSpriteText
-                            {
-                                Anchor = Anchor.CentreLeft,
-                                Origin = Anchor.CentreLeft,
-                                Text = $"{table.Name} ({table.Symbol})",
-                                Font = OsuFont.Default.With(size: 16),
-                            },
-                            new OsuSpriteText
-                            {
-                                Anchor = Anchor.CentreLeft,
-                                Origin = Anchor.CentreLeft,
-                                Text = $"{table.Entries.Count} charts",
-                                Font = OsuFont.Default.With(size: 12),
-                                Colour = Color4.Gray,
-                            },
-                        ],
-                    },
-                    new FillFlowContainer
-                    {
-                        Anchor = Anchor.CentreRight,
-                        Origin = Anchor.CentreRight,
-                        Direction = FillDirection.Horizontal,
-                        AutoSizeAxes = Axes.Both,
-                        Spacing = new Vector2(3),
-                        Children = rightButtons,
-                    },
-                ];
+                return buttons;
             }
 
             private void confirmDelete(DT table)
@@ -728,6 +711,240 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                             : $"Split difficulty table \"{table.Name}\" into per-level collections?"));
                 else
                     syncManager?.ToggleSubdivide(realm, table);
+            }
+
+            /// <summary>
+            /// Lays out wrapped text and a trailing button group with manual
+            /// line breaking. Estimates word widths from character counts and
+            /// builds lines that fit within the available width.
+            /// </summary>
+            private partial class ResponsiveTableRowLayout : Container, IHasTooltip
+            {
+
+                public LocalisableString TooltipText { get; }
+
+                private const float line_height = 22f;
+                private const float button_spacing = 6f;
+                private const float vertical_spacing = 4f;
+
+                private readonly string[] words;
+                private readonly List<Drawable> buttons;
+
+                private readonly FillFlowContainer lineContainer;
+                private readonly FillFlowContainer buttonGroup;
+
+                private float lastAvailableWidth;
+
+                public ResponsiveTableRowLayout(string nameText,
+                                                List<Drawable> buttons,
+                                                DT table)
+                {
+                    this.buttons = buttons;
+                    words = nameText.Split(' ');
+                    TooltipText = buildTooltip(table);
+
+                    lineContainer = new FillFlowContainer
+                    {
+                        Direction = FillDirection.Vertical,
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                    };
+
+                    buttonGroup = new FillFlowContainer
+                    {
+                        Direction = FillDirection.Horizontal,
+                        AutoSizeAxes = Axes.Both,
+                        Spacing = new Vector2(3),
+                        Anchor = Anchor.TopRight,
+                        Origin = Anchor.TopRight,
+                        Children = buttons,
+                    };
+
+                    Children = [lineContainer, buttonGroup];
+                }
+
+                protected override void Update()
+                {
+                    base.Update();
+
+                    var availableWidth = DrawWidth;
+                    if (availableWidth <= 0 || availableWidth == lastAvailableWidth)
+                        return;
+
+                    lastAvailableWidth = availableWidth;
+                    rebuildLines(availableWidth);
+                }
+
+                /// <summary>
+                /// Character-break a long unbroken word into chunks that each
+                /// fit within <paramref name="maxWidth"/>.
+                /// </summary>
+                private static List<string> breakLongWord(string word, float maxWidth)
+                {
+                    var chunks = new List<string>();
+                    var current = "";
+                    float currentW = 0;
+
+                    foreach (var c in word)
+                    {
+                        var cw = estimateCharWidth(c, 16);
+                        if (current.Length > 0 && currentW + cw > maxWidth)
+                        {
+                            chunks.Add(current);
+                            current = "";
+                            currentW = 0;
+                        }
+
+                        current += c;
+                        currentW += cw;
+                    }
+
+                    if (current.Length > 0)
+                        chunks.Add(current);
+
+                    return chunks;
+                }
+
+                /// <summary>Estimate pixel width of a string at a given font size.</summary>
+                private static float estimateWidth(string text, float fontSize)
+                {
+                    float w = 0;
+                    foreach (var c in text)
+                        w += estimateCharWidth(c, fontSize);
+                    return w;
+                }
+
+                /// <summary>Estimate pixel width of a single character.</summary>
+                private static float estimateCharWidth(char c, float fontSize)
+                {
+                    if (c >= 0x2E80) return fontSize;      // CJK — roughly square
+                    if (c == ' ') return fontSize * 0.28f; // space
+                    if (c is 'i' or 'l' or 'I' or '1') return fontSize * 0.3f;
+                    if (c is 'M' or 'W') return fontSize * 0.6f;
+
+                    return fontSize * 0.48f; // average Latin
+                }
+
+                /// <summary>Build a tooltip showing chart counts per level.</summary>
+                private static string buildTooltip(DT table)
+                {
+                    // Count entries per level.
+                    var counts = new Dictionary<string, int>();
+                    foreach (var e in table.Entries)
+                    {
+                        counts.TryGetValue(e.Level, out var c);
+                        counts[e.Level] = c + 1;
+                    }
+
+                    // Order by LevelOrder, then any remaining levels.
+                    var ordered = new List<string>();
+                    foreach (var lv in table.LevelOrder)
+                    {
+                        if (counts.TryGetValue(lv, out var c))
+                        {
+                            ordered.Add($"{lv}: {c}");
+                            counts.Remove(lv);
+                        }
+                    }
+
+                    foreach (var kv in counts.OrderBy(kv => kv.Key))
+                        ordered.Add($"{kv.Key}: {kv.Value}");
+
+                    return $"{table.Entries.Count} charts\n{string.Join(", ", ordered)}";
+                }
+
+                private void rebuildLines(float availableWidth)
+                {
+                    lineContainer.Clear();
+
+                    // Build lines from name words at 16px.
+                    var lines = new List<List<string>>();
+                    var currentLine = new List<string>();
+                    float currentWidth = 0;
+
+                    foreach (var word in words)
+                    {
+                        var wordWidth = estimateWidth(word, 16);
+                        var space = currentLine.Count > 0 ? estimateCharWidth(' ', 16) : 0;
+
+                        if (currentWidth + space + wordWidth > availableWidth)
+                        {
+                            // If the word alone exceeds the line width, character-break it.
+                            if (currentLine.Count == 0)
+                            {
+                                foreach (var chunk in breakLongWord(word, availableWidth))
+                                {
+                                    lines.Add([chunk]);
+                                }
+
+                                currentLine = [];
+                                currentWidth = 0;
+                                continue;
+                            }
+
+                            // Otherwise wrap to a new line first.
+                            lines.Add(currentLine);
+                            currentLine = [];
+                            currentWidth = 0;
+                            space = 0;
+
+                            // If it still doesn't fit alone, character-break it.
+                            if (wordWidth > availableWidth)
+                            {
+                                foreach (var chunk in breakLongWord(word, availableWidth))
+                                    lines.Add([chunk]);
+                                continue;
+                            }
+                        }
+
+                        currentLine.Add(word);
+                        currentWidth += space + wordWidth;
+                    }
+
+                    if (currentLine.Count > 0)
+                        lines.Add(currentLine);
+
+                    // Build text sprites for each line (16px bold name words).
+                    for (var li = 0; li < lines.Count; li++)
+                    {
+                        var lineFlow = new TextFlowContainer { AutoSizeAxes = Axes.Both };
+
+                        for (var wi = 0; wi < lines[li].Count; wi++)
+                        {
+                            lineFlow.AddText((wi > 0 ? " " : "") + lines[li][wi], t =>
+                                t.Font = OsuFont.Default.With(size: 16, weight: FontWeight.Bold));
+                        }
+
+                        lineContainer.Add(lineFlow);
+                    }
+
+                    // Actual button width (or estimate on first pass).
+                    var btnW = buttonGroup.DrawWidth;
+                    if (btnW <= 0) btnW = buttons.Count switch { 3 => 190f, _ => 145f };
+
+                    // Estimate last-line width for button fit.
+                    var lastLineWidth = estimateLineWidth(lines[^1]);
+                    var textHeight = lines.Count * line_height;
+
+                    if (lastLineWidth + button_spacing + btnW <= availableWidth)
+                    {
+                        buttonGroup.Y = textHeight - line_height;
+                        Height = textHeight;
+                    }
+                    else
+                    {
+                        buttonGroup.Y = textHeight + vertical_spacing;
+                        Height = textHeight + line_height + vertical_spacing;
+                    }
+                }
+
+                private float estimateLineWidth(List<string> lineWords)
+                {
+                    float w = 0;
+                    for (var i = 0; i < lineWords.Count; i++)
+                        w += estimateWidth((i > 0 ? " " : "") + lineWords[i], 16);
+                    return w;
+                }
             }
         }
     }
