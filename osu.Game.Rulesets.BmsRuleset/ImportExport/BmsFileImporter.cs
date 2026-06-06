@@ -543,6 +543,10 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     beatmapSetInfo.Files.Add(new RealmNamedFileUsage(realmFileByHash[resource.FileHash], fileName));
             }
 
+            // Compute the common set title from all chart raw titles via LCP.
+            var commonSetTitle = BmsChartParser.InferCommonSetTitle(
+                chartsToImport.Select(c => c.Metadata.RawTitle).ToArray());
+
             // Create beatmap infos.
             foreach (var chart in chartsToImport)
             {
@@ -552,7 +556,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     Ruleset = rulesetInfo,
                     Metadata = new BeatmapMetadata
                     {
-                        Title = chart.Metadata.SetTitle,
+                        Title = commonSetTitle.Length > 0 ? commonSetTitle : chart.Metadata.SetTitle,
                         Artist = chart.Metadata.Artist,
                         Author = new RealmUser { Username = Constant.AUTHOR },
                     },
