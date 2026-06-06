@@ -220,6 +220,11 @@ DP ☆NOTHER [TT★1 TT★2]
 
 The marker shows the table symbol and the entry's level. Markers update automatically when tables are added or removed.
 
+> ⚠ **Important:** Do **not** add or remove difficulty tables while on the **song select** screen.
+> Removing a table triggers a full marker rebuild across all BMS beatmaps, which contends with the
+> beatmap carousel's active Realm reads and will freeze the UI. Always switch to the **main menu**
+> before importing or deleting a difficulty table.
+
 ### Collections
 
 Each table also creates a **BeatmapCollection** named `"BMS: {table.Name}"` containing all matched charts. This lets you

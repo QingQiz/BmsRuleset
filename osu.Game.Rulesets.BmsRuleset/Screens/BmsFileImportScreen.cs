@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -19,6 +18,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Screens;
 using osuTK;
@@ -33,11 +33,11 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     private const float button_height = 50;
     private const float button_vertical_margin = 10;
 
+    private readonly RoundedButton[] buttons = [null!, null!, null!];
+
     private OsuFileSelector fileSelector = null!;
     private Container contentContainer = null!;
     private TextFlowContainer currentFileText = null!;
-
-    private readonly RoundedButton[] buttons = [null!, null!, null!];
 
     [Cached]
     private OverlayColourProvider colourProvider = new(OverlayColourScheme.Purple);
@@ -48,6 +48,8 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     private BmsFileImporter importer;
     private LoadingLayer loadingLayer = null!;
     private bool isImporting;
+
+    private DifficultyNameUpdater difficultyNameUpdater;
 
     [Resolved(CanBeNull = true)]
     private BmsRulesetConfigManager resolvedConfig { get; set; }
@@ -86,13 +88,23 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
         lastImportPath = (config ?? resolvedConfig)?.GetBindable<string>(BmsRulesetSetting.LastImportPath);
         var lastPath = lastImportPath?.Value;
 
+        // Wire up the marker updater (uses same store instance as the settings subsection).
+        if (realm != null && BmsRuleset.DifficultyTableStore != null)
+            difficultyNameUpdater = new DifficultyNameUpdater(realm, BmsRuleset.DifficultyTableStore);
+
         importer = realm != null && storage != null
             ? new BmsFileImporter(realm, storage, notifications)
             {
                 // Persist star ratings (and other cached stats) after import so song-select
                 // sort/group by difficulty work. Without this, BeatmapInfo.StarRating stays 0
                 // even though the live difficulty cache still shows correct stars on panels.
-                OnImportCompleted = (beatmapSet, scope) => beatmapUpdater?.Queue(beatmapSet, scope),
+                // Also schedule a debounced marker refresh — coalesced with any imports from
+                // the settings screen so they don't contend for the realm write mutex.
+                OnImportCompleted = (beatmapSet, scope) =>
+                {
+                    beatmapUpdater?.Queue(beatmapSet, scope);
+                    difficultyNameUpdater?.RefreshAllMarkers(beatmapSet);
+                },
             }
             : null!;
 

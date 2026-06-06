@@ -5,13 +5,11 @@ using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
-using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
-using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 
@@ -22,8 +20,12 @@ public record ImportResult(DifficultyTable Table);
 
 public partial class DifficultyTableStore
 {
-
     public IReadOnlyList<DifficultyTable> Tables => tables;
+
+    /// <summary>
+    /// Optional; set after construction to enable automatic marker refresh when tables change.
+    /// </summary>
+    public DifficultyNameUpdater? DifficultyNameUpdater { get; set; }
 
     private static readonly HttpClient http_client = new();
 
@@ -31,8 +33,6 @@ public partial class DifficultyTableStore
 
     private readonly BmsRulesetConfigManager? config;
     private readonly string cacheDirectory;
-    private readonly CollectionSyncManager? syncManager;
-    private readonly RealmAccess? realm;
 
     private readonly Dictionary<string, List<(DifficultyTable table, TableEntry entry)>> md5Index
         = new(StringComparer.OrdinalIgnoreCase);
@@ -44,9 +44,9 @@ public partial class DifficultyTableStore
     {
         this.config = config;
         this.cacheDirectory = cacheDirectory;
-        this.syncManager = syncManager;
-        this.realm = realm;
         Directory.CreateDirectory(cacheDirectory);
+        RefreshDiffNameEvent += () => DifficultyNameUpdater?.RefreshAllMarkers();
+        TableListRebuildEvent += tb => syncManager?.SyncInTransaction(realm, tb);
     }
 
     /// <summary>
@@ -88,11 +88,11 @@ public partial class DifficultyTableStore
     /// <summary>
     /// User-initiated import: download/read, parse, index, update markers + collections.
     /// </summary>
-    public async Task<ImportResult?> ImportAsync(string source, IProgress<float>? progress = null)
+    public async Task<ImportResult?> ImportAsync(string source, ProgressNotification notification)
     {
         if (string.IsNullOrWhiteSpace(source)) return null;
 
-        progress?.Report(0f);
+        notification.Progress = 0f;
 
         // ── Stage 1: Read + Parse ──
         string json;
@@ -117,7 +117,8 @@ public partial class DifficultyTableStore
                 var jsonUrl = resolveUrlFromHtml(body, source);
                 if (jsonUrl == null)
                 {
-                    Logger.Log($"Page at {source} does not contain a bmstable meta tag");
+                    notification.CompletionText = $"Page at {source} does not contain a bmstable meta tag";
+                    notification.State = ProgressNotificationState.Cancelled;
                     return null;
                 }
 
@@ -130,70 +131,71 @@ public partial class DifficultyTableStore
         }
         else
         {
-            if (!File.Exists(source)) return null;
+            if (!File.Exists(source))
+            {
+                notification.CompletionText = "File not exists.";
+                notification.State = ProgressNotificationState.Cancelled;
+                return null;
+            }
 
             effectiveSource = source;
             json = await File.ReadAllTextAsync(source).ConfigureAwait(false);
         }
 
-        progress?.Report(0.05f);
+        notification.Progress = (0.5f);
 
         var parsed = BmsTableJsonParser.Parse(json);
         if (parsed == null)
         {
-            Logger.Log($"Failed to parse difficulty table from {source}");
+            notification.CompletionText = $"Failed to parse difficulty table from {source}";
+            notification.State = ProgressNotificationState.Cancelled;
             return null;
+        }
+
+        // If header has a separate data_url but no embedded charts, fetch data.
+        var charts = parsed.Charts;
+        var headerDataUrl = parsed.Header?.DataUrl;
+        if (charts == null && headerDataUrl != null && isUrl)
+        {
+            var dataUrl = headerDataUrl.StartsWith("http", StringComparison.Ordinal)
+                ? headerDataUrl
+                : new Uri(new Uri(effectiveSource), headerDataUrl).ToString();
+
+            Logger.Log($"Fetching chart data from {dataUrl}");
+            var dataJson = await http_client.GetStringAsync(dataUrl).ConfigureAwait(false);
+
+            // Cache data separately so startup can restore without re-downloading.
+            var dataCachePath = cacheFileForUrl(dataUrl);
+            await File.WriteAllTextAsync(dataCachePath, dataJson).ConfigureAwait(false);
+
+            var dataParsed = BmsTableJsonParser.Parse(dataJson);
+            charts = dataParsed?.Charts;
         }
 
         // ── Stage 2: Merge + Index ──
         var tableSource = isUrl ? TableSource.RemoteUrl : TableSource.LocalFile;
-        var table = BmsTableJsonParser.Merge(effectiveSource, tableSource, parsed.Header, parsed.Charts);
+        var table = BmsTableJsonParser.Merge(effectiveSource, tableSource, parsed.Header, charts);
 
         if (table == null)
         {
-            Logger.Log($"No valid entries found in difficulty table from {source}");
+            notification.CompletionText = $"No valid entries found in difficulty table from {source}";
+            notification.State = ProgressNotificationState.Cancelled;
             return null;
         }
 
         AddTable(table);
-        progress?.Report(0.1f);
-
-        // ── Stage 3: Apply (single realm.Write) ──
-        realm?.Write(r =>
-        {
-            applyMarkersInTransaction(r, table);
-            syncManager?.SyncInTransaction(r, table);
-            progress?.Report(0.9f);
-        });
-
-        progress?.Report(1.0f);
+        notification.Progress = 1;
         return new ImportResult(table);
     }
 
-    [GeneratedRegex(@"\s\[[^\]]*\]$", RegexOptions.Compiled)]
-    private static partial Regex markerSuffixRegex();
-
-    private void applyMarkersInTransaction(Realm r, DifficultyTable table)
+    public void NotifyToRebuildTableList(DifficultyTable? tableRemoved)
     {
-        foreach (var entry in table.Entries)
-        {
-            var beatmap = r.All<BeatmapInfo>()
-                .Filter("Ruleset.ShortName == 'bms' AND MD5Hash == $0", entry.Md5Hash)
-                .FirstOrDefault();
+        TableListRebuildEvent?.Invoke(tableRemoved);
+    }
 
-            if (beatmap == null) continue;
-
-            var clean = markerSuffixRegex().Replace(beatmap.DifficultyName, string.Empty);
-            var markers = GetMarkers(beatmap.MD5Hash);
-
-            if (markers.Count == 0)
-                beatmap.DifficultyName = clean;
-            else
-            {
-                var markerStr = string.Join(" ", markers.Select(m => $"{m.table.Symbol}{m.entry.Level}"));
-                beatmap.DifficultyName = $"{clean} [{markerStr}]";
-            }
-        }
+    public void NotifyToRefreshAllDiffNames()
+    {
+        RefreshDiffNameEvent?.Invoke();
     }
 
     #region Persistence
@@ -208,20 +210,25 @@ public partial class DifficultyTableStore
 
     #endregion
 
-    public event Action<DifficultyTable>? TableRemoved;
+    /// <summary>
+    /// Fires when a table is added or removed, so the table list in settings can rebuild.
+    /// </summary>
+    public event Action<DifficultyTable?>? TableListRebuildEvent;
 
-    public event Action? TablesChanged;
+    public event Action? RefreshDiffNameEvent;
+
 
     #region Public CRUD
 
     /// <summary>
-    /// Add a newly-imported table. Fires events for UI updates.
+    /// Add a newly-imported table. Fires events for UI updates and triggers marker refresh.
     /// </summary>
     public void AddTable(DifficultyTable table)
     {
         tables.Add(table);
+        NotifyToRebuildTableList(null);
         addToIndex(table);
-        TablesChanged?.Invoke();
+        NotifyToRefreshAllDiffNames();
         persistTableList();
     }
 
@@ -232,18 +239,17 @@ public partial class DifficultyTableStore
     {
         tables.Add(table);
         addToIndex(table);
-        // No events
     }
 
     /// <summary>
-    /// Remove a table and trigger cleanup events.
+    /// Remove a table and trigger cleanup events, including marker refresh.
     /// </summary>
     public void RemoveTable(DifficultyTable table)
     {
         tables.Remove(table);
+        NotifyToRebuildTableList(table);
         removeFromIndex(table);
-        TableRemoved?.Invoke(table);
-        TablesChanged?.Invoke();
+        NotifyToRefreshAllDiffNames();
         persistTableList();
     }
 
@@ -298,15 +304,32 @@ public partial class DifficultyTableStore
             var parsed = BmsTableJsonParser.Parse(json);
             if (parsed == null) return null;
 
+            // If the cached header has a data_url, try to load cached data separately.
+            var charts = parsed.Charts;
+            if (charts == null && parsed.Header?.DataUrl != null)
+            {
+                var dataUrl = parsed.Header.DataUrl.StartsWith("http", StringComparison.Ordinal)
+                    ? parsed.Header.DataUrl
+                    : new Uri(new Uri(sourcePath), parsed.Header.DataUrl).ToString();
+
+                var dataCachePath = cacheFileForUrl(dataUrl);
+                if (File.Exists(dataCachePath))
+                {
+                    var dataJson = File.ReadAllText(dataCachePath);
+                    var dataParsed = BmsTableJsonParser.Parse(dataJson);
+                    charts = dataParsed?.Charts;
+                }
+            }
+
             var source = sourcePath.StartsWith("http", StringComparison.Ordinal)
                 ? TableSource.RemoteUrl
                 : TableSource.LocalFile;
 
-            return BmsTableJsonParser.Merge(sourcePath, source, parsed.Header, parsed.Charts);
+            return BmsTableJsonParser.Merge(sourcePath, source, parsed.Header, charts);
         }
         catch (Exception e)
         {
-            Logger.Log($"Failed to read cached difficulty table {cachePath}: {e.Message}");
+            Logger.Error(e, $"Failed to read cached difficulty table {cachePath}: {e.Message}");
             return null;
         }
     }

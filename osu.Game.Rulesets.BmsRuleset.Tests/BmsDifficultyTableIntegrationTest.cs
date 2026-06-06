@@ -7,6 +7,7 @@ using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 
@@ -128,10 +129,11 @@ public partial class BmsDifficultyTableIntegrationTest
             var tablePath = Path.Combine(storage.GetFullPath(string.Empty), "integration-table.json");
             await File.WriteAllTextAsync(tablePath, tableJson).ConfigureAwait(false);
 
+            var notification = new ProgressNotification();
             // Load the table through DifficultyTableStore.
             var cacheDir = Path.Combine(storage.GetFullPath(string.Empty), "dt-cache");
             var store = new DifficultyTableStore(null, cacheDir);
-            var result = await store.ImportAsync(tablePath).ConfigureAwait(false);
+            var result = await store.ImportAsync(tablePath, notification).ConfigureAwait(false);
 
             Assert.That(result, Is.Not.Null, "Table should load successfully");
             Assert.That(result!.Table.Entries, Has.Count.EqualTo(3));
@@ -197,9 +199,10 @@ public partial class BmsDifficultyTableIntegrationTest
             var tablePath = Path.Combine(storage.GetFullPath(string.Empty), "removal-table.json");
             await File.WriteAllTextAsync(tablePath, tableJson).ConfigureAwait(false);
 
+            var notification = new ProgressNotification();
             var cacheDir = Path.Combine(storage.GetFullPath(string.Empty), "dt-cache");
             var store = new DifficultyTableStore(null, cacheDir);
-            var importResult = await store.ImportAsync(tablePath).ConfigureAwait(false);
+            var importResult = await store.ImportAsync(tablePath, notification).ConfigureAwait(false);
             Assert.That(importResult, Is.Not.Null);
 
             var updater = new DifficultyNameUpdater(realm, store);

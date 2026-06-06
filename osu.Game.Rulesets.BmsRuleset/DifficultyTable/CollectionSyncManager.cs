@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Collections;
+using osu.Game.Database;
 using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
@@ -14,7 +15,7 @@ namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 /// </summary>
 public class CollectionSyncManager
 {
-    public const string COLLECTION_PREFIX = "BMS: ";
+    public const string COLLECTION_PREFIX = "BMS Table: ";
 
     /// <summary>
     /// Tracks which tables are currently subdivided.
@@ -25,11 +26,18 @@ public class CollectionSyncManager
     /// <summary>
     /// Toggle subdivide state for a table.
     /// </summary>
-    public void ToggleSubdivide(DifficultyTable table)
+    public void ToggleSubdivide(RealmAccess? realm, DifficultyTable table)
     {
+        if (realm == null) return;
+
         var key = table.SourcePath ?? table.Name;
         if (!subdividedTables.Remove(key))
             subdividedTables.Add(key);
+
+        // rebuild first. so we can update the divided status
+        BmsRuleset.DifficultyTableStore?.NotifyToRebuildTableList(null);
+
+        SyncInTransaction(realm, null);
     }
 
     public bool IsSubdivided(DifficultyTable table)
@@ -38,16 +46,47 @@ public class CollectionSyncManager
         return subdividedTables.Contains(key);
     }
 
+
     /// <summary>
     /// Sync collections inside an active realm write transaction.
     /// Uses diff-based updates (not delete + recreate).
     /// </summary>
-    public void SyncInTransaction(Realm r, DifficultyTable table)
+    public void SyncInTransaction(RealmAccess? realm, DifficultyTable? tableRemoved)
+    {
+        if (realm == null) return;
+
+        // remove collections for removed table first
+        if (tableRemoved != null)
+        {
+            var prefix = $"{COLLECTION_PREFIX}{tableRemoved.Name} ";
+            var baseName = prefix.TrimEnd(' ');
+
+            realm.Write(r =>
+            {
+                var existing = r.All<BeatmapCollection>()
+                    .Where(c => c.Name.StartsWith(prefix, StringComparison.Ordinal)
+                                || c.Name.Equals(baseName, StringComparison.Ordinal))
+                    .ToList();
+
+                foreach (var c in existing)
+                {
+                    r.Remove(c);
+                }
+            });
+        }
+
+        foreach (var table in BmsRuleset.DifficultyTableStore?.Tables ?? [])
+        {
+            realm.Write(r => syncDivideStatus(r, table));
+        }
+    }
+
+    private void syncDivideStatus(Realm r, DifficultyTable table)
     {
         var prefix = $"{COLLECTION_PREFIX}{table.Name} ";
         var baseName = prefix.TrimEnd(' ');
-        var subdivided = IsSubdivided(table);
 
+        var subdivided = IsSubdivided(table);
         // Find all existing collections that belong to this table
         var existing = r.All<BeatmapCollection>()
             .Where(c => c.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)

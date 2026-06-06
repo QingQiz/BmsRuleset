@@ -77,18 +77,12 @@ public class BmsRuleset : Ruleset
         HitResult.Miss, // Empty POOR counter (keypress with no note to consume)
     ];
 
-    private static BmsRulesetConfigManager? sharedConfigManager;
-
-    private static DifficultyTableStore? sharedDifficultyTableStore;
-
     /// <summary>
     /// Shared difficulty table store, set by <see cref="Settings.BmsSettingsSubsection"/> on creation.
     /// </summary>
-    internal static DifficultyTableStore? DifficultyTableStore
-    {
-        get => sharedDifficultyTableStore;
-        set => sharedDifficultyTableStore = value;
-    }
+    internal static DifficultyTableStore? DifficultyTableStore { get; set; }
+
+    private static BmsRulesetConfigManager? sharedConfigManager;
 
     static BmsRuleset()
     {

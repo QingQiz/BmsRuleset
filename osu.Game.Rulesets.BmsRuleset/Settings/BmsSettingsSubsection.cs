@@ -8,6 +8,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
@@ -153,8 +154,8 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 OnImportCompleted = (beatmapSet, scope) =>
                 {
                     beatmapUpdater?.Queue(beatmapSet, scope);
-                    // Schedule marker refresh on the update thread to avoid nested realm writes.
-                    Schedule(() => difficultyNameUpdater?.RefreshAllMarkers());
+                    // Debounced — coalesces N calls from a batch import into 1.
+                    difficultyNameUpdater?.RefreshAllMarkers(beatmapSet);
                 },
             };
             game.RegisterImportHandler(bmsImporter);
@@ -190,13 +191,9 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             difficultyTableStore = store;
             difficultyNameUpdater = new DifficultyNameUpdater(realm!, store);
 
-            // When a table is removed, refresh markers on background thread
-            store.TableRemoved += _ =>
-            {
-                if (difficultyNameUpdater == null) return;
-
-                Task.Run(() => difficultyNameUpdater.RefreshAllMarkers());
-            };
+            // Wire the updater into the store so AddTable / RemoveTable automatically
+            // trigger RefreshAllMarkers.
+            store.DifficultyNameUpdater = difficultyNameUpdater;
 
             store.LoadPersistedTables();
         }
@@ -267,17 +264,33 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Font = OsuFont.Default.With(size: 16, weight: FontWeight.Bold),
                 Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS, Top = 15 },
             },
-            new TableListContainer(difficultyTableStore!, collectionSyncManager)
+            new TableListContainer(difficultyTableStore!, collectionSyncManager, deleteDiffTable)
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS, Bottom = 15 },
             },
+            new Container
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
+                Child = new SettingsNote
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Current =
+                    {
+                        Value = new SettingsNote.Data(
+                            "Adding or removing difficulty tables while on the song select screen may freeze the UI. Switch to the main menu first.",
+                            SettingsNote.Type.Warning)
+                    },
+                },
+            },
         ];
 
         autocomplete = new DifficultyTableAutocomplete
         {
-            OnImport = importFromPathUrl,
+            OnImport = importDiffTableFromPathUrl,
             OnHistoryDelete = item => deleteFromHistory(item.Url),
             Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS, Bottom = 15 },
         };
@@ -374,9 +387,9 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             bmsImporter.DeleteAllBmsFilesAsync();
     }
 
-    private async void importFromPathUrl(string pathOrUrl)
+    private async void importDiffTableFromPathUrl(string pathOrUrl)
     {
-        ProgressNotification? notification = null;
+        ProgressNotification notification;
 
         try
         {
@@ -388,25 +401,19 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
             if (!isUrl && !isFile) return;
 
-            // Single stateful notification — updated as the import progresses.
-            Schedule(() =>
+            notification = new ProgressNotification
             {
-                notification = new ProgressNotification
-                {
-                    Text = "Importing difficulty table…",
-                    Progress = 0,
-                    State = ProgressNotificationState.Active,
-                };
-                notifications?.Post(notification);
-            });
+                Text = "Importing difficulty table…",
+                Progress = 0,
+                State = ProgressNotificationState.Active,
+            };
+            notifications?.Post(notification);
 
             // Dedup: skip if already imported.
             if (difficultyTableStore.Tables.Any(t => t.SourcePath == pathOrUrl))
             {
                 Schedule(() =>
                 {
-                    if (notification == null) return;
-
                     notification.CompletionText = $"Difficulty table already imported: {pathOrUrl}";
                     notification.State = ProgressNotificationState.Completed;
                 });
@@ -428,7 +435,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 return;
             }
 
-            var importResult = await difficultyTableStore.ImportAsync(pathOrUrl).ConfigureAwait(false);
+            var importResult = await difficultyTableStore.ImportAsync(pathOrUrl, notification).ConfigureAwait(false);
 
             if (importResult != null)
             {
@@ -436,20 +443,15 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 {
                     addToHistory(pathOrUrl, importResult.Table.Name, importResult.Table.Symbol);
                     autocomplete?.SetItems(buildPresetItems(), buildHistoryItems());
-                    if (notification != null)
-                    {
-                        notification.CompletionText = $"Loaded table: {importResult.Table.Name} ({importResult.Table.Entries.Count} charts)";
-                        notification.Progress = 1;
-                        notification.State = ProgressNotificationState.Completed;
-                    }
+                    notification.CompletionText = $"Loaded table: {importResult.Table.Name} ({importResult.Table.Entries.Count} charts)";
+                    notification.Progress = 1;
+                    notification.State = ProgressNotificationState.Completed;
                 });
             }
             else
             {
                 Schedule(() =>
                 {
-                    if (notification == null) return;
-
                     notification.CompletionText = $"Failed to load difficulty table from: {pathOrUrl}";
                     notification.State = ProgressNotificationState.Cancelled;
                 });
@@ -457,23 +459,55 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         }
         catch (Exception e)
         {
-            if (notification != null)
-            {
-                notification.CompletionText = $"Failed to load difficulty table from: {pathOrUrl}. {e.Message}";
-                notification.State = ProgressNotificationState.Cancelled;
-            }
+            Logger.Error(e, $"Failed to import difficulty table from: {pathOrUrl}");
         }
+    }
+
+    /// <summary>
+    /// Remove a table with a progress notification. Runs the index removal and
+    /// marker refresh on a background thread so the UI stays responsive.
+    /// </summary>
+    private async void deleteDiffTable(DT table)
+    {
+        ProgressNotification? notification = null;
+
+        Schedule(() =>
+        {
+            notification = new ProgressNotification
+            {
+                Text = $"Removing difficulty table \"{table.Name}\"...",
+                Progress = 0,
+                State = ProgressNotificationState.Active,
+            };
+            notifications?.Post(notification);
+        });
+
+        // Offload to thread pool — RemoveTable now calls RefreshAllMarkers which
+        // runs Realm queries that would block the UI.
+        await Task.Run(() => difficultyTableStore?.RemoveTable(table)).ConfigureAwait(false);
+
+        Schedule(() =>
+        {
+            if (notification == null) return;
+
+            notification.CompletionText = $"Removed difficulty table \"{table.Name}\"";
+            notification.Progress = 1;
+            notification.State = ProgressNotificationState.Completed;
+        });
     }
 
     private sealed partial class TableListContainer : FillFlowContainer
     {
         private readonly DifficultyTableStore store;
         private readonly CollectionSyncManager? syncManager;
+        private readonly Action<DT>? onDelete;
 
-        public TableListContainer(DifficultyTableStore store, CollectionSyncManager? syncManager)
+        public TableListContainer(DifficultyTableStore store, CollectionSyncManager? syncManager,
+                                  Action<DT>? onDelete = null)
         {
             this.store = store;
             this.syncManager = syncManager;
+            this.onDelete = onDelete;
             Direction = FillDirection.Vertical;
             AutoSizeAxes = Axes.Y;
             RelativeSizeAxes = Axes.X;
@@ -484,7 +518,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
-            store.TablesChanged -= onTablesChanged;
+            store.TableListRebuildEvent -= onTableListRebuildEvent;
         }
 
         #endregion
@@ -492,11 +526,11 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            store.TablesChanged += onTablesChanged;
+            store.TableListRebuildEvent += onTableListRebuildEvent;
             rebuild();
         }
 
-        private void onTablesChanged() => Schedule(rebuild);
+        private void onTableListRebuildEvent(DT? _) => Schedule(rebuild);
 
         private void rebuild()
         {
@@ -504,7 +538,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             foreach (var table in store.Tables)
             {
                 var isSubdivided = syncManager?.IsSubdivided(table) ?? false;
-                Add(new TableRowContainer(table, store, syncManager, isSubdivided));
+                Add(new TableRowContainer(table, syncManager, isSubdivided, onDelete));
             }
         }
 
@@ -517,12 +551,19 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 set => base.RelativeSizeAxes = value;
             }
 
+            private readonly Action<DT>? onDelete;
+
             [Resolved(CanBeNull = true)]
             private IDialogOverlay? dialogOverlay { get; set; }
 
-            public TableRowContainer(DT table, DifficultyTableStore store,
-                                     CollectionSyncManager? syncManager, bool isSubdivided)
+            [Resolved(CanBeNull = true)]
+            private RealmAccess? realm { get; set; }
+
+            public TableRowContainer(DT table,
+                                     CollectionSyncManager? syncManager, bool isSubdivided,
+                                     Action<DT>? onDelete = null)
             {
+                this.onDelete = onDelete;
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
                 Padding = new MarginPadding { Vertical = 3 };
@@ -576,21 +617,21 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                                 Text = "X",
                                 Height = 25,
                                 Width = 35,
-                                Action = () => confirmDelete(table, store),
+                                Action = () => confirmDelete(table),
                             },
                         ],
                     },
                 ];
             }
 
-            private void confirmDelete(DT table, DifficultyTableStore store)
+            private void confirmDelete(DT table)
             {
                 if (dialogOverlay != null)
                     dialogOverlay.Push(new MassDeleteConfirmationDialog(
-                        () => store.RemoveTable(table),
-                        $"Delete difficulty table \"{table.Name}\" ({table.Entries.Count} charts)?"));
+                        () => Task.Run(() => onDelete?.Invoke(table)),
+                        $"Delete difficulty table \"{table.Name}\" ({table.Entries.Count} charts)?\n\n⚠ This may freeze the UI if done from song select. Switch to the main menu first."));
                 else
-                    store.RemoveTable(table);
+                    onDelete?.Invoke(table);
             }
 
             private void confirmSubdivide(DT table,
@@ -598,12 +639,12 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             {
                 if (dialogOverlay != null)
                     dialogOverlay.Push(new MassDeleteConfirmationDialog(
-                        () => syncManager?.ToggleSubdivide(table),
+                        () => syncManager?.ToggleSubdivide(realm, table),
                         isSubdivided
                             ? $"Merge difficulty table \"{table.Name}\" back into a single collection?"
                             : $"Split difficulty table \"{table.Name}\" into per-level collections?"));
                 else
-                    syncManager?.ToggleSubdivide(table);
+                    syncManager?.ToggleSubdivide(realm, table);
             }
         }
     }
