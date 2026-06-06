@@ -264,7 +264,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Font = OsuFont.Default.With(size: 16, weight: FontWeight.Bold),
                 Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS, Top = 15 },
             },
-            new TableListContainer(difficultyTableStore!, collectionSyncManager, deleteDiffTable)
+            new TableListContainer(difficultyTableStore!, collectionSyncManager, deleteDiffTable, updateDiffTable)
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
@@ -496,18 +496,66 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         });
     }
 
+    /// <summary>
+    /// Re-fetch a difficulty table from its remote URL and replace the in-memory data.
+    /// </summary>
+    private async void updateDiffTable(DT table)
+    {
+        if (difficultyTableStore == null || table.SourcePath == null) return;
+        if (table.Source != TableSource.RemoteUrl) return;
+
+        var notification = new ProgressNotification
+        {
+            Text = $"Updating difficulty table \"{table.Name}\"...",
+            Progress = 0,
+            State = ProgressNotificationState.Active,
+        };
+        Schedule(() => notifications?.Post(notification));
+
+        try
+        {
+            var importResult = await difficultyTableStore.ImportAsync(table.SourcePath, notification).ConfigureAwait(false);
+
+            if (importResult != null)
+            {
+                difficultyTableStore.ReplaceTable(table, importResult.Table);
+                Schedule(() =>
+                {
+                    notification.CompletionText = $"Updated table: {importResult.Table.Name} ({importResult.Table.Entries.Count} charts)";
+                    notification.Progress = 1;
+                    notification.State = ProgressNotificationState.Completed;
+                });
+            }
+            else
+            {
+                Schedule(() =>
+                {
+                    notification.CompletionText = $"Failed to update difficulty table: {table.SourcePath}";
+                    notification.State = ProgressNotificationState.Cancelled;
+                });
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, $"Failed to update difficulty table: {table.SourcePath}");
+        }
+    }
+
     private sealed partial class TableListContainer : FillFlowContainer
     {
         private readonly DifficultyTableStore store;
         private readonly CollectionSyncManager? syncManager;
         private readonly Action<DT>? onDelete;
+        private readonly Action<DT>? onUpdate;
 
         public TableListContainer(DifficultyTableStore store, CollectionSyncManager? syncManager,
-                                  Action<DT>? onDelete = null)
+                                  Action<DT>? onDelete = null,
+                                  Action<DT>? onUpdate = null)
         {
             this.store = store;
             this.syncManager = syncManager;
             this.onDelete = onDelete;
+            this.onUpdate = onUpdate;
             Direction = FillDirection.Vertical;
             AutoSizeAxes = Axes.Y;
             RelativeSizeAxes = Axes.X;
@@ -538,7 +586,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             foreach (var table in store.Tables)
             {
                 var isSubdivided = syncManager?.IsSubdivided(table) ?? false;
-                Add(new TableRowContainer(table, syncManager, isSubdivided, onDelete));
+                Add(new TableRowContainer(table, syncManager, isSubdivided, onDelete, onUpdate));
             }
         }
 
@@ -552,6 +600,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             }
 
             private readonly Action<DT>? onDelete;
+            private readonly Action<DT>? onUpdate;
 
             [Resolved(CanBeNull = true)]
             private IDialogOverlay? dialogOverlay { get; set; }
@@ -561,12 +610,50 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
             public TableRowContainer(DT table,
                                      CollectionSyncManager? syncManager, bool isSubdivided,
-                                     Action<DT>? onDelete = null)
+                                     Action<DT>? onDelete = null,
+                                     Action<DT>? onUpdate = null)
             {
                 this.onDelete = onDelete;
+                this.onUpdate = onUpdate;
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
                 Padding = new MarginPadding { Vertical = 3 };
+
+                var rightButtons = new List<Drawable>
+                {
+                    new RoundedButton
+                    {
+                        Text = isSubdivided ? "Unsubdivide" : "Subdivide",
+                        TooltipText = isSubdivided
+                            ? "Merge per-level collections back into one"
+                            : "Split into per-level collections",
+                        Height = 25,
+                        Width = 100,
+                        Action = () => confirmSubdivide(table, syncManager, isSubdivided),
+                    },
+                };
+
+                // Only show Update for remote tables (re-fetchable).
+                if (table.Source == TableSource.RemoteUrl)
+                {
+                    rightButtons.Add(new RoundedButton
+                    {
+                        Text = "Upd",
+                        TooltipText = "Re-fetch table from source",
+                        Height = 25,
+                        Width = 40,
+                        Action = () => confirmUpdate(table),
+                    });
+                }
+
+                rightButtons.Add(new DangerousRoundedButton
+                {
+                    Text = "X",
+                    TooltipText = "Delete table",
+                    Height = 25,
+                    Width = 35,
+                    Action = () => confirmDelete(table),
+                });
 
                 Children =
                 [
@@ -575,11 +662,13 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
                         Direction = FillDirection.Horizontal,
-                        AutoSizeAxes = Axes.Both,
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Padding = new MarginPadding { Right = 190 },
                         Spacing = new Vector2(5),
                         Children =
                         [
-                            new OsuSpriteText
+                            new TruncatingSpriteText
                             {
                                 Anchor = Anchor.CentreLeft,
                                 Origin = Anchor.CentreLeft,
@@ -603,23 +692,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                         Direction = FillDirection.Horizontal,
                         AutoSizeAxes = Axes.Both,
                         Spacing = new Vector2(3),
-                        Children =
-                        [
-                            new RoundedButton
-                            {
-                                Text = isSubdivided ? "Unsubdivide" : "Subdivide",
-                                Height = 25,
-                                Width = 100,
-                                Action = () => confirmSubdivide(table, syncManager, isSubdivided),
-                            },
-                            new DangerousRoundedButton
-                            {
-                                Text = "X",
-                                Height = 25,
-                                Width = 35,
-                                Action = () => confirmDelete(table),
-                            },
-                        ],
+                        Children = rightButtons,
                     },
                 ];
             }
@@ -632,6 +705,16 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                         $"Delete difficulty table \"{table.Name}\" ({table.Entries.Count} charts)?\n\n⚠ This may freeze the UI if done from song select. Switch to the main menu first."));
                 else
                     onDelete?.Invoke(table);
+            }
+
+            private void confirmUpdate(DT table)
+            {
+                if (dialogOverlay != null)
+                    dialogOverlay.Push(new MassDeleteConfirmationDialog(
+                        () => onUpdate?.Invoke(table),
+                        $"Re-fetch difficulty table \"{table.Name}\" from source?\n\n⚠ This may freeze the UI if done from song select. Switch to the main menu first."));
+                else
+                    onUpdate?.Invoke(table);
             }
 
             private void confirmSubdivide(DT table,

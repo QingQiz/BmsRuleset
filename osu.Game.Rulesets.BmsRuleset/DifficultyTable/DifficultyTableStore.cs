@@ -253,6 +253,45 @@ public partial class DifficultyTableStore
         persistTableList();
     }
 
+    /// <summary>
+    /// Replace an existing table with updated data. Removes the old entries from the index,
+    /// inserts the new table at the same position, and fires all events including marker refresh.
+    /// Handles the case where newTable was already added via ImportAsync -> AddTable.
+    /// </summary>
+    public void ReplaceTable(DifficultyTable oldTable, DifficultyTable newTable)
+    {
+        var oldIndex = tables.IndexOf(oldTable);
+        if (oldIndex < 0) return;
+
+        tables.RemoveAt(oldIndex);
+        removeFromIndex(oldTable);
+
+        // newTable may already be in the list (added by ImportAsync -> AddTable).
+        var newIndex = tables.IndexOf(newTable);
+        if (newIndex >= 0)
+        {
+            // Move it to the old position.
+            tables.RemoveAt(newIndex);
+            var insertIndex = newIndex < oldIndex ? oldIndex - 1 : oldIndex;
+            if (insertIndex >= tables.Count)
+                tables.Add(newTable);
+            else
+                tables.Insert(insertIndex, newTable);
+        }
+        else
+        {
+            if (oldIndex >= tables.Count)
+                tables.Add(newTable);
+            else
+                tables.Insert(oldIndex, newTable);
+            addToIndex(newTable);
+        }
+
+        NotifyToRebuildTableList(null);
+        NotifyToRefreshAllDiffNames();
+        persistTableList();
+    }
+
     public List<(DifficultyTable table, TableEntry entry)> GetMarkers(string md5Hash)
         => md5Index.TryGetValue(md5Hash, out var markers)
             ? markers
