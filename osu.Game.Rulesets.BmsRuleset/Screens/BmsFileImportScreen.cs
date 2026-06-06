@@ -120,7 +120,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
                     Text = "Import all in current folder",
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
-                    Action = () => startDirectoryImport(false),
+                    Action = () => Task.Run(() => startDirectoryImport(false)),
                 },
                 buttons[2] = new RoundedButton
                 {
@@ -128,7 +128,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
                     TooltipText = "Imports all BMS files from the selected directory and subdirectories",
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
-                    Action = () => startDirectoryImport(true),
+                    Action = () => Task.Run(() => startDirectoryImport(true)),
                 },
             ],
         };
@@ -227,19 +227,11 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
     private void startImport(params string[] paths)
     {
-        if (paths.Length == 0 || isImporting)
+        if (paths.Length == 0)
             return;
 
         // Schedule the UI setup (FadeIn + flag) on the update thread so this method is safe to
         // call from button actions, directory-change handlers, or thread-pool continuations.
-        Schedule(() =>
-        {
-            if (isImporting) return;
-
-            isImporting = true;
-            loadingLayer.FadeIn(duration);
-        });
-
         Task.Run(async () =>
         {
             await importer.Import(paths).ConfigureAwait(false);
@@ -254,6 +246,16 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
     private void startDirectoryImport(bool recursive)
     {
+        if (isImporting) return;
+
+        Schedule(() =>
+        {
+            if (isImporting) return;
+
+            isImporting = true;
+            loadingLayer.FadeIn(duration);
+        });
+
         var path = fileSelector.CurrentPath.Value;
         if (path == null || !path.Exists)
             return;
@@ -270,5 +272,12 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
             return;
 
         startImport(filesToImport);
+
+        Schedule(() =>
+        {
+            loadingLayer.FadeOut(duration);
+            fileSelector.CurrentPath.TriggerChange();
+            isImporting = false;
+        });
     }
 }
