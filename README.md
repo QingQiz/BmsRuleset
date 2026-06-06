@@ -4,6 +4,8 @@ Native osu! ruleset plugin for BMS-family charts (`.bms`, `.bme`, `.bml`, `.pms`
 
 ---
 
+[中文](./README.zh-CN.md)
+
 ## Installation
 
 1. Build the ruleset:
@@ -76,17 +78,6 @@ To remove all imported BMS content, use the **"Delete all imported BMS files"** 
 Layout is inferred from channel presence and file extension (`.pms` → PMS variants; P2 channels present → Double Play;
 channels `18`/`19` present → 7K). `#PLAYER` is ignored.
 
-| Layout | Format    | Total lanes | Scratch          |
-|--------|-----------|-------------|------------------|
-| 5K     | `.bms` SP | 6           | column 0         |
-| 7K     | `.bme` SP | 8           | column 0         |
-| 9K     | `.pms` SP | 9           | none             |
-| 10K    | `.bms` DP | 12          | columns 0 and 11 |
-| 14K    | `.bme` DP | 16          | columns 0 and 15 |
-| 18K    | `.pms` DP | 18          | none             |
-
-The scratch column is visually narrower and darker than regular key columns.
-
 ---
 
 ### Note Types
@@ -103,15 +94,7 @@ The scratch column is visually narrower and darker than regular key columns.
 
 Default bindings (all rebindable in **Settings → Key Bindings → osu!BMS**):
 
-**ingame controls:** `Up` / `Down` increase/decrease scroll speed temporarily
-
-**5K SP:** `LShift` Scratch · `Z` `S` `X` `D` `C` Keys 1–5
-
-**7K SP:** same as 5K plus `F` Key 6 · `V` Key 7
-
-**9K PMS:** `A` `S` `D` `F` Keys 1–4 · `Space` Key 5 · `J` `K` `L` `;` Keys 6–9
-
-**DP:** P1 uses the same keys as SP; P2 uses `RShift` scratch and Numpad 1–5 / 1–7 / 1–9 for keys.
+**ingame controls:** increase/decrease scroll speed temporarily
 
 Key sound of the next upcoming note in a column plays on every key press regardless of judgement result.
 
@@ -121,14 +104,14 @@ Key sound of the next upcoming note in a column plays on every key press regardl
 
 **Judgement tiers (LR2 timing windows, from `#RANK`):**
 
-| Name       | EX pts | Combo        | RANK 2 (Normal) window                       |
-|------------|--------|--------------|----------------------------------------------|
-| **PGREAT** | 2      | kept         | ±18 ms                                       |
-| **GREAT**  | 1      | kept         | ±40 ms                                       |
-| **GOOD**   | 0      | kept         | ±100 ms                                      |
-| **BAD**    | 0      | reset        | ±200 ms                                      |
-| **POOR**   | 0      | reset        | −200 to −1000 ms (early only); note consumed |
-| **E-POOR** | 0      | **no break** | keypress with no note in range               |
+| Name       | EX pts | Combo        | RANK 2 (Normal) window            |
+|------------|--------|--------------|-----------------------------------|
+| **PGREAT** | 2      | kept         | ±18 ms                            |
+| **GREAT**  | 1      | kept         | ±40 ms                            |
+| **GOOD**   | 0      | kept         | ±100 ms                           |
+| **BAD**    | 0      | reset        | ±200 ms                           |
+| **POOR**   | 0      | reset        | < -200ms / > +200ms               |
+| **E-POOR** | 0      | **no break** | [-1000ms,-200ms], no note consume |
 
 `#RANK` 0 = Very Hard (±8/24/40/200 ms) → 4 = Very Easy (±21/60/200/200 ms).
 
@@ -187,9 +170,8 @@ Easy / Hard / Ex-Hard / Hazard gauge variants are not yet implemented.
 
 Layout visibility filters are applied live in song select — uncheck a layout to hide all beatmaps of that type.
 
-You can also filter by key count from the search box using `k=`, `key=` or `keys=` (supports operators `=`, `!=`, `<`, `<=`, `>`, `>=` and comma-separated values, e.g. `keys=7` or `k>5`).
-
----
+You can also filter by key count from the search box using `k=`, `key=` or `keys=` (supports operators `=`, `!=`, `<`,
+`<=`, `>`, `>=` and comma-separated values, e.g. `keys=7` or `k>5`).
 
 ---
 
@@ -197,6 +179,22 @@ You can also filter by key count from the search box using `k=`, `key=` or `keys
 
 Difficulty tables (LR2/beatoraja format) provide difficulty ratings and markers for BMS charts. The ruleset supports
 importing tables from a JSON file or URL, and automatically matches charts by MD5 hash.
+
+### Preset Tables
+
+The following well-known tables are available as one-click presets in the autocomplete dropdown:
+
+| Table                 | Symbol | URL                                                    |
+|-----------------------|--------|--------------------------------------------------------|
+| Satellite (sl)        | sl     | `http://zris.work/bmstable/satellite/header.json`      |
+| Stella (st)           | st     | `http://zris.work/bmstable/stella/header.json`         |
+| 発狂BMS難易度表 (★)         | ★      | `http://zris.work/bmstable/insane/insane_header.json`  |
+| 通常難易度表 (☆)            | ☆      | `http://zris.work/bmstable/normal/normal_header.json`  |
+| NEW GENERATION 発狂 (▼) | ▼      | `http://zris.work/bmstable/insane2/insane_header.json` |
+| 第三期Overjoy (★★)       | ★★     | `http://zris.work/bmstable/overjoy/header.json`        |
+| Scramble (SB)         | SB     | `http://zris.work/bmstable/scramble/header.json`       |
+| Luminous (ln)         | ln     | `http://zris.work/bmstable/luminous/header.json`       |
+| BMS図書館 (T)            | T      | `http://zris.work/bmstable/turbow/header.json`         |
 
 ### Importing a Table
 
@@ -227,13 +225,23 @@ The marker shows the table symbol and the entry's level. Markers update automati
 
 ### Collections
 
-Each table also creates a **BeatmapCollection** named `"BMS: {table.Name}"` containing all matched charts. This lets you
+Each table also creates a **BeatmapCollection** named `"BMS Table: {table.Name}"` containing all matched charts. This lets you
 browse the table's songs directly from the song select collection list.
+
+### Table Row Display
+
+Each imported table shows its name and symbol in the settings list. Long names wrap to fit. Hover a row
+to see a tooltip with the chart count per level.
 
 ### Subdivide
 
-Click **Subdivide** to split a table's collection into per-level collections (e.g., `"BMS: Table ★1"`, `"BMS: Table ★2"`).
+Click **Subdivide** to split a table's collection into per-level collections (e.g., `"BMS Table: Table ★1"`,
+`"BMS Table: Table ★2"`).
 Click **Unsubdivide** to merge them back into one.
+
+### Update
+
+Click **Upd** to re-import the table from its original source URL or file path.
 
 ---
 
@@ -463,142 +471,26 @@ The full built-in skin (covering all 6 layouts) is at
 
 ## Not Yet Implemented
 
-| Area           | What is missing                                                                             |
-|----------------|---------------------------------------------------------------------------------------------|
-| **Parser**     | `#EXRANK` / channel `A0` — extended rank definition                                         |
-| **Parser**     | `#SUBTITLE`, `#SUBARTIST`, `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — metadata only    |
-| **Parser**     | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                          |
-| **Parser**     | `#EXWAVxx`, `#WAVCMD`, `#VOLWAV` — advanced audio controls                                  |
-| **Parser**     | `#STP` — absolute STOP sequence                                                             |
-| **Parser**     | `#DEFEXRANK`, `#BASEBPM`, `#MAKER`, `%URL`, `%EMAIL`, `#COMMENT`, `#DIFFICULTY` — metadata  |
-| **Parser**     | Channel `04`/`06`/`07`/`0A`–`0E` — BGA layers                                               |
-| **Parser**     | Channel `17` / `27` — free-zone keys                                                        |
-| **Parser**     | Channel `31`–`49` — invisible notes                                                         |
-| **Parser**     | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                   |
-| **Renderer**   | BGA / movie / stagefile / background image                                                  |
-| **Renderer**   | Key beams (column light during hold)                                                        |
-| **Scoring**    | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown                  |
-| **Scoring**    | LN tail sample playback — data is parsed and stored but not played during gameplay          |
-| **Gauge**      | Easy / Hard / Ex-Hard / Hazard gauge variants                                               |
-| **Gauge**      | LN-specific gauge events (head miss ≠ body drop ≠ tail miss)                                |
-| **Mods**       | Random / S-Random / H-Random column shuffle                                                 |
-| **Mods**       | Gauge-selection mods                                                                        |
-| **Mods**       | assist options                                                                              |
-| **Input**      | Scratch turntable semantics — scratch is routed as a plain column key                       |
-| **Import**     | Resource files in subdirectories — only the filename is used, relative paths are unresolved |
-
----
-
-<details>
-  <summary>dev...</summary>
-
-## FIXME
-
-- skin
-    - [ ] legacy 的 mod 部分和分数显示重叠了
-
-- [ ] on changing ruleset from bms to any or from any to bms
-
-  ```
-  2026-06-01 15:13:14 [verbose]: This error has been automatically reported to the dev team.
-  2026-06-01 15:13:14 [error]: An unobserved error has occurred.
-  2026-06-01 15:13:14 [error]: osu.Game.Rulesets.UI.BeatmapInvalidForRulesetException: Beatmap can not be converted for the ruleset (ruleset: osu.Game.Rulesets.Mania.ManiaRuleset, osu.Game.Rulesets.Mania, converter: osu.Game.Rulesets.Mania.Beatmaps.ManiaBeatmapConverter).
-  2026-06-01 15:13:14 [error]: at osu.Game.Beatmaps.WorkingBeatmap.GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList`1 mods, CancellationToken token)
-  2026-06-01 15:13:14 [error]: at osu.Game.Beatmaps.WorkingBeatmap.GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList`1 mods)
-  2026-06-01 15:13:14 [error]: at osu.Game.Screens.Select.BeatmapTitleWedge.DifficultyDisplay.<>c__DisplayClass36_0.<updateCountStatistics>b__0()
-  2026-06-01 15:13:14 [error]: at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
-  2026-06-01 15:13:14 [error]: --- End of stack trace from previous location ---
-  2026-06-01 15:13:14 [error]: at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
-  2026-06-01 15:13:14 [error]: at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
-  ```
-- [ ] 血量过低导致的失败不会更新结果为F
-
-
-## TODO
-
-- parser 未实现 command（参考 https://hitkey.nekokan.dyndns.info/cmds.htm）
-    - [ ] `#SUBTITLE` / `#SUBARTIST` / `#MAKER` / `%URL` / `%EMAIL` — 元数据
-    - [ ] `#DIFFICULTY` — 难度分类
-    - [ ] `#DEFEXRANK` / `#EXRANKxx` / channel `A0` — 判定 rank
-    - [ ] `#GENLE` — `#GENRE` 的 typo 容错
-    - [ ] `#BASEBPM` — 视觉 BPM
-    - [ ] `#EXBPMxx` — `#BPMxx` 的别名（规避 BMSC 解析 bug）
-    - [ ] `#STP` — 绝对 STOP 序列
-    - [ ] `#VOLWAV` — 全局音量
-    - [ ] `#WAVCMD` — MacBeat 音高/音量/时间
-    - [ ] `#EXWAVxx` — 扩展音频定义（pan/volume/freq）
-    - [ ] `#PATH_WAV` — 资源路径前缀（WAV/BMP 共用）
-    - [ ] `#BGAxx` / `#POORBGA` / `#SWBGAxx` / `#@BGAxx` / `#ARGBxx` — BGA 定义
-    - [ ] `#BMPxx` / `#EXBMPxx` — 图像定义（非资源扫描）
-    - [ ] `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — 视频
-    - [ ] `#STAGEFILE` / `#BANNER` / `#BACKBMP` — 界面图像（非资源扫描）
-    - [ ] `#CHARFILE` / `#ExtChr` — 角色/皮肤
-    - [ ] `#CHANGEOPTIONxx` / channel `A6` — 动态 option
-    - [ ] `#OPTION` — 强制 option
-    - [ ] `#OCT/FP` — 八度/踏板
-    - [ ] `#CDDA` / `#MIDIFILE` — CD / MIDI
-    - [ ] `#COMMENT` — 选歌注释
-    - [ ] `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — 资源组
-    - [ ] ~~`#CHARSET` — 编码声明~~
-    - [ ] `#END IF`（带空格）、`#END`、`#IFEND` — `#ENDIF` 的 typo 容错
-    - [ ] channel `04` / `06` / `07` / `0A`–`0E` — BGA 层
-    - [ ] channel `17` / `27` — free-zone 键
-    - [ ] channel `31`–`49` — 隐形音符
-    - [ ] channel `97` — 动态 BGM 音量
-    - [ ] channel `98` — 动态 KEY 音量（channel `97` 的对应）
-
-- [ ] correct metadata display (title, artist, etc, rank, hp, ...)
-
-- skin
-    - [ ] column start : value or enum(leftN, rightN, center)
-    - [ ] bga position/size
-    - [ ] bms skin in none-legacy way, full configurable via skin editor
-    - [ ] hitGreat -> hitGreatLate/hitGreatEarly, ... (`HitGreat: imgearly,imglate` or
-      `HitGreatLate: imglate\nHitGreatEarly:imgearly`)
-    - [ ] e-poor image
-
-- mod
-    - [ ] different health bar
-    - [ ] random
-    - [ ] remember the last used mod combination
-    - [ ] BG: make keysound to background samples. so the hit result will not effect the music
-    - [ ] CS: remove the SV. add options for SV multiplier, default by 0, 1 without the mod
-
-- importer
-    - [ ] use a reference/symbolic link to the original bms file instead of copying it to the realm, to speed up the
-      import.
-
-- [ ] result screen
-
-- [ ] bga
-
-
-- audio
-    - [ ] #WAVCMD (MacBeat) — Sets pitch (00), volume (01), or playback time (02) per WAV slot. Format:
-      #WAVCMD <commandID> <WAV-index> <value>. Default pitch=60 (C6), volume=100%.
-    - [ ] #EXWAVxx (nanasi) — Defines a WAV file with pan (-10000 to 10000), volume (-10000 to 0), and frequency/pitch (
-      100–100000 Hz). Format: #EXWAVxx <flags> <pan> <volume> <freq> <filename>.
-    - [ ] #VOLWAV n (BM98) — Global volume scalar for all sounds as a percentage. #VOLWAV 100 = original, #VOLWAV 200 =
-      200%.
-    - [ ] #xxx97 (fgt) — Dynamic BGM volume change channel. Range [01-FF] (hex), e.g. #00197:003C sets volume to 60 at
-      measure 1.
-
-- [ ] Exrank
-
-- [ ] ln tail 的打击音
-
-- [ ] 结算时不同判定的文字颜色
-- [ ] beatmap statisitc 展示更多信息，比如 random 分支数
-- [ ] combo 显示
-- [ ] 挡板，挡板皮肤， 挡板移动
-- [ ] mania 7k 转谱
-- [ ] reply not available
-- [ ] 调整判定偏移的能力
-- [x] 同样的速度下 bms 下落比 mania 快
-
-- [ ] BMS import: reading charts 很慢，另外会导致大量内存占用。并行似乎也没生效。创建一个池子，read完写进去，导入进程从这里拿
-- [x] 一次性删很多图，完成后会卡很长时间
-- [ ] rewrite 血条，红黄绿三色渐变，不改变整体颜色，去掉边框
-- [ ] GetBeatmapAttributesForDisplay 显示sr难度分量 和 rank
-- [ ] 选择 AS 时，计算难度忽略 scratch
-</details>
+| Area         | What is missing                                                                             |
+|--------------|---------------------------------------------------------------------------------------------|
+| **Parser**   | `#EXRANK` / channel `A0` — extended rank definition                                         |
+| **Parser**   | `#SUBTITLE`, `#SUBARTIST`, `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — metadata only    |
+| **Parser**   | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                          |
+| **Parser**   | `#EXWAVxx`, `#WAVCMD`, `#VOLWAV` — advanced audio controls                                  |
+| **Parser**   | `#STP` — absolute STOP sequence                                                             |
+| **Parser**   | `#DEFEXRANK`, `#BASEBPM`, `#MAKER`, `%URL`, `%EMAIL`, `#COMMENT`, `#DIFFICULTY` — metadata  |
+| **Parser**   | Channel `04`/`06`/`07`/`0A`–`0E` — BGA layers                                               |
+| **Parser**   | Channel `17` / `27` — free-zone keys                                                        |
+| **Parser**   | Channel `31`–`49` — invisible notes                                                         |
+| **Parser**   | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                   |
+| **Renderer** | BGA / movie / stagefile / background image                                                  |
+| **Renderer** | Key beams (column light during hold)                                                        |
+| **Scoring**  | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown                  |
+| **Scoring**  | LN tail sample playback — data is parsed and stored but not played during gameplay          |
+| **Gauge**    | Easy / Hard / Ex-Hard / Hazard gauge variants                                               |
+| **Gauge**    | LN-specific gauge events (head miss ≠ body drop ≠ tail miss)                                |
+| **Mods**     | Random / S-Random / H-Random column shuffle                                                 |
+| **Mods**     | Gauge-selection mods                                                                        |
+| **Mods**     | assist options                                                                              |
+| **Input**    | Scratch turntable semantics — scratch is routed as a plain column key                       |
+| **Import**   | Resource files in subdirectories — only the filename is used, relative paths are unresolved |
