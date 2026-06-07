@@ -5,7 +5,6 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Objects;
 
@@ -54,12 +53,12 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             converted.LayoutVariant = BmsLayout.VariantFromTotalColumns(converted.TotalColumns);
         }
 
-        converted.Difficulty.CircleSize = converted.TotalColumns;
-        converted.BeatmapInfo.Difficulty.CircleSize = converted.TotalColumns;
-
-        var od = BmsStarRatingProcessor.RankToOd(converted.Rank);
-        converted.Difficulty.OverallDifficulty = od;
-        converted.BeatmapInfo.Difficulty.OverallDifficulty = od;
+        new BmsDifficultyInfo
+        {
+            Rank = converted.Rank,
+            Total = converted.Total,
+            KeyCount = converted.TotalColumns,
+        }.WriteToOsuDifficulty(converted);
 
         if (!hasBmsData)
             remapColumns(converted);
@@ -83,7 +82,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (original is BmsBeatmap { TotalColumns: > 0 } bmsBeatmap)
             return bmsBeatmap.TotalColumns;
 
-        var metadataKeyCount = (int)Math.Round(original.Difficulty.CircleSize);
+        var metadataKeyCount = BmsDifficultyInfo.GetKeyCount(original.Difficulty);
 
         if (BmsLayout.IsKnownTotalColumns(metadataKeyCount))
             return metadataKeyCount;

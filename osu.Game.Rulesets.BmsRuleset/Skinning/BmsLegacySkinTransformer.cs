@@ -100,7 +100,7 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
         }
         else
         {
-            layoutVariant = BmsLayout.VariantFromTotalColumns(Math.Max(1, (int)Math.Round(beatmap.BeatmapInfo.Difficulty.CircleSize)));
+            layoutVariant = BmsLayout.VariantFromTotalColumns(BmsDifficultyInfo.GetKeyCount(beatmap.BeatmapInfo.Difficulty));
         }
 
         maniaKeyCount = BmsLayout.GetManiaKeyCount(layoutVariant);

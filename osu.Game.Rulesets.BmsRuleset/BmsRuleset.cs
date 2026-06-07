@@ -7,7 +7,6 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
-using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -112,10 +111,7 @@ public class BmsRuleset : Ruleset
     };
 
     public override int GetVariantForBeatmap(IBeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
-    {
-        var keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
-        return (int)BmsLayout.VariantFromTotalColumns(keyCount);
-    }
+        => (int)BmsLayout.VariantFromTotalColumns(BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty));
 
     public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0) =>
         BmsKeyBindingConfiguration.GetDefaultKeyBindings(variant);
@@ -128,15 +124,21 @@ public class BmsRuleset : Ruleset
 
     public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
     {
-        var originalDifficulty = beatmapInfo.Difficulty;
+        var original = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
         var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
+        var adjusted = BmsDifficultyInfo.FromOsuDifficulty(adjustedDifficulty);
 
-        yield return new RulesetBeatmapAttribute(SongSelectStrings.KeyCount, "KC", originalDifficulty.CircleSize, adjustedDifficulty.CircleSize, 18)
+        var w = BmsHitWindows.RANK_WINDOWS_LR2[Math.Clamp(original.Rank, 0, BmsHitWindows.RANK_WINDOWS_LR2.Length - 1)];
+
+        yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
         {
-            Description = "Affects the number of key columns on the playfield.",
+            Description = $"Pgreat={w.pgreat}ms Great={w.great}ms Good={w.good}ms Bad={w.badEarly}ms",
         };
 
-        yield return new RulesetBeatmapAttribute(SongSelectStrings.HPDrain, "HP", originalDifficulty.DrainRate, adjustedDifficulty.DrainRate, 10);
+        yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total, (float)adjusted.Total, 300)
+        {
+            Description = "PGREAT/GREAT=+auto%  GOOD=+auto/2%  BAD=-4%  POOR=-6%  EPOOR=-2%",
+        };
     }
 
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch

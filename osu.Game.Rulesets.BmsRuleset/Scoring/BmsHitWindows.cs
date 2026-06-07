@@ -14,7 +14,7 @@ public class BmsHitWindows(int rank = 2) : HitWindows
     // poorEarly = badEarly (=200) → no POOR hit gap → BmsResultFor never returns
     //   Meh for early presses.  The EP boundary is at -1000ms (emptyPoorEarly=1000)
     //   for E-POOR detection via IsEpoZone.
-    private static readonly (double pgreat, double great, double good, double badEarly, double badLate, double poorEarly, double poorLate, double emptyPoorEarly)[] rank_windows_lr2 =
+    internal static readonly (double pgreat, double great, double good, double badEarly, double badLate, double poorEarly, double poorLate, double emptyPoorEarly)[] RANK_WINDOWS_LR2 =
     [
         (8, 24, 40, 200, 200, 200, 200, 1000),   // RANK 0 - Very Hard
         (15, 30, 60, 200, 200, 200, 200, 1000),  // RANK 1 - Hard
@@ -58,7 +58,7 @@ public class BmsHitWindows(int rank = 2) : HitWindows
     public override void SetDifficulty(double difficulty)
     {
         // Swap rank_windows_lr2 → rank_windows_beatoraja to switch implementations.
-        loadWindows(rank_windows_lr2[rank]);
+        loadWindows(RANK_WINDOWS_LR2[rank]);
     }
 
     /// <inheritdoc />

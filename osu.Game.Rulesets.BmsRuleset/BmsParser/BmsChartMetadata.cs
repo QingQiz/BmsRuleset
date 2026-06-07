@@ -5,4 +5,7 @@ public readonly record struct BmsChartMetadata(
     string Artist,
     string DifficultyName,
     int KeyCount,
-    string RawTitle);
+    string RawTitle,
+    int Rank,
+    double Total
+);

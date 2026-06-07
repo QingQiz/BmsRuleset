@@ -12,6 +12,7 @@ using osu.Game.Database;
 using osu.Game.Models;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using Realms;
 
@@ -560,10 +561,12 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                         Artist = chart.Metadata.Artist,
                         Author = new RealmUser { Username = Constant.AUTHOR },
                     },
-                    Difficulty = new BeatmapDifficulty { CircleSize = chart.Metadata.KeyCount },
+                    Difficulty = new BeatmapDifficulty(),
                     Hash = chart.FileHash,
                     MD5Hash = chart.Md5Hash,
                 };
+                var diff = BmsDifficultyInfo.FromChartMetadata(chart.Metadata);
+                diff.WriteToOsuDifficulty(beatmapInfo);
 
                 beatmapSetInfo.Beatmaps.Add(beatmapInfo);
                 beatmapInfo.BeatmapSet = beatmapSetInfo;
@@ -583,7 +586,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         }
         catch (Exception e)
         {
-            Logger.Log($"BMS import: failed to import {prepared.Directory}: {e.Message}");
+            Logger.Error(e, $"BMS import: failed to import {prepared.Directory}: {e.Message}");
             return false;
         }
     }

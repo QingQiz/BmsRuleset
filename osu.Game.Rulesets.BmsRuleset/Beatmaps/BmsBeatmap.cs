@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -41,6 +42,8 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
         var holdNotes = HitObjects.Count(h => h.IsLongNote && !isScratch(h));
         var scratch = HitObjects.Count(isScratch);
         var mines = HitObjects.Count(h => h.IsMine);
+        double total = notes + holdNotes + scratch + mines;
+        total = Math.Max(total, 1);
 
         return filterStatistics([
             new BeatmapStatistic
@@ -48,28 +51,33 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
                 Name = "Notes",
                 CreateIcon = () => new BeatmapStatisticIcon(BeatmapStatisticsIconType.Circles),
                 Content = notes.ToString(),
+                BarDisplayLength = perc(notes),
             },
             new BeatmapStatistic
             {
                 Name = "Hold Notes",
                 CreateIcon = () => new BeatmapStatisticIcon(BeatmapStatisticsIconType.Sliders),
                 Content = holdNotes.ToString(),
+                BarDisplayLength = perc(holdNotes),
             },
             new BeatmapStatistic
             {
                 Name = "Scratches",
                 CreateIcon = () => new BeatmapStatisticIcon(BeatmapStatisticsIconType.Spinners),
                 Content = scratch.ToString(),
+                BarDisplayLength = perc(scratch),
             },
             new BeatmapStatistic
             {
                 Name = "Mines",
                 CreateIcon = () => new BeatmapStatisticIcon(BeatmapStatisticsIconType.Circles),
                 Content = mines.ToString(),
+                BarDisplayLength = perc(mines),
             },
         ]);
 
         bool isScratch(BmsHitObject h) => BmsLayout.IsScratchColumn(h.Column, LayoutVariant);
+        float perc(int x) => (float)(x / total);
     }
 
     private IEnumerable<BeatmapStatistic> filterStatistics(IEnumerable<BeatmapStatistic> statistics)

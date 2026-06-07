@@ -38,21 +38,29 @@ To remove all imported BMS content, use the **"Delete all imported BMS files"** 
 
 **Header fields decoded:**
 
-| Field                | Command                                                     | Description                                                                       |
-|----------------------|-------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| Title, Artist, Genre | `#TITLE`, `#ARTIST`, `#GENRE`                               |
-| Play level           | `#PLAYLEVEL` (appended to difficulty name as display label) |                                                                                   |
-| Initial BPM          | `#BPM`                                                      |                                                                                   |
-| Extended BPM table   | `#BPMxx`                                                    |                                                                                   |
-| STOP table           | `#STOPxx`                                                   |                                                                                   |
-| Sample definitions   | `#WAVxx`                                                    |                                                                                   |
-| Long-note type       | `#LNTYPE 1` / `#LNTYPE 2` / `#LNOBJ`                        |                                                                                   |
-| Judge rank           | `#RANK` (0–4, affects hit windows)                          |                                                                                   |
-| Gauge total          | `#TOTAL`                                                    |                                                                                   |
-| Player mode          | `#PLAYER`                                                   | **ignored** — layout is inferred from channel presence and file extension only    |
-| Measure length       | channel `02`                                                |                                                                                   |
-| Text events          | `#TEXTxx`, `#SONGxx`, channel `99`                          |                                                                                   |
-| Random               | `#IF`, `#SWITCH`, and related commands                      | game play supported, but metadata display for different branch is not implemented |
+| Field                   | Command                                                                                                           | Description                                                               |
+|-------------------------|-------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
+| Title, Artist, Subtitle | `#TITLE`, `#ARTIST`, `#SUBTITLE`                                                                                  | Subtitle appended to title as `"Title - Subtitle"`                        |
+| SubArtist               | `#SUBARTIST`                                                                                                      | Appended to artist as `"Artist (SubArtist)"`                              |
+| Maker                   | `#MAKER`                                                                                                          | Mapped to beatmap Creator                                                 |
+| Genre                   | `#GENRE` (also `#GENLE`)                                                                                          | Song style, stored in Tags                                                |
+| URL, Email              | `%URL`, `%EMAIL`                                                                                                  | Stored in Tags                                                            |
+| Comment                 | `#COMMENT`                                                                                                        | Stored in Tags                                                            |
+| Difficulty              | `#DIFFICULTY`                                                                                                     | Numeric classification (not yet mapped)                                   |
+| Play level              | `#PLAYLEVEL` (displayed as difficulty name)                                                                       |                                                                           |
+| Judge rank              | `#RANK` (0–4, affects hit windows)                                                                                | Mapped to `OD`                                                            |
+| Gauge total             | `#TOTAL`                                                                                                          | Mapped to `AR`                                                            |
+| Base BPM (visual)       | `#BASEBPM`                                                                                                        | Overrides scroll speed reference BPM without affecting note timing        |
+| Initial BPM             | `#BPM`                                                                                                            |                                                                           |
+| Extended BPM table      | `#BPMxx`                                                                                                          |                                                                           |
+| STOP table              | `#STOPxx`                                                                                                         |                                                                           |
+| Sample definitions      | `#WAVxx`                                                                                                          |                                                                           |
+| Long-note type          | `#LNTYPE 1` / `#LNTYPE 2` / `#LNOBJ`                                                                              |                                                                           |
+| Player mode             | `#PLAYER`                                                                                                         | **ignored** — layout is inferred from channel presence and extension only |
+| Measure length          | channel `02`                                                                                                      |                                                                           |
+| Text events             | `#TEXTxx`, `#SONGxx`, channel `99`                                                                                |                                                                           |
+| Random / Switch         | `#IF`, `#ELSEIF`, `#ELSE`, `#ENDIF` / `#END` / `#IFEND` / `#END IF` (typo tolerance), `#SWITCH`, related commands | gameplay supported                                                        |
+| Subtitle / Genre typo   | `#GENLE` → `#GENRE`                                                                                               |                                                                           |
 
 **Channels parsed:**
 
@@ -68,7 +76,7 @@ To remove all imported BMS content, use the **"Delete all imported BMS files"** 
 | `5x` / `6x` | Long note channels — P1 / P2            |
 | `Dx` / `Ex` | Landmine channels — P1 / P2             |
 
-**Not parsed / not functional:** `#EXRANK`, `#SUBTITLE`, `#STAGEFILE`, `#BANNER`, BGA/image channels (`04`, `06`,
+**Not parsed / not functional:** `#EXRANK`, `#STAGEFILE`, `#BANNER`, BGA/image channels (`04`, `06`,
 `07`, …).
 
 ---
@@ -227,7 +235,8 @@ The marker shows the table symbol and the entry's level. Markers update automati
 
 Each table also creates a **BeatmapCollection** named `[BMS] {table.Name}` containing all matched charts. This lets you
 browse the table's songs directly from the song select collection list.
-(The collection name uses invisible characters under the hood, so you don't need to worry about it colliding with your own collections.)
+(The collection name uses invisible characters under the hood, so you don't need to worry about it colliding with your
+own collections.)
 
 ### Table Row Display
 
@@ -475,11 +484,11 @@ The full built-in skin (covering all 6 layouts) is at
 | Area         | What is missing                                                                             |
 |--------------|---------------------------------------------------------------------------------------------|
 | **Parser**   | `#EXRANK` / channel `A0` — extended rank definition                                         |
-| **Parser**   | `#SUBTITLE`, `#SUBARTIST`, `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — metadata only    |
+| **Parser**   | `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — metadata only                               |
 | **Parser**   | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                          |
 | **Parser**   | `#EXWAVxx`, `#WAVCMD`, `#VOLWAV` — advanced audio controls                                  |
 | **Parser**   | `#STP` — absolute STOP sequence                                                             |
-| **Parser**   | `#DEFEXRANK`, `#BASEBPM`, `#MAKER`, `%URL`, `%EMAIL`, `#COMMENT`, `#DIFFICULTY` — metadata  |
+| **Parser**   | `#DEFEXRANK` — extended rank definition                                                     |
 | **Parser**   | Channel `04`/`06`/`07`/`0A`–`0E` — BGA layers                                               |
 | **Parser**   | Channel `17` / `27` — free-zone keys                                                        |
 | **Parser**   | Channel `31`–`49` — invisible notes                                                         |

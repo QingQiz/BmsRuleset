@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.Filter;
@@ -62,7 +63,7 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 
     public bool Matches(BeatmapInfo beatmapInfo, FilterCriteria criteria)
     {
-        var keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
+        var keyCount = BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty);
         var variant = variantFromColumns(keyCount);
 
         if (!enabledVariants.Contains(variant))

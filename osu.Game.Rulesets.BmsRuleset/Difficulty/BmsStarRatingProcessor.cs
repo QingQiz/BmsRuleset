@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
@@ -89,22 +90,234 @@ public class BmsStarRatingProcessor
         return Result;
     }
 
-    public static float RankToOd(int rank)
+    private static double[] generateCrossCoeffs(int k)
     {
-        return rank switch
+        if (k <= 0) return [-1];
+
+        var len = k + 1;
+        var coeffs = new double[len];
+
+        if (k == 1)
         {
-            0 => 10f,
-            1 => 8f,
-            2 => 7f,
-            3 => 6f,
-            4 => 5f,
-            _ => 7f,
-        };
+            coeffs[0] = coeffs[1] = 0.075;
+            return coeffs;
+        }
+
+        var m = k >> 1;
+        var outer = 0.05 * m + 0.075;
+
+        if (k % 2 == 0)
+        {
+            coeffs[m] = 0.05;
+            for (var i = 1; i < m; i++)
+            {
+                coeffs[m - i] = coeffs[m + i] = 0.15 + 0.10 * i;
+            }
+
+            coeffs[0] = coeffs[k] = outer;
+        }
+        else
+        {
+            coeffs[m] = coeffs[m + 1] = outer;
+            for (var i = 1; m - i > 0; i++)
+            {
+                coeffs[m - i] = coeffs[m + 1 + i] = 0.15 + 0.10 * i;
+            }
+
+            coeffs[0] = coeffs[k] = outer;
+        }
+
+        return coeffs;
+    }
+
+    private static List<(int column, double head, double tail)> mergeSorted(
+        List<(int column, double head, double tail)> a,
+        List<(int column, double head, double tail)> b)
+    {
+        var result = new List<(int column, double head, double tail)>(a.Count + b.Count);
+        int i = 0, j = 0;
+        while (i < a.Count && j < b.Count)
+        {
+            result.Add(a[i].head <= b[j].head ? a[i++] : b[j++]);
+        }
+
+        while (i < a.Count) result.Add(a[i++]);
+        while (j < b.Count) result.Add(b[j++]);
+        return result;
+    }
+
+    private static double rescaleHigh(double sr)
+    {
+        if (sr <= 9) return sr;
+
+        return 9 + (sr - 9) * (1.0 / 1.2);
+    }
+
+    // -----Start of Helper methods--------
+
+    /// <summary>
+    /// Given sorted positions x (length N) and function values f defined piecewise constant on [x[i], x[i+1]),
+    /// return an array F of cumulative integrals such that F[0]=0 and for i&gt;=1:
+    ///   F[i] = sum_{j=0}^{i-1} f[j]*(x[j+1]-x[j])
+    /// </summary>
+    private static double[] cumulativeSum(double[] x, double[] f)
+    {
+        var F = new double[x.Length];
+        for (var i = 1; i < x.Length; i++)
+            F[i] = F[i - 1] + f[i - 1] * (x[i] - x[i - 1]);
+        return F;
+    }
+
+    /// <summary>
+    /// Given cumulative data (x, F, f) as above, return the cumulative sum at an arbitrary point q.
+    /// Here we assume that f is constant on each interval.
+    /// </summary>
+    private static double queryCumSum(double q, double[] x, double[] F, double[] f)
+    {
+        if (q <= x[0]) return 0;
+        if (q >= x[^1]) return F[^1];
+
+        // Find index i such that x[i] <= q < x[i+1]
+        var i = searchSortedLeft(x, q) - 1;
+        if (i < 0) i = 0;
+        return F[i] + f[i] * (q - x[i]);
+    }
+
+    /// <summary>
+    /// Given positions x (a sorted 1D array) and function values f (piecewise constant on intervals defined by x),
+    /// return an array g defined at x by applying a symmetric sliding window:
+    ///   if mode=='sum': g(s) = scale * ∫[s-window, s+window] f(t) dt
+    ///   if mode=='avg': g(s) = (∫[s-window, s+window] f(t) dt) / (length of window actually used)
+    /// This is computed exactly using the cumulative–sum technique.
+    /// </summary>
+    private static double[] smoothOnCorners(double[] x, double[] f, double window, double scale, bool averageMode)
+    {
+        var F = cumulativeSum(x, f);
+        var g = new double[f.Length];
+
+        for (var i = 0; i < x.Length; i++)
+        {
+            var s = x[i];
+            var a = Math.Max(s - window, x[0]);
+            var b = Math.Min(s + window, x[^1]);
+            var val = queryCumSum(b, x, F, f) - queryCumSum(a, x, F, f);
+
+            if (averageMode)
+                g[i] = b - a > 0 ? val / (b - a) : 0;
+            else
+                g[i] = scale * val;
+        }
+
+        return g;
+    }
+
+    /// <summary>Return new_vals at positions new_x using linear interpolation from old_x, old_vals.</summary>
+    private static double[] interpValues(double[] newX, double[] oldX, double[] oldVals)
+    {
+        var result = new double[newX.Length];
+        for (var i = 0; i < newX.Length; i++)
+        {
+            var x = newX[i];
+            if (x <= oldX[0])
+            {
+                result[i] = oldVals[0];
+            }
+            else if (x >= oldX[^1])
+            {
+                result[i] = oldVals[^1];
+            }
+            else
+            {
+                var idx = searchSortedLeft(oldX, x);
+                var t = (x - oldX[idx - 1]) / (oldX[idx] - oldX[idx - 1]);
+                result[i] = oldVals[idx - 1] + t * (oldVals[idx] - oldVals[idx - 1]);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// For each position in new_x, return the value of old_vals corresponding to the greatest old_x
+    /// that is less than or equal to new_x. This implements a step–function (zero–order hold)
+    /// interpolation.
+    /// </summary>
+    private static double[] stepInterp(double[] newX, double[] oldX, double[] oldVals)
+    {
+        var result = new double[newX.Length];
+        for (var i = 0; i < newX.Length; i++)
+        {
+            var idx = searchSortedRight(oldX, newX[i]) - 1;
+            if (idx < 0) idx = 0;
+            if (idx >= oldVals.Length) idx = oldVals.Length - 1;
+            result[i] = oldVals[idx];
+        }
+
+        return result;
+    }
+
+    private static double lnSum(double a, double b, double[] points, double[] cumsum, double[] values)
+    {
+        // Locate the segments that contain a and b using bisect_right semantics.
+        var i = searchSortedRight(points, a) - 1;
+        var j = searchSortedRight(points, b) - 1;
+
+        double total;
+        if (i == j)
+        {
+            // Both a and b lie in the same segment.
+            total = (b - a) * values[i];
+        }
+        else
+        {
+            // First segment: from a to the end of the i-th segment.
+            total = (points[i + 1] - a) * values[i];
+            // Full segments between i+1 and j-1.
+            total += cumsum[j] - cumsum[i + 1];
+            // Last segment: from start of segment j to b.
+            total += (b - points[j]) * values[j];
+        }
+
+        return total;
+    }
+
+    // ---- Binary search helpers ----
+    // Pure binary search, O(log n) even with duplicate values.
+    // Returns the leftmost index where array[index] >= value.
+
+    private static int searchSortedLeft(double[] array, double value)
+    {
+        int lo = 0, hi = array.Length;
+        while (lo < hi)
+        {
+            var mid = lo + hi >> 1;
+            if (array[mid] < value)
+                lo = mid + 1;
+            else
+                hi = mid;
+        }
+
+        return lo;
+    }
+
+    private static int searchSortedRight(double[] array, double value)
+    {
+        int lo = 0, hi = array.Length;
+        while (lo < hi)
+        {
+            var mid = lo + hi >> 1;
+            if (array[mid] <= value)
+                lo = mid + 1;
+            else
+                hi = mid;
+        }
+
+        return lo;
     }
 
     private void preprocessFile(IReadOnlyList<BmsHitObject> hitObjects, int rank, double clockRate)
     {
-        var od = RankToOd(rank);
+        var od = BmsDifficultyInfo.RankToOd(rank);
 
         // Hit leniency x
         var x = 0.3 * Math.Pow((64.5 - Math.Ceiling(od * 3.0)) / 500.0, 0.5);
@@ -365,62 +578,6 @@ public class BmsStarRatingProcessor
 
         deltaKs = dks;
         return jbar;
-    }
-
-    private static double[] generateCrossCoeffs(int k)
-    {
-        if (k <= 0) return [-1];
-
-        var len = k + 1;
-        var coeffs = new double[len];
-
-        if (k == 1)
-        {
-            coeffs[0] = coeffs[1] = 0.075;
-            return coeffs;
-        }
-
-        var m = k >> 1;
-        var outer = 0.05 * m + 0.075;
-
-        if (k % 2 == 0)
-        {
-            coeffs[m] = 0.05;
-            for (var i = 1; i < m; i++)
-            {
-                coeffs[m - i] = coeffs[m + i] = 0.15 + 0.10 * i;
-            }
-
-            coeffs[0] = coeffs[k] = outer;
-        }
-        else
-        {
-            coeffs[m] = coeffs[m + 1] = outer;
-            for (var i = 1; m - i > 0; i++)
-            {
-                coeffs[m - i] = coeffs[m + 1 + i] = 0.15 + 0.10 * i;
-            }
-
-            coeffs[0] = coeffs[k] = outer;
-        }
-
-        return coeffs;
-    }
-
-    private static List<(int column, double head, double tail)> mergeSorted(
-        List<(int column, double head, double tail)> a,
-        List<(int column, double head, double tail)> b)
-    {
-        var result = new List<(int column, double head, double tail)>(a.Count + b.Count);
-        int i = 0, j = 0;
-        while (i < a.Count && j < b.Count)
-        {
-            result.Add(a[i].head <= b[j].head ? a[i++] : b[j++]);
-        }
-
-        while (i < a.Count) result.Add(a[i++]);
-        while (j < b.Count) result.Add(b[j++]);
-        return result;
     }
 
     private double[] computeXbar()
@@ -808,116 +965,6 @@ public class BmsStarRatingProcessor
         return sr;
     }
 
-    private static double rescaleHigh(double sr)
-    {
-        if (sr <= 9) return sr;
-
-        return 9 + (sr - 9) * (1.0 / 1.2);
-    }
-
-    // -----Start of Helper methods--------
-
-    /// <summary>
-    /// Given sorted positions x (length N) and function values f defined piecewise constant on [x[i], x[i+1]),
-    /// return an array F of cumulative integrals such that F[0]=0 and for i&gt;=1:
-    ///   F[i] = sum_{j=0}^{i-1} f[j]*(x[j+1]-x[j])
-    /// </summary>
-    private static double[] cumulativeSum(double[] x, double[] f)
-    {
-        var F = new double[x.Length];
-        for (var i = 1; i < x.Length; i++)
-            F[i] = F[i - 1] + f[i - 1] * (x[i] - x[i - 1]);
-        return F;
-    }
-
-    /// <summary>
-    /// Given cumulative data (x, F, f) as above, return the cumulative sum at an arbitrary point q.
-    /// Here we assume that f is constant on each interval.
-    /// </summary>
-    private static double queryCumSum(double q, double[] x, double[] F, double[] f)
-    {
-        if (q <= x[0]) return 0;
-        if (q >= x[^1]) return F[^1];
-
-        // Find index i such that x[i] <= q < x[i+1]
-        var i = searchSortedLeft(x, q) - 1;
-        if (i < 0) i = 0;
-        return F[i] + f[i] * (q - x[i]);
-    }
-
-    /// <summary>
-    /// Given positions x (a sorted 1D array) and function values f (piecewise constant on intervals defined by x),
-    /// return an array g defined at x by applying a symmetric sliding window:
-    ///   if mode=='sum': g(s) = scale * ∫[s-window, s+window] f(t) dt
-    ///   if mode=='avg': g(s) = (∫[s-window, s+window] f(t) dt) / (length of window actually used)
-    /// This is computed exactly using the cumulative–sum technique.
-    /// </summary>
-    private static double[] smoothOnCorners(double[] x, double[] f, double window, double scale, bool averageMode)
-    {
-        var F = cumulativeSum(x, f);
-        var g = new double[f.Length];
-
-        for (var i = 0; i < x.Length; i++)
-        {
-            var s = x[i];
-            var a = Math.Max(s - window, x[0]);
-            var b = Math.Min(s + window, x[^1]);
-            var val = queryCumSum(b, x, F, f) - queryCumSum(a, x, F, f);
-
-            if (averageMode)
-                g[i] = b - a > 0 ? val / (b - a) : 0;
-            else
-                g[i] = scale * val;
-        }
-
-        return g;
-    }
-
-    /// <summary>Return new_vals at positions new_x using linear interpolation from old_x, old_vals.</summary>
-    private static double[] interpValues(double[] newX, double[] oldX, double[] oldVals)
-    {
-        var result = new double[newX.Length];
-        for (var i = 0; i < newX.Length; i++)
-        {
-            var x = newX[i];
-            if (x <= oldX[0])
-            {
-                result[i] = oldVals[0];
-            }
-            else if (x >= oldX[^1])
-            {
-                result[i] = oldVals[^1];
-            }
-            else
-            {
-                var idx = searchSortedLeft(oldX, x);
-                var t = (x - oldX[idx - 1]) / (oldX[idx] - oldX[idx - 1]);
-                result[i] = oldVals[idx - 1] + t * (oldVals[idx] - oldVals[idx - 1]);
-            }
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    /// For each position in new_x, return the value of old_vals corresponding to the greatest old_x
-    /// that is less than or equal to new_x. This implements a step–function (zero–order hold)
-    /// interpolation.
-    /// </summary>
-    private static double[] stepInterp(double[] newX, double[] oldX, double[] oldVals)
-    {
-        var result = new double[newX.Length];
-        for (var i = 0; i < newX.Length; i++)
-        {
-            var idx = searchSortedRight(oldX, newX[i]) - 1;
-            if (idx < 0) idx = 0;
-            if (idx >= oldVals.Length) idx = oldVals.Length - 1;
-            result[i] = oldVals[idx];
-        }
-
-        return result;
-    }
-
     // -----End of Helper methods--------
 
     // ---- LN body sparse representation ----
@@ -960,64 +1007,5 @@ public class BmsStarRatingProcessor
         }
 
         return (points, [.. cumsum], [.. values]);
-    }
-
-    private static double lnSum(double a, double b, double[] points, double[] cumsum, double[] values)
-    {
-        // Locate the segments that contain a and b using bisect_right semantics.
-        var i = searchSortedRight(points, a) - 1;
-        var j = searchSortedRight(points, b) - 1;
-
-        double total;
-        if (i == j)
-        {
-            // Both a and b lie in the same segment.
-            total = (b - a) * values[i];
-        }
-        else
-        {
-            // First segment: from a to the end of the i-th segment.
-            total = (points[i + 1] - a) * values[i];
-            // Full segments between i+1 and j-1.
-            total += cumsum[j] - cumsum[i + 1];
-            // Last segment: from start of segment j to b.
-            total += (b - points[j]) * values[j];
-        }
-
-        return total;
-    }
-
-    // ---- Binary search helpers ----
-    // Pure binary search, O(log n) even with duplicate values.
-    // Returns the leftmost index where array[index] >= value.
-
-    private static int searchSortedLeft(double[] array, double value)
-    {
-        int lo = 0, hi = array.Length;
-        while (lo < hi)
-        {
-            var mid = lo + hi >> 1;
-            if (array[mid] < value)
-                lo = mid + 1;
-            else
-                hi = mid;
-        }
-
-        return lo;
-    }
-
-    private static int searchSortedRight(double[] array, double value)
-    {
-        int lo = 0, hi = array.Length;
-        while (lo < hi)
-        {
-            var mid = lo + hi >> 1;
-            if (array[mid] <= value)
-                lo = mid + 1;
-            else
-                hi = mid;
-        }
-
-        return lo;
     }
 }

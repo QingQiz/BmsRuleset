@@ -8,7 +8,6 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -120,10 +119,6 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
             output.Metadata.Title = !string.IsNullOrWhiteSpace(parseResult.Subtitle)
                 ? $"{parseResult.Title} - {parseResult.Subtitle}"
                 : parseResult.Title;
-
-            output.BeatmapInfo.DifficultyName = parseResult.PlayLevel != null
-                ? $"{parseResult.Title} [{parseResult.PlayLevel}]"
-                : parseResult.Title;
         }
 
         if (parseResult.Artist != null)
@@ -147,11 +142,6 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
                 ? tags
                 : $"{output.Metadata.Tags} {tags}";
 
-        output.Difficulty.CircleSize = parseResult.TotalColumns;
-        output.BeatmapInfo.Difficulty.CircleSize = parseResult.TotalColumns;
-
-        var od = BmsStarRatingProcessor.RankToOd(parseResult.Rank);
-        output.Difficulty.OverallDifficulty = od;
-        output.BeatmapInfo.Difficulty.OverallDifficulty = od;
+        BmsDifficultyInfo.FromParseResult(parseResult).WriteToOsuDifficulty(output);
     }
 }

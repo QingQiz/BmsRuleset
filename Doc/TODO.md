@@ -46,8 +46,6 @@
     - [ ] channel `97` — 动态 BGM 音量
     - [ ] channel `98` — 动态 KEY 音量（channel `97` 的对应）
 
-- [ ] correct metadata display (title, artist, etc, rank, hp, ...)
-
 - skin
     - [ ] column start : value or enum(leftN, rightN, center)
     - [ ] bga position/size

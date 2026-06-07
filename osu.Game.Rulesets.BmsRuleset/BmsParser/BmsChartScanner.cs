@@ -41,6 +41,8 @@ internal static partial class BmsChartParser
         var title = path == null ? string.Empty : Path.GetFileNameWithoutExtension(path);
         var artist = string.Empty;
         var subtitle = string.Empty;
+        var rank = string.Empty;
+        var total = string.Empty;
         var channels = new List<string>();
 
         foreach (var line in lines)
@@ -77,13 +79,21 @@ internal static partial class BmsChartParser
                 case "SUBTITLE":
                     subtitle = value;
                     break;
+
+                case "RANK":
+                    rank = value;
+                    break;
+
+                case "TOTAL":
+                    total = value;
+                    break;
             }
         }
 
         var setTitle = inferSetTitle(title);
         var difficultyName = inferDifficultyName(title, subtitle, path);
 
-        return new BmsChartMetadata(setTitle, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path), title);
+        return new BmsChartMetadata(setTitle, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path), title, int.Parse(rank), double.Parse(total));
     }
 
     /// <summary>
