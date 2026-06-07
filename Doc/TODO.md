@@ -19,6 +19,18 @@
   ```
 - [ ] 血量过低导致的失败不会更新结果为F
 
+2026-06-07 17:58:32 [error]: System.IndexOutOfRangeException: Index was outside the bounds of the array.
+2026-06-07 17:58:32 [error]: at osu.Game.Rulesets.BmsRuleset.Difficulty.BmsStarRatingProcessor.getKeyUsage()
+2026-06-07 17:58:32 [error]: at osu.Game.Rulesets.BmsRuleset.Difficulty.BmsStarRatingProcessor.Compute(IReadOnlyList`1 hitObjects, Int32 totalColumns, Int32 rank, Double clockRate)
+2026-06-07 17:58:32 [error]: at osu.Game.Rulesets.BmsRuleset.Difficulty.BmsDifficultyCalculator.CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills, Double clockRate)
+2026-06-07 17:58:32 [error]: at osu.Game.Rulesets.Difficulty.DifficultyCalculator.CalculateTimed(IEnumerable`1 mods, CancellationToken cancellationToken)
+2026-06-07 17:58:32 [error]: at osu.Game.Beatmaps.BeatmapDifficultyCache.<>c__DisplayClass26_0.<GetTimedDifficultyAttributesAsync>b__0()
+2026-06-07 17:58:32 [error]: at System.Threading.Tasks.Task`1.InnerInvoke()
+2026-06-07 17:58:32 [error]: at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+2026-06-07 17:58:32 [error]: --- End of stack trace from previous location ---
+2026-06-07 17:58:32 [error]: at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+2026-06-07 17:58:32 [error]: at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+
 ## TODO
 
 - parser 未实现 command（参考 https://hitkey.nekokan.dyndns.info/cmds.htm）
@@ -93,3 +105,4 @@
 - [ ] rewrite 血条，红黄绿三色渐变，不改变整体颜色，去掉边框
 - [ ] GetBeatmapAttributesForDisplay 显示sr难度分量 和 rank
 - [ ] 选择 AS 时，计算难度忽略 scratch
+- [ ] LN 的 头判

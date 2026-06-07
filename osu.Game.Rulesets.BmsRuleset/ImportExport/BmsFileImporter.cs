@@ -174,7 +174,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             var index = new DirectoryFileIndex(group.Directory);
 
             var bytes = group.ChartPaths.AsParallel().Select(File.ReadAllBytes).ToArray();
-            var allMd5 = bytes.AsParallel().Select(b => Convert.ToHexString(MD5.HashData(b))).ToArray();
+            var allMd5 = bytes.AsParallel().Select(b => Convert.ToHexString(MD5.HashData(b)).ToLowerInvariant()).ToArray();
             var setHash = calculateSetHash(allMd5);
 
             var existingSet = r.All<BeatmapSetInfo>()
