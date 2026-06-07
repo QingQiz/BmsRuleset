@@ -294,11 +294,20 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // We must include LNs released before the tail window (an early release is a drop,
         // scored as POOR) — filtering by the release window here would leave the note
         // frozen at the judgement line until its tail time passed.
-        HitObjectContainer.AliveObjects
+        var heldNote = HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
             .Where(d => d.IsHoldingLongNote && d.HitObject.Column == column.Value)
-            .MinBy(d => d.HitObject.EndTime)
-            ?.TryRelease();
+            .MinBy(d => d.HitObject.EndTime);
+
+        if (heldNote?.TryRelease() == true)
+        {
+            // Play the LN tail's own hit sound if available.
+            // Do NOT fallback to the head's sample — if the tail has no sample,
+            // nothing is played. This matches BMS behavior where only explicitly
+            // defined tail sounds (via the terminating cell's #WAV) are heard.
+            if (!string.IsNullOrEmpty(heldNote.HitObject.TailSamplePath))
+                KeySoundPlayer.PlaySample(column.Value, heldNote.HitObject.TailSamplePath);
+        }
     }
 
     public bool IsColumnPressedForLandmine(int column) => pressedColumns.Contains(column);

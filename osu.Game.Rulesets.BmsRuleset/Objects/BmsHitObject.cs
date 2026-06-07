@@ -38,6 +38,18 @@ public class BmsHitObject : HitObject, IHasDuration
     /// </summary>
     public string LandmineExplosionSamplePath { get; set; } = string.Empty;
 
+    /// <summary>
+    ///     The BMS sample key of the LN terminating cell (e.g. "01", "AZ").
+    ///     Empty when the tail has no distinct sample (LNTYPE 2 or no #WAV for the terminating value).
+    /// </summary>
+    public string TailSampleKey { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     The resolved sample path for the LN tail's key sound.
+    ///     Empty when the tail should play no sound (no fallback to the head's sample).
+    /// </summary>
+    public string TailSamplePath { get; set; } = string.Empty;
+
     /// <summary>BMS #RANK value stamped from the beatmap during conversion. 0=Very Hard, 1=Hard, 2=Normal, 3=Easy, 4=Very Easy.</summary>
     public int BmsRank { get; set; } = 2;
 

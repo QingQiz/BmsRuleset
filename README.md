@@ -149,7 +149,6 @@ Easy / Hard / Ex-Hard / Hazard gauge variants are not yet implemented.
   automatically resolve to `.ogg` siblings if present.
 - **Background samples and key sounds are not affected by the osu! Effect volume slider** — they follow master and music
   volume only.
-- LN tail samples are parsed and stored but not yet played during gameplay.
 
 ---
 
@@ -496,7 +495,6 @@ The full built-in skin (covering all 6 layouts) is at
 | **Renderer** | BGA / movie / stagefile / background image                                                  |
 | **Renderer** | Key beams (column light during hold)                                                        |
 | **Scoring**  | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown                  |
-| **Scoring**  | LN tail sample playback — data is parsed and stored but not played during gameplay          |
 | **Gauge**    | Easy / Hard / Ex-Hard / Hazard gauge variants                                               |
 | **Gauge**    | LN-specific gauge events (head miss ≠ body drop ≠ tail miss)                                |
 | **Mods**     | Random / S-Random / H-Random column shuffle                                                 |

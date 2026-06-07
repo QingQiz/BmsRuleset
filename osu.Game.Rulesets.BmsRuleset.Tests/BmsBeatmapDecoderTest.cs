@@ -561,7 +561,22 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestLongNoteTailSampleEventsUseHeadSampleAtTailTime()
+    public void TestLongNoteTailNoSampleEventForLnType2()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAV01 head.wav
+                             #LNTYPE 2
+                             #00151:0100
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        // LNTYPE 2 terminates with "00" (control value, no sample) → no tail sample event.
+        Assert.That(converted.LongNoteTailSampleEvents, Is.Empty);
+    }
+
+    [Test]
+    public void TestLongNoteTailSampleEventUsesTerminatingCellSampleKey()
     {
         var beatmap = decode("""
                              #BPM 120
@@ -571,9 +586,66 @@ public class BmsBeatmapDecoderTest
                              """);
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
+        // For LNTYPE 1 with payload "0101", both head and tail have value "01",
+        // so the tail sample key resolves to "01" (from the terminating cell).
         Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(1));
         Assert.That(converted.LongNoteTailSampleEvents[0].SampleKey, Is.EqualTo("01"));
         Assert.That(converted.LongNoteTailSampleEvents[0].Time, Is.EqualTo(3000).Within(0.001));
+    }
+
+    [Test]
+    public void TestLongNoteTailSampleEventWithDistinctTailSample()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAV01 head.wav
+                             #WAV02 tail.wav
+                             #LNTYPE 1
+                             #00151:0102
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        // Terminating cell has value "02" → tail sample key is "02", NOT head's "01".
+        Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(1));
+        Assert.That(converted.LongNoteTailSampleEvents[0].SampleKey, Is.EqualTo("02"));
+    }
+
+    [Test]
+    public void TestLongNoteTailSamplePathOnHitObject()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAV01 head.wav
+                             #WAV02 tail.wav
+                             #LNTYPE 1
+                             #00151:0102
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = (BmsHitObject)converted.HitObjects.Single();
+
+        Assert.That(note.IsLongNote, Is.True);
+        Assert.That(note.TailSampleKey, Is.EqualTo("02"));
+        Assert.That(note.TailSamplePath, Is.EqualTo("tail.wav"));
+    }
+
+    [Test]
+    public void TestLongNoteTailSamplePathWithNoWavForTailValue()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAV01 head.wav
+                             #LNTYPE 1
+                             #00151:0103
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = (BmsHitObject)converted.HitObjects.Single();
+
+        Assert.That(note.IsLongNote, Is.True);
+        // Terminating value "03" has no #WAV definition → TailSamplePath should be empty
+        Assert.That(note.TailSampleKey, Is.EqualTo("03"));
+        Assert.That(note.TailSamplePath, Is.Empty);
+        // No tail sample event either since the sample can't be resolved
+        Assert.That(converted.LongNoteTailSampleEvents, Is.Empty);
     }
 
     [Test]
@@ -603,6 +675,39 @@ public class BmsBeatmapDecoderTest
         Assert.That(first.StartTime, Is.EqualTo(0).Within(0.001));
         Assert.That(second.TickInfo.Tick, Is.EqualTo(192));
         Assert.That(second.StartTime, Is.EqualTo(2000).Within(0.001));
+    }
+
+    [Test]
+    public void TestMultiLnObjWithDistinctTailSamples()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAVaa onkeydown1.wav
+                             #WAVbb onkeyup1.wav
+                             #WAVcc onkeydown2.wav
+                             #WAVdd onkeyup2.wav
+                             #LNOBJ BB
+                             #LNOBJ DD
+                             #00111:00aa00bb
+                             #00213:00cc00dd
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var notes = converted.HitObjects.OrderBy(h => h.StartTime).ToList();
+
+        Assert.That(notes, Has.Count.EqualTo(2));
+
+        // First LN: head=aa, tail=bb
+        Assert.That(notes[0].IsLongNote, Is.True);
+        Assert.That(notes[0].SampleKey, Is.EqualTo("aa"));
+        Assert.That(notes[0].TailSampleKey, Is.EqualTo("bb"));
+        Assert.That(notes[0].TailSamplePath, Is.EqualTo("onkeyup1.wav"));
+
+        // Second LN: head=cc, tail=dd
+        Assert.That(notes[1].IsLongNote, Is.True);
+        Assert.That(notes[1].SampleKey, Is.EqualTo("cc"));
+        Assert.That(notes[1].TailSampleKey, Is.EqualTo("dd"));
+        Assert.That(notes[1].TailSamplePath, Is.EqualTo("onkeyup2.wav"));
     }
 
     [Test]

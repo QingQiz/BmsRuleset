@@ -64,6 +64,8 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
         IsMine = parsedObject.IsMine,
         LandmineDamagePercent = parsedObject.LandmineDamagePercent,
         LandmineExplosionSamplePath = parsedObject.LandmineExplosionSamplePath,
+        TailSampleKey = parsedObject.TailSampleKey,
+        TailSamplePath = parsedObject.TailSamplePath,
     };
 
     internal static void PopulateTiming(Beatmap output, IEnumerable<BmsBpmEvent> timingEvents)

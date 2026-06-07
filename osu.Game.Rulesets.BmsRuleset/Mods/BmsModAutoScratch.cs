@@ -80,7 +80,8 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                 }
                 else if (now >= note.EndTime)
                 {
-                    drawable.TryRelease();
+                    if (drawable.TryRelease() && !string.IsNullOrEmpty(note.TailSamplePath))
+                        playfield.KeySoundPlayer.PlaySample(note.Column, note.TailSamplePath);
                 }
             }
             else

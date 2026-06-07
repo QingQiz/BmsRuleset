@@ -273,10 +273,17 @@ internal static partial class BmsChartParser
     {
         foreach (var hitObject in hitObjects)
         {
-            if (!hitObject.IsLongNote || string.IsNullOrWhiteSpace(hitObject.SampleKey) || hitObject.EndTick <= hitObject.Tick)
+            if (!hitObject.IsLongNote || hitObject.EndTick <= hitObject.Tick)
                 continue;
 
-            yield return new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, hitObject.SampleKey);
+            // Only emit a tail sample event if the tail has its own sample key AND the
+            // sample path resolves (i.e. the key has a #WAV definition in the chart).
+            // Do NOT fallback to the head's SampleKey — if the terminating cell has
+            // no sample defined, the tail simply has no sound.
+            if (string.IsNullOrWhiteSpace(hitObject.TailSampleKey) || string.IsNullOrWhiteSpace(hitObject.TailSamplePath))
+                continue;
+
+            yield return new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, hitObject.TailSampleKey);
         }
     }
 
@@ -441,7 +448,7 @@ internal static partial class BmsChartParser
             if (state.LnObjValues.Contains(note.Value))
             {
                 if (pendingByColumn.Remove(note.Column, out var start) && note.Tick > start.Tick)
-                    yield return createHitObject(start, note.Tick, true, timingMap, state.SampleDefinitions);
+                    yield return createHitObject(start, note.Tick, true, timingMap, state.SampleDefinitions, note.Value);
 
                 continue;
             }
@@ -466,7 +473,7 @@ internal static partial class BmsChartParser
             if (openByColumn.Remove(cell.Column, out var start))
             {
                 if (cell.Tick > start.Tick)
-                    yield return createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions);
+                    yield return createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions, cell.Value);
             }
             else
             {
@@ -492,7 +499,7 @@ internal static partial class BmsChartParser
 
                 if (openRun is { } start && cell.Tick > start.Tick)
                 {
-                    yield return createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions);
+                    yield return createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions, cell.Value);
 
                     openRun = null;
                 }
@@ -502,10 +509,22 @@ internal static partial class BmsChartParser
 
     private static BmsParsedHitObject createHitObject(
         RawCell start, long endTick, bool isLongNote, BmsTimingMap timingMap,
-        IReadOnlyDictionary<string, string> sampleDefinitions)
+        IReadOnlyDictionary<string, string> sampleDefinitions,
+        string tailCellValue = "")
     {
         var startTime = timingMap.ProjectTickToTime(start.Tick);
         var endTime = timingMap.ProjectTickToTime(endTick);
+
+        // Resolve tail sample from the terminating cell's value.
+        // "00" is a control value (no note), so treat it as "no tail sample".
+        // Non-empty values that exist in sampleDefinitions will have a tail sample;
+        // others will have an empty tail sample path (play nothing).
+        var tailSampleKey = !string.IsNullOrEmpty(tailCellValue) && tailCellValue != "00"
+            ? tailCellValue
+            : string.Empty;
+        var tailSamplePath = !string.IsNullOrEmpty(tailSampleKey)
+            ? sampleDefinitions.GetValueOrDefault(tailSampleKey, string.Empty)
+            : string.Empty;
 
         return new BmsParsedHitObject(
             start.Tick,
@@ -519,7 +538,9 @@ internal static partial class BmsChartParser
             isLongNote,
             false,
             0,
-            string.Empty);
+            string.Empty,
+            tailSampleKey,
+            tailSamplePath);
     }
 
     private static BmsParsedHitObject createMineHitObject(
@@ -539,7 +560,9 @@ internal static partial class BmsChartParser
             false,
             true,
             parseBase36(mine.Value) / 2d,
-            sampleDefinitions.GetValueOrDefault("00", string.Empty));
+            sampleDefinitions.GetValueOrDefault("00", string.Empty),
+            string.Empty,
+            string.Empty);
     }
 
     private static IEnumerable<RawCell> expandCells(

@@ -144,7 +144,6 @@ Easy / Hard / Ex-Hard / Hazard 血量变体尚未实现。
 - **BGM 通道 01：** 与谱面时钟同步播放，支持跳转、暂停/恢复。
 - **Key sounds（`#WAVxx`）：** 每次按下从音符声明的采样播放。`.wav` 声明会自动解析为存在的 `.ogg` 文件。
 - **背景采样和 key sounds 不受 osu! 特效音量滑块影响** — 仅跟随主音量和音乐音量。
-- LN 尾部采样已解析并存储，但游戏过程中尚未播放。
 
 ---
 
@@ -486,7 +485,6 @@ HitPoor : j-poor
 | **渲染器**   | BGA / 视频 / stagefile / 背景图像                                                            |
 | **渲染器**   | Key beams（长按时的光柱）                                                                    |
 | **计分**     | 结果界面 — EX 分数、DJ LEVEL、通关类型、血量百分比未显示                                     |
-| **计分**     | LN 尾部采样播放 — 数据已解析并存储，但游戏过程中尚未播放                                     |
 | **血量**     | Easy / Hard / Ex-Hard / Hazard 血量变体                                                      |
 | **血量**     | LN 特定血量事件（head miss ≠ body drop ≠ tail miss）                                        |
 | **Mods**     | Random / S-Random / H-Random 随机排列                                                       |
