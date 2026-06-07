@@ -63,7 +63,6 @@ internal static partial class BmsChartParser
         return new BmsParseResult(
             state.Title,
             state.Artist,
-            state.Source,
             state.PlayLevel,
             state.Rank,
             state.Total,
@@ -77,6 +76,7 @@ internal static partial class BmsChartParser
             hitObjects,
             state.BranchDecisions.ToArray(),
             textEvents,
+            state.Genre,
             state.Subtitle,
             state.SubArtist,
             state.Maker,
@@ -139,7 +139,7 @@ internal static partial class BmsChartParser
 
             case "GENRE":
             case "GENLE":
-                state.Source = value;
+                state.Genre = value;
                 break;
 
             case "SUBTITLE":
@@ -698,7 +698,7 @@ internal static partial class BmsChartParser
 
         public string? Artist { get; set; }
 
-        public string? Source { get; set; }
+        public string? Genre { get; set; }
 
         public string? Subtitle { get; set; }
 

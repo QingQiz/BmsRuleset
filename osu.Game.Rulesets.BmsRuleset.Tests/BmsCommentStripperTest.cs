@@ -43,7 +43,7 @@ public class BmsCommentStripperTest
                              #00111:01
                              """);
         Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
-        Assert.That(beatmap.Metadata.Source, Is.Null.Or.Empty);
+        Assert.That(beatmap.Metadata.Source, Is.EqualTo("BMS"));
         Assert.That(beatmap.ControlPointInfo.TimingPoints.Count, Is.GreaterThanOrEqualTo(1));
     }
 

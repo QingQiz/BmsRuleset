@@ -464,7 +464,7 @@ public class BmsBeatmapDecoderTest
     [Test]
     public void TestGenleIsGenreTypoFallback()
     {
-        // #GENLE should be treated as #GENRE (source metadata)
+        // #GENLE should be treated as #GENRE (song genre → Tags)
         var beatmap = decode("""
                              #TITLE Test
                              #ARTIST Me
@@ -472,7 +472,8 @@ public class BmsBeatmapDecoderTest
                              #BPM 120
                              #00111:01
                              """);
-        Assert.That(beatmap.Metadata.Source, Is.EqualTo("Some Genre"));
+        Assert.That(beatmap.Metadata.Tags, Does.Contain("Some Genre"));
+        Assert.That(beatmap.Metadata.Source, Is.EqualTo("BMS"));
     }
 
     [Test]

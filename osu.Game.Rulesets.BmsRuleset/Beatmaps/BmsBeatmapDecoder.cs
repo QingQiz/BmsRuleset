@@ -133,14 +133,13 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
                 : parseResult.Artist;
         }
 
-        if (parseResult.Source != null)
-            output.Metadata.Source = parseResult.Source;
+        output.Metadata.Source = "BMS";
 
         if (!string.IsNullOrWhiteSpace(parseResult.Maker))
             output.Metadata.Author.Username = parseResult.Maker;
 
         var tags = string.Join(" ",
-            new[] { parseResult.Url, parseResult.Email, parseResult.Comment }
+            new[] { parseResult.Genre, parseResult.Url, parseResult.Email, parseResult.Comment }
                 .Where(t => !string.IsNullOrWhiteSpace(t)));
 
         if (!string.IsNullOrWhiteSpace(tags))

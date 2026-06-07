@@ -5,7 +5,6 @@ namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 public sealed record BmsParseResult(
     string? Title,
     string? Artist,
-    string? Source,
     float? PlayLevel,
     int Rank,
     double Total,
@@ -19,6 +18,7 @@ public sealed record BmsParseResult(
     IReadOnlyList<BmsParsedHitObject> HitObjects,
     IReadOnlyList<BmsBranchDecision> BranchDecisions,
     BmsTextEvents TextEvents,
+    string? Genre = null,
     string? Subtitle = null,
     string? SubArtist = null,
     string? Maker = null,
