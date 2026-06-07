@@ -14,6 +14,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.ImportExport;
@@ -567,6 +568,12 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 };
                 var diff = BmsDifficultyInfo.FromChartMetadata(chart.Metadata);
                 diff.WriteToOsuDifficulty(beatmapInfo);
+
+                DifficultyNameUpdater.GetDifficultyName(beatmapInfo, out var markerStr);
+                if (!string.IsNullOrWhiteSpace(markerStr))
+                {
+                    beatmapInfo.DifficultyName += $" [{markerStr}]";
+                }
 
                 beatmapSetInfo.Beatmaps.Add(beatmapInfo);
                 beatmapInfo.BeatmapSet = beatmapSetInfo;

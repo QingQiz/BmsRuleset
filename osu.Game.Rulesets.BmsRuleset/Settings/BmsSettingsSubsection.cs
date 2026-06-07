@@ -160,11 +160,9 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         {
             bmsImporter = new BmsFileImporter(realm, storage, notifications, beatmapManager)
             {
-                OnImportCompleted = (beatmapSet, scope) =>
+                OnImportCompleted = (beatmap, scope) =>
                 {
-                    beatmapUpdater?.Queue(beatmapSet, scope);
-                    // Debounced — coalesces N calls from a batch import into 1.
-                    difficultyNameUpdater?.RefreshAllMarkers(beatmapSet);
+                    beatmapUpdater?.Queue(beatmap, scope);
                 },
             };
             game.RegisterImportHandler(bmsImporter);

@@ -13,24 +13,36 @@ namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 /// </summary>
 public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableStore store)
 {
+    public static void GetDifficultyName(BeatmapInfo beatmap, out string markerStr)
+    {
+        markerStr = string.Empty;
+
+        if (BmsRuleset.DifficultyTableStore == null)
+        {
+            return;
+        }
+
+        var markers = BmsRuleset.DifficultyTableStore.GetMarkers(beatmap.MD5Hash);
+
+        markerStr = markers.Count == 0
+            ? string.Empty
+            : string.Join(" ", markers.Select(m => $"{m.table.Symbol}{m.entry.Level}"));
+    }
+
     /// <summary>
     /// Full rebuild — applies markers from every loaded table to the matching
     /// beatmaps. Only processes entries that are actually in tables —
     /// O(total-table-entries), not O(all-beatmaps-in-database).
     /// Each chunk is a separate realm.Write so the write mutex is held only briefly.
     /// </summary>
-    public void RefreshAllMarkers(Live<BeatmapSetInfo>? beatmapset = null)
+    public void RefreshAllMarkers()
     {
         realm.Run(r =>
         {
-            var q = beatmapset == null
-                ? r.All<BeatmapInfo>().Filter("Ruleset.ShortName == 'bms'")
-                : beatmapset.Value.Beatmaps.Filter("Ruleset.ShortName == 'bms'");
-
             const int batch_size = 100;
 
             var batch = new List<(BeatmapInfo, string)>(batch_size);
-            foreach (var beatmap in q)
+            foreach (var beatmap in r.All<BeatmapInfo>().Filter("Ruleset.ShortName == 'bms'"))
             {
                 if (batch.Count == batch_size)
                 {

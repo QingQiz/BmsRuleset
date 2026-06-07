@@ -100,10 +100,9 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
                 // even though the live difficulty cache still shows correct stars on panels.
                 // Also schedule a debounced marker refresh — coalesced with any imports from
                 // the settings screen so they don't contend for the realm write mutex.
-                OnImportCompleted = (beatmapSet, scope) =>
+                OnImportCompleted = (beatmap, scope) =>
                 {
-                    beatmapUpdater?.Queue(beatmapSet, scope);
-                    difficultyNameUpdater?.RefreshAllMarkers(beatmapSet);
+                    beatmapUpdater?.Queue(beatmap, scope);
                 },
             }
             : null!;
