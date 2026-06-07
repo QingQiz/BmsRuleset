@@ -25,29 +25,13 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
         AutoSizeAxes = Axes.Both;
     }
 
-    #region Disposal
-
-    protected override void Dispose(bool isDisposing)
-    {
-        BmsEventBus.TextEvent -= showText;
-        BmsEventBus.ScrollSpeedChangeEvent -= onBmsEventBusOnScrollSpeedChangeEvent;
-        base.Dispose(isDisposing);
-    }
-
-    #endregion
-
     protected override void LoadComplete()
     {
         base.LoadComplete();
         BmsEventBus.TextEvent += showText;
-        BmsEventBus.ScrollSpeedChangeEvent += onBmsEventBusOnScrollSpeedChangeEvent;
+        BmsEventBus.ScrollSpeedChangeEvent += x => showScrollSpeed(x, BmsPlayerShared.ConfiguredScrollSpeed);
         mainText.Text = "Game Start";
         this.Delay(1000).FadeOut(1000);
-    }
-
-    private void onBmsEventBusOnScrollSpeedChangeEvent(double x)
-    {
-        showScrollSpeed(x, BmsPlayerShared.ConfiguredScrollSpeed);
     }
 
     [BackgroundDependencyLoader]
