@@ -164,7 +164,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     /// <see cref="RealmFileStore.Add"/> calls are sequential (Realm instances are
     /// thread-confined).
     /// </summary>
-    private static PreparedDirectory readPreparedDirectory(
+    private static PreparedDirectory? readPreparedDirectory(
         ImportGroup group,
         RealmAccess realmAccess,
         RealmFileStore fileStore)
@@ -173,11 +173,24 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         {
             var index = new DirectoryFileIndex(group.Directory);
 
-            // Parse every chart, extract metadata, and write chart file to disk.
-            var charts = group.ChartPaths.Select(path =>
+            var bytes = group.ChartPaths.AsParallel().Select(File.ReadAllBytes).ToArray();
+            var allMd5 = bytes.AsParallel().Select(b => Convert.ToHexString(MD5.HashData(b))).ToArray();
+            var setHash = calculateSetHash(allMd5);
+
+            var existingSet = r.All<BeatmapSetInfo>()
+                .Filter("Hash == $0", setHash)
+                .FirstOrDefault();
+
+            if (existingSet != null && !existingSet.DeletePending)
             {
-                var content = File.ReadAllBytes(path);
-                var md5 = Convert.ToHexString(MD5.HashData(content)).ToLowerInvariant();
+                return null;
+            }
+
+            // Parse every chart, extract metadata, and write chart file to disk.
+            var charts = group.ChartPaths.Select((path, i) =>
+            {
+                var content = bytes[i];
+                var md5 = allMd5[i];
                 var lines = BmsChartParser.PreprocessLines(BmsChartParser.ReadAllLines(content));
                 var metadata = BmsChartParser.ScanMetadata(lines, path);
                 var resourcePaths = BmsChartParser.ScanResourceReferences(lines)
@@ -313,7 +326,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             notification.Text = "BMS import: preparing...";
 
-            var pool = new BlockingCollection<PreparedDirectory>(32);
+            var pool = new BlockingCollection<PreparedDirectory?>(32);
 
             var producer = launchProducer(notification, groups, fileStore, pool);
             var (imported, processed, cancelled) = drainConsumer(notification, groups, pool, producer);
@@ -346,7 +359,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         ProgressNotification notification,
         ImportGroup[] groups,
         RealmFileStore fileStore,
-        BlockingCollection<PreparedDirectory> pool)
+        BlockingCollection<PreparedDirectory?> pool)
     {
         return Task.Run(() =>
         {
@@ -386,7 +399,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     private (int imported, int processed, bool cancelled) drainConsumer(
         ProgressNotification notification,
         ImportGroup[] groups,
-        BlockingCollection<PreparedDirectory> pool,
+        BlockingCollection<PreparedDirectory?> pool,
         Task producer)
     {
         var imported = 0;
@@ -401,21 +414,28 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     var rulesetInfo = r.Find<RulesetInfo>("bms")!;
                     notification.CancellationToken.ThrowIfCancellationRequested();
 
+                    bool exists;
                     // ── Fast path: skip if the set hash already exists ──
-                    var setHash = calculateSetHash(prepared.Charts.Select(c => c.Md5Hash));
-                    var existingSet = r.All<BeatmapSetInfo>()
-                        .Filter("Hash == $0", setHash)
-                        .FirstOrDefault();
-
-                    if (existingSet != null && !existingSet.DeletePending)
+                    if (prepared == null)
+                        exists = true;
+                    else
                     {
-                        Logger.Log($"BMS import: skipping existing set {Path.GetFileName(prepared.Directory)} (hash match)");
+                        var setHash = calculateSetHash(prepared.Charts.Select(c => c.Md5Hash));
+                        var existingSet = r.All<BeatmapSetInfo>()
+                            .Filter("Hash == $0", setHash)
+                            .FirstOrDefault();
+                        exists = (existingSet != null && !existingSet.DeletePending);
+                    }
+
+                    if (exists)
+                    {
+                        Logger.Log($"BMS import: skipping existing set {Path.GetFileName(prepared?.Directory)} (hash match)");
                         processed++;
                         reportProgress(notification, imported, groups.Length, processed);
                         return;
                     }
 
-                    var md5 = prepared.Charts.Select(c => c.Md5Hash).ToArray();
+                    var md5 = prepared!.Charts.Select(c => c.Md5Hash).ToArray();
                     var existingByMd5 = getExistingBeatmapsByMd5(r, md5);
 
                     if (importPreparedDirectory(r, prepared, existingByMd5, rulesetInfo))

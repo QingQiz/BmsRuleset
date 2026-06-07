@@ -9,8 +9,6 @@ namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 internal static partial class BmsChartParser
 {
-    private static readonly bool encoding_provider_registered = registerEncodingProvider();
-
     private static readonly Encoding shift_jis_encoding =
         CodePagesEncodingProvider.Instance.GetEncoding(932)
         ?? throw new InvalidOperationException("Shift-JIS encoding is not available.");
@@ -41,8 +39,8 @@ internal static partial class BmsChartParser
         var title = path == null ? string.Empty : Path.GetFileNameWithoutExtension(path);
         var artist = string.Empty;
         var subtitle = string.Empty;
-        var rank = string.Empty;
-        var total = string.Empty;
+        var rank = 2;
+        double total = -1;
         var channels = new List<string>();
 
         foreach (var line in lines)
@@ -81,11 +79,13 @@ internal static partial class BmsChartParser
                     break;
 
                 case "RANK":
-                    rank = value;
+                    if (!int.TryParse(value, out rank))
+                        rank = 2;
                     break;
 
                 case "TOTAL":
-                    total = value;
+                    if (!double.TryParse(value, out total))
+                        total = -1;
                     break;
             }
         }
@@ -93,7 +93,7 @@ internal static partial class BmsChartParser
         var setTitle = inferSetTitle(title);
         var difficultyName = inferDifficultyName(title, subtitle, path);
 
-        return new BmsChartMetadata(setTitle, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path), title, int.Parse(rank), double.Parse(total));
+        return new BmsChartMetadata(setTitle, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path), title, rank, total);
     }
 
     /// <summary>
@@ -113,7 +113,7 @@ internal static partial class BmsChartParser
 
         // Longest common prefix.
         var lcp = rawTitles[0];
-        for (int i = 1; i < rawTitles.Length; i++)
+        for (var i = 1; i < rawTitles.Length; i++)
         {
             var other = rawTitles[i];
             var len = 0;
@@ -126,7 +126,7 @@ internal static partial class BmsChartParser
         // Trim back to the last suffix boundary — the point where a
         // per-difficulty suffix starts (space + opener). Only trim if every
         // title has a matching closer after that position (real suffix).
-        for (int i = lcp.Length - 1; i >= 0; i--)
+        for (var i = lcp.Length - 1; i >= 0; i--)
         {
             var c = lcp[i];
             var closer = c switch
@@ -208,12 +208,6 @@ internal static partial class BmsChartParser
 
         var result = lcp.Trim();
         return result.Length > 0 ? result : rawTitles[0].Trim();
-    }
-
-    private static bool registerEncodingProvider()
-    {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        return true;
     }
 
     private static string decodeText(byte[] content)
