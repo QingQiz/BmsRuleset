@@ -249,7 +249,23 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             .MinBy(d => d.HitObject.StartTime);
 
         if (target?.TryHit() == true)
+        {
+            // LN heads produce a separate judgement for scoring/health/combo
+            // without marking the drawable as fully judged (the tail release
+            // still needs to track it).  Route through ScoreProcessor.ApplyResult
+            // which handles score, accuracy, combo, and health automatically.
+            if (target.HeadResult is { } headResult)
+            {
+                var lnHeadJudgement = new JudgementResult(target.HitObject, target.HitObject.CreateJudgement())
+                {
+                    Type = headResult,
+                };
+
+                RegisterResult(lnHeadJudgement);
+            }
+
             return true;
+        }
 
         // Pass 2: no note was consumed — check whether the key press falls in the E-POOR
         // zone (outside the BAD window but within the EP boundary) of the nearest note.
@@ -318,6 +334,20 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             return;
 
         KeySoundPlayer.PlayLandmineSound(hitObject.LandmineExplosionSamplePath);
+    }
+
+    /// <summary>
+    ///     Routes a <see cref="JudgementResult"/> directly to the score and health
+    ///     processors, bypassing the drawable result pipeline (no <c>Judged</c> flag,
+    ///     no fade-out).  Used by LN head-miss detection in
+    ///     <see cref="DrawableBmsHitObject.CheckForResult"/> so the head POOR is
+    ///     scored without killing the drawable for tail tracking.
+    /// </summary>
+    public void RegisterResult(JudgementResult result)
+    {
+        scoreProcessor?.ApplyResult(result);
+        healthProcessor?.ApplyResult(result);
+        showJudgement(result.Type);
     }
 
     #endregion

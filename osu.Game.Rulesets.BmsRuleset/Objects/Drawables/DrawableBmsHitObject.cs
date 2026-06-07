@@ -109,8 +109,16 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     #region Judgement / long-note state
 
     private bool longNoteStarted;
-    private HitResult? longNoteHeadResult;
+    private bool longNoteHeadMissed;
     private float? longNoteHeadFixedY;
+
+    /// <summary>
+    ///     The head judgement result for a long note, set by <see cref="TryHit"/> when the LN
+    ///     head is pressed within a valid window, or set to <see cref="HitResult.Meh"/> when
+    ///     the head window expires without a press.  <c>null</c> if the head has not been
+    ///     resolved yet or the object is not a long note.
+    /// </summary>
+    public HitResult? HeadResult { get; private set; }
 
     #endregion
 
@@ -132,6 +140,15 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (Judged || HitObject?.HitWindows == null)
             return false;
 
+        // Head was already missed — accept the key press for tail tracking
+        // (so that a subsequent release can be judged) but do not produce
+        // a head judgement (already applied as POOR in CheckForResult).
+        if (HitObject.IsLongNote && longNoteHeadMissed)
+        {
+            longNoteStarted = true;
+            return true;
+        }
+
         if (HitObject.IsLongNote && longNoteStarted)
             return false;
 
@@ -144,7 +161,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (HitObject.IsLongNote)
         {
             longNoteStarted = true;
-            longNoteHeadResult = result;
+            HeadResult = result;
             longNoteHeadFixedY = null;
             tryResolveLongNoteHeadFixedY(result);
             return true;
@@ -169,7 +186,12 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     /// </summary>
     public bool TryRelease()
     {
-        if (Judged || HitObject?.HitWindows == null || !HitObject.IsLongNote || !longNoteStarted)
+        if (Judged || HitObject?.HitWindows == null || !HitObject.IsLongNote)
+            return false;
+
+        // Allow release when the head was hit normally (longNoteStarted) or
+        // when the head was missed but the player pressed for tail tracking.
+        if (!longNoteStarted && !longNoteHeadMissed)
             return false;
 
         var bmsWindows = (BmsHitWindows)HitObject.HitWindows;
@@ -205,8 +227,9 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
         Alpha = 1;
         longNoteStarted = false;
+        longNoteHeadMissed = false;
         longNotePiecesApplied = false;
-        longNoteHeadResult = null;
+        HeadResult = null;
         longNoteHeadFixedY = null;
         cache.InvalidateAll();
         updateSkinPieces();
@@ -324,19 +347,37 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
         if (HitObject.IsLongNote)
         {
-            // LN head never pressed: passive POOR once the head BAD window is exhausted.
-            if (!longNoteStarted && Time.Current > HitObject.StartTime + missWindow)
+            // LN head never pressed and head BAD window expired:
+            // fire head POOR through processors (scoring/health/combo) but keep
+            // the drawable alive so the LN continues rendering through the tail
+            // window, and so a release can still produce a tail judgement.
+            if (!longNoteStarted && !longNoteHeadMissed && Time.Current > HitObject.StartTime + missWindow)
+            {
+                longNoteHeadMissed = true;
+                HeadResult = HitResult.Meh;
+
+                var headJudgement = new JudgementResult(HitObject, HitObject.Judgement)
+                {
+                    Type = HitResult.Meh,
+                };
+                cache.Playfield?.RegisterResult(headJudgement);
+
+                return;
+            }
+
+            // LN held (head was hit, or head-missed + player pressed for tracking)
+            // but the tail BAD window expired — drop → POOR.
+            if (longNoteStarted && Time.Current > HitObject.EndTime + missWindow)
             {
                 ApplyResult(HitResult.Meh);
                 return;
             }
 
-            // LN held but player never released before the tail BAD window expired:
-            // this is a "drop" — scores POOR (Meh) in BMS.
-            if (longNoteStarted && Time.Current > HitObject.EndTime + missWindow)
+            // LN head was missed and the player never pressed during the body,
+            // and the tail window has expired — tail POOR.
+            if (longNoteHeadMissed && !longNoteStarted && Time.Current > HitObject.EndTime + missWindow)
             {
                 ApplyResult(HitResult.Meh);
-                // ReSharper disable once RedundantJumpStatement
                 return;
             }
 
@@ -397,6 +438,18 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             case ArmedState.Miss:
                 this.FadeColour(Color4.Red, 80).FadeOut(220).Expire();
                 break;
+        }
+
+        // When the LN tail is judged (hit or miss), immediately dim the
+        // body pieces so they don't linger at full alpha during the
+        // fade-out animation.  The parent drawable still fades out
+        // normally; this sets the base alpha for child pieces.
+        if (HitObject.IsLongNote && Judged)
+        {
+            const float tail_done_dim = 0.35f;
+            longNoteBody.Alpha = tail_done_dim;
+            longNoteTailContainer.Alpha = tail_done_dim;
+            noteContainer.Alpha = tail_done_dim;
         }
     }
 
@@ -486,7 +539,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
         cache.LatestLayout = layout;
         updateNoteHeight(layout);
-        tryResolveLongNoteHeadFixedY(longNoteHeadResult);
+        tryResolveLongNoteHeadFixedY(HeadResult);
         return true;
     }
 
@@ -559,9 +612,13 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (result == null || longNoteHeadFixedY != null || cache.LatestLayout is not { } layout)
             return;
 
-        longNoteHeadFixedY = result is HitResult.Perfect or HitResult.Great
-            ? judgementHeadYFor(layout)
-            : yForTimeOffset(HitObject.StartTime - Time.Current, layout);
+        // Always pin the LN head to the judgement line on press, regardless of timing.
+        longNoteHeadFixedY = judgementHeadYFor(layout);
+
+        // To restore the old behaviour (pin to press position for off-timing hits), use:
+        // longNoteHeadFixedY = result is HitResult.Perfect or HitResult.Great
+        //     ? judgementHeadYFor(layout)
+        //     : yForTimeOffset(HitObject.StartTime - Time.Current, layout);
     }
 
     #endregion
@@ -666,8 +723,11 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (Math.Abs(longNoteBody.Height - bodyHeight) > 0.5f)
             longNoteBody.Height = Math.Max(1, bodyHeight);
 
+        const float dim_alpha = 0.35f;
+        var missDim = longNoteHeadMissed ? dim_alpha : 1f;
+
         longNoteBody.UpdateBody(bodyHeight, tailAtTop, longNoteStarted);
-        longNoteBody.Alpha = bodyHeight > 0 ? 1 : 0;
+        longNoteBody.Alpha = bodyHeight > 0 ? missDim : 0;
 
         if (Math.Abs(longNoteTailContainer.Y - tailOffset) > 0.5f)
             longNoteTailContainer.Y = tailOffset;
@@ -675,7 +735,8 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (Math.Abs(longNoteTailContainer.Height - currentNoteHeight) > 0.5f)
             longNoteTailContainer.Height = currentNoteHeight;
 
-        longNoteTailContainer.Alpha = 1;
+        longNoteTailContainer.Alpha = missDim;
+        noteContainer.Alpha = missDim;
     }
 
     #endregion
