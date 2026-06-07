@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -19,151 +20,11 @@ public class BmsCommentStripperTest
         return new BmsBeatmapDecoder().Decode(reader);
     }
 
-    private static Beatmap decodeWithSelector(string text, System.Func<int, int> selector)
+    private static Beatmap decodeWithSelector(string text, Func<int, int> selector)
     {
         using var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(text));
         using var reader = new LineBufferedReader(memoryStream);
         return new BmsBeatmapDecoder(selector).Decode(reader);
-    }
-
-    // ---------- // line comments ----------
-
-    [Test]
-    public void TestDoubleSlashComment()
-    {
-        var beatmap = decode("""
-                             #TITLE foo // comment
-                             #BPM 120
-                             #00111:01
-                             """);
-        // // strips comment; parser command value has no trailing space due to Trim()
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo"));
-    }
-
-    [Test]
-    public void TestDoubleSlashOnlyLine()
-    {
-        var beatmap = decode("""
-                             #TITLE foo
-                             // this is a comment line
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
-    }
-
-    [Test]
-    public void TestDoubleSlashOnChannelLine()
-    {
-        var beatmap = decode("""
-                             #BPM 120
-                             #00111:01 // inline comment
-                             """);
-        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
-    }
-
-    // ---------- ; line comments ----------
-
-    [Test]
-    public void TestSemicolonComment()
-    {
-        var beatmap = decode("""
-                             #TITLE foo; bar
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo"));
-    }
-
-    [Test]
-    public void TestSemicolonOnlyLine()
-    {
-        var beatmap = decode("""
-                             #TITLE foo
-                             ; comment line
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
-    }
-
-    // ---------- /* */ block comments ----------
-
-    [Test]
-    public void TestBlockCommentSingleLine()
-    {
-        var beatmap = decode("""
-                             #TITLE foo/*bar*/baz
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foobaz"));
-    }
-
-    [Test]
-    public void TestBlockCommentMultiLine()
-    {
-        var beatmap = decode("""
-                             /*
-                             #ARTIST hidden
-                             */
-                             #TITLE shown
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("shown"));
-        // Artist is not set (comment stripped), defaults to framework default
-        Assert.That(beatmap.Metadata.Artist, Is.EqualTo("Unknown"));
-    }
-
-    [Test]
-    public void TestBlockCommentDoesNotNest()
-    {
-        // First */ closes the block
-        var beatmap = decode("""
-                             #TITLE foo/* /* */ bar */ baz
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo bar */ baz"));
-    }
-
-    [Test]
-    public void TestBlockCommentOnChannelLine()
-    {
-        var beatmap = decode("""
-                             #BPM 120
-                             #00111:01/*00*/
-                             """);
-        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
-    }
-
-    [Test]
-    public void TestLineCommentBeforeBlockCommentDoesNotStartBlock()
-    {
-        // // preceding /* should prevent /* from starting a multi-line block comment.
-        var beatmap = decode("""
-                             #TITLE visible
-                             #BPM 120
-                             ////*---------------------- FAKE EXPANSION FIELD
-                             #00111:01
-                             """);
-        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("visible"));
-    }
-
-    [Test]
-    public void TestLineCommentBeforeBlockCommentKeepsSubsequentData()
-    {
-        // All lines after a ///* line must remain visible (not consumed by block comment).
-        var beatmap = decode("""
-                             #BPM 120
-                             ////*---------------------- EXPANSION FIELD
-                             #WAV01 test.wav
-                             #00111:01
-                             #00112:02
-                             """);
-        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(2));
     }
 
     [Test]
@@ -186,65 +47,6 @@ public class BmsCommentStripperTest
         Assert.That(beatmap.ControlPointInfo.TimingPoints.Count, Is.GreaterThanOrEqualTo(1));
     }
 
-    // ---------- "..." quote protection ----------
-
-    [Test]
-    public void TestQuotedSemicolonIsLiteral()
-    {
-        var beatmap = decode("""
-                             #TITLE "foo; bar"
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("\"foo; bar\""));
-    }
-
-    [Test]
-    public void TestQuotedDoubleSlashIsLiteral()
-    {
-        var beatmap = decode("""
-                             #TITLE "foo // bar"
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("\"foo // bar\""));
-    }
-
-    [Test]
-    public void TestQuotedBlockCommentIsLiteral()
-    {
-        var beatmap = decode("""
-                             #TITLE "foo /* bar */ baz"
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("\"foo /* bar */ baz\""));
-    }
-
-    // ---------- \ escape sequences ----------
-
-    [Test]
-    public void TestEscapedSemicolon()
-    {
-        var beatmap = decode("""
-                             #TITLE foo\; bar
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo; bar"));
-    }
-
-    [Test]
-    public void TestEscapedDoubleSlash()
-    {
-        var beatmap = decode("""
-                             #TITLE foo\/\/bar
-                             #BPM 120
-                             #00111:01
-                             """);
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo//bar"));
-    }
-
     [Test]
     public void TestBackslashInFilePathIsUnchanged()
     {
@@ -259,28 +61,115 @@ public class BmsCommentStripperTest
         Assert.That(hitObject.SampleKey, Is.EqualTo("01"));
     }
 
-    // ---------- Control flow + comments ----------
+    [Test]
+    public void TestBlockCommentAcrossControlFlow()
+    {
+        var chart = string.Join("\n", new[]
+        {
+            "#RANDOM 3",
+            "#IF 1",
+            "#TITLE branch1",
+            "#ENDIF",
+            "#ELSEIF 2/*",
+            "#TITLE hidden",
+            "#ELSEIF ; */3",
+            "#TITLE branch3",
+            "#ENDIF",
+            "#ENDRANDOM",
+            "#BPM 120",
+            "#00111:01",
+        });
+
+        var beatmap = decode(chart);
+        // Default selector picks branch 1
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("branch1"));
+    }
 
     [Test]
-    public void TestElseWithDoubleSlashComment()
+    public void TestBlockCommentDoesNotNest()
     {
-        // #ELSE//IF 4 → line comment strips "//IF 4" → #ELSE (no condition).
-        // After #ENDIF closes the #IF 1 scope, #ELSE starts a fresh unconditional
-        // branch that sets #TITLE branch2.
-        var beatmap = decodeWithSelector("""
-                                         #RANDOM 2
-                                         #IF 1
-                                         #TITLE branch1
-                                         #ENDIF
-                                         #ELSE//IF 2
-                                         #TITLE branch2
-                                         #ENDIF
-                                         #ENDRANDOM
-                                         #BPM 120
-                                         #00111:01
-                                         """, _ => 1);
-        // #ELSE (unconditional) runs after #ENDIF closes #IF 1, so branch2 wins.
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("branch2"));
+        // First */ closes the block
+        var beatmap = decode("""
+                             #TITLE foo/* /* */ bar */ baz
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo bar */ baz"));
+    }
+
+    [Test]
+    public void TestBlockCommentMultiLine()
+    {
+        var beatmap = decode("""
+                             /*
+                             #ARTIST hidden
+                             */
+                             #TITLE shown
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("shown"));
+        // Artist is not set (comment stripped), defaults to framework default
+        Assert.That(beatmap.Metadata.Artist, Is.EqualTo("Unknown"));
+    }
+
+    [Test]
+    public void TestBlockCommentOnChannelLine()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #00111:01/*00*/
+                             """);
+        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
+    }
+
+    // ---------- /* */ block comments ----------
+
+    [Test]
+    public void TestBlockCommentSingleLine()
+    {
+        var beatmap = decode("""
+                             #TITLE foo/*bar*/baz
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foobaz"));
+    }
+
+    // ---------- // line comments ----------
+
+    [Test]
+    public void TestDoubleSlashComment()
+    {
+        var beatmap = decode("""
+                             #TITLE foo // comment
+                             #BPM 120
+                             #00111:01
+                             """);
+        // // strips comment; parser command value has no trailing space due to Trim()
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo"));
+    }
+
+    [Test]
+    public void TestDoubleSlashOnChannelLine()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #00111:01 // inline comment
+                             """);
+        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestDoubleSlashOnlyLine()
+    {
+        var beatmap = decode("""
+                             #TITLE foo
+                             // this is a comment line
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
     }
 
     [Test]
@@ -318,63 +207,52 @@ public class BmsCommentStripperTest
         Assert.That(beatmap2.Metadata.Title, Is.EqualTo("branch12"));
     }
 
+    // ---------- Control flow + comments ----------
+
     [Test]
-    public void TestSemicolonBeforeElseIf()
+    public void TestElseWithDoubleSlashComment()
     {
-        // #ELSEIF ; */3 → ; strips whole value → #ELSEIF (no value)
+        // #ELSE//IF 4 → line comment strips "//IF 4" → #ELSE (no condition).
+        // After #ENDIF closes the #IF 1 scope, #ELSE starts a fresh unconditional
+        // branch that sets #TITLE branch2.
         var beatmap = decodeWithSelector("""
-                                         #RANDOM 3
+                                         #RANDOM 2
                                          #IF 1
                                          #TITLE branch1
                                          #ENDIF
-                                         #ELSEIF ; */3
-                                         #TITLE branch3
+                                         #ELSE//IF 2
+                                         #TITLE branch2
                                          #ENDIF
                                          #ENDRANDOM
                                          #BPM 120
                                          #00111:01
-                                         """, _ => 3);
-        // #ELSEIF with empty value → tryParseInt("") → false → value = 0 → doesn't match 3
-        Assert.That(beatmap.Metadata.Title, Is.Not.EqualTo("branch3"));
+                                         """, _ => 1);
+        // #ELSE (unconditional) runs after #ENDIF closes #IF 1, so branch2 wins.
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("branch2"));
     }
 
-    // ---------- IIDXv spec example ----------
-
     [Test]
-    public void TestIidxvSpecExample()
+    public void TestEscapedDoubleSlash()
     {
-        // #TITLE foo-/*bar-*/baz; :)
         var beatmap = decode("""
-                             #TITLE foo-/*bar-*/baz; :)
+                             #TITLE foo\/\/bar
                              #BPM 120
                              #00111:01
                              """);
-        // /*bar-*/ removed, then ; strips " :)" → "foo-baz"
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo-baz"));
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo//bar"));
     }
 
-    [Test]
-    public void TestBlockCommentAcrossControlFlow()
-    {
-        var chart = string.Join("\n", new[]
-        {
-            "#RANDOM 3",
-            "#IF 1",
-            "#TITLE branch1",
-            "#ENDIF",
-            "#ELSEIF 2/*",
-            "#TITLE hidden",
-            "#ELSEIF ; */3",
-            "#TITLE branch3",
-            "#ENDIF",
-            "#ENDRANDOM",
-            "#BPM 120",
-            "#00111:01",
-        });
+    // ---------- \ escape sequences ----------
 
-        var beatmap = decode(chart);
-        // Default selector picks branch 1
-        Assert.That(beatmap.Metadata.Title, Is.EqualTo("branch1"));
+    [Test]
+    public void TestEscapedSemicolon()
+    {
+        var beatmap = decode("""
+                             #TITLE foo\; bar
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo; bar"));
     }
 
     // ---------- Existing chart still works ----------
@@ -396,5 +274,141 @@ public class BmsCommentStripperTest
         Assert.That(beatmap.Metadata.Title, Is.EqualTo("Test"));
         Assert.That(beatmap.Metadata.Artist, Is.EqualTo("Me"));
         Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(3));
+    }
+
+    // ---------- IIDXv spec example ----------
+
+    [Test]
+    public void TestIidxvSpecExample()
+    {
+        // #TITLE foo-/*bar-*/baz; :)
+        var beatmap = decode("""
+                             #TITLE foo-/*bar-*/baz; :)
+                             #BPM 120
+                             #00111:01
+                             """);
+        // /*bar-*/ removed, then ; strips " :)" → "foo-baz"
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo-baz"));
+    }
+
+    [Test]
+    public void TestLineCommentBeforeBlockCommentDoesNotStartBlock()
+    {
+        // // preceding /* should prevent /* from starting a multi-line block comment.
+        var beatmap = decode("""
+                             #TITLE visible
+                             #BPM 120
+                             ////*---------------------- FAKE EXPANSION FIELD
+                             #00111:01
+                             """);
+        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("visible"));
+    }
+
+    [Test]
+    public void TestLineCommentBeforeBlockCommentKeepsSubsequentData()
+    {
+        // All lines after a ///* line must remain visible (not consumed by block comment).
+        var beatmap = decode("""
+                             #BPM 120
+                             ////*---------------------- EXPANSION FIELD
+                             #WAV01 test.wav
+                             #00111:01
+                             #00112:02
+                             """);
+        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(2));
+    }
+
+    [Test]
+    public void TestPercentUrlPreservesHttpsSlashSlash()
+    {
+        // % lines bypass comment stripping, so // inside URLs is preserved.
+        var beatmap = decode("""
+                             #TITLE Test
+                             #BPM 120
+                             %URL https://example.com/path
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Tags, Does.Contain("https://example.com/path"));
+    }
+
+    [Test]
+    public void TestQuotedBlockCommentIsLiteral()
+    {
+        var beatmap = decode("""
+                             #TITLE "foo /* bar */ baz"
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("\"foo /* bar */ baz\""));
+    }
+
+    [Test]
+    public void TestQuotedDoubleSlashIsLiteral()
+    {
+        var beatmap = decode("""
+                             #TITLE "foo // bar"
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("\"foo // bar\""));
+    }
+
+    // ---------- "..." quote protection ----------
+
+    [Test]
+    public void TestQuotedSemicolonIsLiteral()
+    {
+        var beatmap = decode("""
+                             #TITLE "foo; bar"
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("\"foo; bar\""));
+    }
+
+    [Test]
+    public void TestSemicolonBeforeElseIf()
+    {
+        // #ELSEIF ; */3 → ; strips whole value → #ELSEIF (no value)
+        var beatmap = decodeWithSelector("""
+                                         #RANDOM 3
+                                         #IF 1
+                                         #TITLE branch1
+                                         #ENDIF
+                                         #ELSEIF ; */3
+                                         #TITLE branch3
+                                         #ENDIF
+                                         #ENDRANDOM
+                                         #BPM 120
+                                         #00111:01
+                                         """, _ => 3);
+        // #ELSEIF with empty value → tryParseInt("") → false → value = 0 → doesn't match 3
+        Assert.That(beatmap.Metadata.Title, Is.Not.EqualTo("branch3"));
+    }
+
+    // ---------- ; line comments ----------
+
+    [Test]
+    public void TestSemicolonComment()
+    {
+        var beatmap = decode("""
+                             #TITLE foo; bar
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("foo"));
+    }
+
+    [Test]
+    public void TestSemicolonOnlyLine()
+    {
+        var beatmap = decode("""
+                             #TITLE foo
+                             ; comment line
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
     }
 }

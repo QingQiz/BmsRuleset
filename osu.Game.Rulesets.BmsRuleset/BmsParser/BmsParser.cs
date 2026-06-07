@@ -24,7 +24,9 @@ internal static partial class BmsChartParser
         var commentStripper = new BmsCommentStripper();
 
         var strippedLines = lines
-            .Select(commentStripper.ProcessLine)
+            .Select(line => line.TrimStart().StartsWith('%')
+                ? line
+                : commentStripper.ProcessLine(line))
             .OfType<string>();
 
         foreach (var line in MaterializeControlFlow(strippedLines, randomValueSelector, state.BranchDecisions))
@@ -74,15 +76,25 @@ internal static partial class BmsChartParser
             longNoteTailSampleEvents,
             hitObjects,
             state.BranchDecisions.ToArray(),
-            textEvents);
+            textEvents,
+            state.Subtitle,
+            state.SubArtist,
+            state.Maker,
+            state.Url,
+            state.Email,
+            state.Comment);
     }
 
     private static void parseLine(string line, ParseState state)
     {
         line = line.Trim();
 
-        if (line.Length == 0 || !line.StartsWith('#'))
+        if (line.Length == 0 || (line[0] != '#' && line[0] != '%'))
             return;
+
+        // Normalize % prefix to # for regex matching (%URL, %EMAIL).
+        if (line[0] == '%')
+            line = "#" + line[1..];
 
         var channelMatch = channelLineRegex().Match(line);
 
@@ -128,6 +140,30 @@ internal static partial class BmsChartParser
             case "GENRE":
             case "GENLE":
                 state.Source = value;
+                break;
+
+            case "SUBTITLE":
+                state.Subtitle = value;
+                break;
+
+            case "SUBARTIST":
+                state.SubArtist = value;
+                break;
+
+            case "MAKER":
+                state.Maker = value;
+                break;
+
+            case "URL":
+                state.Url = value;
+                break;
+
+            case "EMAIL":
+                state.Email = value;
+                break;
+
+            case "COMMENT":
+                state.Comment = value;
                 break;
 
             case "PLAYLEVEL":
@@ -663,6 +699,18 @@ internal static partial class BmsChartParser
         public string? Artist { get; set; }
 
         public string? Source { get; set; }
+
+        public string? Subtitle { get; set; }
+
+        public string? SubArtist { get; set; }
+
+        public string? Maker { get; set; }
+
+        public string? Url { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? Comment { get; set; }
 
         public float? PlayLevel { get; set; }
 

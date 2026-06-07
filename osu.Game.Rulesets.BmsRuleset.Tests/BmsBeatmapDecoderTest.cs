@@ -191,6 +191,18 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestCommentGoesToTags()
+    {
+        var beatmap = decode("""
+                             #TITLE Test
+                             #BPM 120
+                             #COMMENT A comment about the chart
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Tags, Does.Contain("A comment about the chart"));
+    }
+
+    [Test]
     public void TestConverterMaterialisesBranchDecisionsAtPlayConversion()
     {
         var decoded = decode("""
@@ -561,6 +573,18 @@ public class BmsBeatmapDecoderTest
         Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(1));
         Assert.That(converted.LongNoteTailSampleEvents[0].SampleKey, Is.EqualTo("01"));
         Assert.That(converted.LongNoteTailSampleEvents[0].Time, Is.EqualTo(3000).Within(0.001));
+    }
+
+    [Test]
+    public void TestMakerSetsAuthor()
+    {
+        var beatmap = decode("""
+                             #TITLE Test
+                             #MAKER ChartCreator
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Author.Username, Is.EqualTo("ChartCreator"));
     }
 
     [Test]
@@ -944,6 +968,31 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestSubArtistAppendedToArtist()
+    {
+        var beatmap = decode("""
+                             #TITLE Test
+                             #ARTIST Main
+                             #SUBARTIST Feat
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Artist, Is.EqualTo("Main (Feat)"));
+    }
+
+    [Test]
+    public void TestSubtitleAppendedToTitle()
+    {
+        var beatmap = decode("""
+                             #TITLE Main
+                             #SUBTITLE Sub
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Title, Is.EqualTo("Main - Sub"));
+    }
+
+    [Test]
     public void TestSwitchDefaultRunsWhenNoCaseMatches()
     {
         var beatmap = decode("""
@@ -1071,6 +1120,20 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         Assert.That(converted.Total, Is.EqualTo(160.5).Within(0.001));
+    }
+
+    [Test]
+    public void TestUrlAndEmailGoToTags()
+    {
+        var beatmap = decode("""
+                             #TITLE Test
+                             #BPM 120
+                             %URL https://example.com
+                             %EMAIL author@example.com
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Tags, Does.Contain("https://example.com"));
+        Assert.That(beatmap.Metadata.Tags, Does.Contain("author@example.com"));
     }
 
     [Test]

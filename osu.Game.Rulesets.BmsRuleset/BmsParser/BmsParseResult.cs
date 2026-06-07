@@ -18,7 +18,13 @@ public sealed record BmsParseResult(
     IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents,
     IReadOnlyList<BmsParsedHitObject> HitObjects,
     IReadOnlyList<BmsBranchDecision> BranchDecisions,
-    BmsTextEvents TextEvents);
+    BmsTextEvents TextEvents,
+    string? Subtitle = null,
+    string? SubArtist = null,
+    string? Maker = null,
+    string? Url = null,
+    string? Email = null,
+    string? Comment = null);
 
 public readonly record struct BmsBranchDecision(int MaxValue, int SelectedValue);
 

@@ -22,8 +22,6 @@
 ## TODO
 
 - parser 未实现 command（参考 https://hitkey.nekokan.dyndns.info/cmds.htm）
-    - [ ] `#SUBTITLE` / `#SUBARTIST` / `#MAKER` / `%URL` / `%EMAIL` — 元数据
-    - [ ] `#DIFFICULTY` — 难度分类
     - [ ] `#DEFEXRANK` / `#EXRANKxx` / channel `A0` — 判定 rank
     - [ ] `#EXBPMxx` — `#BPMxx` 的别名（规避 BMSC 解析 bug）
     - [ ] `#STP` — 绝对 STOP 序列
@@ -40,7 +38,6 @@
     - [ ] `#OPTION` — 强制 option
     - [ ] `#OCT/FP` — 八度/踏板
     - [ ] `#CDDA` / `#MIDIFILE` — CD / MIDI
-    - [ ] `#COMMENT` — 选歌注释
     - [ ] `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — 资源组
     - [ ] ~~`#CHARSET` — 编码声明~~
     - [ ] channel `04` / `06` / `07` / `0A`–`0E` — BGA 层

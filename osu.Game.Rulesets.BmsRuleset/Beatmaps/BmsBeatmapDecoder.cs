@@ -24,10 +24,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Decoder<Beatmap>
 {
     private static readonly object registration_lock = new();
-    private static bool registered;
 
     // The decoded beatmap is cached before play starts; only playable conversion should roll runtime branches.
     private Func<int, int> decodeBranchSelector => randomValueSelector ?? (_ => 1);
+
+    private static bool registered;
 
     public static void Register()
     {
@@ -46,6 +47,38 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
     [ModuleInitializer]
 #pragma warning restore CA2255
     internal static void RegisterOnAssemblyLoad() => Register();
+
+    internal static BmsHitObject CreateHitObject(BmsParsedHitObject parsedObject) => new()
+    {
+        TickInfo = new BmsTickInfo
+        {
+            Tick = parsedObject.Tick,
+            EndTick = parsedObject.EndTick,
+        },
+        StartTime = parsedObject.StartTime,
+        Duration = parsedObject.Duration,
+        Column = parsedObject.Column,
+        SourceChannel = parsedObject.SourceChannel,
+        SampleKey = parsedObject.SampleKey,
+        SamplePath = parsedObject.SamplePath,
+        IsLongNote = parsedObject.IsLongNote,
+        IsMine = parsedObject.IsMine,
+        LandmineDamagePercent = parsedObject.LandmineDamagePercent,
+        LandmineExplosionSamplePath = parsedObject.LandmineExplosionSamplePath,
+    };
+
+    internal static void PopulateTiming(Beatmap output, IEnumerable<BmsBpmEvent> timingEvents)
+    {
+        output.ControlPointInfo.Clear();
+
+        foreach (var timingEvent in timingEvents.GroupBy(e => e.Tick).Select(g => g.Last()))
+        {
+            output.ControlPointInfo.Add(timingEvent.Time, new TimingControlPoint
+            {
+                BeatLength = 60000 / timingEvent.Bpm,
+            });
+        }
+    }
 
     protected override Beatmap CreateTemplateObject() => new BmsDecodedBeatmap();
 
@@ -67,25 +100,6 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
             output.HitObjects.Add(CreateHitObject(parsedObject));
     }
 
-    internal static BmsHitObject CreateHitObject(BmsParsedHitObject parsedObject) => new()
-    {
-        TickInfo = new BmsTickInfo
-        {
-            Tick = parsedObject.Tick,
-            EndTick = parsedObject.EndTick,
-        },
-        StartTime = parsedObject.StartTime,
-        Duration = parsedObject.Duration,
-        Column = parsedObject.Column,
-        SourceChannel = parsedObject.SourceChannel,
-        SampleKey = parsedObject.SampleKey,
-        SamplePath = parsedObject.SamplePath,
-        IsLongNote = parsedObject.IsLongNote,
-        IsMine = parsedObject.IsMine,
-        LandmineDamagePercent = parsedObject.LandmineDamagePercent,
-        LandmineExplosionSamplePath = parsedObject.LandmineExplosionSamplePath,
-    };
-
     private static string[] readLines(LineBufferedReader stream, string? path)
     {
         if (path != null && File.Exists(path))
@@ -103,17 +117,36 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
     {
         if (!string.IsNullOrWhiteSpace(parseResult.Title))
         {
-            output.Metadata.Title = parseResult.Title;
+            output.Metadata.Title = !string.IsNullOrWhiteSpace(parseResult.Subtitle)
+                ? $"{parseResult.Title} - {parseResult.Subtitle}"
+                : parseResult.Title;
+
             output.BeatmapInfo.DifficultyName = parseResult.PlayLevel != null
                 ? $"{parseResult.Title} [{parseResult.PlayLevel}]"
                 : parseResult.Title;
         }
 
         if (parseResult.Artist != null)
-            output.Metadata.Artist = parseResult.Artist;
+        {
+            output.Metadata.Artist = !string.IsNullOrWhiteSpace(parseResult.SubArtist)
+                ? $"{parseResult.Artist} ({parseResult.SubArtist})"
+                : parseResult.Artist;
+        }
 
         if (parseResult.Source != null)
             output.Metadata.Source = parseResult.Source;
+
+        if (!string.IsNullOrWhiteSpace(parseResult.Maker))
+            output.Metadata.Author.Username = parseResult.Maker;
+
+        var tags = string.Join(" ",
+            new[] { parseResult.Url, parseResult.Email, parseResult.Comment }
+                .Where(t => !string.IsNullOrWhiteSpace(t)));
+
+        if (!string.IsNullOrWhiteSpace(tags))
+            output.Metadata.Tags = string.IsNullOrWhiteSpace(output.Metadata.Tags)
+                ? tags
+                : $"{output.Metadata.Tags} {tags}";
 
         output.Difficulty.CircleSize = parseResult.TotalColumns;
         output.BeatmapInfo.Difficulty.CircleSize = parseResult.TotalColumns;
@@ -121,18 +154,5 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
         var od = BmsStarRatingProcessor.RankToOd(parseResult.Rank);
         output.Difficulty.OverallDifficulty = od;
         output.BeatmapInfo.Difficulty.OverallDifficulty = od;
-    }
-
-    internal static void PopulateTiming(Beatmap output, IEnumerable<BmsBpmEvent> timingEvents)
-    {
-        output.ControlPointInfo.Clear();
-
-        foreach (var timingEvent in timingEvents.GroupBy(e => e.Tick).Select(g => g.Last()))
-        {
-            output.ControlPointInfo.Add(timingEvent.Time, new TimingControlPoint
-            {
-                BeatLength = 60000 / timingEvent.Bpm,
-            });
-        }
     }
 }
