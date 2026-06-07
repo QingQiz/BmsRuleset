@@ -225,8 +225,9 @@ The marker shows the table symbol and the entry's level. Markers update automati
 
 ### Collections
 
-Each table also creates a **BeatmapCollection** named `"BMS Table: {table.Name}"` containing all matched charts. This lets you
+Each table also creates a **BeatmapCollection** named `[BMS] {table.Name}` containing all matched charts. This lets you
 browse the table's songs directly from the song select collection list.
+(The collection name uses invisible characters under the hood, so you don't need to worry about it colliding with your own collections.)
 
 ### Table Row Display
 
@@ -235,9 +236,9 @@ to see a tooltip with the chart count per level.
 
 ### Subdivide
 
-Click **Subdivide** to split a table's collection into per-level collections (e.g., `"BMS Table: Table ★1"`,
-`"BMS Table: Table ★2"`).
-Click **Unsubdivide** to merge them back into one.
+Click **Subdivide** to split a table's collection into per-level collections with ordering indices
+(e.g., `[BMS] Table [00] ★1`, `[BMS] Table [01] ★2`). The index width adapts to the number of levels
+(1 digit for &lt;10, 2 for &lt;100, etc.). Click **Unsubdivide** to merge them back into one.
 
 ### Update
 

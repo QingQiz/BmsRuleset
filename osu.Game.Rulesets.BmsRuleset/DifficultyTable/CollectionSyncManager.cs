@@ -9,17 +9,18 @@ namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 
 /// <summary>
 /// Syncs DifficultyTable entries to/from Realm BeatmapCollection objects.
-/// Each table becomes a collection named "BMS: {table.Name}".
-/// When subdivided, becomes "BMS: {table.Name} {level}".
-/// Stateless helper — called by DifficultyTableStore.ImportAsync within a realm.Write.
+/// Naming conventions:
+///   Non-subdivided: [BMS] {TableName}
+///   Subdivided:     [BMS] {TableName} [{index}] {Symbol}{Level}
+///   Index width is dynamic: 1 digit for &lt;10 levels, 2 for &lt;100, etc.
 /// </summary>
 public class CollectionSyncManager
 {
-    public const string COLLECTION_PREFIX = "BMS Table: ";
+    public const string COLLECTION_PREFIX = "[​B​M​S​] ";
 
     /// <summary>
     /// Tracks which tables are currently subdivided.
-    /// Key: table identifier (SourcePath).
+    /// Key: table identifier (SourcePath ?? Name).
     /// </summary>
     private readonly HashSet<string> subdividedTables = [];
 
@@ -87,6 +88,7 @@ public class CollectionSyncManager
         var baseName = prefix.TrimEnd(' ');
 
         var subdivided = IsSubdivided(table);
+
         // Find all existing collections that belong to this table
         var existing = r.All<BeatmapCollection>()
             .Where(c => c.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
@@ -95,34 +97,38 @@ public class CollectionSyncManager
 
         if (subdivided)
         {
-            var desiredLevels = new HashSet<string>(table.LevelOrder);
+            // Determine which levels in LevelOrder actually have entries
+            var levelsWithEntries = table.LevelOrder
+                .Where(l => table.Entries.Any(e => e.Level == l))
+                .ToList();
 
-            // Remove levels that no longer exist in the table
-            foreach (var col in existing)
-            {
-                var colName = col.Name;
-                if (colName.Equals(baseName, StringComparison.OrdinalIgnoreCase))
-                    r.Remove(col); // base collection should not exist when subdivided
-                else if (colName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    var level = colName[prefix.Length..];
-                    if (!desiredLevels.Contains(level))
-                        r.Remove(col);
-                }
-            }
+            // Dynamic index width based on number of levels with entries
+            var indexWidth = levelsWithEntries.Count > 0
+                ? (int)Math.Floor(Math.Log10(levelsWithEntries.Count)) + 1
+                : 1;
 
-            // Create or update per-level collections
-            foreach (var level in table.LevelOrder)
+            var expectedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var index = 0;
+
+            foreach (var level in levelsWithEntries)
             {
+                var indexStr = index.ToString($"D{indexWidth}");
+
                 var entries = table.Entries
                     .Where(e => e.Level == level)
                     .Select(e => e.Md5Hash)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-                if (entries.Count == 0) continue;
+                if (entries.Count == 0)
+                {
+                    index++;
+                    continue;
+                }
 
-                var collectionName = $"{prefix}{level}";
+                var collectionName = $"{prefix}[{indexStr}] {table.Symbol}{level}";
+                expectedNames.Add(collectionName);
+
                 var existingCol = r.All<BeatmapCollection>()
                     .FirstOrDefault(c => c.Name == collectionName);
 
@@ -141,6 +147,16 @@ public class CollectionSyncManager
                 {
                     r.Add(new BeatmapCollection(collectionName, entries));
                 }
+
+                index++;
+            }
+
+            // Remove any existing collections that aren't in the expected set
+            // (handles renamed collections from index-width changes or removed levels)
+            foreach (var col in existing)
+            {
+                if (!expectedNames.Contains(col.Name))
+                    r.Remove(col);
             }
         }
         else
@@ -152,7 +168,7 @@ public class CollectionSyncManager
             // Remove per-level collections
             foreach (var col in existing)
             {
-                if (col.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !col.Name.Equals(baseName, StringComparison.OrdinalIgnoreCase))
+                if (col.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                     r.Remove(col);
             }
 
