@@ -25,7 +25,6 @@
     - [ ] `#SUBTITLE` / `#SUBARTIST` / `#MAKER` / `%URL` / `%EMAIL` — 元数据
     - [ ] `#DIFFICULTY` — 难度分类
     - [ ] `#DEFEXRANK` / `#EXRANKxx` / channel `A0` — 判定 rank
-    - [ ] `#BASEBPM` — 视觉 BPM
     - [ ] `#EXBPMxx` — `#BPMxx` 的别名（规避 BMSC 解析 bug）
     - [ ] `#STP` — 绝对 STOP 序列
     - [ ] `#VOLWAV` — 全局音量

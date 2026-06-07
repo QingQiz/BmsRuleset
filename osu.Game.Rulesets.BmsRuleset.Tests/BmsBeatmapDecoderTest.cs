@@ -74,6 +74,76 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestBaseBpmOverridesScrollReference()
+    {
+        // #BASEBPM should override the scroll reference BPM without affecting note timing.
+        var beatmap = decode("""
+                             #BPM 120
+                             #BASEBPM 200
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = converted.TimingMap!;
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        // Scroll reference uses #BASEBPM, not the header #BPM
+        Assert.That(timingMap.ScrollReferenceBpm, Is.EqualTo(200).Within(0.000001));
+
+        // Note timing is still driven by #BPM 120
+        Assert.That(note.StartTime, Is.EqualTo(2000).Within(0.001));
+    }
+
+    [Test]
+    public void TestBaseBpmScrollDistance()
+    {
+        // Verify scroll distance at #BASEBPM 200 vs standard #BPM 120.
+        // A measure (192 ticks) at base BPM 200 → scroll = 192 * 60000/200 / (192/4) = 192 * 300 / 48 = 1200
+        // A measure (192 ticks) at base BPM 120 → scroll = 192 * 60000/120 / (192/4) = 192 * 500 / 48 = 2000
+        var beatmap = decode("""
+                             #BPM 120
+                             #BASEBPM 200
+                             #00111:01
+                             #00211:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = converted.TimingMap!;
+
+        var scrollDistance = timingMap.GetScrollPositionAtTick(192) - timingMap.GetScrollPositionAtTick(0);
+
+        // With base BPM 200, 192 ticks → 1200 scroll units
+        Assert.That(scrollDistance, Is.EqualTo(1200).Within(0.001));
+    }
+
+    [Test]
+    public void TestBaseBpmWithNoScrollOverride()
+    {
+        // Without #BASEBPM, scroll reference falls back to header #BPM.
+        var beatmap = decode("""
+                             #BPM 120
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = converted.TimingMap!;
+
+        Assert.That(timingMap.ScrollReferenceBpm, Is.EqualTo(120).Within(0.000001));
+    }
+
+    [Test]
+    public void TestBaseBpmWithZeroValueIsIgnored()
+    {
+        // #BASEBPM with an invalid / zero value should be ignored.
+        var beatmap = decode("""
+                             #BPM 150
+                             #BASEBPM 0
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = converted.TimingMap!;
+
+        Assert.That(timingMap.ScrollReferenceBpm, Is.EqualTo(150).Within(0.000001));
+    }
+
+    [Test]
     public void TestBmsDecoderRegisteredWithoutRulesetInstantiation()
     {
         using var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes("""

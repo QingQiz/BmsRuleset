@@ -29,13 +29,13 @@ public sealed class BmsTimingMap
     private int cachedScrollSegmentIndex;
     private double cachedScrollSegmentEndTime = double.MinValue;
 
-    public BmsTimingMap(int tickResolution, IEnumerable<BmsMeasureInfo> measures, IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents)
+    public BmsTimingMap(int tickResolution, IEnumerable<BmsMeasureInfo> measures, IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents, double baseBpm = 0)
     {
         TickResolution = tickResolution;
         Measures = measures.OrderBy(m => m.Index).ToArray();
         BpmEvents = bpmEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
         StopEvents = stopEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
-        ScrollReferenceBpm = initialBpm();
+        ScrollReferenceBpm = baseBpm > 0 ? baseBpm : initialBpm();
         scrollSegments = buildScrollSegments();
         cumulativeStopDurations = buildCumulativeStops();
     }

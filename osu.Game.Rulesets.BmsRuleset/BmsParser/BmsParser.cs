@@ -41,7 +41,8 @@ internal static partial class BmsChartParser
             tickResolution,
             measures,
             timingEvents.Select(e => new BmsBpmEvent(e.Tick, e.Bpm, e.Time, e.Sequence)),
-            stopEvents.Select(e => new BmsStopEvent(e.Tick, e.Duration, e.StopValue, e.Bpm, e.Sequence)));
+            stopEvents.Select(e => new BmsStopEvent(e.Tick, e.Duration, e.StopValue, e.Bpm, e.Sequence)),
+            state.BaseBpm);
 
         var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
         var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
@@ -137,6 +138,11 @@ internal static partial class BmsChartParser
             case "BPM":
                 if (tryParseDouble(value, out var bpm) && bpm > 0)
                     state.InitialBpm = bpm;
+                break;
+
+            case "BASEBPM":
+                if (tryParseDouble(value, out var baseBpm) && baseBpm > 0)
+                    state.BaseBpm = baseBpm;
                 break;
 
             case "LNTYPE":
@@ -661,6 +667,9 @@ internal static partial class BmsChartParser
         public float? PlayLevel { get; set; }
 
         public double InitialBpm { get; set; } = 130;
+
+        /// <summary>#BASEBPM — visual BPM override for scroll speed. Default 0 = not set.</summary>
+        public double BaseBpm { get; set; }
 
         public int LnType { get; set; } = 1;
 
