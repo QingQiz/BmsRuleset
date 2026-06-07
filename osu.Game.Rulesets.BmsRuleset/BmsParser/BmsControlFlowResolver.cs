@@ -16,6 +16,49 @@ internal static partial class BmsChartParser
         return materializeControlFlow(lines, randomValueSelector, decisions);
     }
 
+    public static Func<int, int> CreateReplayDecisionSelector(IEnumerable<BmsBranchDecision> decisions)
+    {
+        var queue = new Queue<BmsBranchDecision>(decisions);
+
+        return max =>
+        {
+            if (!queue.TryDequeue(out var decision))
+                throw new InvalidOperationException("BMS replay is missing a random/switch branch decision.");
+
+            if (decision.MaxValue != max)
+                throw new InvalidOperationException($"BMS replay branch decision shape mismatch. Expected max {max}, got {decision.MaxValue}.");
+
+            return decision.SelectedValue;
+        };
+    }
+
+    public static string SerialiseBranchDecisions(IEnumerable<BmsBranchDecision> decisions) =>
+        string.Join(",", decisions.Select(d => FormattableString.Invariant($"{d.MaxValue}:{d.SelectedValue}")));
+
+    public static IReadOnlyList<BmsBranchDecision> DeserialiseBranchDecisions(string serialised)
+    {
+        if (string.IsNullOrWhiteSpace(serialised))
+            return [];
+
+        var result = new List<BmsBranchDecision>();
+
+        foreach (var token in serialised.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parts = token.Split(':', 2, StringSplitOptions.TrimEntries);
+
+            if (parts.Length != 2
+                || !tryParseInt(parts[0], out var maxValue)
+                || !tryParseInt(parts[1], out var selectedValue))
+            {
+                throw new FormatException($"Invalid BMS branch decision token: '{token}'.");
+            }
+
+            result.Add(new BmsBranchDecision(maxValue, selectedValue));
+        }
+
+        return result;
+    }
+
     private static IEnumerable<string> materializeControlFlow(
         IEnumerable<string> lines, Func<int, int> randomValueSelector, ICollection<BmsBranchDecision> decisions)
     {
@@ -67,6 +110,8 @@ internal static partial class BmsChartParser
                     break;
 
                 case "ENDIF":
+                case "IFEND":
+                case "END":
                     if (frames.Count > 0 && frames[^1] is RandomControlFrame randomEndIf)
                         randomEndIf.EndIf();
                     break;
@@ -138,55 +183,12 @@ internal static partial class BmsChartParser
         command = (split < 0 ? line : line[..split]).ToUpperInvariant();
         value = split < 0 ? string.Empty : line[(split + 1)..].Trim();
 
-        return command is "RANDOM" or "RONDAM" or "SETRANDOM" or "IF" or "ELSEIF" or "ELSE" or "ENDIF" or "ENDRANDOM"
+        return command is "RANDOM" or "RONDAM" or "SETRANDOM" or "IF" or "ELSEIF" or "ELSE" or "ENDIF" or "IFEND" or "END" or "ENDRANDOM"
             or "SWITCH" or "SETSWITCH" or "CASE" or "DEF" or "SKIP" or "ENDSW" or "ENDSWITCH";
     }
 
     private static bool tryParseInt(string value, out int result) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
-
-    public static Func<int, int> CreateReplayDecisionSelector(IEnumerable<BmsBranchDecision> decisions)
-    {
-        var queue = new Queue<BmsBranchDecision>(decisions);
-
-        return max =>
-        {
-            if (!queue.TryDequeue(out var decision))
-                throw new InvalidOperationException("BMS replay is missing a random/switch branch decision.");
-
-            if (decision.MaxValue != max)
-                throw new InvalidOperationException($"BMS replay branch decision shape mismatch. Expected max {max}, got {decision.MaxValue}.");
-
-            return decision.SelectedValue;
-        };
-    }
-
-    public static string SerialiseBranchDecisions(IEnumerable<BmsBranchDecision> decisions) =>
-        string.Join(",", decisions.Select(d => FormattableString.Invariant($"{d.MaxValue}:{d.SelectedValue}")));
-
-    public static IReadOnlyList<BmsBranchDecision> DeserialiseBranchDecisions(string serialised)
-    {
-        if (string.IsNullOrWhiteSpace(serialised))
-            return [];
-
-        var result = new List<BmsBranchDecision>();
-
-        foreach (var token in serialised.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            var parts = token.Split(':', 2, StringSplitOptions.TrimEntries);
-
-            if (parts.Length != 2
-                || !tryParseInt(parts[0], out var maxValue)
-                || !tryParseInt(parts[1], out var selectedValue))
-            {
-                throw new FormatException($"Invalid BMS branch decision token: '{token}'.");
-            }
-
-            result.Add(new BmsBranchDecision(maxValue, selectedValue));
-        }
-
-        return result;
-    }
 
     private static int chooseRandomValue(int max, Func<int, int> randomValueSelector, ICollection<BmsBranchDecision> decisions)
     {
@@ -214,19 +216,21 @@ internal static partial class BmsChartParser
 
     private abstract class ControlFrame(bool parentActive)
     {
-        protected bool ParentActive { get; } = parentActive;
 
         public abstract bool Active { get; }
+
+        protected bool ParentActive { get; } = parentActive;
     }
 
     private sealed class RandomControlFrame(bool parentActive, int value) : ControlFrame(parentActive)
     {
-        private bool branchActive;
-        private bool groupMatched;
-        private bool inBranch;
 
         // Lines inside #RANDOM but outside any #IF/#ELSEIF/#ELSE are unconditional within that random scope.
         public override bool Active => ParentActive && (!inBranch || branchActive);
+
+        private bool branchActive;
+        private bool groupMatched;
+        private bool inBranch;
 
         public void BeginIf(int matchValue)
         {
@@ -264,11 +268,12 @@ internal static partial class BmsChartParser
 
     private sealed class SwitchControlFrame(bool parentActive, int value) : ControlFrame(parentActive)
     {
+
+        public override bool Active => ParentActive && caseActive && !exited;
+
         private bool caseActive;
         private bool exited;
         private bool hasMatchedCase;
-
-        public override bool Active => ParentActive && caseActive && !exited;
 
         public void BeginCase(int matchValue)
         {

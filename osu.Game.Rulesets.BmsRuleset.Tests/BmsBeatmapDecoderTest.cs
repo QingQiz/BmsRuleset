@@ -36,6 +36,44 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestAutoplayExtensionPathCarriesBranchDecisionFrame()
+    {
+        var beatmap = new BmsBeatmap
+        {
+            BranchDecisions = [new BmsBranchDecision(3, 1)],
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+            },
+        };
+        ICreateReplayData autoplay = new BmsModAutoplay();
+
+        var score = autoplay.CreateScoreFromReplayData(beatmap, [autoplay as Mod]);
+
+        Assert.That(score.Replay.Frames.OfType<BmsReplayFrame>().First().BranchDecisions, Is.EqualTo("3:1"));
+    }
+
+    [Test]
+    public void TestAutoplayReplayCarriesBranchDecisions()
+    {
+        var beatmap = new BmsBeatmap
+        {
+            BranchDecisions = [new BmsBranchDecision(2, 2)],
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+            },
+        };
+        var autoplay = new BmsModAutoplay();
+
+        var replayData = autoplay.CreateReplayData(beatmap, [autoplay]);
+        var score = BmsModAutoplay.CreateScoreWithBranchDecisions(beatmap, replayData);
+
+        Assert.That(score.ScoreInfo.Mods.OfType<BmsModBranchReplay>().Single().Decisions.Value, Is.EqualTo("2:2"));
+        Assert.That(replayData.Replay.Frames.OfType<BmsReplayFrame>().First().BranchDecisions, Is.EqualTo("2:2"));
+    }
+
+    [Test]
     public void TestBmsDecoderRegisteredWithoutRulesetInstantiation()
     {
         using var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes("""
@@ -49,6 +87,62 @@ public class BmsBeatmapDecoderTest
 
         Assert.That(decoded.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
         Assert.That(decoded.Metadata.Title, Is.EqualTo("Global Decoder Registration"));
+    }
+
+    [Test]
+    public void TestBranchReplayModAppliesDecisionsToConverter()
+    {
+        var converter = new BmsBeatmapConverter(decode("#BPM 120\n#00111:01"), new BmsRuleset());
+        var mod = new BmsModBranchReplay
+        {
+            Decisions = { Value = "2:1" },
+        };
+
+        mod.ApplyToBeatmapConverter(converter);
+
+        Assert.That(converter.BranchReplayDecisions, Is.EqualTo("2:1"));
+    }
+
+    [Test]
+    public void TestChannelInsideRandomButOutsideIfRemainsActive()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #RANDOM 2
+                             #00111:01
+                             #IF 2
+                             #00112:02
+                             #ENDIF
+                             #00113:03
+                             #ENDRANDOM
+                             """, _ => 1);
+
+        Assert.That(beatmap.HitObjects.Cast<BmsHitObject>().Select(h => h.SourceChannel), Is.EqualTo(new[] { "11", "13" }));
+    }
+
+    [Test]
+    public void TestConverterMaterialisesBranchDecisionsAtPlayConversion()
+    {
+        var decoded = decode("""
+                             #BPM 120
+                             #RANDOM 2
+                             #IF 1
+                             #00111:01
+                             #ENDIF
+                             #IF 2
+                             #00112:02
+                             #ENDIF
+                             #ENDRANDOM
+                             """, _ => 1);
+        var converter = new BmsBeatmapConverter(decoded, new BmsRuleset())
+        {
+            BranchRandomValueSelector = _ => 2,
+        };
+        var converted = (BmsBeatmap)converter.Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("12"));
+        Assert.That(converted.BranchDecisions, Is.EqualTo(new[] { new BmsBranchDecision(2, 2) }));
     }
 
     [Test]
@@ -82,6 +176,33 @@ public class BmsBeatmapDecoderTest
         Assert.That(converted.TotalColumns, Is.EqualTo(8));
         Assert.That(converted.Difficulty.CircleSize, Is.EqualTo(8));
         Assert.That(converted.BeatmapInfo.Difficulty.CircleSize, Is.EqualTo(8));
+    }
+
+    [Test]
+    public void TestConverterUsesReplayBranchDecisions()
+    {
+        var decoded = decode("""
+                             #BPM 120
+                             #RANDOM 2
+                             #IF 1
+                             #00111:01
+                             #ENDIF
+                             #IF 2
+                             #00112:02
+                             #ENDIF
+                             #ENDRANDOM
+                             """, _ => 1);
+        var converter = new BmsBeatmapConverter(decoded, new BmsRuleset())
+        {
+            BranchReplayDecisions = "2:2",
+        };
+
+        var converted = (BmsBeatmap)converter.Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("12"));
+        Assert.That(note.SampleKey, Is.EqualTo("02"));
+        Assert.That(converted.BranchDecisions, Is.EqualTo(new[] { new BmsBranchDecision(2, 2) }));
     }
 
     [Test]
@@ -144,6 +265,100 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestEndIfVariantsWithElseFlow()
+    {
+        // All three typo variants should correctly close an #IF block
+        // so that a subsequent #ELSEIF/#ELSE belongs to the next #IF, not to the closed one.
+        var beatmap = decode("""
+                             #BPM 120
+                             #RANDOM 2
+                             #IF 1
+                             #00111:01
+                             #END
+                             #ELSEIF 2
+                             #00112:02
+                             #IFEND
+                             #END IF
+                             #ENDRANDOM
+                             """, _ => 2);
+
+        // With selector=2, #IF 1 is skipped → lines inside it are inactive.
+        // #ELSEIF with #END (from line 6) → closes a non-existent #IF, no-op.
+        // Then #ELSEIF 2 matches → note 12:02 is active.
+        // #IFEND closes that. #END IF is another no-op (no open #IF).
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("12"));
+        Assert.That(note.SampleKey, Is.EqualTo("02"));
+    }
+
+    [Test]
+    public void TestEndIfWithHashEnd()
+    {
+        // #END should be treated as #ENDIF
+        var beatmap = decode("""
+                             #BPM 120
+                             #RANDOM 2
+                             #IF 1
+                             #00111:01
+                             #END
+                             #IF 2
+                             #00112:02
+                             #END
+                             #ENDRANDOM
+                             """, _ => 1);
+
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("11"));
+        Assert.That(note.SampleKey, Is.EqualTo("01"));
+    }
+
+    [Test]
+    public void TestEndIfWithHashEndSpaceIf()
+    {
+        // #END IF (with space) should be treated as #ENDIF
+        var beatmap = decode("""
+                             #BPM 120
+                             #RANDOM 2
+                             #IF 1
+                             #00111:01
+                             #END IF
+                             #IF 2
+                             #00112:02
+                             #END IF
+                             #ENDRANDOM
+                             """, _ => 1);
+
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("11"));
+        Assert.That(note.SampleKey, Is.EqualTo("01"));
+    }
+
+    [Test]
+    public void TestEndIfWithHashIfEnd()
+    {
+        // #IFEND should be treated as #ENDIF
+        var beatmap = decode("""
+                             #BPM 120
+                             #RANDOM 2
+                             #IF 1
+                             #00111:01
+                             #IFEND
+                             #IF 2
+                             #00112:02
+                             #IFEND
+                             #ENDRANDOM
+                             """, _ => 1);
+
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("11"));
+        Assert.That(note.SampleKey, Is.EqualTo("01"));
+    }
+
+    [Test]
     public void TestExtendedBpmChangesProjectTimes()
     {
         var beatmap = decode("""
@@ -162,6 +377,50 @@ public class BmsBeatmapDecoderTest
         Assert.That(beatmap.ControlPointInfo.TimingPoints[1].BPM, Is.EqualTo(240).Within(0.001));
         Assert.That(timingMap.BpmEvents.Select(e => e.Bpm), Is.EqualTo(new[] { 120, 240 }));
         Assert.That(note.StartTime, Is.EqualTo(3000).Within(0.001));
+    }
+
+    [Test]
+    public void TestGenleIsGenreTypoFallback()
+    {
+        // #GENLE should be treated as #GENRE (source metadata)
+        var beatmap = decode("""
+                             #TITLE Test
+                             #ARTIST Me
+                             #GENLE Some Genre
+                             #BPM 120
+                             #00111:01
+                             """);
+        Assert.That(beatmap.Metadata.Source, Is.EqualTo("Some Genre"));
+    }
+
+    [Test]
+    public void TestInactiveNestedRandomDoesNotConsumeDecision()
+    {
+        var decisions = new Queue<int>([1]);
+
+        var beatmap = decode("""
+                             #BPM 120
+                             #RANDOM 2
+                             #IF 1
+                             #00111:01
+                             #ENDIF
+                             #IF 2
+                             #RANDOM 2
+                             #IF 1
+                             #00112:02
+                             #ENDIF
+                             #IF 2
+                             #00113:03
+                             #ENDIF
+                             #ENDRANDOM
+                             #ENDIF
+                             #ENDRANDOM
+                             """, _ => decisions.Dequeue());
+
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("11"));
+        Assert.That(decisions, Is.Empty);
     }
 
     [Test]
@@ -382,49 +641,6 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestRandomIfMaterialisesSelectedBranchOnly()
-    {
-        var beatmap = decode("""
-                             #BPM 120
-                             #RANDOM 2
-                             #IF 1
-                             #00111:01
-                             #ENDIF
-                             #IF 2
-                             #00112:02
-                             #ENDIF
-                             #ENDRANDOM
-                             """, _ => 2);
-
-        var note = (BmsHitObject)beatmap.HitObjects.Single();
-
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(note.SampleKey, Is.EqualTo("02"));
-    }
-
-    [Test]
-    public void TestRandomDecisionsCanVaryBetweenDecodes()
-    {
-        const string chart = """
-                             #BPM 120
-                             #RANDOM 2
-                             #IF 1
-                             #00111:01
-                             #ENDIF
-                             #IF 2
-                             #00112:02
-                             #ENDIF
-                             #ENDRANDOM
-                             """;
-
-        var first = decode(chart, _ => 1);
-        var second = decode(chart, _ => 2);
-
-        Assert.That(((BmsHitObject)first.HitObjects.Single()).SourceChannel, Is.EqualTo("11"));
-        Assert.That(((BmsHitObject)second.HitObjects.Single()).SourceChannel, Is.EqualTo("12"));
-    }
-
-    [Test]
     public void TestNestedRandomUsesIndependentBranchDecisions()
     {
         var decisions = new Queue<int>([2, 1]);
@@ -453,288 +669,6 @@ public class BmsBeatmapDecoderTest
         Assert.That(note.SourceChannel, Is.EqualTo("12"));
         Assert.That(note.SampleKey, Is.EqualTo("02"));
         Assert.That(decisions, Is.Empty);
-    }
-
-    [Test]
-    public void TestInactiveNestedRandomDoesNotConsumeDecision()
-    {
-        var decisions = new Queue<int>([1]);
-
-        var beatmap = decode("""
-                             #BPM 120
-                             #RANDOM 2
-                             #IF 1
-                             #00111:01
-                             #ENDIF
-                             #IF 2
-                             #RANDOM 2
-                             #IF 1
-                             #00112:02
-                             #ENDIF
-                             #IF 2
-                             #00113:03
-                             #ENDIF
-                             #ENDRANDOM
-                             #ENDIF
-                             #ENDRANDOM
-                             """, _ => decisions.Dequeue());
-
-        var note = (BmsHitObject)beatmap.HitObjects.Single();
-
-        Assert.That(note.SourceChannel, Is.EqualTo("11"));
-        Assert.That(decisions, Is.Empty);
-    }
-
-    [Test]
-    public void TestChannelInsideRandomButOutsideIfRemainsActive()
-    {
-        var beatmap = decode("""
-                             #BPM 120
-                             #RANDOM 2
-                             #00111:01
-                             #IF 2
-                             #00112:02
-                             #ENDIF
-                             #00113:03
-                             #ENDRANDOM
-                             """, _ => 1);
-
-        Assert.That(beatmap.HitObjects.Cast<BmsHitObject>().Select(h => h.SourceChannel), Is.EqualTo(new[] { "11", "13" }));
-    }
-
-    [Test]
-    public void TestSwitchInsideRandomUsesBothBranchDecisions()
-    {
-        var decisions = new Queue<int>([2, 3]);
-
-        var beatmap = decode("""
-                             #BPM 120
-                             #RANDOM 2
-                             #IF 1
-                             #00111:01
-                             #ENDIF
-                             #IF 2
-                             #SWITCH 3
-                             #CASE 1
-                             #00112:02
-                             #SKIP
-                             #CASE 3
-                             #00113:03
-                             #SKIP
-                             #DEF
-                             #00114:04
-                             #ENDSW
-                             #ENDIF
-                             #ENDRANDOM
-                             """, _ => decisions.Dequeue());
-
-        var note = (BmsHitObject)beatmap.HitObjects.Single();
-
-        Assert.That(note.SourceChannel, Is.EqualTo("13"));
-        Assert.That(note.SampleKey, Is.EqualTo("03"));
-        Assert.That(decisions, Is.Empty);
-    }
-
-    [Test]
-    public void TestRandomInsideSwitchUsesBothBranchDecisions()
-    {
-        var decisions = new Queue<int>([2, 1]);
-
-        var beatmap = decode("""
-                             #BPM 120
-                             #SWITCH 2
-                             #CASE 1
-                             #00111:01
-                             #SKIP
-                             #CASE 2
-                             #RANDOM 2
-                             #IF 1
-                             #00112:02
-                             #ENDIF
-                             #IF 2
-                             #00113:03
-                             #ENDIF
-                             #ENDRANDOM
-                             #SKIP
-                             #ENDSW
-                             """, _ => decisions.Dequeue());
-
-        var note = (BmsHitObject)beatmap.HitObjects.Single();
-
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(note.SampleKey, Is.EqualTo("02"));
-        Assert.That(decisions, Is.Empty);
-    }
-
-    [Test]
-    public void TestConverterMaterialisesBranchDecisionsAtPlayConversion()
-    {
-        var decoded = decode("""
-                             #BPM 120
-                             #RANDOM 2
-                             #IF 1
-                             #00111:01
-                             #ENDIF
-                             #IF 2
-                             #00112:02
-                             #ENDIF
-                             #ENDRANDOM
-                             """, _ => 1);
-        var converter = new BmsBeatmapConverter(decoded, new BmsRuleset())
-        {
-            BranchRandomValueSelector = _ => 2,
-        };
-        var converted = (BmsBeatmap)converter.Convert();
-        var note = converted.HitObjects.Single();
-
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(converted.BranchDecisions, Is.EqualTo(new[] { new BmsBranchDecision(2, 2) }));
-    }
-
-    [Test]
-    public void TestConverterUsesReplayBranchDecisions()
-    {
-        var decoded = decode("""
-                             #BPM 120
-                             #RANDOM 2
-                             #IF 1
-                             #00111:01
-                             #ENDIF
-                             #IF 2
-                             #00112:02
-                             #ENDIF
-                             #ENDRANDOM
-                             """, _ => 1);
-        var converter = new BmsBeatmapConverter(decoded, new BmsRuleset())
-        {
-            BranchReplayDecisions = "2:2",
-        };
-
-        var converted = (BmsBeatmap)converter.Convert();
-        var note = converted.HitObjects.Single();
-
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(note.SampleKey, Is.EqualTo("02"));
-        Assert.That(converted.BranchDecisions, Is.EqualTo(new[] { new BmsBranchDecision(2, 2) }));
-    }
-
-    [Test]
-    public void TestBranchReplayModAppliesDecisionsToConverter()
-    {
-        var converter = new BmsBeatmapConverter(decode("#BPM 120\n#00111:01"), new BmsRuleset());
-        var mod = new BmsModBranchReplay
-        {
-            Decisions = { Value = "2:1" },
-        };
-
-        mod.ApplyToBeatmapConverter(converter);
-
-        Assert.That(converter.BranchReplayDecisions, Is.EqualTo("2:1"));
-    }
-
-    [Test]
-    public void TestAutoplayReplayCarriesBranchDecisions()
-    {
-        var beatmap = new BmsBeatmap
-        {
-            BranchDecisions = [new BmsBranchDecision(2, 2)],
-            HitObjects =
-            {
-                new BmsHitObject { StartTime = 1000, Column = 1 },
-            },
-        };
-        var autoplay = new BmsModAutoplay();
-
-        var replayData = autoplay.CreateReplayData(beatmap, [autoplay]);
-        var score = BmsModAutoplay.CreateScoreWithBranchDecisions(beatmap, replayData);
-
-        Assert.That(score.ScoreInfo.Mods.OfType<BmsModBranchReplay>().Single().Decisions.Value, Is.EqualTo("2:2"));
-        Assert.That(replayData.Replay.Frames.OfType<BmsReplayFrame>().First().BranchDecisions, Is.EqualTo("2:2"));
-    }
-
-    [Test]
-    public void TestAutoplayExtensionPathCarriesBranchDecisionFrame()
-    {
-        var beatmap = new BmsBeatmap
-        {
-            BranchDecisions = [new BmsBranchDecision(3, 1)],
-            HitObjects =
-            {
-                new BmsHitObject { StartTime = 1000, Column = 1 },
-            },
-        };
-        ICreateReplayData autoplay = new BmsModAutoplay();
-
-        var score = autoplay.CreateScoreFromReplayData(beatmap, [autoplay as Mod]);
-
-        Assert.That(score.Replay.Frames.OfType<BmsReplayFrame>().First().BranchDecisions, Is.EqualTo("3:1"));
-    }
-
-    [Test]
-    public void TestSetRandomAndElseIfElse()
-    {
-        var beatmap = decode("""
-                             #BPM 120
-                             #SETRANDOM 3
-                             #IF 1
-                             #00111:01
-                             #ELSEIF 3
-                             #00112:02
-                             #ELSE
-                             #00113:03
-                             #ENDIF
-                             #ENDRANDOM
-                             """);
-
-        var note = (BmsHitObject)beatmap.HitObjects.Single();
-
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(note.SampleKey, Is.EqualTo("02"));
-    }
-
-    [Test]
-    public void TestSwitchFallsThroughUntilSkip()
-    {
-        var beatmap = decode("""
-                             #BPM 120
-                             #SETSWITCH 2
-                             #CASE 1
-                             #00111:01
-                             #SKIP
-                             #CASE 2
-                             #00112:02
-                             #CASE 3
-                             #00113:03
-                             #SKIP
-                             #DEF
-                             #00114:04
-                             #ENDSW
-                             """);
-
-        Assert.That(beatmap.HitObjects.Cast<BmsHitObject>().Select(h => h.SourceChannel), Is.EqualTo(new[] { "12", "13" }));
-    }
-
-    [Test]
-    public void TestSwitchDefaultRunsWhenNoCaseMatches()
-    {
-        var beatmap = decode("""
-                             #BPM 120
-                             #SETSWITCH 4
-                             #CASE 1
-                             #00111:01
-                             #SKIP
-                             #CASE 2
-                             #00112:02
-                             #SKIP
-                             #DEF
-                             #00113:03
-                             #ENDSW
-                             """);
-
-        var note = (BmsHitObject)beatmap.HitObjects.Single();
-
-        Assert.That(note.SourceChannel, Is.EqualTo("13"));
-        Assert.That(note.SampleKey, Is.EqualTo("03"));
     }
 
     [Test]
@@ -784,6 +718,80 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestRandomDecisionsCanVaryBetweenDecodes()
+    {
+        const string chart = """
+                             #BPM 120
+                             #RANDOM 2
+                             #IF 1
+                             #00111:01
+                             #ENDIF
+                             #IF 2
+                             #00112:02
+                             #ENDIF
+                             #ENDRANDOM
+                             """;
+
+        var first = decode(chart, _ => 1);
+        var second = decode(chart, _ => 2);
+
+        Assert.That(((BmsHitObject)first.HitObjects.Single()).SourceChannel, Is.EqualTo("11"));
+        Assert.That(((BmsHitObject)second.HitObjects.Single()).SourceChannel, Is.EqualTo("12"));
+    }
+
+    [Test]
+    public void TestRandomIfMaterialisesSelectedBranchOnly()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #RANDOM 2
+                             #IF 1
+                             #00111:01
+                             #ENDIF
+                             #IF 2
+                             #00112:02
+                             #ENDIF
+                             #ENDRANDOM
+                             """, _ => 2);
+
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("12"));
+        Assert.That(note.SampleKey, Is.EqualTo("02"));
+    }
+
+    [Test]
+    public void TestRandomInsideSwitchUsesBothBranchDecisions()
+    {
+        var decisions = new Queue<int>([2, 1]);
+
+        var beatmap = decode("""
+                             #BPM 120
+                             #SWITCH 2
+                             #CASE 1
+                             #00111:01
+                             #SKIP
+                             #CASE 2
+                             #RANDOM 2
+                             #IF 1
+                             #00112:02
+                             #ENDIF
+                             #IF 2
+                             #00113:03
+                             #ENDIF
+                             #ENDRANDOM
+                             #SKIP
+                             #ENDSW
+                             """, _ => decisions.Dequeue());
+
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("12"));
+        Assert.That(note.SampleKey, Is.EqualTo("02"));
+        Assert.That(decisions, Is.Empty);
+    }
+
+    [Test]
     public void TestRankDefaultsToNormalWhenAbsent()
     {
         var beatmap = decode("""
@@ -826,6 +834,28 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestSetRandomAndElseIfElse()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #SETRANDOM 3
+                             #IF 1
+                             #00111:01
+                             #ELSEIF 3
+                             #00112:02
+                             #ELSE
+                             #00113:03
+                             #ENDIF
+                             #ENDRANDOM
+                             """);
+
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("12"));
+        Assert.That(note.SampleKey, Is.EqualTo("02"));
+    }
+
+    [Test]
     public void TestSparseSevenKeyChartStoresKeyCountMetadata()
     {
         var beatmap = decode("""
@@ -841,6 +871,84 @@ public class BmsBeatmapDecoderTest
         Assert.That(converted.HitObjects.Single().Column, Is.EqualTo(7));
         Assert.That(converted.Difficulty.CircleSize, Is.EqualTo(8));
         Assert.That(converted.BeatmapInfo.Difficulty.CircleSize, Is.EqualTo(8));
+    }
+
+    [Test]
+    public void TestSwitchDefaultRunsWhenNoCaseMatches()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #SETSWITCH 4
+                             #CASE 1
+                             #00111:01
+                             #SKIP
+                             #CASE 2
+                             #00112:02
+                             #SKIP
+                             #DEF
+                             #00113:03
+                             #ENDSW
+                             """);
+
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("13"));
+        Assert.That(note.SampleKey, Is.EqualTo("03"));
+    }
+
+    [Test]
+    public void TestSwitchFallsThroughUntilSkip()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #SETSWITCH 2
+                             #CASE 1
+                             #00111:01
+                             #SKIP
+                             #CASE 2
+                             #00112:02
+                             #CASE 3
+                             #00113:03
+                             #SKIP
+                             #DEF
+                             #00114:04
+                             #ENDSW
+                             """);
+
+        Assert.That(beatmap.HitObjects.Cast<BmsHitObject>().Select(h => h.SourceChannel), Is.EqualTo(new[] { "12", "13" }));
+    }
+
+    [Test]
+    public void TestSwitchInsideRandomUsesBothBranchDecisions()
+    {
+        var decisions = new Queue<int>([2, 3]);
+
+        var beatmap = decode("""
+                             #BPM 120
+                             #RANDOM 2
+                             #IF 1
+                             #00111:01
+                             #ENDIF
+                             #IF 2
+                             #SWITCH 3
+                             #CASE 1
+                             #00112:02
+                             #SKIP
+                             #CASE 3
+                             #00113:03
+                             #SKIP
+                             #DEF
+                             #00114:04
+                             #ENDSW
+                             #ENDIF
+                             #ENDRANDOM
+                             """, _ => decisions.Dequeue());
+
+        var note = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(note.SourceChannel, Is.EqualTo("13"));
+        Assert.That(note.SampleKey, Is.EqualTo("03"));
+        Assert.That(decisions, Is.Empty);
     }
 
     [Test]

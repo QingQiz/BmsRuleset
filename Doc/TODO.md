@@ -25,7 +25,6 @@
     - [ ] `#SUBTITLE` / `#SUBARTIST` / `#MAKER` / `%URL` / `%EMAIL` — 元数据
     - [ ] `#DIFFICULTY` — 难度分类
     - [ ] `#DEFEXRANK` / `#EXRANKxx` / channel `A0` — 判定 rank
-    - [ ] `#GENLE` — `#GENRE` 的 typo 容错
     - [ ] `#BASEBPM` — 视觉 BPM
     - [ ] `#EXBPMxx` — `#BPMxx` 的别名（规避 BMSC 解析 bug）
     - [ ] `#STP` — 绝对 STOP 序列
@@ -45,7 +44,6 @@
     - [ ] `#COMMENT` — 选歌注释
     - [ ] `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — 资源组
     - [ ] ~~`#CHARSET` — 编码声明~~
-    - [ ] `#END IF`（带空格）、`#END`、`#IFEND` — `#ENDIF` 的 typo 容错
     - [ ] channel `04` / `06` / `07` / `0A`–`0E` — BGA 层
     - [ ] channel `17` / `27` — free-zone 键
     - [ ] channel `31`–`49` — 隐形音符

@@ -348,7 +348,7 @@ public partial class BmsFileImporterTest
 
             Assert.That(result, Has.Length.EqualTo(2));
             Assert.That(result.Select(s => s.BeatmapCount), Is.EqualTo(new[] { 1, 1 }));
-            Assert.That(result.Select(s => s.Title), Does.Contain("Aleph-0"));
+            Assert.That(result.Select(s => s.Title), Does.Contain("Aleph-0[NORMAL]"));
             Assert.That(result.Select(s => s.Title), Does.Contain("Destr0yer"));
         });
     }

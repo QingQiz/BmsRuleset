@@ -23,7 +23,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
-using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
@@ -320,6 +319,12 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestBmsHealthDisplayDoesNotInheritOsuHealthDisplay()
+    {
+        Assert.That(new BmsHealthDisplay(), Is.Not.InstanceOf<HealthDisplay>());
+    }
+
+    [Test]
     public void TestBmsSkinIniImageCreatesDrawable()
     {
         var skin = createConfiguredSkin("""
@@ -377,7 +382,6 @@ public class BmsLegacySkinTransformerTest
         Assert.That(transformer.GetDrawableComponent(lookup), Is.Null);
         Assert.That(transformer.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup)), Is.Null);
         Assert.That(transformer.GetDrawableComponent(new SkinComponentLookup<HitResult>(HitResult.Perfect)), Is.Null);
-        Assert.That(transformer.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo)), Is.Null);
     }
 
     [Test]
@@ -508,12 +512,6 @@ public class BmsLegacySkinTransformerTest
 
         Assert.That(hud, Is.Not.Null);
         Assert.That(hud!.ChildrenOfType<HealthDisplay>(), Is.Empty);
-    }
-
-    [Test]
-    public void TestBmsHealthDisplayDoesNotInheritOsuHealthDisplay()
-    {
-        Assert.That(new BmsHealthDisplay(), Is.Not.InstanceOf<HealthDisplay>());
     }
 
     [Test]

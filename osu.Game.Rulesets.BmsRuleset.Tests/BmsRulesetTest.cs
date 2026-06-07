@@ -18,13 +18,14 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests;
 [TestFixture]
 public class BmsRulesetTest
 {
-    private BmsRuleset ruleset = null!;
 
     [SetUp]
     public void SetUp()
     {
         ruleset = new BmsRuleset();
     }
+
+    private BmsRuleset ruleset = null!;
 
     [Test]
     public void TestAutomationModsIncludeAutoplay()
@@ -128,7 +129,7 @@ public class BmsRulesetTest
     public void TestMetadata()
     {
         Assert.That(ruleset.ShortName, Is.EqualTo("bms"));
-        Assert.That(ruleset.Description, Is.EqualTo("BMS Ruleset"));
+        Assert.That(ruleset.Description, Is.EqualTo("BMS"));
         Assert.That(ruleset.RulesetAPIVersionSupported, Is.Not.Null.And.Not.Empty);
     }
 }

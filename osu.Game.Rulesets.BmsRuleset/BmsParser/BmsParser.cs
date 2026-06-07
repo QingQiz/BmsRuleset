@@ -125,6 +125,7 @@ internal static partial class BmsChartParser
                 break;
 
             case "GENRE":
+            case "GENLE":
                 state.Source = value;
                 break;
 
@@ -649,6 +650,8 @@ internal static partial class BmsChartParser
 
         public List<RawChannelLine> ChannelLines { get; } = [];
 
+        public List<BmsBranchDecision> BranchDecisions { get; } = [];
+
         public string? Title { get; set; }
 
         public string? Artist { get; set; }
@@ -670,7 +673,5 @@ internal static partial class BmsChartParser
         public int MaxMeasure { get; set; }
 
         public int NextSequence { get; set; }
-
-        public List<BmsBranchDecision> BranchDecisions { get; } = [];
     }
 }
