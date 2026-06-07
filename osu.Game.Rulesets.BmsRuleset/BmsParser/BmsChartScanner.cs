@@ -126,6 +126,8 @@ internal static partial class BmsChartParser
                 '（' => '）',
                 '-' => '-',
                 '~' => '~',
+                '<' => '>',
+                '"' => '"',
                 _ => '\0',
             };
 
