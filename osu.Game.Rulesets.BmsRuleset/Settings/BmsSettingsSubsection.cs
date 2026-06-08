@@ -491,7 +491,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
         // Offload to thread pool — RemoveTable now calls RefreshAllMarkers which
         // runs Realm queries that would block the UI.
-        await Task.Run(() => difficultyTableStore?.RemoveTable(table)).ConfigureAwait(false);
+        await Task.Run(() => difficultyTableStore?.RemoveTable(table, notification)).ConfigureAwait(false);
 
         Schedule(() =>
         {

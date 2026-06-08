@@ -45,7 +45,7 @@ public partial class DifficultyTableStore
         this.config = config;
         this.cacheDirectory = cacheDirectory;
         Directory.CreateDirectory(cacheDirectory);
-        RefreshDiffNameEvent += () => DifficultyNameUpdater?.RefreshAllMarkers();
+        RefreshDiffNameEvent += notification => DifficultyNameUpdater?.RefreshAllMarkers(notification);
         TableListRebuildEvent += tb => syncManager?.SyncInTransaction(realm, tb);
     }
 
@@ -183,7 +183,7 @@ public partial class DifficultyTableStore
             return null;
         }
 
-        AddTable(table);
+        AddTable(table, notification);
         notification.Progress = 1;
         return new ImportResult(table);
     }
@@ -193,9 +193,9 @@ public partial class DifficultyTableStore
         TableListRebuildEvent?.Invoke(tableRemoved);
     }
 
-    public void NotifyToRefreshAllDiffNames()
+    public void NotifyToRefreshAllDiffNames(ProgressNotification? notification = null)
     {
-        RefreshDiffNameEvent?.Invoke();
+        RefreshDiffNameEvent?.Invoke(notification);
     }
 
     #region Persistence
@@ -215,7 +215,7 @@ public partial class DifficultyTableStore
     /// </summary>
     public event Action<DifficultyTable?>? TableListRebuildEvent;
 
-    public event Action? RefreshDiffNameEvent;
+    public event Action<ProgressNotification?>? RefreshDiffNameEvent;
 
 
     #region Public CRUD
@@ -223,12 +223,12 @@ public partial class DifficultyTableStore
     /// <summary>
     /// Add a newly-imported table. Fires events for UI updates and triggers marker refresh.
     /// </summary>
-    public void AddTable(DifficultyTable table)
+    public void AddTable(DifficultyTable table, ProgressNotification? notification = null)
     {
         tables.Add(table);
         NotifyToRebuildTableList(null);
         addToIndex(table);
-        NotifyToRefreshAllDiffNames();
+        NotifyToRefreshAllDiffNames(notification);
         persistTableList();
     }
 
@@ -257,12 +257,12 @@ public partial class DifficultyTableStore
     /// <summary>
     /// Remove a table and trigger cleanup events, including marker refresh.
     /// </summary>
-    public void RemoveTable(DifficultyTable table)
+    public void RemoveTable(DifficultyTable table, ProgressNotification? notification = null)
     {
         tables.Remove(table);
         NotifyToRebuildTableList(table);
         removeFromIndex(table);
-        NotifyToRefreshAllDiffNames();
+        NotifyToRefreshAllDiffNames(notification);
         persistTableList();
     }
 
@@ -271,7 +271,7 @@ public partial class DifficultyTableStore
     /// inserts the new table at the same position, and fires all events including marker refresh.
     /// Handles the case where newTable was already added via ImportAsync -> AddTable.
     /// </summary>
-    public void ReplaceTable(DifficultyTable oldTable, DifficultyTable newTable)
+    public void ReplaceTable(DifficultyTable oldTable, DifficultyTable newTable, ProgressNotification? notification = null)
     {
         var oldIndex = tables.IndexOf(oldTable);
         if (oldIndex < 0) return;
@@ -301,7 +301,7 @@ public partial class DifficultyTableStore
         }
 
         NotifyToRebuildTableList(null);
-        NotifyToRefreshAllDiffNames();
+        NotifyToRefreshAllDiffNames(notification);
         persistTableList();
     }
 
