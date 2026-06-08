@@ -480,25 +480,78 @@ The full built-in skin (covering all 6 layouts) is at
 
 ## Not Yet Implemented
 
-| Area         | What is missing                                                                             |
-|--------------|---------------------------------------------------------------------------------------------|
-| **Parser**   | `#EXRANK` / channel `A0` — extended rank definition                                         |
-| **Parser**   | `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — metadata only                               |
-| **Parser**   | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                          |
-| **Parser**   | `#EXWAVxx`, `#WAVCMD`, `#VOLWAV` — advanced audio controls                                  |
-| **Parser**   | `#STP` — absolute STOP sequence                                                             |
-| **Parser**   | `#DEFEXRANK` — extended rank definition                                                     |
-| **Parser**   | Channel `04`/`06`/`07`/`0A`–`0E` — BGA layers                                               |
-| **Parser**   | Channel `17` / `27` — free-zone keys                                                        |
-| **Parser**   | Channel `31`–`49` — invisible notes                                                         |
-| **Parser**   | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                   |
-| **Renderer** | BGA / movie / stagefile / background image                                                  |
-| **Renderer** | Key beams (column light during hold)                                                        |
-| **Scoring**  | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown                  |
-| **Gauge**    | Easy / Hard / Ex-Hard / Hazard gauge variants                                               |
-| **Gauge**    | LN-specific gauge events (head miss ≠ body drop ≠ tail miss)                                |
-| **Mods**     | Random / S-Random / H-Random column shuffle                                                 |
-| **Mods**     | Gauge-selection mods                                                                        |
-| **Mods**     | assist options                                                                              |
-| **Input**    | Scratch turntable semantics — scratch is routed as a plain column key                       |
-| **Import**   | Resource files in subdirectories — only the filename is used, relative paths are unresolved |
+| Area          | What is missing                                                                             | Priority |
+|---------------|---------------------------------------------------------------------------------------------|----------|
+| **Audio**     | `#WAVCMD` (MacBeat) — pitch/volume/playback-time per WAV slot                               |
+| **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                     |
+| **Audio**     | `#VOLWAV` (BM98) — global volume scalar                                                     |
+| **Audio**     | Hijack preview song to play BMS samples                                                     | 1        |
+| **Audio**     | `#xxx97` (fgt) — dynamic BGM volume change channel                                          |          |
+| **Converter** | Mania 7K → BMS chart conversion                                                             | 3        |
+| **Gauge**     | Easy / Hard / Ex-Hard / Hazard gauge variants                                               | 2        |
+| **Gauge**     | LN-specific gauge events (head miss ≠ body drop ≠ tail miss)                                | 1        |
+| **Import**    | Resource files in subdirectories — only the filename is used, relative paths are unresolved |
+| **Import**    | Use reference/symbolic link to original BMS file instead of copying to realm                | 1        |
+| **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                       |
+| **Input**     | Judgement offset adjustment capability                                                      |
+| **Mods**      | Different health bar types                                                                  | 2        |
+| **Mods**      | Random / S-Random / H-Random column shuffle                                                 | 2        |
+| **Mods**      | Gauge-selection mods                                                                        | 2        |
+| **Mods**      | assist options                                                                              |
+| **Mods**      | Remember last used mod combination                                                          |
+| **Mods**      | BG: make key sounds → background samples (hit results don't affect music)                   | 2        
+| **Parser**    | `#BGAxx` / `#POORBGA` / `#SWBGAxx` / `#@BGAxx` / `#ARGBxx` — BGA definitions                |
+| **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                               |
+| **Parser**    | `#CDDA` / `#MIDIFILE` — CD / MIDI                                                           |
+| **Parser**    | `#CHARFILE` / `#ExtChr` — character / skin                                                  |
+| **Parser**    | `#DEFEXRANK` — extended rank definition                                                     |
+| **Parser**    | `#EXBPMxx` — `#BPMxx` alias (BMSC parser bug workaround)                                    |
+| **Parser**    | `#EXRANK` / channel `A0` — extended rank definition                                         |
+| **Parser**    | `#EXWAVxx`, `#WAVCMD`, `#VOLWAV` — advanced audio controls                                  |
+| **Parser**    | `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — resource groups          |
+| **Parser**    | `#OCT/FP` — octave / pedal                                                                  |
+| **Parser**    | `#OPTION` — forced option                                                                   |
+| **Parser**    | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                          |
+| **Parser**    | `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — metadata only                               |
+| **Parser**    | `#STP` — absolute STOP sequence                                                             |
+| **Parser**    | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — video    |
+| **Parser**    | Channel `04`/`06`/`07`/`0A`–`0E` — BGA layers                                               |
+| **Parser**    | Channel `17` / `27` — free-zone keys                                                        |
+| **Parser**    | Channel `31`–`49` — invisible notes                                                         |
+| **Parser**    | Channel `97` — dynamic BGM volume                                                           |
+| **Parser**    | Channel `98` — dynamic KEY volume (counterpart to channel 97)                               |
+| **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                   |
+| **Perf**      | BMS file I/O — samples/BGA are large; consider reflection to bypass realm copy              | 1        |
+| **Renderer**  | BGA / movie / stagefile / background image                                                  |
+| **Renderer**  | Key beams (column light during hold)                                                        | 2        |
+| **Renderer**  | BGA                                                                                         |
+| **Replay**    | Replay not available                                                                        | 2        |
+| **Scoring**   | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown                  | 2        |
+| **Scoring**   | ExRank support                                                                              | 3        |
+| **Scoring**   | Different judgement text colours on results screen                                          | 4        |
+| **Scoring**   | Beatmap statistics — show more info (e.g., random branch count)                             | 2        |
+| **Scoring**   | LN head judgement                                                                           | 1        |
+| **Skin**      | Column start position — value or enum (leftN, rightN, center)                               | 3        |
+| **Skin**      | BGA position/size configuration                                                             |
+| **Skin**      | Non-legacy BMS skin — fully configurable via skin editor                                    |
+| **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                                  |
+| **Skin**      | E-POOR judgement image                                                                      | 3        |
+| **UI**        | Combo display                                                                               | 1        |
+| **UI**        | Lane cover / skin / movement                                                                | 2        |
+| **UI**        | Rewrite health bar — red/yellow/green gradient, no border, no overall colour change         | 2        |
+
+### FIXME
+
+```text
+2026-06-01 15:13:14 [error]: osu.Game.Rulesets.UI.BeatmapInvalidForRulesetException:
+  Beatmap can not be converted for the ruleset
+  (ruleset: osu.Game.Rulesets.Mania.ManiaRuleset, osu.Game.Rulesets.Mania,
+   converter: osu.Game.Rulesets.Mania.Beatmaps.ManiaBeatmapConverter).
+  at osu.Game.Beatmaps.WorkingBeatmap.GetPlayableBeatmap(...)
+  at osu.Game.Screens.Select.BeatmapTitleWedge.DifficultyDisplay.<>c__DisplayClass36_0
+       .<updateCountStatistics>b__0()
+```
+
+Switching the active ruleset from BMS to any other (or from any other to BMS) crashes with
+`BeatmapInvalidForRulesetException` because the beatmap title wedge tries to recalculate
+difficulty using the wrong converter while the carousel selection is stale.
