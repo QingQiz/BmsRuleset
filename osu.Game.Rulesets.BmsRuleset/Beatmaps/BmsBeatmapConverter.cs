@@ -88,7 +88,20 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         var inferred = BmsLayout.InferTotalColumns(hitObjects.Select(h => h.SourceChannel), original.BeatmapInfo.Path);
 
         if (inferred > 0)
+        {
+            // Source-channel inference defaults to 6 (Bms5K) when channels are empty
+            // or don't match any known layout. If notes reference columns beyond that,
+            // use the max-column-based count so TotalColumns stays consistent with
+            // the actual note data.
+            if (hitObjects.Count > 0)
+            {
+                var maxColumn = hitObjects.Max(h => h.Column);
+                if (maxColumn >= inferred)
+                    inferred = maxColumn + 1;
+            }
+
             return inferred;
+        }
 
         var metadataKeyCount = BmsDifficultyInfo.GetKeyCount(original.Difficulty);
 

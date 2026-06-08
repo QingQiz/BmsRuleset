@@ -20,7 +20,10 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
     {
         var bmsBeatmap = beatmap as BmsBeatmap;
 
-        var totalColumns = bmsBeatmap?.TotalColumns ?? 6;
+        // When called from CalculateTimed, beatmap is a ProgressiveCalculationBeatmap wrapper
+        // (not a BmsBeatmap), so the cast above returns null. In that case, derive TotalColumns
+        // from the difficulty metadata (CircleSize was set to TotalColumns by the converter).
+        var totalColumns = bmsBeatmap?.TotalColumns ?? BmsDifficultyInfo.GetKeyCount(beatmap.Difficulty);
         var rank = bmsBeatmap?.Rank ?? 2;
 
         var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().ToList();
