@@ -69,13 +69,15 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
         var total = collect.Count;
         var processed = 0;
         notification?.Text = "Refreshing ...";
+        notification?.Progress = 0;
 
         realm.Write(r =>
         {
             foreach (var collectItem in collect)
             {
                 r.Find<BeatmapInfo>(collectItem.Item1)?.DifficultyName = collectItem.Item2;
-                processed += 1;
+                processed++;
+                notification?.Text = $"Refreshing {processed}/{total}...";
                 notification?.Progress = (float)processed / total;
             }
         });

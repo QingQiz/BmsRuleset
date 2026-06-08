@@ -430,6 +430,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     if (exists)
                     {
                         Logger.Log($"BMS import: skipping existing set {Path.GetFileName(prepared?.Directory)} (hash match)");
+                        imported++;
                         processed++;
                         reportProgress(notification, imported, groups.Length, processed);
                         return;
