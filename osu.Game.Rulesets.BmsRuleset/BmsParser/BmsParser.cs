@@ -519,7 +519,11 @@ internal static partial class BmsChartParser
         // "00" is a control value (no note), so treat it as "no tail sample".
         // Non-empty values that exist in sampleDefinitions will have a tail sample;
         // others will have an empty tail sample path (play nothing).
-        var tailSampleKey = !string.IsNullOrEmpty(tailCellValue) && tailCellValue != "00"
+        //
+        // For LNTYPE 1 the terminating cell has the same value as the head, which
+        // would play the identical sample on release.  Skip the tail sample when
+        // it matches the head's sample key to avoid the double-play.
+        var tailSampleKey = !string.IsNullOrEmpty(tailCellValue) && tailCellValue != "00" && tailCellValue != start.Value
             ? tailCellValue
             : string.Empty;
         var tailSamplePath = !string.IsNullOrEmpty(tailSampleKey)
