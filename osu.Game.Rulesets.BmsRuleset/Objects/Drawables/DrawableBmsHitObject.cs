@@ -503,11 +503,15 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     /// </summary>
     private float yForTimeOffset(double timeUntilHit, LayoutMetrics layout)
     {
+        // Notes at tick0 with non-zero StartTime sit at the origin of the scroll
+        // coordinate axis (scroll=0).  Using tick-based progress would make them
+        // appear pinned far below the judgement line regardless of real time, so
+        // fall back to linear time for these notes.
         var progressUntilHit = layout.TimingMap == null || cache.Playfield?.ConstantScrollActive == true || HitObject.TickInfo.Tick == HitObject.TickInfo.EndTick && HitObject.TickInfo.Tick == 0 && HitObject.StartTime != 0
             ? timeUntilHit
             : scrollPositionFor(timeUntilHit, layout) - layout.CurrentScrollPosition;
 
-        return layout.ParentHeight - layout.HitTargetPosition - (float)(progressUntilHit * layout.ScrollSpeedMultiplier / layout.ScrollRange) * layout.TravelDistance - currentNoteHeight;
+        return cache.Playfield!.YForScrollProgress(progressUntilHit, layout.ParentHeight, currentNoteHeight);
     }
 
     /// <summary>
@@ -534,7 +538,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     ///     Y coordinate of the judgement line in the column container's local space.
     /// </summary>
     private float judgementHeadYFor(LayoutMetrics layout)
-        => layout.ParentHeight - layout.HitTargetPosition - currentNoteHeight;
+        => cache.Playfield!.YForScrollProgress(0, layout.ParentHeight, currentNoteHeight);
 
     /// <summary>
     ///     Returns the visual head Y for a held long-note.  While the head has a fixed Y

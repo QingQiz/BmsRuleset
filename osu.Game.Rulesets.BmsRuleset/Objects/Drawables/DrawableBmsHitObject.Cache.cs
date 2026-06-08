@@ -1,7 +1,6 @@
 using System;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
@@ -16,12 +15,8 @@ public partial class DrawableBmsHitObject
         Drawable? ColumnContainer,
         float ParentHeight,
         float ScaledParentWidth,
-        float TravelDistance,
-        float HitTargetPosition,
-        double ScrollSpeedMultiplier,
         BmsTimingMap? TimingMap,
-        double CurrentScrollPosition,
-        double ScrollRange);
+        double CurrentScrollPosition);
 
     private readonly record struct LayoutReferences(
         BmsStage? Stage,
@@ -80,12 +75,8 @@ public partial class DrawableBmsHitObject
             return new LayoutMetrics(col, variant, container,
                 parentHeight,
                 Math.Max(1, scaledParentWidth),
-                Math.Max(1f, parentHeight - (stage?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION)),
-                stage?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION,
-                Playfield?.ScrollSpeedMultiplier ?? 1,
                 Playfield?.TimingMap,
-                Playfield?.CurrentScrollPosition ?? currentTime,
-                Playfield?.ScrollRange ?? Playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED));
+                Playfield?.CurrentScrollPosition ?? currentTime);
         }
 
         public void ApplyTransform(float parentWidth, float parentHeight, float scaledWidth)

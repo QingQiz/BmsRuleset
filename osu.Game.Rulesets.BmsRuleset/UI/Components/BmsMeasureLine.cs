@@ -10,7 +10,13 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
 {
     private readonly BmsPlayfield playfield;
     private readonly BmsStage stage;
+
     private readonly Box line;
+
+    // Two coordinate representations of the same measure line:
+    //   scrollAtTick — tick-based scroll coordinate (used in normal BPM-aware mode)
+    //   timeAtTick   — projected real time          (used in constant-scroll mode)
+    // Progress = chosenValue - CurrentScrollPosition/Time.Current.
     private readonly double scrollAtTick;
     private readonly double timeAtTick;
 
@@ -40,12 +46,10 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
             return;
         }
 
-        var scrollRange = Math.Max(1, playfield.ScrollRange);
-        var travelDistance = Math.Max(1, stage.DrawHeight - stage.HitTargetPosition);
         var progress = playfield.ConstantScrollActive
             ? timeAtTick - playfield.Time.Current
             : scrollAtTick - playfield.CurrentScrollPosition;
-        var y = stage.DrawHeight - stage.HitTargetPosition - (float)(progress * playfield.ScrollSpeedMultiplier / scrollRange) * travelDistance;
+        var y = playfield.YForScrollProgress(progress, stage.DrawHeight);
 
         if (!float.IsFinite(y))
         {

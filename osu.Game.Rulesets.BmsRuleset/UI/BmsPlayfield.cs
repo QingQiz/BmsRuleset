@@ -304,31 +304,79 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region Scroll Speed
 
+    /// <summary>
+    ///     Final applied scroll speed = <see cref="configuredScrollSpeed"/> × multiplier preset.
+    /// </summary>
     public double ScrollSpeed { get; private set; } = default_scroll_speed;
 
+    /// <summary>
+    ///     The judgement line's current position on the scroll-coordinate axis.
+    ///     In tick mode this advances at a rate proportional to the active BPM;
+    ///     in constant-scroll mode this is simply Time.Current (linear).
+    ///     When a note's scroll position equals this value, the note is at the
+    ///     judgement line and its Y = <c>parentHeight - HitTargetPosition</c>.
+    /// </summary>
     public double CurrentScrollPosition { get; private set; }
 
+    /// <summary>
+    ///     Visible scroll window size in tick-based scroll units.
+    ///     A note this far ahead of <see cref="CurrentScrollPosition"/> sits at
+    ///     the top edge of the playfield (i.e. Y ≈ 0).
+    /// </summary>
     public double ScrollRange => baseScrollRange * scrollRangeScale;
 
     /// <summary>
-    ///     Scroll-range normalization scale matching osu!mania's visual speed
-    ///     (computed once from <see cref="BmsStage.HIT_TARGET_POSITION"/>).
+    ///     Normalises the scroll range so the visual speed at the default scroll
+    ///     speed matches osu!mania's baseline (computed once from the stage's
+    ///     <see cref="BmsStage.HIT_TARGET_POSITION"/>).
     /// </summary>
     private double scrollRangeScale;
 
+    /// <summary>
+    ///     Scroll range at default speed.  Visible window = this ÷ SpeedMultiplier.
+    /// </summary>
     private static double baseScrollRange => BmsDrawableRuleset.ComputeScrollTime(default_scroll_speed);
 
+    /// <summary>
+    ///     Ratio of the current scroll speed to the default.
+    ///     Scales the pixel-per-scroll-unit mapping in <see cref="YForScrollProgress"/>.
+    /// </summary>
     public double ScrollSpeedMultiplier => ScrollSpeed / default_scroll_speed;
 
-    public double TimeRange => baseScrollRange / ScrollSpeedMultiplier * scrollRangeScale;
+    /// <summary>
+    ///     Converts a scroll progress value (distance from the judgement line in scroll
+    ///     coordinate space) into a Y pixel position relative to the container's top.
+    ///     The progress is zero when the object is at the judgement line, positive when
+    ///     above it (yet to be hit), and negative when below (already past).
+    /// </summary>
+    /// <param name="progress">
+    ///     Distance from the judgement line in scroll-coordinate space.
+    ///     0 = at judgement line, positive = above (yet to hit), negative = below (past).
+    /// </param>
+    /// <param name="parentHeight">
+    ///     Total pixel height of the column container. The returned Y is relative to this.
+    /// </param>
+    /// <param name="noteHeight">
+    ///     Pixel height of the note. Subtracted so the note sits on rather than covers the judgement line.
+    /// </param>
+    public float YForScrollProgress(double progress, double parentHeight, double noteHeight = 0)
+    {
+        var range = Math.Max(1.0, ScrollRange);
+        var hitTarget = Stage.HitTargetPosition;
+        var travelDistance = Math.Max(1f, (float)(parentHeight - hitTarget));
+        return (float)(parentHeight - hitTarget - progress * ScrollSpeedMultiplier / range * travelDistance - noteHeight);
+    }
 
-
+    /// <summary>
+    ///     BMS default scroll speed (≈8.0ms of visible time per pixel at 1.0×).
+    ///     Used as the normalisation denominator for <see cref="ScrollSpeedMultiplier"/>.
+    /// </summary>
     private const double default_scroll_speed = BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED;
 
     /// <summary>
     ///     In-game scroll speed multiplier presets cycled by
     ///     <see cref="AdjustScrollSpeed"/> via Up/Down keys.
-    ///     Index 9 is the base 1.0x (configured speed).
+    ///     Index 9 is the base 1.0× (configured speed).
     /// </summary>
     private static readonly double[] scroll_speed_multipliers =
     [
@@ -337,9 +385,16 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
     ];
 
-    private const int default_multiplier_index = 9; // 1.0x
+    private const int default_multiplier_index = 9; // 1.0×
 
+    /// <summary>
+    ///     Scroll speed configured in the settings (before the in-game multiplier preset is applied).
+    /// </summary>
     private double configuredScrollSpeed = default_scroll_speed;
+
+    /// <summary>
+    ///     Index into <see cref="scroll_speed_multipliers"/> for the current in-game preset.
+    /// </summary>
     private int currentMultiplierIndex = default_multiplier_index;
 
     public void SetConfiguredScrollSpeed(double speed)
