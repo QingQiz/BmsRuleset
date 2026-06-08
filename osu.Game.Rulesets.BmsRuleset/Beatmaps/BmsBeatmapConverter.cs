@@ -82,15 +82,18 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (original is BmsBeatmap { TotalColumns: > 0 } bmsBeatmap)
             return bmsBeatmap.TotalColumns;
 
-        var metadataKeyCount = BmsDifficultyInfo.GetKeyCount(original.Difficulty);
-
-        if (BmsLayout.IsKnownTotalColumns(metadataKeyCount))
-            return metadataKeyCount;
-
+        // Source channels are the ground truth — prefer them over potentially-stale
+        // metadata (CircleSize) which may have been written by a previous processing
+        // pass with incorrect or default values.
         var inferred = BmsLayout.InferTotalColumns(hitObjects.Select(h => h.SourceChannel), original.BeatmapInfo.Path);
 
         if (inferred > 0)
             return inferred;
+
+        var metadataKeyCount = BmsDifficultyInfo.GetKeyCount(original.Difficulty);
+
+        if (BmsLayout.IsKnownTotalColumns(metadataKeyCount))
+            return metadataKeyCount;
 
         return Math.Max(BmsLayout.BMS5_KEY_COLUMNS, hitObjects.Count == 0 ? 0 : hitObjects.Max(h => h.Column) + 1);
     }

@@ -77,13 +77,21 @@ public static class BmsLayout
             return false;
         }
 
-        return totalColumns switch
+        var success = totalColumns switch
         {
             PMS_COLUMNS => tryMapPmsSingleChannel(visibleChannel, out column),
             PMS_DOUBLE_PLAY_COLUMNS => tryMapPmsDoubleChannel(visibleChannel, out column),
             BMS5_DOUBLE_PLAY_COLUMNS => tryMapBms5DoubleChannel(visibleChannel, out column),
             _ => TryMapBmsChannel(visibleChannel, out column),
         };
+
+        if (success && column >= totalColumns)
+        {
+            column = -1;
+            return false;
+        }
+
+        return success;
     }
 
     public static bool TryMapVisibleChannel(string channel, int totalColumns, out int column)
@@ -94,13 +102,21 @@ public static class BmsLayout
             return false;
         }
 
-        return totalColumns switch
+        var success = totalColumns switch
         {
             PMS_COLUMNS => tryMapPmsSingleChannel(channel, out column),
             PMS_DOUBLE_PLAY_COLUMNS => tryMapPmsDoubleChannel(channel, out column),
             BMS5_DOUBLE_PLAY_COLUMNS => tryMapBms5DoubleChannel(channel, out column),
             _ => TryMapBmsChannel(channel, out column),
         };
+
+        if (success && column >= totalColumns)
+        {
+            column = -1;
+            return false;
+        }
+
+        return success;
     }
 
     public static bool TryMapBmsChannel(string channel, out int column)
