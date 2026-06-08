@@ -60,7 +60,6 @@ To remove all imported BMS content, use the **"Delete all imported BMS files"** 
 | Measure length          | channel `02`                                                                                                      |                                                                           |
 | Text events             | `#TEXTxx`, `#SONGxx`, channel `99`                                                                                |                                                                           |
 | Random / Switch         | `#IF`, `#ELSEIF`, `#ELSE`, `#ENDIF` / `#END` / `#IFEND` / `#END IF` (typo tolerance), `#SWITCH`, related commands | gameplay supported                                                        |
-| Subtitle / Genre typo   | `#GENLE` → `#GENRE`                                                                                               |                                                                           |
 
 **Channels parsed:**
 
