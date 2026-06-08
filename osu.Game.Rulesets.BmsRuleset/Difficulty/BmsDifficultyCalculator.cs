@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
@@ -29,8 +31,15 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
         {
             var effectiveClockRate = clockRate;
 
-            var result = StarRatingProcessor.Compute(hitObjects, totalColumns, rank, effectiveClockRate);
-            sr = result.StarRating;
+            // When Auto Scratch is active, exclude scratch column notes from difficulty calculation.
+            if (bmsBeatmap != null && mods.Any(m => m is BmsModAutoScratch))
+                hitObjects = hitObjects.Where(h => !BmsLayout.IsScratchColumn(h.Column, bmsBeatmap.LayoutVariant)).ToList();
+
+            if (hitObjects.Count > 0)
+            {
+                var result = StarRatingProcessor.Compute(hitObjects, totalColumns, rank, effectiveClockRate);
+                sr = result.StarRating;
+            }
         }
 
         return new DifficultyAttributes(mods, sr)
