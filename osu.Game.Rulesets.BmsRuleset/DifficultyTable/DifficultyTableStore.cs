@@ -45,7 +45,11 @@ public partial class DifficultyTableStore
         this.config = config;
         this.cacheDirectory = cacheDirectory;
         Directory.CreateDirectory(cacheDirectory);
-        RefreshDiffNameEvent += notification => DifficultyNameUpdater?.RefreshAllMarkers(notification);
+        RefreshDiffNameEvent += notification => Task.Factory.StartNew(() =>
+        {
+            DifficultyNameUpdater?.RefreshAllMarkers(notification);
+        }, TaskCreationOptions.LongRunning);
+
         TableListRebuildEvent += tb => syncManager?.SyncInTransaction(realm, tb);
     }
 
@@ -142,7 +146,7 @@ public partial class DifficultyTableStore
             json = await File.ReadAllTextAsync(source).ConfigureAwait(false);
         }
 
-        notification.Progress = (0.5f);
+        notification.Progress = 0.5f;
 
         var parsed = BmsTableJsonParser.Parse(json);
         if (parsed == null)

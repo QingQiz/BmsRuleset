@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -38,58 +39,44 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
     /// </summary>
     public void RefreshAllMarkers(ProgressNotification? notification = null)
     {
-        if (notification != null)
-            notification.Text = "Refreshing markers...";
+        notification?.Text = "Collecting ...";
+
+        List<(Guid, string)> collect = [];
 
         realm.Run(r =>
         {
-            const int batch_size = 100;
-
             var allBmsBeatmaps = r.All<BeatmapInfo>().Filter("Ruleset.ShortName == 'bms'");
-            var total = allBmsBeatmaps.Count();
-
-            if (total == 0)
-            {
-                if (notification != null)
-                    notification.Progress = 1;
-                return;
-            }
-
-            var processed = 0;
-            var batch = new List<(BeatmapInfo, string)>(batch_size);
             foreach (var beatmap in allBmsBeatmaps)
             {
-                if (batch.Count == batch_size) updateBatch();
-
                 var clean = markerSuffixRegex().Replace(beatmap.DifficultyName, string.Empty);
                 var markers = store.GetMarkers(beatmap.MD5Hash);
+                var res = string.Empty;
 
                 if (markers.Count == 0)
                 {
-                    if (beatmap.DifficultyName != clean) batch.Add((beatmap, clean));
+                    if (beatmap.DifficultyName != clean) res = clean;
                 }
                 else
                 {
                     var markerStr = string.Join(" ", markers.Select(m => $"{m.table.Symbol}{m.entry.Level}"));
-                    batch.Add((beatmap, $"{clean} [{markerStr}]"));
+                    res = $"{clean} [{markerStr}]";
                 }
 
-                processed++;
-                if (notification != null)
-                    notification.Progress = (float)processed / total;
+                if (res != beatmap.DifficultyName) collect.Add((beatmap.ID, res));
             }
+        });
 
-            updateBatch();
+        var total = collect.Count;
+        var processed = 0;
+        notification?.Text = "Refreshing ...";
 
-            if (notification != null)
-                notification.Progress = 1;
-            return;
-
-            void updateBatch()
+        realm.Write(r =>
+        {
+            foreach (var collectItem in collect)
             {
-                r.Write(() => batch.ForEach(b => b.Item1.DifficultyName = b.Item2));
-                batch.Clear();
-                if (notification != null) notification.Text = $"Refresh {processed}/{total} ...";
+                r.Find<BeatmapInfo>(collectItem.Item1)?.DifficultyName = collectItem.Item2;
+                processed += 1;
+                notification?.Progress = (float)processed / total;
             }
         });
     }
