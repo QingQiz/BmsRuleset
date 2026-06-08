@@ -35,21 +35,16 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
 {
 
-    #region Key-sound fields
+    #region BmsEvents
 
     public BmsKeySoundPlayer KeySoundPlayer { get; }
 
-    #endregion
-
-    #region HUD fields
-
     private readonly BmsTextEventManager textEventManager = null!;
 
-    #endregion
-
-    #region Input fields
-
-    private readonly HashSet<int> pressedColumns = [];
+    private void triggerEvents()
+    {
+        textEventManager.Update(Time.Current, BmsEventBus.OnTextEvent);
+    }
 
     #endregion
 
@@ -89,11 +84,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region Constants
 
-    private const double default_scroll_speed = BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED;
-    private const double min_scroll_speed = 1;
-    private const double max_scroll_speed = BmsRulesetConfigManager.MAX_SCROLL_SPEED;
-    private const double scroll_speed_delta = 1;
-
     private const float minimum_side_padding = 20;
 
     #endregion
@@ -111,18 +101,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public BmsTimingMap? TimingMap { get; }
 
     public bool ConstantScrollActive { get; set; }
-
-    public double BaseScrollRange { get; private set; }
-
-    public double ScrollSpeedMultiplier { get; private set; }
-
-    public double TimeRange { get; private set; }
-
-    public double ScrollSpeed { get; private set; } = default_scroll_speed;
-
-    public double CurrentScrollPosition { get; private set; }
-
-    public double ScrollRange { get; private set; }
 
     #endregion
 
@@ -215,16 +193,18 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region Input
 
+    private readonly HashSet<int> pressedColumns = [];
+
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
     {
         switch (e.Action)
         {
             case BmsAction.IncreaseScrollSpeed:
-                AdjustScrollSpeed(scroll_speed_delta);
+                AdjustScrollSpeed(1);
                 return true;
 
             case BmsAction.DecreaseScrollSpeed:
-                AdjustScrollSpeed(-scroll_speed_delta);
+                AdjustScrollSpeed(-1);
                 return true;
         }
 
@@ -322,44 +302,73 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #endregion
 
-    #region HUD
+    #region Scroll Speed
 
-    public void SetScrollSpeed(double scrollSpeed)
-    {
-        ScrollSpeed = Math.Clamp(scrollSpeed, min_scroll_speed, max_scroll_speed);
-        recalculateSpeedFields();
-        BmsEventBus.OnScrollSpeedChangeEvent(scrollSpeed);
-    }
+    public double ScrollSpeed { get; private set; } = default_scroll_speed;
+
+    public double CurrentScrollPosition { get; private set; }
+
+    public double ScrollRange => baseScrollRange * scrollRangeScale;
+
+    /// <summary>
+    ///     Scroll-range normalization scale matching osu!mania's visual speed
+    ///     (computed once from <see cref="BmsStage.HIT_TARGET_POSITION"/>).
+    /// </summary>
+    private double scrollRangeScale;
+
+    private static double baseScrollRange => BmsDrawableRuleset.ComputeScrollTime(default_scroll_speed);
+
+    public double ScrollSpeedMultiplier => ScrollSpeed / default_scroll_speed;
+
+    public double TimeRange => baseScrollRange / ScrollSpeedMultiplier * scrollRangeScale;
+
+
+    private const double default_scroll_speed = BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED;
+
+    /// <summary>
+    ///     In-game scroll speed multiplier presets cycled by
+    ///     <see cref="AdjustScrollSpeed"/> via Up/Down keys.
+    ///     Index 9 is the base 1.0x (configured speed).
+    /// </summary>
+    private static readonly double[] scroll_speed_multipliers =
+    [
+        0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
+        1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75,
+        3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
+    ];
+
+    private const int default_multiplier_index = 9; // 1.0x
+
+    private double configuredScrollSpeed = default_scroll_speed;
+    private int currentMultiplierIndex = default_multiplier_index;
 
     public void SetConfiguredScrollSpeed(double speed)
     {
-        BmsPlayerShared.ConfiguredScrollSpeed = speed;
-        ScrollSpeed = speed;
-        recalculateSpeedFields();
+        configuredScrollSpeed = speed;
+        setScrollSpeedFromMultiplierIndex();
     }
 
-    public void AdjustScrollSpeed(double delta) => SetScrollSpeed(ScrollSpeed + delta);
-
-    private void recalculateSpeedFields()
+    /// <summary>
+    ///     Cycles the scroll speed through <see cref="scroll_speed_multipliers"/>
+    ///     presets relative to the configured base speed.
+    ///     <paramref name="delta"/> is treated as direction (positive = faster, negative = slower).
+    /// </summary>
+    public void AdjustScrollSpeed(double delta)
     {
-        BaseScrollRange = BmsDrawableRuleset.ComputeScrollTime(default_scroll_speed);
-        ScrollSpeedMultiplier = ScrollSpeed / default_scroll_speed;
-        TimeRange = BaseScrollRange / ScrollSpeedMultiplier;
-        ScrollRange = BaseScrollRange;
+        var direction = delta > 0 ? 1 : -1;
+        var newIndex = Math.Clamp(currentMultiplierIndex + direction, 0, scroll_speed_multipliers.Length - 1);
 
-        // Apply the same TimeRange normalization that osu!mania uses.
-        // This ensures visual scroll speed is independent of hit position
-        // and matches mania's speed at the same numeric scroll speed setting.
-        const float reference_scroll_distance = 768f - 124.8f; // 768 - legacy DEFAULT_HIT_POSITION
-        var actualScrollDistance = 768f - Stage.HitTargetPosition;
-        var scale = actualScrollDistance / reference_scroll_distance;
-        TimeRange *= scale;
-        ScrollRange *= scale;
+        if (newIndex != currentMultiplierIndex)
+        {
+            currentMultiplierIndex = newIndex;
+            setScrollSpeedFromMultiplierIndex();
+        }
     }
 
-    private void updateHud()
+    private void setScrollSpeedFromMultiplierIndex()
     {
-        textEventManager.Update(Time.Current, BmsEventBus.OnTextEvent);
+        ScrollSpeed = configuredScrollSpeed * scroll_speed_multipliers[currentMultiplierIndex];
+        BmsEventBus.OnScrollSpeedChangeEvent(scroll_speed_multipliers[currentMultiplierIndex]);
     }
 
     #endregion
@@ -369,7 +378,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [BackgroundDependencyLoader(true)]
     private void load()
     {
-        recalculateSpeedFields();
+        // Compute the mania-matching scroll-range scale once at load.
+        // HitTargetPosition is constant per layout variant, so this never changes.
+        const float reference_scroll_distance = 768f - 124.8f; // 768 - legacy DEFAULT_HIT_POSITION
+        scrollRangeScale = (768f - Stage.HitTargetPosition) / reference_scroll_distance;
 
         RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, 512);
 
@@ -409,13 +421,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             ? Time.Current
             : TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current;
 
-        // NOTE: ScrollRange must NOT be reset here. recalculateSpeedFields() applies the
-        // mania-matching distance normalization (scale) to ScrollRange; overwriting it with the
-        // unscaled BaseScrollRange every frame discarded that normalization and made BMS notes
-        // fall ~7% faster than mania at the same numeric scroll speed.
-
-        updateHud();
-
+        triggerEvents();
         updateStageScale();
     }
 

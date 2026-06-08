@@ -29,7 +29,7 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
     {
         base.LoadComplete();
         BmsEventBus.TextEvent += showText;
-        BmsEventBus.ScrollSpeedChangeEvent += x => showScrollSpeed(x, BmsPlayerShared.ConfiguredScrollSpeed);
+        BmsEventBus.ScrollSpeedChangeEvent += showScrollSpeed;
         mainText.Text = "Game Start";
         this.Delay(1000).FadeOut(1000);
     }
@@ -67,16 +67,16 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
         ];
     }
 
-    private void showScrollSpeed(double speed, double configured)
+    private void showScrollSpeed(double multiplier)
     {
-        var delta = speed - configured;
+        var delta = multiplier - 1;
         var colour = delta > 0 ? new Color4(255, 200, 0, 255)
             : delta < 0 ? new Color4(100, 180, 255, 255)
             : Color4.White;
 
         arrowText.Text = delta > 0 ? ">>" : delta < 0 ? "<<" : string.Empty;
         arrowText.Colour = colour;
-        mainText.Text = $"{speed:0.0}";
+        mainText.Text = $"{multiplier:0.0}x";
         mainText.Colour = colour;
         animateShow(1000);
     }

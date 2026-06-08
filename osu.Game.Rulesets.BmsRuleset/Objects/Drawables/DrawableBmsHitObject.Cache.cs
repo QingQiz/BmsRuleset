@@ -1,6 +1,7 @@
 using System;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
@@ -84,7 +85,7 @@ public partial class DrawableBmsHitObject
                 Playfield?.ScrollSpeedMultiplier ?? 1,
                 Playfield?.TimingMap,
                 Playfield?.CurrentScrollPosition ?? currentTime,
-                Playfield?.ScrollRange ?? Playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(8));
+                Playfield?.ScrollRange ?? Playfield?.TimeRange ?? BmsDrawableRuleset.ComputeScrollTime(BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED));
         }
 
         public void ApplyTransform(float parentWidth, float parentHeight, float scaledWidth)

@@ -48,7 +48,7 @@ public partial class TestSceneBmsScrollSpeedControls : BmsPlayerTestScene
         AddStep("capture spacing", () => normalSpacing = Playfield.SpacingBetweenTicks(firstTick, secondTick));
 
         AddStep("press up", () => Playfield.AdjustScrollSpeed(1));
-        AddUntilStep("scroll speed increased", () => Playfield.ScrollSpeed, () => Is.EqualTo(9).Within(0.001));
+        AddUntilStep("scroll speed increased", () => Playfield.ScrollSpeed, () => Is.EqualTo(10).Within(0.001));
         AddUntilStep("spacing visibly increased", () => Playfield.SpacingBetweenTicks(firstTick, secondTick), () => Is.GreaterThan(normalSpacing * 1.1f));
 
         AddStep("press down", () => Playfield.AdjustScrollSpeed(-1));

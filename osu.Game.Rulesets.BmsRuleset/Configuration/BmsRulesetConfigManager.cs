@@ -7,7 +7,7 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
     : RulesetConfigManager<BmsRulesetSetting>(settings, ruleset, variant)
 {
 
-    public const double MAX_SCROLL_SPEED = 100.0;
+    public const double MAX_SCROLL_SPEED = 50.0;
     public const double DEFAULT_SCROLL_SPEED = 8.0;
 
     protected override void InitialiseDefaults()
