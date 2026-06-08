@@ -32,11 +32,20 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 /// </remarks>
 public partial class BmsHealthProcessor : HealthProcessor
 {
+
+    /// <summary>
+    /// Whether HP ever dropped to 0 during this play.
+    /// to determine gauge-failed rank even when NF mod prevents mid-song failure.
+    /// </summary>
+    public bool HasEverFailed { get; private set; }
+
     private const double bad_delta = -0.04;
     private const double miss_delta = -0.06;
     private const double empty_poor_delta = -0.02;
 
     private const double initial_health = 0.2;
+
+    private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
     private IBeatmap? beatmap;
     private double pgreatGain;
@@ -62,6 +71,15 @@ public partial class BmsHealthProcessor : HealthProcessor
         base.Reset(storeResults);
         initialized = false;
         Health.Value = initial_health;
+        HasEverFailed = false;
+    }
+
+    protected override void ApplyResultInternal(JudgementResult result)
+    {
+        base.ApplyResultInternal(result);
+
+        if (!HasEverFailed && Health.Value <= 0)
+            HasEverFailed = true;
     }
 
     protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement is BmsJudgement { IsMine: true }
@@ -93,8 +111,6 @@ public partial class BmsHealthProcessor : HealthProcessor
             _ => 0,
         };
     }
-
-    private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
     private void ensureInitialized()
     {

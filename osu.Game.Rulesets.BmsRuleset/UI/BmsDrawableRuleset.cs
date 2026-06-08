@@ -11,6 +11,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -97,14 +98,24 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     /// <summary>
     ///     Called when all hit objects have been judged (play completed).
-    ///     If the final gauge is below the Normal-mode clear threshold (80 %),
-    ///     stamps <see cref="ScoreRank.F"/> on the score without triggering a
-    ///     gameplay fail (no fail animation, results screen shows normally with F rank).
+    ///     If the gauge is failed (HP ever hit 0, even under NF survival) or the final
+    ///     HP is below the Normal-mode clear threshold (80 %), stamps
+    ///     <see cref="ScoreRank.F"/> on the score without triggering a gameplay fail
+    ///     (no fail animation, results screen shows normally with F rank).
     /// </summary>
     private void onPlayCompleted()
     {
         if (scoreProcessor == null || healthProcessor == null || gameplayState == null)
             return;
+
+        // The BmsHealthProcessor tracks HasEverFailed — which remains false during
+        // autoplay simulation (ApplyBeatmap resets it) and only flips to true when HP
+        // drops to 0 during actual gameplay, even if NF mod prevents the fail screen.
+        if (healthProcessor is BmsHealthProcessor bmsHp && bmsHp.HasEverFailed)
+        {
+            scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
+            return;
+        }
 
         if (healthProcessor.Health.Value >= 0.8)
             return;
