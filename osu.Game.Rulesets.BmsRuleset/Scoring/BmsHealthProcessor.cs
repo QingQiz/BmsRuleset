@@ -8,8 +8,6 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 
-// TODO empty health. see https://iidx.org/misc/iidx_lr2_beatoraja_diff
-
 /// <summary>
 ///     BMS-native Normal gauge health processor.
 /// </summary>
@@ -57,24 +55,6 @@ public partial class BmsHealthProcessor : HealthProcessor
     {
         ensureInitialized();
         Health.Value = Math.Max(0, Health.Value + empty_poor_delta);
-    }
-
-    /// <summary>
-    ///     BMS Normal gauge fail condition:
-    ///     <list type="bullet">
-    ///         <item>Fail immediately if health reaches 0.</item>
-    ///         <item>Fail at song end if health is below 80 % (Normal gauge clear condition).</item>
-    ///     </list>
-    /// </summary>
-    protected override bool CheckDefaultFailCondition(JudgementResult result)
-    {
-        if (Health.Value <= 0)
-            return true;
-
-        if (MaxHits > 0 && JudgedHits >= MaxHits && Health.Value < 0.8)
-            return true;
-
-        return false;
     }
 
     protected override void Reset(bool storeResults)

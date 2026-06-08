@@ -17,7 +17,6 @@
   2026-06-01 15:13:14 [error]: at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
 
   ```
-- [ ] 血量过低导致的失败不会更新结果为F
 
 ## TODO
 
@@ -91,6 +90,5 @@
 - [x] 同样的速度下 bms 下落比 mania 快
 
 - [ ] rewrite 血条，红黄绿三色渐变，不改变整体颜色，去掉边框
-- [ ] GetBeatmapAttributesForDisplay 显示sr难度分量 和 rank
 - [ ] 选择 AS 时，计算难度忽略 scratch
 - [ ] LN 的 头判

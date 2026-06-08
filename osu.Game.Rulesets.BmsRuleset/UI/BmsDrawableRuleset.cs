@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Input;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Input.Handlers;
 using osu.Game.Replays;
@@ -47,21 +45,10 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     private HealthProcessor? healthProcessor { get; set; }
 
     [Resolved(CanBeNull = true)]
-    private GameplayState? gameplayState { get; set; }
+    private ScoreProcessor? scoreProcessor { get; set; }
 
     [Resolved(CanBeNull = true)]
-    private ScoreManager? scoreManager { get; set; }
-
-    #region Disposal
-
-    protected override void Dispose(bool isDisposing)
-    {
-        if (healthProcessor != null)
-            healthProcessor.Failed -= onHealthFailed;
-        base.Dispose(isDisposing);
-    }
-
-    #endregion
+    private GameplayState? gameplayState { get; set; }
 
     public static double ComputeScrollTime(double scrollSpeed) => MAX_TIME_RANGE / Math.Max(1, scrollSpeed);
 
@@ -87,24 +74,13 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             ((BmsPlayfield)Playfield).SetConfiguredScrollSpeed(speed);
         }
 
-        // BMS convention: save every play to the local DB, including failed ones.
-        // Player hard-codes SoloPlayer and has no Ruleset.CreatePlayer() hook, so we
-        // hook the HealthProcessor.Failed event from inside DrawableRuleset instead.
-        // We defer import by 500 ms so that Player.ConcludeFailedScore (which stamps
-        // ScoreInfo.Rank = F) has already run by the time we read the score.
-        //
-        // Only hook this when failure is actually permitted. If a fail-override mod
-        // (e.g. No Fail) is active, HealthProcessor.Failed still fires when the gauge
-        // bottoms out, but the failure must be blocked. Our handler returning true would
-        // override the mod and force HasFailed = true (freezing the gauge at zero so it
-        // can never recover) and would import a failed score that the normal completion
-        // path later re-imports with the same ID (duplicate primary key).
-        var failureAllowed = Mods.OfType<IApplicableFailOverride>().All(m => m.PerformFail());
-
-        if (failureAllowed && healthProcessor != null && gameplayState != null && scoreManager != null && ReplayScore == null)
-        {
-            healthProcessor.Failed += onHealthFailed;
-        }
+        // Subscribe to play completion for the end-of-song gauge check.
+        // When health < 80% at song end, the rank must be F but the play should show
+        // results normally (no fail animation).  This cannot live in RankFromScore
+        // (which would lock the rank for subsequent accuracy updates) nor in
+        // CheckDefaultFailCondition (which would trigger a gameplay fail).
+        if (scoreProcessor != null && healthProcessor != null && gameplayState != null)
+            scoreProcessor.HasCompleted.BindValueChanged(_ => onPlayCompleted());
     }
 
     protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);
@@ -119,23 +95,23 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         return new BmsReplayRecorder(score);
     }
 
-    private bool onHealthFailed()
+    /// <summary>
+    ///     Called when all hit objects have been judged (play completed).
+    ///     If the final gauge is below the Normal-mode clear threshold (80 %),
+    ///     stamps <see cref="ScoreRank.F"/> on the score without triggering a
+    ///     gameplay fail (no fail animation, results screen shows normally with F rank).
+    /// </summary>
+    private void onPlayCompleted()
     {
-        // Do not block the fail — return true to allow it to proceed.
-        // Defer import so ConcludeFailedScore (rank = F stamp) has run first.
-        Scheduler.AddDelayed(() =>
-        {
-            if (gameplayState == null || scoreManager == null)
-                return;
+        if (scoreProcessor == null || healthProcessor == null || gameplayState == null)
+            return;
 
-            var scoreCopy = gameplayState.Score.ScoreInfo.DeepClone();
-            Task.Run(() => scoreManager.Import(scoreCopy))
-                .ContinueWith(
-                    t => Logger.Error(t.Exception, "BMS: failed to save failed score to database."),
-                    TaskContinuationOptions.OnlyOnFaulted);
-        }, 500);
+        if (healthProcessor.Health.Value >= 0.8)
+            return;
 
-        return true;
+        // FailScore sets rank.Value = ScoreRank.F and score.Passed = false directly,
+        // bypassing RankFromScore so the updateRank guard never fires mid-play.
+        scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
     }
 
     [BackgroundDependencyLoader]
