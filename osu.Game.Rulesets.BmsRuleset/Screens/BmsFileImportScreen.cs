@@ -2,14 +2,12 @@
 
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
@@ -20,9 +18,9 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Screens;
-using osu.Game.Screens.Play;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Screens;
@@ -44,15 +42,14 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     [Cached]
     private OverlayColourProvider colourProvider = new(OverlayColourScheme.Purple);
 
-    [Resolved]
-    private ILocalUserPlayInfo localUserPlayInfo { get; set; }
-
     private FillFlowContainer buttonGroup;
     private Bindable<string> lastImportPath;
 
     private BmsFileImporter importer;
     private LoadingLayer loadingLayer = null!;
     private bool isImporting;
+
+    private DifficultyNameUpdater difficultyNameUpdater;
 
     [Resolved(CanBeNull = true)]
     private BmsRulesetConfigManager resolvedConfig { get; set; }
@@ -91,8 +88,12 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
         lastImportPath = (config ?? resolvedConfig)?.GetBindable<string>(BmsRulesetSetting.LastImportPath);
         var lastPath = lastImportPath?.Value;
 
+        // Wire up the marker updater (uses same store instance as the settings subsection).
+        if (realm != null && BmsRuleset.DifficultyTableStore != null)
+            difficultyNameUpdater = new DifficultyNameUpdater(realm, BmsRuleset.DifficultyTableStore);
+
         importer = realm != null && storage != null
-            ? new BmsFileImporter(realm, storage, notifications, null, sleepIfRequired)
+            ? new BmsFileImporter(realm, storage, notifications)
             {
                 // Persist star ratings (and other cached stats) after import so song-select
                 // sort/group by difficulty work. Without this, BeatmapInfo.StarRating stays 0
@@ -224,7 +225,8 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
         if (newDirectory != null)
         {
-            lastImportPath?.Value = newDirectory.FullName;
+            if (lastImportPath != null)
+                lastImportPath.Value = newDirectory.FullName;
         }
     }
 
@@ -241,16 +243,16 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
         // Schedule the UI setup (FadeIn + flag) on the update thread so this method is safe to
         // call from button actions, directory-change handlers, or thread-pool continuations.
-        Task.Factory.StartNew(() =>
+        Task.Run(async () =>
         {
-            importer.Import(paths).Wait();
+            await importer.Import(paths).ConfigureAwait(false);
             Schedule(() =>
             {
                 loadingLayer.FadeOut(duration);
                 fileSelector.CurrentPath.TriggerChange();
                 isImporting = false;
             });
-        }, TaskCreationOptions.LongRunning);
+        });
     }
 
     private void startDirectoryImport(bool recursive)
@@ -288,16 +290,5 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
             fileSelector.CurrentPath.TriggerChange();
             isImporting = false;
         });
-    }
-
-    private void sleepIfRequired()
-    {
-        // Importantly, also sleep if high performance session is active.
-        // If we don't do this, memory usage can become runaway due to GC running in a more lenient mode.
-        while (localUserPlayInfo?.PlayingState.Value != LocalUserPlayingState.NotPlaying)
-        {
-            Logger.Log("Background processing sleeping due to active gameplay...");
-            Thread.Sleep(10000);
-        }
     }
 }

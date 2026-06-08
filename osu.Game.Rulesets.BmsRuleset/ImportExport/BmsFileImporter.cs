@@ -19,14 +19,9 @@ using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.ImportExport;
 
-public partial class BmsFileImporter(
-    RealmAccess realm,
-    Storage storage,
-    INotificationOverlay? notifications = null,
-    BeatmapManager? beatmaps = null,
-    Action? sleepIfRequired = null
-) : ICanAcceptFiles
+public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotificationOverlay? notifications = null, BeatmapManager? beatmaps = null) : ICanAcceptFiles
 {
+
     public IEnumerable<string> HandledExtensions => Constant.BMS_EXTENSIONS;
 
     /// <summary>
@@ -84,7 +79,6 @@ public partial class BmsFileImporter(
                     foreach (var set in r.All<BeatmapSetInfo>())
                     {
                         notification.CancellationToken.ThrowIfCancellationRequested();
-                        sleepIfRequired?.Invoke();
 
                         if (set.Beatmaps.Any(x => x.Ruleset.ShortName == "bms"))
                         {
@@ -377,7 +371,6 @@ public partial class BmsFileImporter(
                     CancellationToken = notification.CancellationToken,
                 }, group =>
                 {
-                    sleepIfRequired?.Invoke();
                     var prepared = readPreparedDirectory(group, realm, fileStore);
                     pool.Add(prepared, notification.CancellationToken);
                 });
@@ -416,7 +409,6 @@ public partial class BmsFileImporter(
         {
             Parallel.ForEach(pool.GetConsumingEnumerable(), prepared =>
             {
-                sleepIfRequired?.Invoke();
                 realm.Run(r =>
                 {
                     var rulesetInfo = r.Find<RulesetInfo>("bms")!;
@@ -432,7 +424,7 @@ public partial class BmsFileImporter(
                         var existingSet = r.All<BeatmapSetInfo>()
                             .Filter("Hash == $0", setHash)
                             .FirstOrDefault();
-                        exists = existingSet != null && !existingSet.DeletePending;
+                        exists = (existingSet != null && !existingSet.DeletePending);
                     }
 
                     if (exists)
