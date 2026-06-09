@@ -94,6 +94,9 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     [Resolved(CanBeNull = true)]
     private BeatmapManager? beatmapManager { get; set; }
 
+    [Resolved]
+    private OsuColour colours { get; set; } = null!;
+
     #region Disposal
 
     protected override void Dispose(bool isDisposing)
@@ -126,6 +129,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     private static ImportOption parseHistoryEntry(string entry)
     {
         var parts = entry.Split('|', 3);
+
         if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[0]) && !string.IsNullOrEmpty(parts[1]))
         {
             var symbol = parts.Length >= 3 ? parts[2] : null;
@@ -135,7 +139,6 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
         return new ImportOption(friendlyName(entry), entry);
     }
-
 
     private void onLayoutSettingChanged()
     {
@@ -254,6 +257,16 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 RelativeSizeAxes = Axes.X,
                 Height = 36,
                 Action = () => { performer?.PerformFromScreen(menu => menu.Push(new BmsFileImportScreen(manager))); },
+                Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
+            },
+            new RoundedButton
+            {
+                Text = "Clean up orphaned BMS sets",
+                TooltipText = "Removes BMS beatmaps whose source files (audio, images) can no longer be found on disk",
+                BackgroundColour = colours.YellowDark,
+                RelativeSizeAxes = Axes.X,
+                Height = 36,
+                Action = confirmCleanupOrphans,
                 Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
             },
             new DangerousRoundedButton
@@ -394,6 +407,21 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             bmsImporter.DeleteAllBmsFilesAsync();
     }
 
+    private void confirmCleanupOrphans()
+    {
+        if (bmsImporter == null)
+            return;
+
+        var dialog = new MassDeleteConfirmationDialog(
+            () => Task.Run(() => bmsImporter.CleanupOrphanedSets()),
+            "BMS beatmaps whose source directory no longer exists will be removed. This cannot be undone.\n\nAfter deletion, you will need to re-import them. Cancel now and move the files back to their original location if you want to keep them.");
+
+        if (dialogOverlay != null)
+            dialogOverlay.Push(dialog);
+        else
+            bmsImporter.CleanupOrphanedSets();
+    }
+
     private async void importDiffTableFromPathUrl(string pathOrUrl)
     {
         ProgressNotification notification;
@@ -476,31 +504,38 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     /// </summary>
     private async void deleteDiffTable(DT table)
     {
-        ProgressNotification? notification = null;
-
-        Schedule(() =>
+        try
         {
-            notification = new ProgressNotification
+            ProgressNotification? notification = null;
+
+            Schedule(() =>
             {
-                Text = $"Removing difficulty table \"{table.Name}\"...",
-                Progress = 0,
-                State = ProgressNotificationState.Active,
-            };
-            notifications?.Post(notification);
-        });
+                notification = new ProgressNotification
+                {
+                    Text = $"Removing difficulty table \"{table.Name}\"...",
+                    Progress = 0,
+                    State = ProgressNotificationState.Active,
+                };
+                notifications?.Post(notification);
+            });
 
-        // Offload to thread pool — RemoveTable now calls RefreshAllMarkers which
-        // runs Realm queries that would block the UI.
-        await Task.Run(() => difficultyTableStore?.RemoveTable(table, notification)).ConfigureAwait(false);
+            // Offload to thread pool — RemoveTable now calls RefreshAllMarkers which
+            // runs Realm queries that would block the UI.
+            await Task.Run(() => difficultyTableStore?.RemoveTable(table, notification)).ConfigureAwait(false);
 
-        Schedule(() =>
+            Schedule(() =>
+            {
+                if (notification == null) return;
+
+                notification.CompletionText = $"Removed difficulty table \"{table.Name}\"";
+                notification.Progress = 1;
+                notification.State = ProgressNotificationState.Completed;
+            });
+        }
+        catch (Exception e)
         {
-            if (notification == null) return;
-
-            notification.CompletionText = $"Removed difficulty table \"{table.Name}\"";
-            notification.Progress = 1;
-            notification.State = ProgressNotificationState.Completed;
-        });
+            Logger.Error(e, $"Failed to delete difficulty table: {table.SourcePath}");
+        }
     }
 
     /// <summary>
@@ -508,19 +543,19 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     /// </summary>
     private async void updateDiffTable(DT table)
     {
-        if (difficultyTableStore == null || table.SourcePath == null) return;
-        if (table.Source != TableSource.RemoteUrl) return;
-
-        var notification = new ProgressNotification
-        {
-            Text = $"Updating difficulty table \"{table.Name}\"...",
-            Progress = 0,
-            State = ProgressNotificationState.Active,
-        };
-        Schedule(() => notifications?.Post(notification));
-
         try
         {
+            if (difficultyTableStore == null || table.SourcePath == null) return;
+            if (table.Source != TableSource.RemoteUrl) return;
+
+            var notification = new ProgressNotification
+            {
+                Text = $"Updating difficulty table \"{table.Name}\"...",
+                Progress = 0,
+                State = ProgressNotificationState.Active,
+            };
+            Schedule(() => notifications?.Post(notification));
+
             var importResult = await difficultyTableStore.ImportAsync(table.SourcePath, notification).ConfigureAwait(false);
 
             if (importResult != null)
@@ -590,6 +625,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         private void rebuild()
         {
             Clear();
+
             foreach (var table in store.Tables)
             {
                 var isSubdivided = syncManager?.IsSubdivided(table) ?? false;
@@ -794,6 +830,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                     foreach (var c in word)
                     {
                         var cw = estimateCharWidth(c, 16);
+
                         if (current.Length > 0 && currentW + cw > maxWidth)
                         {
                             chunks.Add(current);
@@ -836,6 +873,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 {
                     // Count entries per level.
                     var counts = new Dictionary<string, int>();
+
                     foreach (var e in table.Entries)
                     {
                         counts.TryGetValue(e.Level, out var c);
@@ -844,6 +882,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
                     // Order by LevelOrder, then any remaining levels.
                     var ordered = new List<string>();
+
                     foreach (var lv in table.LevelOrder)
                     {
                         if (counts.TryGetValue(lv, out var c))

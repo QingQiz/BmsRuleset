@@ -130,7 +130,10 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
                 : parseResult.Artist;
         }
 
-        output.Metadata.Source = "BMS";
+        // Source may already be set to the chart directory by the importer (external-audio mode).
+        // Only set a fallback if it's still null.
+        if (string.IsNullOrWhiteSpace(output.Metadata.Source))
+            output.Metadata.Source = "BMS";
 
         if (!string.IsNullOrWhiteSpace(parseResult.Maker))
             output.Metadata.Author.Username = parseResult.Maker;

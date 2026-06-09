@@ -39,7 +39,10 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     public override int Variant => (int)((BmsBeatmap)Beatmap).LayoutVariant;
 
     [Cached]
-    private BmsSampleStore sampleStore = new(((BmsBeatmap)beatmap).SampleDefinitions.Values);
+    private BmsSampleStore sampleStore = new(
+        ((BmsBeatmap)beatmap).SampleDefinitions.Values,
+        ((BmsBeatmap)beatmap).BeatmapInfo.Metadata.Source
+    );
 
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
     [Resolved(CanBeNull = true)]

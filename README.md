@@ -26,9 +26,17 @@ Native osu! ruleset plugin for BMS-family charts (`.bms`, `.bme`, `.bml`, `.pms`
 2. Click **"Import BMS files"** to open the import screen.
 3. Navigate to and select your BMS folder. Each chart file (`.bms`/`.bme`/`.bml`/`.pms`) in the folder becomes a
    separate beatmap; the whole folder becomes one beatmap set.
-4. Sibling audio/image resources are automatically included.
+4. **Only chart files are stored in osu!'s internal database.** Audio and image resources stay on the original
+   filesystem and are read directly during gameplay via the chart directory path tracked in `Metadata.Source`.
+   Avoid moving or deleting the original BMS folder after import — orphaned sets can be cleaned up from the
+   settings screen (see below).
 
 To remove all imported BMS content, use the **"Delete all imported BMS files"** button in the same settings section.
+This only removes the chart metadata from osu! — your original BMS folder is not affected.
+
+To clean up beatmaps whose source directory has been moved or deleted, click **"Clean up orphaned BMS sets"** in
+the same settings section. This scans for BMS beatmaps whose source directory no longer exists and marks them
+for deletion.
 
 ---
 
@@ -511,7 +519,6 @@ The full built-in skin (covering all 6 layouts) is at
 | **Gauge**     | Easy / Hard / Ex-Hard / Hazard gauge variants                                               | 2        |
 | **Gauge**     | LN-specific gauge events (head miss ≠ body drop ≠ tail miss)                                | 1        |
 | **Import**    | Resource files in subdirectories — only the filename is used, relative paths are unresolved |
-| **Import**    | Use reference/symbolic link to original BMS file instead of copying to realm                | 1        |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                       |
 | **Input**     | Judgement offset adjustment capability                                                      |
 | **Mods**      | Different health bar types                                                                  | 2        |
@@ -541,7 +548,6 @@ The full built-in skin (covering all 6 layouts) is at
 | **Parser**    | Channel `97` — dynamic BGM volume                                                           |
 | **Parser**    | Channel `98` — dynamic KEY volume (counterpart to channel 97)                               |
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                   |
-| **Perf**      | BMS file I/O — samples/BGA are large; consider reflection to bypass realm copy              | 1        |
 | **Renderer**  | BGA / movie / stagefile / background image                                                  |
 | **Renderer**  | Key beams (column light during hold)                                                        | 2        |
 | **Renderer**  | BGA                                                                                         |

@@ -230,7 +230,7 @@ public partial class BmsFileImporterTest
     }
 
     [Test]
-    public void TestImportRealSampleDirectoryCreatesOneSetWithAllChartsAndResources()
+    public void TestImportRealSampleDirectoryCreatesOneSetWithAllCharts()
     {
         runImportTest(async (realm, storage) =>
         {
@@ -261,8 +261,9 @@ public partial class BmsFileImporterTest
             var expectedChartHashes = chartPaths.Select(computeMd5).OrderBy(h => h, StringComparer.Ordinal).ToArray();
             var importedChartHashes = result.ChartHashes.Select(h => h.MD5Hash).OrderBy(h => h, StringComparer.Ordinal).ToArray();
 
+            // Only BMS chart files are imported; resource files stay on the original filesystem.
             Assert.That(result.BeatmapCount, Is.EqualTo(8));
-            Assert.That(result.FileCount, Is.GreaterThan(100));
+            Assert.That(result.FileCount, Is.EqualTo(8));
             Assert.That(result.DifficultyNames, Does.Contain("NORMAL"));
             Assert.That(result.DifficultyNames, Does.Contain("14ANOTHER"));
             Assert.That(importedChartHashes, Is.EqualTo(expectedChartHashes));
@@ -270,8 +271,6 @@ public partial class BmsFileImporterTest
             Assert.That(result.ChartHashes.All(h => h.Path != null), Is.True);
             Assert.That(result.FileNames, Does.Contain("_7NORMAL.bms"));
             Assert.That(result.FileNames, Does.Contain("_14ANOTHER.bms"));
-            Assert.That(result.FileNames, Does.Contain("kick_deep2.ogg"));
-            Assert.That(result.FileNames, Does.Contain("_title.png"));
             Assert.That(result.DistinctRealmFileHashes, Is.LessThanOrEqualTo(result.FileCount));
             Assert.That(result.Layouts.Single(l => l.DifficultyName == "NORMAL").CircleSize, Is.EqualTo(8));
             Assert.That(result.Layouts.Single(l => l.DifficultyName == "NORMAL").Variant, Is.EqualTo((int)BmsLayoutVariant.Bme7K));
@@ -281,7 +280,7 @@ public partial class BmsFileImporterTest
     }
 
     [Test]
-    public void TestImportRealSampleFileImportsSiblingSetResources()
+    public void TestImportSingleBmsFileDoesNotImportSiblingResources()
     {
         runImportTest(async (realm, storage) =>
         {
@@ -313,8 +312,9 @@ public partial class BmsFileImporterTest
             Assert.That(result.Layouts.Single().CircleSize, Is.EqualTo(8));
             Assert.That(result.Layouts.Single().Variant, Is.EqualTo((int)BmsLayoutVariant.Bme7K));
             Assert.That(result.FileNames, Does.Contain("_7NORMAL.bms"));
-            Assert.That(result.FileNames, Does.Contain("kick_deep2.ogg"));
-            Assert.That(result.FileNames, Does.Contain("_title.png"));
+            // Resource files (audio, images) are NOT imported — only BMS chart files.
+            Assert.That(result.FileNames, Does.Not.Contain("kick_deep2.ogg"));
+            Assert.That(result.FileNames, Does.Not.Contain("_title.png"));
         });
     }
 

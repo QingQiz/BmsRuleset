@@ -280,7 +280,18 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
 
     private void ensureTrackStore()
     {
-        if (beatmapTrackStore != null || audioManager == null || skin == null)
+        if (beatmapTrackStore != null)
+            return;
+
+        // Tier 1 — filesystem-backed track store (external-audio import mode).
+        if (sampleCache?.TrackStore != null)
+        {
+            beatmapTrackStore = sampleCache.TrackStore;
+            return;
+        }
+
+        // Tier 2 — LegacyBeatmapSkin Realm-backed track store.
+        if (audioManager == null || skin == null)
             return;
 
         var beatmapResources = skin.AllSources
