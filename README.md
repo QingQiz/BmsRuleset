@@ -564,6 +564,9 @@ The full built-in skin (covering all 6 layouts) is at
 | **Skin**      | E-POOR judgement image                                                                      | 3        |
 | **UI**        | Lane cover / skin / movement                                                                | 2        |
 | **UI**        | Rewrite health bar — red/yellow/green gradient, no border, no overall colour change         | 2        |
+| **Perf**      | sr calc during importing. (searchSortedLeft/getCorners)                                     | 1        |
+| **Perf**      | parseLine performance                                                                       | 1        |
+| **Perf**      | high GC pressure during importing                                                           | 1        |
 
 ### FIXME
 

@@ -90,7 +90,7 @@ internal static partial class BmsChartParser
             }
         }
 
-        var setTitle = inferSetTitle(title);
+        var setTitle = InferTitle(title);
         var difficultyName = inferDifficultyName(title, subtitle, path);
 
         return new BmsChartMetadata(setTitle, artist, difficultyName, BmsLayout.InferTotalColumns(channels, path), title, rank, total);
@@ -210,6 +210,23 @@ internal static partial class BmsChartParser
         return result.Length > 0 ? result : rawTitles[0].Trim();
     }
 
+    public static string InferTitle(string title)
+    {
+        char[] p = ['[', '(', '-'];
+        char[] q = [']', ')', '-'];
+
+        for (var i = 0; i < p.Length; i++)
+        {
+            var start = title.LastIndexOf(p[i]);
+            if (title[^1] == q[i])
+            {
+                return title[..start].TrimEnd();
+            }
+        }
+
+        return title;
+    }
+
     private static string decodeText(byte[] content)
     {
         if (content.Length >= 3 && content[0] == 0xef && content[1] == 0xbb && content[2] == 0xbf)
@@ -225,17 +242,6 @@ internal static partial class BmsChartParser
         {
             return shift_jis_encoding.GetString(content);
         }
-    }
-
-    private static string inferSetTitle(string title)
-    {
-        var start = title.LastIndexOf('[');
-        var end = title.LastIndexOf(']');
-
-        if (start > 0 && end == title.Length - 1)
-            return title[..start].TrimEnd();
-
-        return title;
     }
 
     private static string inferDifficultyName(string title, string subtitle, string? path)

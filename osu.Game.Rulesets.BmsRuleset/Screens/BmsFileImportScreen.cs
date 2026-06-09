@@ -10,7 +10,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
-using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -18,7 +17,6 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Screens;
 using osuTK;
@@ -49,8 +47,6 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     private LoadingLayer loadingLayer = null!;
     private bool isImporting;
 
-    private DifficultyNameUpdater difficultyNameUpdater;
-
     [Resolved(CanBeNull = true)]
     private BmsRulesetConfigManager resolvedConfig { get; set; }
 
@@ -62,9 +58,6 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
     [Resolved(CanBeNull = true)]
     private INotificationOverlay notifications { get; set; }
-
-    [Resolved(CanBeNull = true)]
-    private IBeatmapUpdater beatmapUpdater { get; set; }
 
     public override void OnEntering(ScreenTransitionEvent e)
     {
@@ -88,23 +81,8 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
         lastImportPath = (config ?? resolvedConfig)?.GetBindable<string>(BmsRulesetSetting.LastImportPath);
         var lastPath = lastImportPath?.Value;
 
-        // Wire up the marker updater (uses same store instance as the settings subsection).
-        if (realm != null && BmsRuleset.DifficultyTableStore != null)
-            difficultyNameUpdater = new DifficultyNameUpdater(realm, BmsRuleset.DifficultyTableStore);
-
         importer = realm != null && storage != null
             ? new BmsFileImporter(realm, storage, notifications)
-            {
-                // Persist star ratings (and other cached stats) after import so song-select
-                // sort/group by difficulty work. Without this, BeatmapInfo.StarRating stays 0
-                // even though the live difficulty cache still shows correct stars on panels.
-                // Also schedule a debounced marker refresh — coalesced with any imports from
-                // the settings screen so they don't contend for the realm write mutex.
-                OnImportCompleted = (beatmap, scope) =>
-                {
-                    beatmapUpdater?.Queue(beatmap, scope);
-                },
-            }
             : null!;
 
         buttonGroup = new FillFlowContainer
@@ -225,8 +203,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
         if (newDirectory != null)
         {
-            if (lastImportPath != null)
-                lastImportPath.Value = newDirectory.FullName;
+            lastImportPath?.Value = newDirectory.FullName;
         }
     }
 

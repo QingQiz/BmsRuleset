@@ -161,13 +161,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
     {
         if (bmsImporter == null && realm != null && storage != null && game != null)
         {
-            bmsImporter = new BmsFileImporter(realm, storage, notifications, beatmapManager)
-            {
-                OnImportCompleted = (beatmap, scope) =>
-                {
-                    beatmapUpdater?.Queue(beatmap, scope);
-                },
-            };
+            bmsImporter = new BmsFileImporter(realm, storage, notifications, beatmapManager);
             game.RegisterImportHandler(bmsImporter);
         }
 
@@ -263,7 +257,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             {
                 Text = "Clean up orphaned BMS sets",
                 TooltipText = "Removes BMS beatmaps whose source files (audio, images) can no longer be found on disk",
-                BackgroundColour = colours.YellowDark,
+                BackgroundColour = colours.YellowDarker,
                 RelativeSizeAxes = Axes.X,
                 Height = 36,
                 Action = confirmCleanupOrphans,

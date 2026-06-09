@@ -14,6 +14,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using Realms;
 
@@ -23,13 +24,6 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 {
 
     public IEnumerable<string> HandledExtensions => Constant.BMS_EXTENSIONS;
-
-    /// <summary>
-    /// Fired after a beatmap set is successfully imported, to trigger difficulty recalculation.
-    /// A <see cref="Live{T}"/> reference is passed (rather than the thread-confined realm object) so the
-    /// handler can process the set on a background thread without blocking the import write loop.
-    /// </summary>
-    public Action<Live<BeatmapSetInfo>, MetadataLookupScope>? OnImportCompleted { get; init; }
 
     public Task Import(params string[] paths)
     {
@@ -139,7 +133,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             {
                 realm.Run(r =>
                 {
-                    foreach (var set in r.All<BeatmapSetInfo>())
+                    foreach (var set in r.All<BeatmapSetInfo>().Where(x => !x.DeletePending))
                     {
                         notification.CancellationToken.ThrowIfCancellationRequested();
 
@@ -214,40 +208,173 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         RealmAccess realmAccess,
         RealmFileStore fileStore)
     {
-        return realmAccess.Run(r =>
-        {
-            var bytes = group.ChartPaths.AsParallel().Select(File.ReadAllBytes).ToArray();
-            var allMd5 = bytes.AsParallel().Select(b => Convert.ToHexString(MD5.HashData(b)).ToLowerInvariant()).ToArray();
-            var setHash = calculateSetHash(allMd5);
+        var bytes = group.ChartPaths.AsParallel().Select(File.ReadAllBytes).ToArray();
+        var allMd5 = bytes.AsParallel().Select(b => Convert.ToHexString(MD5.HashData(b)).ToLowerInvariant()).ToArray();
+        var setHash = calculateSetHash(allMd5);
 
+        var existing = realmAccess.Run(r =>
+        {
             var existingSet = r.All<BeatmapSetInfo>()
                 .Filter("Hash == $0", setHash)
                 .FirstOrDefault();
 
-            if (existingSet != null && !existingSet.DeletePending)
+            return existingSet != null && !existingSet.DeletePending;
+        });
+
+        if (existing)
+            return null;
+
+        // Step 1 — Parallel: parse chart, compute all statistics (pure data, no Realm).
+        var parsedCharts = group.ChartPaths.AsParallel().Select((path, i) =>
+        {
+            var content = bytes[i];
+            var md5 = allMd5[i];
+            var lines = BmsChartParser.PreprocessLines(BmsChartParser.ReadAllLines(content));
+            var parsed = BmsChartParser.Parse(lines, path, _ => 1);
+
+            return (
+                Index: i,
+                Content: content,
+                Md5: md5,
+                StarRating: computeStarRating(parsed),
+                Metadata: extractMetadata(parsed, path),
+                Bpm: computeBpm(parsed),
+                Length: computeLength(parsed),
+                TotalObjectCount: parsed.HitObjects.Count,
+                EndTimeObjectCount: parsed.HitObjects.Count(h => h.IsLongNote)
+            );
+        }).ToArray();
+
+        // Step 2 — Sequential: write to disk (Realm-thread-bound), build ChartImport.
+        var charts = realmAccess.Run(r => parsedCharts.Select(parsed =>
+        {
+            var path = group.ChartPaths[parsed.Index];
+            using var stream = new MemoryBackedFileStream(path, parsed.Content);
+            var fileHash =
+                fileStore.Add(stream, r, addToRealm: false, preferHardLinks: true).Hash;
+
+            return new ChartImport(
+                path, parsed.Md5, fileHash,
+                parsed.Metadata, parsed.StarRating, parsed.Bpm, parsed.Length,
+                parsed.TotalObjectCount, parsed.EndTimeObjectCount);
+        }).ToArray());
+
+        return new PreparedDirectory(group.Directory, charts);
+    }
+
+    /// <summary>
+    ///     Compute the average BPM from the timing map of an already-parsed chart.
+    /// </summary>
+    private static double computeBpm(BmsParseResult parsed)
+    {
+        try
+        {
+            var bpms = parsed.TimingMap.BpmEvents;
+            if (bpms.Count == 0) return 0;
+
+            // Use the weighted average, or just the first BPM if only one.
+            if (bpms.Count == 1)
+                return Math.Round(bpms[0].Bpm, 1);
+
+            // Weighted average: sum(bpm * duration) / total_duration.
+            double totalWeight = 0;
+            double weightedSum = 0;
+            for (var i = 0; i < bpms.Count; i++)
             {
-                return null;
+                var time = bpms[i].Time;
+                var nextTime = i + 1 < bpms.Count ? bpms[i + 1].Time : (parsed.HitObjects.Count > 0 ? parsed.HitObjects[^1].StartTime + parsed.HitObjects[^1].Duration : 60000);
+                var dur = nextTime - time;
+                if (dur > 0)
+                {
+                    weightedSum += bpms[i].Bpm * dur;
+                    totalWeight += dur;
+                }
             }
 
-            // Parse every chart, extract metadata, and write chart file to disk.
-            var charts = group.ChartPaths.Select((path, i) =>
-            {
-                var content = bytes[i];
-                var md5 = allMd5[i];
-                var lines = BmsChartParser.PreprocessLines(BmsChartParser.ReadAllLines(content));
-                var metadata = BmsChartParser.ScanMetadata(lines, path);
+            return totalWeight > 0 ? Math.Round(weightedSum / totalWeight, 1) : Math.Round(bpms[0].Bpm, 1);
+        }
+        catch (Exception e)
+        {
+            Logger.Log($"BMS import: BPM computation failed: {e.Message}");
+            return 0;
+        }
+    }
 
-                // Write to disk (hard-link) and obtain the SHA-256 hash.
-                // addToRealm: false → no realm transaction needed; disk I/O only.
-                using var stream = new MemoryBackedFileStream(path, content);
-                var fileHash =
-                    fileStore.Add(stream, r, addToRealm: false, preferHardLinks: true).Hash;
+    /// <summary>
+    ///     Compute the beatmap length (ms) from the last hit object end time.
+    /// </summary>
+    private static double computeLength(BmsParseResult parsed)
+    {
+        try
+        {
+            if (parsed.HitObjects.Count == 0) return 0;
 
-                return new ChartImport(path, md5, fileHash, metadata);
-            }).ToArray();
+            var last = parsed.HitObjects[^1];
+            var endTime = last.StartTime + last.Duration;
+            return endTime > 0 ? endTime : 0;
+        }
+        catch (Exception e)
+        {
+            Logger.Log($"BMS import: Length computation failed: {e.Message}");
+            return 0;
+        }
+    }
 
-            return new PreparedDirectory(group.Directory, charts);
-        });
+    /// <summary>
+    ///     Compute star rating from an already-parsed chart.  Returns 0 on failure
+    ///     (malformed chart, unsupported layout) — the import continues regardless.
+    /// </summary>
+    private static double computeStarRating(BmsParseResult parsed)
+    {
+        try
+        {
+            if (parsed.HitObjects.Count == 0)
+                return 0;
+
+            var hitObjects = parsed.HitObjects
+                .Select(BmsBeatmapDecoder.CreateHitObject)
+                .ToList();
+
+            return new BmsStarRatingProcessor()
+                .Compute(hitObjects, parsed.TotalColumns, parsed.Rank)
+                .StarRating;
+        }
+        catch (Exception e)
+        {
+            Logger.Log($"BMS import: SR computation failed: {e.Message}");
+            return 0;
+        }
+    }
+
+    /// <summary>
+    ///     Derive <see cref="BmsChartMetadata"/> from a full parse result,
+    ///     avoiding a separate <see cref="BmsChartParser.ScanMetadata"/> pass over lines.
+    /// </summary>
+    private static BmsChartMetadata extractMetadata(BmsParseResult parsed, string? path)
+    {
+        var title = parsed.Title ?? (path == null ? string.Empty : Path.GetFileNameWithoutExtension(path));
+
+        // inferSetTitle: strip trailing [difficulty] bracket.
+        var setTitle = BmsChartParser.InferTitle(title.Trim());
+
+        // inferDifficultyName: extract from subtitle → title → filename.
+        var diffName = title[setTitle.Length..].Trim().Trim('[', ']', '-', '(', ')');
+        if (string.IsNullOrEmpty(diffName))
+        {
+            diffName = path == null ? title : Path.GetFileNameWithoutExtension(path);
+        }
+
+        // Key count from the full parse (avoids re-scanning channels).
+        var keyCount = parsed.TotalColumns;
+
+        return new BmsChartMetadata(
+            SetTitle: setTitle,
+            Artist: parsed.Artist ?? string.Empty,
+            DifficultyName: diffName,
+            KeyCount: keyCount,
+            RawTitle: title,
+            Rank: parsed.Rank,
+            Total: parsed.Total);
     }
 
     private static void applyCompletionState(ProgressNotification notification, ImportResult result)
@@ -304,6 +431,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             notification.Text = "BMS import: scanning files...";
             var groups = discoverChartGroups(paths);
+
             if (groups.Length == 0)
             {
                 notification.CompletionText = "No BMS charts found to import.";
@@ -313,7 +441,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             notification.Text = "BMS import: preparing...";
 
-            var pool = new BlockingCollection<PreparedDirectory?>(32);
+            // we only import .bms files, so the size will be very small
+            var pool = new BlockingCollection<PreparedDirectory?>(1024);
 
             var producer = launchProducer(notification, groups, fileStore, pool);
             var (imported, processed, cancelled) = drainConsumer(notification, groups, pool, producer);
@@ -354,7 +483,6 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             {
                 Parallel.ForEach(groups, new ParallelOptions
                 {
-                    // MaxDegreeOfParallelism = Environment.ProcessorCount * 4,
                     CancellationToken = notification.CancellationToken,
                 }, group =>
                 {
@@ -394,7 +522,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
         try
         {
-            Parallel.ForEach(pool.GetConsumingEnumerable(), prepared =>
+            foreach (var prepared in pool.GetConsumingEnumerable())
             {
                 realm.Run(r =>
                 {
@@ -404,20 +532,21 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     // ── Fast path: skip if the set hash already exists (prepared == null) ──
                     if (prepared == null)
                     {
-                        Logger.Log("BMS import: skipping existing set (hash match)");
                         imported++;
                         processed++;
                         reportProgress(notification, imported, groups.Length, processed);
                         return;
                     }
 
-                    if (importPreparedDirectory(r, prepared, rulesetInfo))
+                    var ok = importPreparedDirectory(r, prepared, rulesetInfo);
+
+                    if (ok)
                         imported++;
 
                     processed++;
                     reportProgress(notification, imported, groups.Length, processed);
                 });
-            });
+            }
 
             producer.GetAwaiter().GetResult();
             pool.Dispose();
@@ -445,6 +574,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     /// Creates <see cref="RealmFile"/> + <see cref="BeatmapSetInfo"/> objects for all charts in a
     /// prepared directory, in one transaction. Files were already written to disk by the producer,
     /// so this transaction only touches realm metadata — no disk I/O.
+    /// Star rating is pre-computed during the producer phase and written directly.
     /// </summary>
     private bool importPreparedDirectory(
         Realm r,
@@ -515,6 +645,11 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     Difficulty = new BeatmapDifficulty(),
                     Hash = chart.FileHash,
                     MD5Hash = chart.Md5Hash,
+                    StarRating = chart.StarRating,
+                    BPM = chart.Bpm,
+                    Length = chart.Length,
+                    TotalObjectCount = chart.TotalObjectCount,
+                    EndTimeObjectCount = chart.EndTimeObjectCount,
                 };
                 var diff = BmsDifficultyInfo.FromChartMetadata(chart.Metadata);
                 diff.WriteToOsuDifficulty(beatmapInfo);
@@ -532,12 +667,6 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             beatmapSetInfo.Hash = calculateSetHash(beatmapSetInfo);
             r.Add(beatmapSetInfo);
             transaction.Commit();
-
-            Logger.Log($"BMS import: imported {Path.GetFileName(prepared.Directory)} ({chartImports.Length} charts)");
-
-            // Fire AFTER transaction commit — handlers can safely start their own realm operations
-            // without nesting inside this transaction.
-            OnImportCompleted?.Invoke(beatmapSetInfo.ToLive(realm), MetadataLookupScope.None);
 
             return true;
         }
@@ -558,7 +687,12 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         string Path,
         string Md5Hash,
         string FileHash, // SHA-256 for RealmFile (computed during file write)
-        BmsChartMetadata Metadata);
+        BmsChartMetadata Metadata,
+        double StarRating,
+        double Bpm,
+        double Length,
+        int TotalObjectCount,
+        int EndTimeObjectCount);
 
     private sealed record PreparedDirectory(
         string Directory,
