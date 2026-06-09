@@ -297,6 +297,7 @@ Write one `[BMS]` section per layout you want to support. The `Layout:` key is r
 | `HitPosition`   | Hit target Y from bottom (480-height space) | `440`   |
 | `LightPosition` | Column key-light Y                          | `440`   |
 | `ScorePosition` | Judgement popup Y                           | `250`   |
+| `ComboPosition` | Combo counter Y from top                    | `300`   |
 | `JudgementLine` | Show white line at hit position (`1`/`0`)   | `1`     |
 
 **Column geometry:**
@@ -347,10 +348,21 @@ Write one `[BMS]` section per layout you want to support. The `Layout:` key is r
 | `ColourColumnLine`            | Column separator color (R,G,B,A) | `255,255,255,50`  |
 | `ColourJudgementLine`         | Hit target line color            | `255,255,255,255` |
 | `ColourBarline`               | Measure bar line color           | `0,255,0,255`     |
+| `ColourBreak`                 | Combo break flash color          | `255,0,0`         |
 | `Colour1`–`ColourN`           | Per-column background color      | `0,0,0,0`         |
 | `ColourLight1`–`ColourLightN` | Per-column key-light glow color  | `255,200,0`       |
 | `Colour`                      | All-column background shorthand  | `0,0,0,0`         |
 | `ColourLight`                 | All-column light shorthand       | `0,0,0`           |
+
+**Fonts:**
+
+| Key            | Description                                          | Default |
+|----------------|------------------------------------------------------|---------|
+| `ComboPrefix`  | Texture prefix for combo counter digit images        | `score` |
+
+The combo counter loads textures as `{ComboPrefix}-0.png` through `{ComboPrefix}-9.png`
+
+If the digit textures are missing, the combo counter is silently hidden.
 
 **Note images:**
 
@@ -380,6 +392,15 @@ Write one `[BMS]` section per layout you want to support. The `Layout:` key is r
 | `LightingN`                 | Normal hit explosion image     |
 | `LightingL`                 | LN hit explosion image         |
 | `LightFramePerSecond`       | Column light animation FPS     |
+
+### HUD Components
+
+The combo counter (`BmsComboCounter`) and health display (`BmsHealthDisplay`) implement
+`ISerialisableDrawable` and can be repositioned in the **Skin Editor** during gameplay.
+Open the skin editor and drag the combo counter or health bar to
+your preferred position.
+
+On the next play session the saved layout is automatically loaded.
 
 **Judgement images:**
 
@@ -535,7 +556,6 @@ The full built-in skin (covering all 6 layouts) is at
 | **Skin**      | Non-legacy BMS skin — fully configurable via skin editor                                    |
 | **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                                  |
 | **Skin**      | E-POOR judgement image                                                                      | 3        |
-| **UI**        | Combo display                                                                               | 1        |
 | **UI**        | Lane cover / skin / movement                                                                | 2        |
 | **UI**        | Rewrite health bar — red/yellow/green gradient, no border, no overall colour change         | 2        |
 

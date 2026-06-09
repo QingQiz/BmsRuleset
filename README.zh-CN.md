@@ -59,7 +59,6 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 | 小节长度                 | 通道 `02`                                                        |                                |
 | 文本事件                 | `#TEXTxx`、`#SONGxx`、通道 `99`                                  |                                |
 | Random / Switch          | `#IF`、`#ELSEIF`、`#ELSE`、`#ENDIF` / `#END` / `#IFEND` / `#END IF`（容错）、`#SWITCH` 及相关命令 | 游戏支持，并支持拼写容错                   |
-| 流派拼写容错             | `#GENLE` → `#GENRE`                                              |                                |
 
 **已解析的通道：**
 
@@ -288,6 +287,7 @@ DP ☆NOTHER [TT★1 TT★2]
 | `HitPosition`   | 判定目标距底部 Y（480 高度空间）    | `440`  |
 | `LightPosition` | 列键灯 Y                            | `440`  |
 | `ScorePosition` | 判定弹出 Y                          | `250`  |
+| `ComboPosition` | 连击数字距顶部 Y                    | `300`  |
 | `JudgementLine` | 在判定位置显示白线（`1`/`0`）       | `1`    |
 
 **列几何：**
@@ -338,12 +338,22 @@ DP ☆NOTHER [TT★1 TT★2]
 | `ColourColumnLine`            | 列分隔线颜色 (R,G,B,A)        | `255,255,255,50`  |
 | `ColourJudgementLine`         | 判定线颜色                    | `255,255,255,255` |
 | `ColourBarline`               | 小节线颜色                    | `0,255,0,255`     |
+| `ColourBreak`                 | 连击中断闪烁颜色              | `255,0,0`         |
 | `Colour1`–`ColourN`           | 逐列背景颜色                  | `0,0,0,0`         |
 | `ColourLight1`–`ColourLightN` | 逐列键灯发光颜色              | `255,200,0`       |
 | `Colour`                      | 全列背景简写                  | `0,0,0,0`         |
 | `ColourLight`                 | 全列灯简写                    | `0,0,0`           |
 
-**音符图像：**
+**字体：**
+
+| 键            | 说明                          | 默认值  |
+|---------------|-------------------------------|---------|
+| `ComboPrefix` | 连击数字纹理文件名前缀        | `score` |
+
+连击数字加载 `{ComboPrefix}-0.png` 至 `{ComboPrefix}-9.png`。
+若数字纹理缺失，连击显示将自动隐藏。
+
+**note 图像：**
 
 | 键                                             | 说明                               |
 |-----------------------------------------------|------------------------------------|
@@ -371,6 +381,12 @@ DP ☆NOTHER [TT★1 TT★2]
 | `LightingN`                 | 普通命中图像     |
 | `LightingL`                 | LN 命中图像      |
 | `LightFramePerSecond`       | 列灯动画 FPS         |
+
+### HUD 组件
+
+连击计数器（`BmsComboCounter`）和血量显示（`BmsHealthDisplay`）实现了
+`ISerialisableDrawable`，可在游戏内通过**皮肤编辑器**自由拖拽位置。
+在游戏中打开皮肤编辑器，拖动连击数字或血量条到合适位置，下次游玩时自动加载保存的布局。
 
 **判定图像：**
 
@@ -470,25 +486,77 @@ HitPoor : j-poor
 
 ## 尚未实现
 
-| 领域         | 缺失的功能                                                                                  |
-|--------------|--------------------------------------------------------------------------------------------|
-| **解析器**   | `#EXRANK` / 通道 `A0` — 扩展判定定义                                                       |
-| **解析器**   | `#STAGEFILE`、`#BANNER`、`#BACKBMP`、`#MOVIE` — 仅元数据                                    |
-| **解析器**   | `#PATH_WAV` / `#PATH_BMP` — 资源路径前缀                                                    |
-| **解析器**   | `#EXWAVxx`、`#WAVCMD`、`#VOLWAV` — 高级音频控制                                            |
-| **解析器**   | `#STP` — 绝对 STOP 序列                                                                     |
+| 领域         | 缺失的功能                                                                                 | 优先级 |
+|--------------|---------------------------------------------------------------------------------------------|--------|
+| **音频**     | `#WAVCMD` (MacBeat) — 每个 WAV 槽位的音高/音量/播放时间                                     |
+| **音频**     | `#EXWAVxx` (nanasi) — 每个 WAV 文件的声像/音量/频率                                        |
+| **音频**     | `#VOLWAV` (BM98) — 全局音量缩放                                                             |
+| **音频**     | 截取预览歌曲以播放 BMS 采样                                                                 | 1      |
+| **音频**     | `#xxx97` (fgt) — 动态 BGM 音量变化通道                                                     |        |
+| **转换器**   | Mania 7K → BMS 谱面转换                                                                    | 3      |
+| **血量**     | Easy / Hard / Ex-Hard / Hazard 血量变体                                                     | 2      |
+| **血量**     | LN 特定血量事件（head miss ≠ body drop ≠ tail miss）                                       | 1      |
+| **导入**     | 子目录中的资源文件 — 仅使用文件名，相对路径未处理                                           |
+| **导入**     | 使用引用/符号链接指向原始 BMS 文件，而非复制到 realm                                        | 1      |
+| **输入**     | Scratch 转盘语义 — scratch 目前映射为普通按键                                               |
+| **输入**     | 判定偏移调整能力                                                                           |
+| **Mods**     | 不同血量条类型                                                                              | 2      |
+| **Mods**     | Random / S-Random / H-Random 随机排列                                                       | 2      |
+| **Mods**     | 血量选择类 mods                                                                             | 2      |
+| **Mods**     | 辅助选项                                                                                    |
+| **Mods**     | 记住上次使用的 mod 组合                                                                     |
+| **Mods**     | BG：将 key sounds 转为背景采样（判定结果不影响音乐）                                        | 2      |
+| **解析器**   | `#BGAxx` / `#POORBGA` / `#SWBGAxx` / `#@BGAxx` / `#ARGBxx` — BGA 定义                    |
+| **解析器**   | `#BMPxx` / `#EXBMPxx` — 图像定义（非资源扫描）                                              |
+| **解析器**   | `#CDDA` / `#MIDIFILE` — CD / MIDI                                                           |
+| **解析器**   | `#CHARFILE` / `#ExtChr` — 角色 / 皮肤                                                       |
 | **解析器**   | `#DEFEXRANK` — 扩展判定定义                                                                  |
+| **解析器**   | `#EXBPMxx` — `#BPMxx` 别名（BMSC 解析器 bug 兼容）                                          |
+| **解析器**   | `#EXRANK` / 通道 `A0` — 扩展判定定义                                                        |
+| **解析器**   | `#EXWAVxx`、`#WAVCMD`、`#VOLWAV` — 高级音频控制                                            |
+| **解析器**   | `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — 资源组                  |
+| **解析器**   | `#OCT/FP` — 八度/踏板                                                                       |
+| **解析器**   | `#OPTION` — 强制选项                                                                        |
+| **解析器**   | `#PATH_WAV` / `#PATH_BMP` — 资源路径前缀                                                    |
+| **解析器**   | `#STAGEFILE`、`#BANNER`、`#BACKBMP`、`#MOVIE` — 仅元数据                                    |
+| **解析器**   | `#STP` — 绝对 STOP 序列                                                                     |
+| **解析器**   | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — 视频    |
 | **解析器**   | 通道 `04`/`06`/`07`/`0A`–`0E` — BGA 图层                                                   |
 | **解析器**   | 通道 `17` / `27` — free-zone 按键                                                          |
 | **解析器**   | 通道 `31`–`49` — 隐形音符                                                                   |
+| **解析器**   | 通道 `97` — 动态 BGM 音量                                                                   |
+| **解析器**   | 通道 `98` — 动态 KEY 音量（通道 97 的对应项）                                               |
 | **解析器**   | 通道 `A6` / `#CHANGEOPTIONxx` — 动态选项变更                                               |
+| **性能**     | BMS 文件 I/O — 采样/BGA 较大；考虑用反射绕过 realm 复制                                   | 1      |
 | **渲染器**   | BGA / 视频 / stagefile / 背景图像                                                            |
-| **渲染器**   | Key beams（长按时的光柱）                                                                    |
-| **计分**     | 结果界面 — EX 分数、DJ LEVEL、通关类型、血量百分比未显示                                     |
-| **血量**     | Easy / Hard / Ex-Hard / Hazard 血量变体                                                      |
-| **血量**     | LN 特定血量事件（head miss ≠ body drop ≠ tail miss）                                        |
-| **Mods**     | Random / S-Random / H-Random 随机排列                                                       |
-| **Mods**     | 血量选择类 mods                                                                             |
-| **Mods**     | 辅助选项                                                                                    |
-| **输入**     | Scratch 转盘语义 — scratch 目前映射为普通按键                                                |
-| **导入**     | 子目录中的资源文件 — 仅使用文件名，相对路径未处理                                            |
+| **渲染器**   | Key beams（长按时的光柱）                                                                    | 2      |
+| **渲染器**   | BGA                                                                                         |
+| **回放**     | 回放功能不可用                                                                              | 2      |
+| **计分**     | 结果界面 — EX 分数、DJ LEVEL、通关类型、血量百分比未显示                                   | 2      |
+| **计分**     | ExRank 支持                                                                                 | 3      |
+| **计分**     | 结果界面上不同的判定文字颜色                                                                | 4      |
+| **计分**     | 谱面统计 — 显示更多信息（例如随机分支数量）                                                 | 2      |
+| **计分**     | LN head 判定                                                                               | 1      |
+| **皮肤**     | 列起始位置 — 值或枚举（leftN, rightN, center）                                              | 3      |
+| **皮肤**     | BGA 位置/大小配置                                                                            |
+| **皮肤**     | 非 legacy BMS 皮肤 — 完全通过皮肤编辑器配置                                                  |
+| **皮肤**     | `HitGreat` → `HitGreatLate` / `HitGreatEarly` 分离图像                                      |
+| **皮肤**     | E-POOR 判定图像                                                                             | 3      |
+| **UI**       | Lane cover / skin / movement                                                                | 2      |
+| **UI**       | 重写血量条 — 红/黄/绿渐变，无边框，无整体颜色变化                                            | 2      |
+
+### FIXME
+
+```text
+2026-06-01 15:13:14 [error]: osu.Game.Rulesets.UI.BeatmapInvalidForRulesetException:
+  Beatmap can not be converted for the ruleset
+  (ruleset: osu.Game.Rulesets.Mania.ManiaRuleset, osu.Game.Rulesets.Mania,
+   converter: osu.Game.Rulesets.Mania.Beatmaps.ManiaBeatmapConverter).
+  at osu.Game.Beatmaps.WorkingBeatmap.GetPlayableBeatmap(...)
+  at osu.Game.Screens.Select.BeatmapTitleWedge.DifficultyDisplay.<>c__DisplayClass36_0
+       .<updateCountStatistics>b__0()
+```
+
+从 BMS 切换到其他规则集（或从其他规则集切换到 BMS）时，选歌界面会因
+`BeatmapInvalidForRulesetException` 崩溃。原因是标题组件在轮播选择仍处于过期状态时，
+使用了错误的转换器重新计算难度。
