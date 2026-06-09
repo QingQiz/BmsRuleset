@@ -41,7 +41,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     [Cached]
     private BmsSampleStore sampleStore = new(
         ((BmsBeatmap)beatmap).SampleDefinitions.Values,
-        ((BmsBeatmap)beatmap).BeatmapInfo.Metadata.Source
+        getSource((BmsBeatmap)beatmap)
     );
 
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
@@ -107,6 +107,17 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
         return new BmsReplayRecorder(score);
     }
+
+    /// <summary>
+    ///     Resolve the chart directory path from the DB-backed beatmap (where the importer stored
+    ///     it), bypassing the decoder's unconditional <c>Source = "BMS"</c> override.
+    ///     <see cref="WorkingBeatmap.loadBeatmapAsync"/> copies <see cref="BeatmapInfo.BeatmapSet"/>
+    ///     and <see cref="BeatmapInfo.ID"/> from the database but <b>not</b>
+    ///     <see cref="BeatmapInfo.Metadata"/>, so the decoder override survives into gameplay.
+    /// </summary>
+    private static string getSource(BmsBeatmap b) =>
+        b.BeatmapInfo.BeatmapSet?.Beatmaps.FirstOrDefault(b2 => b2.ID == b.BeatmapInfo.ID)
+            ?.Metadata.Source ?? b.BeatmapInfo.Metadata.Source;
 
     /// <summary>
     ///     Called when all hit objects have been judged (play completed).

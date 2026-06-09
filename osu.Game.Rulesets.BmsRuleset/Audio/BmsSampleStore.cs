@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
@@ -35,10 +36,37 @@ namespace osu.Game.Rulesets.BmsRuleset.Audio;
 /// </remarks>
 public partial class BmsSampleStore : Component
 {
+
+    /// <summary>
+    ///     The length (in milliseconds) of the longest resolved sample. Used to bound how far back
+    ///     a seek needs to look for samples that may still be sounding at the seek target. Returns
+    ///     <c>0</c> until samples have finished decoding.
+    /// </summary>
+    public double MaxSampleLengthMilliseconds
+    {
+        get
+        {
+            double max = 0;
+
+            foreach (var sample in cache.Values)
+            {
+                if (sample != null && sample.Length > max)
+                    max = sample.Length;
+            }
+
+            return max;
+        }
+    }
+
+    /// <summary>
+    ///     An <see cref="ITrackStore" /> for BGM seek-back tracks, backed by the same filesystem
+    ///     store used for sample resolution.  <c>null</c> when <c>basePath</c> is not set
+    ///     (Realm-imported mode).
+    /// </summary>
+    internal ITrackStore? TrackStore { get; private set; }
+
     private readonly IReadOnlyList<string> samplePaths;
     private readonly string? basePath;
-
-    private ISampleStore? fileSampleStore;
 
     /// <summary>
     ///     Declared sample path (the first <see cref="BmsSampleInfo.LookupNames" /> entry) →
@@ -46,6 +74,8 @@ public partial class BmsSampleStore : Component
     ///     re-probed.
     /// </summary>
     private readonly Dictionary<string, ISample?> cache = new(StringComparer.OrdinalIgnoreCase);
+
+    private ISampleStore? fileSampleStore;
 
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
@@ -71,32 +101,22 @@ public partial class BmsSampleStore : Component
         this.basePath = basePath;
     }
 
-    /// <summary>
-    ///     An <see cref="ITrackStore" /> for BGM seek-back tracks, backed by the same filesystem
-    ///     store used for sample resolution.  <c>null</c> when <c>basePath</c> is not set
-    ///     (Realm-imported mode).
-    /// </summary>
-    internal ITrackStore? TrackStore { get; private set; }
+    #region Disposal
 
-    [BackgroundDependencyLoader]
-    private void load()
+    protected override void Dispose(bool isDisposing)
     {
-        // Runs on the async load thread (the "click play → loading screen" phase), so the
-        // disk read + decode of every sample happens off the gameplay hot path.
-        if (basePath != null)
-        {
-            var fileResources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
-            fileResources.AddExtension("wav");
-            fileResources.AddExtension("mp3");
-            fileResources.AddExtension("ogg");
+        // File sample store is owned by this component (unlike skin samples which are owned
+        // by the skin itself).  Dispose it to free native BASS resources.
+        if (fileSampleStore is IDisposable disposable)
+            disposable.Dispose();
 
-            fileSampleStore = audioManager.GetSampleStore(fileResources);
-            TrackStore = audioManager.GetTrackStore(fileResources);
-        }
-
-        foreach (var path in samplePaths)
-            Get(path);
+        fileSampleStore = null;
+        TrackStore = null;
+        cache.Clear();
+        base.Dispose(isDisposing);
     }
+
+    #endregion
 
     /// <summary>
     ///     Returns the resolved sample for the given chart-declared path, resolving and caching it
@@ -153,27 +173,6 @@ public partial class BmsSampleStore : Component
         return cache[key] = resolved;
     }
 
-    /// <summary>
-    ///     The length (in milliseconds) of the longest resolved sample. Used to bound how far back
-    ///     a seek needs to look for samples that may still be sounding at the seek target. Returns
-    ///     <c>0</c> until samples have finished decoding.
-    /// </summary>
-    public double MaxSampleLengthMilliseconds
-    {
-        get
-        {
-            double max = 0;
-
-            foreach (var sample in cache.Values)
-            {
-                if (sample != null && sample.Length > max)
-                    max = sample.Length;
-            }
-
-            return max;
-        }
-    }
-
     private static LegacyBeatmapSkin? extractBeatmapSkin(ISkin skin) => skin switch
     {
         LegacyBeatmapSkin beatmapSkin => beatmapSkin,
@@ -181,16 +180,27 @@ public partial class BmsSampleStore : Component
         _ => null,
     };
 
-    protected override void Dispose(bool isDisposing)
+    [BackgroundDependencyLoader]
+    private void load()
     {
-        // File sample store is owned by this component (unlike skin samples which are owned
-        // by the skin itself).  Dispose it to free native BASS resources.
-        if (fileSampleStore is IDisposable disposable)
-            disposable.Dispose();
+        // Runs on the async load thread (the "click play → loading screen" phase), so the
+        // disk read + decode of every sample happens off the gameplay hot path.
+        //
+        // Only create filesystem-backed stores when basePath is a real directory.
+        // Old imports have basePath = "BMS" (a sentinel, not a real path) and store audio
+        // in Realm — those must fall through to Tier 2 (LegacyBeatmapSkin).
+        if (!string.IsNullOrEmpty(basePath) && Directory.Exists(basePath))
+        {
+            var fileResources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
+            fileResources.AddExtension("wav");
+            fileResources.AddExtension("mp3");
+            fileResources.AddExtension("ogg");
 
-        fileSampleStore = null;
-        TrackStore = null;
-        cache.Clear();
-        base.Dispose(isDisposing);
+            fileSampleStore = audioManager.GetSampleStore(fileResources);
+            TrackStore = audioManager.GetTrackStore(fileResources);
+        }
+
+        foreach (var path in samplePaths)
+            Get(path);
     }
 }
