@@ -364,9 +364,9 @@ Write one `[BMS]` section per layout you want to support. The `Layout:` key is r
 
 **Fonts:**
 
-| Key            | Description                                          | Default |
-|----------------|------------------------------------------------------|---------|
-| `ComboPrefix`  | Texture prefix for combo counter digit images        | `score` |
+| Key           | Description                                   | Default |
+|---------------|-----------------------------------------------|---------|
+| `ComboPrefix` | Texture prefix for combo counter digit images | `score` |
 
 The combo counter loads textures as `{ComboPrefix}-0.png` through `{ComboPrefix}-9.png`
 
@@ -513,7 +513,7 @@ The full built-in skin (covering all 6 layouts) is at
 | **Audio**     | `#WAVCMD` (MacBeat) — pitch/volume/playback-time per WAV slot                               |
 | **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                     |
 | **Audio**     | `#VOLWAV` (BM98) — global volume scalar                                                     |
-| **Audio**     | Hijack preview song to play BMS samples                                                     | 1        |
+| **Audio**     | Hijack preview song to play BMS samples                                                     | 1(test)  |
 | **Audio**     | `#xxx97` (fgt) — dynamic BGM volume change channel                                          |          |
 | **Converter** | Mania 7K → BMS chart conversion                                                             | 3        |
 | **Gauge**     | Easy / Hard / Ex-Hard / Hazard gauge variants                                               | 2        |
