@@ -27,11 +27,7 @@ public static class BmsDefaultHud
     /// <returns></returns>
     private static Drawable bmsHud()
     {
-        return new DefaultSkinComponentsContainer(container =>
-        {
-            foreach (var d in container.OfType<ISerialisableDrawable>())
-                d.UsesFixedAnchor = true;
-        })
+        return new DefaultSkinComponentsContainer(_ => { })
         {
             Children =
             [
@@ -49,6 +45,7 @@ public static class BmsDefaultHud
                     Rotation = 90,
                     Scale = new Vector2(2),
                 },
+                new BmsComboCounter(),
                 new ArgonScoreCounter
                 {
                     Anchor = Anchor.TopRight,

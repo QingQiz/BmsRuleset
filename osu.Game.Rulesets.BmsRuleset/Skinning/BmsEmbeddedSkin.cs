@@ -75,20 +75,16 @@ public sealed class BmsEmbeddedSkin : ISkin, IDisposable
 
     /// <inheritdoc />
     /// <summary>
-    /// Returns a texture from the embedded store, always treating assets as @2x source images.
+    /// Returns a texture from the embedded store.
+    /// Textures are stored at 2x resolution (with <c>@2x</c> suffix in the resource name)
+    /// so the lookup explicitly tries the <c>@2x</c>-suffixed name first and stamps
+    /// <see cref="Texture.ScaleAdjust"/> on the result so the framework renders it
+    /// at the correct 1x display size.
     /// </summary>
-    /// <remarks>
-    /// The embedded textures are authored at double resolution. Any <c>@2x</c> suffix in
-    /// <paramref name="componentName" /> is stripped first, then the method tries the
-    /// <c>@2x</c> variant (setting <see cref="F:osu.Framework.Graphics.Textures.Texture.ScaleAdjust">Texture.ScaleAdjust</see> = 2) before falling
-    /// back to the plain name. This mimics <see cref="T:osu.Game.Skinning.LegacySkin">LegacySkin</see> @2x resolution without
-    /// requiring <c>AllowHighResolutionSprites</c>.
-    /// </remarks>
     public Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT)
     {
-        componentName = componentName.Replace("@2x", string.Empty);
-
-        var texture = textures.Get($"{Path.ChangeExtension(componentName, null)}@2x{Path.GetExtension(componentName)}", wrapModeS, wrapModeT);
+        // First try @2x variant (matching the embedded resource filenames).
+        var texture = textures.Get($"{componentName}@2x", wrapModeS, wrapModeT);
 
         if (texture != null)
         {
@@ -96,6 +92,7 @@ public sealed class BmsEmbeddedSkin : ISkin, IDisposable
             return texture;
         }
 
+        // Fallback to plain name (for LegacyModern or any 1x texture).
         return textures.Get(componentName, wrapModeS, wrapModeT);
     }
 
