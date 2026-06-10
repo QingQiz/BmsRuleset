@@ -18,9 +18,9 @@ public class BmsHitObject : HitObject, IHasDuration
 
     public int Column { get; set; }
 
-    public string SourceChannel { get; set; } = string.Empty;
+    public ushort SourceChannel { get; set; }
 
-    public string SampleKey { get; set; } = string.Empty;
+    public ushort SampleKey { get; set; }
 
     public string SamplePath { get; set; } = string.Empty;
 
@@ -42,7 +42,7 @@ public class BmsHitObject : HitObject, IHasDuration
     ///     The BMS sample key of the LN terminating cell (e.g. "01", "AZ").
     ///     Empty when the tail has no distinct sample (LNTYPE 2 or no #WAV for the terminating value).
     /// </summary>
-    public string TailSampleKey { get; set; } = string.Empty;
+    public ushort TailSampleKey { get; set; }
 
     /// <summary>
     ///     The resolved sample path for the LN tail's key sound.

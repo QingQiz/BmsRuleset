@@ -119,9 +119,9 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
     private static void populateFallbackSampleDefinitions(BmsBeatmap beatmap)
     {
         beatmap.SampleDefinitions = beatmap.HitObjects
-            .Where(h => h.SampleKey.Length > 0 && h.SamplePath.Length > 0)
-            .GroupBy(h => h.SampleKey, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First().SamplePath, StringComparer.OrdinalIgnoreCase);
+            .Where(h => h.SampleKey != 0 && h.SamplePath.Length > 0)
+            .GroupBy(h => h.SampleKey)
+            .ToDictionary(g => g.Key, g => g.First().SamplePath);
     }
 
     private static void remapColumns(BmsBeatmap beatmap)

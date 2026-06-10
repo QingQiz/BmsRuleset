@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
+// ReSharper disable InconsistentNaming
+
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 public static class BmsLayout
@@ -14,16 +16,34 @@ public static class BmsLayout
     public const int PMS_COLUMNS = 9;
     public const int PMS_DOUBLE_PLAY_COLUMNS = 18;
 
-    private static readonly string[] pms_double_play_only_channels = ["21", "26", "27", "28", "29"];
-    private static readonly string[] second_player_channels = ["21", "22", "23", "24", "25", "26", "28", "29"];
-    private static readonly string[] seven_key_only_channels = ["18", "19"];
+    // Encoded channel constants (base-62, uppercase: (hi << 6) | lo).
+    private const ushort C11 = (1 << 6) | 1;
+    private const ushort C12 = (1 << 6) | 2;
+    private const ushort C13 = (1 << 6) | 3;
+    private const ushort C14 = (1 << 6) | 4;
+    private const ushort C15 = (1 << 6) | 5;
+    private const ushort C16 = (1 << 6) | 6;
+    private const ushort C17 = (1 << 6) | 7;
+    private const ushort C18 = (1 << 6) | 8;
+    private const ushort C19 = (1 << 6) | 9;
+    private const ushort C21 = (2 << 6) | 1;
+    private const ushort C22 = (2 << 6) | 2;
+    private const ushort C23 = (2 << 6) | 3;
+    private const ushort C24 = (2 << 6) | 4;
+    private const ushort C25 = (2 << 6) | 5;
+    private const ushort C26 = (2 << 6) | 6;
+    private const ushort C27 = (2 << 6) | 7;
+    private const ushort C28 = (2 << 6) | 8;
+    private const ushort C29 = (2 << 6) | 9;
 
-    public static BmsLayoutVariant InferVariant(IEnumerable<string> channels, string? pathOrExtension = null)
+    private static readonly ushort[] pms_double_play_only_channels = [C21, C26, C27, C28, C29];
+    private static readonly ushort[] second_player_channels = [C21, C22, C23, C24, C25, C26, C28, C29];
+    private static readonly ushort[] seven_key_only_channels = [C18, C19];
+
+    public static BmsLayoutVariant InferVariant(IEnumerable<ushort> channels, string? pathOrExtension = null)
     {
-        var visibleChannels = channels.Select(normalisePlayableChannel)
-            .Where(c => c != null)
-            .Select(c => c!)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var visibleChannels = channels.Select(NormaliseChannel)
+            .ToHashSet();
 
         var extension = pathOrExtension == null ? string.Empty : Path.GetExtension(pathOrExtension);
 
@@ -39,7 +59,7 @@ public static class BmsLayout
         return visibleChannels.Overlaps(seven_key_only_channels) ? BmsLayoutVariant.Bme7K : BmsLayoutVariant.Bms5K;
     }
 
-    public static int InferTotalColumns(IEnumerable<string> channels, string? pathOrExtension = null)
+    public static int InferTotalColumns(IEnumerable<ushort> channels, string? pathOrExtension = null)
         => GetTotalColumns(InferVariant(channels, pathOrExtension));
 
     public static int GetTotalColumns(BmsLayoutVariant variant) => variant switch
@@ -67,15 +87,9 @@ public static class BmsLayout
     public static bool IsKnownTotalColumns(int totalColumns) =>
         totalColumns is BMS5_KEY_COLUMNS or BME7_KEY_COLUMNS or BMS5_DOUBLE_PLAY_COLUMNS or PMS_COLUMNS or DOUBLE_PLAY_COLUMNS or PMS_DOUBLE_PLAY_COLUMNS;
 
-    public static bool TryMapPlayableChannel(string channel, int totalColumns, out int column)
+    public static bool TryMapPlayableChannel(ushort channel, int totalColumns, out int column)
     {
-        var visibleChannel = normalisePlayableChannel(channel);
-
-        if (visibleChannel == null)
-        {
-            column = -1;
-            return false;
-        }
+        var visibleChannel = NormaliseChannel(channel);
 
         var success = totalColumns switch
         {
@@ -94,9 +108,10 @@ public static class BmsLayout
         return success;
     }
 
-    public static bool TryMapVisibleChannel(string channel, int totalColumns, out int column)
+    public static bool TryMapVisibleChannel(ushort channel, int totalColumns, out int column)
     {
-        if (channel.Length != 2 || channel[0] is not ('1' or '2'))
+        var hi = BmsChartParser.Hi(channel);
+        if (hi is not (1 or 2))
         {
             column = -1;
             return false;
@@ -119,26 +134,26 @@ public static class BmsLayout
         return success;
     }
 
-    public static bool TryMapBmsChannel(string channel, out int column)
+    public static bool TryMapBmsChannel(ushort channel, out int column)
     {
         column = channel switch
         {
-            "16" => 0,
-            "11" => 1,
-            "12" => 2,
-            "13" => 3,
-            "14" => 4,
-            "15" => 5,
-            "18" => 6,
-            "19" => 7,
-            "21" => 8,
-            "22" => 9,
-            "23" => 10,
-            "24" => 11,
-            "25" => 12,
-            "28" => 13,
-            "29" => 14,
-            "26" => 15,
+            C16 => 0,
+            C11 => 1,
+            C12 => 2,
+            C13 => 3,
+            C14 => 4,
+            C15 => 5,
+            C18 => 6,
+            C19 => 7,
+            C21 => 8,
+            C22 => 9,
+            C23 => 10,
+            C24 => 11,
+            C25 => 12,
+            C28 => 13,
+            C29 => 14,
+            C26 => 15,
             _ => -1,
         };
 
@@ -157,9 +172,6 @@ public static class BmsLayout
     /// </returns>
     public static (int Left, int Right) RemapColum2PGapIdx(int idx, int columns)
     {
-        // 0 -> 1, 5
-        // 1 -> 0, 1
-        // 5 -> 5, 0
         var lIdx = idx switch
         {
             0 => 1,
@@ -232,72 +244,68 @@ public static class BmsLayout
         _ => column,
     };
 
-    private static bool tryMapPmsSingleChannel(string channel, out int column)
+    /// <summary>Normalise LN/mine channels to their visible equivalents (5x→1x, 6x→2x, Dx→1x, Ex→2x).</summary>
+    internal static ushort NormaliseChannel(ushort key) => BmsChartParser.Hi(key) switch
+    {
+        5 => BmsChartParser.Pack(1, BmsChartParser.Lo(key)),  // 5x → 1x
+        6 => BmsChartParser.Pack(2, BmsChartParser.Lo(key)),  // 6x → 2x
+        13 => BmsChartParser.Pack(1, BmsChartParser.Lo(key)), // Dx → 1x
+        14 => BmsChartParser.Pack(2, BmsChartParser.Lo(key)), // Ex → 2x
+        _ => key,
+    };
+
+    private static bool tryMapPmsSingleChannel(ushort channel, out int column)
     {
         column = channel switch
         {
-            "11" => 0,
-            "12" => 1,
-            "13" => 2,
-            "14" => 3,
-            "15" => 4,
-            "18" or "22" => 5,
-            "19" or "23" => 6,
-            "16" or "24" => 7,
-            "17" or "25" => 8,
+            C11 => 0,
+            C12 => 1,
+            C13 => 2,
+            C14 => 3,
+            C15 => 4,
+            C18 or C22 => 5,
+            C19 or C23 => 6,
+            C16 or C24 => 7,
+            C17 or C25 => 8,
             _ => -1,
         };
 
         return column >= 0;
     }
 
-    private static bool tryMapBms5DoubleChannel(string channel, out int column)
+    private static bool tryMapBms5DoubleChannel(ushort channel, out int column)
     {
         column = channel switch
         {
-            "16" => 0,
-            "11" => 1,
-            "12" => 2,
-            "13" => 3,
-            "14" => 4,
-            "15" => 5,
-            "21" => 6,
-            "22" => 7,
-            "23" => 8,
-            "24" => 9,
-            "25" => 10,
-            "26" => 11,
+            C16 => 0,
+            C11 => 1,
+            C12 => 2,
+            C13 => 3,
+            C14 => 4,
+            C15 => 5,
+            C21 => 6,
+            C22 => 7,
+            C23 => 8,
+            C24 => 9,
+            C25 => 10,
+            C26 => 11,
             _ => -1,
         };
 
         return column >= 0;
     }
 
-    private static bool tryMapPmsDoubleChannel(string channel, out int column)
+    private static bool tryMapPmsDoubleChannel(ushort channel, out int column)
     {
-        if (channel.Length == 2 && channel[0] is '1' or '2' && channel[1] is >= '1' and <= '9')
+        var hi = BmsChartParser.Hi(channel);
+        var lo = BmsChartParser.Lo(channel);
+        if (hi is 1 or 2 && lo is >= 1 and <= 9)
         {
-            column = (channel[0] == '2' ? PMS_COLUMNS : 0) + channel[1] - '1';
+            column = (hi == 2 ? PMS_COLUMNS : 0) + lo - 1;
             return true;
         }
 
         column = -1;
         return false;
-    }
-
-    private static string? normalisePlayableChannel(string channel)
-    {
-        if (channel.Length != 2)
-            return null;
-
-        return channel[0] switch
-        {
-            '1' or '2' => channel,
-            '5' => $"1{channel[1]}",
-            '6' => $"2{channel[1]}",
-            'D' => $"1{channel[1]}",
-            'E' => $"2{channel[1]}",
-            _ => null,
-        };
     }
 }

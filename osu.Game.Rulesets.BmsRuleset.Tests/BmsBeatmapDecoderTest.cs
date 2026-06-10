@@ -48,7 +48,7 @@ public class BmsBeatmapDecoderTest
         };
         ICreateReplayData autoplay = new BmsModAutoplay();
 
-        var score = autoplay.CreateScoreFromReplayData(beatmap, [autoplay as Mod]);
+        var score = autoplay.CreateScoreFromReplayData(beatmap, [(Mod)autoplay]);
 
         Assert.That(score.Replay.Frames.OfType<BmsReplayFrame>().First().BranchDecisions, Is.EqualTo("3:1"));
     }
@@ -71,6 +71,77 @@ public class BmsBeatmapDecoderTest
 
         Assert.That(score.ScoreInfo.Mods.OfType<BmsModBranchReplay>().Single().Decisions.Value, Is.EqualTo("2:2"));
         Assert.That(replayData.Replay.Frames.OfType<BmsReplayFrame>().First().BranchDecisions, Is.EqualTo("2:2"));
+    }
+
+    [Test]
+    public void TestBase62BaseHeaderWithout62IsIgnored()
+    {
+        // #BASE with a value other than "62" should not activate base-62 mode.
+        var beatmap = decode("""
+                             #BASE 36
+                             #BPM 120
+                             #WAVaa lowercase.wav
+                             #WAVAA uppercase.wav
+                             #00111:aa
+                             """);
+        var hitObject = beatmap.HitObjects.OfType<BmsHitObject>().Single();
+
+        // Should still be case-insensitive.
+        Assert.That(hitObject.SamplePath, Is.EqualTo("uppercase.wav"));
+    }
+
+    // ── #BASE 62 (case-sensitive encoding) ─────────────────────────────
+
+    [Test]
+    public void TestBase62CaseInsensitiveByDefault()
+    {
+        // Without #BASE 62, lowercase and uppercase sample keys collide (traditional BMS).
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAVaa lowercase.wav
+                             #WAVAA uppercase.wav
+                             #00111:aa
+                             """);
+        var hitObject = beatmap.HitObjects.OfType<BmsHitObject>().Single();
+
+        // "aa" and "AA" should encode to the same key (case-insensitive default).
+        // The second definition (#WAVAA) overwrites the first.
+        Assert.That(hitObject.SamplePath, Is.EqualTo("uppercase.wav"));
+    }
+
+    [Test]
+    public void TestBase62CaseSensitiveWhenDeclared()
+    {
+        // With #BASE 62, lowercase and uppercase are distinct keys.
+        var beatmap = decode("""
+                             #BASE 62
+                             #BPM 120
+                             #WAVaa lowercase.wav
+                             #WAVAA uppercase.wav
+                             #00111:aa
+                             """);
+        var hitObject = beatmap.HitObjects.OfType<BmsHitObject>().Single();
+
+        // "aa" maps to the lowercase definition only.
+        Assert.That(hitObject.SamplePath, Is.EqualTo("lowercase.wav"));
+    }
+
+    [Test]
+    public void TestBase62CellValuesPreserveCase()
+    {
+        // Cell values in base-62 mode distinguish case.
+        var beatmap = decode("""
+                             #BASE 62
+                             #BPM 120
+                             #WAVaa lower.wav
+                             #WAVAA upper.wav
+                             #00111:aaAA
+                             """);
+        var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().OrderBy(h => h.StartTime).ToList();
+
+        Assert.That(hitObjects, Has.Count.EqualTo(2));
+        Assert.That(hitObjects[0].SamplePath, Is.EqualTo("lower.wav"));
+        Assert.That(hitObjects[1].SamplePath, Is.EqualTo("upper.wav"));
     }
 
     [Test]
@@ -146,11 +217,11 @@ public class BmsBeatmapDecoderTest
     [Test]
     public void TestBmsDecoderRegisteredWithoutRulesetInstantiation()
     {
-        using var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes("""
-                                                                         #TITLE Global Decoder Registration
-                                                                         #BPM 120
-                                                                         #00111:01
-                                                                         """));
+        using var memoryStream = new MemoryStream("""
+                                                  #TITLE Global Decoder Registration
+                                                  #BPM 120
+                                                  #00111:01
+                                                  """u8.ToArray());
         using var reader = new LineBufferedReader(memoryStream);
 
         var decoded = Decoder.GetDecoder<Beatmap>(reader).Decode(reader);
@@ -187,7 +258,7 @@ public class BmsBeatmapDecoderTest
                              #ENDRANDOM
                              """, _ => 1);
 
-        Assert.That(beatmap.HitObjects.Cast<BmsHitObject>().Select(h => h.SourceChannel), Is.EqualTo(new[] { "11", "13" }));
+        Assert.That(beatmap.HitObjects.Cast<BmsHitObject>().Select(h => h.SourceChannel), Is.EqualTo([BmsChartParser.Enc("11"), BmsChartParser.Enc("13")]));
     }
 
     [Test]
@@ -223,8 +294,8 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)converter.Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(converted.BranchDecisions, Is.EqualTo(new[] { new BmsBranchDecision(2, 2) }));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("12")));
+        Assert.That(converted.BranchDecisions, Is.EqualTo([new BmsBranchDecision(2, 2)]));
     }
 
     [Test]
@@ -239,7 +310,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         Assert.That(converted.TimingMap, Is.Not.Null);
-        Assert.That(converted.TimingMap!.BpmEvents.Select(e => e.Bpm), Is.EqualTo(new[] { 120, 240 }));
+        Assert.That(converted.TimingMap!.BpmEvents.Select(e => e.Bpm), Is.EqualTo([120, 240]));
     }
 
     [Test]
@@ -249,7 +320,7 @@ public class BmsBeatmapDecoderTest
         {
             HitObjects =
             {
-                new BmsHitObject { SourceChannel = "19" },
+                new BmsHitObject { SourceChannel = BmsChartParser.Enc("19") },
             },
         };
 
@@ -282,9 +353,9 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)converter.Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(note.SampleKey, Is.EqualTo("02"));
-        Assert.That(converted.BranchDecisions, Is.EqualTo(new[] { new BmsBranchDecision(2, 2) }));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("12")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
+        Assert.That(converted.BranchDecisions, Is.EqualTo([new BmsBranchDecision(2, 2)]));
     }
 
     [Test]
@@ -301,10 +372,10 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         Assert.That(hitObject.SamplePath, Is.EqualTo("kick.wav"));
-        Assert.That(converted.SampleDefinitions["01"], Is.EqualTo("kick.wav"));
-        Assert.That(converted.SampleDefinitions["02"], Is.EqualTo("bgm.ogg"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("kick.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("bgm.ogg"));
         Assert.That(converted.BackgroundSampleEvents, Has.Count.EqualTo(1));
-        Assert.That(converted.BackgroundSampleEvents[0].SampleKey, Is.EqualTo("02"));
+        Assert.That(converted.BackgroundSampleEvents[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
         Assert.That(converted.BackgroundSampleEvents[0].Time, Is.EqualTo(2000).Within(0.001));
     }
 
@@ -321,8 +392,8 @@ public class BmsBeatmapDecoderTest
 
         Assert.That(mine.IsMine, Is.True);
         Assert.That(mine.Column, Is.EqualTo(3));
-        Assert.That(mine.SourceChannel, Is.EqualTo("D3"));
-        Assert.That(mine.SampleKey, Is.EqualTo("1E"));
+        Assert.That(mine.SourceChannel, Is.EqualTo(BmsChartParser.Enc("D3")));
+        Assert.That(mine.SampleKey, Is.EqualTo(BmsChartParser.Enc("1E")));
         Assert.That(mine.SamplePath, Is.Empty);
         Assert.That(mine.LandmineDamagePercent, Is.EqualTo(25));
         Assert.That(mine.LandmineExplosionSamplePath, Is.EqualTo("bomb.wav"));
@@ -342,7 +413,7 @@ public class BmsBeatmapDecoderTest
         Assert.That(beatmap.HitObjects, Has.Count.EqualTo(1));
         Assert.That(mine.IsMine, Is.True);
         Assert.That(mine.Column, Is.EqualTo(6));
-        Assert.That(mine.SourceChannel, Is.EqualTo("E1"));
+        Assert.That(mine.SourceChannel, Is.EqualTo(BmsChartParser.Enc("E1")));
         Assert.That(mine.LandmineDamagePercent, Is.EqualTo(5));
     }
 
@@ -370,8 +441,8 @@ public class BmsBeatmapDecoderTest
         // #IFEND closes that. #END IF is another no-op (no open #IF).
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(note.SampleKey, Is.EqualTo("02"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("12")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
     }
 
     [Test]
@@ -392,8 +463,8 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("11"));
-        Assert.That(note.SampleKey, Is.EqualTo("01"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("11")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("01")));
     }
 
     [Test]
@@ -414,8 +485,8 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("11"));
-        Assert.That(note.SampleKey, Is.EqualTo("01"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("11")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("01")));
     }
 
     [Test]
@@ -436,8 +507,8 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("11"));
-        Assert.That(note.SampleKey, Is.EqualTo("01"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("11")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("01")));
     }
 
     [Test]
@@ -457,7 +528,7 @@ public class BmsBeatmapDecoderTest
         Assert.That(beatmap.ControlPointInfo.TimingPoints, Has.Count.EqualTo(2));
         Assert.That(beatmap.ControlPointInfo.TimingPoints[0].BPM, Is.EqualTo(120).Within(0.001));
         Assert.That(beatmap.ControlPointInfo.TimingPoints[1].BPM, Is.EqualTo(240).Within(0.001));
-        Assert.That(timingMap.BpmEvents.Select(e => e.Bpm), Is.EqualTo(new[] { 120, 240 }));
+        Assert.That(timingMap.BpmEvents.Select(e => e.Bpm), Is.EqualTo([120, 240]));
         Assert.That(note.StartTime, Is.EqualTo(3000).Within(0.001));
     }
 
@@ -502,7 +573,7 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("11"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("11")));
         Assert.That(decisions, Is.Empty);
     }
 
@@ -519,7 +590,7 @@ public class BmsBeatmapDecoderTest
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
         Assert.That(note.IsLongNote, Is.True);
-        Assert.That(note.SampleKey, Is.EqualTo("22"));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("22")));
         Assert.That(note.TickInfo.Tick, Is.EqualTo(192));
         Assert.That(note.TickInfo.EndTick, Is.EqualTo(480));
         Assert.That(note.Duration, Is.EqualTo(3000).Within(0.001));
@@ -589,7 +660,7 @@ public class BmsBeatmapDecoderTest
         // For LNTYPE 1 with payload "0101", both head and tail have value "01",
         // so the tail sample key should not be played.
         Assert.That(converted.HitObjects[0].IsLongNote, Is.True);
-        Assert.That(converted.HitObjects[0].SampleKey, Is.EqualTo("01"));
+        Assert.That(converted.HitObjects[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("01")));
         Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(0));
     }
 
@@ -607,7 +678,7 @@ public class BmsBeatmapDecoderTest
 
         // Terminating cell has value "02" → tail sample key is "02", NOT head's "01".
         Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(1));
-        Assert.That(converted.LongNoteTailSampleEvents[0].SampleKey, Is.EqualTo("02"));
+        Assert.That(converted.LongNoteTailSampleEvents[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
     }
 
     [Test]
@@ -621,10 +692,10 @@ public class BmsBeatmapDecoderTest
                              #00151:0102
                              """);
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        var note = (BmsHitObject)converted.HitObjects.Single();
+        var note = converted.HitObjects.Single();
 
         Assert.That(note.IsLongNote, Is.True);
-        Assert.That(note.TailSampleKey, Is.EqualTo("02"));
+        Assert.That(note.TailSampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
         Assert.That(note.TailSamplePath, Is.EqualTo("tail.wav"));
     }
 
@@ -638,11 +709,11 @@ public class BmsBeatmapDecoderTest
                              #00151:0103
                              """);
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        var note = (BmsHitObject)converted.HitObjects.Single();
+        var note = converted.HitObjects.Single();
 
         Assert.That(note.IsLongNote, Is.True);
         // Terminating value "03" has no #WAV definition → TailSamplePath should be empty
-        Assert.That(note.TailSampleKey, Is.EqualTo("03"));
+        Assert.That(note.TailSampleKey, Is.EqualTo(BmsChartParser.Enc("03")));
         Assert.That(note.TailSamplePath, Is.Empty);
         // No tail sample event either since the sample can't be resolved
         Assert.That(converted.LongNoteTailSampleEvents, Is.Empty);
@@ -699,14 +770,14 @@ public class BmsBeatmapDecoderTest
 
         // First LN: head=aa, tail=bb
         Assert.That(notes[0].IsLongNote, Is.True);
-        Assert.That(notes[0].SampleKey, Is.EqualTo("aa"));
-        Assert.That(notes[0].TailSampleKey, Is.EqualTo("bb"));
+        Assert.That(notes[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("aa")));
+        Assert.That(notes[0].TailSampleKey, Is.EqualTo(BmsChartParser.Enc("bb")));
         Assert.That(notes[0].TailSamplePath, Is.EqualTo("onkeyup1.wav"));
 
         // Second LN: head=cc, tail=dd
         Assert.That(notes[1].IsLongNote, Is.True);
-        Assert.That(notes[1].SampleKey, Is.EqualTo("cc"));
-        Assert.That(notes[1].TailSampleKey, Is.EqualTo("dd"));
+        Assert.That(notes[1].SampleKey, Is.EqualTo(BmsChartParser.Enc("cc")));
+        Assert.That(notes[1].TailSampleKey, Is.EqualTo(BmsChartParser.Enc("dd")));
         Assert.That(notes[1].TailSamplePath, Is.EqualTo("onkeyup2.wav"));
     }
 
@@ -719,9 +790,9 @@ public class BmsBeatmapDecoderTest
             [new BmsBpmEvent(0, 130, 0), new BmsBpmEvent(192, 260, 0)],
             []);
 
-        var oneMeasureAt130 = 60000d / 130 * 4;
-        var halfMeasureAt130Scroll = timingMap.GetScrollPositionAtTime(oneMeasureAt130 / 2) - timingMap.GetScrollPositionAtTime(0);
-        var oneMeasureAt260Scroll = timingMap.GetScrollPositionAtTime(oneMeasureAt130 + oneMeasureAt130 / 2) - timingMap.GetScrollPositionAtTime(oneMeasureAt130);
+        const double one_measure_at130 = 60000d / 130 * 4;
+        var halfMeasureAt130Scroll = timingMap.GetScrollPositionAtTime(one_measure_at130 / 2) - timingMap.GetScrollPositionAtTime(0);
+        var oneMeasureAt260Scroll = timingMap.GetScrollPositionAtTime(one_measure_at130 + one_measure_at130 / 2) - timingMap.GetScrollPositionAtTime(one_measure_at130);
 
         Assert.That(oneMeasureAt260Scroll, Is.EqualTo(halfMeasureAt130Scroll * 2).Within(0.001));
     }
@@ -735,9 +806,9 @@ public class BmsBeatmapDecoderTest
             [new BmsBpmEvent(0, 1_000_000, 0)],
             []);
 
-        var oneMeasureAtExtremeBpm = 60000d / 1_000_000 * 4;
+        const double one_measure_at_extreme_bpm = 60000d / 1_000_000 * 4;
 
-        Assert.That(timingMap.GetScrollPositionAtTime(oneMeasureAtExtremeBpm), Is.EqualTo(timingMap.GetScrollPositionAtTick(192)).Within(0.001));
+        Assert.That(timingMap.GetScrollPositionAtTime(one_measure_at_extreme_bpm), Is.EqualTo(timingMap.GetScrollPositionAtTick(192)).Within(0.001));
     }
 
     [Test]
@@ -805,10 +876,10 @@ public class BmsBeatmapDecoderTest
             [new BmsBpmEvent(0, 130, 0), new BmsBpmEvent(0, 0.25, 0, 1)],
             []);
 
-        var oneBeatAtQuarterBpm = 60000d / 0.25;
+        const double one_beat_at_quarter_bpm = 60000d / 0.25;
 
         Assert.That(timingMap.ScrollReferenceBpm, Is.EqualTo(130).Within(0.000001));
-        Assert.That(timingMap.GetScrollPositionAtTime(oneBeatAtQuarterBpm), Is.EqualTo(timingMap.GetScrollPositionAtTick(48)).Within(0.001));
+        Assert.That(timingMap.GetScrollPositionAtTime(one_beat_at_quarter_bpm), Is.EqualTo(timingMap.GetScrollPositionAtTick(48)).Within(0.001));
     }
 
     [Test]
@@ -866,8 +937,8 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(note.SampleKey, Is.EqualTo("02"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("12")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
         Assert.That(decisions, Is.Empty);
     }
 
@@ -879,18 +950,18 @@ public class BmsBeatmapDecoderTest
             Difficulty = { CircleSize = 18 },
             HitObjects =
             {
-                new BmsHitObject { SourceChannel = "16" },
-                new BmsHitObject { SourceChannel = "21" },
-                new BmsHitObject { SourceChannel = "29" },
+                new BmsHitObject { SourceChannel = BmsChartParser.Enc("16") },
+                new BmsHitObject { SourceChannel = BmsChartParser.Enc("21") },
+                new BmsHitObject { SourceChannel = BmsChartParser.Enc("29") },
             },
         };
 
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         Assert.That(converted.TotalColumns, Is.EqualTo(18));
-        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == "16").Column, Is.EqualTo(5));
-        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == "21").Column, Is.EqualTo(9));
-        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == "29").Column, Is.EqualTo(17));
+        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == BmsChartParser.Enc("16")).Column, Is.EqualTo(5));
+        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == BmsChartParser.Enc("21")).Column, Is.EqualTo(9));
+        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == BmsChartParser.Enc("29")).Column, Is.EqualTo(17));
     }
 
     [Test]
@@ -901,20 +972,20 @@ public class BmsBeatmapDecoderTest
             Difficulty = { CircleSize = 9 },
             HitObjects =
             {
-                new BmsHitObject { SourceChannel = "16" },
-                new BmsHitObject { SourceChannel = "17" },
-                new BmsHitObject { SourceChannel = "18" },
-                new BmsHitObject { SourceChannel = "19" },
+                new BmsHitObject { SourceChannel = BmsChartParser.Enc("16") },
+                new BmsHitObject { SourceChannel = BmsChartParser.Enc("17") },
+                new BmsHitObject { SourceChannel = BmsChartParser.Enc("18") },
+                new BmsHitObject { SourceChannel = BmsChartParser.Enc("19") },
             },
         };
 
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         Assert.That(converted.TotalColumns, Is.EqualTo(9));
-        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == "18").Column, Is.EqualTo(5));
-        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == "19").Column, Is.EqualTo(6));
-        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == "16").Column, Is.EqualTo(7));
-        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == "17").Column, Is.EqualTo(8));
+        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == BmsChartParser.Enc("18")).Column, Is.EqualTo(5));
+        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == BmsChartParser.Enc("19")).Column, Is.EqualTo(6));
+        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == BmsChartParser.Enc("16")).Column, Is.EqualTo(7));
+        Assert.That(converted.HitObjects.Single(h => h.SourceChannel == BmsChartParser.Enc("17")).Column, Is.EqualTo(8));
     }
 
     [Test]
@@ -935,8 +1006,8 @@ public class BmsBeatmapDecoderTest
         var first = decode(chart, _ => 1);
         var second = decode(chart, _ => 2);
 
-        Assert.That(((BmsHitObject)first.HitObjects.Single()).SourceChannel, Is.EqualTo("11"));
-        Assert.That(((BmsHitObject)second.HitObjects.Single()).SourceChannel, Is.EqualTo("12"));
+        Assert.That(((BmsHitObject)first.HitObjects.Single()).SourceChannel, Is.EqualTo(BmsChartParser.Enc("11")));
+        Assert.That(((BmsHitObject)second.HitObjects.Single()).SourceChannel, Is.EqualTo(BmsChartParser.Enc("12")));
     }
 
     [Test]
@@ -956,8 +1027,8 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(note.SampleKey, Is.EqualTo("02"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("12")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
     }
 
     [Test]
@@ -986,8 +1057,8 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(note.SampleKey, Is.EqualTo("02"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("12")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
         Assert.That(decisions, Is.Empty);
     }
 
@@ -1051,8 +1122,8 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("12"));
-        Assert.That(note.SampleKey, Is.EqualTo("02"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("12")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
     }
 
     [Test]
@@ -1117,8 +1188,8 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("13"));
-        Assert.That(note.SampleKey, Is.EqualTo("03"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("13")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("03")));
     }
 
     [Test]
@@ -1140,7 +1211,7 @@ public class BmsBeatmapDecoderTest
                              #ENDSW
                              """);
 
-        Assert.That(beatmap.HitObjects.Cast<BmsHitObject>().Select(h => h.SourceChannel), Is.EqualTo(new[] { "12", "13" }));
+        Assert.That(beatmap.HitObjects.Cast<BmsHitObject>().Select(h => h.SourceChannel), Is.EqualTo([BmsChartParser.Enc("12"), BmsChartParser.Enc("13")]));
     }
 
     [Test]
@@ -1171,8 +1242,8 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.SourceChannel, Is.EqualTo("13"));
-        Assert.That(note.SampleKey, Is.EqualTo("03"));
+        Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("13")));
+        Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("03")));
         Assert.That(decisions, Is.Empty);
     }
 
@@ -1222,7 +1293,7 @@ public class BmsBeatmapDecoderTest
     [Test]
     public void TestTotalPreservesDecimalValue()
     {
-        var beatmap = decode($"#TOTAL 160.5\n#BPM 130\n#00111:01");
+        var beatmap = decode("#TOTAL 160.5\n#BPM 130\n#00111:01");
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         Assert.That(converted.Total, Is.EqualTo(160.5).Within(0.001));
@@ -1261,12 +1332,12 @@ public class BmsBeatmapDecoderTest
         var second = (BmsHitObject)beatmap.HitObjects[1];
 
         Assert.That(first.Column, Is.EqualTo(1));
-        Assert.That(first.SampleKey, Is.EqualTo("01"));
+        Assert.That(first.SampleKey, Is.EqualTo(BmsChartParser.Enc("01")));
         Assert.That(first.TickInfo.Tick, Is.EqualTo(192));
         Assert.That(first.StartTime, Is.EqualTo(2000).Within(0.001));
 
         Assert.That(second.Column, Is.EqualTo(0));
-        Assert.That(second.SampleKey, Is.EqualTo("02"));
+        Assert.That(second.SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
         Assert.That(second.TickInfo.Tick, Is.EqualTo(288));
         Assert.That(second.StartTime, Is.EqualTo(3000).Within(0.001));
     }

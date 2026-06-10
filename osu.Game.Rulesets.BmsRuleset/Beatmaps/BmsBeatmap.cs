@@ -26,7 +26,7 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public BmsTimingMap? TimingMap { get; set; }
 
-    public IReadOnlyDictionary<string, string> SampleDefinitions { get; set; } = new Dictionary<string, string>();
+    public IReadOnlyDictionary<ushort, string> SampleDefinitions { get; set; } = new Dictionary<ushort, string>();
 
     public IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; } = [];
 

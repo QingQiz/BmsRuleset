@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text.RegularExpressions;
+using System.Runtime.CompilerServices;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -10,13 +10,33 @@ internal static partial class BmsChartParser
 {
     private const int base_tick_resolution = 192;
 
-    private readonly record struct RawChannelLine(int Measure, string Channel, string Payload, int Sequence);
+    // ── Base-62 6-bit encoding ───────────────────────────────────────────
 
-    private readonly record struct RawCell(long Tick, string Channel, string Value, int Sequence, int Column);
+    /// <summary>256-entry lookup: ASCII char → 6-bit value (0–61), 255 = invalid.</summary>
+    private static readonly byte[] s_char_to6 = buildCharTo6Table();
+
+
+    // ── Internal types ───────────────────────────────────────────────────
+
+    private readonly record struct RawChannelLine(int Measure, ushort Channel, string Payload, int Sequence);
+
+    private readonly record struct RawCell(long Tick, ushort Channel, ushort Value, int Sequence, int Column);
 
     private readonly record struct TimingEvent(long Tick, double Bpm, double Time, int Sequence = 0);
 
     private readonly record struct StopEvent(long Tick, double Duration, double StopValue, double Bpm, int Sequence);
+
+    /// <summary>Extract the high 6-bit digit (the "tens" place).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int Hi(ushort k) => k >> 6;
+
+    /// <summary>Extract the low 6-bit digit (the "ones" place).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int Lo(ushort k) => k & 0x3F;
+
+    /// <summary>Pack hi/lo 6-bit digits into a 12-bit ushort (hi &lt;&lt; 6 | lo).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ushort Pack(int hi, int lo) => (ushort)((hi << 6) | lo);
 
     public static BmsParseResult Parse(IEnumerable<string> lines, string? path = null, Func<int, int>? randomValueSelector = null)
     {
@@ -48,7 +68,7 @@ internal static partial class BmsChartParser
 
         var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
         var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
-        var sampleDefinitions = new Dictionary<string, string>(state.SampleDefinitions, StringComparer.OrdinalIgnoreCase);
+        var sampleDefinitions = new Dictionary<ushort, string>(state.SampleDefinitions);
         var hitObjects = collectHitObjects(state, totalColumns, measureStarts, timingMap).ToList();
         hitObjects.Sort((a, b) =>
         {
@@ -95,46 +115,94 @@ internal static partial class BmsChartParser
             state.Comment);
     }
 
+    /// <summary>Encode a 2-char base-62 pair into a 12-bit ushort (case-sensitive).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static ushort EncodePair(char hi, char lo) =>
+        Pack(charTo6(hi), charTo6(lo));
+
+    /// <summary>Encode with case-folding to uppercase (for sample keys, cell values — BMS is case-insensitive for these).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static ushort EncodePairCi(char hi, char lo) =>
+        Pack(charTo6(toUpperFast(hi)), charTo6(toUpperFast(lo)));
+
+    /// <summary>Encode a 2-char string, case-insensitive (traditional BMS default).</summary>
+    internal static ushort Enc(string s) => s.Length == 2
+        ? EncodePairCi(s[0], s[1])
+        : (ushort)0;
+
+    private static byte[] buildCharTo6Table()
+    {
+        var t = new byte[256];
+        Array.Fill(t, (byte)255);
+        for (int i = '0'; i <= '9'; i++) t[i] = (byte)(i - '0');      // 0–9
+        for (int i = 'A'; i <= 'Z'; i++) t[i] = (byte)(i - 'A' + 10); // 10–35
+        for (int i = 'a'; i <= 'z'; i++) t[i] = (byte)(i - 'a' + 36); // 36–61
+        return t;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int charTo6(char c) => s_char_to6[c];
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static char toUpperFast(char c) => c >= 'a' && c <= 'z' ? (char)(c - 32) : c;
+
+    /// <summary>Encode a cell value or sample key, respecting #BASE 62 case-sensitivity.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ushort encodeValue(bool useBase62, char hi, char lo) =>
+        useBase62 ? EncodePair(hi, lo) : EncodePairCi(hi, lo);
+
     private static void parseLine(string line, ParseState state)
     {
-        line = line.Trim();
+        ReadOnlySpan<char> span = line.AsSpan().Trim();
 
-        if (line.Length == 0 || (line[0] != '#' && line[0] != '%'))
+        if (span.IsEmpty || (span[0] != '#' && span[0] != '%'))
             return;
 
-        // Normalize % prefix to # for matching (%URL, %EMAIL).
-        if (line[0] == '%')
+        // Handle % prefix commands (%URL, %EMAIL) — only two exist, handle inline.
+        if (span[0] == '%')
         {
-            if (line.Length == 1) return;
+            if (span.Length == 1) return;
 
-            line = string.Concat("#", line.AsSpan(1));
+            var rest = span[1..];
+            if (rest.StartsWith("URL", StringComparison.OrdinalIgnoreCase) && rest.Length > 3 && (rest[3] == ' ' || rest[3] == '\t'))
+            {
+                state.Url = rest[4..].Trim().ToString();
+                return;
+            }
+
+            if (rest.StartsWith("EMAIL", StringComparison.OrdinalIgnoreCase) && rest.Length > 5 && (rest[5] == ' ' || rest[5] == '\t'))
+            {
+                state.Email = rest[6..].Trim().ToString();
+                // ReSharper disable once RedundantJumpStatement
+                return;
+            }
+
+            return;
         }
 
         // Attempt channel line: #XXXYY:...
         // Format: # followed by 3 digits (measure), 2 chars (channel), ':', then payload
-        if (line.Length >= 7)
+        if (span.Length >= 7)
         {
-            var d1 = line[1];
-            var d2 = line[2];
-            var d3 = line[3];
-            if (d1 >= '0' && d1 <= '9' && d2 >= '0' && d2 <= '9' && d3 >= '0' && d3 <= '9' && line[6] == ':')
+            var d1 = span[1];
+            var d2 = span[2];
+            var d3 = span[3];
+            if (d1 >= '0' && d1 <= '9' && d2 >= '0' && d2 <= '9' && d3 >= '0' && d3 <= '9' && span[6] == ':')
             {
                 var measure = (d1 - '0') * 100 + (d2 - '0') * 10 + (d3 - '0');
 
-                // channelPart is already uppercase in BMS format [0-9A-Z]{2}, the slice avoids allocation
-                var payload = line[7..].Trim();
-
+                var payloadSpan = span[7..].Trim();
                 state.MaxMeasure = Math.Max(state.MaxMeasure, measure);
 
-                if (line[4] == '0' && line[5] == '2')
+                if (span[4] == '0' && span[5] == '2')
                 {
-                    if (tryParseDouble(payload, out var length) && length > 0)
+                    if (tryParseDouble(payloadSpan, out var length) && length > 0)
                         state.MeasureLengths[measure] = length;
                 }
-                else if (payload.Length >= 2)
+                else if (payloadSpan.Length >= 2)
                 {
-                    var channel = line.Substring(4, 2);
-                    state.ChannelLines.Add(new RawChannelLine(measure, channel, payload, state.NextSequence++ * 4096));
+                    var channelKey = EncodePair(span[4], span[5]);
+                    state.ChannelLines.Add(new RawChannelLine(measure, channelKey, payloadSpan.ToString(), state.NextSequence++ * 4096));
                 }
 
                 return;
@@ -142,160 +210,197 @@ internal static partial class BmsChartParser
         }
 
         // Attempt command line: #KEYWORD value
-        // Skip leading spaces after #
         var cmdStart = 1;
-        while (cmdStart < line.Length && line[cmdStart] == ' ') cmdStart++;
-        if (cmdStart >= line.Length) return;
+        while (cmdStart < span.Length && span[cmdStart] == ' ') cmdStart++;
+        if (cmdStart >= span.Length) return;
 
         // Find end of command (first whitespace)
         var cmdEnd = cmdStart;
-        while (cmdEnd < line.Length && line[cmdEnd] != ' ' && line[cmdEnd] != '	') cmdEnd++;
+        while (cmdEnd < span.Length && span[cmdEnd] != ' ' && span[cmdEnd] != '\t') cmdEnd++;
 
-        // Require at least one whitespace after command (matches regex \\s+ requirement)
-        if (cmdEnd >= line.Length) return;
+        // Require at least one whitespace after command
+        if (cmdEnd >= span.Length) return;
 
-        var command = line.Substring(cmdStart, cmdEnd - cmdStart).ToUpperInvariant();
-        var value = line[cmdEnd..].Trim();
+        var cmdSpan = span[cmdStart..cmdEnd];
+        var valueSpan = span[(cmdEnd + 1)..].Trim();
 
-        switch (command)
+        // Match commands using span comparisons (zero-alloc).
+        if (cmdSpan.Equals("TITLE", StringComparison.OrdinalIgnoreCase))
         {
-            case "TITLE":
-                state.Title = value;
-                break;
-
-            case "ARTIST":
-                state.Artist = value;
-                break;
-
-            case "GENRE":
-            case "GENLE":
-                state.Genre = value;
-                break;
-
-            case "SUBTITLE":
-                state.Subtitle = value;
-                break;
-
-            case "SUBARTIST":
-                state.SubArtist = value;
-                break;
-
-            case "MAKER":
-                state.Maker = value;
-                break;
-
-            case "URL":
-                state.Url = value;
-                break;
-
-            case "EMAIL":
-                state.Email = value;
-                break;
-
-            case "COMMENT":
-                state.Comment = value;
-                break;
-
-            case "PLAYLEVEL":
-                if (tryParseDouble(value, out var difficulty))
-                    state.PlayLevel = (float)difficulty;
-                break;
-
-            case "BPM":
-                if (tryParseDouble(value, out var bpm) && bpm > 0)
-                    state.InitialBpm = bpm;
-                break;
-
-            case "BASEBPM":
-                if (tryParseDouble(value, out var baseBpm) && baseBpm > 0)
-                    state.BaseBpm = baseBpm;
-                break;
-
-            case "LNTYPE":
-                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnType))
-                    state.LnType = lnType;
-                break;
-
-            case "RANK":
-                if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rank) && rank >= 0 && rank <= 4)
-                    state.Rank = rank;
-                break;
-
-            case "TOTAL":
-                if (tryParseDouble(value, out var total) && total > 0)
-                    state.Total = total;
-                break;
-
-            case "LNOBJ":
-                if (value.Length >= 2)
-                    state.LnObjValues.Add(value[..2].ToUpperInvariant());
-                break;
+            state.Title = valueSpan.ToString();
+            return;
         }
 
-        switch (command.Length)
+        if (cmdSpan.Equals("ARTIST", StringComparison.OrdinalIgnoreCase))
         {
-            case 5 when command.StartsWith("BPM", StringComparison.OrdinalIgnoreCase)
-                        && tryParseDouble(value, out var extendedBpm)
-                        && extendedBpm > 0:
-                state.BpmDefinitions[command[3..5]] = extendedBpm;
-                break;
+            state.Artist = valueSpan.ToString();
+            return;
+        }
 
-            case 5 when command.StartsWith("WAV", StringComparison.OrdinalIgnoreCase)
-                        && value.Length > 0:
-                state.SampleDefinitions[command[3..5]] = value.Trim().Trim('"');
-                break;
+        if (cmdSpan.Equals("GENRE", StringComparison.OrdinalIgnoreCase)
+            || cmdSpan.Equals("GENLE", StringComparison.OrdinalIgnoreCase))
+        {
+            state.Genre = valueSpan.ToString();
+            return;
+        }
 
-            case 6 when command.StartsWith("STOP", StringComparison.OrdinalIgnoreCase)
-                        && tryParseDouble(value, out var stopValue)
-                        && stopValue > 0:
-                state.StopDefinitions[command[4..6]] = stopValue;
-                break;
+        if (cmdSpan.Equals("SUBTITLE", StringComparison.OrdinalIgnoreCase))
+        {
+            state.Subtitle = valueSpan.ToString();
+            return;
+        }
 
-            case 6 when command.StartsWith("TEXT", StringComparison.OrdinalIgnoreCase)
-                        && value.Length > 0:
-                state.TextDefinitions[command[4..6]] = value;
-                break;
+        if (cmdSpan.Equals("SUBARTIST", StringComparison.OrdinalIgnoreCase))
+        {
+            state.SubArtist = valueSpan.ToString();
+            return;
+        }
 
-            case 6 when command.StartsWith("SONG", StringComparison.OrdinalIgnoreCase)
-                        && value.Length > 0:
-            {
-                var key = command[4..6];
+        if (cmdSpan.Equals("MAKER", StringComparison.OrdinalIgnoreCase))
+        {
+            state.Maker = valueSpan.ToString();
+            return;
+        }
 
-                state.TextDefinitions.TryAdd(key, value);
+        if (cmdSpan.Equals("URL", StringComparison.OrdinalIgnoreCase))
+        {
+            state.Url = valueSpan.ToString();
+            return;
+        }
 
-                break;
-            }
+        if (cmdSpan.Equals("EMAIL", StringComparison.OrdinalIgnoreCase))
+        {
+            state.Email = valueSpan.ToString();
+            return;
+        }
+
+        if (cmdSpan.Equals("COMMENT", StringComparison.OrdinalIgnoreCase))
+        {
+            state.Comment = valueSpan.ToString();
+            return;
+        }
+
+        if (cmdSpan.Equals("PLAYLEVEL", StringComparison.OrdinalIgnoreCase))
+        {
+            if (tryParseDouble(valueSpan, out var difficulty))
+                state.PlayLevel = (float)difficulty;
+            return;
+        }
+
+        if (cmdSpan.Equals("BPM", StringComparison.OrdinalIgnoreCase))
+        {
+            if (tryParseDouble(valueSpan, out var bpm) && bpm > 0)
+                state.InitialBpm = bpm;
+            return;
+        }
+
+        if (cmdSpan.Equals("BASEBPM", StringComparison.OrdinalIgnoreCase))
+        {
+            if (tryParseDouble(valueSpan, out var baseBpm) && baseBpm > 0)
+                state.BaseBpm = baseBpm;
+            return;
+        }
+
+        if (cmdSpan.Equals("LNTYPE", StringComparison.OrdinalIgnoreCase))
+        {
+            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnType))
+                state.LnType = lnType;
+            return;
+        }
+
+        if (cmdSpan.Equals("RANK", StringComparison.OrdinalIgnoreCase))
+        {
+            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rank) && rank >= 0 && rank <= 4)
+                state.Rank = rank;
+            return;
+        }
+
+        if (cmdSpan.Equals("TOTAL", StringComparison.OrdinalIgnoreCase))
+        {
+            if (tryParseDouble(valueSpan, out var total) && total > 0)
+                state.Total = total;
+            return;
+        }
+
+        if (cmdSpan.Equals("BASE", StringComparison.OrdinalIgnoreCase))
+        {
+            if (valueSpan.Length >= 2 && valueSpan[..2].Equals("62", StringComparison.Ordinal))
+                state.UseBase62 = true;
+            return;
+        }
+
+        if (cmdSpan.Equals("LNOBJ", StringComparison.OrdinalIgnoreCase))
+        {
+            if (valueSpan.Length >= 2)
+                state.LnObjValues.Add(encodeValue(state.UseBase62, valueSpan[0], valueSpan[1]));
+            return;
+        }
+
+        // Definition commands: #BPMxx, #WAVxx, #STOPxx, #TEXTxx, #SONGxx
+        if (cmdSpan.Length == 5 && cmdSpan.StartsWith("BPM", StringComparison.OrdinalIgnoreCase)
+                                && tryParseDouble(valueSpan, out var extendedBpm) && extendedBpm > 0)
+        {
+            state.BpmDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = extendedBpm;
+            return;
+        }
+
+        if (cmdSpan.Length == 5 && cmdSpan.StartsWith("WAV", StringComparison.OrdinalIgnoreCase)
+                                && valueSpan.Length > 0)
+        {
+            state.SampleDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = valueSpan.Trim('"').ToString();
+            return;
+        }
+
+        if (cmdSpan.Length == 6 && cmdSpan.StartsWith("STOP", StringComparison.OrdinalIgnoreCase)
+                                && tryParseDouble(valueSpan, out var stopValue) && stopValue > 0)
+        {
+            state.StopDefinitions[encodeValue(state.UseBase62, cmdSpan[4], cmdSpan[5])] = stopValue;
+            return;
+        }
+
+        if (cmdSpan.Length == 6 && cmdSpan.StartsWith("TEXT", StringComparison.OrdinalIgnoreCase)
+                                && valueSpan.Length > 0)
+        {
+            state.TextDefinitions[encodeValue(state.UseBase62, cmdSpan[4], cmdSpan[5])] = valueSpan.ToString();
+            return;
+        }
+
+        if (cmdSpan.Length == 6 && cmdSpan.StartsWith("SONG", StringComparison.OrdinalIgnoreCase)
+                                && valueSpan.Length > 0)
+        {
+            state.TextDefinitions.TryAdd(encodeValue(state.UseBase62, cmdSpan[4], cmdSpan[5]), valueSpan.ToString());
         }
     }
 
     private static IEnumerable<BmsSampleEvent> collectBackgroundSampleEvents(
         ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
     {
-        return from line in state.ChannelLines.Where(l => l.Channel == "01")
-               from cell in expandCells(line, measureStarts, false)
-               select new BmsSampleEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, cell.Value);
+        foreach (var line in state.ChannelLines)
+        {
+            if (line.Channel != CH_01) continue;
+
+            foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+                yield return new BmsSampleEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, cell.Value);
+        }
     }
 
-    /// <summary>
-    /// ordered
-    /// </summary>
-    /// <param name="state"></param>
-    /// <param name="measureStarts"></param>
-    /// <param name="timingMap"></param>
-    /// <returns></returns>
     private static BmsTextEvents collectTextEvents(
         ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
     {
-        var events = state.ChannelLines
-            .Where(l => l.Channel == "99")
-            .SelectMany(line => expandCells(line, measureStarts, false))
-            .Where(cell => state.TextDefinitions.ContainsKey(cell.Value))
-            .Select(cell => new BmsTextEvent(
-                timingMap.ProjectTickToTime(cell.Tick),
-                cell.Tick,
-                state.TextDefinitions[cell.Value]))
-            .OrderBy(e => e.Time);
-        state.TextDefinitions.TryGetValue("00", out var mistake);
+        var events = new List<BmsTextEvent>();
+        foreach (var line in state.ChannelLines)
+        {
+            if (line.Channel != CH_99) continue;
+
+            foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+            {
+                if (state.TextDefinitions.TryGetValue(cell.Value, out var text))
+                    events.Add(new BmsTextEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, text));
+            }
+        }
+
+        events.Sort((a, b) => a.Time.CompareTo(b.Time));
+        state.TextDefinitions.TryGetValue(0, out var mistake); // 0 = "00"
         return new BmsTextEvents(mistake, events.ToArray());
     }
 
@@ -310,7 +415,7 @@ internal static partial class BmsChartParser
             // sample path resolves (i.e. the key has a #WAV definition in the chart).
             // Do NOT fallback to the head's SampleKey — if the terminating cell has
             // no sample defined, the tail simply has no sound.
-            if (string.IsNullOrWhiteSpace(hitObject.TailSampleKey) || string.IsNullOrWhiteSpace(hitObject.TailSamplePath))
+            if (hitObject.TailSampleKey == 0 || string.IsNullOrWhiteSpace(hitObject.TailSamplePath))
                 continue;
 
             yield return new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, hitObject.TailSampleKey);
@@ -360,12 +465,12 @@ internal static partial class BmsChartParser
 
         foreach (var line in state.ChannelLines)
         {
-            if (line.Channel is not ("03" or "08"))
+            if (line.Channel != CH_03 && line.Channel != CH_08)
                 continue;
 
-            foreach (var cell in expandCells(line, measureStarts, false))
+            foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
             {
-                var bpm = line.Channel == "03" ? parseHexBpm(cell.Value) : state.BpmDefinitions.GetValueOrDefault(cell.Value);
+                var bpm = line.Channel == CH_03 ? parseHexBpm(cell.Value) : state.BpmDefinitions.GetValueOrDefault(cell.Value);
 
                 if (bpm is > 0)
                     events.Add(new TimingEvent(cell.Tick, bpm.Value, 0, cell.Sequence));
@@ -396,17 +501,20 @@ internal static partial class BmsChartParser
     {
         var events = new List<StopEvent>();
 
-        foreach (var cell in state.ChannelLines
-                     .Where(line => line.Channel == "09")
-                     .SelectMany(line => expandCells(line, measureStarts, false)))
+        foreach (var line in state.ChannelLines)
         {
-            if (!state.StopDefinitions.TryGetValue(cell.Value, out var stopValue) || stopValue <= 0)
-                continue;
+            if (line.Channel != CH_09) continue;
 
-            var bpm = bpmAtTick(cell.Tick, timingEvents);
-            var duration = stopValue * 60000 / (bpm * 48);
+            foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+            {
+                if (!state.StopDefinitions.TryGetValue(cell.Value, out var stopValue) || stopValue <= 0)
+                    continue;
 
-            events.Add(new StopEvent(cell.Tick, duration, stopValue, bpm, cell.Sequence));
+                var bpm = bpmAtTick(cell.Tick, timingEvents);
+                var duration = stopValue * 60000 / (bpm * 48);
+
+                events.Add(new StopEvent(cell.Tick, duration, stopValue, bpm, cell.Sequence));
+            }
         }
 
         return events.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToList();
@@ -431,7 +539,7 @@ internal static partial class BmsChartParser
         {
             if (BmsLayout.TryMapVisibleChannel(line.Channel, totalColumns, out var column))
             {
-                foreach (var cell in expandCells(line, measureStarts, false))
+                foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
                     notes.Add(cell with { Column = column });
                 continue;
             }
@@ -439,14 +547,14 @@ internal static partial class BmsChartParser
             if (tryMapLongNoteChannel(line.Channel, totalColumns, out column))
             {
                 var includeZeroCells = state.LnType == 2;
-                foreach (var cell in expandCells(line, measureStarts, includeZeroCells))
+                foreach (var cell in expandCells(line, measureStarts, includeZeroCells, state.UseBase62))
                     lnCells.Add(cell with { Column = column });
                 continue;
             }
 
             if (tryMapLandmineChannel(line.Channel, totalColumns, out column))
             {
-                foreach (var cell in expandCells(line, measureStarts, false))
+                foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
                     mines.Add(cell with { Column = column });
             }
         }
@@ -499,7 +607,7 @@ internal static partial class BmsChartParser
     }
 
     private static IEnumerable<BmsParsedHitObject> collectLnType1Objects(
-        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<string, string> sampleDefinitions)
+        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions)
     {
         var openByColumn = new Dictionary<int, RawCell>();
 
@@ -518,7 +626,7 @@ internal static partial class BmsChartParser
     }
 
     private static IEnumerable<BmsParsedHitObject> collectLnType2Objects(
-        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<string, string> sampleDefinitions)
+        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions)
     {
         foreach (var channelGroup in lnCells.GroupBy(c => c.Channel))
         {
@@ -526,7 +634,7 @@ internal static partial class BmsChartParser
 
             foreach (var cell in channelGroup.OrderBy(c => c.Tick).ThenBy(c => c.Sequence))
             {
-                if (cell.Value != "00")
+                if (cell.Value != 0) // 0 = "00"
                 {
                     openRun ??= cell;
                     continue;
@@ -544,24 +652,24 @@ internal static partial class BmsChartParser
 
     private static BmsParsedHitObject createHitObject(
         RawCell start, long endTick, bool isLongNote, BmsTimingMap timingMap,
-        IReadOnlyDictionary<string, string> sampleDefinitions,
-        string tailCellValue = "")
+        IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        ushort tailCellValue = 0)
     {
         var startTime = timingMap.ProjectTickToTime(start.Tick);
         var endTime = timingMap.ProjectTickToTime(endTick);
 
         // Resolve tail sample from the terminating cell's value.
-        // "00" is a control value (no note), so treat it as "no tail sample".
-        // Non-empty values that exist in sampleDefinitions will have a tail sample;
+        // 0 ("00") is a control value (no note), so treat it as "no tail sample".
+        // Non-zero values that exist in sampleDefinitions will have a tail sample;
         // others will have an empty tail sample path (play nothing).
         //
         // For LNTYPE 1 the terminating cell has the same value as the head, which
         // would play the identical sample on release.  Skip the tail sample when
         // it matches the head's sample key to avoid the double-play.
-        var tailSampleKey = !string.IsNullOrEmpty(tailCellValue) && tailCellValue != "00" && tailCellValue != start.Value
+        var tailSampleKey = tailCellValue != 0 && tailCellValue != start.Value
             ? tailCellValue
-            : string.Empty;
-        var tailSamplePath = !string.IsNullOrEmpty(tailSampleKey)
+            : (ushort)0;
+        var tailSamplePath = tailSampleKey != 0
             ? sampleDefinitions.GetValueOrDefault(tailSampleKey, string.Empty)
             : string.Empty;
 
@@ -583,7 +691,7 @@ internal static partial class BmsChartParser
     }
 
     private static BmsParsedHitObject createMineHitObject(
-        RawCell mine, BmsTimingMap timingMap, IReadOnlyDictionary<string, string> sampleDefinitions)
+        RawCell mine, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions)
     {
         var startTime = timingMap.ProjectTickToTime(mine.Tick);
 
@@ -598,14 +706,14 @@ internal static partial class BmsChartParser
             string.Empty,
             false,
             true,
-            parseBase36(mine.Value) / 2d,
-            sampleDefinitions.GetValueOrDefault("00", string.Empty),
-            string.Empty,
+            parseBase36Value(mine.Value) / 2d,
+            sampleDefinitions.GetValueOrDefault((ushort)0, string.Empty), // 0 = "00"
+            0,
             string.Empty);
     }
 
     private static IEnumerable<RawCell> expandCells(
-        RawChannelLine line, IReadOnlyDictionary<int, long> measureStarts, bool includeZeroCells)
+        RawChannelLine line, IReadOnlyDictionary<int, long> measureStarts, bool includeZeroCells, bool useBase62)
     {
         var pairCount = line.Payload.Length / 2;
 
@@ -617,37 +725,40 @@ internal static partial class BmsChartParser
 
         for (var i = 0; i < pairCount; i++)
         {
-            var value = line.Payload.Substring(i * 2, 2);
+            var offset = i * 2;
+            var value = encodeValue(useBase62, line.Payload[offset], line.Payload[offset + 1]);
 
-            if (!includeZeroCells && value == "00")
+            if (!includeZeroCells && value == 0) // 0 = "00"
                 continue;
 
             yield return new RawCell(measureStart + measureLength * i / pairCount, line.Channel, value, line.Sequence + i, -1);
         }
     }
 
-    private static bool tryMapLongNoteChannel(string channel, int totalColumns, out int column)
+    private static bool tryMapLongNoteChannel(ushort channel, int totalColumns, out int column)
     {
-        if (channel.Length != 2 || channel[0] is not ('5' or '6'))
+        var hi = Hi(channel);
+        if (hi is not (5 or 6))
         {
             column = -1;
             return false;
         }
 
-        var visibleChannel = channel[0] == '5' ? $"1{channel[1]}" : $"2{channel[1]}";
-        return BmsLayout.TryMapVisibleChannel(visibleChannel, totalColumns, out column);
+        var visibleKey = Pack(hi == 5 ? 1 : 2, Lo(channel));
+        return BmsLayout.TryMapVisibleChannel(visibleKey, totalColumns, out column);
     }
 
-    private static bool tryMapLandmineChannel(string channel, int totalColumns, out int column)
+    private static bool tryMapLandmineChannel(ushort channel, int totalColumns, out int column)
     {
-        if (channel.Length != 2 || channel[0] is not ('D' or 'E'))
+        var hi = Hi(channel);
+        if (hi is not (13 or 14))
         {
             column = -1;
             return false;
-        }
+        } // 13='D', 14='E'
 
-        var visibleChannel = channel[0] == 'D' ? $"1{channel[1]}" : $"2{channel[1]}";
-        return BmsLayout.TryMapVisibleChannel(visibleChannel, totalColumns, out column);
+        var visibleKey = Pack(hi == 13 ? 1 : 2, Lo(channel));
+        return BmsLayout.TryMapVisibleChannel(visibleKey, totalColumns, out column);
     }
 
     private static double bpmAtTick(long tick, IReadOnlyList<TimingEvent> timingEvents)
@@ -671,29 +782,14 @@ internal static partial class BmsChartParser
     private static double ticksToMilliseconds(long ticks, double bpm, int tickResolution) =>
         ticks * (60000 / bpm) / (tickResolution / 4d);
 
-    private static double? parseHexBpm(string value) =>
-        int.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var bpm) ? bpm : null;
+    /// <summary>Decode a hex BPM value from a 2-char encoded cell value (channel 03).</summary>
+    private static double? parseHexBpm(ushort value) =>
+        Hi(value) * 16 + Lo(value) is var bpm and > 0 ? bpm : null;
 
-    private static int parseBase36(string value)
-    {
-        var result = 0;
+    /// <summary>Decode a base-36 integer from an encoded cell value (mine damage).</summary>
+    private static int parseBase36Value(ushort value) => Hi(value) * 36 + Lo(value);
 
-        foreach (var c in value.ToUpperInvariant())
-        {
-            var digit = c switch
-            {
-                >= '0' and <= '9' => c - '0',
-                >= 'A' and <= 'Z' => c - 'A' + 10,
-                _ => 0,
-            };
-
-            result = result * 36 + digit;
-        }
-
-        return result;
-    }
-
-    private static bool tryParseDouble(string value, out double result) =>
+    private static bool tryParseDouble(ReadOnlySpan<char> value, out double result) =>
         double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out result);
 
     private static int denominatorFor(double value)
@@ -732,25 +828,34 @@ internal static partial class BmsChartParser
         return Math.Abs(a);
     }
 
-    [GeneratedRegex(@"^#(\d{3})([0-9A-Z]{2}):(.*)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex channelLineRegex();
+    // Channel constants (base-62 encoded, uppercase = traditional BMS).
+    // ReSharper disable InconsistentNaming
+    // ReSharper disable ShiftExpressionZeroLeftOperand
+    private const ushort CH_01 = (0 << 6) | 1;
 
-    [GeneratedRegex(@"^#([A-Z0-9]+)\s+(.*)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex commandLineRegex();
+    // ReSharper disable once UnusedMember.Local
+    private const ushort CH_02 = (0 << 6) | 2;
+    private const ushort CH_03 = (0 << 6) | 3;
+    private const ushort CH_08 = (0 << 6) | 8;
+    private const ushort CH_09 = (0 << 6) | 9;
+    private const ushort CH_99 = (9 << 6) | 9;
+
+    // ReSharper restore InconsistentNaming
+    // ReSharper restore ShiftExpressionZeroLeftOperand
 
     private sealed class ParseState
     {
         public Dictionary<int, double> MeasureLengths { get; } = new();
 
-        public Dictionary<string, double> BpmDefinitions { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<ushort, double> BpmDefinitions { get; } = new();
 
-        public Dictionary<string, double> StopDefinitions { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<ushort, double> StopDefinitions { get; } = new();
 
-        public Dictionary<string, string> SampleDefinitions { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<ushort, string> SampleDefinitions { get; } = new();
 
-        public Dictionary<string, string> TextDefinitions { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<ushort, string> TextDefinitions { get; } = new();
 
-        public HashSet<string> LnObjValues { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<ushort> LnObjValues { get; } = new();
 
         public List<RawChannelLine> ChannelLines { get; } = [];
 
@@ -780,6 +885,9 @@ internal static partial class BmsChartParser
 
         /// <summary>#BASEBPM — visual BPM override for scroll speed. Default 0 = not set.</summary>
         public double BaseBpm { get; set; }
+
+        /// <summary>#BASE 62 — when set, cell values and sample keys use case-sensitive base-62 encoding.</summary>
+        public bool UseBase62 { get; set; }
 
         public int LnType { get; set; } = 1;
 

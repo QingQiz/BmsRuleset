@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -12,7 +12,7 @@ public sealed record BmsParseResult(
     BmsTimingMap TimingMap,
     BmsLayoutVariant LayoutVariant,
     int TotalColumns,
-    IReadOnlyDictionary<string, string> SampleDefinitions,
+    IReadOnlyDictionary<ushort, string> SampleDefinitions,
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents,
     IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents,
     IReadOnlyList<BmsParsedHitObject> HitObjects,
@@ -34,17 +34,17 @@ public readonly record struct BmsParsedHitObject(
     double StartTime,
     double Duration,
     int Column,
-    string SourceChannel,
-    string SampleKey,
+    ushort SourceChannel,
+    ushort SampleKey,
     string SamplePath,
     bool IsLongNote,
     bool IsMine,
     double LandmineDamagePercent,
     string LandmineExplosionSamplePath,
-    string TailSampleKey,
+    ushort TailSampleKey,
     string TailSamplePath);
 
-public sealed record BmsSampleEvent(double Time, long Tick, string SampleKey);
+public sealed record BmsSampleEvent(double Time, long Tick, ushort SampleKey);
 
 public sealed record BmsTextEvent(double Time, long Tick, string Text);
 

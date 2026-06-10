@@ -10,30 +10,10 @@ namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 internal class BmsCommentStripper
 {
 
-    // Characters that trigger special handling in removeBlockComments.
-    // '*', '*' alone doesn't trigger anything outside a block comment;
-    // we only care about '/' (for // and /*), '"' (quote toggle), and '\' (escape).
-    private static readonly char[] block_comment_trigger_chars = ['"', '/', '\\'];
-
-    // Characters that trigger special handling in stripLineComments.
-    private static readonly char[] line_comment_trigger_chars = ['"', '/', ';', '\\'];
+    // Characters that trigger special handling.
+    // '/' → // or /*, '"' → quote toggle, '\' → escape, ';' → line comment.
+    private static readonly char[] trigger_chars = ['"', '/', '\\', ';'];
     private bool inBlockComment;
-
-    /// <summary>
-    /// Static one-shot: strips all comments from a single line without maintaining
-    /// block comment state. Use for independent scanning passes where block comments
-    /// spanning lines are not expected.
-    /// </summary>
-    public static string StripAll(string line)
-    {
-        var inBlock = false;
-        var stripped = removeBlockComments(line, ref inBlock);
-
-        if (stripped == null)
-            return string.Empty;
-
-        return stripLineComments(stripped);
-    }
 
     /// <summary>
     /// Processes a raw BMS line and returns the content with all comments removed.
@@ -51,171 +31,113 @@ internal class BmsCommentStripper
                 return ProcessLine(line[(idx + 2)..]);
             }
 
-            // Lines inside a block comment become empty (preserving newline structure).
             return string.Empty;
         }
 
-        var stripped = removeBlockComments(line, ref inBlockComment);
-
-        if (stripped == null)
-            return null;
-
-        return stripLineComments(stripped);
+        return stripComments(line, ref inBlockComment);
     }
 
     /// <summary>
-    /// Removes /* */ block comments from a line. If the block is not closed,
-    /// sets <paramref name="inBlock"/> to true and returns content before /*.
-    /// Maintains quote state inline to avoid O(n²) rescans.
+    /// Strips both /* */ block comments and // / ; line comments in a single pass.
+    /// For pure line-comment truncation (e.g. "AAAAA//BB"), slices the original string
+    /// without any allocation. Only allocates a <see cref="StringBuilder"/> when
+    /// content is removed from the middle of the line (block comments, escapes).
     /// </summary>
-    private static string? removeBlockComments(string line, ref bool inBlock)
+    private static string stripComments(string line, ref bool inBlock)
     {
         // Fast path: if not inside a block comment and the line contains no
         // comment-relevant characters, return it unchanged (zero allocation).
-        if (!inBlock && line.AsSpan().IndexOfAny(block_comment_trigger_chars) < 0)
+        if (!inBlock && line.AsSpan().IndexOfAny(trigger_chars) < 0)
             return line;
 
-        var sb = new StringBuilder(line.Length);
+        StringBuilder? sb = null; // lazy — only allocated when middle-of-line removal happens
         var inQuote = false;
         var i = 0;
         var runStart = 0;
 
         while (i < line.Length)
         {
-            if (inBlock)
+            var c = line[i];
+
+            // Escape sequence — strip backslash, keep the escaped character.
+            // This modifies the output, so we need the StringBuilder.
+            if (c == '\\' && i + 1 < line.Length && isEscapeChar(line[i + 1]))
             {
-                var closeIdx = indexOfOutsideQuotes(line, "*/", i);
-
-                if (closeIdx < 0)
-                    return null;
-
-                inBlock = false;
-                i = closeIdx + 2;
+                sb ??= new StringBuilder(line.Length);
+                if (i > runStart) sb.Append(line, runStart, i - runStart);
+                sb.Append(line[i + 1]);
+                i += 2;
                 runStart = i;
                 continue;
             }
 
-            // Track quote/escape state before checking comment tokens at this position.
-            if (line[i] == '\\' && i + 1 < line.Length && isEscapeChar(line[i + 1]))
-            {
-                i += 2;
-                continue;
-            }
-
-            if (line[i] == '"')
+            // Quote toggle.
+            if (c == '"')
                 inQuote = !inQuote;
 
             var charsLeft = line.Length - i;
 
-            // Check for // line comments before /* so that /* inside // is not treated as a block comment.
-            if (!inQuote && charsLeft >= 2 && line[i] == '/' && line[i + 1] == '/')
+            if (!inQuote)
             {
-                // Flush the accumulated run before the //.
-                if (i > runStart)
-                    sb.Append(line, runStart, i - runStart);
-                runStart = i; // prevent double-flush in final append
-                break;
-            }
-
-            // Check for /* only outside quotes
-            if (!inQuote && charsLeft >= 2 && line[i] == '/' && line[i + 1] == '*')
-            {
-                // Flush the accumulated run before the /*.
-                if (i > runStart)
-                    sb.Append(line, runStart, i - runStart);
-
-                var closeIdx = indexOfOutsideQuotes(line, "*/", i + 2);
-
-                if (closeIdx >= 0)
+                // Semicolon line comment — truncate at this position.
+                if (c == ';')
                 {
-                    i = closeIdx + 2;
-                    runStart = i;
-                    continue;
+                    if (sb != null && i > runStart) sb.Append(line, runStart, i - runStart);
+                    return sb != null ? finalize(sb) : slice(line, runStart, i);
                 }
 
-                // Block continues to next line
-                inBlock = true;
-                runStart = i; // prevent double-flush in final append
-                break;
+                if (c == '/' && charsLeft >= 2)
+                {
+                    // // line comment — truncate at this position.
+                    if (line[i + 1] == '/')
+                    {
+                        if (sb != null && i > runStart) sb.Append(line, runStart, i - runStart);
+                        return sb != null ? finalize(sb) : slice(line, runStart, i);
+                    }
+
+                    // /* block comment — middle-of-line removal needs StringBuilder.
+                    if (line[i + 1] == '*')
+                    {
+                        sb ??= new StringBuilder(line.Length);
+                        if (i > runStart) sb.Append(line, runStart, i - runStart);
+
+                        var closeIdx = indexOfOutsideQuotes(line, "*/", i + 2);
+                        if (closeIdx >= 0)
+                        {
+                            i = closeIdx + 2;
+                            runStart = i;
+                            continue;
+                        }
+
+                        inBlock = true;
+                        runStart = i;
+                        break;
+                    }
+                }
             }
 
             i++;
         }
 
-        // Flush any remaining run after the loop.
-        if (i > runStart)
-            sb.Append(line, runStart, i - runStart);
-
-        return sb.ToString();
-    }
-
-    /// <summary>
-    /// Removes // and ; line comments, with "..." quote protection and \ escape
-    /// for comment-related characters only (\, ", ;, /). Other \ sequences (e.g.
-    /// file paths) pass through unchanged.
-    /// </summary>
-    private static string stripLineComments(string s)
-    {
-        // Fast path: if the line contains no comment-relevant characters,
-        // return it unchanged (zero allocation).
-        if (s.AsSpan().IndexOfAny(line_comment_trigger_chars) < 0)
-            return s;
-
-        var sb = new StringBuilder(s.Length);
-        var inQuote = false;
-        var runStart = 0;
-        var i = 0;
-
-        for (; i < s.Length; i++)
+        // End of line reached — flush remaining run.
+        if (sb != null)
         {
-            var c = s[i];
-
-            // Only treat \ as escape when followed by a comment-relevant character.
-            if (c == '\\' && i + 1 < s.Length && isEscapeChar(s[i + 1]))
-            {
-                // Flush run before the escape sequence.
-                if (i > runStart)
-                    sb.Append(s, runStart, i - runStart);
-                // Append the escaped character (skip the backslash).
-                sb.Append(s[i + 1]);
-                i++;
-                runStart = i + 1;
-                continue;
-            }
-
-            // Toggle quote state (only outside escaped sequences)
-            if (c == '"')
-            {
-                inQuote = !inQuote;
-                continue;
-            }
-
-            // Line comments (only outside quotes)
-            if (!inQuote)
-            {
-                if (c == ';')
-                {
-                    if (i > runStart)
-                        sb.Append(s, runStart, i - runStart);
-                    runStart = i; // prevent double-flush in final append
-                    break;
-                }
-
-                if (c == '/' && i + 1 < s.Length && s[i + 1] == '/')
-                {
-                    if (i > runStart)
-                        sb.Append(s, runStart, i - runStart);
-                    runStart = i; // prevent double-flush in final append
-                    break;
-                }
-            }
+            if (i > runStart) sb.Append(line, runStart, i - runStart);
+            return finalize(sb);
         }
 
-        // Flush any remaining run.
-        if (i > runStart)
-            sb.Append(s, runStart, i - runStart);
+        return slice(line, runStart, i);
+    }
 
-        return sb.ToString();
+    /// <summary>Return a slice of the original string when no middle-of-line modification occurred.</summary>
+    private static string slice(string line, int start, int end) =>
+        start == 0 && end == line.Length ? line : end <= start ? string.Empty : line[start..end];
+
+    /// <summary>Finalize the StringBuilder result.</summary>
+    private static string finalize(StringBuilder sb)
+    {
+        var result = sb.ToString();
+        return result.Length == 0 ? string.Empty : result;
     }
 
     private static bool isEscapeChar(char c) => c is '"' or ';' or '\\' or '/';
@@ -223,7 +145,7 @@ internal class BmsCommentStripper
     /// <summary>
     /// Finds the first occurrence of <paramref name="substring"/> in <paramref name="line"/>
     /// starting at <paramref name="startIndex"/> that is NOT inside a quoted string.
-    /// Tracks quote state inline (O(n)) rather than rescaling from the start per position (O(n²)).
+    /// Tracks quote state inline (O(n)) rather than rescanning from the start per position (O(n²)).
     /// Returns -1 if not found.
     /// </summary>
     private static int indexOfOutsideQuotes(string line, string substring, int startIndex = 0)
@@ -235,7 +157,6 @@ internal class BmsCommentStripper
 
         for (var i = 0; i <= line.Length - substring.Length; i++)
         {
-            // Track quote/escape state at this position before checking the match.
             if (line[i] == '\\' && i + 1 < line.Length && isEscapeChar(line[i + 1]))
             {
                 i++;

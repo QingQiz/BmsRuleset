@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
 using osu.Framework.IO.Stores;
-using osu.Framework.Logging;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -35,10 +33,29 @@ namespace osu.Game.Rulesets.BmsRuleset.Audio;
 /// </remarks>
 public class BmsPreviewTrack : Track
 {
+
+    public override bool IsRunning
+    {
+        get
+        {
+            lock (clock) return clock.IsRunning;
+        }
+    }
+
+    public override double CurrentTime
+    {
+        get
+        {
+            lock (clock) return Math.Min(Length, seekOffset + clock.CurrentTime);
+        }
+    }
+
     private readonly StopwatchClock clock = new StopwatchClock();
     private readonly List<BgmEvent> sortedEvents = [];
     private readonly ISampleStore? sampleStore;
     private readonly List<SampleChannel> activeChannels = [];
+
+    private readonly record struct BgmEvent(double Time, string SamplePath);
 
     private int nextEventIndex;
     private double seekOffset;
@@ -52,7 +69,7 @@ public class BmsPreviewTrack : Track
     /// <param name="audioManager">Framework audio manager, used to create a filesystem-backed sample store.</param>
     public BmsPreviewTrack(
         IReadOnlyList<BmsSampleEvent> bgmEvents,
-        IReadOnlyDictionary<string, string> sampleDefinitions,
+        IReadOnlyDictionary<ushort, string> sampleDefinitions,
         string? basePath,
         AudioManager audioManager)
         : base("bms-preview")
@@ -91,21 +108,20 @@ public class BmsPreviewTrack : Track
         Length = length;
     }
 
-    public override bool IsRunning
+    #region Disposal
+
+    protected override void Dispose(bool disposing)
     {
-        get
+        if (!IsDisposed)
         {
-            lock (clock) return clock.IsRunning;
+            Stop();
+            sampleStore?.Dispose();
         }
+
+        base.Dispose(disposing);
     }
 
-    public override double CurrentTime
-    {
-        get
-        {
-            lock (clock) return Math.Min(Length, seekOffset + clock.CurrentTime);
-        }
-    }
+    #endregion
 
     public override void Start()
     {
@@ -255,17 +271,4 @@ public class BmsPreviewTrack : Track
 
         return low;
     }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (!IsDisposed)
-        {
-            Stop();
-            sampleStore?.Dispose();
-        }
-
-        base.Dispose(disposing);
-    }
-
-    private readonly record struct BgmEvent(double Time, string SamplePath);
 }

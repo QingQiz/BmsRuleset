@@ -22,7 +22,7 @@ public interface IBmsBeatmap
 
     BmsTimingMap? TimingMap { get; set; }
 
-    IReadOnlyDictionary<string, string> SampleDefinitions { get; set; }
+    IReadOnlyDictionary<ushort, string> SampleDefinitions { get; set; }
 
     IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; }
 

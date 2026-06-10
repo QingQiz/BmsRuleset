@@ -6,6 +6,7 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
@@ -58,14 +59,13 @@ public class BmsCommentStripperTest
                              """);
         var hitObject = beatmap.HitObjects.OfType<BmsHitObject>().FirstOrDefault();
         Assert.That(hitObject, Is.Not.Null);
-        Assert.That(hitObject.SampleKey, Is.EqualTo("01"));
+        Assert.That(hitObject.SampleKey, Is.EqualTo(BmsChartParser.Enc("01")));
     }
 
     [Test]
     public void TestBlockCommentAcrossControlFlow()
     {
-        var chart = string.Join("\n", new[]
-        {
+        var chart = string.Join("\n",
             "#RANDOM 3",
             "#IF 1",
             "#TITLE branch1",
@@ -77,8 +77,8 @@ public class BmsCommentStripperTest
             "#ENDIF",
             "#ENDRANDOM",
             "#BPM 120",
-            "#00111:01",
-        });
+            "#00111:01"
+        );
 
         var beatmap = decode(chart);
         // Default selector picks branch 1
