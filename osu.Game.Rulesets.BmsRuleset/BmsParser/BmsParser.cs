@@ -18,7 +18,12 @@ internal static partial class BmsChartParser
 
     // ── Internal types ───────────────────────────────────────────────────
 
-    private readonly record struct RawChannelLine(int Measure, ushort Channel, string Payload, int Sequence);
+    /// <summary>
+    /// A parsed BMS channel line. Stores a reference to the original line string plus the payload's
+    /// start offset and length — zero allocation (no Substring or
+    /// <see cref="System.ReadOnlySpan{T}.ToString"/>).
+    /// </summary>
+    private readonly record struct RawChannelLine(int Measure, ushort Channel, string Line, int PayloadStart, int PayloadLength, int Sequence);
 
     private readonly record struct RawCell(long Tick, ushort Channel, ushort Value, int Sequence, int Column);
 
@@ -43,14 +48,33 @@ internal static partial class BmsChartParser
         var state = new ParseState();
         var commentStripper = new BmsCommentStripper();
 
-        var strippedLines = lines
-            .Select(line => line.TrimStart().StartsWith('%')
-                ? line
-                : commentStripper.ProcessLine(line))
-            .OfType<string>();
+        // Merged pipeline: comment stripping → OfType filter → control-flow resolution → parseLine.
+        // A single foreach loop replaces four iterator layers (Select, OfType, MaterializeControlFlow,
+        // and the consuming foreach), eliminating per-element state-machine dispatch overhead.
+        randomValueSelector ??= selectRandomValue;
+        var frames = new List<ControlFrame>();
 
-        foreach (var line in MaterializeControlFlow(strippedLines, randomValueSelector, state.BranchDecisions))
-            parseLine(line, state);
+        foreach (var rawLine in lines)
+        {
+            // Comment stripping + OfType filter (inline).
+            string? line;
+            if (rawLine.Length > 0 && rawLine[0] == '%')
+                line = rawLine;
+            else
+                line = commentStripper.ProcessLine(rawLine);
+
+            if (line == null) continue;
+
+            // Control-flow resolution (inline MaterializeControlFlow).
+            if (tryReadControlCommand(line, out var command, out var value))
+            {
+                applyControlCommand(command, value, frames, randomValueSelector, state.BranchDecisions);
+                continue;
+            }
+
+            if (isActive(frames))
+                parseLine(line, state);
+        }
 
         var tickResolution = calculateTickResolution(state);
         var measures = calculateMeasures(state, tickResolution);
@@ -69,26 +93,20 @@ internal static partial class BmsChartParser
         var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
         var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
         var sampleDefinitions = new Dictionary<ushort, string>(state.SampleDefinitions);
-        var hitObjects = collectHitObjects(state, totalColumns, measureStarts, timingMap).ToList();
-        hitObjects.Sort((a, b) =>
-        {
-            var cmp = a.StartTime.CompareTo(b.StartTime);
-            if (cmp != 0) return cmp;
 
-            cmp = a.Tick.CompareTo(b.Tick);
-            if (cmp != 0) return cmp;
+        // Pre-size output lists to avoid AddWithResize during collection.
+        var hitObjects = new List<BmsParsedHitObject>(state.ChannelLines.Count);
+        collectHitObjects(state, totalColumns, measureStarts, timingMap, hitObjects);
+        hitObjects.Sort(default(HitObjectComparer));
 
-            return a.Column.CompareTo(b.Column);
-        });
-        var longNoteTailSampleEvents = collectLongNoteTailSampleEvents(hitObjects).ToList();
-        longNoteTailSampleEvents.Sort((a, b) =>
-        {
-            var cmp = a.Time.CompareTo(b.Time);
-            if (cmp != 0) return cmp;
+        var longNoteTailSampleEvents = new List<BmsSampleEvent>(hitObjects.Count / 4);
+        collectLongNoteTailSampleEvents(hitObjects, longNoteTailSampleEvents);
+        longNoteTailSampleEvents.Sort(default(SampleEventComparer));
 
-            return a.Tick.CompareTo(b.Tick);
-        });
         var textEvents = collectTextEvents(state, measureStarts, timingMap);
+
+        var bgSampleEvents = new List<BmsSampleEvent>(state.ChannelLines.Count / 10);
+        collectBackgroundSampleEvents(state, measureStarts, timingMap, bgSampleEvents);
 
         return new BmsParseResult(
             state.Title,
@@ -101,7 +119,7 @@ internal static partial class BmsChartParser
             layoutVariant,
             totalColumns,
             sampleDefinitions,
-            collectBackgroundSampleEvents(state, measureStarts, timingMap).ToArray(),
+            bgSampleEvents.ToArray(),
             longNoteTailSampleEvents,
             hitObjects,
             state.BranchDecisions.ToArray(),
@@ -153,13 +171,19 @@ internal static partial class BmsChartParser
 
     private static void parseLine(string line, ParseState state)
     {
-        ReadOnlySpan<char> span = line.AsSpan().Trim();
+        // Skip leading whitespace via direct indexing (avoids span allocation for this common path).
+        var start = 0;
+        while (start < line.Length && (line[start] == ' ' || line[start] == '\t')) start++;
+        if (start >= line.Length) return;
 
-        if (span.IsEmpty || (span[0] != '#' && span[0] != '%'))
-            return;
+        var firstChar = line[start];
+        if (firstChar != '#' && firstChar != '%') return;
+
+        // Use span from `start` for the remainder — it covers the trimmed portion of the line.
+        var span = line.AsSpan(start);
 
         // Handle % prefix commands (%URL, %EMAIL) — only two exist, handle inline.
-        if (span[0] == '%')
+        if (firstChar == '%')
         {
             if (span.Length == 1) return;
 
@@ -181,7 +205,8 @@ internal static partial class BmsChartParser
         }
 
         // Attempt channel line: #XXXYY:...
-        // Format: # followed by 3 digits (measure), 2 chars (channel), ':', then payload
+        // Format: # followed by 3 digits (measure), 2 chars (channel), ':', then payload.
+        // Use direct indexing on the original line to avoid ReadOnlySpan<char>.ToString().
         if (span.Length >= 7)
         {
             var d1 = span[1];
@@ -190,19 +215,25 @@ internal static partial class BmsChartParser
             if (d1 >= '0' && d1 <= '9' && d2 >= '0' && d2 <= '9' && d3 >= '0' && d3 <= '9' && span[6] == ':')
             {
                 var measure = (d1 - '0') * 100 + (d2 - '0') * 10 + (d3 - '0');
-
-                var payloadSpan = span[7..].Trim();
                 state.MaxMeasure = Math.Max(state.MaxMeasure, measure);
+
+                // Payload starts at start+7 in the original line.
+                // Trim trailing whitespace by walking backward from line end.
+                var plStart = start + 7;
+                var plEnd = line.Length;
+                while (plEnd > plStart && (line[plEnd - 1] == ' ' || line[plEnd - 1] == '\t')) plEnd--;
+                var plLen = plEnd - plStart;
 
                 if (span[4] == '0' && span[5] == '2')
                 {
-                    if (tryParseDouble(payloadSpan, out var length) && length > 0)
+                    if (plLen > 0 && tryParseDouble(line.AsSpan(plStart, plLen), out var length) && length > 0)
                         state.MeasureLengths[measure] = length;
                 }
-                else if (payloadSpan.Length >= 2)
+                else if (plLen >= 2)
                 {
                     var channelKey = EncodePair(span[4], span[5]);
-                    state.ChannelLines.Add(new RawChannelLine(measure, channelKey, payloadSpan.ToString(), state.NextSequence++ * 4096));
+                    // Store original line ref + payload offset — zero allocation.
+                    state.ChannelLines.Add(new RawChannelLine(measure, channelKey, line, plStart, plLen, state.NextSequence++ * 4096));
                 }
 
                 return;
@@ -372,15 +403,31 @@ internal static partial class BmsChartParser
         }
     }
 
-    private static IEnumerable<BmsSampleEvent> collectBackgroundSampleEvents(
-        ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
+    private static void collectBackgroundSampleEvents(
+        ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap,
+        List<BmsSampleEvent> output)
     {
         foreach (var line in state.ChannelLines)
         {
             if (line.Channel != CH_01) continue;
 
-            foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
-                yield return new BmsSampleEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, cell.Value);
+            var pairCount = line.PayloadLength / 2;
+            if (pairCount == 0) continue;
+
+            var mStart = measureStarts[line.Measure];
+            var mLength = measureStarts[line.Measure + 1] - mStart;
+            var payload = line.Line.AsSpan(line.PayloadStart, line.PayloadLength);
+            var useBase62 = state.UseBase62;
+
+            for (var i = 0; i < pairCount; i++)
+            {
+                var offset = i * 2;
+                var value = encodeValue(useBase62, payload[offset], payload[offset + 1]);
+                if (value == 0) continue; // 0 = "00"
+
+                var tick = mStart + mLength * i / pairCount;
+                output.Add(new BmsSampleEvent(timingMap.ProjectTickToTime(tick), tick, value));
+            }
         }
     }
 
@@ -404,7 +451,7 @@ internal static partial class BmsChartParser
         return new BmsTextEvents(mistake, events.ToArray());
     }
 
-    private static IEnumerable<BmsSampleEvent> collectLongNoteTailSampleEvents(IEnumerable<BmsParsedHitObject> hitObjects)
+    private static void collectLongNoteTailSampleEvents(IEnumerable<BmsParsedHitObject> hitObjects, List<BmsSampleEvent> output)
     {
         foreach (var hitObject in hitObjects)
         {
@@ -418,7 +465,7 @@ internal static partial class BmsChartParser
             if (hitObject.TailSampleKey == 0 || string.IsNullOrWhiteSpace(hitObject.TailSamplePath))
                 continue;
 
-            yield return new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, hitObject.TailSampleKey);
+            output.Add(new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, hitObject.TailSampleKey));
         }
     }
 
@@ -427,7 +474,7 @@ internal static partial class BmsChartParser
         var resolution = base_tick_resolution;
         foreach (var line in state.ChannelLines)
         {
-            var pairCount = line.Payload.Length / 2;
+            var pairCount = line.PayloadLength / 2;
             if (pairCount > 0)
                 resolution = lcmChecked(resolution, pairCount);
         }
@@ -468,12 +515,26 @@ internal static partial class BmsChartParser
             if (line.Channel != CH_03 && line.Channel != CH_08)
                 continue;
 
-            foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+            var pairCount = line.PayloadLength / 2;
+            if (pairCount == 0) continue;
+
+            var mStart = measureStarts[line.Measure];
+            var mLength = measureStarts[line.Measure + 1] - mStart;
+            var payload = line.Line.AsSpan(line.PayloadStart, line.PayloadLength);
+            var useBase62 = state.UseBase62;
+            var isHexChannel = line.Channel == CH_03;
+
+            for (var i = 0; i < pairCount; i++)
             {
-                var bpm = line.Channel == CH_03 ? parseHexBpm(cell.Value) : state.BpmDefinitions.GetValueOrDefault(cell.Value);
+                var offset = i * 2;
+                var value = encodeValue(useBase62, payload[offset], payload[offset + 1]);
+                if (value == 0) continue; // 0 = "00"
+
+                var tick = mStart + mLength * i / pairCount;
+                var bpm = isHexChannel ? parseHexBpm(value) : state.BpmDefinitions.GetValueOrDefault(value);
 
                 if (bpm is > 0)
-                    events.Add(new TimingEvent(cell.Tick, bpm.Value, 0, cell.Sequence));
+                    events.Add(new TimingEvent(tick, bpm.Value, 0, line.Sequence + i));
             }
         }
 
@@ -505,15 +566,28 @@ internal static partial class BmsChartParser
         {
             if (line.Channel != CH_09) continue;
 
-            foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+            var pairCount = line.PayloadLength / 2;
+            if (pairCount == 0) continue;
+
+            var mStart = measureStarts[line.Measure];
+            var mLength = measureStarts[line.Measure + 1] - mStart;
+            var payload = line.Line.AsSpan(line.PayloadStart, line.PayloadLength);
+            var useBase62 = state.UseBase62;
+
+            for (var i = 0; i < pairCount; i++)
             {
-                if (!state.StopDefinitions.TryGetValue(cell.Value, out var stopValue) || stopValue <= 0)
+                var offset = i * 2;
+                var value = encodeValue(useBase62, payload[offset], payload[offset + 1]);
+                if (value == 0) continue; // 0 = "00"
+
+                if (!state.StopDefinitions.TryGetValue(value, out var stopValue) || stopValue <= 0)
                     continue;
 
-                var bpm = bpmAtTick(cell.Tick, timingEvents);
+                var tick = mStart + mLength * i / pairCount;
+                var bpm = bpmAtTick(tick, timingEvents);
                 var duration = stopValue * 60000 / (bpm * 48);
 
-                events.Add(new StopEvent(cell.Tick, duration, stopValue, bpm, cell.Sequence));
+                events.Add(new StopEvent(tick, duration, stopValue, bpm, line.Sequence + i));
             }
         }
 
@@ -528,8 +602,9 @@ internal static partial class BmsChartParser
         return timingEvents.Select(e => e with { Time = e.Time + stopEvents.Where(s => s.Tick < e.Tick).Sum(s => s.Duration) }).ToList();
     }
 
-    private static IEnumerable<BmsParsedHitObject> collectHitObjects(
-        ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
+    private static void collectHitObjects(
+        ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap,
+        List<BmsParsedHitObject> output)
     {
         var notes = new List<RawCell>();
         var lnCells = new List<RawCell>();
@@ -559,29 +634,27 @@ internal static partial class BmsChartParser
             }
         }
 
-        foreach (var hitObject in state.LnType == 2
-                     ? collectLnType2Objects(lnCells, timingMap, state.SampleDefinitions)
-                     : collectLnType1Objects(lnCells, timingMap, state.SampleDefinitions))
-        {
-            yield return hitObject;
-        }
+        if (state.LnType == 2)
+            collectLnType2Objects(lnCells, timingMap, state.SampleDefinitions, output);
+        else
+            collectLnType1Objects(lnCells, timingMap, state.SampleDefinitions, output);
 
-        foreach (var hitObject in collectVisibleObjects(notes, state, timingMap))
-            yield return hitObject;
+        collectVisibleObjects(notes, state, timingMap, output);
 
         foreach (var mine in mines.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-            yield return createMineHitObject(mine, timingMap, state.SampleDefinitions);
+            output.Add(createMineHitObject(mine, timingMap, state.SampleDefinitions));
     }
 
-    private static IEnumerable<BmsParsedHitObject> collectVisibleObjects(
-        IEnumerable<RawCell> notes, ParseState state, BmsTimingMap timingMap)
+    private static void collectVisibleObjects(
+        IEnumerable<RawCell> notes, ParseState state, BmsTimingMap timingMap,
+        List<BmsParsedHitObject> output)
     {
         if (state.LnObjValues.Count == 0)
         {
             foreach (var note in notes.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-                yield return createHitObject(note, note.Tick, false, timingMap, state.SampleDefinitions);
+                output.Add(createHitObject(note, note.Tick, false, timingMap, state.SampleDefinitions));
 
-            yield break;
+            return;
         }
 
         var pendingByColumn = new Dictionary<int, RawCell>();
@@ -591,23 +664,24 @@ internal static partial class BmsChartParser
             if (state.LnObjValues.Contains(note.Value))
             {
                 if (pendingByColumn.Remove(note.Column, out var start) && note.Tick > start.Tick)
-                    yield return createHitObject(start, note.Tick, true, timingMap, state.SampleDefinitions, note.Value);
+                    output.Add(createHitObject(start, note.Tick, true, timingMap, state.SampleDefinitions, note.Value));
 
                 continue;
             }
 
             if (pendingByColumn.TryGetValue(note.Column, out var previous))
-                yield return createHitObject(previous, previous.Tick, false, timingMap, state.SampleDefinitions);
+                output.Add(createHitObject(previous, previous.Tick, false, timingMap, state.SampleDefinitions));
 
             pendingByColumn[note.Column] = note;
         }
 
         foreach (var pending in pendingByColumn.Values.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-            yield return createHitObject(pending, pending.Tick, false, timingMap, state.SampleDefinitions);
+            output.Add(createHitObject(pending, pending.Tick, false, timingMap, state.SampleDefinitions));
     }
 
-    private static IEnumerable<BmsParsedHitObject> collectLnType1Objects(
-        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions)
+    private static void collectLnType1Objects(
+        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        List<BmsParsedHitObject> output)
     {
         var openByColumn = new Dictionary<int, RawCell>();
 
@@ -616,7 +690,7 @@ internal static partial class BmsChartParser
             if (openByColumn.Remove(cell.Column, out var start))
             {
                 if (cell.Tick > start.Tick)
-                    yield return createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions, cell.Value);
+                    output.Add(createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions, cell.Value));
             }
             else
             {
@@ -625,8 +699,9 @@ internal static partial class BmsChartParser
         }
     }
 
-    private static IEnumerable<BmsParsedHitObject> collectLnType2Objects(
-        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions)
+    private static void collectLnType2Objects(
+        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        List<BmsParsedHitObject> output)
     {
         foreach (var channelGroup in lnCells.GroupBy(c => c.Channel))
         {
@@ -642,7 +717,7 @@ internal static partial class BmsChartParser
 
                 if (openRun is { } start && cell.Tick > start.Tick)
                 {
-                    yield return createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions, cell.Value);
+                    output.Add(createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions, cell.Value));
 
                     openRun = null;
                 }
@@ -715,18 +790,23 @@ internal static partial class BmsChartParser
     private static IEnumerable<RawCell> expandCells(
         RawChannelLine line, IReadOnlyDictionary<int, long> measureStarts, bool includeZeroCells, bool useBase62)
     {
-        var pairCount = line.Payload.Length / 2;
+        var pairCount = line.PayloadLength / 2;
 
         if (pairCount == 0)
             yield break;
 
         var measureStart = measureStarts[line.Measure];
         var measureLength = measureStarts[line.Measure + 1] - measureStart;
+        // Index directly into the original line string — avoids ReadOnlySpan<char>
+        // which cannot cross yield boundaries.
+        var lineStr = line.Line;
+        var plStart = line.PayloadStart;
 
         for (var i = 0; i < pairCount; i++)
         {
             var offset = i * 2;
-            var value = encodeValue(useBase62, line.Payload[offset], line.Payload[offset + 1]);
+            var pos = plStart + offset;
+            var value = encodeValue(useBase62, lineStr[pos], lineStr[pos + 1]);
 
             if (!includeZeroCells && value == 0) // 0 = "00"
                 continue;
@@ -900,5 +980,32 @@ internal static partial class BmsChartParser
         public int MaxMeasure { get; set; }
 
         public int NextSequence { get; set; }
+    }
+
+    // ── Struct comparers for List<T>.Sort — zero allocation, no virtual dispatch ──
+
+    private struct HitObjectComparer : IComparer<BmsParsedHitObject>
+    {
+        public int Compare(BmsParsedHitObject a, BmsParsedHitObject b)
+        {
+            var cmp = a.StartTime.CompareTo(b.StartTime);
+            if (cmp != 0) return cmp;
+
+            cmp = a.Tick.CompareTo(b.Tick);
+            if (cmp != 0) return cmp;
+
+            return a.Column.CompareTo(b.Column);
+        }
+    }
+
+    private struct SampleEventComparer : IComparer<BmsSampleEvent>
+    {
+        public int Compare(BmsSampleEvent a, BmsSampleEvent b)
+        {
+            var cmp = a.Time.CompareTo(b.Time);
+            if (cmp != 0) return cmp;
+
+            return a.Tick.CompareTo(b.Tick);
+        }
     }
 }

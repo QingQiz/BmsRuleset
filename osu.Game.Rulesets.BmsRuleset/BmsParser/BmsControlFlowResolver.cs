@@ -8,14 +8,6 @@ namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 internal static partial class BmsChartParser
 {
-    public static IEnumerable<string> MaterializeControlFlow(
-        IEnumerable<string> lines, Func<int, int>? randomValueSelector, ICollection<BmsBranchDecision> decisions)
-    {
-        randomValueSelector ??= selectRandomValue;
-
-        return materializeControlFlow(lines, randomValueSelector, decisions);
-    }
-
     public static Func<int, int> CreateReplayDecisionSelector(IEnumerable<BmsBranchDecision> decisions)
     {
         var queue = new Queue<BmsBranchDecision>(decisions);
@@ -59,105 +51,95 @@ internal static partial class BmsChartParser
         return result;
     }
 
-    private static IEnumerable<string> materializeControlFlow(
-        IEnumerable<string> lines, Func<int, int> randomValueSelector, ICollection<BmsBranchDecision> decisions)
+    /// <summary>
+    /// Applies a parsed control-flow command to the frame stack.
+    /// </summary>
+    private static void applyControlCommand(
+        string command, string value, List<ControlFrame> frames,
+        Func<int, int> randomValueSelector, ICollection<BmsBranchDecision> decisions)
     {
-        // The stack mirrors nested #RANDOM/#SWITCH scopes while yielding the active runtime command stream.
-        var frames = new List<ControlFrame>();
-
-        foreach (var rawLine in lines)
+        switch (command)
         {
-            if (!tryReadControlCommand(rawLine, out var command, out var value))
+            case "RANDOM":
+            case "RONDAM":
             {
-                if (isActive(frames))
-                    yield return rawLine;
-
-                continue;
+                var parentActive = isActive(frames);
+                // Do not consume a random decision for a nested block inside an inactive branch.
+                var selectedValue = parentActive && tryParseInt(value, out var randomMax) ? chooseRandomValue(randomMax, randomValueSelector, decisions) : 0;
+                frames.Add(new RandomControlFrame(parentActive, selectedValue));
+                break;
             }
 
-            switch (command)
+            case "SETRANDOM":
             {
-                case "RANDOM":
-                case "RONDAM":
-                {
-                    var parentActive = isActive(frames);
-                    // Do not consume a random decision for a nested block inside an inactive branch.
-                    var selectedValue = parentActive && tryParseInt(value, out var randomMax) ? chooseRandomValue(randomMax, randomValueSelector, decisions) : 0;
-                    frames.Add(new RandomControlFrame(parentActive, selectedValue));
-                    break;
-                }
-
-                case "SETRANDOM":
-                {
-                    var parentActive = isActive(frames);
-                    frames.Add(new RandomControlFrame(parentActive, parentActive && tryParseInt(value, out var setRandomValue) ? setRandomValue : 0));
-                    break;
-                }
-
-                case "IF":
-                    if (frames.Count > 0 && frames[^1] is RandomControlFrame randomIf)
-                        randomIf.BeginIf(tryParseInt(value, out var ifValue) ? ifValue : 0);
-                    break;
-
-                case "ELSEIF":
-                    if (frames.Count > 0 && frames[^1] is RandomControlFrame randomElseIf)
-                        randomElseIf.ElseIf(tryParseInt(value, out var elseIfValue) ? elseIfValue : 0);
-                    break;
-
-                case "ELSE":
-                    if (frames.Count > 0 && frames[^1] is RandomControlFrame randomElse)
-                        randomElse.Else();
-                    break;
-
-                case "ENDIF":
-                case "IFEND":
-                case "END":
-                    if (frames.Count > 0 && frames[^1] is RandomControlFrame randomEndIf)
-                        randomEndIf.EndIf();
-                    break;
-
-                case "ENDRANDOM":
-                    if (frames.Count > 0 && frames[^1] is RandomControlFrame)
-                        frames.RemoveAt(frames.Count - 1);
-                    break;
-
-                case "SWITCH":
-                {
-                    var parentActive = isActive(frames);
-                    // #SWITCH uses the same runtime decision source as #RANDOM.
-                    var selectedValue = parentActive && tryParseInt(value, out var switchMax) ? chooseRandomValue(switchMax, randomValueSelector, decisions) : 0;
-                    frames.Add(new SwitchControlFrame(parentActive, selectedValue));
-                    break;
-                }
-
-                case "SETSWITCH":
-                {
-                    var parentActive = isActive(frames);
-                    frames.Add(new SwitchControlFrame(parentActive, parentActive && tryParseInt(value, out var setSwitchValue) ? setSwitchValue : 0));
-                    break;
-                }
-
-                case "CASE":
-                    if (frames.Count > 0 && frames[^1] is SwitchControlFrame switchCase)
-                        switchCase.BeginCase(tryParseInt(value, out var caseValue) ? caseValue : 0);
-                    break;
-
-                case "DEF":
-                    if (frames.Count > 0 && frames[^1] is SwitchControlFrame switchDefault)
-                        switchDefault.BeginDefault();
-                    break;
-
-                case "SKIP":
-                    if (frames.Count > 0 && frames[^1] is SwitchControlFrame switchSkip)
-                        switchSkip.Skip();
-                    break;
-
-                case "ENDSW":
-                case "ENDSWITCH":
-                    if (frames.Count > 0 && frames[^1] is SwitchControlFrame)
-                        frames.RemoveAt(frames.Count - 1);
-                    break;
+                var parentActive = isActive(frames);
+                frames.Add(new RandomControlFrame(parentActive, parentActive && tryParseInt(value, out var setRandomValue) ? setRandomValue : 0));
+                break;
             }
+
+            case "IF":
+                if (frames.Count > 0 && frames[^1] is RandomControlFrame randomIf)
+                    randomIf.BeginIf(tryParseInt(value, out var ifValue) ? ifValue : 0);
+                break;
+
+            case "ELSEIF":
+                if (frames.Count > 0 && frames[^1] is RandomControlFrame randomElseIf)
+                    randomElseIf.ElseIf(tryParseInt(value, out var elseIfValue) ? elseIfValue : 0);
+                break;
+
+            case "ELSE":
+                if (frames.Count > 0 && frames[^1] is RandomControlFrame randomElse)
+                    randomElse.Else();
+                break;
+
+            case "ENDIF":
+            case "IFEND":
+            case "END":
+                if (frames.Count > 0 && frames[^1] is RandomControlFrame randomEndIf)
+                    randomEndIf.EndIf();
+                break;
+
+            case "ENDRANDOM":
+                if (frames.Count > 0 && frames[^1] is RandomControlFrame)
+                    frames.RemoveAt(frames.Count - 1);
+                break;
+
+            case "SWITCH":
+            {
+                var parentActive = isActive(frames);
+                // #SWITCH uses the same runtime decision source as #RANDOM.
+                var selectedValue = parentActive && tryParseInt(value, out var switchMax) ? chooseRandomValue(switchMax, randomValueSelector, decisions) : 0;
+                frames.Add(new SwitchControlFrame(parentActive, selectedValue));
+                break;
+            }
+
+            case "SETSWITCH":
+            {
+                var parentActive = isActive(frames);
+                frames.Add(new SwitchControlFrame(parentActive, parentActive && tryParseInt(value, out var setSwitchValue) ? setSwitchValue : 0));
+                break;
+            }
+
+            case "CASE":
+                if (frames.Count > 0 && frames[^1] is SwitchControlFrame switchCase)
+                    switchCase.BeginCase(tryParseInt(value, out var caseValue) ? caseValue : 0);
+                break;
+
+            case "DEF":
+                if (frames.Count > 0 && frames[^1] is SwitchControlFrame switchDefault)
+                    switchDefault.BeginDefault();
+                break;
+
+            case "SKIP":
+                if (frames.Count > 0 && frames[^1] is SwitchControlFrame switchSkip)
+                    switchSkip.Skip();
+                break;
+
+            case "ENDSW":
+            case "ENDSWITCH":
+                if (frames.Count > 0 && frames[^1] is SwitchControlFrame)
+                    frames.RemoveAt(frames.Count - 1);
+                break;
         }
     }
 
