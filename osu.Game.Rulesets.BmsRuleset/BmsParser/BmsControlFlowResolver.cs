@@ -168,24 +168,54 @@ internal static partial class BmsChartParser
         command = string.Empty;
         value = string.Empty;
 
-        var line = rawLine.Trim();
+        var span = rawLine.AsSpan().Trim();
 
-        if (line.Length == 0 || line[0] != '#')
+        if (span.IsEmpty || span[0] != '#')
             return false;
 
-        line = line[1..].TrimStart();
+        span = span[1..].TrimStart();
 
-        if (line.Length == 0)
+        if (span.IsEmpty)
             return false;
 
-        var split = line.IndexOfAny([' ', '\t']);
+        // Fast rejection: channel/data lines start with a digit (e.g. #00111:...).
+        // All control commands (#RANDOM, #IF, #SWITCH, etc.) start with a letter.
+        // This avoids allocating strings for the 99.99% of lines that are data.
+        if (span[0] is >= '0' and <= '9')
+            return false;
 
-        command = (split < 0 ? line : line[..split]).ToUpperInvariant();
-        value = split < 0 ? string.Empty : line[(split + 1)..].Trim();
+        var split = span.IndexOfAny(' ', '\t');
 
-        return command is "RANDOM" or "RONDAM" or "SETRANDOM" or "IF" or "ELSEIF" or "ELSE" or "ENDIF" or "IFEND" or "END" or "ENDRANDOM"
-            or "SWITCH" or "SETSWITCH" or "CASE" or "DEF" or "SKIP" or "ENDSW" or "ENDSWITCH";
+        var cmdSpan = split < 0 ? span : span[..split];
+
+        // Case-insensitive span comparison — no allocation.
+        if (!isControlCommand(cmdSpan))
+            return false;
+
+        command = cmdSpan.ToString().ToUpperInvariant();
+        value = split < 0 ? string.Empty : span[(split + 1)..].Trim().ToString();
+
+        return true;
     }
+
+    private static bool isControlCommand(ReadOnlySpan<char> cmd) =>
+        cmd.Equals("RANDOM", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("RONDAM", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("SETRANDOM", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("IF", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("ELSEIF", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("ELSE", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("ENDIF", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("IFEND", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("END", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("ENDRANDOM", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("SWITCH", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("SETSWITCH", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("CASE", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("DEF", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("SKIP", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("ENDSW", StringComparison.OrdinalIgnoreCase)
+        || cmd.Equals("ENDSWITCH", StringComparison.OrdinalIgnoreCase);
 
     private static bool tryParseInt(string value, out int result) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);

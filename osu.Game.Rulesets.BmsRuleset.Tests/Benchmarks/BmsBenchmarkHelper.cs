@@ -14,11 +14,11 @@ internal static class BmsBenchmarkHelper
     public static readonly string SONGS_ROOT = Path.GetFullPath(Path.Combine(
         TestContext.CurrentContext.TestDirectory, "..", "..", "..", "bms_test_songs"));
 
-    public const string EXTRA_SONGS_ROOT = @"D:\BMS\LargePack\BMS";
-
-    private static string[]? cachedFiles;
+    public const string EXTRA_SONGS_ROOT = @"D:\BMS Song Pack\Normal";
 
     private static string cacheFilePath => ".bms_file_cache.json";
+
+    private static string[]? cachedFiles;
 
     /// <summary>Discover up to <paramref name="maxCount"/> BMS chart files. Cached to disk between runs.</summary>
     public static string[] DiscoverBmsFiles(int maxCount = 10000)

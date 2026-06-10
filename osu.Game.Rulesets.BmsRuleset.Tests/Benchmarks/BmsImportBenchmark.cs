@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,6 +19,23 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Benchmarks;
 public class BmsImportBenchmark
 {
     private const int iterations = 5;
+
+    private static double processChart(byte[] content, string path)
+    {
+        var lines = BmsChartParser.ReadAllLines(content);
+        var parsed = BmsChartParser.Parse(lines, path, _ => 1);
+
+        if (parsed.HitObjects.Count == 0)
+            return 0;
+
+        var hitObjects = parsed.HitObjects
+            .Select(BmsBeatmapDecoder.CreateHitObject)
+            .ToList();
+
+        return new BmsStarRatingProcessorV2()
+            .Compute(hitObjects, parsed.TotalColumns, parsed.Rank)
+            .StarRating;
+    }
 
     [Test]
     public void MeasureAllCharts()
@@ -80,22 +96,5 @@ public class BmsImportBenchmark
         Console.WriteLine($"Total time (ms)   {times.Sum(),10:F0}");
         Console.WriteLine($"Throughput (ch/s) {finalResults.Count / (times.Sum() / 1000),10:F1}");
         Console.WriteLine($"Mem avg (KB)      {mems.Average() / 1024,10:F0}");
-    }
-
-    private static double processChart(byte[] content, string path)
-    {
-        var lines = BmsChartParser.PreprocessLines(BmsChartParser.ReadAllLines(content));
-        var parsed = BmsChartParser.Parse(lines, path, _ => 1);
-
-        if (parsed.HitObjects.Count == 0)
-            return 0;
-
-        var hitObjects = parsed.HitObjects
-            .Select(BmsBeatmapDecoder.CreateHitObject)
-            .ToList();
-
-        return new BmsStarRatingProcessorV2()
-            .Compute(hitObjects, parsed.TotalColumns, parsed.Rank)
-            .StarRating;
     }
 }

@@ -229,7 +229,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         {
             var content = bytes[i];
             var md5 = allMd5[i];
-            var lines = BmsChartParser.PreprocessLines(BmsChartParser.ReadAllLines(content));
+            var lines = BmsChartParser.ReadAllLines(content);
             var parsed = BmsChartParser.Parse(lines, path, _ => 1);
 
             return (
@@ -346,10 +346,6 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         }
     }
 
-    /// <summary>
-    ///     Derive <see cref="BmsChartMetadata"/> from a full parse result,
-    ///     avoiding a separate <see cref="BmsChartParser.ScanMetadata"/> pass over lines.
-    /// </summary>
     private static BmsChartMetadata extractMetadata(BmsParseResult parsed, string? path)
     {
         var title = parsed.Title ?? (path == null ? string.Empty : Path.GetFileNameWithoutExtension(path));

@@ -32,6 +32,77 @@ public class BmsStarRatingBenchmark
 
     private static readonly object data_gen_lock = new();
 
+    private void ensureBenchmarkData()
+    {
+        if (Directory.Exists(data_dir) && Directory.GetFiles(data_dir, "*.json").Length > 0)
+            return;
+
+        lock (data_gen_lock)
+        {
+            if (Directory.Exists(data_dir) && Directory.GetFiles(data_dir, "*.json").Length > 0)
+                return;
+
+            Console.WriteLine("Generating benchmark data...");
+            Directory.CreateDirectory(data_dir);
+
+            var bmsFiles = BmsBenchmarkHelper.DiscoverBmsFiles();
+            Console.WriteLine($"  Found {bmsFiles.Length} BMS files");
+
+            foreach (var file in bmsFiles)
+            {
+                try
+                {
+                    var content = File.ReadAllBytes(file);
+                    var lines = BmsChartParser.ReadAllLines(content);
+                    var parsed = BmsChartParser.Parse(lines, file, _ => 1);
+
+                    var input = new SrBenchmarkInput(
+                        parsed.TotalColumns,
+                        parsed.Rank,
+                        parsed.HitObjects.Select(h => new HitObjectData(
+                            h.Column, h.StartTime, h.Duration, h.IsLongNote
+                        )).ToList()
+                    );
+
+                    var name = Path.GetFileNameWithoutExtension(file) + ".json";
+                    var dataFile = Path.Combine(data_dir, name);
+                    var counter = 1;
+                    while (File.Exists(dataFile))
+                        dataFile = Path.Combine(data_dir, $"{Path.GetFileNameWithoutExtension(name)}_{counter++}.json");
+
+                    var json = JsonSerializer.Serialize(input, json_options);
+                    File.WriteAllText(dataFile, json);
+
+                    Console.WriteLine($"  {Path.GetFileName(dataFile)}: {parsed.HitObjects.Count,6} notes, "
+                                      + $"{parsed.TotalColumns,2} cols, Rank={parsed.Rank}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"  SKIP {Path.GetFileName(file)}: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    private static SrBenchmarkInput loadInput(string dataPath)
+    {
+        var json = File.ReadAllText(dataPath);
+        var input = JsonSerializer.Deserialize<SrBenchmarkInput>(json);
+        Assert.That(input, Is.Not.Null);
+        return input!;
+    }
+
+    private static List<BmsHitObject> toHitObjects(SrBenchmarkInput input)
+    {
+        return input.HitObjects.Select(h => new BmsHitObject
+        {
+            Column = h.Column,
+            StartTime = h.StartTime,
+            Duration = h.Duration,
+            IsLongNote = h.IsLongNote,
+        }).ToList();
+    }
+
     [Test]
     public void CompareOldVsNewAll()
     {
@@ -129,77 +200,6 @@ public class BmsStarRatingBenchmark
                 Console.WriteLine($"  SR MISMATCH: {f}");
             Assert.Fail($"{failureList.Count} SR value mismatches detected.");
         }
-    }
-
-    private void ensureBenchmarkData()
-    {
-        if (Directory.Exists(data_dir) && Directory.GetFiles(data_dir, "*.json").Length > 0)
-            return;
-
-        lock (data_gen_lock)
-        {
-            if (Directory.Exists(data_dir) && Directory.GetFiles(data_dir, "*.json").Length > 0)
-                return;
-
-            Console.WriteLine("Generating benchmark data...");
-            Directory.CreateDirectory(data_dir);
-
-            var bmsFiles = BmsBenchmarkHelper.DiscoverBmsFiles();
-            Console.WriteLine($"  Found {bmsFiles.Length} BMS files");
-
-            foreach (var file in bmsFiles)
-            {
-                try
-                {
-                    var content = File.ReadAllBytes(file);
-                    var lines = BmsChartParser.PreprocessLines(BmsChartParser.ReadAllLines(content));
-                    var parsed = BmsChartParser.Parse(lines, file, _ => 1);
-
-                    var input = new SrBenchmarkInput(
-                        parsed.TotalColumns,
-                        parsed.Rank,
-                        parsed.HitObjects.Select(h => new HitObjectData(
-                            h.Column, h.StartTime, h.Duration, h.IsLongNote
-                        )).ToList()
-                    );
-
-                    var name = Path.GetFileNameWithoutExtension(file) + ".json";
-                    var dataFile = Path.Combine(data_dir, name);
-                    var counter = 1;
-                    while (File.Exists(dataFile))
-                        dataFile = Path.Combine(data_dir, $"{Path.GetFileNameWithoutExtension(name)}_{counter++}.json");
-
-                    var json = JsonSerializer.Serialize(input, json_options);
-                    File.WriteAllText(dataFile, json);
-
-                    Console.WriteLine($"  {Path.GetFileName(dataFile)}: {parsed.HitObjects.Count,6} notes, "
-                                      + $"{parsed.TotalColumns,2} cols, Rank={parsed.Rank}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"  SKIP {Path.GetFileName(file)}: {ex.Message}");
-                }
-            }
-        }
-    }
-
-    private static SrBenchmarkInput loadInput(string dataPath)
-    {
-        var json = File.ReadAllText(dataPath);
-        var input = JsonSerializer.Deserialize<SrBenchmarkInput>(json);
-        Assert.That(input, Is.Not.Null);
-        return input!;
-    }
-
-    private static List<BmsHitObject> toHitObjects(SrBenchmarkInput input)
-    {
-        return input.HitObjects.Select(h => new BmsHitObject
-        {
-            Column = h.Column,
-            StartTime = h.StartTime,
-            Duration = h.Duration,
-            IsLongNote = h.IsLongNote,
-        }).ToList();
     }
 }
 
