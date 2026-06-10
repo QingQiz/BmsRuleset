@@ -32,6 +32,8 @@ public class BmsStarRatingProcessorV2
     private double[][] keyUsage400 = [];
     private double[][] deltaKs = [];
     private double[] anchor = [];
+    private double[] cumSumBuffer = [];
+    private double[] cumSumBufferA = [];
 
     // Precomputed sliding-window bounds for smoothOnCorners (window=500 on baseCorners, window=250 on aCorners)
     private int[] smoothWl = [];
@@ -56,6 +58,9 @@ public class BmsStarRatingProcessorV2
         smoothWr = buildWindowBounds(baseCorners, 500).right;
         smoothWlA = buildWindowBounds(aCorners, 250).left;
         smoothWrA = buildWindowBounds(aCorners, 250).right;
+
+        cumSumBuffer = new double[baseCorners.Length];
+        cumSumBufferA = new double[aCorners.Length];
 
         var jbar = computeJbar();
         var xbar = computeXbar();
@@ -127,7 +132,6 @@ public class BmsStarRatingProcessorV2
                 coeffs[m - i] = coeffs[m + i] = 0.15 + 0.10 * i;
             }
 
-            coeffs[0] = coeffs[k] = outer;
         }
         else
         {
@@ -137,8 +141,9 @@ public class BmsStarRatingProcessorV2
                 coeffs[m - i] = coeffs[m + 1 + i] = 0.15 + 0.10 * i;
             }
 
-            coeffs[0] = coeffs[k] = outer;
         }
+
+        coeffs[0] = coeffs[k] = outer;
 
         return coeffs;
     }
@@ -166,62 +171,12 @@ public class BmsStarRatingProcessorV2
         return 9 + (sr - 9) * (1.0 / 1.2);
     }
 
-    // -----Start of Helper methods--------
-
-    /// <summary>
-    /// Given sorted positions x (length N) and function values f defined piecewise constant on [x[i], x[i+1]),
-    /// return an array F of cumulative integrals such that F[0]=0 and for i&gt;=1:
-    ///   F[i] = sum_{j=0}^{i-1} f[j]*(x[j+1]-x[j])
-    /// </summary>
-    private static double[] cumulativeSum(double[] x, double[] f)
+    /// <summary>Write cumulative sum into a pre-allocated buffer. Avoids allocating a new array per call.</summary>
+    private static void cumulativeSum(double[] x, double[] f, double[] F)
     {
-        var F = new double[x.Length];
+        F[0] = 0;
         for (var i = 1; i < x.Length; i++)
             F[i] = F[i - 1] + f[i - 1] * (x[i] - x[i - 1]);
-        return F;
-    }
-
-    /// <summary>
-    /// Given cumulative data (x, F, f) as above, return the cumulative sum at an arbitrary point q.
-    /// Here we assume that f is constant on each interval.
-    /// </summary>
-    private static double queryCumSum(double q, double[] x, double[] F, double[] f)
-    {
-        if (q <= x[0]) return 0;
-        if (q >= x[^1]) return F[^1];
-
-        // Find index i such that x[i] <= q < x[i+1]
-        var i = searchSortedLeft(x, q) - 1;
-        if (i < 0) i = 0;
-        return F[i] + f[i] * (q - x[i]);
-    }
-
-    /// <summary>
-    /// Given positions x (a sorted 1D array) and function values f (piecewise constant on intervals defined by x),
-    /// return an array g defined at x by applying a symmetric sliding window:
-    ///   if mode=='sum': g(s) = scale * ∫[s-window, s+window] f(t) dt
-    ///   if mode=='avg': g(s) = (∫[s-window, s+window] f(t) dt) / (length of window actually used)
-    /// This is computed exactly using the cumulative–sum technique.
-    /// </summary>
-    private static double[] smoothOnCorners(double[] x, double[] f, double window, double scale, bool averageMode)
-    {
-        var F = cumulativeSum(x, f);
-        var g = new double[f.Length];
-
-        for (var i = 0; i < x.Length; i++)
-        {
-            var s = x[i];
-            var a = Math.Max(s - window, x[0]);
-            var b = Math.Min(s + window, x[^1]);
-            var val = queryCumSum(b, x, F, f) - queryCumSum(a, x, F, f);
-
-            if (averageMode)
-                g[i] = b - a > 0 ? val / (b - a) : 0;
-            else
-                g[i] = scale * val;
-        }
-
-        return g;
     }
 
     /// <summary>
@@ -243,14 +198,15 @@ public class BmsStarRatingProcessorV2
             left[i] = Math.Min(l, x.Length - 1);
             right[i] = Math.Min(r, x.Length - 1);
         }
+
         return (left, right);
     }
 
-    /// <summary>smoothOnCorners using precomputed window bounds (O(N) instead of O(N log N)).</summary>
+    /// <summary>smoothOnCorners using precomputed window bounds and a pre-allocated cumulative-sum buffer.</summary>
     private static double[] smoothOnCornersFast(double[] x, double[] f, double window, double scale, bool averageMode,
-        int[] wl, int[] wr)
+                                                int[] wl, int[] wr, double[] F)
     {
-        var F = cumulativeSum(x, f);
+        cumulativeSum(x, f, F);
         var g = new double[f.Length];
 
         for (var i = 0; i < x.Length; i++)
@@ -278,36 +234,12 @@ public class BmsStarRatingProcessorV2
             }
 
             var val = qb - qa;
-            g[i] = averageMode ? (b - a > 0 ? val / (b - a) : 0) : scale * val;
+            g[i] = averageMode
+                ? b - a > 0 ? val / (b - a) : 0
+                : scale * val;
         }
 
         return g;
-    }
-
-    /// <summary>Return new_vals at positions new_x using linear interpolation from old_x, old_vals.</summary>
-    private static double[] interpValues(double[] newX, double[] oldX, double[] oldVals)
-    {
-        var result = new double[newX.Length];
-        for (var i = 0; i < newX.Length; i++)
-        {
-            var x = newX[i];
-            if (x <= oldX[0])
-            {
-                result[i] = oldVals[0];
-            }
-            else if (x >= oldX[^1])
-            {
-                result[i] = oldVals[^1];
-            }
-            else
-            {
-                var idx = searchSortedLeft(oldX, x);
-                var t = (x - oldX[idx - 1]) / (oldX[idx] - oldX[idx - 1]);
-                result[i] = oldVals[idx - 1] + t * (oldVals[idx] - oldVals[idx - 1]);
-            }
-        }
-
-        return result;
     }
 
     /// <summary>
@@ -317,13 +249,14 @@ public class BmsStarRatingProcessorV2
     private static int[] buildInterpIdx(double[] newX, double[] oldX)
     {
         var idx = new int[newX.Length];
-        int j = 0;
+        var j = 0;
         for (var i = 0; i < newX.Length; i++)
         {
             while (j < oldX.Length - 1 && oldX[j + 1] <= newX[i])
                 j++;
             idx[i] = j;
         }
+
         return idx;
     }
 
@@ -346,6 +279,7 @@ public class BmsStarRatingProcessorV2
                 result[i] = oldVals[idx] + t * (oldVals[idx + 1] - oldVals[idx]);
             }
         }
+
         return result;
     }
 
@@ -358,6 +292,7 @@ public class BmsStarRatingProcessorV2
             var idx = interpIdx[i];
             result[i] = idx < oldVals.Length ? oldVals[idx] : oldVals[^1];
         }
+
         return result;
     }
 
@@ -395,7 +330,7 @@ public class BmsStarRatingProcessorV2
         int lo = 0, hi = array.Length;
         while (lo < hi)
         {
-            var mid = lo + hi >> 1;
+            var mid = (lo + hi) >> 1;
             if (array[mid] < value)
                 lo = mid + 1;
             else
@@ -410,7 +345,7 @@ public class BmsStarRatingProcessorV2
         int lo = 0, hi = list.Count;
         while (lo < hi)
         {
-            var mid = lo + hi >> 1;
+            var mid = (lo + hi) >> 1;
             if (list[mid].head < value)
                 lo = mid + 1;
             else
@@ -425,7 +360,7 @@ public class BmsStarRatingProcessorV2
         int lo = 0, hi = array.Length;
         while (lo < hi)
         {
-            var mid = lo + hi >> 1;
+            var mid = (lo + hi) >> 1;
             if (array[mid] <= value)
                 lo = mid + 1;
             else
@@ -481,45 +416,129 @@ public class BmsStarRatingProcessorV2
 
     private void getCorners()
     {
-        var cornersBase = new HashSet<double>();
-        var cornersA = new HashSet<double>();
+        // Collect raw corner values using List instead of HashSet to avoid hashing and LINQ overhead.
+        var rawBase = new List<double>((noteSeq.Count + 1) * 5);
+        var rawA = new List<double>((noteSeq.Count + 1) * 4);
 
         foreach (var (_, head, tail) in noteSeq)
         {
-            cornersBase.Add(head);
-            cornersA.Add(head);
+            rawBase.Add(head);
+            rawA.Add(head);
             if (tail >= 0)
             {
-                cornersBase.Add(tail);
-                cornersA.Add(tail);
+                rawBase.Add(tail);
+                rawA.Add(tail);
             }
         }
 
-        foreach (var s in cornersBase.ToList())
+        // Add offset values (±501, -499, +1) to base corners
+        var baseCount = rawBase.Count;
+        for (var i = 0; i < baseCount; i++)
         {
-            cornersBase.Add(s + 501);
-            cornersBase.Add(s - 499);
-            cornersBase.Add(s + 1); // To resolve the Dirac-Delta additions exactly at notes
+            var s = rawBase[i];
+            rawBase.Add(s + 501);
+            rawBase.Add(s - 499);
+            rawBase.Add(s + 1);
         }
 
-        cornersBase.Add(0);
-        cornersBase.Add(TotalTimeT);
+        rawBase.Add(0);
+        rawBase.Add(TotalTimeT);
 
         // For Abar, unsmoothed values (KU and A) usually change at ±500 relative to note boundaries, hence ±1000 overall.
-        foreach (var s in cornersA.ToList())
+        var aCount = rawA.Count;
+        for (var i = 0; i < aCount; i++)
         {
-            cornersA.Add(s + 1000);
-            cornersA.Add(s - 1000);
+            var s = rawA[i];
+            rawA.Add(s + 1000);
+            rawA.Add(s - 1000);
         }
 
-        cornersA.Add(0);
-        cornersA.Add(TotalTimeT);
+        rawA.Add(0);
+        rawA.Add(TotalTimeT);
 
-        // Finally, take the union of all corners for final interpolation
-        baseCorners = cornersBase.Where(v => v >= 0 && v <= TotalTimeT).OrderBy(v => v).ToArray();
-        aCorners = cornersA.Where(v => v >= 0 && v <= TotalTimeT).OrderBy(v => v).ToArray();
-        allCorners = baseCorners.Union(aCorners).OrderBy(v => v).ToArray();
+        // Sort, then deduplicate and filter in a single pass
+        rawBase.Sort();
+        rawA.Sort();
+
+        baseCorners = toDedupedFilteredArray(rawBase, TotalTimeT);
+        aCorners = toDedupedFilteredArray(rawA, TotalTimeT);
+
+        // Merge two sorted unique arrays into allCorners
+        allCorners = mergeSortedUnique(baseCorners, aCorners);
     }
+
+    private static double[] toDedupedFilteredArray(List<double> sorted, double maxTime)
+    {
+        var j = 0;
+        for (var i = 0; i < sorted.Count; i++)
+        {
+            var v = sorted[i];
+            if (v >= 0 && v <= maxTime)
+            {
+                if (j == 0 || v > sorted[j - 1])
+                    sorted[j++] = v;
+            }
+        }
+
+        var result = new double[j];
+        for (var i = 0; i < j; i++)
+            result[i] = sorted[i];
+        return result;
+    }
+
+    private static double[] mergeSortedUnique(double[] a, double[] b)
+    {
+        var result = new double[a.Length + b.Length];
+        int i = 0, j = 0, k = 0;
+
+        while (i < a.Length && j < b.Length)
+        {
+            double va = a[i], vb = b[j];
+            if (va < vb)
+            {
+                if (k == 0 || va > result[k - 1])
+                    result[k++] = va;
+                i++;
+            }
+            else if (vb < va)
+            {
+                if (k == 0 || vb > result[k - 1])
+                    result[k++] = vb;
+                j++;
+            }
+            else
+            {
+                if (k == 0 || va > result[k - 1])
+                    result[k++] = va;
+                i++;
+                j++;
+            }
+        }
+
+        while (i < a.Length)
+        {
+            var v = a[i++];
+            if (k == 0 || v > result[k - 1])
+                result[k++] = v;
+        }
+
+        while (j < b.Length)
+        {
+            var v = b[j++];
+            if (k == 0 || v > result[k - 1])
+                result[k++] = v;
+        }
+
+        if (k < result.Length)
+        {
+            var trimmed = new double[k];
+            Array.Copy(result, 0, trimmed, 0, k);
+            return trimmed;
+        }
+
+        return result;
+    }
+
 
     private bool[][] getKeyUsage()
     {
@@ -675,7 +694,7 @@ public class BmsStarRatingProcessorV2
         // Now smooth each column's J_ks (uses precomputed window bounds)
         var jbarKs = new double[TotalColumns][];
         for (var k = 0; k < TotalColumns; k++)
-            jbarKs[k] = smoothOnCornersFast(baseCorners, jks[k], 500, 0.001, false, smoothWl, smoothWr);
+            jbarKs[k] = smoothOnCornersFast(baseCorners, jks[k], 500, 0.001, false, smoothWl, smoothWr, cumSumBuffer);
 
         // Aggregate across columns using weighted average
         var jbar = new double[baseCorners.Length];
@@ -782,7 +801,7 @@ public class BmsStarRatingProcessorV2
             xBase[i] = sum + sqrtSum;
         }
 
-        return smoothOnCornersFast(baseCorners, xBase, 500, 0.001, false, smoothWl, smoothWr);
+        return smoothOnCornersFast(baseCorners, xBase, 500, 0.001, false, smoothWl, smoothWr, cumSumBuffer);
     }
 
     private double[] computePbar()
@@ -845,7 +864,7 @@ public class BmsStarRatingProcessorV2
                 pStep[j] += Math.Min(inc * anchor[j], Math.Max(inc, inc * 2 - 10));
         }
 
-        return smoothOnCornersFast(baseCorners, pStep, 500, 0.001, false, smoothWl, smoothWr);
+        return smoothOnCornersFast(baseCorners, pStep, 500, 0.001, false, smoothWl, smoothWr, cumSumBuffer);
     }
 
     private double[] computeAbar()
@@ -902,7 +921,7 @@ public class BmsStarRatingProcessorV2
             }
         }
 
-        return smoothOnCornersFast(aCorners, aStep, 250, 1.0, true, smoothWlA, smoothWrA);
+        return smoothOnCornersFast(aCorners, aStep, 250, 1.0, true, smoothWlA, smoothWrA, cumSumBufferA);
     }
 
     private double[] computeRbar()
@@ -940,7 +959,7 @@ public class BmsStarRatingProcessorV2
                 rStep[j] = rVal;
         }
 
-        return smoothOnCornersFast(baseCorners, rStep, 500, 0.001, false, smoothWl, smoothWr);
+        return smoothOnCornersFast(baseCorners, rStep, 500, 0.001, false, smoothWl, smoothWr, cumSumBuffer);
     }
 
     private void computeCAndKs(out double[] cArr, out double[] ksArr)
@@ -986,7 +1005,7 @@ public class BmsStarRatingProcessorV2
             var jCap = Math.Min(j, 8 + 0.85 * j);
             var a3Ks = Math.Pow(a, 3.0 / ks);
 
-            var s1 = (a3Ks * jCap) * Math.Sqrt(a3Ks * jCap);
+            var s1 = a3Ks * jCap * Math.Sqrt(a3Ks * jCap);
             var streamTerm = 0.8 * pbar[i] + rbar[i] * 35.0 / (cArr[i] + 8);
             var a23 = Math.Pow(a, 2.0 / 3.0);
             var s2Base = a23 * streamTerm;
@@ -1090,10 +1109,22 @@ public class BmsStarRatingProcessorV2
             diff[tail] = diff.GetValueOrDefault(tail, 0) - 1;
         }
 
-        // The breakpoints are the times where changes occur.
-        var pointsSet = new HashSet<double> { 0, TotalTimeT };
-        foreach (var p in diff.Keys) pointsSet.Add(p);
-        var points = pointsSet.OrderBy(p => p).ToArray();
+        // The breakpoints are the times where changes occur. Collect using List instead of HashSet.
+        var pointsList = new List<double>(diff.Count + 2) { 0, TotalTimeT };
+        pointsList.AddRange(diff.Keys);
+        pointsList.Sort();
+        // Deduplicate into an array (avoids LINQ OrderBy().ToArray() allocation overhead)
+        var points = new double[pointsList.Count];
+        var writeIdx = 0;
+        for (var i = 0; i < pointsList.Count; i++)
+        {
+            var v = pointsList[i];
+            if (writeIdx == 0 || v > points[writeIdx - 1])
+                points[writeIdx++] = v;
+        }
+
+        if (writeIdx < points.Length)
+            Array.Resize(ref points, writeIdx);
 
         // Build piecewise constant values (after transformation) and a cumulative sum.
         var values = new List<double>();
