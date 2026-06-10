@@ -335,7 +335,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 .Select(BmsBeatmapDecoder.CreateHitObject)
                 .ToList();
 
-            return new BmsStarRatingProcessor()
+            return new BmsStarRatingProcessorV2()
                 .Compute(hitObjects, parsed.TotalColumns, parsed.Rank)
                 .StarRating;
         }

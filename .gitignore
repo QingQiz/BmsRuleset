@@ -27,7 +27,10 @@ bld/
 #wwwroot/
 
 # MSTest test Results
-[Tt]est[Rr]esult*/
+[Tt]est[Rr]esult*
+
+# Benchmark generated data
+benchmark_data/
 [Bb]uild[Ll]og.*
 
 # NUNIT
