@@ -583,3 +583,12 @@ The full built-in skin (covering all 6 layouts) is at
 Switching the active ruleset from BMS to any other (or from any other to BMS) crashes with
 `BeatmapInvalidForRulesetException` because the beatmap title wedge tries to recalculate
 difficulty using the wrong converter while the carousel selection is stale.
+
+---
+
+## Appendix: Reference Links
+
+| Subject                            | Link                                              |
+|------------------------------------|---------------------------------------------------|
+| Star-Rating-Rebirth (SR algorithm) | <https://github.com/sunnyxxy/Star-Rating-Rebirth> |
+| BMS Command Specification          | <https://hitkey.nekokan.dyndns.info/cmds.htm>     

@@ -560,3 +560,12 @@ HitPoor : j-poor
 从 BMS 切换到其他规则集（或从其他规则集切换到 BMS）时，选歌界面会因
 `BeatmapInvalidForRulesetException` 崩溃。原因是标题组件在轮播选择仍处于过期状态时，
 使用了错误的转换器重新计算难度。
+
+---
+
+## 附录：参考链接
+
+| 主题                            | 链接                                                                  |
+|--------------------------------|-----------------------------------------------------------------------|
+| Star-Rating-Rebirth (SR 算法)  | <https://github.com/sunnyxxy/Star-Rating-Rebirth>                   |
+| BMS 命令规范                    | <https://hitkey.nekokan.dyndns.info/cmds.htm>                        |
