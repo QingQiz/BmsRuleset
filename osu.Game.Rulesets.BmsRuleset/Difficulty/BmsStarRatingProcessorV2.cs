@@ -546,12 +546,14 @@ public class BmsStarRatingProcessorV2
         for (var k = 0; k < TotalColumns; k++)
             usage[k] = new bool[baseCorners.Length];
 
+        var leftHint = 0;
         foreach (var (k, head, tail) in noteSeq)
         {
             var start = Math.Max(head - 150, 0);
             var end = tail < 0 ? head + 150 : Math.Min(tail + 150, TotalTimeT - 1);
 
-            var left = searchSortedLeft(baseCorners, start);
+            leftHint = walkForward(baseCorners, start, leftHint);
+            var left = leftHint;
             var right = searchSortedLeft(baseCorners, end);
             for (var i = left; i < right; i++)
                 usage[k][i] = true;
@@ -562,11 +564,12 @@ public class BmsStarRatingProcessorV2
 
     private void buildActiveColumns()
     {
+        var nCols = TotalColumns;
         activeColumnMask = new bool[baseCorners.Length][];
         for (var i = 0; i < baseCorners.Length; i++)
         {
-            var mask = new bool[TotalColumns];
-            for (var k = 0; k < TotalColumns; k++)
+            var mask = new bool[nCols];
+            for (var k = 0; k < nCols; k++)
             {
                 if (keyUsage[k][i])
                     mask[k] = true;
@@ -582,13 +585,16 @@ public class BmsStarRatingProcessorV2
         for (var k = 0; k < TotalColumns; k++)
             usage[k] = new double[baseCorners.Length];
 
+        int leftHint = 0, left400Hint = 0;
         foreach (var (k, head, tail) in noteSeq)
         {
             var start = Math.Max(head, 0);
             var end = tail < 0 ? head : Math.Min(tail, TotalTimeT - 1);
 
-            var left400 = searchSortedLeft(baseCorners, start - 400);
-            var left = searchSortedLeft(baseCorners, start);
+            left400Hint = walkForward(baseCorners, start - 400, left400Hint);
+            leftHint = walkForward(baseCorners, start, leftHint);
+            var left400 = left400Hint;
+            var left = leftHint;
             var right = searchSortedLeft(baseCorners, end);
             var right400 = searchSortedLeft(baseCorners, end + 400);
 
@@ -607,21 +613,48 @@ public class BmsStarRatingProcessorV2
         return usage;
     }
 
+
+    /// <summary>Walk forward from hint to find leftmost index with array[idx] >= value.
+    /// Values must be non-decreasing between calls with the same hint variable.</summary>
+    private static int walkForward(double[] array, double value, int hint)
+    {
+        while (hint < array.Length && array[hint] < value) hint++;
+        return hint;
+    }
+
+    /// <summary>Insertion sort in descending order. Avoids delegate allocation overhead of Array.Sort with Comparison.</summary>
+    private static void sortDescending(double[] arr, int len)
+    {
+        for (var i = 1; i < len; i++)
+        {
+            var key = arr[i];
+            var j = i - 1;
+            while (j >= 0 && arr[j] < key)
+            {
+                arr[j + 1] = arr[j];
+                j--;
+            }
+
+            arr[j + 1] = key;
+        }
+    }
+
     private double[] computeAnchor()
     {
         var result = new double[baseCorners.Length];
-        var counts = new double[TotalColumns];
+        var nCols = TotalColumns;
+        var counts = new double[nCols];
 
         for (var idx = 0; idx < baseCorners.Length; idx++)
         {
             // Collect the counts for each group at this base corner
-            for (var k = 0; k < TotalColumns; k++)
+            for (var k = 0; k < nCols; k++)
                 counts[k] = keyUsage400[k][idx];
 
-            Array.Sort(counts, (a, b) => b.CompareTo(a)); // descending
+            sortDescending(counts, nCols); // avoids delegate + boxing overhead
 
             var nonZeroCount = 0;
-            for (var i = 0; i < TotalColumns && counts[i] != 0; i++)
+            for (var i = 0; i < nCols && counts[i] != 0; i++)
                 nonZeroCount++;
 
             if (nonZeroCount > 1)
@@ -650,10 +683,11 @@ public class BmsStarRatingProcessorV2
 
     private double[] computeJbar()
     {
-        var jks = new double[TotalColumns][];
-        var dks = new double[TotalColumns][];
+        var nCols = TotalColumns;
+        var jks = new double[nCols][];
+        var dks = new double[nCols][];
 
-        for (var k = 0; k < TotalColumns; k++)
+        for (var k = 0; k < nCols; k++)
         {
             jks[k] = new double[baseCorners.Length];
             dks[k] = new double[baseCorners.Length];
@@ -666,17 +700,20 @@ public class BmsStarRatingProcessorV2
             return 1 - 7e-5 / (x * x * x * x);
         }
 
-        for (var k = 0; k < TotalColumns; k++)
+        for (var k = 0; k < nCols; k++)
         {
             var notes = noteSeqByColumn[k];
+            var baseHint = 0;
             for (var i = 0; i < notes.Count - 1; i++)
             {
                 var start = notes[i].head;
                 var end = notes[i + 1].head;
 
-                // Find indices in base_corners that lie in [start, end)
-                var left = searchSortedLeft(baseCorners, start);
-                var right = searchSortedLeft(baseCorners, end);
+                // Walk forward through baseCorners instead of binary search
+                baseHint = walkForward(baseCorners, start, baseHint);
+                var left = baseHint;
+                baseHint = walkForward(baseCorners, end, baseHint);
+                var right = baseHint;
                 if (left >= right) continue;
 
                 var delta = 0.001 * (end - start);
@@ -719,18 +756,19 @@ public class BmsStarRatingProcessorV2
 
     private double[] computeXbar()
     {
-        var crossCoeff = generateCrossCoeffs(TotalColumns);
+        var nCols = TotalColumns;
+        var crossCoeff = generateCrossCoeffs(nCols);
 
-        var xks = new double[TotalColumns + 1][];
-        var fastCross = new double[TotalColumns + 1][];
+        var xks = new double[nCols + 1][];
+        var fastCross = new double[nCols + 1][];
 
-        for (var k = 0; k <= TotalColumns; k++)
+        for (var k = 0; k <= nCols; k++)
         {
             xks[k] = new double[baseCorners.Length];
             fastCross[k] = new double[baseCorners.Length];
         }
 
-        for (var k = 0; k <= TotalColumns; k++)
+        for (var k = 0; k <= nCols; k++)
         {
             List<(int column, double head, double tail)> notesInPair;
 
@@ -741,13 +779,16 @@ public class BmsStarRatingProcessorV2
             else
                 notesInPair = mergeSorted(noteSeqByColumn[k - 1], noteSeqByColumn[k]);
 
+            var baseHint = 0;
             for (var i = 1; i < notesInPair.Count; i++)
             {
                 var start = notesInPair[i - 1].head;
                 var end = notesInPair[i].head;
 
-                var left = searchSortedLeft(baseCorners, start);
-                var right = searchSortedLeft(baseCorners, end);
+                baseHint = walkForward(baseCorners, start, baseHint);
+                var left = baseHint;
+                baseHint = walkForward(baseCorners, end, baseHint);
+                var right = baseHint;
                 if (left >= right) continue;
 
                 var delta = 0.001 * (end - start);
@@ -789,11 +830,11 @@ public class BmsStarRatingProcessorV2
         for (var i = 0; i < baseCorners.Length; i++)
         {
             double sum = 0;
-            for (var k = 0; k <= TotalColumns; k++)
+            for (var k = 0; k <= nCols; k++)
                 sum += xks[k][i] * crossCoeff[k];
 
             double sqrtSum = 0;
-            for (var k = 0; k < TotalColumns; k++)
+            for (var k = 0; k < nCols; k++)
             {
                 sqrtSum += Math.Sqrt(fastCross[k][i] * crossCoeff[k] * fastCross[k + 1][i] * crossCoeff[k + 1]);
             }
@@ -869,15 +910,16 @@ public class BmsStarRatingProcessorV2
 
     private double[] computeAbar()
     {
-        var dks = new double[TotalColumns][];
-        for (var k = 0; k < TotalColumns; k++)
+        var nCols = TotalColumns;
+        var dks = new double[nCols][];
+        for (var k = 0; k < nCols; k++)
             dks[k] = new double[baseCorners.Length];
 
         for (var i = 0; i < baseCorners.Length; i++)
         {
             var mask = activeColumnMask[i];
             var prevActive = -1;
-            for (var k = 0; k < TotalColumns; k++)
+            for (var k = 0; k < nCols; k++)
             {
                 if (!mask[k]) continue;
 
@@ -902,7 +944,7 @@ public class BmsStarRatingProcessorV2
 
             var mask = activeColumnMask[idx];
             var prevActive = -1;
-            for (var k = 0; k < TotalColumns; k++)
+            for (var k = 0; k < nCols; k++)
             {
                 if (!mask[k]) continue;
 
@@ -983,7 +1025,7 @@ public class BmsStarRatingProcessorV2
         {
             var count = 0;
             var mask = activeColumnMask[i];
-            for (var k = 0; k < TotalColumns; k++)
+            for (var k = 0; k < mask.Length; k++)
             {
                 if (mask[k]) count++;
             }
