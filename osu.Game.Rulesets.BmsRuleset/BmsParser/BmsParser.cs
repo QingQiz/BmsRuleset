@@ -49,15 +49,25 @@ internal static partial class BmsChartParser
         var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
         var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
         var sampleDefinitions = new Dictionary<string, string>(state.SampleDefinitions, StringComparer.OrdinalIgnoreCase);
-        var hitObjects = collectHitObjects(state, totalColumns, measureStarts, timingMap)
-            .OrderBy(h => h.StartTime)
-            .ThenBy(h => h.Tick)
-            .ThenBy(h => h.Column)
-            .ToArray();
-        var longNoteTailSampleEvents = collectLongNoteTailSampleEvents(hitObjects)
-            .OrderBy(e => e.Time)
-            .ThenBy(e => e.Tick)
-            .ToArray();
+        var hitObjects = collectHitObjects(state, totalColumns, measureStarts, timingMap).ToList();
+        hitObjects.Sort((a, b) =>
+        {
+            var cmp = a.StartTime.CompareTo(b.StartTime);
+            if (cmp != 0) return cmp;
+
+            cmp = a.Tick.CompareTo(b.Tick);
+            if (cmp != 0) return cmp;
+
+            return a.Column.CompareTo(b.Column);
+        });
+        var longNoteTailSampleEvents = collectLongNoteTailSampleEvents(hitObjects).ToList();
+        longNoteTailSampleEvents.Sort((a, b) =>
+        {
+            var cmp = a.Time.CompareTo(b.Time);
+            if (cmp != 0) return cmp;
+
+            return a.Tick.CompareTo(b.Tick);
+        });
         var textEvents = collectTextEvents(state, measureStarts, timingMap);
 
         return new BmsParseResult(
@@ -92,40 +102,60 @@ internal static partial class BmsChartParser
         if (line.Length == 0 || (line[0] != '#' && line[0] != '%'))
             return;
 
-        // Normalize % prefix to # for regex matching (%URL, %EMAIL).
+        // Normalize % prefix to # for matching (%URL, %EMAIL).
         if (line[0] == '%')
-            line = "#" + line[1..];
-
-        var channelMatch = channelLineRegex().Match(line);
-
-        if (channelMatch.Success)
         {
-            var measure = int.Parse(channelMatch.Groups[1].Value, CultureInfo.InvariantCulture);
-            var channel = channelMatch.Groups[2].Value.ToUpperInvariant();
-            var payload = channelMatch.Groups[3].Value.Trim();
+            if (line.Length == 1) return;
 
-            state.MaxMeasure = Math.Max(state.MaxMeasure, measure);
-
-            if (channel == "02")
-            {
-                if (tryParseDouble(payload, out var length) && length > 0)
-                    state.MeasureLengths[measure] = length;
-            }
-            else if (payload.Length >= 2)
-            {
-                state.ChannelLines.Add(new RawChannelLine(measure, channel, payload, state.NextSequence++ * 4096));
-            }
-
-            return;
+            line = string.Concat("#", line.AsSpan(1));
         }
 
-        var commandMatch = commandLineRegex().Match(line);
+        // Attempt channel line: #XXXYY:...
+        // Format: # followed by 3 digits (measure), 2 chars (channel), ':', then payload
+        if (line.Length >= 7)
+        {
+            var d1 = line[1];
+            var d2 = line[2];
+            var d3 = line[3];
+            if (d1 >= '0' && d1 <= '9' && d2 >= '0' && d2 <= '9' && d3 >= '0' && d3 <= '9' && line[6] == ':')
+            {
+                var measure = (d1 - '0') * 100 + (d2 - '0') * 10 + (d3 - '0');
 
-        if (!commandMatch.Success)
-            return;
+                // channelPart is already uppercase in BMS format [0-9A-Z]{2}, the slice avoids allocation
+                var payload = line[7..].Trim();
 
-        var command = commandMatch.Groups[1].Value.ToUpperInvariant();
-        var value = commandMatch.Groups[2].Value.Trim();
+                state.MaxMeasure = Math.Max(state.MaxMeasure, measure);
+
+                if (line[4] == '0' && line[5] == '2')
+                {
+                    if (tryParseDouble(payload, out var length) && length > 0)
+                        state.MeasureLengths[measure] = length;
+                }
+                else if (payload.Length >= 2)
+                {
+                    var channel = line.Substring(4, 2);
+                    state.ChannelLines.Add(new RawChannelLine(measure, channel, payload, state.NextSequence++ * 4096));
+                }
+
+                return;
+            }
+        }
+
+        // Attempt command line: #KEYWORD value
+        // Skip leading spaces after #
+        var cmdStart = 1;
+        while (cmdStart < line.Length && line[cmdStart] == ' ') cmdStart++;
+        if (cmdStart >= line.Length) return;
+
+        // Find end of command (first whitespace)
+        var cmdEnd = cmdStart;
+        while (cmdEnd < line.Length && line[cmdEnd] != ' ' && line[cmdEnd] != '	') cmdEnd++;
+
+        // Require at least one whitespace after command (matches regex \\s+ requirement)
+        if (cmdEnd >= line.Length) return;
+
+        var command = line.Substring(cmdStart, cmdEnd - cmdStart).ToUpperInvariant();
+        var value = line[cmdEnd..].Trim();
 
         switch (command)
         {
@@ -289,13 +319,18 @@ internal static partial class BmsChartParser
 
     private static int calculateTickResolution(ParseState state)
     {
-        var resolution = state.ChannelLines
-            .Select(line => line.Payload.Length / 2)
-            .Where(pairCount => pairCount > 0)
-            .Aggregate(base_tick_resolution, lcmChecked);
+        var resolution = base_tick_resolution;
+        foreach (var line in state.ChannelLines)
+        {
+            var pairCount = line.Payload.Length / 2;
+            if (pairCount > 0)
+                resolution = lcmChecked(resolution, pairCount);
+        }
 
-        return state.MeasureLengths.Values
-            .Aggregate(resolution, (current, length) => lcmChecked(current, denominatorFor(length)));
+        foreach (var length in state.MeasureLengths.Values)
+            resolution = lcmChecked(resolution, denominatorFor(length));
+
+        return resolution;
     }
 
     private static List<BmsMeasureInfo> calculateMeasures(ParseState state, int tickResolution)
