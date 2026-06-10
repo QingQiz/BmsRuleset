@@ -576,7 +576,7 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestLongNoteTailSampleEventUsesTerminatingCellSampleKey()
+    public void TestLongNoteTailSameSampleKeyWithTail()
     {
         var beatmap = decode("""
                              #BPM 120
@@ -587,10 +587,10 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         // For LNTYPE 1 with payload "0101", both head and tail have value "01",
-        // so the tail sample key resolves to "01" (from the terminating cell).
-        Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(1));
-        Assert.That(converted.LongNoteTailSampleEvents[0].SampleKey, Is.EqualTo("01"));
-        Assert.That(converted.LongNoteTailSampleEvents[0].Time, Is.EqualTo(3000).Within(0.001));
+        // so the tail sample key should not be played.
+        Assert.That(converted.HitObjects[0].IsLongNote, Is.True);
+        Assert.That(converted.HitObjects[0].SampleKey, Is.EqualTo("01"));
+        Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(0));
     }
 
     [Test]

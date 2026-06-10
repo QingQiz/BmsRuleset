@@ -82,9 +82,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (original is BmsBeatmap { TotalColumns: > 0 } bmsBeatmap)
             return bmsBeatmap.TotalColumns;
 
-        // Source channels are the ground truth — prefer them over potentially-stale
-        // metadata (CircleSize) which may have been written by a previous processing
-        // pass with incorrect or default values.
         var inferred = BmsLayout.InferTotalColumns(hitObjects.Select(h => h.SourceChannel), original.BeatmapInfo.Path);
 
         if (inferred > 0)
@@ -100,7 +97,15 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
                     inferred = maxColumn + 1;
             }
 
-            return inferred;
+            // Use the inferred result only when it exceeds the explicit CS (CircleSize)
+            // config. CS is the chart author's intended column count — inference from
+            // visible channels should only override it when the chart uses more columns
+            // than CS declares (e.g. extended-play layouts).
+            var csKeyCount = BmsDifficultyInfo.GetKeyCount(original.Difficulty);
+            if (inferred > csKeyCount)
+                return inferred;
+
+            return BmsLayout.IsKnownTotalColumns(csKeyCount) ? csKeyCount : inferred;
         }
 
         var metadataKeyCount = BmsDifficultyInfo.GetKeyCount(original.Difficulty);
