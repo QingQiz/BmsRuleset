@@ -162,16 +162,18 @@ Easy / Hard / Ex-Hard / Hazard gauge variants are not yet implemented.
 
 ### Mods
 
-| Mod                        | Description                            |                 |
-|----------------------------|----------------------------------------|-----------------|
-| Autoplay                   | auto play                              |                 |
-| Double Time / Half Time    |                                        | Not Tested      |
-| No Fail                    |                                        |                 |
-| Cinema                     |                                        | Working         |
-| Random / gauge mods        |                                        | Not implemented |
-| Mirror                     |                                        |                 |
-| 2P                         | change the player layout from 1P to 2P |                 |
-| Auto Scratch /Hide Scratch | auto play/hide scratch lane            |                 |
+| Mod                        | Description                            |            |
+|----------------------------|----------------------------------------|------------|
+| Autoplay                   | auto play                              |            |
+| Double Time / Half Time    |                                        | Not Tested |
+| No Fail                    |                                        |            |
+| Cinema                     |                                        | Working    |
+| Mirror                     | Mirrors the key layout                 |            |
+| 2P                         | change the player layout from 1P to 2P |            |
+| Auto Scratch /Hide Scratch | auto play/hide scratch lane            |            |
+| Lane Random (LR)           | RANDOM: permutes lane columns          |            |
+| Note Random (NR)           | S-RANDOM / H-RANDOM: per-note random   |            |
+| Rotation Random (RR)       | R-RANDOM: rotate + optional mirror     |            |
 
 ---
 
@@ -523,11 +525,11 @@ The full built-in skin (covering all 6 layouts) is at
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                       |
 | **Input**     | Judgement offset adjustment capability                                                      |
 | **Mods**      | Different health bar types                                                                  | 2         |
-| **Mods**      | Random / S-Random / H-Random column shuffle                                                 | 2         |
 | **Mods**      | Gauge-selection mods                                                                        | 2         |
 | **Mods**      | assist options                                                                              |
 | **Mods**      | Remember last used mod combination                                                          |
 | **Mods**      | BG: make key sounds → background samples (hit results don't affect music)                   | 2         
+| **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)              |           |
 | **Parser**    | `#BGAxx` / `#POORBGA` / `#SWBGAxx` / `#@BGAxx` / `#ARGBxx` — BGA definitions                |
 | **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                               |
 | **Parser**    | `#CDDA` / `#MIDIFILE` — CD / MIDI                                                           |

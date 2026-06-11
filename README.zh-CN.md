@@ -156,10 +156,12 @@ Easy / Hard / Ex-Hard / Hazard 血量变体尚未实现。
 | Double Time / Half Time    |                                        | 未测试          |
 | No Fail                    |                                        |                 |
 | Cinema                     |                                        | 正常            |
-| Random / gauge mods        |                                        | 未实现          |
-| Mirror                     |                                        |                 |
+| Mirror                     | 镜像键位布局                           |                 |
 | 2P                         | 将玩家布局从 1P 切换为 2P              |                 |
 | Auto Scratch /Hide Scratch | 自动/隐藏 scratch 轨道                 |                 |
+| Lane Random (LR)           | RANDOM：随机排列轨道列                 |                 |
+| Note Random (NR)           | S-RANDOM / H-RANDOM：逐音符随机        |                 |
+| Rotation Random (RR)       | R-RANDOM：旋转 + 可选镜像              |                 |
 
 ---
 
@@ -502,11 +504,11 @@ HitPoor : j-poor
 | **输入**     | Scratch 转盘语义 — scratch 目前映射为普通按键                                               |
 | **输入**     | 判定偏移调整能力                                                                           |
 | **Mods**     | 不同血量条类型                                                                              | 2      |
-| **Mods**     | Random / S-Random / H-Random 随机排列                                                       | 2      |
 | **Mods**     | 血量选择类 mods                                                                             | 2      |
 | **Mods**     | 辅助选项                                                                                    |
 | **Mods**     | 记住上次使用的 mod 组合                                                                     |
 | **Mods**     | BG：将 key sounds 转为背景采样（判定结果不影响音乐）                                        | 2      |
+| **Mods**     | DP only mods（FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM）              |        |
 | **解析器**   | `#BGAxx` / `#POORBGA` / `#SWBGAxx` / `#@BGAxx` / `#ARGBxx` — BGA 定义                    |
 | **解析器**   | `#BMPxx` / `#EXBMPxx` — 图像定义（非资源扫描）                                              |
 | **解析器**   | `#CDDA` / `#MIDIFILE` — CD / MIDI                                                           |
@@ -544,6 +546,8 @@ HitPoor : j-poor
 | **皮肤**     | E-POOR 判定图像                                                                             | 3      |
 | **UI**       | Lane cover / skin / movement                                                                | 2      |
 | **UI**       | 重写血量条 — 红/黄/绿渐变，无边框，无整体颜色变化                                            | 2      |
+| **Perf**      | parser performance (tinny parser for importer / ProjectTickToTime(build & query))           | 4         |
+| **Perf**      | high GC pressure during importing (sr) (consider pre compute and query)                     | 3         |
 
 ### FIXME
 

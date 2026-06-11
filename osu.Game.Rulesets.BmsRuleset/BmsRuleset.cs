@@ -146,7 +146,7 @@ public class BmsRuleset : Ruleset
         ModType.DifficultyReduction => [new BmsModNoFail(), new BmsModHalfTime(), new BmsModConstant(), new BmsModAutoScratch()],
         ModType.DifficultyIncrease => [new BmsModDoubleTime()],
         ModType.Automation => [new BmsModAutoplay(), new BmsModCinema()],
-        ModType.Conversion => [new BmsModMirror(), new BmsModSecondPlayer()],
+        ModType.Conversion => [new BmsModMirror(), new BmsModSecondPlayer(), new BmsModLaneRandom(), new BmsModNoteRandom(), new BmsModRotationRandom()],
         ModType.System => [new BmsModBranchReplay()],
         _ => [],
     };
