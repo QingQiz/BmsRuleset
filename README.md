@@ -521,7 +521,6 @@ The full built-in skin (covering all 6 layouts) is at
 | **Converter** | Mania 7K → BMS chart conversion                                                             | 3         |
 | **Gauge**     | Easy / Hard / Ex-Hard / Hazard gauge variants                                               | 2         |
 | **Gauge**     | LN-specific gauge events (head miss ≠ body drop ≠ tail miss)                                | 1         |
-| **Import**    | Resource files in subdirectories — only the filename is used, relative paths are unresolved | 1         |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                       |
 | **Input**     | Judgement offset adjustment capability                                                      |
 | **Mods**      | Different health bar types                                                                  | 2         |

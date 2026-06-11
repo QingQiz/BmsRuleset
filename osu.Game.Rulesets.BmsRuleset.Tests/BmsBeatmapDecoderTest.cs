@@ -359,6 +359,42 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestDecoderPreservesSamplePathWithSubdirectory()
+    {
+        // BMS charts may use relative paths with subdirectories in #WAV definitions
+        // (e.g. #WAV01 wav/kick.wav). The parser must preserve the full path as-is.
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAV01 kick.wav
+                             #WAV02 wav/kick.wav
+                             #WAV03 subdir/sample.wav
+                             #WAV04 a/b/c.wav
+                             #00111:01
+                             #00112:02
+                             #00113:03
+                             #00114:04
+                             """);
+        var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().OrderBy(h => h.StartTime).ToList();
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        // Flat filename (no subdir) — baseline.
+        Assert.That(hitObjects[0].SamplePath, Is.EqualTo("kick.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("kick.wav"));
+
+        // Single subdirectory level.
+        Assert.That(hitObjects[1].SamplePath, Is.EqualTo("wav/kick.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("wav/kick.wav"));
+
+        // Single subdirectory, different path.
+        Assert.That(hitObjects[2].SamplePath, Is.EqualTo("subdir/sample.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("03")], Is.EqualTo("subdir/sample.wav"));
+
+        // Nested subdirectories.
+        Assert.That(hitObjects[3].SamplePath, Is.EqualTo("a/b/c.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("04")], Is.EqualTo("a/b/c.wav"));
+    }
+
+    [Test]
     public void TestDecoderAndConverterPreserveBmsSampleDefinitionsAndBgmEvents()
     {
         var beatmap = decode("""
