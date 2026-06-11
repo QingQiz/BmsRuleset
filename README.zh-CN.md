@@ -40,43 +40,65 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 
 **已解码的 Header 字段：**
 
-| 字段                     | 命令                                                              | 说明                             |
-|--------------------------|------------------------------------------------------------------|--------------------------------|
-| 标题、艺术家、子标题     | `#TITLE`、`#ARTIST`、`#SUBTITLE`                                 | 子标题追加到标题为 `"Title - Subtitle"` |
-| 子艺术家                 | `#SUBARTIST`                                                     | 追加到艺术家为 `"Artist (SubArtist)"` |
-| 制作人                   | `#MAKER`                                                         | 映射到谱面 Creator                  |
-| 流派                     | `#GENRE`（也支持 `#GENLE`）                                      | 歌曲风格，存入 Tags                   |
-| URL、Email               | `%URL`、`%EMAIL`                                                 | 存入 Tags                        |
-| 注释                     | `#COMMENT`                                                       | 存入 Tags                        |
-| Play level               | `#PLAYLEVEL`（作为难度名显示）                                   |                                |
-| 判定等级                 | `#RANK`（0–4，影响判定窗口）                                     | 映射到 `OD`                       |
-| 血量总量                 | `#TOTAL`                                                         | 映射到 `AR`                       |
-| 视觉 BPM                 | `#BASEBPM`                                                       | 覆盖滚动速度参考 BPM，不影响音符时序           |
-| 初始 BPM                 | `#BPM`                                                           |                                |
-| 扩展 BPM 表              | `#BPMxx`                                                         |                                |
-| STOP 表                  | `#STOPxx`                                                        |                                |
-| 采样定义                 | `#WAVxx`                                                         |                                |
-| 长音符类型               | `#LNTYPE 1` / `#LNTYPE 2` / `#LNOBJ`                             |                                |
-| 玩家模式                 | `#PLAYER`                                                        | **已忽略** — 布局仅根据通道存在和文件扩展名推断    |
-| 小节长度                 | 通道 `02`                                                        |                                |
-| 文本事件                 | `#TEXTxx`、`#SONGxx`、通道 `99`                                  |                                |
-| Random / Switch          | `#IF`、`#ELSEIF`、`#ELSE`、`#ENDIF` / `#END` / `#IFEND` / `#END IF`（容错）、`#SWITCH` 及相关命令 | 游戏支持，并支持拼写容错                   |
+| 字段                 | 命令                                                                                                                                    | 说明                                                    |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------|
+| 标题、艺术家、子标题 | `#TITLE`、`#ARTIST`、`#SUBTITLE`                                                                                                       | 子标题追加到标题为 `"Title - Subtitle"`               |
+| 子艺术家             | `#SUBARTIST`                                                                                                                           | 追加到艺术家为 `"Artist (SubArtist)"`                 |
+| 制作人               | `#MAKER`                                                                                                                               | 映射到谱面 Creator                                      |
+| 流派                 | `#GENRE`（也支持 `#GENLE`）                                                                                                            | 歌曲风格，存入 Tags                                     |
+| URL、Email           | `%URL`、`%EMAIL`                                                                                                                       | 存入 Tags                                               |
+| 注释                 | `#COMMENT`                                                                                                                             | 存入 Tags                                               |
+| Play level           | `#PLAYLEVEL`                                                                                                                           | 作为难度名显示                                          |
+| 判定等级             | `#RANK`（0–4）                                                                                                                         | 影响判定窗口，映射到 `OD`                              |
+| 血量总量             | `#TOTAL`                                                                                                                               | 血量恢复系数，映射到 `AR`                              |
+| 视觉 BPM             | `#BASEBPM`                                                                                                                             | 滚动速度参考 BPM，不影响音符时序                       |
+| 初始 BPM             | `#BPM`                                                                                                                                 | 默认 130                                                |
+| 扩展 BPM 表          | `#BPMxx`                                                                                                                               | 实数 BPM（超出通道 `03` 的 0–255 范围）               |
+| STOP 表              | `#STOPxx`                                                                                                                              | 停止序列时长（1 单位 = 1/192 个 4/4 小节）            |
+| 采样定义             | `#WAVxx`                                                                                                                               | 音频文件路径（WAV/OGG）                                 |
+| 长音符类型           | `#LNTYPE 1` / `#LNTYPE 2`                                                                                                             | LN 记法：1=RDM（默认），2=MGQ                          |
+| 长音符标记           | `#LNOBJ`                                                                                                                               | LN 终点标记值（存储在 HashSet 中）                     |
+| 文本事件             | `#TEXTxx`、`#SONGxx`                                                                                                                   | 游戏过程中在通道 `99` 上显示                           |
+| Base 62 扩展         | `#BASE 62`                                                                                                                             | 命令和通道的大小写敏感 base-62 编码                    |
+| 玩家模式             | `#PLAYER`                                                                                                                              | **已忽略** — 布局仅根据通道存在和文件扩展名推断        |
+| 随机块               | `#RANDOM` / `#RONDAM`（容错拼写）、`#ENDRANDOM`、`#SETRANDOM`                                                       | 随机分支及条件子块；`#SETRANDOM` 固定随机值            |
+|                      | `#IF`、`#ELSEIF`、`#ELSE`、`#ENDIF` / `#END` / `#IFEND` / `#END IF`                                                  |                                                         |
+| 开关块               | `#SWITCH`、`#ENDSW` / `#ENDSWITCH`、`#SETSWITCH`、`#CASE`、`#DEF`、`#SKIP`                                             | 带 case 的开关控制流；`#SETSWITCH` 固定开关值         |
+
+**未解析：** `#BANNER`、`#STAGEFILE`、`#BACKBMP`、`#BMPxx`、`#BGAxx`、`#EXWAVxx`、
+`#WAVCMD`、`#VOLWAV`、`#MIDIFILE`、`#DIFFICULTY`、`#SCROLLxx`、`#SPEEDxx`、`#EXRANK` / `#EXRANKxx`、
+`#DEFEXRANK`、`#EXBPMxx`、`#LNMODE`、`#PREVIEW`、`#STP`、`#PATH_WAV` / `#PATH_BMP`、`#OPTION`、
+`#CHANGEOPTIONxx`、`#POORBGA`、`#SWBGAxx`、`#@BGAxx`、`#ARGBxx`、视频相关命令、`#CHARFILE`、
+`#ExtChr`、`#OCT/FP`、`#MATERIALS`、`#SONGxx` / `#TEXTxx`（已合并），
+BGA 通道（`04`、`06`、`07`、`0A`–`0E`）、动态音量通道（`97`、`98`）、
+动态判定通道（`A0`）和动态选项通道（`A6`）。
 
 **已解析的通道：**
 
-| 通道        | 含义                                       |
-|-------------|-------------------------------------------|
-| `01`        | BGM 自动播放采样                           |
-| `02`        | 小节长度（拍号变化）                       |
-| `03`        | 行内十六进制 BPM 变化                      |
-| `08`        | 扩展 BPM 变化（`#BPMxx` 查找）             |
-| `09`        | STOP 事件（`#STOPxx` 查找）                |
-| `99`        | TEXT 事件（`#TEXTxx`/`#SONGxx` 查找）      |
-| `1x` / `2x` | 可玩音符 — P1 / P2                         |
-| `5x` / `6x` | 长音符通道 — P1 / P2                       |
-| `Dx` / `Ex` | 地雷通道 — P1 / P2                         |
+| 通道        | 含义                                               |
+|-------------|----------------------------------------------------|
+| `01`        | BGM 自动播放采样                                   |
+| `02`        | 小节长度（拍号变化）                               |
+| `03`        | 行内十六进制 BPM 变化（0–255）                    |
+| `08`        | 扩展 BPM 变化（`#BPMxx` 查找）                    |
+| `09`        | STOP 事件（`#STOPxx` 查找）                        |
+| `99`        | TEXT 事件（`#TEXTxx`/`#SONGxx` 查找）              |
+| `11`–`15`   | 可玩音符 — P1 轨道 1–5（起源：5键）               |
+| `16`        | Scratch / 转盘 — P1                                |
+| `17`        | Free-zone — P1                                     |
+| `18`–`19`   | 可玩音符 — P1 轨道 6–7（7键扩展）                 |
+| `21`–`25`   | 可玩音符 — P2 轨道 1–5                             |
+| `26`        | Scratch / 转盘 — P2                                |
+| `27`        | Free-zone — P2                                     |
+| `28`–`29`   | 可玩音符 — P2 轨道 6–7                             |
+| `51`–`59`   | 长音符 — P1（映射到 `11`–`19`）                  |
+| `61`–`69`   | 长音符 — P2（映射到 `21`–`29`）                  |
+| `D1`–`D9`   | 地雷 — P1（36 进制编码）                          |
+| `E1`–`E9`   | 地雷 — P2（36 进制编码）                          |
 
-**未解析/未实现：** `#EXRANK`、`#STAGEFILE`、`#BANNER`、BGA/图像通道（`04`、`06`、`07` 等）。
+**未解析：** 隐形音符通道（`31`–`39`、`41`–`49`），BGA 图层
+（`04`、`06`、`07`、`0A`–`0E`），动态 BGM 音量（`97`），动态 KEY 音量（`98`），
+动态判定变化（`A0`），动态选项变化（`A6`）。
 
 ---
 
@@ -222,7 +244,8 @@ DP ☆NOTHER [TT★1 TT★2]
 
 标记显示表符号和条目等级。添加或删除表时标记会自动更新。
 
-> ⚠ **重要：** 不要在**选歌界面**添加或删除难度表。删除表会触发所有 BMS 谱面的完整标记重建，
+> [!IMPORTANT]
+> 不要在**选歌界面**添加或删除难度表。删除表会触发所有 BMS 谱面的完整标记重建，
 > 与谱面轮播的活跃 Realm 读取竞争，导致 UI 冻结。请在导入或删除难度表之前先切换到**主菜单**。
 
 ### 收藏夹
@@ -486,90 +509,3 @@ HitPoor : j-poor
 完整内置皮肤（覆盖全部 6 种布局）位于
 `osu.Game.Rulesets.BmsRuleset/Resources/Skins/Modern/skin.ini` — 可作为参考。
 
----
-
-## 尚未实现
-
-| 领域         | 缺失的功能                                                                                 | 优先级 |
-|--------------|---------------------------------------------------------------------------------------------|--------|
-| **音频**     | `#WAVCMD` (MacBeat) — 每个 WAV 槽位的音高/音量/播放时间                                     |
-| **音频**     | `#EXWAVxx` (nanasi) — 每个 WAV 文件的声像/音量/频率                                        |
-| **音频**     | `#VOLWAV` (BM98) — 全局音量缩放                                                             |
-| **音频**     | 截取预览歌曲以播放 BMS 采样                                                                 | 1      |
-| **音频**     | `#xxx97` (fgt) — 动态 BGM 音量变化通道                                                     |        |
-| **转换器**   | Mania 7K → BMS 谱面转换                                                                    | 3      |
-| **血量**     | Easy / Hard / Ex-Hard / Hazard 血量变体                                                     | 2      |
-| **血量**     | LN 特定血量事件（head miss ≠ body drop ≠ tail miss）                                       | 1      |
-| **导入**     | 子目录中的资源文件 — 仅使用文件名，相对路径未处理                                           |
-| **输入**     | Scratch 转盘语义 — scratch 目前映射为普通按键                                               |
-| **输入**     | 判定偏移调整能力                                                                           |
-| **Mods**     | 不同血量条类型                                                                              | 2      |
-| **Mods**     | 血量选择类 mods                                                                             | 2      |
-| **Mods**     | 辅助选项                                                                                    |
-| **Mods**     | 记住上次使用的 mod 组合                                                                     |
-| **Mods**     | BG：将 key sounds 转为背景采样（判定结果不影响音乐）                                        | 2      |
-| **Mods**     | DP only mods（FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM）              |        |
-| **解析器**   | `#BGAxx` / `#POORBGA` / `#SWBGAxx` / `#@BGAxx` / `#ARGBxx` — BGA 定义                    |
-| **解析器**   | `#BMPxx` / `#EXBMPxx` — 图像定义（非资源扫描）                                              |
-| **解析器**   | `#CDDA` / `#MIDIFILE` — CD / MIDI                                                           |
-| **解析器**   | `#CHARFILE` / `#ExtChr` — 角色 / 皮肤                                                       |
-| **解析器**   | `#DEFEXRANK` — 扩展判定定义                                                                  |
-| **解析器**   | `#EXBPMxx` — `#BPMxx` 别名（BMSC 解析器 bug 兼容）                                          |
-| **解析器**   | `#EXRANK` / 通道 `A0` — 扩展判定定义                                                        |
-| **解析器**   | `#EXWAVxx`、`#WAVCMD`、`#VOLWAV` — 高级音频控制                                            |
-| **解析器**   | `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — 资源组                  |
-| **解析器**   | `#OCT/FP` — 八度/踏板                                                                       |
-| **解析器**   | `#OPTION` — 强制选项                                                                        |
-| **解析器**   | `#PATH_WAV` / `#PATH_BMP` — 资源路径前缀                                                    |
-| **解析器**   | `#STAGEFILE`、`#BANNER`、`#BACKBMP`、`#MOVIE` — 仅元数据                                    |
-| **解析器**   | `#STP` — 绝对 STOP 序列                                                                     |
-| **解析器**   | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — 视频    |
-| **解析器**   | 通道 `04`/`06`/`07`/`0A`–`0E` — BGA 图层                                                   |
-| **解析器**   | 通道 `17` / `27` — free-zone 按键                                                          |
-| **解析器**   | 通道 `31`–`49` — 隐形音符                                                                   |
-| **解析器**   | 通道 `97` — 动态 BGM 音量                                                                   |
-| **解析器**   | 通道 `98` — 动态 KEY 音量（通道 97 的对应项）                                               |
-| **解析器**   | 通道 `A6` / `#CHANGEOPTIONxx` — 动态选项变更                                               |
-| **渲染器**   | BGA / 视频 / stagefile / 背景图像                                                            |
-| **渲染器**   | Key beams（长按时的光柱）                                                                    | 2      |
-| **渲染器**   | BGA                                                                                         |
-| **回放**     | 回放功能不可用                                                                              | 2      |
-| **计分**     | 结果界面 — EX 分数、DJ LEVEL、通关类型、血量百分比未显示                                   | 2      |
-| **计分**     | ExRank 支持                                                                                 | 3      |
-| **计分**     | 结果界面上不同的判定文字颜色                                                                | 4      |
-| **计分**     | 谱面统计 — 显示更多信息（例如随机分支数量）                                                 | 2      |
-| **计分**     | LN head 判定                                                                               | 1      |
-| **皮肤**     | 列起始位置 — 值或枚举（leftN, rightN, center）                                              | 3      |
-| **皮肤**     | BGA 位置/大小配置                                                                            |
-| **皮肤**     | 非 legacy BMS 皮肤 — 完全通过皮肤编辑器配置                                                  |
-| **皮肤**     | `HitGreat` → `HitGreatLate` / `HitGreatEarly` 分离图像                                      |
-| **皮肤**     | E-POOR 判定图像                                                                             | 3      |
-| **UI**       | Lane cover / skin / movement                                                                | 2      |
-| **UI**       | 重写血量条 — 红/黄/绿渐变，无边框，无整体颜色变化                                            | 2      |
-| **Perf**      | parser performance (tinny parser for importer / ProjectTickToTime(build & query))           | 4         |
-| **Perf**      | high GC pressure during importing (sr) (consider pre compute and query)                     | 3         |
-
-### FIXME
-
-```text
-2026-06-01 15:13:14 [error]: osu.Game.Rulesets.UI.BeatmapInvalidForRulesetException:
-  Beatmap can not be converted for the ruleset
-  (ruleset: osu.Game.Rulesets.Mania.ManiaRuleset, osu.Game.Rulesets.Mania,
-   converter: osu.Game.Rulesets.Mania.Beatmaps.ManiaBeatmapConverter).
-  at osu.Game.Beatmaps.WorkingBeatmap.GetPlayableBeatmap(...)
-  at osu.Game.Screens.Select.BeatmapTitleWedge.DifficultyDisplay.<>c__DisplayClass36_0
-       .<updateCountStatistics>b__0()
-```
-
-从 BMS 切换到其他规则集（或从其他规则集切换到 BMS）时，选歌界面会因
-`BeatmapInvalidForRulesetException` 崩溃。原因是标题组件在轮播选择仍处于过期状态时，
-使用了错误的转换器重新计算难度。
-
----
-
-## 附录：参考链接
-
-| 主题                            | 链接                                                                  |
-|--------------------------------|-----------------------------------------------------------------------|
-| Star-Rating-Rebirth (SR 算法)  | <https://github.com/sunnyxxy/Star-Rating-Rebirth>                   |
-| BMS 命令规范                    | <https://hitkey.nekokan.dyndns.info/cmds.htm>                        |
