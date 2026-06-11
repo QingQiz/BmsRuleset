@@ -145,6 +145,131 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestBase62Channel03HexWithLowercaseIsUnaffected()
+    {
+        // Channel 03 (BPM changes) uses hex — unaffected by #BASE 62.
+        // Both "1a" (lowercase) and "1A" (uppercase) must decode to 0x1A = 26 BPM.
+        var beatmap = decode("""
+                             #BASE 62
+                             #BPM 120
+                             #00003:1a1A
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        var bpmEvents = converted.TimingMap!.BpmEvents;
+        // Both 26 BPM events from "1a" and "1A" (plus initial 120)
+        var bpm26Events = bpmEvents.Where(e => Math.Abs(e.Bpm - 26) < 0.001).ToList();
+        Assert.That(bpm26Events, Has.Count.EqualTo(2), "Both '1a' and '1A' should decode to BPM 26");
+        Assert.That(bpmEvents[0].Bpm, Is.EqualTo(120).Within(0.001));
+    }
+
+    [Test]
+    public void TestBase62LandmineChannelWithLowercaseIsUnaffected()
+    {
+        // Mine damage channels (D*, E*) use 36-base — unaffected by #BASE 62.
+        // Both "0a" (lowercase) and "0A" (uppercase) must decode to 5% damage.
+        var beatmap = decode("""
+                             #BASE 62
+                             #BPM 120
+                             #WAV00 bomb.wav
+                             #001D3:0a0A
+                             """);
+        var mines = beatmap.HitObjects.OfType<BmsHitObject>().Where(h => h.IsMine).OrderBy(h => h.StartTime).ToList();
+
+        Assert.That(mines, Has.Count.EqualTo(2));
+        Assert.That(mines[0].LandmineDamagePercent, Is.EqualTo(5), "'0a' should decode to 5%");
+        Assert.That(mines[1].LandmineDamagePercent, Is.EqualTo(5), "'0A' should decode to 5%");
+    }
+
+    [Test]
+    public void TestBase62ChannelIdCaseInsensitiveWithBase62()
+    {
+        // Channel IDs are hex and always case-insensitive, even with #BASE 62.
+        // Lowercase #001d3 should be recognized as the same channel as #001D3.
+        var beatmap = decode("""
+                             #BASE 62
+                             #BPM 120
+                             #WAV00 bomb.wav
+                             #001d3:0a
+                             """);
+        var mines = beatmap.HitObjects.OfType<BmsHitObject>().Where(h => h.IsMine).ToList();
+
+        Assert.That(mines, Has.Count.EqualTo(1), "Lowercase channel 'd3' should be recognized as mine channel");
+        Assert.That(mines[0].LandmineDamagePercent, Is.EqualTo(5));
+    }
+
+    [Test]
+    public void TestBase62ChannelIdCaseInsensitiveWithoutBase62()
+    {
+        // Channel IDs are always case-insensitive per BMS spec, regardless of #BASE 62.
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAV00 bomb.wav
+                             #001d3:0A
+                             """);
+        var mines = beatmap.HitObjects.OfType<BmsHitObject>().Where(h => h.IsMine).ToList();
+
+        Assert.That(mines, Has.Count.EqualTo(1), "Lowercase channel 'd3' should be recognized as mine channel");
+        Assert.That(mines[0].LandmineDamagePercent, Is.EqualTo(5));
+    }
+
+    [Test]
+    public void TestBase62BpmDefinitionsAreCaseSensitive()
+    {
+        // With #BASE 62, #BPMaa (150) and #BPMAa (200) are distinct keys.
+        // Cell "aa" → #BPMaa = 150; cell "Aa" → #BPMAa = 200.
+        var beatmap = decode("""
+                             #BASE 62
+                             #BPM 120
+                             #BPMaa 150
+                             #BPMAa 200
+                             #00108:aaAa
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        var bpmEvents = converted.TimingMap!.BpmEvents;
+        Assert.That(bpmEvents.Any(e => Math.Abs(e.Bpm - 150) < 0.001), Is.True, "BPM 150 from 'aa' should exist");
+        Assert.That(bpmEvents.Any(e => Math.Abs(e.Bpm - 200) < 0.001), Is.True, "BPM 200 from 'Aa' should exist");
+        Assert.That(bpmEvents.Count(e => e.Bpm > 0), Is.EqualTo(3)); // 120 + 150 + 200
+    }
+
+    [Test]
+    public void TestBase62BpmDefinitionsKeyCollisionWithoutBase62()
+    {
+        // Without #BASE 62, #BPMaa and #BPMAa collide (case-insensitive).
+        // The later definition (#BPMAa = 200) overwrites #BPMaa = 150.
+        var beatmap = decode("""
+                             #BPM 120
+                             #BPMaa 150
+                             #BPMAa 200
+                             #00108:aa
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        // "aa" and "AA" encode to the same key → BPM should be 200 (later wins)
+        Assert.That(converted.TimingMap!.BpmEvents.Any(e => Math.Abs(e.Bpm - 200) < 0.001), Is.True);
+        Assert.That(converted.TimingMap.BpmEvents.Any(e => Math.Abs(e.Bpm - 150) < 0.001), Is.False);
+    }
+
+    [Test]
+    public void TestBase62LandmineChannelZzIsInstantDeath()
+    {
+        // ZZ in 36-base = 35×36+35 = 1295 → exceeds max → instant death.
+        var beatmap = decode("""
+                             #BASE 62
+                             #BPM 120
+                             #WAV00 bomb.wav
+                             #001D3:ZZ
+                             """);
+        var mine = (BmsHitObject)beatmap.HitObjects.Single();
+
+        Assert.That(mine.IsMine, Is.True);
+        Assert.That(mine.LandmineDamagePercent, Is.EqualTo(647.5));
+        // (At 647.5, the health processor triggers instant death.)
+    }
+
+    [Test]
     public void TestBaseBpmOverridesScrollReference()
     {
         // #BASEBPM should override the scroll reference BPM without affecting note timing.

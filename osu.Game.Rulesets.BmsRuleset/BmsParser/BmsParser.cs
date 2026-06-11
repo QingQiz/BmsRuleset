@@ -231,7 +231,9 @@ internal static partial class BmsChartParser
                 }
                 else if (plLen >= 2)
                 {
-                    var channelKey = EncodePair(span[4], span[5]);
+                    // Channel IDs are hex (0-9, A-F) and case-insensitive per BMS spec.
+                    // #BASE 62 does NOT affect channel encoding — only definitions and cell values.
+                    var channelKey = EncodePairCi(span[4], span[5]);
                     // Store original line ref + payload offset — zero allocation.
                     state.ChannelLines.Add(new RawChannelLine(measure, channelKey, line, plStart, plLen, state.NextSequence++ * 4096));
                 }
@@ -521,13 +523,17 @@ internal static partial class BmsChartParser
             var mStart = measureStarts[line.Measure];
             var mLength = measureStarts[line.Measure + 1] - mStart;
             var payload = line.Line.AsSpan(line.PayloadStart, line.PayloadLength);
-            var useBase62 = state.UseBase62;
             var isHexChannel = line.Channel == CH_03;
 
             for (var i = 0; i < pairCount; i++)
             {
                 var offset = i * 2;
-                var value = encodeValue(useBase62, payload[offset], payload[offset + 1]);
+                // Channel 03 is always hex — unaffected by #BASE 62 (which is case-sensitive).
+                // Hex uses 0-9/A-F/a-f; we always fold case via EncodePairCi so "1a" and "1A"
+                // both decode to BPM 26, regardless of the #BASE 62 setting.
+                var value = isHexChannel
+                    ? EncodePairCi(payload[offset], payload[offset + 1])
+                    : encodeValue(state.UseBase62, payload[offset], payload[offset + 1]);
                 if (value == 0) continue; // 0 = "00"
 
                 var tick = mStart + mLength * i / pairCount;
@@ -629,7 +635,8 @@ internal static partial class BmsChartParser
 
             if (tryMapLandmineChannel(line.Channel, totalColumns, out column))
             {
-                foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+                // Mine damage channels (D*, E*) use 36-base values — unaffected by #BASE 62.
+                foreach (var cell in expandCells(line, measureStarts, false, false))
                     mines.Add(cell with { Column = column });
             }
         }

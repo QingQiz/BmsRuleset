@@ -589,7 +589,8 @@ difficulty using the wrong converter while the carousel selection is stale.
 
 ## Appendix: Reference Links
 
-| Subject                            | Link                                              |
-|------------------------------------|---------------------------------------------------|
-| Star-Rating-Rebirth (SR algorithm) | <https://github.com/sunnyxxy/Star-Rating-Rebirth> |
-| BMS Command Specification          | <https://hitkey.nekokan.dyndns.info/cmds.htm>     
+| Subject                            | Link |
+|------------------------------------|------|
+| Star-Rating-Rebirth (SR algorithm) | [GitHub](https://github.com/sunnyxxy/Star-Rating-Rebirth) |
+| BMS Command Specification          | [hitkey.nekokan.dyndns.info](https://hitkey.nekokan.dyndns.info/cmds.htm) |
+| 62-Base BMS Format Specification   | [Google Docs](https://docs.google.com/document/d/e/2PACX-1vTl8zOS3ukl5HpuNsBUlN8rn_ZaNdJSHb8a4se3Z3ap9Y6UJ1nB8LA3HnxWAk9kMTDp0j9orpg43-tl/pub)
