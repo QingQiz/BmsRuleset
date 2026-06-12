@@ -46,6 +46,11 @@ public readonly record struct BmsParsedHitObject(
 
 public sealed record BmsSampleEvent(double Time, long Tick, ushort SampleKey);
 
+// ReSharper disable once NotAccessedPositionalProperty.Global
 public sealed record BmsTextEvent(double Time, long Tick, string Text);
 
 public sealed record BmsTextEvents(string? MistakeText, BmsTextEvent[] TextEvents);
+
+public readonly record struct BmsScrollEvent(long Tick, double Factor, int Sequence);
+
+public readonly record struct BmsSpeedEvent(long Tick, double Factor, int Sequence);

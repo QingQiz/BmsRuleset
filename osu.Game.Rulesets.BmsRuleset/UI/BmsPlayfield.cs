@@ -319,6 +319,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public double CurrentScrollPosition { get; private set; }
 
     /// <summary>
+    ///     Active SPEED factor from the chart's <c>#SPEEDxx</c> / channel <c>SP</c> events.
+    ///     Multiplies <see cref="ScrollSpeedMultiplier"/> like a user speed adjustment.
+    ///     1.0 = normal, 2.0 = scroll advances 2× faster.
+    /// </summary>
+    public double ChartSpeedFactor { get; private set; } = 1.0;
+
+    /// <summary>
     ///     Visible scroll window size in tick-based scroll units.
     ///     A note this far ahead of <see cref="CurrentScrollPosition"/> sits at
     ///     the top edge of the playfield (i.e. Y ≈ 0).
@@ -341,7 +348,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     ///     Ratio of the current scroll speed to the default.
     ///     Scales the pixel-per-scroll-unit mapping in <see cref="YForScrollProgress"/>.
     /// </summary>
-    public double ScrollSpeedMultiplier => ScrollSpeed / default_scroll_speed;
+    /// <summary>
+    ///     Effective scroll speed ratio = user speed × chart SPEED factor.
+    /// </summary>
+    public double ScrollSpeedMultiplier => ScrollSpeed / default_scroll_speed * ChartSpeedFactor;
 
     /// <summary>
     ///     Converts a scroll progress value (distance from the judgement line in scroll
@@ -475,6 +485,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         CurrentScrollPosition = ConstantScrollActive
             ? Time.Current
             : TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current;
+
+        ChartSpeedFactor = ConstantScrollActive
+            ? 1.0
+            : TimingMap?.GetSpeedFactorAtTime(Time.Current) ?? 1.0;
 
         triggerEvents();
         updateStageScale();

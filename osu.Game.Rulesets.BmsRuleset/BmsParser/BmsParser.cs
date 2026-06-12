@@ -31,6 +31,10 @@ internal static partial class BmsChartParser
 
     private readonly record struct StopEvent(long Tick, double Duration, double StopValue, double Bpm, int Sequence);
 
+    private readonly record struct ScrollEvent(long Tick, double Factor, int Sequence);
+
+    private readonly record struct SpeedEvent(long Tick, double Factor, int Sequence);
+
     /// <summary>Extract the high 6-bit digit (the "tens" place).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Hi(ushort k) => k >> 6;
@@ -83,11 +87,16 @@ internal static partial class BmsChartParser
         var stopEvents = collectStopEvents(state, measureStarts, timingEvents);
         timingEvents = applyStopOffsetsToTimingEvents(timingEvents, stopEvents);
 
+        var scrollEvents = collectScrollEvents(state, measureStarts, timingEvents);
+        var speedEvents = collectSpeedEvents(state, measureStarts, timingEvents);
+
         var timingMap = new BmsTimingMap(
             tickResolution,
             measures,
             timingEvents.Select(e => new BmsBpmEvent(e.Tick, e.Bpm, e.Time, e.Sequence)),
             stopEvents.Select(e => new BmsStopEvent(e.Tick, e.Duration, e.StopValue, e.Bpm, e.Sequence)),
+            scrollEvents.Select(e => new BmsScrollEvent(e.Tick, e.Factor, e.Sequence)),
+            speedEvents.Select(e => new BmsSpeedEvent(e.Tick, e.Factor, e.Sequence)),
             state.BaseBpm);
 
         var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
@@ -391,6 +400,22 @@ internal static partial class BmsChartParser
             return;
         }
 
+        // #SCROLLxx value — 8 chars, 2-char index (e.g. #SCROLL01)
+        if (cmdSpan.Length == 8 && cmdSpan.StartsWith("SCROLL", StringComparison.OrdinalIgnoreCase)
+                                && tryParseDouble(valueSpan, out var scrollValue))
+        {
+            state.ScrollDefinitions[encodeValue(state.UseBase62, cmdSpan[6], cmdSpan[7])] = scrollValue;
+            return;
+        }
+
+        // #SPEEDxx value — 7 chars, 2-char index (e.g. #SPEED01)
+        if (cmdSpan.Length == 7 && cmdSpan.StartsWith("SPEED", StringComparison.OrdinalIgnoreCase)
+                                && tryParseDouble(valueSpan, out var speedValue))
+        {
+            state.SpeedDefinitions[encodeValue(state.UseBase62, cmdSpan[5], cmdSpan[6])] = speedValue;
+            return;
+        }
+
         if (cmdSpan.Length == 6 && cmdSpan.StartsWith("TEXT", StringComparison.OrdinalIgnoreCase)
                                 && valueSpan.Length > 0)
         {
@@ -594,6 +619,72 @@ internal static partial class BmsChartParser
                 var duration = stopValue * 60000 / (bpm * 48);
 
                 events.Add(new StopEvent(tick, duration, stopValue, bpm, line.Sequence + i));
+            }
+        }
+
+        return events.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToList();
+    }
+
+    private static List<ScrollEvent> collectScrollEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts, List<TimingEvent> timingEvents)
+    {
+        var events = new List<ScrollEvent>();
+
+        foreach (var line in state.ChannelLines)
+        {
+            if (line.Channel != CH_SC) continue;
+
+            var pairCount = line.PayloadLength / 2;
+            if (pairCount == 0) continue;
+
+            var mStart = measureStarts[line.Measure];
+            var mLength = measureStarts[line.Measure + 1] - mStart;
+            var payload = line.Line.AsSpan(line.PayloadStart, line.PayloadLength);
+            var useBase62 = state.UseBase62;
+
+            for (var i = 0; i < pairCount; i++)
+            {
+                var offset = i * 2;
+                var value = encodeValue(useBase62, payload[offset], payload[offset + 1]);
+                if (value == 0) continue;
+
+                if (!state.ScrollDefinitions.TryGetValue(value, out var factor))
+                    continue;
+
+                var tick = mStart + mLength * i / pairCount;
+                events.Add(new ScrollEvent(tick, factor, line.Sequence + i));
+            }
+        }
+
+        return events.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToList();
+    }
+
+    private static List<SpeedEvent> collectSpeedEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts, List<TimingEvent> timingEvents)
+    {
+        var events = new List<SpeedEvent>();
+
+        foreach (var line in state.ChannelLines)
+        {
+            if (line.Channel != CH_SP) continue;
+
+            var pairCount = line.PayloadLength / 2;
+            if (pairCount == 0) continue;
+
+            var mStart = measureStarts[line.Measure];
+            var mLength = measureStarts[line.Measure + 1] - mStart;
+            var payload = line.Line.AsSpan(line.PayloadStart, line.PayloadLength);
+            var useBase62 = state.UseBase62;
+
+            for (var i = 0; i < pairCount; i++)
+            {
+                var offset = i * 2;
+                var value = encodeValue(useBase62, payload[offset], payload[offset + 1]);
+                if (value == 0) continue;
+
+                if (!state.SpeedDefinitions.TryGetValue(value, out var factor))
+                    continue;
+
+                var tick = mStart + mLength * i / pairCount;
+                events.Add(new SpeedEvent(tick, factor, line.Sequence + i));
             }
         }
 
@@ -926,6 +1017,8 @@ internal static partial class BmsChartParser
     private const ushort CH_08 = (0 << 6) | 8;
     private const ushort CH_09 = (0 << 6) | 9;
     private const ushort CH_99 = (9 << 6) | 9;
+    private const ushort CH_SC = (28 << 6) | 12;   // 'S','C'
+    private const ushort CH_SP = (28 << 6) | 25;   // 'S','P'
 
     // ReSharper restore InconsistentNaming
     // ReSharper restore ShiftExpressionZeroLeftOperand
@@ -937,6 +1030,10 @@ internal static partial class BmsChartParser
         public Dictionary<ushort, double> BpmDefinitions { get; } = new();
 
         public Dictionary<ushort, double> StopDefinitions { get; } = new();
+
+        public Dictionary<ushort, double> ScrollDefinitions { get; } = new();
+
+        public Dictionary<ushort, double> SpeedDefinitions { get; } = new();
 
         public Dictionary<ushort, string> SampleDefinitions { get; } = new();
 

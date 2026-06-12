@@ -306,7 +306,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
                 ApplyResult(HitResult.Meh);
             }
             else
-                Expire(); // column was not held — mine passes silently
+                Expire(true);
 
             return;
         }
@@ -526,10 +526,10 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
             return Time.Current + timeUntilHit;
 
         if (Math.Abs(timeUntilHit - (HitObject.StartTime - Time.Current)) < 0.001)
-            return layout.TimingMap.GetScrollPositionAtTick(HitObject.TickInfo.Tick);
+            return layout.TimingMap.GetScrollPositionAtTime(HitObject.StartTime);
 
         if (HitObject.IsLongNote && Math.Abs(timeUntilHit - (HitObject.EndTime - Time.Current)) < 0.001)
-            return layout.TimingMap.GetScrollPositionAtTick(HitObject.TickInfo.EndTick);
+            return layout.TimingMap.GetScrollPositionAtTime(HitObject.EndTime);
 
         return layout.TimingMap.GetScrollPositionAtTime(Time.Current + timeUntilHit);
     }

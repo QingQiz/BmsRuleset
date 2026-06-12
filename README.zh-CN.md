@@ -80,9 +80,11 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 | 随机块               | `#RANDOM` / `#RONDAM`（容错拼写）、`#ENDRANDOM`、`#SETRANDOM`                                                       | 随机分支及条件子块；`#SETRANDOM` 固定随机值            |
 |                      | `#IF`、`#ELSEIF`、`#ELSE`、`#ENDIF` / `#END` / `#IFEND` / `#END IF`                                                  |                                                         |
 | 开关块               | `#SWITCH`、`#ENDSW` / `#ENDSWITCH`、`#SETSWITCH`、`#CASE`、`#DEF`、`#SKIP`                                             | 带 case 的开关控制流；`#SETSWITCH` 固定开关值         |
+| 滚动速度             | `#SCROLLxx`                                                                                                                            | 滚动坐标的逐段显示倍率                                |
+| 间距变化             | `#SPEEDxx`                                                                                                                             | `ScrollSpeedMultiplier` 的逐段倍率                     |
 
 **未解析：** `#BANNER`、`#STAGEFILE`、`#BACKBMP`、`#BMPxx`、`#BGAxx`、`#EXWAVxx`、
-`#WAVCMD`、`#VOLWAV`、`#MIDIFILE`、`#DIFFICULTY`、`#SCROLLxx`、`#SPEEDxx`、`#EXRANK` / `#EXRANKxx`、
+`#WAVCMD`、`#VOLWAV`、`#MIDIFILE`、`#DIFFICULTY`、`#EXRANK` / `#EXRANKxx`、
 `#DEFEXRANK`、`#EXBPMxx`、`#LNMODE`、`#PREVIEW`、`#STP`、`#PATH_WAV` / `#PATH_BMP`、`#OPTION`、
 `#CHANGEOPTIONxx`、`#POORBGA`、`#SWBGAxx`、`#@BGAxx`、`#ARGBxx`、视频相关命令、`#CHARFILE`、
 `#ExtChr`、`#OCT/FP`、`#MATERIALS`、`#SONGxx` / `#TEXTxx`（已合并），
@@ -99,6 +101,8 @@ BGA 通道（`04`、`06`、`07`、`0A`–`0E`）、动态音量通道（`97`、`
 | `08`        | 扩展 BPM 变化（`#BPMxx` 查找）                    |
 | `09`        | STOP 事件（`#STOPxx` 查找）                        |
 | `99`        | TEXT 事件（`#TEXTxx`/`#SONGxx` 查找）              |
+| `SC`        | SCROLL 倍率变化（`#SCROLLxx` 查找）                |
+| `SP`        | SPEED 倍率变化（`#SPEEDxx` 查找）                  |
 | `11`–`15`   | 可玩音符 — P1 轨道 1–5（起源：5键）               |
 | `16`        | Scratch / 转盘 — P1                                |
 | `17`        | Free-zone — P1                                     |
@@ -116,7 +120,9 @@ BGA 通道（`04`、`06`、`07`、`0A`–`0E`）、动态音量通道（`97`、`
 （`04`、`06`、`07`、`0A`–`0E`），动态 BGM 音量（`97`），动态 KEY 音量（`98`），
 动态判定变化（`A0`），动态选项变化（`A6`）。
 
----
+> 通道 `02` 控制每个小节的长度（拍号变化），由 `#xxx02` 定义。值 `1` 为标准长度（4/4），`0.5` 为半长，`2` 为双倍长。
+> 小节时长(ms) = `#xxx02 × 240000 / BPM`（固定 BPM 下）。
+> `1/1024` 是精确保留的最小值。更小的值可能被舍入为 0，导致该小节内所有事件挤在同一位置。
 
 ### 布局和轨道
 

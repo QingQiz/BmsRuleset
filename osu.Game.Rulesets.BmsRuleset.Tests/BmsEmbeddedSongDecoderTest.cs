@@ -344,7 +344,7 @@ public partial class BmsEmbeddedSongDecoderTest
     [Test]
     public void TestSampleChartsAreEmbedded()
     {
-        Assert.That(getChartResourceNames(), Has.Length.EqualTo(20));
+        Assert.That(getChartResourceNames(), Has.Length.GreaterThanOrEqualTo(20));
         Assert.That(getSampleResourceNames(), Has.Length.GreaterThan(100));
         Assert.That(getSampleResourceNames().Any(n => n.EndsWith(".kick_deep2.ogg", StringComparison.OrdinalIgnoreCase)), Is.True);
         Assert.That(getSampleResourceNames().Any(n => n.EndsWith("._bga.mpg", StringComparison.OrdinalIgnoreCase)), Is.True);

@@ -24,7 +24,7 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
     {
         this.playfield = playfield;
         this.stage = stage;
-        scrollAtTick = timingMap.GetScrollPositionAtTick(tick);
+        scrollAtTick = timingMap.GetVisualScrollPositionAtTick(tick);
         timeAtTick = timingMap.ProjectTickToTime(tick);
 
         Anchor = Anchor.TopLeft;

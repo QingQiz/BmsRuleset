@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Judgements;
@@ -15,11 +16,43 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 {
     private static readonly Action<JudgementResult, int> set_combo_after = createComboAfterSetter();
 
+    private double latestEndTime = double.MaxValue;
+
     private static Action<JudgementResult, int> createComboAfterSetter()
     {
         var field = typeof(JudgementResult).GetField("<ComboAfterJudgement>k__BackingField",
             BindingFlags.Instance | BindingFlags.NonPublic);
         return (r, v) => field!.SetValue(r, v);
+    }
+
+    public override void ApplyBeatmap(IBeatmap beatmap)
+    {
+        base.ApplyBeatmap(beatmap);
+
+        if (beatmap.HitObjects.Count == 0)
+        {
+            latestEndTime = 0;
+            return;
+        }
+
+        // Latest possible judgement time = max object end time + worst-case late window.
+        var maxEndTime = beatmap.HitObjects.Max(h => h.GetEndTime());
+        var lateWindow = beatmap.HitObjects[0].HitWindows?.WindowFor(HitResult.Ok)
+                         ?? BmsHitWindows.FALLBACK_BAD_WINDOW;
+
+        latestEndTime = maxEndTime + lateWindow;
+    }
+
+    protected override void Update()
+    {
+        // Don't call base — JudgementProcessor.Update() checks JudgedHits == MaxHits,
+        // which never becomes true when mines expire without a result.  Replace with a
+        // time-based check: play is complete when the last object's late window has passed.
+        if (!HasCompleted.Value && Time.Current >= latestEndTime)
+        {
+            if (HasCompleted is BindableBool bb)
+                bb.Value = true;
+        }
     }
 
     public override int GetBaseScoreForResult(HitResult result) => result switch

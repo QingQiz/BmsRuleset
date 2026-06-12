@@ -379,10 +379,14 @@ public class BmsStarRatingProcessorV2
         x = Math.Min(x, 0.6 * (x - 0.09) + 0.09);
         HitLeniencyX = x;
 
-        // Build note_seq as a list of tuples (column, head_time, tail_time)
+        // Build note_seq as a list of tuples (column, head_time, tail_time).
+        // Mines are penalty objects that do not contribute to pattern difficulty.
         noteSeq = [];
         foreach (var obj in hitObjects)
         {
+            if (obj.IsMine)
+                continue;
+
             var head = Math.Floor(obj.StartTime / clockRate);
             // Only set tail_time when IsLongNote; otherwise use -1.
             var tail = obj.IsLongNote ? Math.Floor(obj.EndTime / clockRate) : -1;

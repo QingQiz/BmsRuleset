@@ -8,6 +8,8 @@ using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
@@ -33,6 +35,96 @@ public class BmsBeatmapDecoderTest
         using var reader = new LineBufferedReader(memoryStream);
 
         return new BmsBeatmapDecoder(randomValueSelector).Decode(reader);
+    }
+
+    private static Beatmap decodeResource(string resourceName)
+    {
+        using var stream = typeof(BmsBeatmapDecoderTest).Assembly.GetManifestResourceStream(resourceName)
+                           ?? throw new InvalidOperationException($"Missing embedded resource: {resourceName}");
+        using var reader = new osu.Game.IO.LineBufferedReader(stream);
+
+        return new BmsBeatmapDecoder().Decode(reader);
+    }
+
+    [Test]
+    public void DiagnoseLnAutoplayTimingForCautionChart()
+    {
+        // Find the actual resource name
+        var allResources = typeof(BmsBeatmapDecoderTest).Assembly.GetManifestResourceNames();
+        var resourceName = allResources.FirstOrDefault(n => n.EndsWith("99_outlaw_caution.bms", StringComparison.OrdinalIgnoreCase))
+                           ?? throw new InvalidOperationException("Resource not found in: " + string.Join(", ", allResources.Where(n => n.Contains("outlaw"))));
+
+        using var stream = typeof(BmsBeatmapDecoderTest).Assembly.GetManifestResourceStream(resourceName)
+                           ?? throw new InvalidOperationException($"Missing: {resourceName}");
+        using var reader = new LineBufferedReader(stream);
+
+        var decoded = new BmsBeatmapDecoder().Decode(reader);
+        var beatmap = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().ToList();
+
+        var lns = hitObjects.Where(h => h.IsLongNote).ToList();
+        var windows = new BmsHitWindows(beatmap.Rank);
+        windows.SetDifficulty(0); // initialise windows from rank
+        var rankWindows = BmsHitWindows.RANK_WINDOWS_LR2[Math.Clamp(beatmap.Rank, 0, 4)];
+        var pgreat = Math.Min(rankWindows.pgreat, windows.WindowFor(HitResult.Perfect));
+        var great = Math.Min(rankWindows.great, windows.WindowFor(HitResult.Great));
+        var good = Math.Min(rankWindows.good, windows.WindowFor(HitResult.Good));
+        var bad = windows.WindowFor(HitResult.Ok);
+
+        var issues = new List<string>();
+
+        foreach (var ln in lns)
+        {
+            var autoplayPress = ln.StartTime;
+            var autoplayRelease = ln.EndTime; // calculateReleaseTime for LN with Duration>0
+
+            // Check press timing
+            var pressOffset = autoplayPress - ln.StartTime; // should be 0
+            var pressJudgement = windows.BmsResultFor(pressOffset);
+            var pressOk = pressOffset >= -pgreat && pressOffset <= pgreat;
+
+            // Check release timing
+            var releaseOffset = autoplayRelease - ln.EndTime; // should be 0
+            var releaseJudgement = windows.BmsResultFor(releaseOffset);
+            var releaseOk = releaseOffset >= -pgreat && releaseOffset <= pgreat;
+
+            if (!pressOk || !releaseOk || pressJudgement != HitResult.Perfect || releaseJudgement != HitResult.Perfect)
+            {
+                var issue = $"LN tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} " +
+                            $"Duration={ln.Duration:F3}ms " +
+                            $"pressOffset={pressOffset:F3}ms→{pressJudgement} " +
+                            $"releaseOffset={releaseOffset:F3}ms→{releaseJudgement}";
+                issues.Add(issue);
+            }
+        }
+
+        var summary = $"Chart: {beatmap.Metadata.Title}  Rank: {beatmap.Rank}  " +
+                      $"PGREAT={pgreat}ms GREAT={great}ms GOOD={good}ms BAD={bad}ms  " +
+                      $"Total LNs: {lns.Count}  Notes: {hitObjects.Count(h => !h.IsMine && !h.IsLongNote)}  " +
+                      $"Mines: {hitObjects.Count(h => h.IsMine)}";
+
+        if (issues.Count > 0)
+            Assert.Fail($"{summary}\n=== LNs with timing issues ===\n{string.Join("\n", issues)}");
+
+        // Find short LNs and LNs with potential issues
+        var shortLns = lns.Where(ln => ln.Duration <= great * 2).OrderBy(ln => ln.Duration).ToList();
+        var shortLnsReport = string.Join("\n  ", shortLns.Take(20).Select(ln =>
+            $"tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} dur={ln.Duration:F1}ms " +
+            $"start={ln.StartTime:F1}ms end={ln.EndTime:F1}ms"));
+
+        // Also show LNs around combo 190 (roughly 190 notes in)
+        var normalNotes = hitObjects.Where(h => !h.IsMine).ToList();
+        var aroundCombo190 = lns.Skip(Math.Max(0, normalNotes.Take(190).Count(h => h.IsLongNote) - 3)).Take(7)
+            .Select(ln => $"tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} dur={ln.Duration:F1}ms " +
+                          $"start={ln.StartTime:F0}ms end={ln.EndTime:F0}ms");
+        var around190 = string.Join("\n  ", aroundCombo190);
+
+        File.WriteAllText(@"C:\Users\kali\RiderProjects\ruleset-dev\caution_ln_diag.txt",
+            $"{summary}\nAll LNs PGREAT.\n" +
+            $"=== Shortest LNs (dur < {great * 2:F0}ms, {shortLns.Count} total, showing first 20) ===\n  {shortLnsReport}\n" +
+            $"=== LNs around combo ~190 ===\n  {around190}");
+
+        Assert.Pass("Diagnostic written to caution_ln_diag.txt");
     }
 
     [Test]
@@ -88,6 +180,44 @@ public class BmsBeatmapDecoderTest
 
         // Should still be case-insensitive.
         Assert.That(hitObject.SamplePath, Is.EqualTo("uppercase.wav"));
+    }
+
+    [Test]
+    public void TestBase62BpmDefinitionsAreCaseSensitive()
+    {
+        // With #BASE 62, #BPMaa (150) and #BPMAa (200) are distinct keys.
+        // Cell "aa" → #BPMaa = 150; cell "Aa" → #BPMAa = 200.
+        var beatmap = decode("""
+                             #BASE 62
+                             #BPM 120
+                             #BPMaa 150
+                             #BPMAa 200
+                             #00108:aaAa
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        var bpmEvents = converted.TimingMap!.BpmEvents;
+        Assert.That(bpmEvents.Any(e => Math.Abs(e.Bpm - 150) < 0.001), Is.True, "BPM 150 from 'aa' should exist");
+        Assert.That(bpmEvents.Any(e => Math.Abs(e.Bpm - 200) < 0.001), Is.True, "BPM 200 from 'Aa' should exist");
+        Assert.That(bpmEvents.Count(e => e.Bpm > 0), Is.EqualTo(3)); // 120 + 150 + 200
+    }
+
+    [Test]
+    public void TestBase62BpmDefinitionsKeyCollisionWithoutBase62()
+    {
+        // Without #BASE 62, #BPMaa and #BPMAa collide (case-insensitive).
+        // The later definition (#BPMAa = 200) overwrites #BPMaa = 150.
+        var beatmap = decode("""
+                             #BPM 120
+                             #BPMaa 150
+                             #BPMAa 200
+                             #00108:aa
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        // "aa" and "AA" encode to the same key → BPM should be 200 (later wins)
+        Assert.That(converted.TimingMap!.BpmEvents.Any(e => Math.Abs(e.Bpm - 200) < 0.001), Is.True);
+        Assert.That(converted.TimingMap.BpmEvents.Any(e => Math.Abs(e.Bpm - 150) < 0.001), Is.False);
     }
 
     // ── #BASE 62 (case-sensitive encoding) ─────────────────────────────
@@ -165,24 +295,6 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestBase62LandmineChannelWithLowercaseIsUnaffected()
-    {
-        // Mine damage channels (D*, E*) use 36-base — unaffected by #BASE 62.
-        // Both "0a" (lowercase) and "0A" (uppercase) must decode to 5% damage.
-        var beatmap = decode("""
-                             #BASE 62
-                             #BPM 120
-                             #WAV00 bomb.wav
-                             #001D3:0a0A
-                             """);
-        var mines = beatmap.HitObjects.OfType<BmsHitObject>().Where(h => h.IsMine).OrderBy(h => h.StartTime).ToList();
-
-        Assert.That(mines, Has.Count.EqualTo(2));
-        Assert.That(mines[0].LandmineDamagePercent, Is.EqualTo(5), "'0a' should decode to 5%");
-        Assert.That(mines[1].LandmineDamagePercent, Is.EqualTo(5), "'0A' should decode to 5%");
-    }
-
-    [Test]
     public void TestBase62ChannelIdCaseInsensitiveWithBase62()
     {
         // Channel IDs are hex and always case-insensitive, even with #BASE 62.
@@ -215,41 +327,21 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestBase62BpmDefinitionsAreCaseSensitive()
+    public void TestBase62LandmineChannelWithLowercaseIsUnaffected()
     {
-        // With #BASE 62, #BPMaa (150) and #BPMAa (200) are distinct keys.
-        // Cell "aa" → #BPMaa = 150; cell "Aa" → #BPMAa = 200.
+        // Mine damage channels (D*, E*) use 36-base — unaffected by #BASE 62.
+        // Both "0a" (lowercase) and "0A" (uppercase) must decode to 5% damage.
         var beatmap = decode("""
                              #BASE 62
                              #BPM 120
-                             #BPMaa 150
-                             #BPMAa 200
-                             #00108:aaAa
+                             #WAV00 bomb.wav
+                             #001D3:0a0A
                              """);
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var mines = beatmap.HitObjects.OfType<BmsHitObject>().Where(h => h.IsMine).OrderBy(h => h.StartTime).ToList();
 
-        var bpmEvents = converted.TimingMap!.BpmEvents;
-        Assert.That(bpmEvents.Any(e => Math.Abs(e.Bpm - 150) < 0.001), Is.True, "BPM 150 from 'aa' should exist");
-        Assert.That(bpmEvents.Any(e => Math.Abs(e.Bpm - 200) < 0.001), Is.True, "BPM 200 from 'Aa' should exist");
-        Assert.That(bpmEvents.Count(e => e.Bpm > 0), Is.EqualTo(3)); // 120 + 150 + 200
-    }
-
-    [Test]
-    public void TestBase62BpmDefinitionsKeyCollisionWithoutBase62()
-    {
-        // Without #BASE 62, #BPMaa and #BPMAa collide (case-insensitive).
-        // The later definition (#BPMAa = 200) overwrites #BPMaa = 150.
-        var beatmap = decode("""
-                             #BPM 120
-                             #BPMaa 150
-                             #BPMAa 200
-                             #00108:aa
-                             """);
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-
-        // "aa" and "AA" encode to the same key → BPM should be 200 (later wins)
-        Assert.That(converted.TimingMap!.BpmEvents.Any(e => Math.Abs(e.Bpm - 200) < 0.001), Is.True);
-        Assert.That(converted.TimingMap.BpmEvents.Any(e => Math.Abs(e.Bpm - 150) < 0.001), Is.False);
+        Assert.That(mines, Has.Count.EqualTo(2));
+        Assert.That(mines[0].LandmineDamagePercent, Is.EqualTo(5), "'0a' should decode to 5%");
+        Assert.That(mines[1].LandmineDamagePercent, Is.EqualTo(5), "'0A' should decode to 5%");
     }
 
     [Test]
@@ -353,6 +445,80 @@ public class BmsBeatmapDecoderTest
 
         Assert.That(decoded.HitObjects.OfType<BmsHitObject>().Count(), Is.EqualTo(1));
         Assert.That(decoded.Metadata.Title, Is.EqualTo("Global Decoder Registration"));
+    }
+
+    [Test]
+    public void TestBmsePseudoSpeedSampleDecodesWithScrollEvents()
+    {
+        var beatmap = decodeResource("osu.Game.Rulesets.BmsRuleset.Tests.Resources.bms_test_songs.bmse_speed_samples.pseudo_speed_sample1.bms");
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = converted.TimingMap!;
+
+        // #SCROLL01 through #SCROLL75 = 257 definitions, stepped 1.0 → 10.0
+        // 8 measures × 32 cells + 1 cell at measure 9 = 257 events
+        Assert.That(timingMap.ScrollEvents, Has.Count.EqualTo(257));
+        Assert.That(timingMap.ScrollEvents[0].Factor, Is.EqualTo(1.0));
+        Assert.That(timingMap.ScrollEvents[^1].Factor, Is.EqualTo(10.0));
+        Assert.That(timingMap.SpeedEvents, Is.Empty);
+
+        // Notes should still decode correctly
+        var objects = converted.HitObjects;
+        Assert.That(objects, Has.Count.GreaterThan(100));
+        Assert.That(objects, Is.Ordered.By(nameof(BmsHitObject.StartTime)));
+    }
+
+    [Test]
+    public void TestBmseSpeedGradualSampleDecodesWithSpeedEvents()
+    {
+        var beatmap = decodeResource("osu.Game.Rulesets.BmsRuleset.Tests.Resources.bms_test_songs.bmse_speed_samples.speed_sample1.bms");
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = converted.TimingMap!;
+
+        // #SPEED01 through #SPEED75 = 257 definitions, stepped 1.0 → 10.0
+        Assert.That(timingMap.SpeedEvents, Has.Count.EqualTo(257));
+        Assert.That(timingMap.SpeedEvents[0].Factor, Is.EqualTo(1.0));
+        Assert.That(timingMap.SpeedEvents[^1].Factor, Is.EqualTo(10.0));
+        Assert.That(timingMap.ScrollEvents, Is.Empty);
+
+        var objects = converted.HitObjects;
+        Assert.That(objects, Has.Count.GreaterThan(100));
+        Assert.That(objects, Is.Ordered.By(nameof(BmsHitObject.StartTime)));
+    }
+
+    [Test]
+    public void TestBmseSpeedSampleSpeedFactorChange()
+    {
+        var beatmap = decodeResource("osu.Game.Rulesets.BmsRuleset.Tests.Resources.bms_test_songs.bmse_speed_samples.speed_sample2.bms");
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = converted.TimingMap!;
+
+        Assert.That(timingMap.SpeedEvents, Has.Count.EqualTo(2));
+        Assert.That(timingMap.SpeedEvents[0].Factor, Is.EqualTo(1.0));
+        Assert.That(timingMap.SpeedEvents[1].Factor, Is.EqualTo(10.0));
+
+        // #001SP:01 at measure 1 (tick 192, time 2000ms).
+        // #009SP:02 at measure 9 (tick 1728, time 18000ms).
+        Assert.That(timingMap.GetSpeedFactorAtTime(1000), Is.EqualTo(1.0).Within(0.001));
+        Assert.That(timingMap.GetSpeedFactorAtTime(10000), Is.EqualTo(1.0).Within(0.001));
+        Assert.That(timingMap.GetSpeedFactorAtTime(19000), Is.EqualTo(10.0).Within(0.001));
+    }
+
+    [Test]
+    public void TestBmseSpeedTwoStepSampleDecodesWithSpeedEvents()
+    {
+        var beatmap = decodeResource("osu.Game.Rulesets.BmsRuleset.Tests.Resources.bms_test_songs.bmse_speed_samples.speed_sample2.bms");
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = converted.TimingMap!;
+
+        // #SPEED01 = 1 at measure 1, #SPEED02 = 10 at measure 9
+        Assert.That(timingMap.SpeedEvents, Has.Count.EqualTo(2));
+        Assert.That(timingMap.SpeedEvents[0].Factor, Is.EqualTo(1.0));
+        Assert.That(timingMap.SpeedEvents[1].Factor, Is.EqualTo(10.0));
+        Assert.That(timingMap.ScrollEvents, Is.Empty);
+
+        var objects = converted.HitObjects;
+        Assert.That(objects, Has.Count.GreaterThan(100));
+        Assert.That(objects, Is.Ordered.By(nameof(BmsHitObject.StartTime)));
     }
 
     [Test]
@@ -484,42 +650,6 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestDecoderPreservesSamplePathWithSubdirectory()
-    {
-        // BMS charts may use relative paths with subdirectories in #WAV definitions
-        // (e.g. #WAV01 wav/kick.wav). The parser must preserve the full path as-is.
-        var beatmap = decode("""
-                             #BPM 120
-                             #WAV01 kick.wav
-                             #WAV02 wav/kick.wav
-                             #WAV03 subdir/sample.wav
-                             #WAV04 a/b/c.wav
-                             #00111:01
-                             #00112:02
-                             #00113:03
-                             #00114:04
-                             """);
-        var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().OrderBy(h => h.StartTime).ToList();
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-
-        // Flat filename (no subdir) — baseline.
-        Assert.That(hitObjects[0].SamplePath, Is.EqualTo("kick.wav"));
-        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("kick.wav"));
-
-        // Single subdirectory level.
-        Assert.That(hitObjects[1].SamplePath, Is.EqualTo("wav/kick.wav"));
-        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("wav/kick.wav"));
-
-        // Single subdirectory, different path.
-        Assert.That(hitObjects[2].SamplePath, Is.EqualTo("subdir/sample.wav"));
-        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("03")], Is.EqualTo("subdir/sample.wav"));
-
-        // Nested subdirectories.
-        Assert.That(hitObjects[3].SamplePath, Is.EqualTo("a/b/c.wav"));
-        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("04")], Is.EqualTo("a/b/c.wav"));
-    }
-
-    [Test]
     public void TestDecoderAndConverterPreserveBmsSampleDefinitionsAndBgmEvents()
     {
         var beatmap = decode("""
@@ -576,6 +706,57 @@ public class BmsBeatmapDecoderTest
         Assert.That(mine.Column, Is.EqualTo(6));
         Assert.That(mine.SourceChannel, Is.EqualTo(BmsChartParser.Enc("E1")));
         Assert.That(mine.LandmineDamagePercent, Is.EqualTo(5));
+    }
+
+    [Test]
+    public void TestDecoderPreservesSamplePathWithSubdirectory()
+    {
+        // BMS charts may use relative paths with subdirectories in #WAV definitions
+        // (e.g. #WAV01 wav/kick.wav). The parser must preserve the full path as-is.
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAV01 kick.wav
+                             #WAV02 wav/kick.wav
+                             #WAV03 subdir/sample.wav
+                             #WAV04 a/b/c.wav
+                             #00111:01
+                             #00112:02
+                             #00113:03
+                             #00114:04
+                             """);
+        var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().OrderBy(h => h.StartTime).ToList();
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        // Flat filename (no subdir) — baseline.
+        Assert.That(hitObjects[0].SamplePath, Is.EqualTo("kick.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("kick.wav"));
+
+        // Single subdirectory level.
+        Assert.That(hitObjects[1].SamplePath, Is.EqualTo("wav/kick.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("wav/kick.wav"));
+
+        // Single subdirectory, different path.
+        Assert.That(hitObjects[2].SamplePath, Is.EqualTo("subdir/sample.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("03")], Is.EqualTo("subdir/sample.wav"));
+
+        // Nested subdirectories.
+        Assert.That(hitObjects[3].SamplePath, Is.EqualTo("a/b/c.wav"));
+        Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("04")], Is.EqualTo("a/b/c.wav"));
+    }
+
+    [Test]
+    public void TestDefaultScrollAndSpeedAreUnity()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #00111:01
+                             #00211:02
+                             """);
+        var bmsBeatmap = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = bmsBeatmap.TimingMap!;
+
+        Assert.That(timingMap.ScrollEvents, Is.Empty);
+        Assert.That(timingMap.SpeedEvents, Is.Empty);
     }
 
     [Test]
@@ -709,6 +890,32 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestGetScrollPositionAtTimeContinuousAtScrollBoundary()
+    {
+        // Verify GetScrollPositionAtTime has NO discontinuity at SCROLL boundaries.
+        // SCROLL 0.5 from tick 0, changes to 2.0 at tick 4800 (time ~18461.5 ms at BPM 130).
+        var timingMap = new BmsTimingMap(
+            480,
+            [],
+            [new BmsBpmEvent(0, 130, 0)],
+            [],
+            [new BmsScrollEvent(0, 0.5, 0), new BmsScrollEvent(4800, 2.0, 0)],
+            []);
+
+        var boundaryTime = timingMap.ProjectTickToTime(4800);
+
+        // Just before and just after the boundary — scroll position must be continuous.
+        var justBefore = timingMap.GetScrollPositionAtTime(boundaryTime - 0.001);
+        var atBoundary = timingMap.GetScrollPositionAtTime(boundaryTime);
+        var justAfter = timingMap.GetScrollPositionAtTime(boundaryTime + 0.001);
+
+        Assert.That(atBoundary, Is.EqualTo(justBefore).Within(0.1),
+            $"Discontinuity before boundary: before={justBefore:F3}, at={atBoundary:F3}");
+        Assert.That(justAfter, Is.EqualTo(atBoundary).Within(0.1),
+            $"Discontinuity after boundary: at={atBoundary:F3}, after={justAfter:F3}");
+    }
+
+    [Test]
     public void TestInactiveNestedRandomDoesNotConsumeDecision()
     {
         var decisions = new Queue<int>([1]);
@@ -736,6 +943,146 @@ public class BmsBeatmapDecoderTest
 
         Assert.That(note.SourceChannel, Is.EqualTo(BmsChartParser.Enc("11")));
         Assert.That(decisions, Is.Empty);
+    }
+
+    [Test]
+    public void TestInterMeasureTimeIntervalsAreConsistent()
+    {
+        // Verify that the time between consecutive measures is correct
+        // at constant BPM 120 with TickResolution=192 (each measure = 4 beats = 2000ms).
+        var timingMap = new BmsTimingMap(
+            192,
+            Enumerable.Range(0, 10).Select(i => new BmsMeasureInfo(i, i * 192, 192, 1.0)),
+            [new BmsBpmEvent(0, 120, 0)],
+            []);
+
+        for (var i = 1; i < 10; i++)
+        {
+            var prevMeasureTime = timingMap.ProjectTickToTime((i - 1) * 192);
+            var currMeasureTime = timingMap.ProjectTickToTime(i * 192);
+            var interval = currMeasureTime - prevMeasureTime;
+
+            Assert.That(interval, Is.EqualTo(2000).Within(0.001),
+                $"Measure {i - 1} → {i}: expected 2000 ms, got {interval:F3} ms");
+        }
+    }
+
+    [Test]
+    public void TestInterMeasureTimeIntervalsUnaffectedByScroll()
+    {
+        // SCROLL changes must NOT affect inter-measure time intervals.
+        // Timing (ProjectTickToTime) ignores SCROLL entirely.
+        var timingMapWithScroll = new BmsTimingMap(
+            192,
+            Enumerable.Range(0, 5).Select(i => new BmsMeasureInfo(i, i * 192, 192, 1.0)),
+            [new BmsBpmEvent(0, 120, 0)],
+            [],
+            [new BmsScrollEvent(0, 0.5, 0), new BmsScrollEvent(384, 2.0, 0)],
+            []);
+
+        var timingMapNoScroll = new BmsTimingMap(
+            192,
+            Enumerable.Range(0, 5).Select(i => new BmsMeasureInfo(i, i * 192, 192, 1.0)),
+            [new BmsBpmEvent(0, 120, 0)],
+            []);
+
+        for (var i = 0; i < 4; i++)
+        {
+            var timeWithScroll = timingMapWithScroll.ProjectTickToTime((i + 1) * 192)
+                                 - timingMapWithScroll.ProjectTickToTime(i * 192);
+            var timeNoScroll = timingMapNoScroll.ProjectTickToTime((i + 1) * 192)
+                               - timingMapNoScroll.ProjectTickToTime(i * 192);
+
+            Assert.That(timeWithScroll, Is.EqualTo(timeNoScroll).Within(0.001),
+                $"Measure {i} → {i + 1}: SCROLL must not affect time interval (with={timeWithScroll:F3}, without={timeNoScroll:F3})");
+        }
+    }
+
+    [Test]
+    public void TestInterMeasureTimeIntervalsWithBpmChange()
+    {
+        // BPM changes from 120 to 240 at tick 384 (start of measure 2).
+        // TickRes=192, measure=192 ticks.
+        // Measure 0 (tick 0-192):   2000ms at BPM 120
+        // Measure 1 (tick 192-384): 2000ms at BPM 120
+        // Measure 2 (tick 384-576): 1000ms at BPM 240
+        // Measure 3 (tick 576-768): 1000ms at BPM 240
+        //
+        // BPM event at tick 384: time = 0 + (384-0)*60000/120/48 = 4000 ms
+        const double tick384_time = 4000d;
+        var timingMap = new BmsTimingMap(
+            192,
+            Enumerable.Range(0, 5).Select(i => new BmsMeasureInfo(i, i * 192, 192, 1.0)),
+            [new BmsBpmEvent(0, 120, 0), new BmsBpmEvent(384, 240, tick384_time)],
+            []);
+
+        var intervals = new[] { 2000d, 2000, 1000, 1000 };
+
+        for (var i = 0; i < 4; i++)
+        {
+            var prevTime = timingMap.ProjectTickToTime(i * 192);
+            var currTime = timingMap.ProjectTickToTime((i + 1) * 192);
+            var interval = currTime - prevTime;
+
+            Assert.That(interval, Is.EqualTo(intervals[i]).Within(0.001),
+                $"Measure {i} → {i + 1}: expected {intervals[i]} ms, got {interval:F3} ms");
+        }
+    }
+
+    [Test]
+    public void TestInterMeasureTimeIntervalsWithStop()
+    {
+        // STOP at tick 192 (measure boundary) with duration 2000ms freeze.
+        // The STOP takes effect after tick 192 is reached, so ProjectTickToTime(192)
+        // does NOT include it, but ProjectTickToTime(193) does.
+        // At constant BPM 120: ProjectTickToTime(192) = 2000ms (play time, no stop)
+        //                     ProjectTickToTime(193) = 2000 + 10.417 + 2000 = 4010.417ms
+        var timingMap = new BmsTimingMap(
+            192,
+            [
+                new BmsMeasureInfo(0, 0, 192, 1.0),
+                new BmsMeasureInfo(1, 192, 192, 1.0),
+            ],
+            [new BmsBpmEvent(0, 120, 0)],
+            [new BmsStopEvent(192, 2000, 192, 120, 0)]);
+
+        // Time from tick 0 to tick 192: 2000ms play, STOP not included (at the boundary)
+        var measure0Time = timingMap.ProjectTickToTime(192) - timingMap.ProjectTickToTime(0);
+        Assert.That(measure0Time, Is.EqualTo(2000).Within(0.001),
+            $"Tick 0 → 192: expected 2000 ms (STOP is at tick 192, not before), got {measure0Time:F3} ms");
+
+        // Time from tick 192 to tick 384 (includes the 2000ms STOP):
+        // play: (384-192) * 60000/120 / 48 = 2000ms, plus STOP: 2000ms = 4000ms total
+        var measure1Time = timingMap.ProjectTickToTime(384) - timingMap.ProjectTickToTime(192);
+        Assert.That(measure1Time, Is.EqualTo(4000).Within(0.001),
+            $"Tick 192 → 384 with STOP: expected 4000 ms (2000 play + 2000 stop), got {measure1Time:F3} ms");
+    }
+
+    [Test]
+    public void TestInterMeasureTimeIntervalsWithVariableLengthRatios()
+    {
+        // Measure 1 has 0.5× length (96 ticks at BPM 120 = 1000 ms).
+        // Other measures have 1.0× length (192 ticks at BPM 120 = 2000 ms).
+        var timingMap = new BmsTimingMap(
+            192,
+            [
+                new BmsMeasureInfo(0, 0, 192, 1.0),
+                new BmsMeasureInfo(1, 192, 96, 0.5),
+                new BmsMeasureInfo(2, 288, 192, 1.0),
+                new BmsMeasureInfo(3, 480, 192, 1.0),
+            ],
+            [new BmsBpmEvent(0, 120, 0)],
+            []);
+
+        // Measure 0: 192 ticks at BPM 120 = 2000ms
+        Assert.That(timingMap.ProjectTickToTime(192) - timingMap.ProjectTickToTime(0),
+            Is.EqualTo(2000).Within(0.001));
+        // Measure 1: 96 ticks at BPM 120 = 1000ms
+        Assert.That(timingMap.ProjectTickToTime(288) - timingMap.ProjectTickToTime(192),
+            Is.EqualTo(1000).Within(0.001));
+        // Measure 2: 192 ticks at BPM 120 = 2000ms
+        Assert.That(timingMap.ProjectTickToTime(480) - timingMap.ProjectTickToTime(288),
+            Is.EqualTo(2000).Within(0.001));
     }
 
     [Test]
@@ -1266,6 +1613,136 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestScrollAndSpeedFactorsIndependent()
+    {
+        // SCROLL affects scroll position rate. SPEED does NOT — it's a display multiplier.
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 120, 0)],
+            [],
+            [new BmsScrollEvent(0, 2.0, 0)],
+            [new BmsSpeedEvent(0, 3.0, 0)]);
+
+        Assert.That(timingMap.GetScrollFactorAtTime(1000), Is.EqualTo(2.0));
+        Assert.That(timingMap.GetSpeedFactorAtTime(1000), Is.EqualTo(3.0));
+
+        // SCROLL 2× affects rate; SPEED does not.
+        var advance = timingMap.GetScrollPositionAtTime(3000) - timingMap.GetScrollPositionAtTime(1000);
+        var timingMapBase = new BmsTimingMap(192, [], [new BmsBpmEvent(0, 120, 0)], [], [], []);
+        var baseAdvance = timingMapBase.GetScrollPositionAtTime(3000) - timingMapBase.GetScrollPositionAtTime(1000);
+        Assert.That(advance, Is.EqualTo(baseAdvance * 2.0).Within(0.001));
+    }
+
+    [Test]
+    public void TestScrollCommandDefinesFactor()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #SCROLL01 0.5
+                             #00102:1
+                             #002SC:01
+                             #00311:01
+                             """);
+        var bmsBeatmap = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = bmsBeatmap.TimingMap!;
+
+        Assert.That(timingMap.ScrollEvents, Has.Count.EqualTo(1));
+        Assert.That(timingMap.ScrollEvents[0].Factor, Is.EqualTo(0.5));
+        Assert.That(timingMap.ScrollEvents[0].Tick, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void TestScrollFactorAffectsScrollPosition()
+    {
+        // SCROLL changes the scroll coordinate rate (unlike SPEED which is a display multiplier).
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 120, 0)],
+            [],
+            [new BmsScrollEvent(0, 2.0, 0)],
+            []);
+
+        var advanceWithScroll = timingMap.GetScrollPositionAtTime(3000) - timingMap.GetScrollPositionAtTime(1000);
+
+        var timingMapNoScroll = new BmsTimingMap(192, [], [new BmsBpmEvent(0, 120, 0)], [], [], []);
+        var advanceNoScroll = timingMapNoScroll.GetScrollPositionAtTime(3000) - timingMapNoScroll.GetScrollPositionAtTime(1000);
+
+        // Scroll factor 2× doubles the scroll coordinate advance rate.
+        Assert.That(advanceWithScroll, Is.EqualTo(advanceNoScroll * 2.0).Within(0.001));
+        Assert.That(timingMap.GetScrollFactorAtTime(1000), Is.EqualTo(2.0).Within(0.001));
+    }
+
+    [Test]
+    public void TestScrollFactorStoredAndQueryable()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 120, 0)],
+            [],
+            [new BmsScrollEvent(192, 0.5, 0), new BmsScrollEvent(384, -1.0, 0)],
+            []);
+
+        // Tick 192 at BPM 120 → time 2000ms. Before that, default 1.0.
+        Assert.That(timingMap.GetScrollFactorAtTime(500), Is.EqualTo(1.0).Within(0.001));
+        Assert.That(timingMap.GetScrollFactorAtTime(2500), Is.EqualTo(0.5).Within(0.001));
+        // Tick 384 at BPM 120 → time 4000ms.
+        Assert.That(timingMap.GetScrollFactorAtTime(5000), Is.EqualTo(-1.0).Within(0.001));
+    }
+
+    [Test]
+    public void TestScrollPositionAtTimeMatchesVisualScrollPositionAtTick()
+    {
+        // When SCROLL != 1.0, GetScrollPositionAtTime(ProjectTickToTime(t))
+        // must equal GetVisualScrollPositionAtTick(t) for every tick,
+        // otherwise CurrentScrollPosition has discontinuities at SCROLL boundaries.
+        // This chart has SCROLL 2× from tick 0, with BPM 120.
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 120, 0)],
+            [],
+            [new BmsScrollEvent(0, 2.0, 0)],
+            []);
+
+        // verify at several tick positions
+        foreach (var tick in new long[] { 0, 192, 384, 960, 1920 })
+        {
+            var time = timingMap.ProjectTickToTime(tick);
+            var fromTime = timingMap.GetScrollPositionAtTime(time);
+            var fromTick = timingMap.GetVisualScrollPositionAtTick(tick);
+            Assert.That(fromTime, Is.EqualTo(fromTick).Within(0.001),
+                $"Mismatch at tick {tick}: GetScrollPositionAtTime({time:F3})={fromTime:F3} vs GetVisualScrollPositionAtTick({tick})={fromTick:F3}");
+        }
+    }
+
+    [Test]
+    public void TestScrollPositionAtTimeMatchesVisualScrollPositionAtTickWithScrollChange()
+    {
+        // SCROLL changes at tick 4800 from 0.5 to 2.0, BPM 130.
+        // This exercises the case where previous segments have SCROLL != 1.0,
+        // which previously caused a discontinuity because StartTick was raw BMS ticks.
+        var timingMap = new BmsTimingMap(
+            480,
+            [],
+            [new BmsBpmEvent(0, 130, 0)],
+            [],
+            [new BmsScrollEvent(0, 0.5, 0), new BmsScrollEvent(4800, 2.0, 0)],
+            []);
+
+        foreach (var tick in new long[] { 0, 1200, 2400, 4800, 6000, 7200, 9600 })
+        {
+            var time = timingMap.ProjectTickToTime(tick);
+            var fromTime = timingMap.GetScrollPositionAtTime(time);
+            var fromTick = timingMap.GetVisualScrollPositionAtTick(tick);
+            Assert.That(fromTime, Is.EqualTo(fromTick).Within(0.001),
+                $"Mismatch at tick {tick}: GetScrollPositionAtTime({time:F3})={fromTime:F3} vs GetVisualScrollPositionAtTick({tick})={fromTick:F3}");
+        }
+    }
+
+    [Test]
     public void TestSetRandomAndElseIfElse()
     {
         var beatmap = decode("""
@@ -1303,6 +1780,47 @@ public class BmsBeatmapDecoderTest
         Assert.That(converted.HitObjects.Single().Column, Is.EqualTo(7));
         Assert.That(converted.Difficulty.CircleSize, Is.EqualTo(8));
         Assert.That(converted.BeatmapInfo.Difficulty.CircleSize, Is.EqualTo(8));
+    }
+
+    [Test]
+    public void TestSpeedCommandDefinesFactor()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #SPEED01 2.5
+                             #00102:1
+                             #002SP:01
+                             #00311:01
+                             """);
+        var bmsBeatmap = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var timingMap = bmsBeatmap.TimingMap!;
+
+        Assert.That(timingMap.SpeedEvents, Has.Count.EqualTo(1));
+        Assert.That(timingMap.SpeedEvents[0].Factor, Is.EqualTo(2.5));
+    }
+
+    [Test]
+    public void TestSpeedFactorDoesNotAffectScrollPosition()
+    {
+        // SPEED is a ScrollSpeedMultiplier — it does NOT change scroll position coordinates.
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 120, 0)],
+            [],
+            [],
+            [new BmsSpeedEvent(0, 3.0, 0)]);
+
+        var advance = timingMap.GetScrollPositionAtTime(3000) - timingMap.GetScrollPositionAtTime(1000);
+
+        var timingMapNoSpeed = new BmsTimingMap(192, [], [new BmsBpmEvent(0, 120, 0)], [], [], []);
+        var advanceNoSpeed = timingMapNoSpeed.GetScrollPositionAtTime(3000) - timingMapNoSpeed.GetScrollPositionAtTime(1000);
+
+        // Speed does NOT affect scroll position rate.
+        Assert.That(advance, Is.EqualTo(advanceNoSpeed).Within(0.001));
+
+        // But GetSpeedFactorAtTime returns the active factor.
+        Assert.That(timingMap.GetSpeedFactorAtTime(1000), Is.EqualTo(3.0).Within(0.001));
     }
 
     [Test]

@@ -29,7 +29,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     public override bool CanConvert() =>
         Beatmap is BmsDecodedBeatmap { RawLines.Length: > 0 }
-        || Beatmap.HitObjects.Any() && Beatmap.HitObjects.All(h => h is BmsHitObject);
+        || (Beatmap.HitObjects.Any() && Beatmap.HitObjects.All(h => h is BmsHitObject));
 
     protected override Beatmap<BmsHitObject> CreateBeatmap() => new BmsBeatmap();
 
@@ -146,6 +146,8 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             tickResolution,
             measures,
             [new BmsBpmEvent(0, 130, 0)],
+            [],
+            [],
             []);
     }
 

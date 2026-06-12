@@ -87,9 +87,11 @@ for deletion.
 | Random blocks           | `#RANDOM` / `#RONDAM` (typo tolerance), `#ENDRANDOM`, `#SETRANDOM`         | Random branch with conditional sub-blocks; `#SETRANDOM` fixes the value |
 |                         | `#IF`, `#ELSEIF`, `#ELSE`, `#ENDIF` / `#END` / `#IFEND` / `#END IF`        |                                                                         |
 | Switch blocks           | `#SWITCH`, `#ENDSW` / `#ENDSWITCH`, `#SETSWITCH`, `#CASE`, `#DEF`, `#SKIP` | Switch control flow with cases; `#SETSWITCH` fixes the value            |
+| Scroll speed            | `#SCROLLxx`                                                                | Per-segment display multiplier on scroll coordinate                     |
+| Spacing change          | `#SPEEDxx`                                                                 | Per-segment multiplier on `ScrollSpeedMultiplier`                       |
 
 **Not parsed:** `#BANNER`, `#STAGEFILE`, `#BACKBMP`, `#BMPxx`, `#BGAxx`, `#EXWAVxx`,
-`#WAVCMD`, `#VOLWAV`, `#MIDIFILE`, `#DIFFICULTY`, `#SCROLLxx`, `#SPEEDxx`, `#EXRANK` / `#EXRANKxx`,
+`#WAVCMD`, `#VOLWAV`, `#MIDIFILE`, `#DIFFICULTY`, `#EXRANK` / `#EXRANKxx`,
 `#DEFEXRANK`, `#EXBPMxx`, `#LNMODE`, `#PREVIEW`, `#STP`, `#PATH_WAV` / `#PATH_BMP`, `#OPTION`,
 `#CHANGEOPTIONxx`, `#POORBGA`, `#SWBGAxx`, `#@BGAxx`, `#ARGBxx`, video commands, `#CHARFILE`,
 `#ExtChr`, `#OCT/FP`, `#MATERIALS`, `#SONGxx` / `#TEXTxx` (merged),
@@ -107,6 +109,8 @@ dynamic rank channel (`A0`), and dynamic option channel (`A6`).
 | `08`      | Extended BPM change (`#BPMxx` lookup)           |
 | `09`      | STOP event (`#STOPxx` lookup)                   |
 | `99`      | TEXT event (`#TEXTxx`/`#SONGxx` lookup)         |
+| `SC`      | SCROLL factor change (`#SCROLLxx` lookup)       |
+| `SP`      | SPEED factor change (`#SPEEDxx` lookup)         |
 | `11`–`15` | Playable notes — P1 lanes 1–5 (origin: 5-key)   |
 | `16`      | Scratch / turntable — P1                        |
 | `17`      | Free-zone — P1                                  |
@@ -123,6 +127,12 @@ dynamic rank channel (`A0`), and dynamic option channel (`A6`).
 **Not parsed:** invisible note channels (`31`–`39`, `41`–`49`), BGA layers
 (`04`, `06`, `07`, `0A`–`0E`), dynamic BGM volume (`97`), dynamic KEY volume (`98`),
 dynamic rank change (`A0`), dynamic option change (`A6`).
+
+> Channel `02` controls per-measure length (time signature changes), defined by `#xxx02`. A value of `1` means standard
+> length (4/4), `0.5` half length, `2` double length.
+> Measure duration (ms) = `#xxx02 × 240000 / BPM` (at a fixed BPM).
+> `1/1024` is the smallest value that can be accurately represented. Smaller values may round to 0 ticks, collapsing all
+> events in that measure to the same position.
 
 ---
 
@@ -678,35 +688,35 @@ Commands are grouped by origin and listed with their status in this ruleset.
 
 #### 1.15 Generalized / Modern Extensions
 
-| Command         | Status | Notes                                                      |
-|-----------------|--------|------------------------------------------------------------|
-| `#EXBPMxx`      | ✗      | `#BPMxx` alias (BMSC parser bug workaround)                |
-| `#BASEBPM`      | ✓      | Visual scroll speed reference BPM (does not affect timing) |
-| `#SONGxx`       | ✓      | Song-related text (merged with `#TEXTxx`)                  |
-| `#MAKER`        | ✓      | Charter/noter name                                         |
-| `#EXWAVxx`      | ✗      | Extended WAV with pan/volume/frequency (nanasi)            |
-| `#EXBMPxx`      | ✗      | Extended BMP definition slot                               |
-| `#EXRANK`       | ✗      | Extended rank definition header                            |
-| `#POORBGA`      | ✗      | BGA displayed on POOR judgment                             |
-| `#SWBGAxx`      | ✗      | Switchable BGA definition                                  |
-| `#@BGAxx`       | ✗      | BGA variant command                                        |
-| `#ARGBxx`       | ✗      | ARGB color definition for BGA elements                     |
-| `#SCROLLxx`     | ✗      | Scroll speed change definitions (bms-rs models this)       |
-| `#SPEEDxx`      | ✗      | Spacing change definitions (bms-rs models this)            |
-| `#VIDEOFILE`    | ✗      | Video file path                                            |
-| `#MOVIE`        | ✗      | Movie file path                                            |
-| `#SEEKxx`       | ✗      | Seek position for video                                    |
-| `#VIDEOf/s`     | ✗      | Video frame rate setting                                   |
-| `#VIDEOCOLORS`  | ✗      | Video color configuration                                  |
-| `#VIDEODLY`     | ✗      | Video delay setting                                        |
-| `#OCT/FP`       | ✗      | Octave/FootPedal play mode flag                            |
-| `MATERIALS`     | ✗      | Materials section marker                                   |
-| `#MATERIALSWAV` | ✗      | Materials audio definition                                 |
-| `#MATERIALSBMP` | ✗      | Materials image definition                                 |
-| `#DIVIDEPROP`   | ✗      | Divide property configuration                              |
-| `#CHARSET`      | ✗      | Character encoding specification                           |
-| `#CDDA`         | ✗      | CD audio track reference                                   |
-| `#ExtChr`       | ✗      | BM98 proprietary: extended character sprite display        |
+| Command         | Status | Notes                                                          |
+|-----------------|--------|----------------------------------------------------------------|
+| `#EXBPMxx`      | ✗      | `#BPMxx` alias (BMSC parser bug workaround)                    |
+| `#BASEBPM`      | ✓      | Visual scroll speed reference BPM (does not affect timing)     |
+| `#SONGxx`       | ✓      | Song-related text (merged with `#TEXTxx`)                      |
+| `#MAKER`        | ✓      | Charter/noter name                                             |
+| `#EXWAVxx`      | ✗      | Extended WAV with pan/volume/frequency (nanasi)                |
+| `#EXBMPxx`      | ✗      | Extended BMP definition slot                                   |
+| `#EXRANK`       | ✗      | Extended rank definition header                                |
+| `#POORBGA`      | ✗      | BGA displayed on POOR judgment                                 |
+| `#SWBGAxx`      | ✗      | Switchable BGA definition                                      |
+| `#@BGAxx`       | ✗      | BGA variant command                                            |
+| `#ARGBxx`       | ✗      | ARGB color definition for BGA elements                         |
+| `#SCROLLxx`     | ✓      | Scroll speed change definitions; per-segment visual multiplier |
+| `#SPEEDxx`      | ✓      | Spacing change definitions via ChartSpeedFactor`               |
+| `#VIDEOFILE`    | ✗      | Video file path                                                |
+| `#MOVIE`        | ✗      | Movie file path                                                |
+| `#SEEKxx`       | ✗      | Seek position for video                                        |
+| `#VIDEOf/s`     | ✗      | Video frame rate setting                                       |
+| `#VIDEOCOLORS`  | ✗      | Video color configuration                                      |
+| `#VIDEODLY`     | ✗      | Video delay setting                                            |
+| `#OCT/FP`       | ✗      | Octave/FootPedal play mode flag                                |
+| `MATERIALS`     | ✗      | Materials section marker                                       |
+| `#MATERIALSWAV` | ✗      | Materials audio definition                                     |
+| `#MATERIALSBMP` | ✗      | Materials image definition                                     |
+| `#DIVIDEPROP`   | ✗      | Divide property configuration                                  |
+| `#CHARSET`      | ✗      | Character encoding specification                               |
+| `#CDDA`         | ✗      | CD audio track reference                                       |
+| `#ExtChr`       | ✗      | BM98 proprietary: extended character sprite display            |
 
 ### 2. Channel Identifiers
 
@@ -794,13 +804,13 @@ Commands are grouped by origin and listed with their status in this ruleset.
 
 #### 2.8 Extended Control
 
-| Channel | Name            | Status | Description                                        |
-|---------|-----------------|--------|----------------------------------------------------|
-| `99`    | TEXT Display    | ✓      | In-game text via `#TEXTxx` / `#SONGxx`             |
-| `A0`    | RANK Change     | ✗      | Dynamic rank change via `#EXRANKxx` (nanasigroove) |
-| `A6`    | OPTION Change   | ✗      | Dynamic option change via `#CHANGEOPTIONxx`        |
-| `SC`    | Special channel | ◐      | Implementation-specific                            |
-| `SP`    | Special channel | ◐      | Implementation-specific                            |
+| Channel | Name          | Status | Description                                          |
+|---------|---------------|--------|------------------------------------------------------|
+| `99`    | TEXT Display  | ✓      | In-game text via `#TEXTxx` / `#SONGxx`               |
+| `A0`    | RANK Change   | ✗      | Dynamic rank change via `#EXRANKxx` (nanasigroove)   |
+| `A6`    | OPTION Change | ✗      | Dynamic option change via `#CHANGEOPTIONxx`          |
+| `SC`    | SCROLL Change | ✓      | Applies `#SCROLLxx` factor to scroll coordinates     |
+| `SP`    | SPEED Change  | ✓      | Applies `#SPEEDxx` factor to `ScrollSpeedMultiplier` |
 
 ### 3. Control Flow Commands
 
@@ -906,7 +916,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — metadata only                            |
 | **Parser**    | `#STP` — absolute STOP sequence                                                          |
 | **Parser**    | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — video |
-| **Parser**    | `#SCROLLxx` / `#SPEEDxx` — scroll speed / spacing change definitions                     | 1         |
 | **Parser**    | `#PREVIEW` — beatoraja preview audio path for music selection                            | 1         |
 | **Parser**    | `#LNMODE` — beatoraja long-note mode lock (LN/CN/HCN)                                    |
 | **Parser**    | `#DEFEXRANK` — fine-grained judgment width multiplier (overrides `#RANK`)                |
@@ -940,6 +949,7 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **UI**        | Rewrite health bar — red/yellow/green gradient, no border, no overall colour change      | 2         |
 | **Perf**      | parser performance (tinny parser for importer / ProjectTickToTime(build & query))        | 4         |
 | **Perf**      | high GC pressure during importing (sr) (consider pre compute and query)                  | 3         |
+| **Perf**      | low fps (<100) when play a song with 10k+ mines                                          | 1         |
 
 ### FIXME
 
@@ -963,11 +973,11 @@ difficulty using the wrong converter while the carousel selection is stale.
 
 | Subject                            | Link                                                                                                                                           |
 |------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| Star-Rating-Rebirth (SR algorithm) | [GitHub](https://github.com/sunnyxxy/Star-Rating-Rebirth)                                                                                      |
-| BMS Command Specification          | [hitkey.nekokan.dyndns.info](https://hitkey.nekokan.dyndns.info/cmds.htm)                                                                      |
+| Star-Rating-Rebirth (SR algorithm) | https://github.com/sunnyxxy/Star-Rating-Rebirth                                                                                                |
+| BMS Command Specification          | https://hitkey.nekokan.dyndns.info/cmds.htm                                                                                                    |
 | 62-Base BMS Format Specification   | [Google Docs](https://docs.google.com/document/d/e/2PACX-1vTl8zOS3ukl5HpuNsBUlN8rn_ZaNdJSHb8a4se3Z3ap9Y6UJ1nB8LA3HnxWAk9kMTDp0j9orpg43-tl/pub) |
-| beatoraja Extension Manual         | [GitHub (raw)](https://raw.githubusercontent.com/exch-bms2/beatoraja/master/manual/extension.txt)                                              |
-| LR2 BMS Option Reference           | [hitkey.nekokan.dyndns.info](http://hitkey.nekokan.dyndns.info/option.htm)                                                                     |
-| bms-rs Rust Parser (model)         | [docs.rs](https://docs.rs/bms-rs/0.9.0/bms_rs/bms/model/struct.Header.html)                                                                    |
-| BMS Gimmick Techniques (JP)        | [note.com/numuther](https://note.com/numuther/n/n57bf895e7969)                                                                                 |
+| beatoraja Extension Manual         | https://raw.githubusercontent.com/exch-bms2/beatoraja/master/manual/extension.txt                                                              |
+| LR2 BMS Option Reference           | http://hitkey.nekokan.dyndns.info/option.htm                                                                                                   |
+| BMS Gimmick Techniques (JP)        | https://note.com/numuther/n/n57bf895e7969                                                                                                      |
 | Benchmark                          | https://hitkey.nekokan.dyndns.info/bmsbench.shtml                                                                                              |
+| `#SPEED` vs `#SCROLL`              | https://hitkey.nekokan.dyndns.info/bmse_help_full/Capture/_read.htm#SAMPLEBMS                                                                  | 

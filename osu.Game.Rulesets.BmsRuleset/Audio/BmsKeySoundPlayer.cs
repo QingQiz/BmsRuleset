@@ -176,7 +176,7 @@ public sealed partial class BmsKeySoundPlayer : CompositeDrawable
         {
             var hitObject = hitObjects[index];
 
-            if (hitObject.Column != column || hasNoteFinished(hitObject))
+            if (hitObject.Column != column || hitObject.IsMine || hasNoteFinished(hitObject))
             {
                 index++;
                 continue;

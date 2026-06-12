@@ -11,6 +11,9 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 /// </summary>
 public readonly struct BmsDifficultyInfo
 {
+    /// <summary>Pre-parsed difficulty name from chart title/filename (e.g. "SP Beginner"). Takes priority over PlayLevel/Rank.</summary>
+    public string? ParsedName { get; init; }
+
     /// <summary>#PLAYLEVEL — star rating (1–20+). Null if absent.</summary>
     public float? PlayLevel { get; init; }
 
@@ -36,7 +39,8 @@ public readonly struct BmsDifficultyInfo
 
     public static BmsDifficultyInfo FromChartMetadata(BmsChartMetadata metadata) => new()
     {
-        PlayLevel = null,
+        ParsedName = metadata.DifficultyName,
+        PlayLevel = metadata.PlayLevel,
         Rank = metadata.Rank,
         Total = metadata.Total,
         KeyCount = metadata.KeyCount,
@@ -74,6 +78,9 @@ public readonly struct BmsDifficultyInfo
     /// </summary>
     public string ToDisplayName()
     {
+        if (!string.IsNullOrWhiteSpace(ParsedName))
+            return ParsedName;
+
         if (PlayLevel.HasValue)
             return PlayLevel.Value.ToString("F0");
 

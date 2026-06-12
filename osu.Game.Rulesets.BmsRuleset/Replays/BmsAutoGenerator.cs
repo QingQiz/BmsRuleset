@@ -63,7 +63,7 @@ public class BmsAutoGenerator(BmsBeatmap beatmap) : AutoGenerator<BmsReplayFrame
             if (nextObject is BmsHitObject { IsMine: true } mineAfterLn && mineAfterLn.StartTime <= endTime + 1)
                 return Math.Max(current.StartTime, mineAfterLn.StartTime - 1);
 
-            return current.Duration > 0 ? endTime : endTime + 1;
+            return Math.Max(endTime, current.StartTime + RELEASE_DELAY);
         }
 
         // Non-LN: prefer the default RELEASE_DELAY, but pull the release in to before
