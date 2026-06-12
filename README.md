@@ -8,15 +8,32 @@ Native osu! ruleset plugin for BMS-family charts (`.bms`, `.bme`, `.bml`, `.pms`
 
 ## Installation
 
-1. Build the ruleset:
+1. Cloning
+
+   When cloning this repository, you can skip the `bms_test_songs` folder to save time and disk space — it contains
+   large test audio files only needed for running tests:
+
+    ```bash
+    git clone --filter=blob:none --sparse https://github.com/QINGQIZ/BmsRuleset.git
+    cd BmsRuleset
+    git sparse-checkout set --no-cone '/*' '!bms_test_songs'
+    ```
+
+   To restore the folder later (e.g., to run tests):
+
+    ```bash
+    git sparse-checkout add bms_test_songs
+    ```
+
+2. Build the ruleset:
    ```
    dotnet build "osu.Game.Rulesets.BmsRuleset"
    ```
    Output: `osu.Game.Rulesets.BmsRuleset/bin/Debug/net8.0/osu.Game.Rulesets.BmsRuleset.dll`
 
-2. Copy the DLL to your osu! `rulesets/` folder.
+3. Copy the DLL to your osu! `rulesets/` folder.
 
-3. Restart osu!. The ruleset will appear in the ruleset selector (currently uses the osu!mania icon as a placeholder).
+4. Restart osu!. The ruleset will appear in the ruleset selector (currently uses the osu!mania icon as a placeholder).
 
 ---
 
@@ -953,3 +970,4 @@ difficulty using the wrong converter while the carousel selection is stale.
 | LR2 BMS Option Reference           | [hitkey.nekokan.dyndns.info](http://hitkey.nekokan.dyndns.info/option.htm)                                                                     |
 | bms-rs Rust Parser (model)         | [docs.rs](https://docs.rs/bms-rs/0.9.0/bms_rs/bms/model/struct.Header.html)                                                                    |
 | BMS Gimmick Techniques (JP)        | [note.com/numuther](https://note.com/numuther/n/n57bf895e7969)                                                                                 |
+| Benchmark                          | https://hitkey.nekokan.dyndns.info/bmsbench.shtml                                                                                              |

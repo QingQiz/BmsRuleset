@@ -8,6 +8,22 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 
 ## 安装
 
+1. 克隆
+
+   克隆仓库时可以跳过 `bms_test_songs` 文件夹以节省时间和磁盘空间，它包含仅运行测试所需的大型音频文件：
+
+   ```bash
+   git clone --filter=blob:none --sparse https://github.com/QINGQIZ/BmsRuleset.git
+   cd BmsRuleset
+   git sparse-checkout set --no-cone '/*' '!bms_test_songs'
+   ```
+
+   如果需要恢复该文件夹（例如运行测试）：
+
+   ```bash
+   git sparse-checkout add bms_test_songs
+   ```
+
 1. 构建规则集：
    ```
    dotnet build "osu.Game.Rulesets.BmsRuleset"
