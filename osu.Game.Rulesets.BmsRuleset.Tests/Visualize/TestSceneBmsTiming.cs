@@ -1,8 +1,10 @@
 #nullable enable
+using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Tests.Visual;
 
@@ -12,13 +14,14 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 public partial class TestSceneBmsTiming : BmsPlayerTestScene
 {
     private float normalSpeedSpacing;
+    private string currentChart = timing_chart;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
         => CreateBmsPlayer(BmsTestReplays.CreateAutoPlayFrames);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
-        var beatmap = BmsTestBeatmaps.CreateBeatmapFromChart(timing_chart);
+        var beatmap = BmsTestBeatmaps.CreateBeatmapFromChart(currentChart);
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset, endPadding: 3000);
         return beatmap;
     }
@@ -97,6 +100,35 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
         #00814:00000001
         """;
 
+    private DrawableBmsHitObject? getCrossSpeedLongNote()
+        => Playfield.HitObjectContainer.AliveObjects
+            .OfType<DrawableBmsHitObject>()
+            .FirstOrDefault(d => d.HitObject is { IsLongNote: true, TickInfo.Tick: 384 });
+
+    // ── Negative BPM (reverse scroll) ──────────────────────────────────────
+
+    private const string negative_bpm_chart =
+        """
+        #TITLE Negative BPM Timing Visual
+        #ARTIST BMS Ruleset Test
+        #BPM 130
+        #BPM01 -130
+        #LNTYPE 1
+
+        #00111:0100000000000000
+        #00112:0001000000000000
+
+        #00211:0100000000000000
+        #00212:0001000000000000
+
+        #00308:01
+        #00311:0100000000000000
+        #00312:0001000000000000
+
+        #00411:0100000000000000
+        #00412:0001000000000000
+        """;
+
     [Test]
     public void TestArgonTimingScroll()
     {
@@ -155,8 +187,52 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
         AddUntilStep("sub-1 BPM notes visible", () => Playfield.HitObjectContainer.AliveObjects.Count(), () => Is.GreaterThan(0));
     }
 
-    private Objects.Drawables.DrawableBmsHitObject? getCrossSpeedLongNote()
-        => Playfield.HitObjectContainer.AliveObjects
-            .OfType<Objects.Drawables.DrawableBmsHitObject>()
-            .FirstOrDefault(d => d.HitObject is { IsLongNote: true, TickInfo.Tick: 384 });
+    [Test]
+    public void TestNegativeBpmTiming()
+    {
+        AddStep("switch to negative BPM chart", () => currentChart = negative_bpm_chart);
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
+
+        AddAssert("BPM event parsed", () =>
+        {
+            var bm = (BmsBeatmap)Player.GameplayState.Beatmap;
+            return bm.TimingMap!.BpmEvents.Any(e => e.Bpm < 0);
+        });
+
+        AddAssert("negative BPM uses abs for timing", () =>
+        {
+            var bm = (BmsBeatmap)Player.GameplayState.Beatmap;
+            var timingMap = bm.TimingMap!;
+
+            // One measure (192 ticks) at BPM 130 = 192 * 60000/130 / 48 ≈ 1846.15ms
+            const double measure_ms = 60000d / 130 * 192 / (192 / 4d);
+
+            var t0 = timingMap.ProjectTickToTime(0);
+            var t192 = timingMap.ProjectTickToTime(192);
+            if (Math.Abs(t192 - t0 - measure_ms) > 1) return false;
+
+            // Measure 2 (tick 384→576) still at |BPM| 130, even after BPM switches to -130 at tick 576
+            var t384 = timingMap.ProjectTickToTime(384);
+            var t576 = timingMap.ProjectTickToTime(576);
+            return Math.Abs(t576 - t384 - measure_ms) < 1;
+        });
+
+        AddAssert("negative BPM reverses scroll direction", () =>
+        {
+            var bm = (BmsBeatmap)Player.GameplayState.Beatmap;
+            var timingMap = bm.TimingMap!;
+
+            // Before change (+130): scroll advances forward.
+            var posBefore = timingMap.GetScrollPositionAtTime(1000);
+            var posLater = timingMap.GetScrollPositionAtTime(5000);
+            if (posLater <= posBefore) return false;
+
+            // After change (-130 at tick 576 ≈ 5538ms): scroll goes backward.
+            var posAtChange = timingMap.GetScrollPositionAtTime(5600);
+            var posAfter = timingMap.GetScrollPositionAtTime(6600);
+            return posAfter < posAtChange;
+        });
+    }
 }

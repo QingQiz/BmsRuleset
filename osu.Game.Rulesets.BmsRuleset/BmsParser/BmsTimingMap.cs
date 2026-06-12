@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -33,24 +34,25 @@ public sealed class BmsTimingMap
         double bpm,
         double scrollFactor,
         double speedFactor,
+        int scrollDir,
         bool isStop)
     {
         public readonly double Time = time;                 // segment start (ms)
         public readonly double NextTime = nextTime;         // segment end (ms), double.PositiveInfinity for last
         public readonly double ScrollPos = scrollPos;       // precomputed scroll position at Time
-        public readonly double Bpm = bpm;                   // active BPM for this segment
+        public readonly double Bpm = bpm;                   // active |BPM| for this segment (always positive)
         public readonly double ScrollFactor = scrollFactor; // active SCROLL factor
         public readonly double SpeedFactor = speedFactor;   // active SPEED factor
+        public readonly int ScrollDir = scrollDir;          // 1 = normal, -1 = reverse (negative BPM)
         public readonly bool IsStop = isStop;               // true → scroll position frozen during this segment
-
     }
 
     private readonly TimingPoint[] points;
-    private int cursor;
 
     // ── Tick→time infrastructure (only used during parsing, not gameplay) ──
 
     private readonly double[] cumulativeStopDurations;
+    private int cursor;
 
     // ── Construction ──────────────────────────────────────────────────────────
 
@@ -78,6 +80,142 @@ public sealed class BmsTimingMap
     {
     }
 
+    // ── Time-based queries ────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Returns the native BMS scroll coordinate at a tick position.
+    ///     SCROLL and SPEED factors are NOT applied here — use <see cref="GetVisualScrollPositionAtTick"/>
+    ///     for the display-coordinate equivalent that accounts for <c>#SCROLLxx</c>.
+    /// </summary>
+    public double GetScrollPositionAtTick(double tick) => ticksToMilliseconds(tick, ScrollReferenceBpm);
+
+    /// <summary>
+    ///     Returns the display scroll coordinate for a tick position, with
+    ///     <c>#SCROLLxx</c> factors applied per segment. Notes in a 2× SCROLL zone
+    ///     get 2× the scroll distance for the same tick range, spreading them apart visually.
+    /// </summary>
+    public double GetVisualScrollPositionAtTick(double tick)
+    {
+        if (ScrollEvents.Count == 0)
+            return ticksToMilliseconds(tick, ScrollReferenceBpm);
+
+        double position = 0;
+        long prevTick = 0;
+        var factor = 1.0;
+        var scrollIdx = 0;
+
+        foreach (var evt in ScrollEvents)
+        {
+            if (evt.Tick >= tick)
+                break;
+
+            if (evt.Tick > prevTick)
+            {
+                position += ticksToMilliseconds(evt.Tick - prevTick, ScrollReferenceBpm) * factor;
+                prevTick = evt.Tick;
+            }
+
+            factor = evt.Factor;
+            scrollIdx++;
+
+            if (scrollIdx >= ScrollEvents.Count)
+                break;
+        }
+
+        if (tick > prevTick)
+            position += ticksToMilliseconds(tick - prevTick, ScrollReferenceBpm) * factor;
+
+        return position;
+    }
+
+    /// <summary>
+    ///     Returns the native BMS scroll coordinate reached at a projected osu! time,
+    ///     accounting for BPM changes, STOP segments, and SCROLL factors.
+    /// </summary>
+    public double GetScrollPositionAtTime(double time)
+    {
+        if (points.Length == 0)
+            return time;
+
+        var idx = findPoint(time);
+        var pt = points[idx];
+
+        if (pt.IsStop)
+            return pt.ScrollPos;
+
+        // Negative BPM → reverse scroll direction.
+        var effectiveBpm = pt.Bpm * pt.ScrollFactor * pt.ScrollDir;
+        var tickAdvance = millisecondsToTicks(time - pt.Time, effectiveBpm);
+        return GetScrollPositionAtTick(tickAdvance) + pt.ScrollPos;
+    }
+
+    /// <summary>
+    ///     Returns the SCROLL factor active at the given time, or 1.0 if no points exist.
+    /// </summary>
+    public double GetScrollFactorAtTime(double time)
+    {
+        if (points.Length == 0)
+            return 1.0;
+
+        var idx = findPoint(time);
+        return points[idx].ScrollFactor;
+    }
+
+    /// <summary>
+    ///     Returns the SPEED factor active at the given time, or 1.0 if no points exist.
+    /// </summary>
+    public double GetSpeedFactorAtTime(double time)
+    {
+        if (points.Length == 0)
+            return 1.0;
+
+        var idx = findPoint(time);
+        return points[idx].SpeedFactor;
+    }
+
+    /// <summary>
+    ///     Returns the BPM value active at the given tick position.
+    /// </summary>
+    public double GetBpmAtTick(long tick)
+    {
+        var bpm = ScrollReferenceBpm;
+
+        foreach (var evt in BpmEvents)
+        {
+            if (evt.Tick > tick)
+                break;
+
+            if (evt.Bpm > 0)
+                bpm = evt.Bpm;
+        }
+
+        return bpm;
+    }
+
+    /// <summary>
+    ///     Returns the projected osu! time in milliseconds for a native BMS tick,
+    ///     accounting for all BPM changes and STOP segments.
+    /// </summary>
+    public double ProjectTickToTime(long tick)
+    {
+        var bpmEvent = BpmEvents[findLastBpmIndex(tick)];
+
+        var firstStop = findFirstStopIndex(bpmEvent.Tick);
+        var pastStop = findFirstStopIndex(tick);
+
+        var stopOffset = 0d;
+
+        if (firstStop < pastStop)
+        {
+            stopOffset = cumulativeStopDurations[pastStop - 1];
+
+            if (firstStop > 0)
+                stopOffset -= cumulativeStopDurations[firstStop - 1];
+        }
+
+        return bpmEvent.Time + ticksToMilliseconds(tick - bpmEvent.Tick, Math.Abs(bpmEvent.Bpm)) + stopOffset;
+    }
+
     // ── Build: precompute all timing points ───────────────────────────────────
 
     private TimingPoint[] buildTimingPoints()
@@ -94,7 +232,9 @@ public sealed class BmsTimingMap
         var currentTick = 0L;
         var scrollTick = 0.0;
         var currentTime = 0d;
-        var currentBpm = BpmEvents.FirstOrDefault(e => e.Tick == 0 && e.Bpm > 0).Bpm;
+        var firstBpm = BpmEvents.FirstOrDefault(e => e.Tick == 0 && e.Bpm != 0).Bpm;
+        var currentBpm = Math.Abs(firstBpm);
+        var currentDir = firstBpm < 0 ? -1 : 1;
         var currentScroll = 1.0;
         var currentSpeed = 1.0;
 
@@ -116,11 +256,11 @@ public sealed class BmsTimingMap
                 {
                     var scrollPos = GetScrollPositionAtTick(scrollTick);
                     result.Add(new TimingPoint(currentTime, currentTime + duration,
-                        scrollPos, currentBpm, currentScroll, currentSpeed, false));
+                        scrollPos, currentBpm, currentScroll, currentSpeed, currentDir, false));
                 }
 
                 currentTime += duration;
-                scrollTick += (tick - currentTick) * currentScroll;
+                scrollTick += (tick - currentTick) * currentScroll * currentDir;
                 currentTick = tick;
             }
 
@@ -128,8 +268,11 @@ public sealed class BmsTimingMap
             while (bpmIndex < BpmEvents.Count && BpmEvents[bpmIndex].Tick == tick)
             {
                 var bpm = BpmEvents[bpmIndex++].Bpm;
-                if (bpm > 0)
-                    currentBpm = bpm;
+                if (bpm != 0)
+                {
+                    currentBpm = Math.Abs(bpm);
+                    currentDir = bpm < 0 ? -1 : 1;
+                }
             }
 
             // STOP at this tick
@@ -141,7 +284,7 @@ public sealed class BmsTimingMap
                 {
                     var scrollPos = GetScrollPositionAtTick(scrollTick);
                     result.Add(new TimingPoint(currentTime, currentTime + stop.Duration,
-                        scrollPos, currentBpm, currentScroll, currentSpeed, true));
+                        scrollPos, currentBpm, currentScroll, currentSpeed, currentDir, true));
                     currentTime += stop.Duration;
                 }
             }
@@ -157,7 +300,7 @@ public sealed class BmsTimingMap
 
         // Final infinite segment
         result.Add(new TimingPoint(currentTime, double.PositiveInfinity,
-            GetScrollPositionAtTick(scrollTick), currentBpm, currentScroll, currentSpeed, false));
+            GetScrollPositionAtTick(scrollTick), currentBpm, currentScroll, currentSpeed, currentDir, false));
 
         return result.ToArray();
     }
@@ -229,142 +372,6 @@ public sealed class BmsTimingMap
         return cursor;
     }
 
-    // ── Time-based queries ────────────────────────────────────────────────────
-
-    /// <summary>
-    ///     Returns the native BMS scroll coordinate at a tick position.
-    ///     SCROLL and SPEED factors are NOT applied here — use <see cref="GetVisualScrollPositionAtTick"/>
-    ///     for the display-coordinate equivalent that accounts for <c>#SCROLLxx</c>.
-    /// </summary>
-    public double GetScrollPositionAtTick(double tick) => ticksToMilliseconds(tick, ScrollReferenceBpm);
-
-    /// <summary>
-    ///     Returns the display scroll coordinate for a tick position, with
-    ///     <c>#SCROLLxx</c> factors applied per segment. Notes in a 2× SCROLL zone
-    ///     get 2× the scroll distance for the same tick range, spreading them apart visually.
-    /// </summary>
-    public double GetVisualScrollPositionAtTick(double tick)
-    {
-        if (ScrollEvents.Count == 0)
-            return ticksToMilliseconds(tick, ScrollReferenceBpm);
-
-        double position = 0;
-        long prevTick = 0;
-        var factor = 1.0;
-        var scrollIdx = 0;
-
-        foreach (var evt in ScrollEvents)
-        {
-            if (evt.Tick >= tick)
-                break;
-
-            if (evt.Tick > prevTick)
-            {
-                position += ticksToMilliseconds(evt.Tick - prevTick, ScrollReferenceBpm) * factor;
-                prevTick = evt.Tick;
-            }
-
-            factor = evt.Factor;
-            scrollIdx++;
-
-            if (scrollIdx >= ScrollEvents.Count)
-                break;
-        }
-
-        if (tick > prevTick)
-            position += ticksToMilliseconds(tick - prevTick, ScrollReferenceBpm) * factor;
-
-        return position;
-    }
-
-    /// <summary>
-    ///     Returns the native BMS scroll coordinate reached at a projected osu! time,
-    ///     accounting for BPM changes, STOP segments, and SCROLL factors.
-    /// </summary>
-    public double GetScrollPositionAtTime(double time)
-    {
-        if (points.Length == 0)
-            return time;
-
-        var idx = findPoint(time);
-        var pt = points[idx];
-
-        if (pt.IsStop)
-            return pt.ScrollPos;
-
-        // ScrollPos is stored in native tick units (GetScrollPositionAtTick).
-        // The time elapsed in this segment converts back to native ticks × ScrollFactor.
-        var tickAdvance = millisecondsToTicks(time - pt.Time, pt.Bpm * pt.ScrollFactor);
-        return GetScrollPositionAtTick(tickAdvance) + pt.ScrollPos;
-    }
-
-    /// <summary>
-    ///     Returns the SCROLL factor active at the given time, or 1.0 if no points exist.
-    /// </summary>
-    public double GetScrollFactorAtTime(double time)
-    {
-        if (points.Length == 0)
-            return 1.0;
-
-        var idx = findPoint(time);
-        return points[idx].ScrollFactor;
-    }
-
-    /// <summary>
-    ///     Returns the SPEED factor active at the given time, or 1.0 if no points exist.
-    /// </summary>
-    public double GetSpeedFactorAtTime(double time)
-    {
-        if (points.Length == 0)
-            return 1.0;
-
-        var idx = findPoint(time);
-        return points[idx].SpeedFactor;
-    }
-
-    /// <summary>
-    ///     Returns the BPM value active at the given tick position.
-    /// </summary>
-    public double GetBpmAtTick(long tick)
-    {
-        var bpm = ScrollReferenceBpm;
-
-        foreach (var evt in BpmEvents)
-        {
-            if (evt.Tick > tick)
-                break;
-
-            if (evt.Bpm > 0)
-                bpm = evt.Bpm;
-        }
-
-        return bpm;
-    }
-
-    /// <summary>
-    ///     Returns the projected osu! time in milliseconds for a native BMS tick,
-    ///     accounting for all BPM changes and STOP segments.
-    /// </summary>
-    public double ProjectTickToTime(long tick)
-    {
-        var bpmEvent = BpmEvents[findLastBpmIndex(tick)];
-
-        var firstStop = findFirstStopIndex(bpmEvent.Tick);
-        var pastStop = findFirstStopIndex(tick);
-
-        var stopOffset = 0d;
-
-        if (firstStop < pastStop)
-        {
-            stopOffset = cumulativeStopDurations[pastStop - 1];
-
-            if (firstStop > 0)
-                stopOffset -= cumulativeStopDurations[firstStop - 1];
-        }
-
-        return bpmEvent.Time + ticksToMilliseconds(tick - bpmEvent.Tick, bpmEvent.Bpm) + stopOffset;
-    }
-
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private double[] buildCumulativeStops()
@@ -431,8 +438,8 @@ public sealed class BmsTimingMap
 
     private double initialBpm()
     {
-        var initial = BpmEvents.FirstOrDefault(e => e.Tick == 0 && e.Sequence == 0 && e.Bpm > 0).Bpm;
-        return initial > 0 ? initial : 130;
+        var initial = BpmEvents.FirstOrDefault(e => e.Tick == 0 && e.Sequence == 0 && e.Bpm != 0).Bpm;
+        return initial != 0 ? Math.Abs(initial) : 130;
     }
 
     private double ticksToMilliseconds(double ticks, double bpm) =>

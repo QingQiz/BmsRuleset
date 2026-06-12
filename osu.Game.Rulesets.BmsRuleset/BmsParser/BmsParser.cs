@@ -87,8 +87,8 @@ internal static partial class BmsChartParser
         var stopEvents = collectStopEvents(state, measureStarts, timingEvents);
         timingEvents = applyStopOffsetsToTimingEvents(timingEvents, stopEvents);
 
-        var scrollEvents = collectScrollEvents(state, measureStarts, timingEvents);
-        var speedEvents = collectSpeedEvents(state, measureStarts, timingEvents);
+        var scrollEvents = collectScrollEvents(state, measureStarts);
+        var speedEvents = collectSpeedEvents(state, measureStarts);
 
         var timingMap = new BmsTimingMap(
             tickResolution,
@@ -331,7 +331,7 @@ internal static partial class BmsChartParser
 
         if (cmdSpan.Equals("BPM", StringComparison.OrdinalIgnoreCase))
         {
-            if (tryParseDouble(valueSpan, out var bpm) && bpm > 0)
+            if (tryParseDouble(valueSpan, out var bpm) && bpm != 0)
                 state.InitialBpm = bpm;
             return;
         }
@@ -380,7 +380,7 @@ internal static partial class BmsChartParser
 
         // Definition commands: #BPMxx, #WAVxx, #STOPxx, #TEXTxx, #SONGxx
         if (cmdSpan.Length == 5 && cmdSpan.StartsWith("BPM", StringComparison.OrdinalIgnoreCase)
-                                && tryParseDouble(valueSpan, out var extendedBpm) && extendedBpm > 0)
+                                && tryParseDouble(valueSpan, out var extendedBpm) && extendedBpm != 0)
         {
             state.BpmDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = extendedBpm;
             return;
@@ -564,7 +564,7 @@ internal static partial class BmsChartParser
                 var tick = mStart + mLength * i / pairCount;
                 var bpm = isHexChannel ? parseHexBpm(value) : state.BpmDefinitions.GetValueOrDefault(value);
 
-                if (bpm is > 0)
+                if (bpm is not 0 and not null)
                     events.Add(new TimingEvent(tick, bpm.Value, 0, line.Sequence + i));
             }
         }
@@ -579,7 +579,7 @@ internal static partial class BmsChartParser
             var timingEvent = ordered[i];
 
             if (i > 0)
-                time += ticksToMilliseconds(timingEvent.Tick - previousTick, previousBpm, tickResolution);
+                time += ticksToMilliseconds(timingEvent.Tick - previousTick, Math.Abs(previousBpm), tickResolution);
 
             ordered[i] = timingEvent with { Time = time };
             previousTick = timingEvent.Tick;
@@ -625,7 +625,7 @@ internal static partial class BmsChartParser
         return events.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToList();
     }
 
-    private static List<ScrollEvent> collectScrollEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts, List<TimingEvent> timingEvents)
+    private static List<ScrollEvent> collectScrollEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts)
     {
         var events = new List<ScrollEvent>();
 
@@ -658,7 +658,7 @@ internal static partial class BmsChartParser
         return events.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToList();
     }
 
-    private static List<SpeedEvent> collectSpeedEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts, List<TimingEvent> timingEvents)
+    private static List<SpeedEvent> collectSpeedEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts)
     {
         var events = new List<SpeedEvent>();
 
@@ -1017,8 +1017,8 @@ internal static partial class BmsChartParser
     private const ushort CH_08 = (0 << 6) | 8;
     private const ushort CH_09 = (0 << 6) | 9;
     private const ushort CH_99 = (9 << 6) | 9;
-    private const ushort CH_SC = (28 << 6) | 12;   // 'S','C'
-    private const ushort CH_SP = (28 << 6) | 25;   // 'S','P'
+    private const ushort CH_SC = (28 << 6) | 12; // 'S','C'
+    private const ushort CH_SP = (28 << 6) | 25; // 'S','P'
 
     // ReSharper restore InconsistentNaming
     // ReSharper restore ShiftExpressionZeroLeftOperand
@@ -1104,9 +1104,9 @@ internal static partial class BmsChartParser
 
     private struct SampleEventComparer : IComparer<BmsSampleEvent>
     {
-        public int Compare(BmsSampleEvent a, BmsSampleEvent b)
+        public int Compare(BmsSampleEvent? a, BmsSampleEvent? b)
         {
-            var cmp = a.Time.CompareTo(b.Time);
+            var cmp = a!.Time.CompareTo(b!.Time);
             if (cmp != 0) return cmp;
 
             return a.Tick.CompareTo(b.Tick);
