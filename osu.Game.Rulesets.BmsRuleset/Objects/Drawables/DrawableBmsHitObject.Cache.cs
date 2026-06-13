@@ -15,7 +15,6 @@ public partial class DrawableBmsHitObject
         Drawable? ColumnContainer,
         float ParentHeight,
         float ScaledParentWidth,
-        BmsTimingMap? TimingMap,
         double CurrentScrollPosition);
 
     private readonly record struct LayoutReferences(
@@ -32,10 +31,6 @@ public partial class DrawableBmsHitObject
     {
 
         public bool HasLayout => LayoutRef != null;
-
-        public int CurrentColumn => LayoutRef?.Column ?? 0;
-
-        public BmsLayoutVariant CurrentLayoutVariant => LayoutRef?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
 
         public BmsPlayfield? Playfield;
         public LayoutReferences? LayoutRef;
@@ -67,7 +62,6 @@ public partial class DrawableBmsHitObject
 
         public LayoutMetrics CreateLayoutMetrics(float parentHeight, float scaledParentWidth, double currentTime)
         {
-            var stage = LayoutRef?.Stage;
             var col = LayoutRef?.Column ?? 0;
             var variant = LayoutRef?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
             var container = LayoutRef?.ColumnContainer;
@@ -75,7 +69,6 @@ public partial class DrawableBmsHitObject
             return new LayoutMetrics(col, variant, container,
                 parentHeight,
                 Math.Max(1, scaledParentWidth),
-                Playfield?.TimingMap,
                 Playfield?.CurrentScrollPosition ?? currentTime);
         }
 

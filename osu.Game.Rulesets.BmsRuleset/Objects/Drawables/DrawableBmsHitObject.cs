@@ -498,7 +498,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     ///     Converts a time offset (<paramref name="timeUntilHit" />, where negative means past)
     ///     into a vertical pixel position relative to the column container's top.  For charts
     ///     with tick-based timing, the scroll coordinate is projected through
-    ///     <see cref="scrollPositionFor" />; otherwise a simple linear time-to-pixel scaling
+    ///     <see cref="getScrollPositionForOffset" />; otherwise a simple linear time-to-pixel scaling
     ///     is used.
     /// </summary>
     private float yForTimeOffset(double timeUntilHit, LayoutMetrics layout)
@@ -507,31 +507,35 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         // coordinate axis (scroll=0).  Using tick-based progress would make them
         // appear pinned far below the judgement line regardless of real time, so
         // fall back to linear time for these notes.
-        var progressUntilHit = layout.TimingMap == null || cache.Playfield?.ConstantScrollActive == true || HitObject.TickInfo.Tick == HitObject.TickInfo.EndTick && HitObject.TickInfo.Tick == 0 && HitObject.StartTime != 0
+        var progressUntilHit = cache.Playfield?.TimingMap == null
+                               || cache.Playfield?.ConstantScrollActive == true
+                               || (HitObject.TickInfo.Tick == HitObject.TickInfo.EndTick && HitObject.TickInfo.Tick == 0 && HitObject.StartTime != 0)
             ? timeUntilHit
-            : scrollPositionFor(timeUntilHit, layout) - layout.CurrentScrollPosition;
+            : getScrollPositionForOffset(timeUntilHit) - layout.CurrentScrollPosition;
 
         return cache.Playfield!.YForScrollProgress(progressUntilHit, layout.ParentHeight, currentNoteHeight);
     }
 
     /// <summary>
-    ///     Resolves the scroll-position value (in the coordinate space of
-    ///     <see cref="BmsTimingMap" />) for the time <c>Time.Current + timeUntilHit</c>.
-    ///     When the offset matches a known tick boundary (start or end of the note), the
-    ///     per-tick position is used directly to avoid floating-point drift.
+    ///     Returns the precomputed scroll position for the given time offset,
+    ///     using <see cref="BmsHitObject.ScrollPositionAtStartTime"/> /
+    ///     <see cref="BmsHitObject.ScrollPositionAtEndTime"/> which were computed
+    ///     once during beatmap loading.  This replaces the old per-frame
+    ///     <see cref="BmsTimingMap.GetScrollPositionAtTime"/> call chain that
+    ///     traversed the full timing-point array for every hitobject every frame.
     /// </summary>
-    private double scrollPositionFor(double timeUntilHit, LayoutMetrics layout)
+    private double getScrollPositionForOffset(double timeUntilHit)
     {
-        if (layout.TimingMap == null)
-            return Time.Current + timeUntilHit;
-
+        // Primary hot path: scroll position at note's start time (hit by yForTimeOffset for head Y).
         if (Math.Abs(timeUntilHit - (HitObject.StartTime - Time.Current)) < 0.001)
-            return layout.TimingMap.GetScrollPositionAtTime(HitObject.StartTime);
+            return HitObject.ScrollPositionAtStartTime;
 
+        // Secondary hot path: scroll position at long note's end time (hit by yForTimeOffset for tail Y).
         if (HitObject.IsLongNote && Math.Abs(timeUntilHit - (HitObject.EndTime - Time.Current)) < 0.001)
-            return layout.TimingMap.GetScrollPositionAtTime(HitObject.EndTime);
+            return HitObject.ScrollPositionAtEndTime;
 
-        return layout.TimingMap.GetScrollPositionAtTime(Time.Current + timeUntilHit);
+        // Fallback: off-boundary times (should rarely occur in practice).
+        return Time.Current + timeUntilHit;
     }
 
     /// <summary>

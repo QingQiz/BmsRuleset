@@ -47,6 +47,10 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         converted.TimingMap ??= createFallbackTimingMap(converted);
         converted.TickResolution = converted.TimingMap.TickResolution;
 
+        // Precompute scroll positions once per hitobject to eliminate per-frame
+        // GetScrollPositionAtTime calls in the DrawableBmsHitObject hot path.
+        precomputeScrollPositions(converted);
+
         if (converted.TotalColumns <= 0)
         {
             converted.TotalColumns = inferTotalColumns(original, converted.HitObjects);
@@ -155,6 +159,25 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
     {
         foreach (var hitObject in beatmap.HitObjects)
             hitObject.BmsRank = beatmap.Rank;
+    }
+
+    /// <summary>
+    ///     Precomputes <see cref="BmsHitObject.ScrollPositionAtStartTime"/> and
+    ///     <see cref="BmsHitObject.ScrollPositionAtEndTime"/> for every hitobject.
+    ///     This runs once during beatmap loading, eliminating the per-frame
+    ///     <see cref="BmsTimingMap.GetScrollPositionAtTime"/> calls in the drawable hot path
+    ///     (which would otherwise traverse the timing-point array for every hitobject, every frame).
+    /// </summary>
+    private static void precomputeScrollPositions(BmsBeatmap beatmap)
+    {
+        var timingMap = beatmap.TimingMap;
+        if (timingMap == null) return;
+
+        foreach (var hitObject in beatmap.HitObjects)
+        {
+            hitObject.ScrollPositionAtStartTime = timingMap.GetScrollPositionAtTime(hitObject.StartTime);
+            hitObject.ScrollPositionAtEndTime = timingMap.GetScrollPositionAtTime(hitObject.EndTime);
+        }
     }
 
     private static BmsBeatmap convertToBmsBeatmap(IBeatmap original, CancellationToken cancellationToken)

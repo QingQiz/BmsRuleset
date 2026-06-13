@@ -53,6 +53,19 @@ public class BmsHitObject : HitObject, IHasDuration
     /// <summary>BMS #RANK value stamped from the beatmap during conversion. 0=Very Hard, 1=Hard, 2=Normal, 3=Easy, 4=Very Easy.</summary>
     public int BmsRank { get; set; } = 2;
 
+    /// <summary>
+    ///     Precomputed scroll position at <see cref="HitObject.StartTime"/>.
+    ///     Computed once during beatmap loading via <see cref="BmsParser.BmsTimingMap.GetScrollPositionAtTime"/>.
+    ///     Eliminates per-frame calls to the full timing-map lookup chain in the drawable hot path.
+    /// </summary>
+    public double ScrollPositionAtStartTime { get; set; }
+
+    /// <summary>
+    ///     Precomputed scroll position at <see cref="EndTime"/>.
+    ///     Computed once during beatmap loading for all objects (equals <see cref="ScrollPositionAtStartTime"/> for non-LN notes).
+    /// </summary>
+    public double ScrollPositionAtEndTime { get; set; }
+
     public override Judgement CreateJudgement() => new BmsJudgement(IsMine);
 
     protected override BmsHitWindows CreateHitWindows() => new(BmsRank);
