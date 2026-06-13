@@ -9,15 +9,26 @@ public sealed class BmsTimingMap
 
     public int TickResolution { get; }
 
-    public IReadOnlyList<BmsMeasureInfo> Measures { get; }
+    public IReadOnlyList<BmsMeasureInfo> Measures => measures;
 
-    public IReadOnlyList<BmsBpmEvent> BpmEvents { get; }
+    /// <summary>Backed by array for zero-overhead access in hot-path binary searches.</summary>
+    private readonly BmsMeasureInfo[] measures;
 
-    public IReadOnlyList<BmsStopEvent> StopEvents { get; }
+    public IReadOnlyList<BmsBpmEvent> BpmEvents => bpmEvents;
 
-    public IReadOnlyList<BmsScrollEvent> ScrollEvents { get; }
+    private readonly BmsBpmEvent[] bpmEvents;
 
-    public IReadOnlyList<BmsSpeedEvent> SpeedEvents { get; }
+    public IReadOnlyList<BmsStopEvent> StopEvents => stopEvents;
+
+    private readonly BmsStopEvent[] stopEvents;
+
+    public IReadOnlyList<BmsScrollEvent> ScrollEvents => scrollEvents;
+
+    private readonly BmsScrollEvent[] scrollEvents;
+
+    public IReadOnlyList<BmsSpeedEvent> SpeedEvents => speedEvents;
+
+    private readonly BmsSpeedEvent[] speedEvents;
 
     /// <summary>
     ///     BPM used to express scroll coordinates as millisecond-like values.
@@ -62,11 +73,11 @@ public sealed class BmsTimingMap
                         double baseBpm = 0)
     {
         TickResolution = tickResolution;
-        Measures = measures.OrderBy(m => m.Index).ToArray();
-        BpmEvents = bpmEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
-        StopEvents = stopEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
-        ScrollEvents = scrollEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
-        SpeedEvents = speedEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
+        this.measures = measures.OrderBy(m => m.Index).ToArray();
+        this.bpmEvents = bpmEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
+        this.stopEvents = stopEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
+        this.scrollEvents = scrollEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
+        this.speedEvents = speedEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
         ScrollReferenceBpm = baseBpm > 0 ? baseBpm : initialBpm();
         points = buildTimingPoints();
         cumulativeStopDurations = buildCumulativeStops();
@@ -96,7 +107,7 @@ public sealed class BmsTimingMap
     /// </summary>
     public double GetVisualScrollPositionAtTick(double tick)
     {
-        if (ScrollEvents.Count == 0)
+        if (scrollEvents.Length == 0)
             return ticksToMilliseconds(tick, ScrollReferenceBpm);
 
         double position = 0;
@@ -118,7 +129,7 @@ public sealed class BmsTimingMap
             factor = evt.Factor;
             scrollIdx++;
 
-            if (scrollIdx >= ScrollEvents.Count)
+            if (scrollIdx >= scrollEvents.Length)
                 break;
         }
 
@@ -180,7 +191,7 @@ public sealed class BmsTimingMap
     {
         var bpm = ScrollReferenceBpm;
 
-        foreach (var evt in BpmEvents)
+        foreach (var evt in bpmEvents)
         {
             if (evt.Tick > tick)
                 break;
@@ -198,7 +209,7 @@ public sealed class BmsTimingMap
     /// </summary>
     public double ProjectTickToTime(long tick)
     {
-        var bpmEvent = BpmEvents[findLastBpmIndex(tick)];
+        var bpmEvent = bpmEvents[findLastBpmIndex(tick)];
 
         var firstStop = findFirstStopIndex(bpmEvent.Tick);
         var pastStop = findFirstStopIndex(tick);
@@ -221,10 +232,10 @@ public sealed class BmsTimingMap
     private TimingPoint[] buildTimingPoints()
     {
         // Collect all change ticks: BPM, STOP, SCROLL, and SPEED.
-        var eventTicks = BpmEvents.Select(e => e.Tick)
-            .Concat(StopEvents.Select(e => e.Tick))
-            .Concat(ScrollEvents.Select(e => e.Tick))
-            .Concat(SpeedEvents.Select(e => e.Tick))
+        var eventTicks = bpmEvents.Select(e => e.Tick)
+            .Concat(stopEvents.Select(e => e.Tick))
+            .Concat(scrollEvents.Select(e => e.Tick))
+            .Concat(speedEvents.Select(e => e.Tick))
             .Distinct().OrderBy(t => t).ToArray();
 
         var result = new List<TimingPoint>();
@@ -232,7 +243,7 @@ public sealed class BmsTimingMap
         var currentTick = 0L;
         var scrollTick = 0.0;
         var currentTime = 0d;
-        var firstBpm = BpmEvents.FirstOrDefault(e => e.Tick == 0 && e.Bpm != 0).Bpm;
+        var firstBpm = bpmEvents.FirstOrDefault(e => e.Tick == 0 && e.Bpm != 0).Bpm;
         var currentBpm = Math.Abs(firstBpm);
         var currentDir = firstBpm < 0 ? -1 : 1;
         var currentScroll = 1.0;
@@ -265,9 +276,9 @@ public sealed class BmsTimingMap
             }
 
             // BPM changes at this tick
-            while (bpmIndex < BpmEvents.Count && BpmEvents[bpmIndex].Tick == tick)
+            while (bpmIndex < bpmEvents.Length && bpmEvents[bpmIndex].Tick == tick)
             {
-                var bpm = BpmEvents[bpmIndex++].Bpm;
+                var bpm = bpmEvents[bpmIndex++].Bpm;
                 if (bpm != 0)
                 {
                     currentBpm = Math.Abs(bpm);
@@ -276,9 +287,9 @@ public sealed class BmsTimingMap
             }
 
             // STOP at this tick
-            while (stopIndex < StopEvents.Count && StopEvents[stopIndex].Tick == tick)
+            while (stopIndex < stopEvents.Length && stopEvents[stopIndex].Tick == tick)
             {
-                var stop = StopEvents[stopIndex++];
+                var stop = stopEvents[stopIndex++];
 
                 if (stop.Duration > 0)
                 {
@@ -290,12 +301,12 @@ public sealed class BmsTimingMap
             }
 
             // SCROLL change at this tick
-            while (scrollIndex < ScrollEvents.Count && ScrollEvents[scrollIndex].Tick == tick)
-                currentScroll = ScrollEvents[scrollIndex++].Factor;
+            while (scrollIndex < scrollEvents.Length && scrollEvents[scrollIndex].Tick == tick)
+                currentScroll = scrollEvents[scrollIndex++].Factor;
 
             // SPEED change at this tick
-            while (speedIndex < SpeedEvents.Count && SpeedEvents[speedIndex].Tick == tick)
-                currentSpeed = SpeedEvents[speedIndex++].Factor;
+            while (speedIndex < speedEvents.Length && speedEvents[speedIndex].Tick == tick)
+                currentSpeed = speedEvents[speedIndex++].Factor;
         }
 
         // Final infinite segment
@@ -376,12 +387,12 @@ public sealed class BmsTimingMap
 
     private double[] buildCumulativeStops()
     {
-        var prefix = new double[StopEvents.Count];
+        var prefix = new double[stopEvents.Length];
         double cumulative = 0;
 
-        for (var i = 0; i < StopEvents.Count; i++)
+        for (var i = 0; i < stopEvents.Length; i++)
         {
-            cumulative += StopEvents[i].Duration;
+            cumulative += stopEvents[i].Duration;
             prefix[i] = cumulative;
         }
 
@@ -391,14 +402,14 @@ public sealed class BmsTimingMap
     private int findLastBpmIndex(long tick)
     {
         var lo = 0;
-        var hi = BpmEvents.Count - 1;
+        var hi = bpmEvents.Length - 1;
         var result = 0;
 
         while (lo <= hi)
         {
             var mid = lo + (hi - lo) / 2;
 
-            if (BpmEvents[mid].Tick <= tick)
+            if (bpmEvents[mid].Tick <= tick)
             {
                 result = mid;
                 lo = mid + 1;
@@ -415,14 +426,14 @@ public sealed class BmsTimingMap
     private int findFirstStopIndex(long tick)
     {
         var lo = 0;
-        var hi = StopEvents.Count - 1;
-        var result = StopEvents.Count;
+        var hi = stopEvents.Length - 1;
+        var result = stopEvents.Length;
 
         while (lo <= hi)
         {
             var mid = lo + (hi - lo) / 2;
 
-            if (StopEvents[mid].Tick >= tick)
+            if (stopEvents[mid].Tick >= tick)
             {
                 result = mid;
                 hi = mid - 1;
@@ -438,7 +449,7 @@ public sealed class BmsTimingMap
 
     private double initialBpm()
     {
-        var initial = BpmEvents.FirstOrDefault(e => e.Tick == 0 && e.Sequence == 0 && e.Bpm != 0).Bpm;
+        var initial = bpmEvents.FirstOrDefault(e => e.Tick == 0 && e.Sequence == 0 && e.Bpm != 0).Bpm;
         return initial != 0 ? Math.Abs(initial) : 130;
     }
 

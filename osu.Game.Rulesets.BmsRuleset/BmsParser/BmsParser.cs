@@ -696,7 +696,45 @@ internal static partial class BmsChartParser
         if (stopEvents.Count == 0)
             return timingEvents;
 
-        return timingEvents.Select(e => e with { Time = e.Time + stopEvents.Where(s => s.Tick < e.Tick).Sum(s => s.Duration) }).ToList();
+        // Prefix sum of stop durations — replaces O(T × S) Where+Sum with O(S + T log S).
+        var prefix = new double[stopEvents.Count];
+        double cumulative = 0;
+
+        for (var i = 0; i < stopEvents.Count; i++)
+        {
+            cumulative += stopEvents[i].Duration;
+            prefix[i] = cumulative;
+        }
+
+        for (var i = 0; i < timingEvents.Count; i++)
+        {
+            var e = timingEvents[i];
+
+            // Binary search: find the last stop whose Tick is strictly before e.Tick.
+            var lo = 0;
+            var hi = stopEvents.Count - 1;
+            var idx = -1;
+
+            while (lo <= hi)
+            {
+                var mid = lo + (hi - lo) / 2;
+
+                if (stopEvents[mid].Tick < e.Tick)
+                {
+                    idx = mid;
+                    lo = mid + 1;
+                }
+                else
+                {
+                    hi = mid - 1;
+                }
+            }
+
+            var stopDuration = idx >= 0 ? prefix[idx] : 0;
+            timingEvents[i] = e with { Time = e.Time + stopDuration };
+        }
+
+        return timingEvents;
     }
 
     private static void collectHitObjects(
@@ -904,9 +942,14 @@ internal static partial class BmsChartParser
         {
             var offset = i * 2;
             var pos = plStart + offset;
+
+            // Fast path: ~97% of BMS cells are "00" — skip encoding entirely for these.
+            if (!includeZeroCells && lineStr[pos] == '0' && lineStr[pos + 1] == '0')
+                continue;
+
             var value = encodeValue(useBase62, lineStr[pos], lineStr[pos + 1]);
 
-            if (!includeZeroCells && value == 0) // 0 = "00"
+            if (!includeZeroCells && value == 0)
                 continue;
 
             yield return new RawCell(measureStart + measureLength * i / pairCount, line.Channel, value, line.Sequence + i, -1);
