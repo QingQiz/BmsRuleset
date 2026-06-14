@@ -112,6 +112,13 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     private HitResult? longNoteHeadResult;
     private float? longNoteHeadFixedY;
 
+    /// <summary>
+    ///     When <c>true</c>, the mine has already passed harmlessly and subsequent
+    ///     frames must not re-check <see cref="BmsPlayfield.IsColumnPressedForLandmine"/>
+    ///     Reset in <see cref="OnApply"/> for pool reuse safety.
+    /// </summary>
+    private bool mineHandled;
+
     #endregion
 
     #region Sizing state
@@ -208,6 +215,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         longNotePiecesApplied = false;
         longNoteHeadResult = null;
         longNoteHeadFixedY = null;
+        mineHandled = false;
         cache.InvalidateAll();
         updateSkinPieces();
     }
@@ -298,15 +306,21 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         // it means it is being triggered in the current or next frame.
         // At this point, the mine is processed:
         // if it is held down, trigger the mine; otherwise, let it expire immediately.
-        if (HitObject.IsMine && !Judged && Time.Current >= HitObject.StartTime)
+        if (HitObject.IsMine && !Judged && !mineHandled && Time.Current >= HitObject.StartTime)
         {
+            mineHandled = true;
+
             if (cache.Playfield?.IsColumnPressedForLandmine(HitObject.Column) == true)
             {
                 cache.Playfield.DetonateLandmine(HitObject);
                 ApplyResult(HitResult.Meh);
             }
             else
-                Expire(true);
+            {
+                // Mine passed harmlessly without being pressed.
+                // Hide the mine and let the HitObjectLifetimeEntry expire naturally
+                Alpha = 0;
+            }
 
             return;
         }

@@ -492,7 +492,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         const float reference_scroll_distance = 768f - 124.8f; // 768 - legacy DEFAULT_HIT_POSITION
         ScrollRangeScale = (768f - Stage.HitTargetPosition) / reference_scroll_distance;
 
-        RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, 512);
+        RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, 10240);
 
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
         updateEmbeddedSkinFallback();

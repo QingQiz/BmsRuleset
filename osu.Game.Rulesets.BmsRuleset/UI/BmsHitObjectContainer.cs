@@ -78,6 +78,12 @@ public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectCo
     private static bool usesLinearTimeProjection(BmsHitObject hitObject)
         => hitObject.TickInfo.Tick == hitObject.TickInfo.EndTick && hitObject.TickInfo.Tick == 0 && hitObject.StartTime != 0;
 
+    /// <summary>
+    /// Lifetime past a mine's <see cref="HitObject.StartTime"/>, in ms.
+    /// Mines only need a single frame to check whether the column is pressed
+    /// </summary>
+    private const double mine_past_lifetime = 10;
+
     private static double computePastLifetime() => default_past_lifetime + lifetime_margin;
 
     private static double getLateWindow(BmsHitObject hitObject)
@@ -92,7 +98,9 @@ public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectCo
         var pastLifetime = double.IsNaN(lastPastLifetime) ? computePastLifetime() : lastPastLifetime;
 
         var start = hitObject.StartTime - futureLifetime;
-        var end = hitObject.EndTime + Math.Max(pastLifetime, getLateWindow(hitObject) + lifetime_margin);
+        var end = hitObject.IsMine
+            ? hitObject.StartTime + mine_past_lifetime
+            : hitObject.EndTime + Math.Max(pastLifetime, getLateWindow(hitObject) + lifetime_margin);
 
         if (force || Math.Abs(entry.LifetimeStart - start) >= 1)
             entry.LifetimeStart = start;
