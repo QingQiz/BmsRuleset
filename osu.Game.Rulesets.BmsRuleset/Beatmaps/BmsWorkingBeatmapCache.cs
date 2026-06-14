@@ -4,6 +4,7 @@ using System.Reflection.Emit;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.IO.Stores;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -70,13 +71,31 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
 
     private static T getField<T>(object target, string fieldName, BindingFlags flags)
     {
-        var field = target.GetType().GetField(fieldName, flags)
-                    ?? throw new InvalidOperationException(
-                        $"Cannot find private field '{fieldName}' on {target.GetType().Name}. "
-                        + "The osu! framework may have changed; the BMS preview-track hook needs updating.");
+        var field = target.GetType().GetField(fieldName, flags);
 
-        return (T)(field.GetValue(target) ?? throw new InvalidOperationException(
-            $"Field '{fieldName}' on {target.GetType().Name} is null — unexpected."));
+        if (field == null)
+        {
+            Logger.Log(
+                $"BMS WorkingBeatmapCache: Cannot find private field '{fieldName}' on {target.GetType().Name}. "
+                + "The osu! framework may have changed; the BMS preview-track hook needs updating.",
+                level: LogLevel.Error);
+            throw new InvalidOperationException(
+                $"Cannot find private field '{fieldName}' on {target.GetType().Name}. "
+                + "The osu! framework may have changed; the BMS preview-track hook needs updating.");
+        }
+
+        var value = field.GetValue(target);
+
+        if (value == null)
+        {
+            Logger.Log(
+                $"BMS WorkingBeatmapCache: Field '{fieldName}' on {target.GetType().Name} is null — unexpected.",
+                level: LogLevel.Error);
+            throw new InvalidOperationException(
+                $"Field '{fieldName}' on {target.GetType().Name} is null — unexpected.");
+        }
+
+        return (T)value;
     }
 
     #endregion
@@ -118,7 +137,13 @@ public static class BmsWorkingBeatmapHelper
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
             if (cacheField == null)
+            {
+                Logger.Log(
+                    "BMS WorkingBeatmapHelper: Cannot find private field 'workingBeatmapCache' on BeatmapManager. "
+                    + "The osu! framework may have changed; BMS preview audio will not be available.",
+                    level: LogLevel.Error);
                 return false;
+            }
 
             var original = cacheField.GetValue(manager) as WorkingBeatmapCache;
 
@@ -153,21 +178,36 @@ public static class BmsWorkingBeatmapHelper
         }
         catch (FieldAccessException)
         {
+            // Modern .NET may block SetValue on init-only / readonly fields; fall through to IL emit.
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, $"BMS WorkingBeatmapHelper: Failed to set readonly field '{field.Name}' via SetValue. "
+                             + "BMS preview-track hook will not be active.");
+            return;
         }
 
-        var dynamicMethod = new DynamicMethod(
-            $"WriteField_{field.Name}",
-            null,
-            [typeof(object), typeof(object)],
-            typeof(FieldInfo).Module,
-            true);
+        try
+        {
+            var dynamicMethod = new DynamicMethod(
+                $"WriteField_{field.Name}",
+                null,
+                [typeof(object), typeof(object)],
+                typeof(FieldInfo).Module,
+                true);
 
-        var il = dynamicMethod.GetILGenerator();
-        il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Ldarg_1);
-        il.Emit(OpCodes.Stfld, field);
-        il.Emit(OpCodes.Ret);
+            var il = dynamicMethod.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Stfld, field);
+            il.Emit(OpCodes.Ret);
 
-        dynamicMethod.Invoke(null, [target, value]);
+            dynamicMethod.Invoke(null, [target, value]);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, $"BMS WorkingBeatmapHelper: Failed to write readonly field '{field.Name}' via IL emit. "
+                             + "BMS preview-track hook will not be active.");
+        }
     }
 }

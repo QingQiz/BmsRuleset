@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using osu.Framework.Bindables;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Judgements;
@@ -20,9 +21,28 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     private static Action<JudgementResult, int> createComboAfterSetter()
     {
-        var field = typeof(JudgementResult).GetField("<ComboAfterJudgement>k__BackingField",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-        return (r, v) => field!.SetValue(r, v);
+        try
+        {
+            var field = typeof(JudgementResult).GetField("<ComboAfterJudgement>k__BackingField",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            if (field == null)
+            {
+                Logger.Log(
+                    "BMS ScoreProcessor: Could not find JudgementResult.ComboAfterJudgement backing field. "
+                    + "The osu! framework may have changed; BAD/POOR combo-break revert will not function correctly.",
+                    level: LogLevel.Error);
+                return (_, _) => { };
+            }
+
+            return (r, v) => field.SetValue(r, v);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "BMS ScoreProcessor: Failed to bind ComboAfterJudgement setter via reflection. "
+                             + "BAD/POOR combo-break revert will not function correctly.");
+            return (_, _) => { };
+        }
     }
 
     public override void ApplyBeatmap(IBeatmap beatmap)
