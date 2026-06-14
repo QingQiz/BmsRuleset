@@ -3,6 +3,8 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Threading;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
@@ -12,35 +14,65 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 
 public sealed partial class BmsComboCounter : CompositeDrawable, ISerialisableDrawable
 {
-    public bool UsesFixedAnchor { get; set; }
+
+    [SettingSource("Auto-hide delay", "Seconds before combo counter hides when combo hasn't grown. Set to -1 to never auto-hide.")]
+    public BindableFloat AutoHideDelay { get; } = new(3f)
+    {
+        MinValue = -1f,
+        MaxValue = 100f,
+        Precision = 1f,
+    };
+
+    [SettingSource("Min visible combo", "Minimum combo count for the counter to be visible.")]
+    public Bindable<int> MinVisibleCombo { get; } = new BindableInt(10)
+    {
+        MinValue = 0,
+        MaxValue = 100,
+    };
 
     public Bindable<int> Current { get; } = new BindableInt { MinValue = 0 };
 
+    public bool UsesFixedAnchor { get; set; }
+
     public int DisplayedCount
     {
-        get => displayedCount;
+        get;
         private set
         {
-            if (displayedCount.Equals(value))
+            if (field.Equals(value))
                 return;
 
             displayedCountText.Text = value.ToString(CultureInfo.InvariantCulture);
             counterContainer.Size = displayedCountText.Size;
-            displayedCount = value;
+            field = value;
         }
     }
 
-    private int displayedCount;
-    private int previousValue;
-
     private const double fade_out_duration = 100;
     private const double rolling_duration = 20;
+
+    private int previousValue;
+
+    private bool autoHidden;
+    private ScheduledDelegate? autoHideTask;
 
     private Container counterContainer = null!;
     private LegacySpriteText popOutCountText = null!;
     private LegacySpriteText displayedCountText = null!;
 
     private Color4 breakColour = Color4.Red;
+
+    protected override void LoadComplete()
+    {
+        base.LoadComplete();
+
+        displayedCountText.Text = Current.Value.ToString(CultureInfo.InvariantCulture);
+        popOutCountText.Text = Current.Value.ToString(CultureInfo.InvariantCulture);
+
+        Current.BindValueChanged(combo => updateCount(combo.NewValue == 0), true);
+
+        counterContainer.Size = displayedCountText.Size;
+    }
 
     [BackgroundDependencyLoader]
     private void load(ISkinSource skin, ScoreProcessor scoreProcessor)
@@ -56,6 +88,7 @@ public sealed partial class BmsComboCounter : CompositeDrawable, ISerialisableDr
             new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ComboBreakColour)
         )?.Value ?? Color4.Red;
 
+        AlwaysPresent = true;
         AutoSizeAxes = Axes.Both;
 
         InternalChildren =
@@ -88,21 +121,9 @@ public sealed partial class BmsComboCounter : CompositeDrawable, ISerialisableDr
         Current.BindTo(scoreProcessor.Combo);
     }
 
-    protected override void LoadComplete()
-    {
-        base.LoadComplete();
-
-        displayedCountText.Text = Current.Value.ToString(CultureInfo.InvariantCulture);
-        popOutCountText.Text = Current.Value.ToString(CultureInfo.InvariantCulture);
-
-        Current.BindValueChanged(combo => updateCount(combo.NewValue == 0), true);
-
-        counterContainer.Size = displayedCountText.Size;
-    }
-
     private void updateCount(bool rolling)
     {
-        int prev = previousValue;
+        var prev = previousValue;
         previousValue = Current.Value;
 
         if (!IsLoaded)
@@ -119,6 +140,49 @@ public sealed partial class BmsComboCounter : CompositeDrawable, ISerialisableDr
         }
         else
             onCountRolling();
+
+        scheduleAutoHide();
+    }
+
+    private void scheduleAutoHide()
+    {
+        autoHideTask?.Cancel();
+
+        // Don't interfere with combo-break animation.
+        if (Current.Value == 0)
+            return;
+
+        // AutoHideDelay = -1 means never auto-hide.
+        if (AutoHideDelay.Value < 0)
+            return;
+
+        var threshold = MinVisibleCombo.Value;
+
+        if (Current.Value < threshold)
+        {
+            if (!autoHidden)
+            {
+                autoHidden = true;
+                this.FadeOut(200);
+            }
+        }
+        else
+        {
+            if (autoHidden)
+            {
+                autoHidden = false;
+                this.FadeIn(200);
+            }
+
+            autoHideTask = Scheduler.AddDelayed(() =>
+            {
+                if (Current.Value == 0)
+                    return;
+
+                autoHidden = true;
+                this.FadeOut(200);
+            }, AutoHideDelay.Value * 1000);
+        }
     }
 
     private void onCountIncrement()
@@ -127,8 +191,10 @@ public sealed partial class BmsComboCounter : CompositeDrawable, ISerialisableDr
 
         DisplayedCount = Current.Value;
         displayedCountText.ScaleTo(new Vector2(1f, 1.4f))
-                          .ScaleTo(new Vector2(1f), 300, Easing.Out)
-                          .FadeIn(120);
+            .ScaleTo(new Vector2(1f), 300, Easing.Out);
+
+        if (Current.Value >= MinVisibleCombo.Value)
+            displayedCountText.FadeIn(120);
     }
 
     private void onCountChange()
@@ -143,6 +209,9 @@ public sealed partial class BmsComboCounter : CompositeDrawable, ISerialisableDr
 
         DisplayedCount = Current.Value;
 
+        if (Current.Value >= MinVisibleCombo.Value)
+            displayedCountText.FadeIn(120);
+
         displayedCountText.ScaleTo(1f);
     }
 
@@ -152,7 +221,7 @@ public sealed partial class BmsComboCounter : CompositeDrawable, ISerialisableDr
         {
             popOutCountText.Text = DisplayedCount.ToString(CultureInfo.InvariantCulture);
             popOutCountText.FadeTo(0.8f).FadeOut(200)
-                           .ScaleTo(1f).ScaleTo(4f, 200);
+                .ScaleTo(1f).ScaleTo(4f, 200);
 
             displayedCountText.FadeTo(0.5f, 300);
 
