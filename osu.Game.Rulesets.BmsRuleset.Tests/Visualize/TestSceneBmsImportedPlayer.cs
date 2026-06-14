@@ -10,17 +10,14 @@ using osu.Framework.Extensions;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
-using osu.Game.Tests.Visual;
 using osuTK.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -130,6 +127,13 @@ public partial class TestSceneBmsImportedPlayer : BmsPlayerTestScene
         new BmsFileImporter(Realm, LocalStorage).Import(chartPath).WaitSafely();
     }
 
+    private void importCautionBms()
+    {
+        var chartPath = Path.Combine(testSongsRoot, "103_outlaw_ogg", "99_outlaw_caution.bms");
+        Assert.That(File.Exists(chartPath), Is.True, $"Missing test chart at {chartPath}");
+        new BmsFileImporter(Realm, LocalStorage).Import(chartPath).WaitSafely();
+    }
+
     private void selectImportedBeatmap(Mod[]? mods = null)
     {
         importedBeatmap = Realm.Run(r => r.All<BeatmapSetInfo>()
@@ -178,6 +182,35 @@ public partial class TestSceneBmsImportedPlayer : BmsPlayerTestScene
         AddUntilStep("judgements produced", () => Player.Results.Count, () => Is.GreaterThanOrEqualTo(10));
         AddAssert("autoplay produces perfects", () => Player.Results.Count(r => r.Type == HitResult.Perfect), () => Is.GreaterThanOrEqualTo(10));
         AddAssert("health increased from initial", () => Player.HealthProcessor.Health.Value, () => Is.GreaterThan(initialHealth));
+    }
+
+    [Test]
+    public void TestCautionAutoplayDoesNotPoorWhenFirstNoteAppears()
+    {
+        AddStep("register bms ruleset", addBmsRuleset);
+        AddStep("import caution bms", importCautionBms);
+        AddStep("select imported beatmap", () => selectImportedBeatmap());
+        AddStep("load player", () => LoadScreen(Player = CreateBmsPlayer(BmsTestReplays.CreateAutoPlayFrames)));
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+
+        AddStep("seek before first non-mine note", () =>
+        {
+            firstKeyNote = Player.DrawableRuleset.Objects.OfType<BmsHitObject>().First(o => !o.IsMine);
+            Player.GameplayClockContainer.Seek(firstKeyNote.StartTime - 1000);
+        });
+
+        AddUntilStep("early judgements produced", () => Player.Results.Count, () => Is.GreaterThanOrEqualTo(30));
+        AddStep("early autoplay has no poor or bad", () =>
+        {
+            var badResults = Player.Results.Take(30).Where(r => r.Type is HitResult.Meh or HitResult.Ok).ToArray();
+            var report = string.Join("\n", Player.Results.Take(30).Select(r =>
+            {
+                var hitObject = (BmsHitObject)r.HitObject;
+                return $"{r.Type} time={r.TimeAbsolute:F1} start={hitObject.StartTime:F1} tick={hitObject.TickInfo.Tick} col={hitObject.Column} mine={hitObject.IsMine}";
+            }));
+
+            Assert.That(badResults, Is.Empty, report);
+        });
     }
 
     [Test]

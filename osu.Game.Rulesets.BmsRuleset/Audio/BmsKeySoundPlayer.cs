@@ -1,15 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Objects;
-using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
 
@@ -23,7 +21,7 @@ public sealed partial class BmsKeySoundPlayer : CompositeDrawable
 {
     public override bool IsPresent => false;
 
-    public BmsKeySoundPlayer(IReadOnlyList<BmsHitObject> hitObjects, HitObjectContainer hitObjectContainer, Func<double> getCurrentTime, int totalColumns)
+    public BmsKeySoundPlayer(IReadOnlyList<BmsHitObject> hitObjects, BmsHitObjectContainer hitObjectContainer, Func<double> getCurrentTime, int totalColumns)
     {
         this.hitObjects = hitObjects;
         this.hitObjectContainer = hitObjectContainer;
@@ -51,7 +49,7 @@ public sealed partial class BmsKeySoundPlayer : CompositeDrawable
     #region Fields
 
     private readonly IReadOnlyList<BmsHitObject> hitObjects;
-    private readonly HitObjectContainer hitObjectContainer;
+    private readonly BmsHitObjectContainer hitObjectContainer;
     private readonly Func<double> getCurrentTime;
     private readonly BmsChartSampleSound[] keySounds;
     private readonly BmsChartSampleSound landmineSound = new();
@@ -82,9 +80,7 @@ public sealed partial class BmsKeySoundPlayer : CompositeDrawable
     {
         var currentTime = getCurrentTime();
 
-        var drawable = hitObjectContainer.AliveObjects
-            .OfType<DrawableBmsHitObject>()
-            .FirstOrDefault(d => ReferenceEquals(d.HitObject, hitObject));
+        hitObjectContainer.TryGetAliveDrawable(hitObject, out var drawable);
 
         if (drawable?.Judged == true)
             return true;

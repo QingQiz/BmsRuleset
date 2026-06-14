@@ -2,31 +2,25 @@ using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 
 public sealed partial class BmsMeasureLine : CompositeDrawable
 {
-    private readonly BmsPlayfield playfield;
-    private readonly BmsStage stage;
 
     private readonly Box line;
+    private BmsPlayfield? playfield;
+    private BmsStage? stage;
 
     // Two coordinate representations of the same measure line:
     //   scrollAtTick — tick-based scroll coordinate (used in normal BPM-aware mode)
     //   timeAtTick   — projected real time          (used in constant-scroll mode)
     // Progress = chosenValue - CurrentScrollPosition/Time.Current.
-    private readonly double scrollAtTick;
-    private readonly double timeAtTick;
+    private double scrollAtTick;
+    private double timeAtTick;
 
-    public BmsMeasureLine(long tick, BmsTimingMap timingMap, BmsPlayfield playfield, BmsStage stage)
+    public BmsMeasureLine()
     {
-        this.playfield = playfield;
-        this.stage = stage;
-        scrollAtTick = timingMap.GetVisualScrollPositionAtTick(tick);
-        timeAtTick = timingMap.ProjectTickToTime(tick);
-
         Anchor = Anchor.TopLeft;
         Origin = Anchor.TopLeft;
 
@@ -36,11 +30,19 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
         };
     }
 
+    internal void Apply(BmsMeasureLineContainer.MeasureLineInfo info, BmsPlayfield playfield, BmsStage stage)
+    {
+        this.playfield = playfield;
+        this.stage = stage;
+        scrollAtTick = info.ScrollPosition;
+        timeAtTick = info.Time;
+    }
+
     protected override void Update()
     {
         base.Update();
 
-        if (Parent == null || !stage.IsLoaded || stage.DrawHeight <= 0)
+        if (Parent == null || playfield == null || stage == null || !stage.IsLoaded || stage.DrawHeight <= 0)
         {
             Alpha = 0;
             return;

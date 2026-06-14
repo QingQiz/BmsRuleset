@@ -23,7 +23,7 @@ public sealed partial class BmsStage : CompositeDrawable
 
     public Container JudgementArea { get; }
 
-    public Container MeasureLineArea { get; }
+    public BmsMeasureLineContainer MeasureLineArea { get; }
 
     public float HitTargetPosition => hitTargetPosition.Value;
 
@@ -70,7 +70,7 @@ public sealed partial class BmsStage : CompositeDrawable
                 RelativeSizeAxes = Axes.Both,
             },
             columnFlow,
-            MeasureLineArea = new Container
+            MeasureLineArea = new BmsMeasureLineContainer
             {
                 RelativeSizeAxes = Axes.Both,
             },
