@@ -51,6 +51,15 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
         var progress = playfield.ConstantScrollActive
             ? timeAtTick - playfield.Time.Current
             : scrollAtTick - playfield.CurrentScrollPosition;
+
+        // Once the measure start has passed the judgement line (progress < 0),
+        // the measure line should no longer be displayed.
+        if (progress < 0)
+        {
+            Alpha = 0;
+            return;
+        }
+
         var y = playfield.YForScrollProgress(progress, stage.DrawHeight);
 
         if (!float.IsFinite(y))

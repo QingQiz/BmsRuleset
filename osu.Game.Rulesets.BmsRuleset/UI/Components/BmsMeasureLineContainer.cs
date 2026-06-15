@@ -11,7 +11,7 @@ public sealed partial class BmsMeasureLineContainer : Container
 
     internal readonly record struct MeasureLineInfo(double ScrollPosition, double Time);
 
-    private const double past_margin = 250;
+    private const double past_margin = 0;
     private const double future_margin = 500;
 
     private readonly Dictionary<int, BmsMeasureLine> activeLines = new();
