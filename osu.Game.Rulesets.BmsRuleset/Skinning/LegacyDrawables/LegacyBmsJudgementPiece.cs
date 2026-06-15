@@ -1,7 +1,8 @@
-using osu.Framework.Graphics;
+﻿using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
@@ -11,7 +12,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 /// </summary>
 /// <remarks>
 /// BMS judgement names are mapped to osu!mania legacy image names by
-/// <see cref="BmsLegacySkinTransformer" />. This drawable only owns the playback transform:
+/// BmsLegacySkinTransformer. This drawable only owns the playback transform:
 /// PGREAT/GREAT/GOOD use the shrinking stable-style pop, while POOR/E-POOR use a simpler pulse.
 /// </remarks>
 internal sealed partial class LegacyBmsJudgementPiece : CompositeDrawable, IAnimatableJudgement

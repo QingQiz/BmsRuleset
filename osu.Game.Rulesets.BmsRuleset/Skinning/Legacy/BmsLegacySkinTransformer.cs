@@ -10,30 +10,35 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
+using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 
-// TODO rank mark
-/// <inheritdoc />
 /// <summary>
 /// Skin transformer applied over a user-supplied or embedded skin during BMS gameplay.
 /// </summary>
 /// <remarks>
-/// Extends <see cref="T:osu.Game.Skinning.LegacySkinTransformer">LegacySkinTransformer</see> to handle BMS-specific component lookups
-/// (<see cref="T:osu.Game.Rulesets.BmsRuleset.Skinning.BmsSkinComponentLookup">BmsSkinComponentLookup</see>, hit results, and the in-ruleset HUD container).
+/// Extends LegacySkinTransformer to handle BMS-specific component lookups
+/// (BmsSkinComponentLookup, hit results, and the in-ruleset HUD container).
 /// <para>
-/// The transformer is instantiated by <see cref="M:osu.Game.Rulesets.BmsRuleset.BmsRuleset.CreateSkinTransformer(osu.Game.Skinning.ISkin,osu.Game.Beatmaps.IBeatmap)">BmsRuleset.CreateSkinTransformer</see> for
-/// every concrete <see cref="T:osu.Game.Skinning.Skin">Skin</see> in the chain (user skins, unrecognised third-party skins).
-/// For <see cref="T:osu.Game.Rulesets.BmsRuleset.Skinning.BmsEmbeddedSkin">BmsEmbeddedSkin</see> instances the ruleset returns <c>null</c> from
+/// The transformer is instantiated by BmsRuleset.CreateSkinTransformer for
+/// every concrete Skin in the chain (user skins, unrecognised third-party skins).
+/// For BmsEmbeddedSkin instances the ruleset returns <c>null</c> from
 /// <c>CreateSkinTransformer</c>; those skins are wrapped here directly by
-/// <see cref="T:osu.Game.Rulesets.BmsRuleset.Skinning.BmsEmbeddedSkinSource">BmsEmbeddedSkinSource</see>.
+/// BmsEmbeddedSkinSource.
 /// </para>
 /// <para>
 /// BMS skin configuration (<c>skin.ini</c>) is decoded once and cached in
-/// <see cref="F:osu.Game.Rulesets.BmsRuleset.Skinning.BmsLegacySkinTransformer.skinConfigurations">skinConfigurations</see>. The config drives column widths, key images,
+/// skinConfigurations. The config drives column widths, key images,
 /// hit-explosion colours, and other per-column properties that are not covered by
-/// the standard <see cref="T:osu.Game.Skinning.LegacyManiaSkinConfigurationLookup">LegacyManiaSkinConfigurationLookup</see> API.
+/// the standard LegacyManiaSkinConfigurationLookup API.
 /// </para>
 /// </remarks>
 public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGameplaySkinDrawableSource
@@ -44,17 +49,17 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
     /// Returns <c>true</c> if this transformer should supply legacy-style skin components.
     /// </summary>
     /// <remarks>
-    /// Extends the base check (<see cref="P:osu.Game.Skinning.LegacySkinTransformer.IsProvidingLegacyResources">LegacySkinTransformer.IsProvidingLegacyResources</see>
+    /// Extends the base check (LegacySkinTransformer.IsProvidingLegacyResources
     /// = has a legacy combo font) to also return <c>true</c> when the wrapped skin provides
-    /// BMS-specific resources (<see cref="F:osu.Game.Rulesets.BmsRuleset.Skinning.BmsLegacySkinTransformer.hasBmsResources">hasBmsResources</see>). This allows skins that ship
+    /// BMS-specific resources (hasBmsResources). This allows skins that ship
     /// mania textures without a full legacy font to still activate the BMS legacy rendering path.
     /// </remarks>
     public override bool IsProvidingLegacyResources => base.IsProvidingLegacyResources || hasBmsResources.Value;
 
     internal const double HIT_EXPLOSION_FADE_IN_DURATION = 80;
 
-    private readonly BmsLayoutVariant layoutVariant;
-    private readonly int maniaKeyCount;
+    private readonly BmsLegacySkinConfigurationProvider configurationProvider;
+    private readonly BmsLegacySkinResourceNames resourceNames;
 
     /// <summary>
     /// Lazily evaluated flag that is <c>true</c> when the wrapped skin contains
@@ -63,14 +68,12 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
     /// texture animation.
     /// </summary>
     /// <remarks>
-    /// Used by <see cref="IsProvidingLegacyResources"/> to extend the base check to
+    /// Used by IsProvidingLegacyResources to extend the base check to
     /// skins that have BMS textures but no legacy font (which is what the base
-    /// <see cref="LegacySkinTransformer.IsProvidingLegacyResources"/> checks for).
+    /// LegacySkinTransformer.IsProvidingLegacyResources checks for).
     /// Evaluated at most once per transformer instance.
     /// </remarks>
     private readonly Lazy<bool> hasBmsResources;
-
-    private readonly Lazy<IReadOnlyList<BmsSkinConfiguration>> skinConfigurations;
 
     private static readonly (HitResult Result, LegacyManiaSkinConfigurationLookups Lookup, string Filename)[] hit_result_mappings =
     [
@@ -85,35 +88,34 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
 
     /// <param name="skin">
     /// The skin to wrap. Maybe a user skin, a third-party skin, or a
-    /// <see cref="BmsEmbeddedSkin"/> when created directly by <see cref="BmsEmbeddedSkinSource"/>.
+    /// BmsEmbeddedSkin when created directly by BmsEmbeddedSkinSource.
     /// </param>
     /// <param name="beatmap">
-    /// The current beatmap, used to derive the <see cref="BmsLayoutVariant"/> (column layout).
-    /// A <see cref="BmsBeatmap"/> is preferred; other beatmap types fall back to
-    /// <see cref="BeatmapInfo.Difficulty"/> <c>CircleSize</c>.
+    /// The current beatmap, used to derive the BmsLayoutVariant (column layout).
+    /// A BmsBeatmap is preferred; other beatmap types fall back to
+    /// BeatmapInfo.Difficulty <c>CircleSize</c>.
     /// </param>
     public BmsLegacySkinTransformer(ISkin skin, IBeatmap beatmap)
         : base(skin)
     {
+        BmsLayoutVariant layoutVariant1;
         if (beatmap is BmsBeatmap bmsBeatmap)
         {
-            layoutVariant = bmsBeatmap.LayoutVariant;
+            layoutVariant1 = bmsBeatmap.LayoutVariant;
         }
         else
         {
-            layoutVariant = BmsLayout.VariantFromTotalColumns(BmsDifficultyInfo.GetKeyCount(beatmap.BeatmapInfo.Difficulty));
+            layoutVariant1 = BmsLayout.VariantFromTotalColumns(BmsDifficultyInfo.GetKeyCount(beatmap.BeatmapInfo.Difficulty));
         }
 
-        maniaKeyCount = BmsLayout.GetManiaKeyCount(layoutVariant);
-
-        skinConfigurations = new Lazy<IReadOnlyList<BmsSkinConfiguration>>(() =>
-            Skin is BmsEmbeddedSkin embedded
-                ? BmsSkinConfigurationDecoder.Decode(embedded.Resources)
-                : BmsSkinConfigurationDecoder.Decode(Skin));
+        configurationProvider = new BmsLegacySkinConfigurationProvider(Skin, layoutVariant1);
+        resourceNames = new BmsLegacySkinResourceNames(
+            (lookup, componentLookup, columnIndex) => GetManiaConfig<string>(lookup, componentLookup, columnIndex)?.Value,
+            hasAnimation);
 
         hasBmsResources = new Lazy<bool>(()
             // A parsed [BMS] or [Mania] section is the strongest signal.
-            => skinConfigurations.Value.Count > 0
+            => configurationProvider.HasConfigurations
                // mania-key1 is a standard mania image name — any legacy mania skin has it —
                // so it is a weak signal and is mostly redundant with base.IsProvidingLegacyResources
                // (which triggers on a legacy combo font that the same skin almost certainly ships).
@@ -227,21 +229,7 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
     public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
     {
         if (lookup is BmsSkinConfigurationLookup bmsLookup)
-        {
-            // BMS config resolution is stricter than plain mania: exact [BMS] layout first, then
-            // special-style [Mania] fallbacks (6K/8K with scratch), then plain mania key-count
-            // sections, and finally the wrapped skin's own LegacyManiaSkinConfigurationLookup API.
-            foreach (var configuration in getConfigurations())
-            {
-                var column = getConfigurationColumn(configuration, bmsLookup);
-
-                if (configuration.TryGet<TValue>(bmsLookup.Lookup, column, out var value))
-                    return value;
-            }
-
-            return Skin.GetConfig<LegacyManiaSkinConfigurationLookup, TValue>(new LegacyManiaSkinConfigurationLookup(maniaKeyCount, bmsLookup.Lookup,
-                bmsLookup.ComponentLookup?.ManiaColumnIndex ?? bmsLookup.ColumnIndex));
-        }
+            return configurationProvider.GetConfig<TValue>(bmsLookup);
 
         return base.GetConfig<TLookup, TValue>(lookup);
     }
@@ -254,130 +242,35 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
         this.GetAnimation(name, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
 
     internal string GetNoteImageName(BmsSkinComponentLookup lookup) =>
-        GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.NoteImage, lookup)?.Value
-        ?? $"mania-note{BmsLegacyTextureResolver.FallbackColumnIndex(lookup)}";
+        resourceNames.GetNoteImageName(lookup);
 
     internal string GetHoldNoteHeadImageName(BmsSkinComponentLookup lookup) =>
-        getFirstAnimationName(getHoldNoteHeadImageNames(lookup)) ?? GetNoteImageName(lookup);
+        resourceNames.GetHoldNoteHeadImageName(lookup);
 
     internal string GetHoldNoteTailImageName(BmsSkinComponentLookup lookup) =>
-        getFirstAnimationName(getHoldNoteTailImageNames(lookup)) ?? GetHoldNoteHeadImageName(lookup);
+        resourceNames.GetHoldNoteTailImageName(lookup);
 
     internal string GetMineImageName(BmsSkinComponentLookup lookup) =>
-        GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.Hit100, lookup)?.Value
-        ?? "mania-noteS";
+        resourceNames.GetMineImageName(lookup);
 
     internal string GetKeyImageName(BmsSkinComponentLookup lookup, bool down) =>
-        GetManiaConfig<string>(down ? LegacyManiaSkinConfigurationLookups.KeyImageDown : LegacyManiaSkinConfigurationLookups.KeyImage, lookup)?.Value
-        ?? $"mania-key{BmsLegacyTextureResolver.FallbackColumnIndex(lookup)}{(down ? "D" : string.Empty)}";
+        resourceNames.GetKeyImageName(lookup, down);
 
     internal string GetHitExplosionImageName(BmsSkinComponentLookup lookup) =>
-        lookup.IsLongNote
-            ? GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.HoldNoteLightImage, lookup)?.Value ?? "lightingL"
-            : GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.ExplosionImage, lookup)?.Value ?? "lightingN";
+        resourceNames.GetHitExplosionImageName(lookup);
 
     internal string GetHitTargetImageName() =>
-        GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.HitTargetImage)?.Value ?? "mania-stage-hint";
+        resourceNames.GetHitTargetImageName();
 
     internal string[] GetStageBackgroundImageNames() =>
-    [
-        GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.LeftStageImage)?.Value ?? "mania-stage-left",
-        GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.RightStageImage)?.Value ?? "mania-stage-right",
-    ];
+        resourceNames.GetStageBackgroundImageNames();
 
     internal string GetStageForegroundImageName() =>
-        GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.BottomStageImage)?.Value ?? "mania-stage-bottom";
+        resourceNames.GetStageForegroundImageName();
 
     private bool hasAnimation(string name) => GetLegacyAnimation(name) != null;
 
     private bool hasAnyAnimation(params string[] names) => names.Any(hasAnimation);
-
-    private IEnumerable<BmsSkinConfiguration> getConfigurations()
-    {
-        // [BMS] sections use BMS column indices directly and are layout-specific. They must win over
-        // [Mania] sections because a skin may include both generic mania and BMS-specialised values.
-        foreach (var configuration in skinConfigurations.Value.Where(c => c.Section == BmsSkinConfigurationSection.Bms && c.Layout == layoutVariant))
-            yield return configuration;
-
-        // 2P variants (5K2P, 7K2P) share the same column semantics as their 1P counterparts
-        // (scratch=0, keys=1..N) — only visual column order differs. Fall back to the 1P
-        // skin.ini section so NoteImage*, KeyImage*, ColumnWidth etc. still apply.
-        var layout1P = layoutVariant switch
-        {
-            BmsLayoutVariant.Bms5K2P => BmsLayoutVariant.Bms5K,
-            BmsLayoutVariant.Bme7K2P => BmsLayoutVariant.Bme7K,
-            _ => (BmsLayoutVariant?)null,
-        };
-
-        if (layout1P != null)
-        {
-            foreach (var configuration in skinConfigurations.Value.Where(c => c.Section == BmsSkinConfigurationSection.Bms && c.Layout == layout1P))
-                yield return configuration;
-        }
-
-        foreach (var configuration in getManiaFallbackConfigurations())
-            yield return configuration;
-    }
-
-    private IEnumerable<BmsSkinConfiguration> getManiaFallbackConfigurations()
-    {
-        var configurations = skinConfigurations.Value.Where(c => c.Section == BmsSkinConfigurationSection.Mania).ToArray();
-
-        // Stable BMS skins often represent 5K/7K with scratch using mania SpecialStyle sections:
-        // 6K special for 5K+scratch and 8K special for 7K+scratch. Prefer those over plain 5K/7K.
-        foreach (var keys in getSpecialStyleManiaFallbackKeys())
-        {
-            foreach (var configuration in configurations.Where(c => c.Keys == keys && c.SpecialStyle == 1))
-                yield return configuration;
-        }
-
-        foreach (var configuration in configurations.Where(c => c.Keys == maniaKeyCount))
-            yield return configuration;
-    }
-
-    private IEnumerable<int> getSpecialStyleManiaFallbackKeys()
-    {
-        switch (layoutVariant)
-        {
-            case BmsLayoutVariant.Bms5K:
-            case BmsLayoutVariant.Bms5K2P:
-                yield return 6;
-
-                break;
-
-            case BmsLayoutVariant.Bme7K:
-            case BmsLayoutVariant.Bme7K2P:
-                yield return 8;
-
-                break;
-        }
-    }
-
-    private int? getConfigurationColumn(BmsSkinConfiguration configuration, BmsSkinConfigurationLookup lookup)
-    {
-        // BMS sections are indexed by raw BMS columns (including scratch). Plain mania sections are
-        // indexed by mapped mania columns, but special-style fallback sections use BMS-style indices.
-        if (configuration.Section == BmsSkinConfigurationSection.Bms || configuration.Keys != maniaKeyCount)
-            return lookup.ComponentLookup?.ColumnIndex ?? lookup.ColumnIndex;
-
-        return lookup.ComponentLookup?.ManiaColumnIndex ?? lookup.ColumnIndex;
-    }
-
-    private string[] getHoldNoteHeadImageNames(BmsSkinComponentLookup lookup) =>
-    [
-        GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup)?.Value ?? string.Empty,
-        GetNoteImageName(lookup),
-    ];
-
-    private string[] getHoldNoteTailImageNames(BmsSkinComponentLookup lookup) =>
-    [
-        GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.HoldNoteTailImage, lookup)?.Value ?? string.Empty,
-        GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup)?.Value ?? string.Empty,
-        GetNoteImageName(lookup),
-    ];
-
-    private string? getFirstAnimationName(IEnumerable<string> names)
-        => names.FirstOrDefault(name => !string.IsNullOrWhiteSpace(name) && hasAnimation(name));
 
     private Drawable? getResult(HitResult result)
     {

@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -8,6 +8,7 @@ using osu.Game.Configuration;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;

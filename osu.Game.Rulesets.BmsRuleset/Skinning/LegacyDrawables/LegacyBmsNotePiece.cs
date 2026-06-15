@@ -1,9 +1,11 @@
-using System;
+﻿using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
@@ -13,7 +15,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 /// </summary>
 /// <remarks>
 /// The texture is scaled to the current lane width on X. On Y it uses legacy
-/// <see cref="LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale" /> semantics:
+/// LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale semantics:
 /// if that value exists, the height is calculated as though the note was drawn at that fixed
 /// reference width, independent of the actual lane width.
 /// </remarks>

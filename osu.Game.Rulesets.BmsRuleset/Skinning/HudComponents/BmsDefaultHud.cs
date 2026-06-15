@@ -1,12 +1,11 @@
 ﻿using System.Linq;
 using osu.Framework.Graphics;
-using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 using osuTK;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 
 public static class BmsDefaultHud
 {

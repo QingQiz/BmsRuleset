@@ -1,9 +1,11 @@
-using System;
+﻿using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Skinning;
 using osuTK;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;

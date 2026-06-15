@@ -3,9 +3,14 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
+using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Skinning;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 
 /// <inheritdoc />
 /// <summary>
@@ -20,20 +25,20 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 /// Routing rules:
 /// <list type="bullet">
 ///   <item><description>
-///     Global HUD container (<see cref="F:osu.Game.Skinning.GlobalSkinnableContainers.MainHUDComponents">GlobalSkinnableContainers.MainHUDComponents</see>
+///     Global HUD container (GlobalSkinnableContainers.MainHUDComponents
 ///     with no ruleset scope) — passed through to the built-in skin, then wrapped in
-///     <see cref="T:osu.Game.Rulesets.BmsRuleset.Skinning.BmsBuiltInSkinTransformer.HealthFilteredHudContainer">HealthFilteredHudContainer</see> to strip <see cref="T:osu.Game.Screens.Play.HUD.HealthDisplay">HealthDisplay</see>
+///     HealthFilteredHudContainer to strip HealthDisplay
 ///     children, because BMS uses its own gauge and does not expose an osu!-compatible
 ///     health value.
 ///   </description></item>
 ///   <item><description>
-///     <see cref="T:osu.Game.Rulesets.BmsRuleset.Skinning.BmsSkinComponentLookup">BmsSkinComponentLookup</see>, <see cref="T:osu.Game.Skinning.SkinComponentLookup`1">SkinComponentLookup{HitResult}</see>,
+///     BmsSkinComponentLookup, SkinComponentLookup{HitResult},
 ///     and the ruleset-scoped HUD container — return <c>null</c>. These are handled
-///     exclusively by <see cref="T:osu.Game.Rulesets.BmsRuleset.Skinning.BmsEmbeddedSkinSource">BmsEmbeddedSkinSource</see>'s embedded skin chain and must
+///     exclusively by BmsEmbeddedSkinSource's embedded skin chain and must
 ///     not be answered by the built-in skin.
 ///   </description></item>
 ///   <item><description>
-///     <see cref="T:osu.Game.Rulesets.BmsRuleset.Skinning.BmsSkinConfigurationLookup">BmsSkinConfigurationLookup</see> — always returns <c>null</c>. Built-in
+///     BmsSkinConfigurationLookup — always returns <c>null</c>. Built-in
 ///     skins carry no <c>skin.ini</c> BMS or mania configuration.
 ///   </description></item>
 ///   <item><description>
@@ -66,13 +71,13 @@ public partial class BmsBuiltInSkinTransformer(ISkin skin) : SkinTransformer(ski
 
     /// <summary>
     /// Wraps the built-in skin's global HUD container and removes all
-    /// <see cref="HealthDisplay"/> descendants after the container has loaded.
+    /// HealthDisplay descendants after the container has loaded.
     /// </summary>
     /// <remarks>
-    /// Removal is deferred to <see cref="LoadComplete"/> because the children of the
+    /// Removal is deferred to LoadComplete because the children of the
     /// serialisable HUD container are not populated until that point.
     /// The traversal is depth-first so nested containers (e.g. a
-    /// <see cref="DefaultSkinComponentsContainer"/> wrapping another container) are
+    /// DefaultSkinComponentsContainer wrapping another container) are
     /// also checked. Removal iterates backwards to avoid index-shift bugs.
     /// </remarks>
     private sealed partial class HealthFilteredHudContainer : Container

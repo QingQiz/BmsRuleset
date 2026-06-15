@@ -1,9 +1,13 @@
 using System;
 using System.Linq;
 using osu.Framework.Graphics.Textures;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Skinning;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 
 /// <summary>
 /// Computes legacy BMS note cap heights from skin.ini and texture aspect rules.

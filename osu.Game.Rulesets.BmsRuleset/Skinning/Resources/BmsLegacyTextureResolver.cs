@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
 using osu.Game.Skinning;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
 
 /// <summary>
 /// Centralises legacy mania/BMS image-name fallback rules.

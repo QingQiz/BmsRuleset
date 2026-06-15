@@ -6,13 +6,14 @@ using System.Reflection;
 using osu.Framework.IO.Stores;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 
 /// <summary>
 /// Decodes BMS-extended <c>skin.ini</c> configuration into a list of
-/// <see cref="BmsSkinConfiguration"/> objects.
+/// BmsSkinConfiguration objects.
 /// </summary>
 /// <remarks>
 /// Understands two non-standard section headers in addition to the stock osu! mania format:
@@ -33,12 +34,12 @@ public static class BmsSkinConfigurationDecoder
     private static readonly FieldInfo? skin_store_field = typeof(Skin).GetField("store", BindingFlags.Instance | BindingFlags.NonPublic);
 
     /// <summary>
-    /// Decodes <c>skin.ini</c> directly from an <see cref="IResourceStore{T}"/>.
+    /// Decodes <c>skin.ini</c> directly from an IResourceStore{T}.
     /// </summary>
     /// <remarks>
     /// This is the preferred overload because it requires no reflection.
     /// Use it whenever the raw store is already available — for example via
-    /// <see cref="BmsEmbeddedSkin.Resources"/>.
+    /// BmsEmbeddedSkin.Resources.
     /// Returns an empty list when the store does not contain a <c>skin.ini</c> entry.
     /// </remarks>
     /// <param name="store">The resource store to read <c>skin.ini</c> from.</param>
@@ -49,17 +50,16 @@ public static class BmsSkinConfigurationDecoder
             return [];
 
         using var reader = new StreamReader(stream);
-        return Decode(reader);
+        return decode(reader);
     }
 
-    // TODO: Remove reflection once all callers can supply an IResourceStore<byte[]> directly.
     /// <summary>
-    /// Decodes <c>skin.ini</c> from a <see cref="Skin"/> instance via reflection.
+    /// Decodes <c>skin.ini</c> from a Skin instance via reflection.
     /// </summary>
     /// <remarks>
-    /// Accesses the private <c>store</c> field of <see cref="Skin"/> to obtain an
-    /// <see cref="IResourceStore{T}"/> without requiring a subclass API change.
-    /// Returns an empty list if <paramref name="skin"/> is not a concrete <see cref="Skin"/>
+    /// Accesses the private <c>store</c> field of Skin to obtain an
+    /// IResourceStore{T} without requiring a subclass API change.
+    /// Returns an empty list if <paramref name="skin"/> is not a concrete Skin
     /// subclass or if the field cannot be resolved.
     /// </remarks>
     /// <param name="skin">The skin whose backing store to read.</param>
@@ -72,7 +72,7 @@ public static class BmsSkinConfigurationDecoder
     }
 
     /// <summary>
-    /// Decodes <c>skin.ini</c> content from an already-opened <see cref="TextReader"/>.
+    /// Decodes <c>skin.ini</c> content from an already-opened TextReader.
     /// </summary>
     /// <remarks>
     /// Parses line-by-line. Comments (<c>//</c>) are stripped before processing.
@@ -80,7 +80,7 @@ public static class BmsSkinConfigurationDecoder
     /// Sections without a mandatory discriminator key (<c>Layout</c> for <c>[BMS]</c>,
     /// <c>Keys</c> for <c>[Mania]</c>) are discarded on the next section header or end of file.
     /// </remarks>
-    public static IReadOnlyList<BmsSkinConfiguration> Decode(TextReader reader)
+    private static List<BmsSkinConfiguration> decode(TextReader reader)
     {
         var result = new List<BmsSkinConfiguration>();
         BmsSkinConfiguration? current = null;

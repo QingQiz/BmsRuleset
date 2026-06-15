@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;

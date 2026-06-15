@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,6 +10,7 @@ using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Rendering.Dummy;
 using osu.Framework.Graphics.Textures;
@@ -22,10 +23,15 @@ using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
-using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
+using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
@@ -120,6 +126,21 @@ public class BmsLegacySkinTransformerTest
         public ISample GetSample(ISampleInfo sampleInfo) => null;
 
         public IBindable<TValue> GetConfig<TLookup, TValue>(TLookup lookup)
+            where TLookup : notnull
+            where TValue : notnull => null;
+    }
+
+    private class TestDrawableSkin : ISkin
+    {
+        public Drawable? Drawable { get; set; }
+
+        public Drawable? GetDrawableComponent(ISkinComponentLookup lookup) => Drawable;
+
+        public Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => null;
+
+        public ISample? GetSample(ISampleInfo sampleInfo) => null;
+
+        public IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
             where TLookup : notnull
             where TValue : notnull => null;
     }
@@ -387,7 +408,7 @@ public class BmsLegacySkinTransformerTest
     [Test]
     public void TestCustomSkinStopsBeforeDefaultFallbackSkin()
     {
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind(
+        Assert.That(BmsEmbeddedSkinFallbackFactory.GetEmbeddedSkinKind(
         [
             new TestSkinIniSkin("""
                 [BMS]
@@ -413,20 +434,20 @@ public class BmsLegacySkinTransformerTest
     [Test]
     public void TestEmbeddedFallbackUsesLegacyForLegacyBuiltInSkins()
     {
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new DefaultLegacySkin(DefaultLegacySkin.CreateInfo(), storage_resources))]),
+        Assert.That(BmsEmbeddedSkinFallbackFactory.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new DefaultLegacySkin(DefaultLegacySkin.CreateInfo(), storage_resources))]),
             Is.EqualTo(BmsEmbeddedSkinKind.LegacyOld));
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new RetroSkin(RetroSkin.CreateInfo(), storage_resources))]),
+        Assert.That(BmsEmbeddedSkinFallbackFactory.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new RetroSkin(RetroSkin.CreateInfo(), storage_resources))]),
             Is.EqualTo(BmsEmbeddedSkinKind.LegacyOld));
     }
 
     [Test]
     public void TestEmbeddedFallbackUsesModernForModernBuiltInSkins()
     {
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new ArgonSkin(ArgonSkin.CreateInfo(), storage_resources))]),
+        Assert.That(BmsEmbeddedSkinFallbackFactory.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new ArgonSkin(ArgonSkin.CreateInfo(), storage_resources))]),
             Is.EqualTo(BmsEmbeddedSkinKind.LegacyModern));
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new ArgonProSkin(ArgonProSkin.CreateInfo(), storage_resources))]),
+        Assert.That(BmsEmbeddedSkinFallbackFactory.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new ArgonProSkin(ArgonProSkin.CreateInfo(), storage_resources))]),
             Is.EqualTo(BmsEmbeddedSkinKind.LegacyModern));
-        Assert.That(BmsEmbeddedSkinSource.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new TrianglesSkin(TrianglesSkin.CreateInfo(), storage_resources))]),
+        Assert.That(BmsEmbeddedSkinFallbackFactory.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new TrianglesSkin(TrianglesSkin.CreateInfo(), storage_resources))]),
             Is.EqualTo(BmsEmbeddedSkinKind.LegacyModern));
     }
 
@@ -447,7 +468,7 @@ public class BmsLegacySkinTransformerTest
             NoteImage1: legacy-note
             """, ["legacy-note"]), beatmap);
 
-        source.SetSources(parent, primary, fallback);
+        source.SetSources(parent, new BmsEmbeddedSkinFallbackChain(primary, fallback));
 
         Assert.That(source.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage,
                 new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)))?.Value,
@@ -466,7 +487,7 @@ public class BmsLegacySkinTransformerTest
             Layout: 7K
             """), beatmap);
 
-        source.SetSources(parent, primary, null);
+        source.SetSources(parent, new BmsEmbeddedSkinFallbackChain(primary, null));
 
         Assert.That(source.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo)), Is.Not.Null);
     }
@@ -492,11 +513,52 @@ public class BmsLegacySkinTransformerTest
             NoteImage1: fallback-note
             """, ["fallback-note"]), beatmap);
 
-        source.SetSources(parent, primary, fallback);
+        source.SetSources(parent, new BmsEmbeddedSkinFallbackChain(primary, fallback));
 
         Assert.That(source.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage,
                 new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)))?.Value,
             Is.EqualTo("parent-note"));
+    }
+
+    [Test]
+    public void TestGameplaySkinCacheUsesParentDrawableBeforeEmbeddedFallbackFactory()
+    {
+        var beatmap = createBeatmap();
+        using var source = new BmsEmbeddedSkinSource();
+        var parentDrawable = new Container();
+        var parent = new TestSkinSource(new TestDrawableSkin { Drawable = parentDrawable });
+        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: primary-note
+            """, ["primary-note"]), beatmap);
+
+        source.SetSources(parent, new BmsEmbeddedSkinFallbackChain(primary, null));
+
+        using var cache = new BmsGameplaySkinCache(source);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(cache.GetDrawableFactory(lookup)?.Create(), Is.SameAs(parentDrawable));
+    }
+
+    [Test]
+    public void TestGameplaySkinCacheUsesEmbeddedFallbackFactoryWhenParentMisses()
+    {
+        var beatmap = createBeatmap();
+        using var source = new BmsEmbeddedSkinSource();
+        var parent = new TestSkinSource();
+        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: primary-note
+            """, ["primary-note"]), beatmap);
+
+        source.SetSources(parent, new BmsEmbeddedSkinFallbackChain(primary, null));
+
+        using var cache = new BmsGameplaySkinCache(source);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(cache.GetDrawableFactory(lookup)?.Create(), Is.Not.Null);
     }
 
     [Test]

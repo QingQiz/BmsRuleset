@@ -1,4 +1,4 @@
-using osu.Framework.Allocation;
+﻿using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -7,6 +7,7 @@ using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Skinning;
 using osuTK.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 

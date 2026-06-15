@@ -1,18 +1,20 @@
 using osu.Game.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 
 /// <summary>
 /// Lookup key used to query BMS-specific skin configuration values from
-/// <see cref="BmsLegacySkinTransformer.GetConfig{TLookup,TValue}"/>.
+/// BmsLegacySkinTransformer.GetConfig{TLookup,TValue}.
 /// </summary>
 /// <remarks>
 /// BMS skin config overlaps heavily with osu!mania legacy skin config — keys such as
 /// <c>NoteImage</c>, <c>KeyImage</c>, <c>ColumnWidth</c>, and <c>HitPosition</c> are
-/// shared — so this lookup reuses <see cref="LegacyManiaSkinConfigurationLookups"/>
+/// shared — so this lookup reuses LegacyManiaSkinConfigurationLookups
 /// rather than duplicating the enum.
 /// <para>
-/// Resolution order in <see cref="BmsLegacySkinTransformer"/>:
+/// Resolution order in BmsLegacySkinTransformer:
 /// <list type="number">
 ///   <item><description>
 ///     BMS-section configurations parsed from <c>[BMS]</c> sections of <c>skin.ini</c>,
@@ -23,21 +25,21 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 ///     (with special-style fallback for 5K/7K scratch variants).
 ///   </description></item>
 ///   <item><description>
-///     The wrapped skin's native <see cref="LegacyManiaSkinConfigurationLookup"/> API,
-///     using <see cref="BmsLegacySkinTransformer"/>'s <c>maniaKeyCount</c>.
+///     The wrapped skin's native LegacyManiaSkinConfigurationLookup API,
+///     using BmsLegacySkinTransformer's <c>maniaKeyCount</c>.
 ///   </description></item>
 /// </list>
 /// </para>
 /// <para>
 /// Column resolution:
-/// When <see cref="ComponentLookup"/> is provided (the lookup originates from a specific
+/// When ComponentLookup is provided (the lookup originates from a specific
 /// playfield component), column index is derived from it — using the BMS column index for
 /// <c>[BMS]</c> sections and the mania column index for <c>[Mania]</c> sections.
-/// When only <see cref="ColumnIndex"/> is set (lookups with no per-column context, such as
+/// When only ColumnIndex is set (lookups with no per-column context, such as
 /// <c>HitPosition</c>), it is used directly for both section types.
 /// </para>
 /// <para>
-/// <see cref="BmsBuiltInSkinTransformer"/> always returns <c>null</c> for this lookup
+/// BmsBuiltInSkinTransformer always returns <c>null</c> for this lookup
 /// type — built-in skins carry no <c>skin.ini</c> BMS or mania configuration.
 /// </para>
 /// </remarks>
@@ -54,7 +56,7 @@ public class BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups look
     public readonly BmsSkinComponentLookup? ComponentLookup = componentLookup;
 
     /// <summary>
-    /// Raw column index override used when <see cref="ComponentLookup"/> is <c>null</c>.
+    /// Raw column index override used when ComponentLookup is <c>null</c>.
     /// </summary>
     public readonly int? ColumnIndex = columnIndex;
 }

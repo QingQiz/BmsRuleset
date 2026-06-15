@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -12,6 +12,8 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;

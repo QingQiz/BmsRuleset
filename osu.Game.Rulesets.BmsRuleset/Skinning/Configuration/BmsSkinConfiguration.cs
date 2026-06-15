@@ -7,7 +7,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 
 public sealed class BmsSkinConfiguration(BmsSkinConfigurationSection section)
 {
@@ -117,7 +117,7 @@ public sealed class BmsSkinConfiguration(BmsSkinConfigurationSection section)
         if (!Values.TryGetValue(key, out var raw))
             return null;
 
-        return raw == "1" || bool.TryParse(raw, out var result) && result;
+        return raw == "1" || (bool.TryParse(raw, out var result) && result);
     }
 
     private float? getPositionFromBottom(string key, float min = float.MinValue, float max = float.MaxValue)

@@ -13,11 +13,27 @@ BMS ruleset 的皮肤系统在 osu! 标准皮肤链的基础上增加了一个�
 | 类                           | 职责                                                     |
 |-----------------------------|--------------------------------------------------------|
 | `BmsEmbeddedSkinSource`     | 三层查找的入口，`[Cached]` 到 DI 树                              |
+| `BmsEmbeddedSkinFallbackFactory` | 根据当前 osu! 皮肤风格创建 embedded fallback chain         |
+| `BmsEmbeddedSkinFallbackChain` | 持有并释放 primary/fallback embedded transformers              |
 | `BmsBuiltInSkinTransformer` | 包装 osu! 内置皮肤，屏蔽 BMS 特定 lookup，剥离 global HUD 中的血条       |
 | `BmsLegacySkinTransformer`  | 包装任意皮肤，提供 BMS 特定 drawable 和 config                     |
 | `BmsEmbeddedSkin`           | 从 ruleset DLL 内嵌资源加载贴图/音效的最小 ISkin                     |
 | `BmsEmbeddedSkinDefinition` | 用户皮肤类型 → `BmsEmbeddedSkinKind` 的映射注册表                  |
 | `rulesetResourcesSkin`      | osu! 框架创建的 `ResourceStoreBackedSkin`，服务于通用贴图/音效 lookup |
+
+## 目录边界
+
+| 目录              | 职责                                               |
+|------------------|--------------------------------------------------|
+| `Components/`    | BMS 专用 skin lookup 类型                           |
+| `Configuration/` | `[BMS]` / `[Mania]` 配置解析和配置 lookup             |
+| `Embedded/`      | ruleset 内嵌 fallback skin、风格选择、fallback chain |
+| `Legacy/`        | osu! skin transformer 与 legacy 配置/资源名解析       |
+| `LegacyDrawables/` | legacy skin 生成的具体 drawable                   |
+| `Resources/`     | legacy 纹理解析和 LN body 切片资源                    |
+| `Runtime/`       | gameplay 缓存、drawable factory、note metric 解析    |
+| `HudComponents/` | BMS HUD 组件                                      |
+| `Drawables/`     | skin drawable 尺寸/解析结果 DTO                      |
 
 ---
 
@@ -48,28 +64,26 @@ ArgonSkin / ArgonProSkin / TrianglesSkin / DefaultLegacySkin / RetroSkin
 `osu.Game.Rulesets.BmsRuleset.dll` 内嵌的 `Resources/Textures/` 和 `Resources/Samples/`，
 只响应 `GetTexture` / `GetSample`，`GetDrawableComponent` 和 `GetConfig` 始终返回 null。
 
-### 第二步：`BmsPlayfield` 构建三层 source
+### 第二步：`BmsPlayfield` 刷新 embedded fallback source
 
-`BmsPlayfield.updateEmbeddedSkinFallback()`（`BmsPlayfield.cs:243`）在游戏开始及
-用户切换皮肤时执行：
+`BmsPlayfield.updateEmbeddedSkinFallback()` 在游戏开始及用户切换皮肤时执行。
+UI 层只负责把当前 parent skin chain 和 beatmap 交给 Skinning 层：
 
-1. 调用 `BmsEmbeddedSkinSource.GetEmbeddedSkinKind(parentSkin.AllSources)`
-   （`BmsEmbeddedSkinSource.cs:100`），通过 `BmsEmbeddedSkinDefinition.TryGetKind`
-   识别当前用户皮肤对应的内嵌资源风格：
+1. 若当前 playfield 没有 `BmsBeatmap`，调用 `activeSkin.SetSources(parentSkin, null)`。
+2. 否则调用 `BmsEmbeddedSkinFallbackFactory.Create(parentSkin.AllSources, beatmap, renderer, audio)`。
+3. factory 通过 `BmsEmbeddedSkinDefinition.TryGetKind` 识别当前用户皮肤对应的内嵌资源风格：
     - `ArgonSkin / ArgonProSkin / TrianglesSkin` → `LegacyModern`
     - `DefaultLegacySkin / RetroSkin` → `LegacyOld`
     - 其他 → `LegacyOld`
-
-2. 创建 `primary`：`BmsLegacySkinTransformer(BmsEmbeddedSkin(kind), beatmap)`
-3. 若 `kind != LegacyOld`，创建 `fallback`：`BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyOld), beatmap)`
-4. 调用 `activeSkin.SetSources(parentSkin, primary, fallback)`
+4. factory 创建 `BmsEmbeddedSkinFallbackChain`，其中 primary 使用匹配风格；当匹配风格不是 `LegacyOld` 时，额外创建 `LegacyOld` fallback。
+5. `BmsEmbeddedSkinSource` 只接收 parent 与 fallback chain，并负责后续 lookup 路由。
 
 ---
 
 ## 完整查找链
 
 ```
-BmsEmbeddedSkinSource                              [BmsPlayfield.cs:75, Cached into DI]
+BmsEmbeddedSkinSource                              [Cached into DI]
 │
 ├─ parent = BeatmapSkinProvidingContainer          [RulesetSkinProvidingContainer.cs:60]
 │   │
@@ -92,29 +106,30 @@ BmsEmbeddedSkinSource                              [BmsPlayfield.cs:75, Cached i
 │                例：BmsBuiltInSkinTransformer(TrianglesSkin)
 │                （用户选 TrianglesSkin 本身时此项不存在）
 │
-├─ primary = BmsLegacySkinTransformer(BmsEmbeddedSkin(kind))
-│       kind 由当前用户皮肤决定：ArgonSkin 系 → LegacyModern，其余 → LegacyOld
-│       BmsEmbeddedSkin 读取 DLL 内嵌对应风格资源
-│       IsProvidingLegacyResources = true（内嵌资源始终包含 BMS 贴图）
-│
-└─ fallback = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyOld))
-        仅当 kind != LegacyOld 时创建
-        BmsEmbeddedSkin 读取 DLL 内嵌旧式资源
+└─ embeddedFallbacks = BmsEmbeddedSkinFallbackChain
+    │
+    ├─ primary = BmsLegacySkinTransformer(BmsEmbeddedSkin(kind))
+    │       kind 由当前用户皮肤决定：ArgonSkin 系 → LegacyModern，其余 → LegacyOld
+    │       BmsEmbeddedSkin 读取 DLL 内嵌对应风格资源
+    │       IsProvidingLegacyResources = true（内嵌资源始终包含 BMS 贴图）
+    │
+    └─ fallback = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyOld))
+            仅当 kind != LegacyOld 时创建
+            BmsEmbeddedSkin 读取 DLL 内嵌旧式资源
 ```
 
 ---
 
 ## 各 lookup 类型的查找路由
 
-`BmsEmbeddedSkinSource.GetDrawableComponent`（`BmsEmbeddedSkinSource.cs:152`）
-根据 lookup 类型决定是否启用三层兜底：
+`BmsEmbeddedSkinSource.GetDrawableComponent` 根据 lookup 类型决定是否启用三层兜底：
 
 ```csharp
 // BMS 特定 lookup：走三层兜底
 lookup is BmsSkinComponentLookup
     or SkinComponentLookup<HitResult>
     or GlobalSkinnableContainerLookup { Ruleset: not null }
-    ? parent ?? primary ?? fallback
+    ? parent ?? embeddedFallbacks
     : parent   // 其他所有 lookup：只走 parent
 ```
 
@@ -143,8 +158,10 @@ skinSources = [
   rulesetResourcesSkin,
   BmsBuiltInSkinTransformer(TrianglesSkin),
 ]
-primary  = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyModern))
-fallback = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyOld))
+embeddedFallbacks = [
+  primary  = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyModern)),
+  fallback = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyOld)),
+]
 ```
 
 ### 选择 TrianglesSkin
@@ -156,8 +173,10 @@ skinSources = [
   BmsBuiltInSkinTransformer(TrianglesSkin),
   rulesetResourcesSkin,                      ← 无 TrianglesSkin 可插前，走 else 追加末尾
 ]
-primary  = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyModern))
-fallback = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyOld))
+embeddedFallbacks = [
+  primary  = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyModern)),
+  fallback = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyOld)),
+]
 ```
 
 ### 选择用户 legacy 皮肤（含 mania 贴图）
@@ -171,19 +190,20 @@ skinSources = [
   rulesetResourcesSkin,
   BmsBuiltInSkinTransformer(TrianglesSkin),
 ]
-primary  = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyOld))
-fallback = null（kind 已是 LegacyOld）
+embeddedFallbacks = [
+  primary = BmsLegacySkinTransformer(BmsEmbeddedSkin(LegacyOld)),
+]
 ```
 
 ---
 
 ## `BmsBuiltInSkinTransformer` 的作用
 
-对内置皮肤，所有 BMS 特定 lookup 返回 null，使控制权落到 primary/fallback。
+对内置皮肤，所有 BMS 特定 lookup 返回 null，使控制权落到 embedded fallback chain。
 唯一的实质贡献是处理 global HUD：透传内置皮肤的 HUD drawable，但用
 `HealthFilteredHudContainer`（`BmsBuiltInSkinTransformer.cs:87`）在 `LoadComplete`
 时深度遍历并移除所有 `HealthDisplay` 子节点，避免与 `BmsPlayfield` 自有的
-`LegacyHealthDisplay`（`BmsPlayfield.cs:225`）重复显示。
+`LegacyHealthDisplay` 重复显示。
 
 ---
 
@@ -273,4 +293,3 @@ exposes a first-class `Resources` property on `Skin`. The TODO tracking this is 
 
 For `BmsEmbeddedSkin`, no reflection is needed — `BmsEmbeddedSkin.Resources` is
 `internal` and accessible directly.
-

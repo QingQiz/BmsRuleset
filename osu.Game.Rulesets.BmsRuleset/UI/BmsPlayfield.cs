@@ -1,8 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
-using osu.Framework.Audio;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
@@ -16,7 +15,6 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
@@ -24,6 +22,9 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
@@ -61,18 +62,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         if (beatmap == null)
         {
-            activeSkin.SetSources(parentSkin, null, null);
+            activeSkin.SetSources(parentSkin, null);
             return;
         }
 
-        var kind = BmsEmbeddedSkinSource.GetEmbeddedSkinKind(parentSkin.AllSources);
-        var primary = new BmsLegacySkinTransformer(new BmsEmbeddedSkin(kind, host.Renderer, audio), beatmap);
-        BmsLegacySkinTransformer? fallback = null;
-
-        if (kind != BmsEmbeddedSkinKind.LegacyOld)
-            fallback = new BmsLegacySkinTransformer(new BmsEmbeddedSkin(BmsEmbeddedSkinKind.LegacyOld, host.Renderer, audio), beatmap);
-
-        activeSkin.SetSources(parentSkin, primary, fallback);
+        activeSkin.SetSources(parentSkin, BmsEmbeddedSkinFallbackFactory.Create(parentSkin.AllSources, beatmap, host.Renderer));
     }
 
     #endregion
@@ -135,9 +129,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     [Resolved]
     private GameHost host { get; set; } = null!;
-
-    [Resolved(CanBeNull = true)]
-    private AudioManager? audio { get; set; }
 
     [Resolved]
     private ISkinSource parentSkin { get; set; } = null!;

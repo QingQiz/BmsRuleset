@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -18,6 +18,12 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Skinning;
 using SixLabors.ImageSharp;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
@@ -390,7 +396,7 @@ public class BmsSkinningHelperTest
         var source = new TestSkinSource(skin);
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
 
-        var factory = BmsGameplaySkinCache.ResolveDrawableFactory(source, lookup);
+        var factory = BmsGameplaySkinDrawableResolver.Resolve(source, lookup);
 
         Assert.That(skin.DrawableLookups, Is.EqualTo(0));
         Assert.That(factory?.Create(), Is.Not.Null);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
@@ -24,6 +24,7 @@ using osu.Game.Rulesets.Filter;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset;
