@@ -48,6 +48,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         NewResult -= onNewResult;
         parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
+        skinCache.Dispose();
         activeSkin.DisposeEmbeddedSkins();
         base.Dispose(isDisposing);
     }
@@ -117,6 +118,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [Cached(typeof(ISkinSource))]
     private readonly BmsEmbeddedSkinSource activeSkin;
 
+    [Cached]
+    private readonly BmsGameplaySkinCache skinCache;
+
     private readonly BmsBeatmap? beatmap;
 
     private BmsHealthProcessor? healthProcessor => resolvedHealthProcessor as BmsHealthProcessor;
@@ -153,6 +157,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     )
     {
         activeSkin = new BmsEmbeddedSkinSource();
+        skinCache = new BmsGameplaySkinCache(activeSkin);
 
         IReadOnlyList<BmsHitObject> hitObjectsOrdered = hitObjects
             .OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
@@ -492,7 +497,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         const float reference_scroll_distance = 768f - 124.8f; // 768 - legacy DEFAULT_HIT_POSITION
         ScrollRangeScale = (768f - Stage.HitTargetPosition) / reference_scroll_distance;
 
-        RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, 10240);
+        RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, int.MaxValue);
 
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
         updateEmbeddedSkinFallback();

@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 /// generic osu! lookups are forwarded to the <b>parent only</b>, preventing
 /// the embedded skins from leaking BMS-specific resources into general osu! UI.
 /// </remarks>
-public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable
+public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGameplaySkinDrawableSource
 {
 
     /// <inheritdoc/>
@@ -167,6 +167,32 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable
         return lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents }
             ? BmsBuiltInSkinTransformer.WithoutHealthDisplay(drawable)
             : drawable;
+    }
+
+    BmsResolvedDrawableFactory? IBmsGameplaySkinDrawableSource.GetDrawableFactory(BmsSkinComponentLookup lookup)
+    {
+        if (parent != null)
+        {
+            foreach (var source in parent.AllSources)
+            {
+                if (source is IBmsGameplaySkinDrawableSource factorySource
+                    && factorySource.GetDrawableFactory(lookup) is { } factory)
+                {
+                    return factory;
+                }
+            }
+
+            var primaryFactory = ((IBmsGameplaySkinDrawableSource?)primary)?.GetDrawableFactory(lookup);
+            var fallbackFactory = ((IBmsGameplaySkinDrawableSource?)fallback)?.GetDrawableFactory(lookup);
+
+            return new BmsResolvedDrawableFactory(() =>
+                parent.GetDrawableComponent(lookup)
+                ?? primaryFactory?.Create()
+                ?? fallbackFactory?.Create());
+        }
+
+        return ((IBmsGameplaySkinDrawableSource?)primary)?.GetDrawableFactory(lookup)
+               ?? ((IBmsGameplaySkinDrawableSource?)fallback)?.GetDrawableFactory(lookup);
     }
 
     /// <summary>Looks up a texture, falling through parent → primary → fallback.</summary>

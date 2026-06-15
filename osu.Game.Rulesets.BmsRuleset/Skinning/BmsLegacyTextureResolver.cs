@@ -52,6 +52,16 @@ public static class BmsLegacyTextureResolver
 
                 break;
 
+            case BmsSkinComponents.HoldNoteTail:
+                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteTailImage, lookup))?.Value;
+                yield return $"mania-note{fallback}T";
+                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup))?.Value;
+                yield return $"mania-note{fallback}H";
+                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value;
+                yield return $"mania-note{fallback}";
+
+                break;
+
             default:
                 yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value;
                 yield return $"mania-note{fallback}";

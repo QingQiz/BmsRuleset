@@ -41,6 +41,9 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     [Resolved(CanBeNull = true)]
     private ISkinSource? skin { get; set; }
 
+    [Resolved(CanBeNull = true)]
+    private BmsGameplaySkinCache? gameplaySkinCache { get; set; }
+
     #endregion
 
     #region Construction
@@ -79,7 +82,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         noteContainer.Clear();
         longNoteTailContainer.Clear();
 
-        noteContainer.Add(new SkinnableDrawable(new BmsSkinComponentLookup(component, resolvedLayoutVariant, resolvedColumn))
+        noteContainer.Add(new BmsCachedSkinnableDrawable(new BmsSkinComponentLookup(component, resolvedLayoutVariant, resolvedColumn))
         {
             RelativeSizeAxes = Axes.Both,
             CentreComponent = false, // legacy BMS pieces use top-left anchoring
@@ -88,7 +91,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (!HitObject.IsLongNote)
             return;
 
-        longNoteTailContainer.Add(new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, resolvedLayoutVariant, resolvedColumn))
+        longNoteTailContainer.Add(new BmsCachedSkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, resolvedLayoutVariant, resolvedColumn))
         {
             RelativeSizeAxes = Axes.Both,
             // See noteContainer above: cap geometry uses top-left coordinates.
@@ -605,9 +608,11 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     }
 
     private float getCurrentNoteHeight(float drawWidth, BmsLayoutVariant layoutVariant, int column)
-        => BmsNoteSizing.GetNoteHeight(skin, new BmsSkinComponentLookup(
-            currentSkinComponent(),
-            layoutVariant, column), drawWidth);
+    {
+        var lookup = new BmsSkinComponentLookup(currentSkinComponent(), layoutVariant, column);
+        return gameplaySkinCache?.GetNoteHeight(lookup, drawWidth)
+               ?? BmsNoteSizing.GetNoteHeight(skin, lookup, drawWidth);
+    }
 
     private BmsSkinComponents currentSkinComponent()
         => HitObject.IsMine ? BmsSkinComponents.Mine : HitObject.IsLongNote ? BmsSkinComponents.HoldNoteHead : BmsSkinComponents.Note;

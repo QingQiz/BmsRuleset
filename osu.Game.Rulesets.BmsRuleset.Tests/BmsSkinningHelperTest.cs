@@ -8,11 +8,13 @@ using NUnit.Framework;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering.Dummy;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
 using osu.Game.Skinning;
 using SixLabors.ImageSharp;
@@ -75,6 +77,81 @@ public class BmsSkinningHelperTest
 
             return null;
         }
+    }
+
+    private class CountingTextureSkin(DummyRenderer renderer) : TestSkin(renderer)
+    {
+        public int TextureLookups { get; private set; }
+
+        public override Texture GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT)
+        {
+            TextureLookups++;
+            return base.GetTexture(componentName, wrapModeS, wrapModeT);
+        }
+    }
+
+    private class CountingComponentSkin : ISkin
+    {
+        public int DrawableLookups { get; private set; }
+
+        public Drawable GetDrawableComponent(ISkinComponentLookup lookup)
+        {
+            DrawableLookups++;
+            return new Container();
+        }
+
+        public Texture GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => null;
+
+        public ISample GetSample(ISampleInfo sampleInfo) => null;
+
+        public IBindable<TValue> GetConfig<TLookup, TValue>(TLookup lookup)
+            where TLookup : notnull
+            where TValue : notnull => null;
+    }
+
+    private class LiveLegacyConfigSkin(DummyRenderer renderer) : TestSkin(renderer)
+    {
+        public Bindable<float> ExplosionScale { get; } = new(1);
+
+        public override IBindable<TValue> GetConfig<TLookup, TValue>(TLookup lookup)
+        {
+            if (lookup is LegacyManiaSkinConfigurationLookup legacyLookup
+                && legacyLookup.Lookup == LegacyManiaSkinConfigurationLookups.ExplosionScale)
+            {
+                return SkinUtils.As<TValue>(ExplosionScale);
+            }
+
+            return base.GetConfig<TLookup, TValue>(lookup);
+        }
+    }
+
+    private class CountingDrawableSkinSource : ISkinSource, IBmsGameplaySkinDrawableSource
+    {
+        public int FactoryLookups { get; private set; }
+
+        public IEnumerable<ISkin> AllSources => [];
+
+        public BmsResolvedDrawableFactory GetDrawableFactory(BmsSkinComponentLookup lookup)
+        {
+            FactoryLookups++;
+            return new BmsResolvedDrawableFactory(() => new Container());
+        }
+
+        public Drawable GetDrawableComponent(ISkinComponentLookup lookup) => null;
+
+        public Texture GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => null;
+
+        public ISample GetSample(ISampleInfo sampleInfo) => null;
+
+        public IBindable<TValue> GetConfig<TLookup, TValue>(TLookup lookup)
+            where TLookup : notnull
+            where TValue : notnull => null;
+
+        public ISkin FindProvider(Func<ISkin, bool> lookupFunction) => null;
+
+        public void TriggerSourceChanged() => SourceChanged?.Invoke();
+
+        public event Action SourceChanged;
     }
 
     private class TestRawSkin : Skin
@@ -197,6 +274,146 @@ public class BmsSkinningHelperTest
 
         Assert.That(BmsLegacyTextureResolver.HoldBodyImageCandidates(skin, lookup).Where(c => c != null),
             Is.EqualTo(new[] { "mania-note1L", "note", "mania-note1" }));
+    }
+
+    [Test]
+    public void TestGameplaySkinCacheReusesResolvedDrawableFactoryUntilSourceChanges()
+    {
+        var skin = new CountingDrawableSkinSource();
+        using var cache = new BmsGameplaySkinCache(skin);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(cache.GetDrawableFactory(lookup).Create(), Is.Not.Null);
+        Assert.That(cache.GetDrawableFactory(lookup).Create(), Is.Not.Null);
+        Assert.That(skin.FactoryLookups, Is.EqualTo(1));
+
+        skin.TriggerSourceChanged();
+
+        Assert.That(cache.GetDrawableFactory(lookup).Create(), Is.Not.Null);
+        Assert.That(skin.FactoryLookups, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void TestGameplaySkinCacheReusesResolvedNoteHeight()
+    {
+        var skin = new CountingTextureSkin(renderer)
+        {
+            StringConfigs = { [LegacyManiaSkinConfigurationLookups.NoteImage] = "custom-note" },
+        };
+        skin.TextureSizes["custom-note"] = (20, 10);
+        var source = new TestSkinSource(skin);
+        using var cache = new BmsGameplaySkinCache(source);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(cache.GetNoteHeight(lookup, 80), Is.EqualTo(40));
+        var lookupsAfterFirstResolve = skin.TextureLookups;
+
+        Assert.That(cache.GetNoteHeight(lookup, 80), Is.EqualTo(40));
+        Assert.That(skin.TextureLookups, Is.EqualTo(lookupsAfterFirstResolve));
+    }
+
+    [Test]
+    public void TestGameplaySkinCacheUsesTailTextureForTailHeight()
+    {
+        var skin = new CountingTextureSkin(renderer);
+        skin.TextureSizes["mania-note1"] = (20, 10);
+        skin.TextureSizes["mania-note1T"] = (20, 40);
+        var source = new TestSkinSource(skin);
+        using var cache = new BmsGameplaySkinCache(source);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(cache.GetNoteHeight(lookup, 20), Is.EqualTo(40));
+    }
+
+    [Test]
+    public void TestGameplaySkinCacheReusesResolvedLongNoteBodyTextures()
+    {
+        var skin = new CountingTextureSkin(renderer);
+        skin.TextureSizes["mania-note1L-0"] = (20, 100);
+        skin.TextureSizes["mania-note1L-1"] = (20, 120);
+        var source = new TestSkinSource(skin);
+        using var cache = new BmsGameplaySkinCache(source);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(cache.GetLongNoteBodyTextureSet(lookup, renderer), Is.Not.Null);
+        var lookupsAfterFirstResolve = skin.TextureLookups;
+
+        Assert.That(cache.GetLongNoteBodyTextureSet(lookup, renderer), Is.Not.Null);
+        Assert.That(skin.TextureLookups, Is.EqualTo(lookupsAfterFirstResolve));
+    }
+
+    [Test]
+    public void TestLegacyTransformerCreatesResolvedNoteAndExplosionDrawables()
+    {
+        var skin = new CountingTextureSkin(renderer);
+        skin.TextureSizes["mania-key1"] = (1, 1);
+        skin.TextureSizes["mania-note1"] = (20, 10);
+        skin.TextureSizes["lightingN"] = (40, 30);
+
+        var transformer = new BmsLegacySkinTransformer(skin, new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+        });
+
+        var noteFactory = ((IBmsGameplaySkinDrawableSource)transformer).GetDrawableFactory(
+            new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1));
+        var explosionFactory = ((IBmsGameplaySkinDrawableSource)transformer).GetDrawableFactory(
+            new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1));
+
+        Assert.That(noteFactory?.Create(), Is.TypeOf<BmsResolvedNotePiece>());
+        Assert.That(explosionFactory?.Create(), Is.TypeOf<BmsResolvedHitExplosion>());
+    }
+
+    [Test]
+    public void TestLegacyTransformerDrawableFactoryReturnsNullForUnsupportedComponents()
+    {
+        var skin = new CountingTextureSkin(renderer);
+        skin.TextureSizes["mania-key1"] = (1, 1);
+        var transformer = new BmsLegacySkinTransformer(skin, new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            Assert.That(((IBmsGameplaySkinDrawableSource)transformer).GetDrawableFactory(
+                new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1)), Is.Null);
+        });
+    }
+
+    [Test]
+    public void TestGenericDrawableFallbackDoesNotCreateDrawableUntilFactoryCreate()
+    {
+        var skin = new CountingComponentSkin();
+        var source = new TestSkinSource(skin);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        var factory = BmsGameplaySkinCache.ResolveDrawableFactory(source, lookup);
+
+        Assert.That(skin.DrawableLookups, Is.EqualTo(0));
+        Assert.That(factory?.Create(), Is.Not.Null);
+        Assert.That(skin.DrawableLookups, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestExplosionFactoryReadsLiveConfigWhenCreatingDrawable()
+    {
+        var skin = new LiveLegacyConfigSkin(renderer);
+        skin.TextureSizes["mania-key1"] = (1, 1);
+        skin.TextureSizes["lightingN"] = (20, 20);
+        var transformer = new BmsLegacySkinTransformer(skin, new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+        });
+        var factory = ((IBmsGameplaySkinDrawableSource)transformer).GetDrawableFactory(
+            new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1));
+
+        skin.ExplosionScale.Value = 2;
+
+        Assert.That(((BmsResolvedHitExplosion)factory!.Create()).ResolvedScale, Is.EqualTo(2));
     }
 
     [Test]

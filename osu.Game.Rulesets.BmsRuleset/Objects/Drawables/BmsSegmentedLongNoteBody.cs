@@ -65,6 +65,9 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
     [Resolved(CanBeNull = true)]
     private ISkinSource? skin { get; set; }
 
+    [Resolved(CanBeNull = true)]
+    private BmsGameplaySkinCache? gameplaySkinCache { get; set; }
+
     [Resolved]
     private IRenderer renderer { get; set; } = null!;
 
@@ -195,7 +198,8 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
             return;
 
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, layoutVariant, column.Value);
-        var textures = BmsLongNoteBodySource.Resolve(skin, lookup, renderer);
+        var textures = gameplaySkinCache?.GetLongNoteBodyTextureSet(lookup, renderer)
+                       ?? BmsLongNoteBodySource.Resolve(skin, lookup, renderer);
 
         if (textures == null)
             return;

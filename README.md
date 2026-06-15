@@ -950,7 +950,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Perf**      | parser performance (tinny parser for importer / ProjectTickToTime(build & query))        | 4         |
 | **Perf**      | high GC pressure during importing (sr) (consider pre compute and query)                  | 3         |
 | **Perf**      | fps is not stable when a large amount of mine disposed                                   | 1         |
-| **Perf**      | the all hitobjects/ln-body/explosion use independent skin lookup on init                 | 1         | 
 
 ### FIXME
 

@@ -10,6 +10,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 
@@ -35,7 +36,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning;
 /// the standard <see cref="T:osu.Game.Skinning.LegacyManiaSkinConfigurationLookup">LegacyManiaSkinConfigurationLookup</see> API.
 /// </para>
 /// </remarks>
-public partial class BmsLegacySkinTransformer : LegacySkinTransformer
+public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGameplaySkinDrawableSource
 {
 
     /// <inheritdoc />
@@ -141,34 +142,86 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer
         if (!IsProvidingLegacyResources)
             return null;
 
+        return getDrawableFactory(bmsLookup)?.Create();
+    }
+
+    BmsResolvedDrawableFactory? IBmsGameplaySkinDrawableSource.GetDrawableFactory(BmsSkinComponentLookup lookup) => getDrawableFactory(lookup);
+
+    private BmsResolvedDrawableFactory? getDrawableFactory(BmsSkinComponentLookup bmsLookup)
+    {
+        if (!IsProvidingLegacyResources)
+            return null;
+
         // Component routing stops here. Rendering details live in the separate LegacyBms* drawables;
         // this class only decides which legacy asset family is available for the requested lookup.
         return bmsLookup.Component switch
         {
-            BmsSkinComponents.Note when hasAnimation(GetNoteImageName(bmsLookup))
-                => new LegacyBmsNotePiece(this, bmsLookup),
+            BmsSkinComponents.Note
+                => createNoteFactory(BmsLegacyTextureResolver.NoteImageCandidates(this, bmsLookup)),
             BmsSkinComponents.ColumnBackground
-                => new LegacyBmsColumnBackground(this, bmsLookup),
+                => new BmsResolvedDrawableFactory(() => new LegacyBmsColumnBackground(this, bmsLookup)),
             BmsSkinComponents.HitTarget when bmsLookup.ColumnIndex == null && hasAnimation(GetHitTargetImageName())
-                => new LegacyBmsHitTarget(this),
+                => new BmsResolvedDrawableFactory(() => new LegacyBmsHitTarget(this)),
             BmsSkinComponents.KeyArea when hasAnimation(GetKeyImageName(bmsLookup, false))
-                => new LegacyBmsKeyArea(this, bmsLookup),
-            BmsSkinComponents.Mine when hasAnimation(GetMineImageName(bmsLookup))
-                => new LegacyBmsNotePiece(this, bmsLookup),
-            BmsSkinComponents.HitExplosion when hasAnimation(GetHitExplosionImageName(bmsLookup))
-                => new LegacyBmsHitExplosion(this, bmsLookup),
+                => new BmsResolvedDrawableFactory(() => new LegacyBmsKeyArea(this, bmsLookup)),
+            BmsSkinComponents.Mine
+                => createNoteFactory(BmsLegacyTextureResolver.NoteImageCandidates(this, bmsLookup)),
+            BmsSkinComponents.HitExplosion
+                => createHitExplosionFactory(bmsLookup),
             BmsSkinComponents.StageBackground when hasAnyAnimation(GetStageBackgroundImageNames())
-                => new LegacyBmsStageBackground(this),
+                => new BmsResolvedDrawableFactory(() => new LegacyBmsStageBackground(this)),
             BmsSkinComponents.StageForeground when hasAnimation(GetStageForegroundImageName())
-                => new LegacyBmsStageForeground(this),
-            BmsSkinComponents.HoldNoteHead when hasAnyAnimation(getHoldNoteHeadImageNames(bmsLookup))
-                => new LegacyBmsNotePiece(this, bmsLookup),
-            BmsSkinComponents.HoldNoteTail when hasAnyAnimation(getHoldNoteTailImageNames(bmsLookup))
-                => new LegacyBmsNotePiece(this, bmsLookup),
-            BmsSkinComponents.HoldNoteBody or BmsSkinComponents.BarLine
-                => throw new UnsupportedSkinComponentException(lookup),
+                => new BmsResolvedDrawableFactory(() => new LegacyBmsStageForeground(this)),
+            BmsSkinComponents.HoldNoteHead
+                => createNoteFactory(BmsLegacyTextureResolver.NoteImageCandidates(this, bmsLookup)),
+            BmsSkinComponents.HoldNoteTail
+                => createNoteFactory(BmsLegacyTextureResolver.NoteImageCandidates(this, bmsLookup)),
             _ => null,
         };
+    }
+
+    private BmsResolvedDrawableFactory? createNoteFactory(IEnumerable<string?> imageNames)
+    {
+        Texture[] textures = [];
+
+        foreach (var imageName in imageNames.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct())
+        {
+            textures = this.GetTextures(imageName!, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, "-", null, out _)
+                .Where(t => t.DisplayWidth > 0 && t.DisplayHeight > 0)
+                .ToArray();
+
+            if (textures.Length > 0)
+                break;
+        }
+
+        if (textures.Length == 0)
+            return null;
+
+        var widthForNoteHeightScale = GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale)?.Value;
+        return new BmsResolvedDrawableFactory(() => new BmsResolvedNotePiece(textures, widthForNoteHeightScale));
+    }
+
+    private BmsResolvedDrawableFactory? createHitExplosionFactory(BmsSkinComponentLookup lookup)
+    {
+        var textures = this.GetTextures(GetHitExplosionImageName(lookup), default, default, true, "-", null, out _)
+            .Where(t => t.DisplayWidth > 0 && t.DisplayHeight > 0)
+            .ToArray();
+
+        if (textures.Length == 0)
+            return null;
+
+        var frameLength = Math.Max(1000 / 60.0, 170.0 / textures.Length);
+        var scale = GetManiaConfig<float>(
+            lookup.IsLongNote ? LegacyManiaSkinConfigurationLookups.HoldNoteLightScale : LegacyManiaSkinConfigurationLookups.ExplosionScale, lookup);
+        var colour = GetManiaConfig<Color4>(LegacyManiaSkinConfigurationLookups.ColumnLightColour, lookup);
+        var hitPosition = GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition);
+
+        return new BmsResolvedDrawableFactory(() => new BmsResolvedHitExplosion(
+            textures,
+            frameLength,
+            scale?.Value ?? 1,
+            colour?.Value ?? Color4.White,
+            hitPosition?.Value ?? 0));
     }
 
     public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
