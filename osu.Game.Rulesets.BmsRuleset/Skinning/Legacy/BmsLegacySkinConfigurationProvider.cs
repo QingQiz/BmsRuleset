@@ -9,8 +9,14 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 
+/// <summary>
+/// get the config in skin.ini for current layout
+/// </summary>
 internal sealed class BmsLegacySkinConfigurationProvider
 {
+
+    public bool HasConfigurations => skinConfigurations.Value.Count > 0;
+
     private readonly ISkin skin;
     private readonly BmsLayoutVariant layoutVariant;
     private readonly int maniaKeyCount;
@@ -26,8 +32,6 @@ internal sealed class BmsLegacySkinConfigurationProvider
                 ? BmsSkinConfigurationDecoder.Decode(embedded.Resources)
                 : BmsSkinConfigurationDecoder.Decode(skin));
     }
-
-    public bool HasConfigurations => skinConfigurations.Value.Count > 0;
 
     public IBindable<TValue>? GetConfig<TValue>(BmsSkinConfigurationLookup lookup)
         where TValue : notnull

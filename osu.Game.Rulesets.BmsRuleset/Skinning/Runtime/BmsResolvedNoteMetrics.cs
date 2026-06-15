@@ -13,6 +13,6 @@ internal readonly record struct BmsResolvedNoteMetrics(float? ConfiguredReferenc
 
         return ConfiguredReferenceWidth != null
             ? Math.Max(1, referenceWidth)
-            : BmsNoteSizing.DEFAULT_NOTE_HEIGHT;
+            : BmsGameplaySkinMetricsResolver.DEFAULT_NOTE_HEIGHT;
     }
 }

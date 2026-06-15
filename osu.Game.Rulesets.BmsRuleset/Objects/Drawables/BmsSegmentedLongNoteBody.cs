@@ -9,13 +9,12 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using RectangleF = osu.Framework.Graphics.Primitives.RectangleF;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;

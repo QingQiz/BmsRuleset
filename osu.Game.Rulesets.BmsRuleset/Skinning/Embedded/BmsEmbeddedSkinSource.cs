@@ -5,12 +5,12 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
+using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
+using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
@@ -104,31 +104,8 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
             : parent?.GetDrawableComponent(lookup);
 
         return lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents }
-            ? BmsBuiltInSkinTransformer.WithoutHealthDisplay(drawable)
+            ? BmsDefaultHud.GetDrawableComponent(lookup)
             : drawable;
-    }
-
-    BmsResolvedDrawableFactory? IBmsGameplaySkinDrawableSource.GetDrawableFactory(BmsSkinComponentLookup lookup)
-    {
-        if (parent != null)
-        {
-            foreach (var source in parent.AllSources)
-            {
-                if (source is IBmsGameplaySkinDrawableSource factorySource
-                    && factorySource.GetDrawableFactory(lookup) is { } factory)
-                {
-                    return factory;
-                }
-            }
-
-            var embeddedFactory = embeddedFallbacks?.GetDrawableFactory(lookup);
-
-            return new BmsResolvedDrawableFactory(() =>
-                parent.GetDrawableComponent(lookup)
-                ?? embeddedFactory?.Create());
-        }
-
-        return embeddedFallbacks?.GetDrawableFactory(lookup);
     }
 
     /// <summary>Looks up a texture, falling through parent → primary → fallback.</summary>
@@ -176,6 +153,29 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
     {
         embeddedFallbacks?.Dispose();
         embeddedFallbacks = null;
+    }
+
+    BmsResolvedDrawableFactory? IBmsGameplaySkinDrawableSource.GetDrawableFactory(BmsSkinComponentLookup lookup)
+    {
+        if (parent != null)
+        {
+            foreach (var source in parent.AllSources)
+            {
+                if (source is IBmsGameplaySkinDrawableSource factorySource
+                    && factorySource.GetDrawableFactory(lookup) is { } factory)
+                {
+                    return factory;
+                }
+            }
+
+            var embeddedFactory = embeddedFallbacks?.GetDrawableFactory(lookup);
+
+            return new BmsResolvedDrawableFactory(() =>
+                parent.GetDrawableComponent(lookup)
+                ?? embeddedFactory?.Create());
+        }
+
+        return embeddedFallbacks?.GetDrawableFactory(lookup);
     }
 
     public event Action? SourceChanged;

@@ -5,15 +5,14 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Layout;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
@@ -38,23 +37,13 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     #endregion
 
-    #region DI
-
-    [Resolved(CanBeNull = true)]
-    private ISkinSource? skin { get; set; }
-
-    [Resolved(CanBeNull = true)]
-    private BmsGameplaySkinCache? gameplaySkinCache { get; set; }
-
-    #endregion
-
     #region Construction
 
     public DrawableBmsHitObject()
         : base(null!)
     {
         Origin = Anchor.TopLeft;
-        Size = new Vector2(40, BmsNoteSizing.DEFAULT_NOTE_HEIGHT);
+        Size = new Vector2(40, BmsGameplaySkinMetricsResolver.DEFAULT_NOTE_HEIGHT);
     }
 
     #endregion
@@ -103,6 +92,16 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     #endregion
 
+    #region DI
+
+    [Resolved(CanBeNull = true)]
+    private ISkinSource? skin { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private BmsGameplaySkinCache? gameplaySkinCache { get; set; }
+
+    #endregion
+
     #region Core drawable fields
 
     private Container noteContainer = null!;
@@ -128,7 +127,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     #region Sizing state
 
-    private float currentNoteHeight = BmsNoteSizing.DEFAULT_NOTE_HEIGHT;
+    private float currentNoteHeight = BmsGameplaySkinMetricsResolver.DEFAULT_NOTE_HEIGHT;
     private bool longNotePiecesApplied;
 
     #endregion
@@ -613,7 +612,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
     {
         var lookup = new BmsSkinComponentLookup(currentSkinComponent(), layoutVariant, column);
         return gameplaySkinCache?.GetNoteHeight(lookup, drawWidth)
-               ?? BmsNoteSizing.GetNoteHeight(skin, lookup, drawWidth);
+               ?? BmsGameplaySkinMetricsResolver.ResolveNoteHeight(skin, lookup, drawWidth);
     }
 
     private BmsSkinComponents currentSkinComponent()
@@ -639,7 +638,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopLeft,
                 RelativeSizeAxes = Axes.X,
-                Height = BmsNoteSizing.DEFAULT_NOTE_HEIGHT,
+                Height = BmsGameplaySkinMetricsResolver.DEFAULT_NOTE_HEIGHT,
                 Alpha = 0,
             },
             noteContainer = new Container
@@ -647,7 +646,7 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopLeft,
                 RelativeSizeAxes = Axes.X,
-                Height = BmsNoteSizing.DEFAULT_NOTE_HEIGHT,
+                Height = BmsGameplaySkinMetricsResolver.DEFAULT_NOTE_HEIGHT,
             },
         ]);
     }

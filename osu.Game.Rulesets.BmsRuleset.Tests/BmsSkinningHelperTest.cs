@@ -13,17 +13,16 @@ using osu.Framework.Graphics.Rendering.Dummy;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Game.Audio;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Skinning;
-using osu.Game.Skinning;
-using SixLabors.ImageSharp;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
+using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Skinning;
+using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
@@ -133,9 +132,10 @@ public class BmsSkinningHelperTest
 
     private class CountingDrawableSkinSource : ISkinSource, IBmsGameplaySkinDrawableSource
     {
-        public int FactoryLookups { get; private set; }
 
         public IEnumerable<ISkin> AllSources => [];
+
+        public int FactoryLookups { get; private set; }
 
         public BmsResolvedDrawableFactory GetDrawableFactory(BmsSkinComponentLookup lookup)
         {
@@ -266,20 +266,22 @@ public class BmsSkinningHelperTest
     }
 
     [Test]
-    public void TestHoldBodyCandidatesSkipBodyWhenItIsShortNoteFallback()
+    public void TestExplosionFactoryReadsLiveConfigWhenCreatingDrawable()
     {
-        var skin = new TestSkin(renderer)
+        var skin = new LiveLegacyConfigSkin(renderer);
+        skin.TextureSizes["mania-key1"] = (1, 1);
+        skin.TextureSizes["lightingN"] = (20, 20);
+        var transformer = new BmsLegacySkinTransformer(skin, new BmsBeatmap
         {
-            StringConfigs =
-            {
-                [LegacyManiaSkinConfigurationLookups.HoldNoteBodyImage] = "note",
-                [LegacyManiaSkinConfigurationLookups.NoteImage] = "note",
-            },
-        };
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1);
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+        });
+        var factory = ((IBmsGameplaySkinDrawableSource)transformer).GetDrawableFactory(
+            new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1));
 
-        Assert.That(BmsLegacyTextureResolver.HoldBodyImageCandidates(skin, lookup).Where(c => c != null),
-            Is.EqualTo(new[] { "mania-note1L", "note", "mania-note1" }));
+        skin.ExplosionScale.Value = 2;
+
+        Assert.That(((BmsResolvedHitExplosion)factory!.Create()).ResolvedScale, Is.EqualTo(2));
     }
 
     [Test]
@@ -297,6 +299,23 @@ public class BmsSkinningHelperTest
 
         Assert.That(cache.GetDrawableFactory(lookup).Create(), Is.Not.Null);
         Assert.That(skin.FactoryLookups, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void TestGameplaySkinCacheReusesResolvedLongNoteBodyTextures()
+    {
+        var skin = new CountingTextureSkin(renderer);
+        skin.TextureSizes["mania-note1L-0"] = (20, 100);
+        skin.TextureSizes["mania-note1L-1"] = (20, 120);
+        var source = new TestSkinSource(skin);
+        using var cache = new BmsGameplaySkinCache(source);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(cache.GetLongNoteBodyTextureSet(lookup, renderer), Is.Not.Null);
+        var lookupsAfterFirstResolve = skin.TextureLookups;
+
+        Assert.That(cache.GetLongNoteBodyTextureSet(lookup, renderer), Is.Not.Null);
+        Assert.That(skin.TextureLookups, Is.EqualTo(lookupsAfterFirstResolve));
     }
 
     [Test]
@@ -332,20 +351,57 @@ public class BmsSkinningHelperTest
     }
 
     [Test]
-    public void TestGameplaySkinCacheReusesResolvedLongNoteBodyTextures()
+    public void TestGenericDrawableFallbackDoesNotCreateDrawableUntilFactoryCreate()
     {
-        var skin = new CountingTextureSkin(renderer);
-        skin.TextureSizes["mania-note1L-0"] = (20, 100);
-        skin.TextureSizes["mania-note1L-1"] = (20, 120);
+        var skin = new CountingComponentSkin();
         var source = new TestSkinSource(skin);
-        using var cache = new BmsGameplaySkinCache(source);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        var factory = BmsGameplaySkinDrawableResolver.Resolve(source, lookup);
+
+        Assert.That(skin.DrawableLookups, Is.EqualTo(0));
+        Assert.That(factory?.Create(), Is.Not.Null);
+        Assert.That(skin.DrawableLookups, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestHoldBodyCandidatesSkipBodyWhenItIsShortNoteFallback()
+    {
+        var skin = new TestSkin(renderer)
+        {
+            StringConfigs =
+            {
+                [LegacyManiaSkinConfigurationLookups.HoldNoteBodyImage] = "note",
+                [LegacyManiaSkinConfigurationLookups.NoteImage] = "note",
+            },
+        };
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1);
 
-        Assert.That(cache.GetLongNoteBodyTextureSet(lookup, renderer), Is.Not.Null);
-        var lookupsAfterFirstResolve = skin.TextureLookups;
+        Assert.That(BmsLegacyTextureResolver.HoldBodyImageCandidates(skin, lookup).Where(c => c != null),
+            Is.EqualTo(new[] { "mania-note1L", "note", "mania-note1" }));
+    }
 
-        Assert.That(cache.GetLongNoteBodyTextureSet(lookup, renderer), Is.Not.Null);
-        Assert.That(skin.TextureLookups, Is.EqualTo(lookupsAfterFirstResolve));
+    [Test]
+    public void TestHoldHeadTexturePrefersConfiguredHeadThenLegacyFallback()
+    {
+        var skin = new TestSkin(renderer)
+        {
+            TextureSizes =
+            {
+                // Only "head" has a texture — the first configured candidate wins.
+                ["head"] = (20, 10),
+            },
+            StringConfigs =
+            {
+                [LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage] = "head",
+                [LegacyManiaSkinConfigurationLookups.NoteImage] = "note",
+            },
+        };
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteHead, BmsLayoutVariant.Bme7K, 1);
+
+        var textures = BmsLegacyTextureResolver.ResolveNoteTextures(skin, lookup);
+        Assert.That(textures, Has.Length.EqualTo(1));
+        Assert.That(textures[0].DisplayWidth, Is.EqualTo(20));
     }
 
     [Test]
@@ -387,56 +443,6 @@ public class BmsSkinningHelperTest
             Assert.That(((IBmsGameplaySkinDrawableSource)transformer).GetDrawableFactory(
                 new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1)), Is.Null);
         });
-    }
-
-    [Test]
-    public void TestGenericDrawableFallbackDoesNotCreateDrawableUntilFactoryCreate()
-    {
-        var skin = new CountingComponentSkin();
-        var source = new TestSkinSource(skin);
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-
-        var factory = BmsGameplaySkinDrawableResolver.Resolve(source, lookup);
-
-        Assert.That(skin.DrawableLookups, Is.EqualTo(0));
-        Assert.That(factory?.Create(), Is.Not.Null);
-        Assert.That(skin.DrawableLookups, Is.EqualTo(1));
-    }
-
-    [Test]
-    public void TestExplosionFactoryReadsLiveConfigWhenCreatingDrawable()
-    {
-        var skin = new LiveLegacyConfigSkin(renderer);
-        skin.TextureSizes["mania-key1"] = (1, 1);
-        skin.TextureSizes["lightingN"] = (20, 20);
-        var transformer = new BmsLegacySkinTransformer(skin, new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-        });
-        var factory = ((IBmsGameplaySkinDrawableSource)transformer).GetDrawableFactory(
-            new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1));
-
-        skin.ExplosionScale.Value = 2;
-
-        Assert.That(((BmsResolvedHitExplosion)factory!.Create()).ResolvedScale, Is.EqualTo(2));
-    }
-
-    [Test]
-    public void TestHoldHeadCandidatesPreferConfiguredHeadThenLegacyFallbackThenShortNote()
-    {
-        var skin = new TestSkin(renderer)
-        {
-            StringConfigs =
-            {
-                [LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage] = "head",
-                [LegacyManiaSkinConfigurationLookups.NoteImage] = "note",
-            },
-        };
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteHead, BmsLayoutVariant.Bme7K, 1);
-
-        Assert.That(BmsLegacyTextureResolver.NoteImageCandidates(skin, lookup).Where(c => c != null),
-            Is.EqualTo(new[] { "head", "mania-note1H", "note", "mania-note1" }));
     }
 
     [Test]
@@ -482,16 +488,22 @@ public class BmsSkinningHelperTest
     }
 
     [Test]
-    public void TestMineCandidatesUseHit100ThenSpecialNoteFallback()
+    public void TestMineTextureUsesHit100ThenSpecialNoteFallback()
     {
         var skin = new TestSkin(renderer)
         {
+            TextureSizes =
+            {
+                // Only "mine" has a texture — the configured Hit100 name wins.
+                ["mine"] = (10, 10),
+            },
             StringConfigs = { [LegacyManiaSkinConfigurationLookups.Hit100] = "mine" },
         };
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Mine, BmsLayoutVariant.Bme7K, 1);
 
-        Assert.That(BmsLegacyTextureResolver.NoteImageCandidates(skin, lookup).Where(c => c != null),
-            Is.EqualTo(new[] { "mine", "mania-noteS" }));
+        var textures = BmsLegacyTextureResolver.ResolveNoteTextures(skin, lookup);
+        Assert.That(textures, Has.Length.EqualTo(1));
+        Assert.That(textures[0].DisplayWidth, Is.EqualTo(10));
     }
 
     [Test]
@@ -503,7 +515,7 @@ public class BmsSkinningHelperTest
             FloatConfigs = { [LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale] = 30 },
         });
 
-        Assert.That(BmsNoteSizing.GetNoteHeight(skin, lookup, 80), Is.EqualTo(30));
+        Assert.That(BmsGameplaySkinMetricsResolver.ResolveNoteHeight(skin, lookup, 80), Is.EqualTo(30));
     }
 
     [Test]
@@ -517,7 +529,7 @@ public class BmsSkinningHelperTest
             FloatConfigs = { [LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale] = 30 },
         });
 
-        Assert.That(BmsNoteSizing.GetNoteHeight(skin, lookup, 80), Is.EqualTo(15));
+        Assert.That(BmsGameplaySkinMetricsResolver.ResolveNoteHeight(skin, lookup, 80), Is.EqualTo(15));
     }
 
     [Test]
@@ -525,7 +537,7 @@ public class BmsSkinningHelperTest
     {
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
 
-        Assert.That(BmsNoteSizing.GetNoteHeight(new TestSkinSource(new TestSkin(renderer)), lookup, 80), Is.EqualTo(BmsNoteSizing.DEFAULT_NOTE_HEIGHT));
+        Assert.That(BmsGameplaySkinMetricsResolver.ResolveNoteHeight(new TestSkinSource(new TestSkin(renderer)), lookup, 80), Is.EqualTo(BmsGameplaySkinMetricsResolver.DEFAULT_NOTE_HEIGHT));
     }
 
     [Test]

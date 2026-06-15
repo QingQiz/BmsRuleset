@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Graphics.Rendering;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
+using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
@@ -19,6 +19,12 @@ internal sealed class BmsGameplaySkinCache : IDisposable
         this.skin = skin;
         skin.SourceChanged += clear;
     }
+
+    #region Disposal
+
+    public void Dispose() => skin.SourceChanged -= clear;
+
+    #endregion
 
     public BmsResolvedDrawableFactory? GetDrawableFactory(BmsSkinComponentLookup lookup)
     {
@@ -58,8 +64,6 @@ internal sealed class BmsGameplaySkinCache : IDisposable
 
         return textureSet;
     }
-
-    public void Dispose() => skin.SourceChanged -= clear;
 
     private void clear()
     {

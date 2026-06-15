@@ -7,16 +7,15 @@ using System.Runtime.CompilerServices;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osu.Game.Skinning;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
 using Image = SixLabors.ImageSharp.Image;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning.Resources;
+namespace osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 
 public enum BmsLongNoteBodyTextureKind
 {
@@ -130,7 +129,8 @@ public static class BmsLongNoteBodySource
         {
             var y = image.Height * i / count;
             var nextY = image.Height * (i + 1) / count;
-            using var slice = image.Clone(ctx => ctx.Crop(new Rectangle(0, y, image.Width, nextY - y)));
+            var w = image.Width;
+            using var slice = image.Clone(ctx => ctx.Crop(new Rectangle(0, y, w, nextY - y)));
             var upload = new TextureUpload(slice.Clone());
             var texture = renderer.CreateTexture(upload.Width, upload.Height, wrapModeS: WrapMode.ClampToEdge, wrapModeT: WrapMode.ClampToEdge);
             texture.SetData(upload);

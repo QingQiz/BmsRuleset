@@ -6,7 +6,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Skinning;
 using osuTK;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;

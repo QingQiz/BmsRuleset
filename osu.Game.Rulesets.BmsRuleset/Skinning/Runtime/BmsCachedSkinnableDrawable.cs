@@ -3,16 +3,16 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 
 internal partial class BmsCachedSkinnableDrawable : SkinReloadableDrawable
 {
-    public Drawable Drawable { get; private set; } = null!;
 
     public bool CentreComponent = true;
+
+    public Drawable Drawable { get; private set; } = null!;
 
     private readonly BmsSkinComponentLookup componentLookup;
     private readonly Func<BmsSkinComponentLookup, Drawable>? createDefault;
