@@ -241,13 +241,10 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
         if (HitObject == null)
             return; // HitObject may not be set yet during early pool lifecycle
 
-        // Hidden scratch notes (AutoScratch + hide scratch) live in a zero-width column, so the
-        // layout refresh below early-returns and they never reposition. They are auto-judged and
-        // must stay invisible. Enforcing Alpha here every frame (after the framework has applied
-        // the FadeInFromZero transform earlier in the subtree update) reliably keeps them hidden;
-        // a one-shot Alpha=0 during apply is otherwise overwritten by that fade transform.
-        if (isColumnHidden() && Alpha != 0)
-            Alpha = 0;
+        // Once a note is judged or a mine has been handled, there is nothing left to compute:
+        // scroll position, geometry, and layout metrics are all irrelevant.
+        if (Judged || mineHandled)
+            return;
 
         if (!tryRefreshLayoutMetrics(out var layout))
         {
@@ -370,18 +367,15 @@ public sealed partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObjec
 
     protected override void UpdateInitialTransforms()
     {
-        base.UpdateInitialTransforms();
-
-        // Hidden scratch notes (AutoScratch + hide scratch) must stay invisible. The base
-        // fade-in would otherwise animate Alpha back to 1, making the auto-judged note pop
-        // into view and freeze at (0,0) (its scratch column has zero width, so the per-frame
-        // layout refresh bails and never repositions it).
+        // Hidden scratch notes must stay invisible from the start. The base fade-in transform
+        // is skipped for these so a one-shot Alpha=0 is sufficient — no per-frame enforcement needed.
         if (isColumnHidden())
         {
             Alpha = 0;
             return;
         }
 
+        base.UpdateInitialTransforms();
         this.FadeInFromZero(100);
     }
 
