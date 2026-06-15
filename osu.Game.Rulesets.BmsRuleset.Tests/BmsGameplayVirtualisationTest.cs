@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using NUnit.Framework;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -86,7 +87,7 @@ public class BmsGameplayVirtualisationTest
     [Test]
     public void TestAlephAnotherCombo841LifetimeStartsBeforeVisibleWindow()
     {
-        var beatmap = decodeFilesystemBeatmap(Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Aleph-0 (by LeaF)", "_14ANOTHER.bms"));
+        var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "Aleph-0 (by LeaF)", "_14ANOTHER.bms"));
         var hitObject = beatmap.HitObjects.Where(h => !h.IsMine).OrderBy(h => h.StartTime).ElementAt(840);
         var playfield = new BmsPlayfield(beatmap);
 
@@ -140,7 +141,7 @@ public class BmsGameplayVirtualisationTest
     [Test]
     public void TestOutlawCautionNonMineNotesAreAliveBeforeAutoplayPress()
     {
-        var beatmap = decodeFilesystemBeatmap(Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "103_outlaw_ogg", "99_outlaw_caution.bms"));
+        var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "103_outlaw_ogg", "99_outlaw_caution.bms"));
         var playfield = new BmsPlayfield(beatmap);
 
         foreach (var hitObject in beatmap.HitObjects.Where(h => !h.IsMine).Take(64))
@@ -155,12 +156,69 @@ public class BmsGameplayVirtualisationTest
         Assert.That(lateEntries, Is.Empty);
     }
 
+    [Test]
+    public void TestOutlawScrollplusNotesAroundCombo316AreAliveBeforeFirstVisibleWindow()
+    {
+        var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "103_outlaw_ogg", "99_outlaw_scrollplus.bms"));
+        var playableObjects = beatmap.HitObjects.Where(h => !h.IsMine).OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
+        var playfield = new BmsPlayfield(beatmap);
+
+        foreach (var hitObject in playableObjects.Skip(300).Take(40))
+            playfield.Add(hitObject);
+
+        var lateEntries = playfield.HitObjectContainer.Entries
+            .Select(e => (Entry: e, HitObject: (BmsHitObject)e.HitObject))
+            .Select(x => (x.Entry, x.HitObject, Combo: Array.IndexOf(playableObjects, x.HitObject) + 1, FirstVisibleTime: findEarliestVisibleTime(beatmap, x.HitObject)))
+            .Where(x => x.Entry.LifetimeStart > x.FirstVisibleTime - 100)
+            .Select(x => $"combo={x.Combo} tick={x.HitObject.TickInfo.Tick} col={x.HitObject.Column} start={x.HitObject.StartTime:F1} firstVisible={x.FirstVisibleTime:F1} lifetime={x.Entry.LifetimeStart:F1}")
+            .ToArray();
+
+        Assert.That(lateEntries, Is.Empty);
+    }
+
     private static BmsBeatmap decodeFilesystemBeatmap(string path)
     {
         using var stream = new MemoryStream(File.ReadAllBytes(path));
         using var reader = new LineBufferedReader(stream);
         var decoded = new BmsBeatmapDecoder().Decode(reader);
         return (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+    }
+
+    private static string findTestSongsRoot([CallerFilePath] string sourceFile = "")
+    {
+        var rootFromSourceFile = findTestSongsRootFrom(Path.GetDirectoryName(sourceFile) ?? string.Empty);
+
+        if (!string.IsNullOrEmpty(rootFromSourceFile))
+            return rootFromSourceFile;
+
+        var rootFromCurrentDirectory = findTestSongsRootFrom(Environment.CurrentDirectory);
+
+        if (!string.IsNullOrEmpty(rootFromCurrentDirectory))
+            return rootFromCurrentDirectory;
+
+        var rootFromTestDirectory = findTestSongsRootFrom(TestContext.CurrentContext.TestDirectory);
+
+        if (!string.IsNullOrEmpty(rootFromTestDirectory))
+            return rootFromTestDirectory;
+
+        return BmsEmbeddedSongDecoderTest.TestSongsRoot;
+    }
+
+    private static string findTestSongsRootFrom(string startDirectory)
+    {
+        var directory = new DirectoryInfo(startDirectory);
+
+        while (directory != null)
+        {
+            var candidate = Path.Combine(directory.FullName, "osu.Game.Rulesets.BmsRuleset.Tests", "bms_test_songs");
+
+            if (Directory.Exists(candidate))
+                return candidate;
+
+            directory = directory.Parent;
+        }
+
+        return string.Empty;
     }
 
     private static double findFirstVisibleTime(BmsBeatmap beatmap, BmsHitObject hitObject)
@@ -182,5 +240,27 @@ public class BmsGameplayVirtualisationTest
         }
 
         return visibleStart;
+    }
+
+    private static double findEarliestVisibleTime(BmsBeatmap beatmap, BmsHitObject hitObject)
+    {
+        var timingMap = beatmap.TimingMap!;
+        var scrollRange = BmsDrawableRuleset.ComputeScrollTime(8);
+        var firstVisible = hitObject.StartTime;
+
+        for (var time = 0d; time <= hitObject.StartTime; time += 10)
+        {
+            var speed = timingMap.GetSpeedFactorAtTime(time);
+            var multiplier = Math.Max(0.001, Math.Abs(speed));
+            var progress = hitObject.ScrollPositionAtStartTime - timingMap.GetScrollPositionAtTime(time);
+
+            if (progress <= scrollRange / multiplier)
+            {
+                firstVisible = time;
+                break;
+            }
+        }
+
+        return firstVisible;
     }
 }

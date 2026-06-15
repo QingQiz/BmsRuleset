@@ -22,6 +22,12 @@ public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectCo
     private readonly Dictionary<BmsHitObject, DrawableBmsHitObject> aliveDrawableMap = new();
     private readonly Dictionary<BmsHitObject, double> futureLifetimeCache = new();
 
+    /// <summary>
+    /// Lifetime past a mine's <see cref="HitObject.StartTime"/>, in ms.
+    /// Mines only need a single frame to check whether the column is pressed
+    /// </summary>
+    private const double mine_past_lifetime = 10;
+
     private double lastPastLifetime = double.NaN;
     private double lastUpdateTime = double.NaN;
     private double lastCachedScrollSpeed = double.NaN;
@@ -78,12 +84,6 @@ public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectCo
     private static bool usesLinearTimeProjection(BmsHitObject hitObject)
         => hitObject.TickInfo.Tick == hitObject.TickInfo.EndTick && hitObject.TickInfo.Tick == 0 && hitObject.StartTime != 0;
 
-    /// <summary>
-    /// Lifetime past a mine's <see cref="HitObject.StartTime"/>, in ms.
-    /// Mines only need a single frame to check whether the column is pressed
-    /// </summary>
-    private const double mine_past_lifetime = 10;
-
     private static double computePastLifetime() => default_past_lifetime + lifetime_margin;
 
     private static double getLateWindow(BmsHitObject hitObject)
@@ -128,7 +128,7 @@ public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectCo
         if (playfield.ConstantScrollActive || timingMap == null || usesLinearTimeProjection(hitObject))
             return computeConstantScrollFutureLifetime();
 
-        var visibleTime = findFinalVisibleWindowStart(hitObject, timingMap);
+        var visibleTime = findEarliestVisibleWindowStart(hitObject, timingMap);
 
         if (!double.IsFinite(visibleTime))
             return computeConstantScrollFutureLifetime();
@@ -154,22 +154,32 @@ public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectCo
         return true;
     }
 
-    private double findFinalVisibleWindowStart(BmsHitObject hitObject, BmsTimingMap timingMap)
+    private double findEarliestVisibleWindowStart(BmsHitObject hitObject, BmsTimingMap timingMap)
     {
-        var visibleTime = hitObject.StartTime;
+        var earliestVisibleTime = hitObject.StartTime;
+        var laterTime = hitObject.StartTime;
+        var laterVisible = true;
 
         for (var probeTime = hitObject.StartTime; probeTime > 0;)
         {
             var nextProbeTime = Math.Max(0, probeTime - visible_window_search_step);
+            var nextVisible = isVisibleAt(hitObject, timingMap, nextProbeTime);
 
-            if (!isVisibleAt(hitObject, timingMap, nextProbeTime))
-                return refineVisibleWindowStart(hitObject, timingMap, nextProbeTime, probeTime);
+            if (nextVisible)
+            {
+                earliestVisibleTime = nextProbeTime;
+            }
+            else if (laterVisible)
+            {
+                earliestVisibleTime = refineVisibleWindowStart(hitObject, timingMap, nextProbeTime, laterTime);
+            }
 
-            visibleTime = nextProbeTime;
             probeTime = nextProbeTime;
+            laterTime = nextProbeTime;
+            laterVisible = nextVisible;
         }
 
-        return visibleTime;
+        return earliestVisibleTime;
     }
 
     private double refineVisibleWindowStart(BmsHitObject hitObject, BmsTimingMap timingMap, double hiddenTime, double visibleTime)
