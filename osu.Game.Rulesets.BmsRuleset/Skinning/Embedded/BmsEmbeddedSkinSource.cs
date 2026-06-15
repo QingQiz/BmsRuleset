@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
@@ -85,7 +86,7 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
 
         this.parent = parent;
         this.embeddedFallbacks = embeddedFallbacks;
-        SourceChanged?.Invoke();
+        raiseSourceChanged();
     }
 
     /// <inheritdoc />
@@ -178,5 +179,186 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
         return embeddedFallbacks?.GetDrawableFactory(lookup);
     }
 
-    public event Action? SourceChanged;
+    /// <summary>
+    /// Fired when the skin source changes.  Uses a custom slot-based backing store with
+    /// O(1) subscribe / unsubscribe instead of a plain multicast delegate, which would
+    /// degrade to O(n²) copy churn when many <see cref="SkinReloadableDrawable"/> instances
+    /// subscribe and then dispose (each <c>-=</c> copies the invocation list).
+    /// </summary>
+    public event Action? SourceChanged
+    {
+        add
+        {
+            if (value == null)
+                return;
+
+            lock (sourceChangedLock)
+                addSourceChangedHandler(value);
+        }
+
+        remove
+        {
+            if (value == null)
+                return;
+
+            lock (sourceChangedLock)
+                removeSourceChangedHandler(value);
+        }
+    }
+
+    private readonly object sourceChangedLock = new();
+
+    private readonly List<SourceChangedSubscription> sourceChangedSubscriptions = [];
+    private readonly Dictionary<Action, int> sourceChangedLastSubscription = [];
+
+    private int sourceChangedHead = -1;
+    private int sourceChangedTail = -1;
+    private int sourceChangedFreeHead = -1;
+    private int sourceChangedCount;
+
+    private void addSourceChangedHandler(Action handler)
+    {
+        var previousSame = sourceChangedLastSubscription.GetValueOrDefault(handler, -1);
+
+        int slot;
+
+        if (sourceChangedFreeHead >= 0)
+        {
+            slot = sourceChangedFreeHead;
+            sourceChangedFreeHead = sourceChangedSubscriptions[slot].NextFree;
+
+            sourceChangedSubscriptions[slot] = new SourceChangedSubscription
+            {
+                Handler = handler,
+                PreviousSame = previousSame,
+                PreviousActive = sourceChangedTail,
+                NextActive = -1,
+                NextFree = -1,
+            };
+        }
+        else
+        {
+            slot = sourceChangedSubscriptions.Count;
+
+            sourceChangedSubscriptions.Add(new SourceChangedSubscription
+            {
+                Handler = handler,
+                PreviousSame = previousSame,
+                PreviousActive = sourceChangedTail,
+                NextActive = -1,
+                NextFree = -1,
+            });
+        }
+
+        if (sourceChangedTail >= 0)
+        {
+            var tail = sourceChangedSubscriptions[sourceChangedTail];
+            tail.NextActive = slot;
+            sourceChangedSubscriptions[sourceChangedTail] = tail;
+        }
+        else
+        {
+            sourceChangedHead = slot;
+        }
+
+        sourceChangedTail = slot;
+        sourceChangedLastSubscription[handler] = slot;
+        sourceChangedCount++;
+    }
+
+    private void removeSourceChangedHandler(Action handler)
+    {
+        if (!sourceChangedLastSubscription.TryGetValue(handler, out var slot))
+            return;
+
+        var subscription = sourceChangedSubscriptions[slot];
+
+        if (subscription.PreviousSame >= 0)
+            sourceChangedLastSubscription[handler] = subscription.PreviousSame;
+        else
+            sourceChangedLastSubscription.Remove(handler);
+
+        if (subscription.PreviousActive >= 0)
+        {
+            var previous = sourceChangedSubscriptions[subscription.PreviousActive];
+            previous.NextActive = subscription.NextActive;
+            sourceChangedSubscriptions[subscription.PreviousActive] = previous;
+        }
+        else
+        {
+            sourceChangedHead = subscription.NextActive;
+        }
+
+        if (subscription.NextActive >= 0)
+        {
+            var next = sourceChangedSubscriptions[subscription.NextActive];
+            next.PreviousActive = subscription.PreviousActive;
+            sourceChangedSubscriptions[subscription.NextActive] = next;
+        }
+        else
+        {
+            sourceChangedTail = subscription.PreviousActive;
+        }
+
+        sourceChangedSubscriptions[slot] = new SourceChangedSubscription
+        {
+            Handler = null,
+            PreviousSame = -1,
+            PreviousActive = -1,
+            NextActive = -1,
+            NextFree = sourceChangedFreeHead,
+        };
+
+        sourceChangedFreeHead = slot;
+        sourceChangedCount--;
+    }
+
+    private void raiseSourceChanged()
+    {
+        Action[]? handlers;
+        var count = 0;
+
+        lock (sourceChangedLock)
+        {
+            if (sourceChangedCount == 0)
+                return;
+
+            handlers = ArrayPool<Action>.Shared.Rent(sourceChangedCount);
+
+            for (var slot = sourceChangedHead; slot >= 0; slot = sourceChangedSubscriptions[slot].NextActive)
+            {
+                var handler = sourceChangedSubscriptions[slot].Handler;
+
+                if (handler != null)
+                    handlers[count++] = handler;
+            }
+        }
+
+        try
+        {
+            for (var i = 0; i < count; i++)
+                handlers[i]();
+        }
+        finally
+        {
+            Array.Clear(handlers, 0, count);
+            ArrayPool<Action>.Shared.Return(handlers);
+        }
+    }
+
+    private struct SourceChangedSubscription
+    {
+        public Action? Handler;
+
+        // Previous active subscription with the same delegate.
+        // This lets -= remove the latest matching handler, like normal C# events.
+        public int PreviousSame;
+
+        // Active linked list.
+        public int PreviousActive;
+        public int NextActive;
+
+        // Free-list slot reuse.
+        public int NextFree;
+    }
 }
