@@ -11,9 +11,9 @@ internal readonly record struct BmsHitObjectLifetimePlan(double LifetimeStart, d
 
 internal sealed class BmsHitObjectLifetimePlanner(BmsPlayfield playfield)
 {
-    private const double minimum_future_lifetime = 750;
-    private const double lifetime_margin = 500;
-    private const double default_past_lifetime = 1000;
+    internal const double MINIMUM_FUTURE_LIFETIME = 750;
+    internal const double LIFETIME_MARGIN = 500;
+    internal const double DEFAULT_PAST_LIFETIME = 1000;
 
     /// <summary>
     /// Lifetime past a mine's <see cref="osu.Game.Rulesets.Objects.HitObject.StartTime"/>, in ms.
@@ -43,7 +43,7 @@ internal sealed class BmsHitObjectLifetimePlanner(BmsPlayfield playfield)
         var start = hitObject.StartTime - futureLifetime;
         var end = hitObject.IsMine
             ? hitObject.StartTime + mine_past_lifetime
-            : hitObject.EndTime + Math.Max(pastLifetime, getLateWindow(hitObject) + lifetime_margin);
+            : hitObject.EndTime + Math.Max(pastLifetime, getLateWindow(hitObject) + LIFETIME_MARGIN);
 
         return plans[hitObject] = new BmsHitObjectLifetimePlan(start, end);
     }
@@ -69,10 +69,10 @@ internal sealed class BmsHitObjectLifetimePlanner(BmsPlayfield playfield)
     private static bool usesLinearTimeProjection(BmsHitObject hitObject)
         => hitObject.TickInfo.Tick == hitObject.TickInfo.EndTick && hitObject.TickInfo.Tick == 0 && hitObject.StartTime != 0;
 
-    private static double computePastLifetime() => default_past_lifetime + lifetime_margin;
+    private static double computePastLifetime() => DEFAULT_PAST_LIFETIME + LIFETIME_MARGIN;
 
     private static double getLateWindow(BmsHitObject hitObject)
-        => hitObject.HitWindows?.WindowFor(HitResult.Ok) ?? default_past_lifetime;
+        => hitObject.HitWindows?.WindowFor(HitResult.Ok) ?? DEFAULT_PAST_LIFETIME;
 
     private double computeFutureLifetime(BmsHitObject hitObject)
     {
@@ -83,7 +83,7 @@ internal sealed class BmsHitObjectLifetimePlanner(BmsPlayfield playfield)
 
         var visibleTime = findEarliestVisibleWindowStart(hitObject, timingMap);
 
-        return Math.Max(minimum_future_lifetime, hitObject.StartTime - visibleTime + lifetime_margin);
+        return Math.Max(MINIMUM_FUTURE_LIFETIME, hitObject.StartTime - visibleTime + LIFETIME_MARGIN);
     }
 
     private double findEarliestVisibleWindowStart(BmsHitObject hitObject, BmsTimingMap timingMap)
@@ -139,7 +139,7 @@ internal sealed class BmsHitObjectLifetimePlanner(BmsPlayfield playfield)
     private double computeConstantScrollFutureLifetime()
     {
         var speed = Math.Max(0.001, playfield.ScrollSpeed);
-        return Math.Max(minimum_future_lifetime, BmsDrawableRuleset.ComputeScrollTime(speed) * currentScrollRangeScale() + lifetime_margin);
+        return Math.Max(MINIMUM_FUTURE_LIFETIME, BmsDrawableRuleset.ComputeScrollTime(speed) * currentScrollRangeScale() + LIFETIME_MARGIN);
     }
 
     private double currentScrollRangeScale() => playfield.ScrollRangeScale > 0 ? playfield.ScrollRangeScale : 1;

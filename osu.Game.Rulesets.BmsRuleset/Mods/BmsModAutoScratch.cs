@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
@@ -57,40 +56,48 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
         autoScratchLnHeads.RemoveWhere(d => d.Judged);
 
-        foreach (var drawable in playfield.HitObjectContainer.AliveObjects.OfType<DrawableBmsHitObject>())
+        for (var column = 0; column < playfield.TotalColumns; column++)
         {
-            if (drawable.Judged || drawable.HitObject.IsMine)
+            if (!BmsLayout.IsScratchColumn(column, playfield.LayoutVariant))
                 continue;
 
-            if (!BmsLayout.IsScratchColumn(drawable.HitObject.Column, playfield.LayoutVariant))
-                continue;
-
-            var note = drawable.HitObject;
-
-            if (note.IsLongNote)
+            foreach (var drawable in ((BmsHitObjectContainer)playfield.HitObjectContainer).AliveDrawablesInColumn(column))
             {
-                if (!autoScratchLnHeads.Contains(drawable))
-                {
-                    if (now >= note.StartTime)
-                    {
-                        playfield.KeySoundPlayer.PlaySample(note.Column, note.SamplePath);
-                        if (drawable.TryHit())
-                            autoScratchLnHeads.Add(drawable);
-                    }
-                }
-                else if (now >= note.EndTime)
-                {
-                    if (drawable.TryRelease() && !string.IsNullOrEmpty(note.TailSamplePath))
-                        playfield.KeySoundPlayer.PlaySample(note.Column, note.TailSamplePath);
-                }
+                updateAutoScratchDrawable(drawable, now);
             }
-            else
+        }
+    }
+
+    private void updateAutoScratchDrawable(DrawableBmsHitObject drawable, double now)
+    {
+        if (drawable.Judged || drawable.HitObject.IsMine)
+            return;
+
+        var note = drawable.HitObject;
+
+        if (note.IsLongNote)
+        {
+            if (!autoScratchLnHeads.Contains(drawable))
             {
                 if (now >= note.StartTime)
                 {
                     playfield.KeySoundPlayer.PlaySample(note.Column, note.SamplePath);
-                    drawable.TryHit();
+                    if (drawable.TryHit())
+                        autoScratchLnHeads.Add(drawable);
                 }
+            }
+            else if (now >= note.EndTime)
+            {
+                if (drawable.TryRelease() && !string.IsNullOrEmpty(note.TailSamplePath))
+                    playfield.KeySoundPlayer.PlaySample(note.Column, note.TailSamplePath);
+            }
+        }
+        else
+        {
+            if (now >= note.StartTime)
+            {
+                playfield.KeySoundPlayer.PlaySample(note.Column, note.SamplePath);
+                drawable.TryHit();
             }
         }
     }

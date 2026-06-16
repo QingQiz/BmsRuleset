@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -218,12 +218,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // ensures strict sequential ordering within a column.
         DrawableBmsHitObject? target = null;
 
-        foreach (var alive in HitObjectContainer.AliveEntries.Values)
+        foreach (var d in ((BmsHitObjectContainer)HitObjectContainer).AliveDrawablesInColumn(column.Value))
         {
-            if (alive is not DrawableBmsHitObject d
-                || d.Judged
+            if (d.Judged
                 || d.HitObject.IsMine
-                || d.HitObject.Column != column.Value
                 || d.HitObject.HitWindows is not BmsHitWindows w
                 || w.BmsResultFor(Time.Current - d.HitObject.StartTime) == HitResult.None)
             {
@@ -243,12 +241,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         DrawableBmsHitObject? nearestUnjudged = null;
         var nearestDistance = double.MaxValue;
 
-        foreach (var alive in HitObjectContainer.AliveEntries.Values)
+        foreach (var d in ((BmsHitObjectContainer)HitObjectContainer).AliveDrawablesInColumn(column.Value))
         {
-            if (alive is not DrawableBmsHitObject d
-                || d.Judged
+            if (d.Judged
                 || d.HitObject.IsMine
-                || d.HitObject.Column != column.Value
                 || d.HitObject.HitWindows is not BmsHitWindows)
             {
                 continue;
@@ -297,9 +293,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // frozen at the judgement line until its tail time passed.
         DrawableBmsHitObject? heldNote = null;
 
-        foreach (var alive in HitObjectContainer.AliveEntries.Values)
+        foreach (var d in ((BmsHitObjectContainer)HitObjectContainer).AliveDrawablesInColumn(column.Value))
         {
-            if (alive is not DrawableBmsHitObject d || !d.IsHoldingLongNote || d.HitObject.Column != column.Value)
+            if (!d.IsHoldingLongNote)
                 continue;
 
             if (heldNote == null || d.HitObject.EndTime < heldNote.HitObject.EndTime)
