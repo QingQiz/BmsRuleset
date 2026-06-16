@@ -21,6 +21,8 @@ public sealed partial class BmsStage : CompositeDrawable
     public const float HIT_TARGET_POSITION = 80;
     public const float COLUMN_SPACING = 0;
 
+    internal event Action<float>? HitTargetPositionChanged;
+
     public BmsColumn[] Columns { get; }
 
     public Container JudgementArea { get; }
@@ -159,9 +161,15 @@ public sealed partial class BmsStage : CompositeDrawable
 
     private void updateFromSkin()
     {
+        var previousHitTargetPosition = hitTargetPosition.Value;
+
         hitTargetPosition.Value = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
                                   ?? HIT_TARGET_POSITION;
         hitTarget.Y = -hitTargetPosition.Value;
+
+        if (Math.Abs(hitTargetPosition.Value - previousHitTargetPosition) >= 0.001f)
+            HitTargetPositionChanged?.Invoke(hitTargetPosition.Value);
+
         JudgementArea.Y = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ScorePosition))?.Value
                           ?? 300 * 1.6f;
         barLineHeight.Value = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineHeight))?.Value

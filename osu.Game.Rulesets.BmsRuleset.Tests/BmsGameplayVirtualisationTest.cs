@@ -1,17 +1,20 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using NUnit.Framework;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Components;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
 
-public class BmsGameplayVirtualisationTest
+public partial class BmsGameplayVirtualisationTest
 {
     [Test]
     public void TestPlayfieldUsesBmsHitObjectContainer()
@@ -71,7 +74,7 @@ public class BmsGameplayVirtualisationTest
         var lifetime = planner.CreatePlan(hitObject);
         var expectedFutureLifetime = Math.Max(
             BmsHitObjectLifetimePlanner.MINIMUM_FUTURE_LIFETIME,
-            BmsDrawableRuleset.ComputeScrollTime(8) + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN);
+            BmsDrawableRuleset.ComputeScrollTime(8) * playfield.ScrollRangeScale + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN);
         const double expected_past_lifetime = BmsHitObjectLifetimePlanner.DEFAULT_PAST_LIFETIME + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN;
 
         Assert.That(lifetime.LifetimeStart, Is.EqualTo(hitObject.StartTime - expectedFutureLifetime).Within(0.001));
@@ -101,7 +104,7 @@ public class BmsGameplayVirtualisationTest
         var lifetime = planner.CreatePlan(hitObject);
         var expectedFutureLifetime = Math.Max(
             BmsHitObjectLifetimePlanner.MINIMUM_FUTURE_LIFETIME,
-            BmsDrawableRuleset.ComputeScrollTime(40) + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN);
+            BmsDrawableRuleset.ComputeScrollTime(40) * playfield.ScrollRangeScale + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN);
 
         Assert.That(lifetime.LifetimeStart, Is.EqualTo(hitObject.StartTime - expectedFutureLifetime).Within(0.001));
     }
@@ -134,9 +137,44 @@ public class BmsGameplayVirtualisationTest
         var lifetime = planner.CreatePlan(hitObject);
         var expectedFutureLifetime = Math.Max(
             BmsHitObjectLifetimePlanner.MINIMUM_FUTURE_LIFETIME,
-            BmsDrawableRuleset.ComputeScrollTime(40) + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN);
+            BmsDrawableRuleset.ComputeScrollTime(40) * playfield.ScrollRangeScale + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN);
 
         Assert.That(lifetime.LifetimeStart, Is.EqualTo(hitObject.StartTime - expectedFutureLifetime).Within(0.001));
+    }
+
+    [Test]
+    public void TestDrawableRulesetCreatesPlayfieldWithConfiguredScrollSpeed()
+    {
+        var ruleset = new BmsRuleset();
+        var hitObject = new BmsHitObject { StartTime = 5000, Column = 1 };
+        var beatmap = new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            HitObjects = { hitObject },
+        };
+        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
+        config.SetValue(BmsRulesetSetting.ScrollSpeed, 40.0);
+        var drawableRuleset = new TestableBmsDrawableRuleset(ruleset, beatmap);
+
+        drawableRuleset.SetConfigForTest(config);
+
+        var playfield = drawableRuleset.CreatePlayfieldForTest();
+
+        Assert.That(playfield.ScrollSpeed, Is.EqualTo(40.0).Within(0.001));
+    }
+
+    [Test]
+    public void TestPlayfieldInitialisesScrollRangeScaleBeforeLoad()
+    {
+        var playfield = new BmsPlayfield(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+        });
+        var expectedScale = (768f - BmsStage.HIT_TARGET_POSITION) / (768f - 124.8f);
+
+        Assert.That(playfield.ScrollRangeScale, Is.EqualTo(expectedScale).Within(0.001));
     }
 
     [Test]
@@ -193,6 +231,7 @@ public class BmsGameplayVirtualisationTest
         });
 
         playfield.Add(hitObject);
+        ((BmsHitObjectContainer)playfield.HitObjectContainer).InitialiseLifetimePlans();
 
         var entry = playfield.HitObjectContainer.Entries.Single();
 
@@ -207,6 +246,7 @@ public class BmsGameplayVirtualisationTest
         var playfield = new BmsPlayfield(beatmap);
 
         playfield.Add(hitObject);
+        ((BmsHitObjectContainer)playfield.HitObjectContainer).InitialiseLifetimePlans();
 
         var entry = playfield.HitObjectContainer.Entries.Single();
         var visibleStart = findFirstVisibleTime(beatmap, hitObject);
@@ -246,6 +286,7 @@ public class BmsGameplayVirtualisationTest
         var playfield = new BmsPlayfield(beatmap);
 
         playfield.Add(hitObject);
+        ((BmsHitObjectContainer)playfield.HitObjectContainer).InitialiseLifetimePlans();
 
         var entry = playfield.HitObjectContainer.Entries.Single();
         var visibleStart = findFirstVisibleTime(beatmap, hitObject);
@@ -261,6 +302,8 @@ public class BmsGameplayVirtualisationTest
 
         foreach (var hitObject in beatmap.HitObjects.Where(h => !h.IsMine).Take(64))
             playfield.Add(hitObject);
+
+        ((BmsHitObjectContainer)playfield.HitObjectContainer).InitialiseLifetimePlans();
 
         var lateEntries = playfield.HitObjectContainer.Entries
             .Where(e => e.HitObject is BmsHitObject)
@@ -280,6 +323,8 @@ public class BmsGameplayVirtualisationTest
 
         foreach (var hitObject in playableObjects.Skip(300).Take(40))
             playfield.Add(hitObject);
+
+        ((BmsHitObjectContainer)playfield.HitObjectContainer).InitialiseLifetimePlans();
 
         var lateEntries = playfield.HitObjectContainer.Entries
             .Select(e => (Entry: e, HitObject: (BmsHitObject)e.HitObject))
@@ -377,5 +422,18 @@ public class BmsGameplayVirtualisationTest
         }
 
         return firstVisible;
+    }
+
+    private sealed partial class TestableBmsDrawableRuleset(BmsRuleset ruleset, BmsBeatmap beatmap)
+        : BmsDrawableRuleset(ruleset, beatmap)
+    {
+        public BmsPlayfield CreatePlayfieldForTest() => (BmsPlayfield)CreatePlayfield();
+
+        public void SetConfigForTest(BmsRulesetConfigManager config)
+        {
+            var configProperty = typeof(osu.Game.Rulesets.UI.DrawableRuleset<BmsHitObject>).GetProperty("Config", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(configProperty, Is.Not.Null);
+            configProperty!.SetValue(this, config);
+        }
     }
 }
