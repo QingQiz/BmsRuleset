@@ -415,11 +415,11 @@ public class BmsBeatmapDecoderTest
         Assert.That(timingMap.SpeedEvents[0].Factor, Is.EqualTo(1.0));
         Assert.That(timingMap.SpeedEvents[1].Factor, Is.EqualTo(10.0));
 
-        // #001SP:01 at measure 1 (tick 192, time 2000ms → shifted 5000ms).
-        // #009SP:02 at measure 9 (tick 1728, time 18000ms → shifted 21000ms).
-        Assert.That(timingMap.GetSpeedFactorAtTime(4000), Is.EqualTo(1.0).Within(0.001));
-        Assert.That(timingMap.GetSpeedFactorAtTime(12000), Is.EqualTo(1.0).Within(0.001));
-        Assert.That(timingMap.GetSpeedFactorAtTime(22000), Is.EqualTo(10.0).Within(0.001));
+        // #001SP:01 at measure 1 (tick 192, time 2000ms).
+        // #009SP:02 at measure 9 (tick 1728, time 18000ms).
+        Assert.That(timingMap.GetSpeedFactorAtTime(1000), Is.EqualTo(1.0).Within(0.001));
+        Assert.That(timingMap.GetSpeedFactorAtTime(10000), Is.EqualTo(1.0).Within(0.001));
+        Assert.That(timingMap.GetSpeedFactorAtTime(19000), Is.EqualTo(10.0).Within(0.001));
     }
 
     [Test]
