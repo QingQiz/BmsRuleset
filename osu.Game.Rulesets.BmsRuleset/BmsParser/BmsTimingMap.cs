@@ -60,6 +60,8 @@ public sealed class BmsTimingMap
 
     private readonly TimingPoint[] points;
 
+    private readonly BmsScrollTimingSegment[] scrollTimingSegments;
+
     // ── Tick→time infrastructure (only used during parsing, not gameplay) ──
 
     private readonly double[] cumulativeStopDurations;
@@ -80,6 +82,7 @@ public sealed class BmsTimingMap
         this.speedEvents = speedEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
         ScrollReferenceBpm = baseBpm > 0 ? baseBpm : initialBpm();
         points = buildTimingPoints();
+        scrollTimingSegments = buildScrollTimingSegments();
         cumulativeStopDurations = buildCumulativeStops();
     }
 
@@ -183,6 +186,8 @@ public sealed class BmsTimingMap
         var idx = findPoint(time);
         return points[idx].SpeedFactor;
     }
+
+    internal IReadOnlyList<BmsScrollTimingSegment> GetScrollTimingSegments() => scrollTimingSegments;
 
     /// <summary>
     ///     Returns the BPM value active at the given tick position.
@@ -314,6 +319,20 @@ public sealed class BmsTimingMap
             GetScrollPositionAtTick(scrollTick), currentBpm, currentScroll, currentSpeed, currentDir, false));
 
         return result.ToArray();
+    }
+
+    private BmsScrollTimingSegment[] buildScrollTimingSegments()
+    {
+        var segments = new BmsScrollTimingSegment[points.Length];
+
+        for (var i = 0; i < points.Length; i++)
+        {
+            var point = points[i];
+            var velocity = point.IsStop ? 0 : point.Bpm * point.ScrollFactor * point.ScrollDir / ScrollReferenceBpm;
+            segments[i] = new BmsScrollTimingSegment(point.Time, point.NextTime, point.ScrollPos, velocity, point.SpeedFactor, point.IsStop);
+        }
+
+        return segments;
     }
 
     // ── Query: find timing point for a given time ─────────────────────────────
@@ -461,6 +480,8 @@ public sealed class BmsTimingMap
 }
 
 public readonly record struct BmsMeasureInfo(int Index, long StartTick, long LengthTicks, double LengthRatio);
+
+internal readonly record struct BmsScrollTimingSegment(double Time, double NextTime, double ScrollPosition, double ScrollVelocity, double SpeedFactor, bool IsStop);
 
 public readonly record struct BmsBpmEvent(long Tick, double Bpm, double Time, int Sequence = 0);
 

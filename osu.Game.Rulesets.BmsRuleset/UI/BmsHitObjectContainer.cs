@@ -1,38 +1,17 @@
 using System;
 using System.Collections.Generic;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
 public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectContainer
 {
-    private const double minimum_future_lifetime = 750;
-    private const double lifetime_margin = 500;
-    private const double default_past_lifetime = 1000;
-    private const double visible_window_search_step = 100;
-    private const double visible_window_binary_precision = 1;
-
     private readonly Dictionary<BmsHitObject, DrawableBmsHitObject> aliveDrawableMap = new();
-    private readonly Dictionary<BmsHitObject, double> futureLifetimeCache = new();
-
-    /// <summary>
-    /// Lifetime past a mine's <see cref="HitObject.StartTime"/>, in ms.
-    /// Mines only need a single frame to check whether the column is pressed
-    /// </summary>
-    private const double mine_past_lifetime = 10;
-
-    private double lastPastLifetime = double.NaN;
-    private double lastUpdateTime = double.NaN;
-    private double lastCachedScrollSpeed = double.NaN;
-    private double lastCachedScrollRangeScale = double.NaN;
-    private bool lastCachedConstantScrollActive;
+    private readonly BmsHitObjectLifetimePlanner lifetimePlanner = new(playfield);
 
     // ReSharper disable once UnusedMethodReturnValue.Global
     public bool TryGetAliveDrawable(BmsHitObject hitObject, out DrawableBmsHitObject? drawable)
@@ -64,164 +43,28 @@ public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectCo
     {
         base.Update();
 
-        var pastLifetime = computePastLifetime();
-        var futureLifetimeCacheChanged = ensureFutureLifetimeCacheValid();
-
-        if (!futureLifetimeCacheChanged
-            && Math.Abs(pastLifetime - lastPastLifetime) < 1
-            && Math.Abs(Time.Current - lastUpdateTime) < 250)
-        {
+        if (!lifetimePlanner.RefreshIfNeeded())
             return;
-        }
-
-        lastPastLifetime = pastLifetime;
-        lastUpdateTime = Time.Current;
 
         foreach (var entry in Entries)
-            updateEntryLifetime(entry);
+            updateEntryLifetime(entry, refreshPlanner: false);
     }
 
-    private static bool usesLinearTimeProjection(BmsHitObject hitObject)
-        => hitObject.TickInfo.Tick == hitObject.TickInfo.EndTick && hitObject.TickInfo.Tick == 0 && hitObject.StartTime != 0;
-
-    private static double computePastLifetime() => default_past_lifetime + lifetime_margin;
-
-    private static double getLateWindow(BmsHitObject hitObject)
-        => hitObject.HitWindows?.WindowFor(HitResult.Ok) ?? default_past_lifetime;
-
-    private void updateEntryLifetime(HitObjectLifetimeEntry entry, bool force = false)
+    private void updateEntryLifetime(HitObjectLifetimeEntry entry, bool force = false, bool refreshPlanner = true)
     {
         if (entry.HitObject is not BmsHitObject hitObject)
             return;
 
-        var futureLifetime = computeFutureLifetime(hitObject);
-        var pastLifetime = double.IsNaN(lastPastLifetime) ? computePastLifetime() : lastPastLifetime;
+        var plan = refreshPlanner
+            ? lifetimePlanner.CreatePlan(hitObject)
+            : lifetimePlanner.CreatePlanForCurrentSettings(hitObject);
 
-        var start = hitObject.StartTime - futureLifetime;
-        var end = hitObject.IsMine
-            ? hitObject.StartTime + mine_past_lifetime
-            : hitObject.EndTime + Math.Max(pastLifetime, getLateWindow(hitObject) + lifetime_margin);
+        if (force || Math.Abs(entry.LifetimeStart - plan.LifetimeStart) >= 1)
+            entry.LifetimeStart = plan.LifetimeStart;
 
-        if (force || Math.Abs(entry.LifetimeStart - start) >= 1)
-            entry.LifetimeStart = start;
-
-        if (!entry.Judged && (force || Math.Abs(entry.LifetimeEnd - end) >= 1))
-            entry.LifetimeEnd = end;
+        if (!entry.Judged && (force || Math.Abs(entry.LifetimeEnd - plan.LifetimeEnd) >= 1))
+            entry.LifetimeEnd = plan.LifetimeEnd;
     }
-
-    private double computeFutureLifetime(BmsHitObject hitObject)
-    {
-        ensureFutureLifetimeCacheValid();
-
-        if (futureLifetimeCache.TryGetValue(hitObject, out var cached))
-            return cached;
-
-        var futureLifetime = computeUncachedFutureLifetime(hitObject);
-        futureLifetimeCache[hitObject] = futureLifetime;
-        return futureLifetime;
-    }
-
-    private double computeUncachedFutureLifetime(BmsHitObject hitObject)
-    {
-        var timingMap = playfield.TimingMap;
-
-        if (playfield.ConstantScrollActive || timingMap == null || usesLinearTimeProjection(hitObject))
-            return computeConstantScrollFutureLifetime();
-
-        var visibleTime = findEarliestVisibleWindowStart(hitObject, timingMap);
-
-        if (!double.IsFinite(visibleTime))
-            return computeConstantScrollFutureLifetime();
-
-        return Math.Max(minimum_future_lifetime, hitObject.StartTime - visibleTime + lifetime_margin);
-    }
-
-    private bool ensureFutureLifetimeCacheValid()
-    {
-        var scrollRangeScale = currentScrollRangeScale();
-
-        if (Math.Abs(playfield.ScrollSpeed - lastCachedScrollSpeed) < 0.001
-            && Math.Abs(scrollRangeScale - lastCachedScrollRangeScale) < 0.001
-            && playfield.ConstantScrollActive == lastCachedConstantScrollActive)
-        {
-            return false;
-        }
-
-        futureLifetimeCache.Clear();
-        lastCachedScrollSpeed = playfield.ScrollSpeed;
-        lastCachedScrollRangeScale = scrollRangeScale;
-        lastCachedConstantScrollActive = playfield.ConstantScrollActive;
-        return true;
-    }
-
-    private double findEarliestVisibleWindowStart(BmsHitObject hitObject, BmsTimingMap timingMap)
-    {
-        var earliestVisibleTime = hitObject.StartTime;
-        var laterTime = hitObject.StartTime;
-        var laterVisible = true;
-
-        for (var probeTime = hitObject.StartTime; probeTime > 0;)
-        {
-            var nextProbeTime = Math.Max(0, probeTime - visible_window_search_step);
-            var nextVisible = isVisibleAt(hitObject, timingMap, nextProbeTime);
-
-            if (nextVisible)
-            {
-                earliestVisibleTime = nextProbeTime;
-            }
-            else if (laterVisible)
-            {
-                earliestVisibleTime = refineVisibleWindowStart(hitObject, timingMap, nextProbeTime, laterTime);
-            }
-
-            probeTime = nextProbeTime;
-            laterTime = nextProbeTime;
-            laterVisible = nextVisible;
-        }
-
-        return earliestVisibleTime;
-    }
-
-    private double refineVisibleWindowStart(BmsHitObject hitObject, BmsTimingMap timingMap, double hiddenTime, double visibleTime)
-    {
-        while (visibleTime - hiddenTime > visible_window_binary_precision)
-        {
-            var midpoint = (hiddenTime + visibleTime) / 2;
-
-            if (isVisibleAt(hitObject, timingMap, midpoint))
-                visibleTime = midpoint;
-            else
-                hiddenTime = midpoint;
-        }
-
-        return visibleTime;
-    }
-
-    private bool isVisibleAt(BmsHitObject hitObject, BmsTimingMap timingMap, double time)
-    {
-        var progress = hitObject.ScrollPositionAtStartTime - timingMap.GetScrollPositionAtTime(time);
-        return progress <= visibleScrollDistanceAt(timingMap, time);
-    }
-
-    private double visibleScrollDistanceAt(BmsTimingMap timingMap, double time)
-    {
-        var speedFactor = Math.Abs(timingMap.GetSpeedFactorAtTime(time));
-
-        if (!double.IsFinite(speedFactor) || speedFactor < 0.001)
-            return double.PositiveInfinity;
-
-        return BmsDrawableRuleset.ComputeScrollTime(BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED)
-               * currentScrollRangeScale()
-               / Math.Max(0.001, playfield.ScrollSpeed / BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED * speedFactor);
-    }
-
-    private double computeConstantScrollFutureLifetime()
-    {
-        var speed = Math.Max(0.001, playfield.ScrollSpeed);
-        return Math.Max(minimum_future_lifetime, BmsDrawableRuleset.ComputeScrollTime(speed) * currentScrollRangeScale() + lifetime_margin);
-    }
-
-    private double currentScrollRangeScale() => playfield.ScrollRangeScale > 0 ? playfield.ScrollRangeScale : 1;
 }
 
 internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject) : HitObjectLifetimeEntry(hitObject)

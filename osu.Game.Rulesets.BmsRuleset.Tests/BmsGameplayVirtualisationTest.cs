@@ -50,6 +50,55 @@ public class BmsGameplayVirtualisationTest
     }
 
     [Test]
+    public void TestLifetimePlannerComputesConstantScrollLifetimeFromScrollSpeed()
+    {
+        var hitObject = new BmsHitObject
+        {
+            StartTime = 5000,
+            Column = 1,
+        };
+        var playfield = new BmsPlayfield(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            HitObjects = { hitObject },
+        })
+        {
+            ConstantScrollActive = true,
+        };
+        var planner = new BmsHitObjectLifetimePlanner(playfield);
+
+        var lifetime = planner.CreatePlan(hitObject);
+
+        Assert.That(lifetime.LifetimeStart, Is.EqualTo(5000 - BmsDrawableRuleset.ComputeScrollTime(8) - 500).Within(0.001));
+        Assert.That(lifetime.LifetimeEnd, Is.EqualTo(5000 + 1500).Within(0.001));
+    }
+
+    [Test]
+    public void TestTimingMapExposesLinearScrollSegments()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            Enumerable.Range(0, 4).Select(i => new BmsMeasureInfo(i, i * 192, 192, 1)),
+            [
+                new BmsBpmEvent(0, 130, 0),
+                new BmsBpmEvent(384, 260, 384 * (60000d / 130) / (192 / 4d), 1),
+            ],
+            [],
+            [],
+            [],
+            130);
+
+        var segments = timingMap.GetScrollTimingSegments().ToArray();
+
+        Assert.That(segments, Has.Length.GreaterThanOrEqualTo(2));
+        Assert.That(segments[0].Time, Is.EqualTo(0).Within(0.001));
+        Assert.That(segments[0].ScrollPosition, Is.EqualTo(0).Within(0.001));
+        Assert.That(segments[0].ScrollVelocity, Is.EqualTo(1).Within(0.001));
+        Assert.That(segments[1].ScrollVelocity, Is.EqualTo(2).Within(0.001));
+    }
+
+    [Test]
     public void TestSlowBpmExtendsHitObjectLifetime()
     {
         var timingMap = new BmsTimingMap(
@@ -69,6 +118,7 @@ public class BmsGameplayVirtualisationTest
             StartTime = timingMap.ProjectTickToTime(192),
             Column = 1,
         };
+        hitObject.ScrollPositionAtStartTime = timingMap.GetScrollPositionAtTime(hitObject.StartTime);
         var playfield = new BmsPlayfield(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
