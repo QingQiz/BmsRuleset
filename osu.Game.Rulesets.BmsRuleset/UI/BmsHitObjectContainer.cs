@@ -11,15 +11,11 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectContainer
 {
     private readonly Dictionary<BmsHitObject, DrawableBmsHitObject> aliveDrawableMap = new();
-    private readonly BmsAliveDrawableIndex aliveDrawableIndex = new();
     private readonly BmsHitObjectLifetimePlanner lifetimePlanner = new(playfield);
 
     // ReSharper disable once UnusedMethodReturnValue.Global
     public bool TryGetAliveDrawable(BmsHitObject hitObject, out DrawableBmsHitObject? drawable)
         => aliveDrawableMap.TryGetValue(hitObject, out drawable);
-
-    public IEnumerable<DrawableBmsHitObject> AliveDrawablesInColumn(int column)
-        => aliveDrawableIndex.GetColumn(column);
 
     public override void Add(HitObjectLifetimeEntry entry)
     {
@@ -32,20 +28,13 @@ public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectCo
         base.AddDrawable(entry, drawable);
 
         if (entry.HitObject is BmsHitObject hitObject && drawable is DrawableBmsHitObject bmsDrawable)
-        {
             aliveDrawableMap[hitObject] = bmsDrawable;
-            aliveDrawableIndex.Add(hitObject, bmsDrawable);
-        }
     }
 
     protected override void RemoveDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
     {
         if (entry.HitObject is BmsHitObject hitObject)
-        {
             aliveDrawableMap.Remove(hitObject);
-            if (drawable is DrawableBmsHitObject bmsDrawable)
-                aliveDrawableIndex.Remove(bmsDrawable);
-        }
 
         base.RemoveDrawable(entry, drawable);
     }

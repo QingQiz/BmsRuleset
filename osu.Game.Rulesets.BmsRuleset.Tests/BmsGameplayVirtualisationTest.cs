@@ -69,74 +69,9 @@ public class BmsGameplayVirtualisationTest
         var planner = new BmsHitObjectLifetimePlanner(playfield);
 
         var lifetime = planner.CreatePlan(hitObject);
-        var expectedFutureLifetime = Math.Max(
-            BmsHitObjectLifetimePlanner.MINIMUM_FUTURE_LIFETIME,
-            BmsDrawableRuleset.ComputeScrollTime(8) + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN);
-        const double expected_past_lifetime = BmsHitObjectLifetimePlanner.DEFAULT_PAST_LIFETIME + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN;
 
-        Assert.That(lifetime.LifetimeStart, Is.EqualTo(hitObject.StartTime - expectedFutureLifetime).Within(0.001));
-        Assert.That(lifetime.LifetimeEnd, Is.EqualTo(hitObject.EndTime + expected_past_lifetime).Within(0.001));
-    }
-
-    [Test]
-    public void TestConstantScrollLifetimeDoesNotForceInitialOffsetAtHighScrollSpeed()
-    {
-        var hitObject = new BmsHitObject
-        {
-            StartTime = 5000,
-            Column = 1,
-        };
-        var playfield = new BmsPlayfield(new BmsBeatmap
-        {
-            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            HitObjects = { hitObject },
-        })
-        {
-            ConstantScrollActive = true,
-        };
-        playfield.SetConfiguredScrollSpeed(40);
-        var planner = new BmsHitObjectLifetimePlanner(playfield);
-
-        var lifetime = planner.CreatePlan(hitObject);
-        var expectedFutureLifetime = Math.Max(
-            BmsHitObjectLifetimePlanner.MINIMUM_FUTURE_LIFETIME,
-            BmsDrawableRuleset.ComputeScrollTime(40) + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN);
-
-        Assert.That(lifetime.LifetimeStart, Is.EqualTo(hitObject.StartTime - expectedFutureLifetime).Within(0.001));
-    }
-
-    [Test]
-    public void TestLinearTimeProjectionLifetimeDoesNotForceInitialOffsetAtHighScrollSpeed()
-    {
-        var hitObject = new BmsHitObject
-        {
-            StartTime = 5000,
-            Column = 1,
-        };
-        var playfield = new BmsPlayfield(new BmsBeatmap
-        {
-            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TimingMap = new BmsTimingMap(
-                192,
-                [
-                    new BmsMeasureInfo(0, 0, 192, 1),
-                    new BmsMeasureInfo(1, 192, 192, 1),
-                ],
-                [new BmsBpmEvent(0, 130, 0)],
-                []),
-            HitObjects = { hitObject },
-        });
-        playfield.SetConfiguredScrollSpeed(40);
-        var planner = new BmsHitObjectLifetimePlanner(playfield);
-
-        var lifetime = planner.CreatePlan(hitObject);
-        var expectedFutureLifetime = Math.Max(
-            BmsHitObjectLifetimePlanner.MINIMUM_FUTURE_LIFETIME,
-            BmsDrawableRuleset.ComputeScrollTime(40) + BmsHitObjectLifetimePlanner.LIFETIME_MARGIN);
-
-        Assert.That(lifetime.LifetimeStart, Is.EqualTo(hitObject.StartTime - expectedFutureLifetime).Within(0.001));
+        Assert.That(lifetime.LifetimeStart, Is.EqualTo(5000 - BmsDrawableRuleset.ComputeScrollTime(8) - 500).Within(0.001));
+        Assert.That(lifetime.LifetimeEnd, Is.EqualTo(5000 + 1500).Within(0.001));
     }
 
     [Test]

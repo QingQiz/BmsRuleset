@@ -39,7 +39,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
 
         AddAssert("scratch not hidden", () => !Playfield.Stage.Columns[0].Hidden);
-        AddUntilStep("judgement area visible", () => Playfield.Stage.JudgementArea.Count, () => Is.GreaterThan(0));
+        AddAssert("judgement area visible", () => Playfield.Stage.JudgementArea.Count, () => Is.GreaterThan(0));
     }
 
     [Test]
