@@ -47,6 +47,87 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void DiagnoseLnAutoplayTimingForCautionChart()
+    {
+        // Find the actual resource name
+        var allResources = typeof(BmsBeatmapDecoderTest).Assembly.GetManifestResourceNames();
+        var resourceName = allResources.FirstOrDefault(n => n.EndsWith("99_outlaw_caution.bms", StringComparison.OrdinalIgnoreCase))
+                           ?? throw new InvalidOperationException("Resource not found in: " + string.Join(", ", allResources.Where(n => n.Contains("outlaw"))));
+
+        using var stream = typeof(BmsBeatmapDecoderTest).Assembly.GetManifestResourceStream(resourceName)
+                           ?? throw new InvalidOperationException($"Missing: {resourceName}");
+        using var reader = new LineBufferedReader(stream);
+
+        var decoded = new BmsBeatmapDecoder().Decode(reader);
+        var beatmap = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().ToList();
+
+        var lns = hitObjects.Where(h => h.IsLongNote).ToList();
+        var windows = new BmsHitWindows(beatmap.Rank);
+        windows.SetDifficulty(0); // initialise windows from rank
+        var rankWindows = BmsHitWindows.RANK_WINDOWS_LR2[Math.Clamp(beatmap.Rank, 0, 4)];
+        var pgreat = Math.Min(rankWindows.pgreat, windows.WindowFor(HitResult.Perfect));
+        var great = Math.Min(rankWindows.great, windows.WindowFor(HitResult.Great));
+        var good = Math.Min(rankWindows.good, windows.WindowFor(HitResult.Good));
+        var bad = windows.WindowFor(HitResult.Ok);
+
+        var issues = new List<string>();
+
+        foreach (var ln in lns)
+        {
+            var autoplayPress = ln.StartTime;
+            var autoplayRelease = ln.EndTime; // calculateReleaseTime for LN with Duration>0
+
+            // Check press timing
+            var pressOffset = autoplayPress - ln.StartTime; // should be 0
+            var pressJudgement = windows.BmsResultFor(pressOffset);
+            var pressOk = pressOffset >= -pgreat && pressOffset <= pgreat;
+
+            // Check release timing
+            var releaseOffset = autoplayRelease - ln.EndTime; // should be 0
+            var releaseJudgement = windows.BmsResultFor(releaseOffset);
+            var releaseOk = releaseOffset >= -pgreat && releaseOffset <= pgreat;
+
+            if (!pressOk || !releaseOk || pressJudgement != HitResult.Perfect || releaseJudgement != HitResult.Perfect)
+            {
+                var issue = $"LN tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} " +
+                            $"Duration={ln.Duration:F3}ms " +
+                            $"pressOffset={pressOffset:F3}ms→{pressJudgement} " +
+                            $"releaseOffset={releaseOffset:F3}ms→{releaseJudgement}";
+                issues.Add(issue);
+            }
+        }
+
+        var summary = $"Chart: {beatmap.Metadata.Title}  Rank: {beatmap.Rank}  " +
+                      $"PGREAT={pgreat}ms GREAT={great}ms GOOD={good}ms BAD={bad}ms  " +
+                      $"Total LNs: {lns.Count}  Notes: {hitObjects.Count(h => !h.IsMine && !h.IsLongNote)}  " +
+                      $"Mines: {hitObjects.Count(h => h.IsMine)}";
+
+        if (issues.Count > 0)
+            Assert.Fail($"{summary}\n=== LNs with timing issues ===\n{string.Join("\n", issues)}");
+
+        // Find short LNs and LNs with potential issues
+        var shortLns = lns.Where(ln => ln.Duration <= great * 2).OrderBy(ln => ln.Duration).ToList();
+        var shortLnsReport = string.Join("\n  ", shortLns.Take(20).Select(ln =>
+            $"tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} dur={ln.Duration:F1}ms " +
+            $"start={ln.StartTime:F1}ms end={ln.EndTime:F1}ms"));
+
+        // Also show LNs around combo 190 (roughly 190 notes in)
+        var normalNotes = hitObjects.Where(h => !h.IsMine).ToList();
+        var aroundCombo190 = lns.Skip(Math.Max(0, normalNotes.Take(190).Count(h => h.IsLongNote) - 3)).Take(7)
+            .Select(ln => $"tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} dur={ln.Duration:F1}ms " +
+                          $"start={ln.StartTime:F0}ms end={ln.EndTime:F0}ms");
+        var around190 = string.Join("\n  ", aroundCombo190);
+
+        File.WriteAllText(@"C:\Users\kali\RiderProjects\ruleset-dev\caution_ln_diag.txt",
+            $"{summary}\nAll LNs PGREAT.\n" +
+            $"=== Shortest LNs (dur < {great * 2:F0}ms, {shortLns.Count} total, showing first 20) ===\n  {shortLnsReport}\n" +
+            $"=== LNs around combo ~190 ===\n  {around190}");
+
+        Assert.Pass("Diagnostic written to caution_ln_diag.txt");
+    }
+
+    [Test]
     public void TestAutoplayExtensionPathCarriesBranchDecisionFrame()
     {
         var beatmap = new BmsBeatmap
