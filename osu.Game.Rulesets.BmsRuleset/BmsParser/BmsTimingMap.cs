@@ -335,6 +335,31 @@ public sealed class BmsTimingMap
         return segments;
     }
 
+    // ── Gameplay start offset ───────────────────────────────────────────────────
+
+    internal void ShiftStartTime(double offset)
+    {
+        if (offset == 0 || points.Length == 0)
+            return;
+
+        for (var i = 0; i < points.Length; i++)
+        {
+            var p = points[i];
+            var next = double.IsPositiveInfinity(p.NextTime) ? p.NextTime : p.NextTime + offset;
+            points[i] = new TimingPoint(p.Time + offset, next,
+                p.ScrollPos, p.Bpm, p.ScrollFactor, p.SpeedFactor, p.ScrollDir, p.IsStop);
+        }
+
+        for (var i = 0; i < scrollTimingSegments.Length; i++)
+        {
+            var s = scrollTimingSegments[i];
+            var next = double.IsPositiveInfinity(s.NextTime) ? s.NextTime : s.NextTime + offset;
+            scrollTimingSegments[i] = s with { Time = s.Time + offset, NextTime = next };
+        }
+
+        cursor = 0;
+    }
+
     // ── Query: find timing point for a given time ─────────────────────────────
 
     /// <summary>

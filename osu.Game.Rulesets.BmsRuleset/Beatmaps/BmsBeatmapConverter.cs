@@ -23,6 +23,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 /// </remarks>
 public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapConverter<BmsHitObject>(beatmap, ruleset)
 {
+    public const double GAMEPLAY_START_DELAY = 3000;
+
     public string? BranchReplayDecisions { get; set; }
 
     public Func<int, int>? BranchRandomValueSelector { get; init; }
@@ -70,7 +72,21 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         // Stamp the chart-level #RANK onto every hit object so CreateHitWindows() has it.
         stampRankOnHitObjects(converted);
 
+        // Shift all times forward so there's a 3-second pause before gameplay starts.
+        if (GAMEPLAY_START_DELAY > 0)
+            applyGameplayStartDelay(converted);
+
         return converted;
+    }
+
+    private static void applyGameplayStartDelay(BmsBeatmap beatmap)
+    {
+        beatmap.TimingMap?.ShiftStartTime(GAMEPLAY_START_DELAY);
+
+        foreach (var h in beatmap.HitObjects)
+            h.StartTime += GAMEPLAY_START_DELAY;
+
+        precomputeScrollPositions(beatmap);
     }
 
     protected override IEnumerable<BmsHitObject> ConvertHitObject(HitObject original, IBeatmap beatmap, CancellationToken cancellationToken)
