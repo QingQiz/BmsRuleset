@@ -69,12 +69,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             BmsBranchReplayState.EnsureBranchReplayMod(replayScore, bmsBeatmap.BranchDecisions);
     }
 
-    protected override Playfield CreatePlayfield()
-    {
-        var playfield = new BmsPlayfield((BmsBeatmap)Beatmap);
-        applyConfiguredScrollSpeed(playfield);
-        return playfield;
-    }
+    protected override Playfield CreatePlayfield() => new BmsPlayfield((BmsBeatmap)Beatmap);
 
     protected override void LoadComplete()
     {
@@ -85,6 +80,12 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         // audio for BMS charts will use BmsPreviewTrack instead of a silent virtual track.
         if (beatmapManager != null)
             BmsWorkingBeatmapHelper.Install(beatmapManager);
+
+        if (Config is BmsRulesetConfigManager config)
+        {
+            var speed = config.Get<double>(BmsRulesetSetting.ScrollSpeed);
+            ((BmsPlayfield)Playfield).SetConfiguredScrollSpeed(speed);
+        }
 
         // Subscribe to play completion for the end-of-song gauge check.
         // When health < 80% at song end, the rank must be F but the play should show
@@ -145,14 +146,6 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         // FailScore sets rank.Value = ScoreRank.F and score.Passed = false directly,
         // bypassing RankFromScore so the updateRank guard never fires mid-play.
         scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
-    }
-
-    private void applyConfiguredScrollSpeed(BmsPlayfield playfield)
-    {
-        if (Config is not BmsRulesetConfigManager config)
-            return;
-
-        playfield.SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
     }
 
     [BackgroundDependencyLoader]

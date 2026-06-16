@@ -21,12 +21,10 @@ public partial class BmsHitObjectContainer(BmsPlayfield playfield) : HitObjectCo
     public IEnumerable<DrawableBmsHitObject> AliveDrawablesInColumn(int column)
         => aliveDrawableIndex.GetColumn(column);
 
-    internal void InitialiseLifetimePlans()
+    public override void Add(HitObjectLifetimeEntry entry)
     {
-        lifetimePlanner.RefreshIfNeeded();
-
-        foreach (var entry in Entries)
-            updateEntryLifetime(entry, force: true, refreshPlanner: false);
+        updateEntryLifetime(entry, force: true);
+        base.Add(entry);
     }
 
     protected override void AddDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)

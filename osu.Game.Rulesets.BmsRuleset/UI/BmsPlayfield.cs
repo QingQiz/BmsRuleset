@@ -47,7 +47,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     protected override void Dispose(bool isDisposing)
     {
-        Stage.HitTargetPositionChanged -= updateScrollRangeScale;
         NewResult -= onNewResult;
         parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
         skinCache.Dispose();
@@ -164,8 +163,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both };
 
         Stage = new BmsStage(TotalColumns, LayoutVariant);
-        Stage.HitTargetPositionChanged += updateScrollRangeScale;
-        updateScrollRangeScale(Stage.HitTargetPosition);
 
         KeySoundPlayer = new BmsKeySoundPlayer(hitObjectsOrdered, (BmsHitObjectContainer)HitObjectContainer, () => Time.Current, TotalColumns);
 
@@ -360,7 +357,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     /// <summary>
     ///     Normalises the scroll range so the visual speed at the default scroll
-    ///     speed matches osu!mania's baseline for the stage's current hit target position.
+    ///     speed matches osu!mania's baseline (computed once from the stage's
+    ///     <see cref="BmsStage.HIT_TARGET_POSITION"/>).
     /// </summary>
     public double ScrollRangeScale { get; private set; }
 
@@ -474,12 +472,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         BmsEventBus.OnScrollSpeedChangeEvent(scroll_speed_multipliers[currentMultiplierIndex]);
     }
 
-    private void updateScrollRangeScale(float hitTargetPosition)
-    {
-        const float reference_scroll_distance = 768f - 124.8f; // 768 - legacy DEFAULT_HIT_POSITION
-        ScrollRangeScale = (768f - hitTargetPosition) / reference_scroll_distance;
-    }
-
     #endregion
 
     #region Lifecycle
@@ -487,6 +479,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [BackgroundDependencyLoader(true)]
     private void load()
     {
+        // Compute the mania-matching scroll-range scale once at load.
+        // HitTargetPosition is constant per layout variant, so this never changes.
+        const float reference_scroll_distance = 768f - 124.8f; // 768 - legacy DEFAULT_HIT_POSITION
+        ScrollRangeScale = (768f - Stage.HitTargetPosition) / reference_scroll_distance;
+
         RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, int.MaxValue);
 
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
@@ -496,14 +493,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     protected override HitObjectContainer CreateHitObjectContainer() => new BmsHitObjectContainer(this);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
-
-    protected override void LoadAsyncComplete()
-    {
-        // Must happen before CompositeDrawable's first CheckChildrenLife().
-        ((BmsHitObjectContainer)HitObjectContainer).InitialiseLifetimePlans();
-
-        base.LoadAsyncComplete();
-    }
 
     protected override void LoadComplete()
     {

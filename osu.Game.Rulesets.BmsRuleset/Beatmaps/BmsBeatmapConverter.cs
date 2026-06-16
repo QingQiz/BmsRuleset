@@ -49,6 +49,10 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         converted.TimingMap ??= createFallbackTimingMap(converted);
         converted.TickResolution = converted.TimingMap.TickResolution;
 
+        // Precompute scroll positions once per hitobject to eliminate per-frame
+        // GetScrollPositionAtTime calls in the DrawableBmsHitObject hot path.
+        precomputeScrollPositions(converted);
+
         if (converted.TotalColumns <= 0)
         {
             converted.TotalColumns = inferTotalColumns(original, converted.HitObjects);
@@ -72,10 +76,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (GAMEPLAY_START_DELAY > 0)
             applyGameplayStartDelay(converted);
 
-        // Precompute scroll positions once per hitobject to eliminate per-frame
-        // GetScrollPositionAtTime calls in the DrawableBmsHitObject hot path.
-        precomputeScrollPositions(converted);
-
         return converted;
     }
 
@@ -85,6 +85,8 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
         foreach (var h in beatmap.HitObjects)
             h.StartTime += GAMEPLAY_START_DELAY;
+
+        precomputeScrollPositions(beatmap);
     }
 
     protected override IEnumerable<BmsHitObject> ConvertHitObject(HitObject original, IBeatmap beatmap, CancellationToken cancellationToken)
