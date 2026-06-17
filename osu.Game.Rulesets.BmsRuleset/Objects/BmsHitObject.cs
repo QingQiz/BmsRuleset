@@ -66,7 +66,75 @@ public class BmsHitObject : HitObject, IHasDuration
     /// </summary>
     public double ScrollPositionAtEndTime { get; set; }
 
+    public static BmsHitObject CreateForKind(bool isLongNote, bool isMine)
+    {
+        if (isMine)
+            return new BmsLandmine();
+
+        if (isLongNote)
+            return new BmsLongNote();
+
+        return new BmsNote();
+    }
+
+    public BmsHitObject ToTypedHitObject()
+    {
+        if (GetType() != typeof(BmsHitObject))
+            return this;
+
+        var typed = CreateForKind(IsLongNote, IsMine);
+        CopyTo(typed);
+        return typed;
+    }
+
+    protected void CopyTo(BmsHitObject target)
+    {
+        target.TickInfo = TickInfo;
+        target.StartTime = StartTime;
+        target.Duration = Duration;
+        target.Column = Column;
+        target.SourceChannel = SourceChannel;
+        target.SampleKey = SampleKey;
+        target.SamplePath = SamplePath;
+        target.IsLongNote = IsLongNote;
+        target.IsMine = IsMine;
+        target.LandmineDamagePercent = LandmineDamagePercent;
+        target.LandmineExplosionSamplePath = LandmineExplosionSamplePath;
+        target.TailSampleKey = TailSampleKey;
+        target.TailSamplePath = TailSamplePath;
+        target.BmsRank = BmsRank;
+        target.ScrollPositionAtStartTime = ScrollPositionAtStartTime;
+        target.ScrollPositionAtEndTime = ScrollPositionAtEndTime;
+    }
+
     public override Judgement CreateJudgement() => new BmsJudgement(IsMine);
 
     protected override BmsHitWindows CreateHitWindows() => new(BmsRank);
+}
+
+public class BmsNote : BmsHitObject
+{
+    public BmsNote()
+    {
+        IsLongNote = false;
+        IsMine = false;
+    }
+}
+
+public class BmsLongNote : BmsHitObject
+{
+    public BmsLongNote()
+    {
+        IsLongNote = true;
+        IsMine = false;
+    }
+}
+
+public class BmsLandmine : BmsHitObject
+{
+    public BmsLandmine()
+    {
+        IsLongNote = false;
+        IsMine = true;
+    }
 }

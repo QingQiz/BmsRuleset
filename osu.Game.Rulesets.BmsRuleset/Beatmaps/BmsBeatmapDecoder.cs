@@ -47,26 +47,29 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
 #pragma warning restore CA2255
     internal static void RegisterOnAssemblyLoad() => Register();
 
-    internal static BmsHitObject CreateHitObject(BmsParsedHitObject parsedObject) => new()
+    internal static BmsHitObject CreateHitObject(BmsParsedHitObject parsedObject)
     {
-        TickInfo = new BmsTickInfo
+        var hitObject = BmsHitObject.CreateForKind(parsedObject.IsLongNote, parsedObject.IsMine);
+
+        hitObject.TickInfo = new BmsTickInfo
         {
             Tick = parsedObject.Tick,
             EndTick = parsedObject.EndTick,
-        },
-        StartTime = parsedObject.StartTime,
-        Duration = parsedObject.Duration,
-        Column = parsedObject.Column,
-        SourceChannel = parsedObject.SourceChannel,
-        SampleKey = parsedObject.SampleKey,
-        SamplePath = parsedObject.SamplePath,
-        IsLongNote = parsedObject.IsLongNote,
-        IsMine = parsedObject.IsMine,
-        LandmineDamagePercent = parsedObject.LandmineDamagePercent,
-        LandmineExplosionSamplePath = parsedObject.LandmineExplosionSamplePath,
-        TailSampleKey = parsedObject.TailSampleKey,
-        TailSamplePath = parsedObject.TailSamplePath,
-    };
+        };
+        hitObject.StartTime = parsedObject.StartTime;
+        hitObject.Duration = parsedObject.Duration;
+        hitObject.Column = parsedObject.Column;
+        hitObject.SourceChannel = parsedObject.SourceChannel;
+        hitObject.SampleKey = parsedObject.SampleKey;
+        hitObject.SamplePath = parsedObject.SamplePath;
+        hitObject.IsLongNote = parsedObject.IsLongNote;
+        hitObject.IsMine = parsedObject.IsMine;
+        hitObject.LandmineDamagePercent = parsedObject.LandmineDamagePercent;
+        hitObject.LandmineExplosionSamplePath = parsedObject.LandmineExplosionSamplePath;
+        hitObject.TailSampleKey = parsedObject.TailSampleKey;
+        hitObject.TailSamplePath = parsedObject.TailSamplePath;
+        return hitObject;
+    }
 
     internal static void PopulateTiming(Beatmap output, IEnumerable<BmsBpmEvent> timingEvents)
     {

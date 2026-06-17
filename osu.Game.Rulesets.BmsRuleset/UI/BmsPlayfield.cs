@@ -295,11 +295,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // We must include LNs released before the tail window (an early release is a drop,
         // scored as POOR) — filtering by the release window here would leave the note
         // frozen at the judgement line until its tail time passed.
-        DrawableBmsHitObject? heldNote = null;
+        DrawableBmsLongNote? heldNote = null;
 
         foreach (var alive in HitObjectContainer.AliveEntries.Values)
         {
-            if (alive is not DrawableBmsHitObject d || !d.IsHoldingLongNote || d.HitObject.Column != column.Value)
+            if (alive is not DrawableBmsLongNote d || !d.IsHoldingLongNote || d.HitObject.Column != column.Value)
                 continue;
 
             if (heldNote == null || d.HitObject.EndTime < heldNote.HitObject.EndTime)
@@ -488,7 +488,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         const float reference_scroll_distance = 768f - 124.8f; // 768 - legacy DEFAULT_HIT_POSITION
         ScrollRangeScale = (768f - Stage.HitTargetPosition) / reference_scroll_distance;
 
-        RegisterPool<BmsHitObject, DrawableBmsHitObject>(32, int.MaxValue);
+        RegisterPool<BmsNote, DrawableBmsNote>(32, int.MaxValue);
+        RegisterPool<BmsLongNote, DrawableBmsLongNote>(16, int.MaxValue);
+        RegisterPool<BmsLandmine, DrawableBmsLandmine>(8, int.MaxValue);
 
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
         updateEmbeddedSkinFallback();

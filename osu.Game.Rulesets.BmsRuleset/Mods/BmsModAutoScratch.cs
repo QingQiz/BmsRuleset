@@ -31,7 +31,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
     [SettingSource("Hide scratch", "Hides the scratch column while auto-scratching")]
     public Bindable<bool> HideScratch { get; } = new();
 
-    private readonly HashSet<DrawableBmsHitObject> autoScratchLnHeads = [];
+    private readonly HashSet<DrawableBmsLongNote> autoScratchLnHeads = [];
 
     private BmsPlayfield playfield = null!;
 
@@ -67,20 +67,20 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
             var note = drawable.HitObject;
 
-            if (note.IsLongNote)
+            if (drawable is DrawableBmsLongNote longNote)
             {
-                if (!autoScratchLnHeads.Contains(drawable))
+                if (!autoScratchLnHeads.Contains(longNote))
                 {
                     if (now >= note.StartTime)
                     {
                         playfield.KeySoundPlayer.PlaySample(note.Column, note.SamplePath);
-                        if (drawable.TryHit())
-                            autoScratchLnHeads.Add(drawable);
+                        if (longNote.TryHit())
+                            autoScratchLnHeads.Add(longNote);
                     }
                 }
                 else if (now >= note.EndTime)
                 {
-                    if (drawable.TryRelease() && !string.IsNullOrEmpty(note.TailSamplePath))
+                    if (longNote.TryRelease() && !string.IsNullOrEmpty(note.TailSamplePath))
                         playfield.KeySoundPlayer.PlaySample(note.Column, note.TailSamplePath);
                 }
             }

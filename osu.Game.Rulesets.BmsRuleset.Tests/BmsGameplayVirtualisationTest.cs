@@ -30,6 +30,67 @@ public class BmsGameplayVirtualisationTest
     }
 
     [Test]
+    public void TestDecoderCreatesTypedHitObjects()
+    {
+        using var stream = new MemoryStream("""
+                                            #BPM 120
+                                            #LNTYPE 1
+                                            #WAV00 bomb.wav
+                                            #00111:01
+                                            #00151:0203
+                                            #001D1:0A
+                                            """u8.ToArray());
+        using var reader = new LineBufferedReader(stream);
+        var decoded = new BmsBeatmapDecoder().Decode(reader);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        var hitObjects = converted.HitObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
+
+        Assert.That(hitObjects, Has.Length.EqualTo(3));
+        Assert.That(hitObjects.Count(h => h.GetType() == typeof(BmsNote)), Is.EqualTo(1));
+        Assert.That(hitObjects.Count(h => h.GetType() == typeof(BmsLongNote)), Is.EqualTo(1));
+        Assert.That(hitObjects.Count(h => h.GetType() == typeof(BmsLandmine)), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestDrawableBmsHitObjectDoesNotBranchOnNoteKind()
+    {
+        var sourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "Objects", "Drawables", "DrawableBmsHitObject.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.That(source, Does.Not.Contain("IsLongNote"));
+        Assert.That(source, Does.Not.Contain("IsMine"));
+        Assert.That(source, Does.Not.Contain("HoldNote"));
+        Assert.That(source, Does.Not.Contain("Mine"));
+        Assert.That(source, Does.Not.Contain("tail"));
+        Assert.That(source, Does.Not.Contain("Tail"));
+    }
+
+    [Test]
+    public void TestPlayfieldDoesNotRewriteBeatmapHitObjects()
+    {
+        var hitObject = new BmsHitObject { StartTime = 1000, Column = 1, IsLongNote = true, Duration = 500 };
+        var beatmap = new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            HitObjects = { hitObject },
+        };
+
+        _ = new BmsPlayfield(beatmap);
+
+        Assert.That(beatmap.HitObjects.Single(), Is.SameAs(hitObject));
+        Assert.That(beatmap.HitObjects.Single(), Is.TypeOf<BmsHitObject>());
+
+        var sourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "UI", "BmsPlayfield.cs");
+        var source = File.ReadAllText(sourcePath);
+
+        Assert.That(source, Does.Not.Contain("normaliseHitObject"));
+        Assert.That(source, Does.Not.Contain("ToTypedHitObject"));
+        Assert.That(source, Does.Not.Contain("RegisterPool<BmsHitObject, DrawableBmsNote>"));
+    }
+
+    [Test]
     public void TestStageUsesVirtualisedMeasureLineArea()
     {
         var playfield = new BmsPlayfield(new BmsBeatmap
@@ -202,6 +263,21 @@ public class BmsGameplayVirtualisationTest
             return rootFromTestDirectory;
 
         return BmsEmbeddedSongDecoderTest.TestSongsRoot;
+    }
+
+    private static string findRepositoryRoot([CallerFilePath] string sourceFile = "")
+    {
+        var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile) ?? string.Empty);
+
+        while (directory != null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "osu.Game.Rulesets.BmsRuleset.sln")))
+                return directory.FullName;
+
+            directory = directory.Parent;
+        }
+
+        return TestContext.CurrentContext.WorkDirectory;
     }
 
     private static string findTestSongsRootFrom(string startDirectory)

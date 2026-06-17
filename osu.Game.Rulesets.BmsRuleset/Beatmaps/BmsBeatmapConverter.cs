@@ -78,7 +78,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         cancellationToken.ThrowIfCancellationRequested();
 
         if (original is BmsHitObject bmsObject)
-            yield return bmsObject;
+            yield return bmsObject.ToTypedHitObject();
     }
 
     private static int inferTotalColumns(IBeatmap original, IReadOnlyList<BmsHitObject> hitObjects)
@@ -186,7 +186,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         {
             BeatmapInfo = original.BeatmapInfo,
             ControlPointInfo = original.ControlPointInfo,
-            HitObjects = original.HitObjects.OfType<BmsHitObject>().OrderBy(h => h.StartTime).ToList(),
+            HitObjects = original.HitObjects.OfType<BmsHitObject>().Select(h => h.ToTypedHitObject()).OrderBy(h => h.StartTime).ToList(),
             Breaks = original.Breaks,
             AudioLeadIn = original.AudioLeadIn,
             StackLeniency = original.StackLeniency,

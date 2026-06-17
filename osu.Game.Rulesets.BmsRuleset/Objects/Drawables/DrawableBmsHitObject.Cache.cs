@@ -10,7 +10,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 
 public partial class DrawableBmsHitObject
 {
-    private readonly record struct LayoutMetrics(
+    protected readonly record struct LayoutMetrics(
         int Column,
         BmsLayoutVariant LayoutVariant,
         Drawable? ColumnContainer,
