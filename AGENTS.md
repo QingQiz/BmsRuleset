@@ -12,3 +12,7 @@
 - Do NOT run benchmark tests without asking. Benchmarks can take minutes and consume significant resources.
 - Always run tests with `--filter` arguments — never run the full unfiltered test suite.
 
+## Comment Style
+
+- Write **why**-type comments (the rationale, intent, or non-obvious trade-off), not **what**-type comments (restating what the code already says).
+

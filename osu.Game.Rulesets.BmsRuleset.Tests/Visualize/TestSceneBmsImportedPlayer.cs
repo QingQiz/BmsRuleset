@@ -235,7 +235,7 @@ public partial class TestSceneBmsImportedPlayer : BmsPlayerTestScene
             Player.GameplayClockContainer.Seek(firstKeyNote.StartTime - 100);
         });
 
-        AddUntilStep("target key note alive", () => Player.DrawableRuleset.Playfield.HitObjectContainer.AliveObjects.Any(d => d.HitObject == firstKeyNote));
+        AddUntilStep("target key note alive", () => ((BmsPlayfield)Player.DrawableRuleset.Playfield).AllColumnAliveObjects().Any(d => d.HitObject == firstKeyNote));
         AddStep("press key for column 1", () =>
         {
             var variant = (BmsLayoutVariant)((BmsDrawableRuleset)Player.DrawableRuleset).Variant;

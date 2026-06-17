@@ -1,9 +1,11 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.Objects.Drawables;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -22,9 +24,24 @@ public static class BmsPlayfieldAssertions
     /// <param name="excludeLongNotes">If <c>true</c>, long notes are skipped — useful when a non-LN
     /// note shares its tick with an LN body and the test only cares about the tap.</param>
     public static DrawableBmsHitObject? GetAliveObjectAtTick(this BmsPlayfield playfield, long tick, bool excludeLongNotes = false)
-        => playfield.HitObjectContainer.AliveObjects
-            .OfType<DrawableBmsHitObject>()
-            .FirstOrDefault(d => d.HitObject.TickInfo.Tick == tick && (!excludeLongNotes || !d.HitObject.IsLongNote));
+    {
+        // After the scrolling refactor, hit objects live in per-column BmsColumnHitObjectContainer
+        // instances, not in the playfield's default (empty) HitObjectContainer.
+        foreach (var column in playfield.Stage.Columns)
+        {
+            foreach (var (entry, d) in column.HitObjectContainer.AliveEntries)
+            {
+                if (d is DrawableBmsHitObject note &&
+                    note.HitObject.TickInfo.Tick == tick &&
+                    (!excludeLongNotes || !note.HitObject.IsLongNote))
+                {
+                    return note;
+                }
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Distance between the screen-space tops of the two notes at the given ticks,
@@ -49,6 +66,9 @@ public static class BmsPlayfieldAssertions
         var lineLocalY = playfield.Stage.DrawHeight - playfield.Stage.HitTargetPosition;
         return playfield.Stage.ToScreenSpace(new Vector2(0, lineLocalY)).Y;
     }
+
+    public static IEnumerable<DrawableHitObject> AllColumnAliveObjects(this BmsPlayfield playfield)
+        => playfield.Stage.Columns.SelectMany(c => c.HitObjectContainer.AliveEntries.Values);
 
     public static float TopOf(Drawable drawable) => drawable.ScreenSpaceDrawQuad.TopLeft.Y;
 

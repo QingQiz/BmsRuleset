@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests;
 public class BmsGameplayVirtualisationTest
 {
     [Test]
-    public void TestPlayfieldUsesBmsHitObjectContainer()
+    public void TestPlayfieldRoutesHitObjectsToPerColumnContainers()
     {
         var playfield = new BmsPlayfield(new BmsBeatmap
         {
@@ -26,7 +26,11 @@ public class BmsGameplayVirtualisationTest
             },
         });
 
-        Assert.That(playfield.HitObjectContainer.GetType().Name, Is.EqualTo("BmsHitObjectContainer"));
+        // Top-level HitObjectContainer is the default (empty) one from Playfield base.
+        Assert.That(playfield.HitObjectContainer.GetType().Name, Is.EqualTo("HitObjectContainer"));
+
+        // Hit objects are routed to per-column BmsColumnHitObjectContainers.
+        Assert.That(playfield.Stage.Columns[1].HitObjectContainer.GetType().Name, Is.EqualTo("BmsColumnHitObjectContainer"));
     }
 
     [Test]
@@ -64,6 +68,37 @@ public class BmsGameplayVirtualisationTest
         Assert.That(source, Does.Not.Contain("Mine"));
         Assert.That(source, Does.Not.Contain("tail"));
         Assert.That(source, Does.Not.Contain("Tail"));
+    }
+
+    [Test]
+    public void TestDrawableBmsHitObjectDoesNotDiscardReusablePoolStateOnApply()
+    {
+        var sourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "Objects", "Drawables", "DrawableBmsHitObject.cs");
+        var source = File.ReadAllText(sourcePath);
+        var onApply = extractMethodBody(source, "protected override void OnApply()");
+
+        Assert.That(onApply, Does.Not.Contain("InvalidateAll"));
+        Assert.That(onApply, Does.Not.Contain("UpdateSkinPieces"));
+
+        var longNoteSourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "Objects", "Drawables", "DrawableBmsLongNote.cs");
+        var longNoteSource = File.ReadAllText(longNoteSourcePath);
+
+        Assert.That(longNoteSource, Does.Not.Contain("longNoteTailContainer.Clear();"));
+    }
+
+    [Test]
+    public void TestBmsColumnsUsePerColumnHitObjectContainers()
+    {
+        var columnSourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "UI", "Components", "BmsColumn.cs");
+        var columnSource = File.ReadAllText(columnSourcePath);
+
+        Assert.That(columnSource, Does.Contain("BmsColumnHitObjectContainer"));
+
+        var containerSourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "UI", "Components", "BmsColumnHitObjectContainer.cs");
+        var containerSource = File.ReadAllText(containerSourcePath);
+
+        Assert.That(containerSource, Does.Contain("UpdateAfterChildrenLife"));
+        Assert.That(containerSource, Does.Contain("UpdateBodyGeometry"));
     }
 
     [Test]
@@ -140,7 +175,8 @@ public class BmsGameplayVirtualisationTest
 
         playfield.Add(hitObject);
 
-        var entry = playfield.HitObjectContainer.Entries.Single();
+        var col = hitObject.Column;
+        var entry = playfield.Stage.Columns[col].HitObjectContainer.Entries.Single();
 
         Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(hitObject.StartTime - 3000));
     }
@@ -154,7 +190,8 @@ public class BmsGameplayVirtualisationTest
 
         playfield.Add(hitObject);
 
-        var entry = playfield.HitObjectContainer.Entries.Single();
+        var col = hitObject.Column;
+        var entry = playfield.Stage.Columns[col].HitObjectContainer.Entries.Single();
         var visibleStart = findFirstVisibleTime(beatmap, hitObject);
 
         Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(visibleStart - 100));
@@ -193,7 +230,8 @@ public class BmsGameplayVirtualisationTest
 
         playfield.Add(hitObject);
 
-        var entry = playfield.HitObjectContainer.Entries.Single();
+        var col = hitObject.Column;
+        var entry = playfield.Stage.Columns[col].HitObjectContainer.Entries.Single();
         var visibleStart = findFirstVisibleTime(beatmap, hitObject);
 
         Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(visibleStart - 100));
@@ -208,7 +246,8 @@ public class BmsGameplayVirtualisationTest
         foreach (var hitObject in beatmap.HitObjects.Where(h => !h.IsMine).Take(64))
             playfield.Add(hitObject);
 
-        var lateEntries = playfield.HitObjectContainer.Entries
+        var lateEntries = playfield.Stage.Columns
+            .SelectMany(c => c.HitObjectContainer.Entries)
             .Where(e => e.HitObject is BmsHitObject)
             .Where(e => e.LifetimeStart > e.HitObject.StartTime)
             .Select(e => $"{((BmsHitObject)e.HitObject).TickInfo.Tick}@{e.HitObject.StartTime:F1} lifetime={e.LifetimeStart:F1}")
@@ -227,7 +266,8 @@ public class BmsGameplayVirtualisationTest
         foreach (var hitObject in playableObjects.Skip(300).Take(40))
             playfield.Add(hitObject);
 
-        var lateEntries = playfield.HitObjectContainer.Entries
+        var lateEntries = playfield.Stage.Columns
+            .SelectMany(c => c.HitObjectContainer.Entries)
             .Select(e => (Entry: e, HitObject: (BmsHitObject)e.HitObject))
             .Select(x => (x.Entry, x.HitObject, Combo: Array.IndexOf(playableObjects, x.HitObject) + 1, FirstVisibleTime: findEarliestVisibleTime(beatmap, x.HitObject)))
             .Where(x => x.Entry.LifetimeStart > x.FirstVisibleTime - 100)
@@ -278,6 +318,33 @@ public class BmsGameplayVirtualisationTest
         }
 
         return TestContext.CurrentContext.WorkDirectory;
+    }
+
+    private static string extractMethodBody(string source, string signature)
+    {
+        var signatureIndex = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.That(signatureIndex, Is.GreaterThanOrEqualTo(0), $"Could not find {signature}");
+
+        var bodyStart = source.IndexOf('{', signatureIndex);
+        Assert.That(bodyStart, Is.GreaterThanOrEqualTo(0), $"Could not find body for {signature}");
+
+        var depth = 0;
+
+        for (var i = bodyStart; i < source.Length; i++)
+        {
+            if (source[i] == '{')
+                depth++;
+            else if (source[i] == '}')
+            {
+                depth--;
+
+                if (depth == 0)
+                    return source.Substring(bodyStart, i - bodyStart + 1);
+            }
+        }
+
+        Assert.Fail($"Could not parse body for {signature}");
+        return string.Empty;
     }
 
     private static string findTestSongsRootFrom(string startDirectory)

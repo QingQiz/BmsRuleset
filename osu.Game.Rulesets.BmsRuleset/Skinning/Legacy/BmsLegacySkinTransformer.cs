@@ -107,9 +107,7 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
         }
 
         configurationProvider = new BmsLegacySkinConfigurationProvider(Skin, layoutVariant1);
-        resourceNames = new BmsLegacySkinResourceNames(
-            (lookup, componentLookup, columnIndex) => GetManiaConfig<string>(lookup, componentLookup, columnIndex)?.Value,
-            hasAnimation);
+        resourceNames = new BmsLegacySkinResourceNames((lookup, componentLookup, columnIndex) => GetManiaConfig<string>(lookup, componentLookup, columnIndex)?.Value);
 
         hasBmsResources = new Lazy<bool>(()
             // A parsed [BMS] or [Mania] section is the strongest signal.
@@ -159,18 +157,6 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
 
     internal Drawable? GetLegacyAnimation(string name) =>
         this.GetAnimation(name, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
-
-    internal string GetNoteImageName(BmsSkinComponentLookup lookup) =>
-        resourceNames.GetNoteImageName(lookup);
-
-    internal string GetHoldNoteHeadImageName(BmsSkinComponentLookup lookup) =>
-        resourceNames.GetHoldNoteHeadImageName(lookup);
-
-    internal string GetHoldNoteTailImageName(BmsSkinComponentLookup lookup) =>
-        resourceNames.GetHoldNoteTailImageName(lookup);
-
-    internal string GetMineImageName(BmsSkinComponentLookup lookup) =>
-        resourceNames.GetMineImageName(lookup);
 
     internal string GetKeyImageName(BmsSkinComponentLookup lookup, bool down) =>
         resourceNames.GetKeyImageName(lookup, down);

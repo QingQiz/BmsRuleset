@@ -57,7 +57,9 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
         autoScratchLnHeads.RemoveWhere(d => d.Judged);
 
-        foreach (var drawable in playfield.HitObjectContainer.AliveObjects.OfType<DrawableBmsHitObject>())
+        foreach (var drawable in playfield.Stage.Columns
+                     .SelectMany(c => c.HitObjectContainer.AliveObjects)
+                     .OfType<DrawableBmsHitObject>())
         {
             if (drawable.Judged || drawable.HitObject.IsMine)
                 continue;

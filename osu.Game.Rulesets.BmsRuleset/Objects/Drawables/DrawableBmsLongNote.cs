@@ -1,7 +1,6 @@
 using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
@@ -12,10 +11,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 
 public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
 {
-    private const float max_piece_height = 4096;
-
     private bool longNoteStarted;
-    private HitResult? longNoteHeadResult;
     private float? longNoteHeadFixedY;
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private Container longNoteTailContainer = null!;
@@ -36,9 +32,9 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
             return false;
 
         longNoteStarted = true;
-        longNoteHeadResult = result;
-        longNoteHeadFixedY = null;
-        tryResolveLongNoteHeadFixedY(result);
+        // Freeze at the judgement line position, not at the early/late-hit Y,
+        // so the LN head stays at the correct screen position during hold.
+        longNoteHeadFixedY = -(Playfield?.Stage.HitTargetPosition ?? 200);
         return true;
     }
 
@@ -66,13 +62,31 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
     protected override void ResetKindState()
     {
         longNoteStarted = false;
-        longNoteHeadResult = null;
         longNoteHeadFixedY = null;
+
+        longNoteBody.Alpha = 0;
+        longNoteTailContainer.Alpha = 0;
     }
 
-    protected override void OnLayoutMetricsRefreshed(LayoutMetrics layout) => tryResolveLongNoteHeadFixedY(longNoteHeadResult);
+    protected override void OnApply()
+    {
+        base.OnApply();
 
-    protected override void OnLayoutResolved(BmsLayoutVariant layoutVariant, int column) => longNoteBody.SetSkinLookup(layoutVariant, column);
+        if (HitObject != null && Playfield != null)
+        {
+            longNoteBody.SetSkinLookup(Playfield.LayoutVariant, HitObject.Column);
+
+            if (longNoteTailContainer.Count == 0)
+            {
+                longNoteTailContainer.Add(new BmsCachedSkinnableDrawable(
+                    new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail,
+                        Playfield.LayoutVariant, HitObject.Column))
+                {
+                    ComponentAnchor = Anchor.BottomCentre,
+                });
+            }
+        }
+    }
 
     protected override void AddKindDrawablesBeforeNote()
     {
@@ -82,6 +96,7 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopLeft,
                 RelativeSizeAxes = Axes.X,
+                BodyColour = Color4.Cyan,
                 Alpha = 0,
             },
             longNoteTailContainer = new Container
@@ -89,39 +104,9 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopLeft,
                 RelativeSizeAxes = Axes.X,
-                Height = BmsGameplaySkinMetricsResolver.DEFAULT_NOTE_HEIGHT,
                 Alpha = 0,
             },
         ]);
-    }
-
-    protected override void UpdateSkinPieces(BmsLayoutVariant? layoutVariant = null, int? column = null)
-    {
-        base.UpdateSkinPieces(layoutVariant, column);
-
-        if (HitObject == null)
-            return;
-
-        var resolvedLayoutVariant = layoutVariant ?? Playfield?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
-        var resolvedColumn = column ?? HitObject.Column;
-
-        longNoteBody.BodyColour = Color4.Cyan;
-        longNoteBody.Alpha = 0.65f;
-        longNoteTailContainer.Alpha = 1;
-        longNoteTailContainer.Clear();
-        longNoteTailContainer.Add(new BmsCachedSkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, resolvedLayoutVariant, resolvedColumn))
-        {
-            RelativeSizeAxes = Axes.Both,
-            CentreComponent = false,
-        });
-    }
-
-    protected override float VisualHeadYFor(float naturalY, float judgementHeadY)
-    {
-        if (!longNoteStarted)
-            return naturalY;
-
-        return Math.Min(longNoteHeadFixedY ?? naturalY, judgementHeadY);
     }
 
     protected override void CheckForResult(bool userTriggered, double timeOffset)
@@ -141,40 +126,33 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
             ApplyResult(HitResult.Meh);
     }
 
-    protected override VisualLayout CreateVisualLayout(float visualY, LayoutMetrics layout)
+    /// <summary>
+    /// Called by BmsColumnHitObjectContainer every frame with pre-computed
+    /// head and end Y positions. Updates the body/tail visual geometry.
+    /// </summary>
+    public void UpdateBodyGeometry(float headY, float endY)
     {
-        var endY = YForTimeOffset(HitObject.EndTime - Time.Current, layout);
-        var visualEndY = longNoteStarted ? Math.Min(endY, visualY) : endY;
-        var objectTop = Math.Min(visualY, visualEndY);
+        const float max_piece_height = 4096;
 
-        return new VisualLayout(
-            objectTop,
-            visualY - objectTop,
-            visualEndY - objectTop,
-            Math.Max(CurrentNoteHeight, Math.Abs(visualEndY - visualY) + CurrentNoteHeight));
-    }
+        // If head is frozen at a fixed position (held LN), use that instead.
+        // Math.Min works in normal scroll (head moves downward → freeze at the higher/fixed Y),
+        // but in reverse scroll the head moves upward, so Min would pick the moving headY.
+        // Always use the captured fixed Y to freeze correctly in both directions.
+        if (longNoteStarted && longNoteHeadFixedY.HasValue)
+            headY = longNoteHeadFixedY.Value;
 
-    protected override double GetScrollPositionForOffset(double timeUntilHit)
-    {
-        if (Math.Abs(timeUntilHit - (HitObject.EndTime - Time.Current)) < 0.001)
-            return HitObject.ScrollPositionAtEndTime;
+        var myY = Y;
+        var headOffset = headY - myY;
+        var tailOffset = endY - myY;
 
-        return base.GetScrollPositionForOffset(timeUntilHit);
-    }
-
-    protected override void UpdateVisualPieces(float headOffset, float tailOffset)
-    {
-        VisualPiecesApplied = true;
-
+        // Position head
         if (Math.Abs(NoteContainer.Y - headOffset) > 0.5f)
             NoteContainer.Y = headOffset;
 
-        if (Math.Abs(NoteContainer.Height - CurrentNoteHeight) > 0.5f)
-            NoteContainer.Height = CurrentNoteHeight;
-
+        // Compute body geometry
         var tailAtTop = tailOffset < headOffset;
         var bodyTop = Math.Min(headOffset, tailOffset);
-        var bodyBottom = Math.Max(headOffset, tailOffset) + CurrentNoteHeight;
+        var bodyBottom = Math.Max(headOffset, tailOffset);
 
         var visibleTop = Math.Max(bodyTop, headOffset - max_piece_height);
         var visibleBottom = Math.Min(bodyBottom, headOffset + max_piece_height);
@@ -189,22 +167,13 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
         longNoteBody.UpdateBody(bodyHeight, tailAtTop, longNoteStarted);
         longNoteBody.Alpha = bodyHeight > 0 ? 1 : 0;
 
+        // Position tail
         if (Math.Abs(longNoteTailContainer.Y - tailOffset) > 0.5f)
             longNoteTailContainer.Y = tailOffset;
 
-        if (Math.Abs(longNoteTailContainer.Height - CurrentNoteHeight) > 0.5f)
-            longNoteTailContainer.Height = CurrentNoteHeight;
+        if (Math.Abs(longNoteTailContainer.Height - Height) > 0.5f)
+            longNoteTailContainer.Height = Height;
 
         longNoteTailContainer.Alpha = 1;
-    }
-
-    private void tryResolveLongNoteHeadFixedY(HitResult? result)
-    {
-        if (result == null || longNoteHeadFixedY != null || LatestLayout is not { } layout)
-            return;
-
-        longNoteHeadFixedY = result is HitResult.Perfect or HitResult.Great
-            ? JudgementHeadYFor(layout)
-            : YForTimeOffset(HitObject.StartTime - Time.Current, layout);
     }
 }

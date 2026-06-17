@@ -1,13 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
 
@@ -21,10 +23,10 @@ public sealed partial class BmsKeySoundPlayer : CompositeDrawable
 {
     public override bool IsPresent => false;
 
-    public BmsKeySoundPlayer(IReadOnlyList<BmsHitObject> hitObjects, BmsHitObjectContainer hitObjectContainer, Func<double> getCurrentTime, int totalColumns)
+    public BmsKeySoundPlayer(IReadOnlyList<BmsHitObject> hitObjects, IReadOnlyList<HitObjectContainer> columnContainers, Func<double> getCurrentTime, int totalColumns)
     {
         this.hitObjects = hitObjects;
-        this.hitObjectContainer = hitObjectContainer;
+        this.columnContainers = columnContainers;
         this.getCurrentTime = getCurrentTime;
         keySounds = new BmsChartSampleSound[totalColumns];
 
@@ -49,7 +51,7 @@ public sealed partial class BmsKeySoundPlayer : CompositeDrawable
     #region Fields
 
     private readonly IReadOnlyList<BmsHitObject> hitObjects;
-    private readonly BmsHitObjectContainer hitObjectContainer;
+    private readonly IReadOnlyList<HitObjectContainer> columnContainers;
     private readonly Func<double> getCurrentTime;
     private readonly BmsChartSampleSound[] keySounds;
     private readonly BmsChartSampleSound landmineSound = new();
@@ -80,7 +82,23 @@ public sealed partial class BmsKeySoundPlayer : CompositeDrawable
     {
         var currentTime = getCurrentTime();
 
-        hitObjectContainer.TryGetAliveDrawable(hitObject, out var drawable);
+        // Look up the drawable in the per-column HitObjectContainer.
+        // Each BmsColumn has its own container after the scrolling refactor,
+        // so we pick the right one by column index.
+        var col = hitObject.Column;
+        DrawableBmsHitObject? drawable = null;
+
+        if (col >= 0 && col < columnContainers.Count)
+        {
+            foreach (var (entry, d) in columnContainers[col].AliveEntries)
+            {
+                if (entry.HitObject == hitObject && d is DrawableBmsHitObject bmsD)
+                {
+                    drawable = bmsD;
+                    break;
+                }
+            }
+        }
 
         if (drawable?.Judged == true)
             return true;

@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning;
+using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Skinning;
 using osuTK;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;

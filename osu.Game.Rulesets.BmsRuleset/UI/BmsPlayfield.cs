@@ -34,6 +34,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 ///     Native BMS playfield.  Manages the stage, hit-object container, key-sound playback,
 ///     judgement display, scroll-speed HUD, and input routing for all BMS layout variants.
 /// </summary>
+[Cached]
 public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
 {
 
@@ -164,12 +165,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         Stage = new BmsStage(TotalColumns, LayoutVariant);
 
-        KeySoundPlayer = new BmsKeySoundPlayer(hitObjectsOrdered, (BmsHitObjectContainer)HitObjectContainer, () => Time.Current, TotalColumns);
+        KeySoundPlayer = new BmsKeySoundPlayer(hitObjectsOrdered, Stage.Columns.Select(c => c.HitObjectContainer).ToArray(), () => Time.Current, TotalColumns);
 
         InternalChildren =
         [
             Stage,
-            HitObjectContainer,
             KeySoundPlayer,
             judgementDrawablePool,
         ];
@@ -184,6 +184,25 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         this.beatmap = beatmap;
         textEventManager = new BmsTextEventManager(beatmap.TextEvents);
+    }
+
+    #endregion
+
+    #region HitObject routing
+
+    public override void Add(HitObject hitObject)
+    {
+        if (hitObject is BmsHitObject bmsHo)
+        {
+            var col = bmsHo.Column;
+            if (col >= 0 && col < Stage.Columns.Length)
+            {
+                Stage.Columns[col].Add(hitObject);
+                return;
+            }
+        }
+
+        base.Add(hitObject);
     }
 
     #endregion
@@ -216,14 +235,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // Pass 1: find a hittable note — earliest unjudged note whose timing falls within
         // a judgement window (PGREAT … BAD, or the POOR hit zone).  Picking by StartTime
         // ensures strict sequential ordering within a column.
+        var columnContainer = Stage.Columns[column.Value].HitObjectContainer;
         DrawableBmsHitObject? target = null;
 
-        foreach (var alive in HitObjectContainer.AliveEntries.Values)
+        foreach (var alive in columnContainer.AliveEntries.Values)
         {
             if (alive is not DrawableBmsHitObject d
                 || d.Judged
                 || d.HitObject.IsMine
-                || d.HitObject.Column != column.Value
                 || d.HitObject.HitWindows is not BmsHitWindows w
                 || w.BmsResultFor(Time.Current - d.HitObject.StartTime) == HitResult.None)
             {
@@ -243,12 +262,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         DrawableBmsHitObject? nearestUnjudged = null;
         var nearestDistance = double.MaxValue;
 
-        foreach (var alive in HitObjectContainer.AliveEntries.Values)
+        foreach (var alive in columnContainer.AliveEntries.Values)
         {
             if (alive is not DrawableBmsHitObject d
                 || d.Judged
                 || d.HitObject.IsMine
-                || d.HitObject.Column != column.Value
                 || d.HitObject.HitWindows is not BmsHitWindows)
             {
                 continue;
@@ -295,11 +313,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // We must include LNs released before the tail window (an early release is a drop,
         // scored as POOR) — filtering by the release window here would leave the note
         // frozen at the judgement line until its tail time passed.
+        var columnContainer = Stage.Columns[column.Value].HitObjectContainer;
         DrawableBmsLongNote? heldNote = null;
 
-        foreach (var alive in HitObjectContainer.AliveEntries.Values)
+        foreach (var alive in columnContainer.AliveEntries.Values)
         {
-            if (alive is not DrawableBmsLongNote d || !d.IsHoldingLongNote || d.HitObject.Column != column.Value)
+            if (alive is not DrawableBmsLongNote d || !d.IsHoldingLongNote)
                 continue;
 
             if (heldNote == null || d.HitObject.EndTime < heldNote.HitObject.EndTime)
@@ -344,6 +363,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     ///     judgement line and its Y = <c>parentHeight - HitTargetPosition</c>.
     /// </summary>
     public double CurrentScrollPosition { get; private set; }
+
+    /// <summary>
+    ///     Active SCROLL factor from the chart's <c>#SCROLLxx</c> events.
+    ///     Determines display multiplier (1.0 = normal, 2.0 = 2× spread, -1.0 = reverse).
+    /// </summary>
+    public double ChartScrollFactor { get; private set; } = 1.0;
 
     /// <summary>
     ///     Active SPEED factor from the chart's <c>#SPEEDxx</c> / channel <c>SP</c> events.
@@ -410,11 +435,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     ///     Pixel height of the note. Subtracted so the note sits on rather than covers the judgement line.
     /// </param>
     public float YForScrollProgress(double progress, double parentHeight, double noteHeight = 0)
+        => (float)(parentHeight - Stage.HitTargetPosition - progress * scrollCoordinateScale(parentHeight) - noteHeight);
+
+    private double scrollCoordinateScale(double parentHeight)
     {
         var range = Math.Max(1.0, ScrollRange);
         var hitTarget = Stage.HitTargetPosition;
         var travelDistance = Math.Max(1f, (float)(parentHeight - hitTarget));
-        return (float)(parentHeight - hitTarget - progress * ScrollSpeedMultiplier / range * travelDistance - noteHeight);
+        return ScrollSpeedMultiplier / range * travelDistance;
     }
 
     /// <summary>
@@ -488,15 +516,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         const float reference_scroll_distance = 768f - 124.8f; // 768 - legacy DEFAULT_HIT_POSITION
         ScrollRangeScale = (768f - Stage.HitTargetPosition) / reference_scroll_distance;
 
-        RegisterPool<BmsNote, DrawableBmsNote>(32, int.MaxValue);
-        RegisterPool<BmsLongNote, DrawableBmsLongNote>(16, int.MaxValue);
-        RegisterPool<BmsLandmine, DrawableBmsLandmine>(8, int.MaxValue);
-
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
         updateEmbeddedSkinFallback();
     }
-
-    protected override HitObjectContainer CreateHitObjectContainer() => new BmsHitObjectContainer(this);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
 
@@ -506,7 +528,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         populateMeasureLines();
 
-        NewResult += onNewResult;
+        // Subscribe to per-column NewResult events so BmsPlayfield aggregates all results (hit explosions, judgement
+        // display).
+        foreach (var column in Stage.Columns)
+        {
+            column.NewResult += onNewResult;
+            AddNested(column);
+        }
 
         foreach (var result in BmsRuleset.STATIC_VALID_HIT_RESULTS)
         {
@@ -526,15 +554,19 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     protected override void Update()
     {
-        base.Update();
-
         CurrentScrollPosition = ConstantScrollActive
             ? Time.Current
             : TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current;
 
+        ChartScrollFactor = ConstantScrollActive
+            ? 1.0
+            : TimingMap?.GetScrollFactorAtTime(Time.Current) ?? 1.0;
+
         ChartSpeedFactor = ConstantScrollActive
             ? 1.0
             : TimingMap?.GetSpeedFactorAtTime(Time.Current) ?? 1.0;
+
+        base.Update();
 
         triggerEvents();
         updateStageScale();

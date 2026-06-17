@@ -8,15 +8,19 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Skinning;
-using osu.Game.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.UI;
+using osu.Game.Skinning;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 
-public sealed partial class BmsColumn : CompositeDrawable
+[Cached]
+public sealed partial class BmsColumn : Playfield
 {
     public const float COLUMN_WIDTH = 42;
     public const float SCRATCH_COLUMN_WIDTH = 50;
@@ -24,7 +28,6 @@ public sealed partial class BmsColumn : CompositeDrawable
     public readonly int Index;
     public readonly bool IsScratch;
 
-    public readonly Container HitObjectArea;
     public readonly Container HitExplosionArea;
 
     /// <summary>
@@ -33,13 +36,13 @@ public sealed partial class BmsColumn : CompositeDrawable
     /// </summary>
     public bool Hidden
     {
-        get => hidden;
+        get;
         set
         {
-            if (hidden == value)
+            if (field == value)
                 return;
 
-            hidden = value;
+            field = value;
 
             if (value)
             {
@@ -53,7 +56,7 @@ public sealed partial class BmsColumn : CompositeDrawable
     private readonly BmsLayoutVariant layoutVariant;
     private readonly SkinnableDrawable hitTarget;
 
-    private bool hidden;
+    public BmsPlayfield? ParentPlayfield { get; set; }
 
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
@@ -80,7 +83,6 @@ public sealed partial class BmsColumn : CompositeDrawable
                 RelativeSizeAxes = Axes.Both,
                 CentreComponent = false,
             },
-            HitObjectArea = new Container { RelativeSizeAxes = Axes.Both },
             HitExplosionArea = new Container { RelativeSizeAxes = Axes.Both },
             hitTarget = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, layoutVariant, index), _ => new DefaultBmsHitTarget(IsScratch))
             {
@@ -92,6 +94,10 @@ public sealed partial class BmsColumn : CompositeDrawable
             },
         ];
     }
+
+    protected override HitObjectContainer CreateHitObjectContainer() => new BmsColumnHitObjectContainer(this);
+
+    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
 
     #region Disposal
 
@@ -115,6 +121,12 @@ public sealed partial class BmsColumn : CompositeDrawable
     [BackgroundDependencyLoader]
     private void load()
     {
+        RegisterPool<BmsNote, DrawableBmsNote>(16, int.MaxValue);
+        RegisterPool<BmsLongNote, DrawableBmsLongNote>(8, int.MaxValue);
+        RegisterPool<BmsLandmine, DrawableBmsLandmine>(4, int.MaxValue);
+
+        ParentPlayfield ??= this.FindClosestParent<BmsPlayfield>();
+
         skin.SourceChanged += updateFromSkin;
         updateFromSkin();
     }

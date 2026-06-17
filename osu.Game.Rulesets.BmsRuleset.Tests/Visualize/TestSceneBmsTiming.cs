@@ -101,7 +101,7 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
         """;
 
     private DrawableBmsHitObject? getCrossSpeedLongNote()
-        => Playfield.HitObjectContainer.AliveObjects
+        => Playfield.AllColumnAliveObjects()
             .OfType<DrawableBmsHitObject>()
             .FirstOrDefault(d => d.HitObject is { IsLongNote: true, TickInfo.Tick: 384 });
 
@@ -141,7 +141,7 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
         AddAssert("measure lines added", () => Playfield.Stage.MeasureLineArea.Count, () => Is.GreaterThan(0));
 
         AddStep("seek normal BPM", () => seekToTick(192));
-        AddUntilStep("normal notes visible", () => Playfield.HitObjectContainer.AliveObjects.Count(), () => Is.GreaterThan(0));
+        AddUntilStep("normal notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
         AddUntilStep("normal speed spacing measurable", () => Playfield.SpacingBetweenTicks(192, 240, excludeLongNotes: true), () => Is.GreaterThan(1));
         AddStep("capture normal speed spacing", () => normalSpeedSpacing = Playfield.SpacingBetweenTicks(192, 240, excludeLongNotes: true));
 
@@ -152,7 +152,7 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
         AddAssert("scroll speed restored", () => Playfield.ScrollSpeed, () => Is.EqualTo(8).Within(0.001));
 
         AddStep("seek fast BPM", () => seekToTick(384));
-        AddUntilStep("fast notes visible", () => Playfield.HitObjectContainer.AliveObjects.Count(), () => Is.GreaterThan(0));
+        AddUntilStep("fast notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
         AddUntilStep("cross-speed LN held", () => getCrossSpeedLongNote()?.Judged == false);
         AddAssert("cross-speed LN body above line",
             () => BmsPlayfieldAssertions.BottomOf(getCrossSpeedLongNote()!),
@@ -166,10 +166,10 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
 
             Player.GameplayClockContainer.Seek(stopObject.StartTime + stop.Duration / 2);
         });
-        AddUntilStep("stop notes visible", () => Playfield.HitObjectContainer.AliveObjects.Count(), () => Is.GreaterThan(0));
+        AddUntilStep("stop notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
 
         AddStep("seek slow BPM", () => seekToTick(768));
-        AddUntilStep("slow notes visible", () => Playfield.HitObjectContainer.AliveObjects.Count(), () => Is.GreaterThan(0));
+        AddUntilStep("slow notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
 
         AddStep("seek post-LN note", () => seekToTick(1056));
         AddUntilStep("post-LN note alive", () => Playfield.GetAliveObjectAtTick(1056, excludeLongNotes: true) != null);
@@ -178,13 +178,13 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
             () => Is.LessThanOrEqualTo(Playfield.JudgementLineY() + 1));
 
         AddStep("seek extreme BPM", () => seekToTick(1152, 20));
-        AddUntilStep("extreme BPM notes visible", () => Playfield.HitObjectContainer.AliveObjects.Count(), () => Is.GreaterThan(0));
+        AddUntilStep("extreme BPM notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
 
         AddStep("seek zero BPM fallback", () => seekToTick(1344, 20));
-        AddUntilStep("zero BPM fallback notes visible", () => Playfield.HitObjectContainer.AliveObjects.Count(), () => Is.GreaterThan(0));
+        AddUntilStep("zero BPM fallback notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
 
         AddStep("seek sub-1 BPM", () => seekToTick(1536, 200));
-        AddUntilStep("sub-1 BPM notes visible", () => Playfield.HitObjectContainer.AliveObjects.Count(), () => Is.GreaterThan(0));
+        AddUntilStep("sub-1 BPM notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
     }
 
     [Test]

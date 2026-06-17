@@ -9,8 +9,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 
 internal partial class BmsCachedSkinnableDrawable : SkinReloadableDrawable
 {
-
-    public bool CentreComponent = true;
+    public Anchor? ComponentAnchor { get; init; } = Anchor.Centre;
 
     public Drawable Drawable { get; private set; } = null!;
 
@@ -45,10 +44,10 @@ internal partial class BmsCachedSkinnableDrawable : SkinReloadableDrawable
             Drawable = retrieved;
         }
 
-        if (CentreComponent)
+        if (ComponentAnchor.HasValue)
         {
-            Drawable.Origin = Anchor.Centre;
-            Drawable.Anchor = Anchor.Centre;
+            Drawable.Origin = ComponentAnchor.Value;
+            Drawable.Anchor = ComponentAnchor.Value;
         }
 
         InternalChild = Drawable;

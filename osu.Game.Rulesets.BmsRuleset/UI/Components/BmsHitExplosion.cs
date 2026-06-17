@@ -22,7 +22,7 @@ public sealed partial class BmsHitExplosion : CompositeDrawable
         InternalChild = skinnableExplosion = new BmsCachedSkinnableDrawable(lookup, _ => new DefaultBmsHitExplosion())
         {
             RelativeSizeAxes = Axes.Both,
-            CentreComponent = false,
+            ComponentAnchor = null,
         };
     }
 
