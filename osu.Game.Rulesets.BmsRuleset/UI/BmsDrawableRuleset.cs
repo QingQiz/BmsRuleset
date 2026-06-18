@@ -81,12 +81,6 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         if (beatmapManager != null)
             BmsWorkingBeatmapHelper.Install(beatmapManager);
 
-        if (Config is BmsRulesetConfigManager config)
-        {
-            var speed = config.Get<double>(BmsRulesetSetting.ScrollSpeed);
-            ((BmsPlayfield)Playfield).SetConfiguredScrollSpeed(speed);
-        }
-
         // Subscribe to play completion for the end-of-song gauge check.
         // When health < 80% at song end, the rank must be F but the play should show
         // results normally (no fail animation).  This cannot live in RankFromScore
@@ -165,5 +159,13 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
         if (events.Count > 0)
             FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events, IsPaused));
+
+        if (Config is BmsRulesetConfigManager config)
+        {
+            // Set scroll speed early so BmsColumnHitObjectContainer.Add() → RefreshLifetime()
+            // computes correct lifetimes during async loading.  Must skip the event/lifetime
+            // path — those require the update thread.
+            ((BmsPlayfield)Playfield).SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
+        }
     }
 }
