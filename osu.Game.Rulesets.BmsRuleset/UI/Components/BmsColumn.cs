@@ -56,15 +56,16 @@ public sealed partial class BmsColumn : Playfield
     private readonly BmsLayoutVariant layoutVariant;
     private readonly SkinnableDrawable hitTarget;
 
-    public BmsPlayfield? ParentPlayfield { get; set; }
+    private BmsPlayfield parentPlayfield { get; }
 
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
 
-    public BmsColumn(int index, BmsLayoutVariant layoutVariant)
+    public BmsColumn(int index, BmsPlayfield playfield)
     {
+        parentPlayfield = playfield;
         Index = index;
-        this.layoutVariant = layoutVariant;
+        layoutVariant = playfield.LayoutVariant;
         IsScratch = BmsLayout.IsScratchColumn(index, layoutVariant);
 
         RelativeSizeAxes = Axes.Y;
@@ -95,10 +96,6 @@ public sealed partial class BmsColumn : Playfield
         ];
     }
 
-    protected override HitObjectContainer CreateHitObjectContainer() => new BmsColumnHitObjectContainer(this);
-
-    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
-
     #region Disposal
 
     protected override void Dispose(bool isDisposing)
@@ -110,6 +107,10 @@ public sealed partial class BmsColumn : Playfield
     }
 
     #endregion
+
+    protected override HitObjectContainer CreateHitObjectContainer() => new BmsColumnHitObjectContainer(parentPlayfield);
+
+    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
 
     private static Color4 columnColour(int index) => index % 2 == 0
         ? Color4.Black.Opacity(0.28f)
@@ -124,8 +125,6 @@ public sealed partial class BmsColumn : Playfield
         RegisterPool<BmsNote, DrawableBmsNote>(16, int.MaxValue);
         RegisterPool<BmsLongNote, DrawableBmsLongNote>(8, int.MaxValue);
         RegisterPool<BmsLandmine, DrawableBmsLandmine>(4, int.MaxValue);
-
-        ParentPlayfield ??= this.FindClosestParent<BmsPlayfield>();
 
         skin.SourceChanged += updateFromSkin;
         updateFromSkin();

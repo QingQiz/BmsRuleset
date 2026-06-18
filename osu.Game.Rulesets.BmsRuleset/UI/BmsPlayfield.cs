@@ -15,6 +15,9 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
@@ -22,9 +25,6 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
@@ -53,6 +53,25 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         skinCache.Dispose();
         activeSkin.DisposeEmbeddedSkins();
         base.Dispose(isDisposing);
+    }
+
+    #endregion
+
+    #region HitObject routing
+
+    public override void Add(HitObject hitObject)
+    {
+        if (hitObject is BmsHitObject bmsHo)
+        {
+            var col = bmsHo.Column;
+            if (col >= 0 && col < Stage.Columns.Length)
+            {
+                Stage.Columns[col].Add(hitObject);
+                return;
+            }
+        }
+
+        base.Add(hitObject);
     }
 
     #endregion
@@ -163,7 +182,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both };
 
-        Stage = new BmsStage(TotalColumns, LayoutVariant);
+        Stage = new BmsStage(this);
 
         KeySoundPlayer = new BmsKeySoundPlayer(hitObjectsOrdered, Stage.Columns.Select(c => c.HitObjectContainer).ToArray(), () => Time.Current, TotalColumns);
 
@@ -184,25 +203,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         this.beatmap = beatmap;
         textEventManager = new BmsTextEventManager(beatmap.TextEvents);
-    }
-
-    #endregion
-
-    #region HitObject routing
-
-    public override void Add(HitObject hitObject)
-    {
-        if (hitObject is BmsHitObject bmsHo)
-        {
-            var col = bmsHo.Column;
-            if (col >= 0 && col < Stage.Columns.Length)
-            {
-                Stage.Columns[col].Add(hitObject);
-                return;
-            }
-        }
-
-        base.Add(hitObject);
     }
 
     #endregion

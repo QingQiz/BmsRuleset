@@ -7,12 +7,10 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Skinning;
-using osu.Game.Rulesets.BmsRuleset.UI;
-using osu.Game.Skinning;
-using osuTK;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Skinning;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
@@ -47,16 +45,16 @@ public sealed partial class BmsStage : CompositeDrawable
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
 
-    public BmsStage(int totalColumns, BmsLayoutVariant layoutVariant)
+    public BmsStage(BmsPlayfield playfield)
     {
-        this.layoutVariant = layoutVariant;
+        layoutVariant = playfield.LayoutVariant;
 
         RelativeSizeAxes = Axes.Y;
         AutoSizeAxes = Axes.X;
         Anchor = Anchor.Centre;
         Origin = Anchor.Centre;
 
-        Columns = new BmsColumn[totalColumns];
+        Columns = new BmsColumn[playfield.TotalColumns];
 
         var columnFlow = new FillFlowContainer
         {
@@ -109,20 +107,20 @@ public sealed partial class BmsStage : CompositeDrawable
             },
         ];
 
-        for (var i = 0; i < totalColumns; i++)
+        for (var i = 0; i < playfield.TotalColumns; i++)
         {
-            Columns[i] = new BmsColumn(i, layoutVariant);
+            Columns[i] = new BmsColumn(i, playfield);
         }
 
         if (BmsLayout.Is2P(layoutVariant))
         {
-            for (var i = 1; i < totalColumns; i++)
+            for (var i = 1; i < playfield.TotalColumns; i++)
                 columnFlow.Add(Columns[i]);
             columnFlow.Add(Columns[0]);
         }
         else
         {
-            for (var i = 0; i < totalColumns; i++)
+            for (var i = 0; i < playfield.TotalColumns; i++)
                 columnFlow.Add(Columns[i]);
         }
     }

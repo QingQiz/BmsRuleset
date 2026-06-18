@@ -1,5 +1,4 @@
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
@@ -10,5 +9,5 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 /// </summary>
 internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject) : HitObjectLifetimeEntry(hitObject)
 {
-    protected override double InitialLifetimeOffset => 10000;
+    protected override double InitialLifetimeOffset => 2500;
 }
