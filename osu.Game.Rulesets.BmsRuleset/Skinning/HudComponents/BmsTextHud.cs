@@ -7,7 +7,6 @@ using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Skinning;
 using osuTK.Graphics;
-using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 
@@ -94,5 +93,12 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
     {
         ClearTransforms();
         this.FadeIn(80).Delay(displayDurationMs).FadeOut(300);
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        BmsEventBus.TextEvent -= showText;
+        BmsEventBus.ScrollSpeedChangeEvent -= showScrollSpeed;
+        base.Dispose(isDisposing);
     }
 }

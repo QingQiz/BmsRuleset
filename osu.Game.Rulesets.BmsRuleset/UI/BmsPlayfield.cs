@@ -478,7 +478,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public void SetConfiguredScrollSpeed(double speed)
     {
         configuredScrollSpeed = speed;
-        setScrollSpeedFromMultiplierIndex();
+        setScrollSpeedFromMultiplierIndex(false);
     }
 
     /// <summary>
@@ -498,10 +498,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         }
     }
 
-    private void setScrollSpeedFromMultiplierIndex()
+    private void setScrollSpeedFromMultiplierIndex(bool fireEvent = true)
     {
         ScrollSpeed = configuredScrollSpeed * scroll_speed_multipliers[currentMultiplierIndex];
-        BmsEventBus.OnScrollSpeedChangeEvent(scroll_speed_multipliers[currentMultiplierIndex]);
+        if (fireEvent)
+            BmsEventBus.OnScrollSpeedChangeEvent(scroll_speed_multipliers[currentMultiplierIndex]);
         RefreshAllLifetimes();
     }
 

@@ -162,9 +162,6 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
         if (Config is BmsRulesetConfigManager config)
         {
-            // Set scroll speed early so BmsColumnHitObjectContainer.Add() → RefreshLifetime()
-            // computes correct lifetimes during async loading.  Must skip the event/lifetime
-            // path — those require the update thread.
             ((BmsPlayfield)Playfield).SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
         }
     }
