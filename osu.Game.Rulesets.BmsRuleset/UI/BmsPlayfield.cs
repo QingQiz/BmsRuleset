@@ -502,6 +502,16 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         ScrollSpeed = configuredScrollSpeed * scroll_speed_multipliers[currentMultiplierIndex];
         BmsEventBus.OnScrollSpeedChangeEvent(scroll_speed_multipliers[currentMultiplierIndex]);
+        RefreshAllLifetimes();
+    }
+
+    internal void RefreshAllLifetimes()
+    {
+        foreach (var column in Stage.Columns)
+        {
+            if (column.HitObjectContainer is BmsColumnHitObjectContainer container)
+                container.RefreshAllEntries();
+        }
     }
 
     #endregion

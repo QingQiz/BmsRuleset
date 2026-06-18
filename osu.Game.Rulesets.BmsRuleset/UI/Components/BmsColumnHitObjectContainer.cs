@@ -1,7 +1,6 @@
 using System;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
@@ -54,32 +53,16 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         }
     }
 
-    // Throttle: skip per-frame updates if nothing has changed for 250 ms.
-    private double lastUpdateTime = double.NaN;
-
-    public override void Add(HitObjectLifetimeEntry entry)
+    /// <summary>
+    ///     Re-compute lifetimes for every entry in this container.
+    ///     Triggered on load completion and whenever the user adjusts the scroll speed.
+    /// </summary>
+    public void RefreshAllEntries()
     {
-        if (entry is BmsHitObjectLifetimeEntry bmsEntry)
-            bmsEntry.RefreshLifetime(force: true);
-
-        base.Add(entry);
-    }
-
-    protected override void Update()
-    {
-        base.Update();
-
-        // Throttle — lifetimes only need to track scroll-speed changes which are gradual.
-        if (Math.Abs(Time.Current - lastUpdateTime) < 250)
-            return;
-
-        lastUpdateTime = Time.Current;
-
         foreach (var entry in Entries)
         {
             if (entry is BmsHitObjectLifetimeEntry bmsEntry)
                 bmsEntry.RefreshLifetime();
         }
     }
-
 }

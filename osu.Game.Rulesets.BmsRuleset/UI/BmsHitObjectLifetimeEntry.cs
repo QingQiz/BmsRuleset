@@ -3,36 +3,45 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
-/// <summary>
-///     Custom <see cref="HitObjectLifetimeEntry" /> used by <see cref="BmsPlayfield" />
-///     to give BMS hit objects scroll-aware lifetimes: notes appear early enough to enter
-///     from the top of the playfield (or exit cleanly at the bottom) at any scroll speed.
-/// </summary>
 internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfield playfield)
     : HitObjectLifetimeEntry(hitObject)
 {
+
+    /// <summary>
+    ///     Set to true once <see cref="RefreshLifetime"/> has run.
+    ///     Guards against framework code overwriting our
+    ///     scroll-speed-aware computed values with blanket defaults.
+    /// </summary>
+    private bool lifetimeComputed;
 
     #region Constants
 
     /// <summary>
     ///     Minimum visible window — no note should appear for less than this many ms before its hit time.
     /// </summary>
-    private const double minimum_future_lifetime = 750;
+    private const double minimum_future_lifetime = 0;
 
     /// <summary>
     ///     Extra margin added to computed lifetimes so the note is fully visible (not clipped at the
     ///     container edge) when it enters the playfield.
     /// </summary>
-    private const double lifetime_margin = 500;
+    private const double lifetime_margin = 0;
 
     /// <summary>
     ///     How long a note stays alive after it passes the judgement line (or after its EndTime).
     /// </summary>
-    private const double default_past_lifetime = 1000;
+    private const double default_past_lifetime = 0;
+
+    /// <summary>
+    ///     Mines only need a single frame to check whether the column is pressed; after that they
+    ///     can die immediately.  10 ms past-lifetime ensures they are alive on exactly one check.
+    /// </summary>
+    private const double mine_past_lifetime = 0;
 
     /// <summary>
     ///     Step-size used when probing backwards from StartTime to find the earliest visible frame.
@@ -45,75 +54,69 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
     /// </summary>
     private const double visible_window_binary_precision = 1;
 
-    /// <summary>
-    ///     Mines only need a single frame to check whether the column is pressed; after that they
-    ///     can die immediately.  10 ms past-lifetime ensures they are alive on exactly one check.
-    /// </summary>
-    private const double mine_past_lifetime = 10;
-
-    #endregion
-
-    #region Cache state
-
-    private double? cachedFutureLifetime;
-
-    // Cached scroll state — when any of these change the future-lifetime cache is cleared.
-    private double lastCachedScrollSpeed = double.NaN;
-    private double lastCachedScrollRangeScale = double.NaN;
-    private bool lastCachedConstantScrollActive;
-
     #endregion
 
     #region Entry lifecycle
 
-    /// <summary>
-    ///     Base framework offset (fallback lifetime used before the scroll-aware computation kicks in).
-    /// </summary>
-    protected override double InitialLifetimeOffset => 2500;
+    protected override double InitialLifetimeOffset => 0;
 
     /// <summary>
     ///     Re-compute and apply this entry's lifetime from current scroll state.
-    ///     Called by <see cref="Components.BmsColumnHitObjectContainer" /> on <c>Add</c>
-    ///     and periodically in <c>Update</c> so lifetimes track scroll-speed changes.
+    ///     Called once on <c>Add</c> (during loading) and again whenever the user
+    ///     adjusts the scroll speed in-game.
     /// </summary>
-    public void RefreshLifetime(bool force = false)
+    public void RefreshLifetime()
     {
         if (HitObject is not BmsHitObject hitObject)
             return;
-
-        invalidateCacheIfScrollChanged();
 
         var futureLifetime = computeFutureLifetime(hitObject);
         var pastLifetime = computePastLifetime();
         var lateWindow = getLateWindow(hitObject);
 
-        var start = hitObject.StartTime - futureLifetime;
-        var end = hitObject.IsMine
+        lifetimeComputed = false;
+
+        // Set LifetimeEnd before LifetimeStart.  Setting LifetimeStart first
+        // with the current LifetimeEnd would produce an intermediate
+        // MaxValue that the framework may latch on to before the follow-up
+        // LifetimeEnd set corrects it.
+        LifetimeEnd = hitObject.IsMine
             ? hitObject.StartTime + mine_past_lifetime
             : hitObject.EndTime + Math.Max(pastLifetime, lateWindow + lifetime_margin);
+        LifetimeStart = hitObject.StartTime - futureLifetime;
 
-        if (force || Math.Abs(LifetimeStart - start) >= 1)
-            LifetimeStart = start;
-
-        if (!Judged && (force || Math.Abs(LifetimeEnd - end) >= 1))
-            LifetimeEnd = end;
+        lifetimeComputed = true;
     }
 
-    private void invalidateCacheIfScrollChanged()
+    #endregion
+
+    #region Guard overrides: protect computed lifetimes from framework overwrites
+
+    /// <summary>
+    ///     Once <see cref="RefreshLifetime"/> has computed a scroll-speed-aware
+    ///     value, reject subsequent overwrites from
+    ///     <see cref="HitObjectLifetimeEntry.SetInitialLifetime"/>
+    ///     (triggered by <c>DefaultsApplied</c> / <c>StartTimeBindable</c>)
+    ///     that would reset <c>LifetimeStart</c> to the default offset.
+    /// </summary>
+    protected override void SetLifetimeStart(double start)
     {
-        var scrollRangeScale = currentScrollRangeScale();
+        if (!lifetimeComputed)
+            base.SetLifetimeStart(start);
+    }
 
-        if (Math.Abs(playfield.ScrollSpeed - lastCachedScrollSpeed) < 0.001
-            && Math.Abs(scrollRangeScale - lastCachedScrollRangeScale) < 0.001
-            && playfield.ConstantScrollActive == lastCachedConstantScrollActive)
-        {
-            return;
-        }
-
-        cachedFutureLifetime = null;
-        lastCachedScrollSpeed = playfield.ScrollSpeed;
-        lastCachedScrollRangeScale = scrollRangeScale;
-        lastCachedConstantScrollActive = playfield.ConstantScrollActive;
+    /// <summary>
+    ///     <see cref="DrawableHitObject{TObject}.UpdateState"/> unconditionally sets
+    ///     <c>LifetimeEnd = double.MaxValue</c> on every state transition.
+    ///     For entries whose state stays Idle until hit — such
+    ///     as mines — the follow-up conditional at line 487 does not fire,
+    ///     leaving the entry alive indefinitely.  Reject the blanket MaxValue
+    ///     when we already hold a correct finite value.
+    /// </summary>
+    protected override void SetLifetimeEnd(double end)
+    {
+        if (!lifetimeComputed || end < double.MaxValue - 1)
+            base.SetLifetimeEnd(end);
     }
 
     #endregion
@@ -122,16 +125,6 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
 
     private double computeFutureLifetime(BmsHitObject hitObject)
     {
-        if (cachedFutureLifetime.HasValue)
-            return cachedFutureLifetime.Value;
-
-        var value = computeUncachedFutureLifetime(hitObject);
-        cachedFutureLifetime = value;
-        return value;
-    }
-
-    private double computeUncachedFutureLifetime(BmsHitObject hitObject)
-    {
         var timingMap = getTimingMap();
 
         if (useConstantScrollFallback(hitObject, timingMap))
@@ -139,10 +132,9 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
 
         var visibleTime = findEarliestVisibleWindowStart(hitObject, timingMap!);
 
-        if (!double.IsFinite(visibleTime))
-            return computeConstantScrollFutureLifetime();
-
-        return Math.Max(minimum_future_lifetime, hitObject.StartTime - visibleTime + lifetime_margin);
+        return !double.IsFinite(visibleTime)
+            ? computeConstantScrollFutureLifetime()
+            : Math.Max(minimum_future_lifetime, hitObject.StartTime - visibleTime + lifetime_margin);
     }
 
     private bool useConstantScrollFallback(BmsHitObject hitObject, BmsTimingMap? timingMap)

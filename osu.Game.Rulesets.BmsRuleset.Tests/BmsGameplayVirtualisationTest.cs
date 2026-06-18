@@ -174,6 +174,7 @@ public class BmsGameplayVirtualisationTest
         });
 
         playfield.Add(hitObject);
+        playfield.RefreshAllLifetimes();
 
         var col = hitObject.Column;
         var entry = playfield.Stage.Columns[col].HitObjectContainer.Entries.Single();
@@ -189,6 +190,7 @@ public class BmsGameplayVirtualisationTest
         var playfield = new BmsPlayfield(beatmap);
 
         playfield.Add(hitObject);
+        playfield.RefreshAllLifetimes();
 
         var col = hitObject.Column;
         var entry = playfield.Stage.Columns[col].HitObjectContainer.Entries.Single();
@@ -229,6 +231,7 @@ public class BmsGameplayVirtualisationTest
         var playfield = new BmsPlayfield(beatmap);
 
         playfield.Add(hitObject);
+        playfield.RefreshAllLifetimes();
 
         var col = hitObject.Column;
         var entry = playfield.Stage.Columns[col].HitObjectContainer.Entries.Single();
@@ -245,6 +248,8 @@ public class BmsGameplayVirtualisationTest
 
         foreach (var hitObject in beatmap.HitObjects.Where(h => !h.IsMine).Take(64))
             playfield.Add(hitObject);
+
+        playfield.RefreshAllLifetimes();
 
         var lateEntries = playfield.Stage.Columns
             .SelectMany(c => c.HitObjectContainer.Entries)
@@ -265,6 +270,8 @@ public class BmsGameplayVirtualisationTest
 
         foreach (var hitObject in playableObjects.Skip(300).Take(40))
             playfield.Add(hitObject);
+
+        playfield.RefreshAllLifetimes();
 
         var lateEntries = playfield.Stage.Columns
             .SelectMany(c => c.HitObjectContainer.Entries)
