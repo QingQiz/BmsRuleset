@@ -110,7 +110,7 @@ public sealed partial class BmsColumn : Playfield
 
     protected override HitObjectContainer CreateHitObjectContainer() => new BmsColumnHitObjectContainer(parentPlayfield);
 
-    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject);
+    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject, parentPlayfield);
 
     private static Color4 columnColour(int index) => index % 2 == 0
         ? Color4.Black.Opacity(0.28f)
