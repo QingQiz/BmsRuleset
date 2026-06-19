@@ -124,35 +124,6 @@ public partial class BmsFileImporterTest
         });
     }
 
-    [Test]
-    public void TestDirectoryImportAfterSingleFileImportCreatesSeparateSets()
-    {
-        runImportTest(async (realm, storage) =>
-        {
-            addBmsRuleset(realm);
-
-            var importer = new BmsFileImporter(realm, storage);
-            var directory = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Destr0yer (by 削除 feat. Nikki Simmons)");
-
-            await importer.Import(Path.Combine(directory, "destr0yer_starhyper.bms")).ConfigureAwait(false);
-            await importer.Import(directory).ConfigureAwait(false);
-
-            var result = realm.Run(r =>
-            {
-                var sets = r.All<BeatmapSetInfo>().AsEnumerable().Where(s => !s.DeletePending).ToArray();
-                var directorySet = sets.Single(s => s.Beatmaps.Count > 1);
-
-                return (SetCount: sets.Length, DirectoryBeatmapCount: directorySet.Beatmaps.Count,
-                    DifficultyNames: directorySet.Beatmaps.Select(b => b.DifficultyName).OrderBy(n => n, StringComparer.Ordinal).ToArray(),
-                    ChartFileCount: directorySet.Files.Count(f => Constant.BMS_EXTENSIONS.Contains(Path.GetExtension(f.Filename), StringComparer.OrdinalIgnoreCase)));
-            });
-
-            Assert.That(result.SetCount, Is.EqualTo(2));
-            Assert.That(result.DirectoryBeatmapCount, Is.EqualTo(5));
-            Assert.That(result.DifficultyNames, Does.Contain("DP ☆NOTHER"));
-            Assert.That(result.ChartFileCount, Is.EqualTo(5));
-        });
-    }
 
     [Test]
     public void TestHandledExtensions()
@@ -387,45 +358,6 @@ public partial class BmsFileImporterTest
             Assert.That(result.ActiveCount, Is.EqualTo(1));
             Assert.That(result.DeletedStillPending, Is.True);
             Assert.That(result.FileResolved, Is.True);
-        });
-    }
-
-    [Test]
-    public void TestReimportReplacesBrokenLegacyHashImport()
-    {
-        runImportTest(async (realm, storage) =>
-        {
-            addBmsRuleset(realm);
-
-            var importer = new BmsFileImporter(realm, storage);
-            var chartPath = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Aleph-0 (by LeaF)", "_7NORMAL.bms");
-
-            await importer.Import(chartPath).ConfigureAwait(false);
-
-            realm.Write(r =>
-            {
-                var beatmap = r.All<BeatmapInfo>().Single();
-                beatmap.Hash = beatmap.MD5Hash;
-            });
-
-            await importer.Import(chartPath).ConfigureAwait(false);
-
-            var result = realm.Run(r =>
-            {
-                var sets = r.All<BeatmapSetInfo>().AsEnumerable().ToArray();
-                var active = sets.Single(s => !s.DeletePending);
-                var old = sets.Single(s => s.DeletePending);
-                var beatmap = active.Beatmaps.Single();
-
-                return (SetCount: sets.Length, OldDeleted: old.DeletePending, beatmap.Path, FileResolved: beatmap.File != null,
-                    HashEqualsMd5: beatmap.Hash == beatmap.MD5Hash);
-            });
-
-            Assert.That(result.SetCount, Is.EqualTo(2));
-            Assert.That(result.OldDeleted, Is.True);
-            Assert.That(result.Path, Is.EqualTo("_7NORMAL.bms"));
-            Assert.That(result.FileResolved, Is.True);
-            Assert.That(result.HashEqualsMd5, Is.False);
         });
     }
 

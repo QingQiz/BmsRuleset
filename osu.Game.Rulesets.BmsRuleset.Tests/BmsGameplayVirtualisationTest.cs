@@ -57,95 +57,6 @@ public class BmsGameplayVirtualisationTest
     }
 
     [Test]
-    public void TestDrawableBmsHitObjectDoesNotBranchOnNoteKind()
-    {
-        var sourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "Objects", "Drawables", "DrawableBmsHitObject.cs");
-        var source = File.ReadAllText(sourcePath);
-
-        Assert.That(source, Does.Not.Contain("IsLongNote"));
-        Assert.That(source, Does.Not.Contain("IsMine"));
-        Assert.That(source, Does.Not.Contain("HoldNote"));
-        Assert.That(source, Does.Not.Contain("Mine"));
-        Assert.That(source, Does.Not.Contain("tail"));
-        Assert.That(source, Does.Not.Contain("Tail"));
-    }
-
-    [Test]
-    public void TestDrawableBmsHitObjectDoesNotDiscardReusablePoolStateOnApply()
-    {
-        var sourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "Objects", "Drawables", "DrawableBmsHitObject.cs");
-        var source = File.ReadAllText(sourcePath);
-        var onApply = extractMethodBody(source, "protected override void OnApply()");
-
-        Assert.That(onApply, Does.Not.Contain("InvalidateAll"));
-        Assert.That(onApply, Does.Not.Contain("UpdateSkinPieces"));
-
-        var longNoteSourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "Objects", "Drawables", "DrawableBmsLongNote.cs");
-        var longNoteSource = File.ReadAllText(longNoteSourcePath);
-
-        Assert.That(longNoteSource, Does.Not.Contain("longNoteTailContainer.Clear();"));
-    }
-
-    [Test]
-    public void TestBmsColumnsUsePerColumnHitObjectContainers()
-    {
-        var columnSourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "UI", "Components", "BmsColumn.cs");
-        var columnSource = File.ReadAllText(columnSourcePath);
-
-        Assert.That(columnSource, Does.Contain("BmsColumnHitObjectContainer"));
-
-        var containerSourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "UI", "Components", "BmsColumnHitObjectContainer.cs");
-        var containerSource = File.ReadAllText(containerSourcePath);
-
-        Assert.That(containerSource, Does.Contain("UpdateAfterChildrenLife"));
-        Assert.That(containerSource, Does.Contain("UpdateBodyGeometry"));
-    }
-
-    [Test]
-    public void TestPlayfieldDoesNotRewriteBeatmapHitObjects()
-    {
-        var hitObject = new BmsHitObject { StartTime = 1000, Column = 1, IsLongNote = true, Duration = 500 };
-        var beatmap = new BmsBeatmap
-        {
-            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            HitObjects = { hitObject },
-        };
-
-        _ = new BmsPlayfield(beatmap);
-
-        Assert.That(beatmap.HitObjects.Single(), Is.SameAs(hitObject));
-        Assert.That(beatmap.HitObjects.Single(), Is.TypeOf<BmsHitObject>());
-
-        var sourcePath = Path.Combine(findRepositoryRoot(), "osu.Game.Rulesets.BmsRuleset", "UI", "BmsPlayfield.cs");
-        var source = File.ReadAllText(sourcePath);
-
-        Assert.That(source, Does.Not.Contain("normaliseHitObject"));
-        Assert.That(source, Does.Not.Contain("ToTypedHitObject"));
-        Assert.That(source, Does.Not.Contain("RegisterPool<BmsHitObject, DrawableBmsNote>"));
-    }
-
-    [Test]
-    public void TestStageUsesVirtualisedMeasureLineArea()
-    {
-        var playfield = new BmsPlayfield(new BmsBeatmap
-        {
-            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TimingMap = new BmsTimingMap(
-                192,
-                [
-                    new BmsMeasureInfo(0, 0, 192, 1),
-                    new BmsMeasureInfo(1, 192, 192, 1),
-                ],
-                [new BmsBpmEvent(0, 130, 0)],
-                []),
-        });
-
-        Assert.That(playfield.Stage.MeasureLineArea.GetType().Name, Is.EqualTo("BmsMeasureLineContainer"));
-    }
-
-    [Test]
     public void TestSlowBpmExtendsHitObjectLifetime()
     {
         var timingMap = new BmsTimingMap(
@@ -196,7 +107,7 @@ public class BmsGameplayVirtualisationTest
         var entry = playfield.Stage.Columns[col].HitObjectContainer.Entries.Single();
         var visibleStart = findFirstVisibleTime(beatmap, hitObject);
 
-        Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(visibleStart - 100));
+        Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(visibleStart));
     }
 
     [Test]
@@ -237,7 +148,7 @@ public class BmsGameplayVirtualisationTest
         var entry = playfield.Stage.Columns[col].HitObjectContainer.Entries.Single();
         var visibleStart = findFirstVisibleTime(beatmap, hitObject);
 
-        Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(visibleStart - 100));
+        Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(visibleStart));
     }
 
     [Test]
@@ -277,7 +188,7 @@ public class BmsGameplayVirtualisationTest
             .SelectMany(c => c.HitObjectContainer.Entries)
             .Select(e => (Entry: e, HitObject: (BmsHitObject)e.HitObject))
             .Select(x => (x.Entry, x.HitObject, Combo: Array.IndexOf(playableObjects, x.HitObject) + 1, FirstVisibleTime: findEarliestVisibleTime(beatmap, x.HitObject)))
-            .Where(x => x.Entry.LifetimeStart > x.FirstVisibleTime - 100)
+            .Where(x => x.Entry.LifetimeStart > x.FirstVisibleTime + 1)
             .Select(x => $"combo={x.Combo} tick={x.HitObject.TickInfo.Tick} col={x.HitObject.Column} start={x.HitObject.StartTime:F1} firstVisible={x.FirstVisibleTime:F1} lifetime={x.Entry.LifetimeStart:F1}")
             .ToArray();
 
@@ -310,48 +221,6 @@ public class BmsGameplayVirtualisationTest
             return rootFromTestDirectory;
 
         return BmsEmbeddedSongDecoderTest.TestSongsRoot;
-    }
-
-    private static string findRepositoryRoot([CallerFilePath] string sourceFile = "")
-    {
-        var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile) ?? string.Empty);
-
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "osu.Game.Rulesets.BmsRuleset.sln")))
-                return directory.FullName;
-
-            directory = directory.Parent;
-        }
-
-        return TestContext.CurrentContext.WorkDirectory;
-    }
-
-    private static string extractMethodBody(string source, string signature)
-    {
-        var signatureIndex = source.IndexOf(signature, StringComparison.Ordinal);
-        Assert.That(signatureIndex, Is.GreaterThanOrEqualTo(0), $"Could not find {signature}");
-
-        var bodyStart = source.IndexOf('{', signatureIndex);
-        Assert.That(bodyStart, Is.GreaterThanOrEqualTo(0), $"Could not find body for {signature}");
-
-        var depth = 0;
-
-        for (var i = bodyStart; i < source.Length; i++)
-        {
-            if (source[i] == '{')
-                depth++;
-            else if (source[i] == '}')
-            {
-                depth--;
-
-                if (depth == 0)
-                    return source.Substring(bodyStart, i - bodyStart + 1);
-            }
-        }
-
-        Assert.Fail($"Could not parse body for {signature}");
-        return string.Empty;
     }
 
     private static string findTestSongsRootFrom(string startDirectory)

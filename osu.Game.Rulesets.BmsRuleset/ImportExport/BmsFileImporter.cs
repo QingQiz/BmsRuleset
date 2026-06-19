@@ -354,11 +354,13 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         var setTitle = BmsChartParser.InferTitle(title.Trim());
 
         // inferDifficultyName: extract from subtitle → title → filename.
-        var diffName = title[setTitle.Length..].Trim().Trim('[', ']', '-', '(', ')');
+        var diffName = string.Empty;
+        if (!string.IsNullOrWhiteSpace(parsed.Subtitle))
+            diffName = parsed.Subtitle.Trim().Trim('[', ']', '-', '(', ')');
         if (string.IsNullOrEmpty(diffName))
-        {
+            diffName = title[setTitle.Length..].Trim().Trim('[', ']', '-', '(', ')');
+        if (string.IsNullOrEmpty(diffName))
             diffName = path == null ? title : Path.GetFileNameWithoutExtension(path);
-        }
 
         // Key count from the full parse (avoids re-scanning channels).
         var keyCount = parsed.TotalColumns;

@@ -9,6 +9,7 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
@@ -385,8 +386,8 @@ public partial class BmsEmbeddedSongDecoderTest
         Assert.That(expectedFirst.Channel, Is.EqualTo("11"));
         Assert.That(expectedFirst.Value, Is.EqualTo("08"));
         Assert.That(actualFirst.Column, Is.EqualTo(expectedFirst.Column));
-        Assert.That(actualFirst.SourceChannel, Is.EqualTo(expectedFirst.Channel));
-        Assert.That(actualFirst.SampleKey, Is.EqualTo(expectedFirst.Value));
+        Assert.That(actualFirst.SourceChannel, Is.EqualTo(BmsChartParser.Enc(expectedFirst.Channel)));
+        Assert.That(actualFirst.SampleKey, Is.EqualTo(BmsChartParser.Enc(expectedFirst.Value)));
         Assert.That(actualFirst.TickInfo.Tick, Is.EqualTo(expectedFirst.Tick));
 
         Assert.That(actualFirst.StartTime, Is.EqualTo(expected.ProjectTickToTime(expectedFirst.Tick, true)).Within(0.001));
