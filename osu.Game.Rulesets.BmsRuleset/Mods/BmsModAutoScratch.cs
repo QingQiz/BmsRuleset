@@ -1,11 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
-using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
@@ -28,9 +26,6 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
     public override double ScoreMultiplier => 1;
 
-    [SettingSource("Hide scratch", "Hides the scratch column while auto-scratching")]
-    public Bindable<bool> HideScratch { get; } = new();
-
     private readonly HashSet<DrawableBmsLongNote> autoScratchLnHeads = [];
 
     private BmsPlayfield playfield = null!;
@@ -40,15 +35,6 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
         playfield = (BmsPlayfield)drawableRuleset.Playfield;
 
         ((BmsDrawableRuleset)drawableRuleset).KeyBindingInputManager.Add(new ScratchInputInterceptor(playfield));
-
-        if (HideScratch.Value)
-        {
-            foreach (var col in playfield.Stage.Columns)
-            {
-                if (col.IsScratch)
-                    col.Hidden = true;
-            }
-        }
     }
 
     public void Update(Playfield _)

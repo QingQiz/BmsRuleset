@@ -16,7 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Settings;
-using osu.Game.Rulesets.BmsRuleset.Skinning;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Rulesets.Difficulty;
@@ -24,7 +24,6 @@ using osu.Game.Rulesets.Filter;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset;
@@ -144,7 +143,11 @@ public class BmsRuleset : Ruleset
 
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
     {
-        ModType.DifficultyReduction => [new BmsModNoFail(), new BmsModHalfTime(), new BmsModConstant(), new BmsModAutoScratch()],
+        ModType.DifficultyReduction =>
+        [
+            new BmsModNoFail(), new BmsModHalfTime(), new BmsModConstant(), new BmsModAutoScratch(),
+            new BmsModHideScratch(),
+        ],
         ModType.DifficultyIncrease => [new BmsModDoubleTime()],
         ModType.Automation => [new BmsModAutoplay(), new BmsModCinema()],
         ModType.Conversion => [new BmsModMirror(), new BmsModSecondPlayer(), new BmsModLaneRandom(), new BmsModNoteRandom(), new BmsModRotationRandom()],
