@@ -1,6 +1,7 @@
 using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
@@ -9,16 +10,18 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 
-public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
+public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCol>, ILongNoteHolder
+    where TCol : struct, IColumnProvider
 {
+
+    public bool IsHoldingLongNote => longNoteStarted && !Judged;
+
+    protected override BmsSkinComponents SkinComponent => BmsSkinComponents.HoldNoteHead;
+
     private bool longNoteStarted;
     private float? longNoteHeadFixedY;
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private Container longNoteTailContainer = null!;
-
-    protected override BmsSkinComponents SkinComponent => BmsSkinComponents.HoldNoteHead;
-
-    public bool IsHoldingLongNote => longNoteStarted && !Judged;
 
     public override bool TryHit()
     {
@@ -57,73 +60,6 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
 
         ApplyResult(result);
         return true;
-    }
-
-    protected override void ResetKindState()
-    {
-        longNoteStarted = false;
-        longNoteHeadFixedY = null;
-
-        longNoteBody.Alpha = 0;
-        longNoteTailContainer.Alpha = 0;
-    }
-
-    protected override void OnApply()
-    {
-        base.OnApply();
-
-        if (HitObject != null && Playfield != null)
-        {
-            longNoteBody.SetSkinLookup(Playfield.LayoutVariant, HitObject.Column);
-
-            if (longNoteTailContainer.Count == 0)
-            {
-                longNoteTailContainer.Add(new BmsCachedSkinnableDrawable(
-                    new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail,
-                        Playfield.LayoutVariant, HitObject.Column))
-                {
-                    ComponentAnchor = Anchor.BottomCentre,
-                });
-            }
-        }
-    }
-
-    protected override void AddKindDrawablesBeforeNote()
-    {
-        AddRangeInternal([
-            longNoteBody = new BmsSegmentedLongNoteBody
-            {
-                Anchor = Anchor.TopLeft,
-                Origin = Anchor.TopLeft,
-                RelativeSizeAxes = Axes.X,
-                BodyColour = Color4.Cyan,
-                Alpha = 0,
-            },
-            longNoteTailContainer = new Container
-            {
-                Anchor = Anchor.TopLeft,
-                Origin = Anchor.TopLeft,
-                RelativeSizeAxes = Axes.X,
-                Alpha = 0,
-            },
-        ]);
-    }
-
-    protected override void CheckForResult(bool userTriggered, double timeOffset)
-    {
-        if (userTriggered || HitObject.HitWindows == null)
-            return;
-
-        var missWindow = HitObject.HitWindows.WindowFor(HitResult.Ok);
-
-        if (!longNoteStarted && Time.Current > HitObject.StartTime + missWindow)
-        {
-            ApplyResult(HitResult.Meh);
-            return;
-        }
-
-        if (longNoteStarted && Time.Current > HitObject.EndTime + missWindow)
-            ApplyResult(HitResult.Meh);
     }
 
     /// <summary>
@@ -175,5 +111,69 @@ public sealed partial class DrawableBmsLongNote : DrawableBmsHitObject
             longNoteTailContainer.Height = Height;
 
         longNoteTailContainer.Alpha = 1;
+    }
+
+    protected override void ResetKindState()
+    {
+        longNoteStarted = false;
+        longNoteHeadFixedY = null;
+
+        longNoteBody.Alpha = 0;
+        longNoteTailContainer.Alpha = 0;
+    }
+
+    protected override void OnApply()
+    {
+        base.OnApply();
+
+        if (HitObject != null && Playfield != null)
+            longNoteBody.SetSkinLookup(Playfield.LayoutVariant, Column);
+    }
+
+    protected override void AddKindDrawablesBeforeNote()
+    {
+        AddRangeInternal([
+            longNoteBody = new BmsSegmentedLongNoteBody
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
+                RelativeSizeAxes = Axes.X,
+                BodyColour = Color4.Cyan,
+                Alpha = 0,
+            },
+            longNoteTailContainer = new Container
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
+                RelativeSizeAxes = Axes.X,
+                Alpha = 0,
+                Children =
+                [
+                    new BmsCachedSkinnableDrawable(
+                        new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail,
+                            Playfield?.LayoutVariant ?? BmsLayoutVariant.Bme7K, Column))
+                    {
+                        ComponentAnchor = Anchor.BottomCentre,
+                    },
+                ],
+            },
+        ]);
+    }
+
+    protected override void CheckForResult(bool userTriggered, double timeOffset)
+    {
+        if (userTriggered || HitObject.HitWindows == null)
+            return;
+
+        var missWindow = HitObject.HitWindows.WindowFor(HitResult.Ok);
+
+        if (!longNoteStarted && Time.Current > HitObject.StartTime + missWindow)
+        {
+            ApplyResult(HitResult.Meh);
+            return;
+        }
+
+        if (longNoteStarted && Time.Current > HitObject.EndTime + missWindow)
+            ApplyResult(HitResult.Meh);
     }
 }

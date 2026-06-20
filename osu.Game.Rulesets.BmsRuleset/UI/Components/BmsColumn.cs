@@ -1,4 +1,5 @@
-﻿using osu.Framework.Allocation;
+﻿using System;
+using osu.Framework.Allocation;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
@@ -8,8 +9,6 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Objects;
-using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.Objects;
@@ -20,15 +19,18 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 
 [Cached]
-public sealed partial class BmsColumn : Playfield
+public partial class BmsColumn : Playfield, IBmsColumn
 {
     public const float COLUMN_WIDTH = 42;
     public const float SCRATCH_COLUMN_WIDTH = 50;
 
     public readonly int Index;
-    public readonly bool IsScratch;
 
-    public readonly Container HitExplosionArea;
+    public int ColumnIndex => Index;
+
+    public bool IsScratch { get; }
+
+    public Container HitExplosionArea { get; }
 
     /// <summary>
     ///     When <c>true</c>, this column is hidden from layout — zero width, zero
@@ -53,17 +55,17 @@ public sealed partial class BmsColumn : Playfield
         }
     }
 
+    protected BmsPlayfield ParentPlayfield { get; }
+
     private readonly BmsLayoutVariant layoutVariant;
     private readonly SkinnableDrawable hitTarget;
-
-    private BmsPlayfield parentPlayfield { get; }
 
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
 
     public BmsColumn(int index, BmsPlayfield playfield)
     {
-        parentPlayfield = playfield;
+        ParentPlayfield = playfield;
         Index = index;
         layoutVariant = playfield.LayoutVariant;
         IsScratch = BmsLayout.IsScratchColumn(index, layoutVariant);
@@ -108,13 +110,18 @@ public sealed partial class BmsColumn : Playfield
 
     #endregion
 
-    protected override HitObjectContainer CreateHitObjectContainer() => new BmsColumnHitObjectContainer(parentPlayfield);
+    public static BmsColumn Create(int index, BmsPlayfield playfield)
+    {
+        var providerType = BmsColumnFactory.GetColumnProviderType(index);
+        var genericType = typeof(BmsColumnGeneric<>).MakeGenericType(providerType);
+        return (BmsColumn)Activator.CreateInstance(genericType, index, playfield)!;
+    }
 
-    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject, parentPlayfield);
+    protected override HitObjectContainer CreateHitObjectContainer()
+        => new BmsColumnHitObjectContainer(ParentPlayfield);
 
-    private static Color4 columnColour(int index) => index % 2 == 0
-        ? Color4.Black.Opacity(0.28f)
-        : Color4.White.Opacity(0.05f);
+    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
+        => new BmsHitObjectLifetimeEntry(hitObject, ParentPlayfield);
 
     private static float defaultColumnWidth(int index, BmsLayoutVariant layoutVariant) =>
         BmsLayout.IsScratchColumn(index, layoutVariant) ? SCRATCH_COLUMN_WIDTH : COLUMN_WIDTH;
@@ -122,10 +129,6 @@ public sealed partial class BmsColumn : Playfield
     [BackgroundDependencyLoader]
     private void load()
     {
-        RegisterPool<BmsNote, DrawableBmsNote>(16, int.MaxValue);
-        RegisterPool<BmsLongNote, DrawableBmsLongNote>(8, int.MaxValue);
-        RegisterPool<BmsLandmine, DrawableBmsLandmine>(4, int.MaxValue);
-
         skin.SourceChanged += updateFromSkin;
         updateFromSkin();
     }
@@ -186,7 +189,11 @@ public sealed partial class BmsColumn : Playfield
             InternalChild = new Box
             {
                 RelativeSizeAxes = Axes.Both,
-                Colour = isScratch ? Color4.DarkSlateBlue.Opacity(0.26f) : columnColour(index),
+                Colour = isScratch
+                    ? Color4.DarkSlateBlue.Opacity(0.26f)
+                    : index % 2 == 0
+                        ? Color4.Black.Opacity(0.28f)
+                        : Color4.White.Opacity(0.05f),
             };
         }
     }

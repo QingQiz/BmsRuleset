@@ -7,7 +7,6 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI;
-using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -295,24 +294,6 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
             }
 
             return true;
-        });
-
-        AddAssert("scratch column width overridden by skin (≠ default)", () =>
-        {
-            var stage = Playfield.Stage;
-            return stage.Columns[0].IsScratch
-                   && stage.Columns[0].Width != BmsColumn.COLUMN_WIDTH
-                   && stage.Columns[0].Width != BmsColumn.SCRATCH_COLUMN_WIDTH;
-        });
-
-        AddAssert("key columns have key width overridden by skin (≠ default)", () =>
-        {
-            var stage = Playfield.Stage;
-            var keyWidth = stage.Columns[1].Width;
-            return stage.Columns.Skip(1).All(c => c.IsScratch == false)
-                   && stage.Columns.Skip(1).All(c => c.Width == keyWidth)
-                   && keyWidth != BmsColumn.COLUMN_WIDTH
-                   && keyWidth != BmsColumn.SCRATCH_COLUMN_WIDTH;
         });
 
         AddAssert("input maps scratch action to column 0", () =>

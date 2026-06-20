@@ -26,7 +26,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
     public override double ScoreMultiplier => 1;
 
-    private readonly HashSet<DrawableBmsLongNote> autoScratchLnHeads = [];
+    private readonly HashSet<DrawableBmsHitObject> autoScratchLnHeads = [];
 
     private BmsPlayfield playfield = null!;
 
@@ -55,15 +55,15 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
             var note = drawable.HitObject;
 
-            if (drawable is DrawableBmsLongNote longNote)
+            if (drawable is ILongNoteHolder longNote)
             {
-                if (!autoScratchLnHeads.Contains(longNote))
+                if (!autoScratchLnHeads.Contains(drawable))
                 {
                     if (now >= note.StartTime)
                     {
                         playfield.KeySoundPlayer.PlaySample(note.Column, note.SamplePath);
-                        if (longNote.TryHit())
-                            autoScratchLnHeads.Add(longNote);
+                        if (drawable.TryHit())
+                            autoScratchLnHeads.Add(drawable);
                     }
                 }
                 else if (now >= note.EndTime)

@@ -20,7 +20,7 @@ public sealed partial class BmsStage : CompositeDrawable
     public const float HIT_TARGET_POSITION = 80;
     public const float COLUMN_SPACING = 0;
 
-    public BmsColumn[] Columns { get; }
+    public IBmsColumn[] Columns { get; }
 
     public Container JudgementArea { get; }
 
@@ -54,7 +54,7 @@ public sealed partial class BmsStage : CompositeDrawable
         Anchor = Anchor.Centre;
         Origin = Anchor.Centre;
 
-        Columns = new BmsColumn[playfield.TotalColumns];
+        Columns = new IBmsColumn[playfield.TotalColumns];
 
         var columnFlow = new FillFlowContainer
         {
@@ -109,19 +109,19 @@ public sealed partial class BmsStage : CompositeDrawable
 
         for (var i = 0; i < playfield.TotalColumns; i++)
         {
-            Columns[i] = new BmsColumn(i, playfield);
+            Columns[i] = BmsColumn.Create(i, playfield);
         }
 
         if (BmsLayout.Is2P(layoutVariant))
         {
             for (var i = 1; i < playfield.TotalColumns; i++)
-                columnFlow.Add(Columns[i]);
-            columnFlow.Add(Columns[0]);
+                columnFlow.Add((Drawable)Columns[i]);
+            columnFlow.Add((Drawable)Columns[0]);
         }
         else
         {
             for (var i = 0; i < playfield.TotalColumns; i++)
-                columnFlow.Add(Columns[i]);
+                columnFlow.Add((Drawable)Columns[i]);
         }
     }
 
@@ -217,11 +217,12 @@ public sealed partial class BmsStage : CompositeDrawable
 
         foreach (var column in Columns)
         {
-            if (BmsLayout.IsScratchColumn(column.Index, layoutVariant))
+            if (BmsLayout.IsScratchColumn(column.ColumnIndex, layoutVariant))
                 continue;
 
-            min = Math.Min(min, column.DrawPosition.X);
-            max = Math.Max(max, column.DrawPosition.X + column.DrawWidth);
+            var d = (Drawable)column;
+            min = Math.Min(min, d.DrawPosition.X);
+            max = Math.Max(max, d.DrawPosition.X + d.DrawWidth);
         }
 
         return min == float.MaxValue ? DrawWidth / 2 : (min + max) / 2;

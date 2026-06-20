@@ -4,7 +4,8 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 
-public sealed partial class DrawableBmsNote : DrawableBmsHitObject
+public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
+    where TCol : struct, IColumnProvider
 {
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Note;
 

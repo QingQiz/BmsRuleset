@@ -16,6 +16,18 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         RelativeSizeAxes = Axes.Both;
     }
 
+    /// <summary>
+    ///     Re-compute lifetimes for every entry in this container.
+    ///     Triggered on load completion and whenever the user adjusts the scroll speed.
+    /// </summary>
+    public void RefreshAllEntries()
+    {
+        foreach (var entry in Entries)
+        {
+            if (entry is BmsHitObjectLifetimeEntry bmsEntry)
+                bmsEntry.RefreshLifetime();
+        }
+    }
 
     protected override void UpdateAfterChildrenLife()
     {
@@ -37,7 +49,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
             note.Y = y;
 
-            if (note is DrawableBmsLongNote ln)
+            if (note is ILongNoteHolder ln)
             {
                 var endOffset = (float)((note.HitObject.ScrollPositionAtEndTime - currentScrollPos) * scale);
 
@@ -50,19 +62,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
                 ln.UpdateBodyGeometry(y, -(hitTarget + clampedEndOffset));
             }
-        }
-    }
-
-    /// <summary>
-    ///     Re-compute lifetimes for every entry in this container.
-    ///     Triggered on load completion and whenever the user adjusts the scroll speed.
-    /// </summary>
-    public void RefreshAllEntries()
-    {
-        foreach (var entry in Entries)
-        {
-            if (entry is BmsHitObjectLifetimeEntry bmsEntry)
-                bmsEntry.RefreshLifetime();
         }
     }
 }

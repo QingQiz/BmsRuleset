@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Rulesets.BmsRulese
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.BmsRuleset.Tests", "osu.Game.Rulesets.BmsRuleset.Tests\osu.Game.Rulesets.BmsRuleset.Tests.csproj", "{B4577C85-CB83-462A-BCE3-22FFEB16311D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.BmsRuleset.SourceGeneration", "osu.Game.Rulesets.BmsRuleset.SourceGeneration\osu.Game.Rulesets.BmsRuleset.SourceGeneration.csproj", "{E9A5B96F-EDEE-4B06-8E60-20A5C8E51965}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,6 +28,12 @@ Global
 		{B4577C85-CB83-462A-BCE3-22FFEB16311D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{B4577C85-CB83-462A-BCE3-22FFEB16311D}.VisualTests|Any CPU.ActiveCfg = Debug|Any CPU
 		{B4577C85-CB83-462A-BCE3-22FFEB16311D}.VisualTests|Any CPU.Build.0 = Debug|Any CPU
+		{E9A5B96F-EDEE-4B06-8E60-20A5C8E51965}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E9A5B96F-EDEE-4B06-8E60-20A5C8E51965}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E9A5B96F-EDEE-4B06-8E60-20A5C8E51965}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E9A5B96F-EDEE-4B06-8E60-20A5C8E51965}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E9A5B96F-EDEE-4B06-8E60-20A5C8E51965}.VisualTests|Any CPU.ActiveCfg = Debug|Any CPU
+		{E9A5B96F-EDEE-4B06-8E60-20A5C8E51965}.VisualTests|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

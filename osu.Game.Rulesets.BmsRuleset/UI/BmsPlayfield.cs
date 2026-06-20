@@ -44,6 +44,42 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #endregion
 
+    #region Construction
+
+    public BmsPlayfield(BmsBeatmap beatmap)
+    {
+        Beatmap = beatmap;
+        textEventManager = new BmsTextEventManager(beatmap.TextEvents);
+
+        activeSkin = new BmsEmbeddedSkinSource();
+        skinCache = new BmsGameplaySkinCache(activeSkin);
+
+        var hitObjectsOrdered = beatmap.HitObjects
+            .OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
+        TotalColumns = Math.Max(1, beatmap.TotalColumns);
+        LayoutVariant = beatmap.LayoutVariant;
+        TimingMap = beatmap.TimingMap;
+
+        Anchor = Anchor.Centre;
+        Origin = Anchor.Centre;
+        RelativeSizeAxes = Axes.Both;
+
+        judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both };
+
+        Stage = new BmsStage(this);
+
+        KeySoundPlayer = new BmsKeySoundPlayer(hitObjectsOrdered, Stage.Columns.Select(c => c.HitObjectContainer).ToArray(), () => Time.Current, TotalColumns);
+
+        InternalChildren =
+        [
+            Stage,
+            KeySoundPlayer,
+            judgementDrawablePool,
+        ];
+    }
+
+    #endregion
+
     #region Disposal
 
     protected override void Dispose(bool isDisposing)
@@ -66,7 +102,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             var col = bmsHo.Column;
             if (col >= 0 && col < Stage.Columns.Length)
             {
-                Stage.Columns[col].Add(hitObject);
+                ((Playfield)Stage.Columns[col]).Add(hitObject);
                 return;
             }
         }
@@ -80,13 +116,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private void updateEmbeddedSkinFallback()
     {
-        if (beatmap == null)
-        {
-            activeSkin.SetSources(parentSkin, null);
-            return;
-        }
-
-        activeSkin.SetSources(parentSkin, BmsEmbeddedSkinFallbackFactory.Create(parentSkin.AllSources, beatmap, host.Renderer));
+        activeSkin.SetSources(parentSkin, BmsEmbeddedSkinFallbackFactory.Create(parentSkin.AllSources, Beatmap, host.Renderer));
     }
 
     #endregion
@@ -95,7 +125,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public BmsKeySoundPlayer KeySoundPlayer { get; }
 
-    private readonly BmsTextEventManager textEventManager = null!;
+    private readonly BmsTextEventManager textEventManager;
 
     private void triggerEvents()
     {
@@ -135,7 +165,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [Cached]
     private readonly BmsGameplaySkinCache skinCache;
 
-    private readonly BmsBeatmap? beatmap;
+    internal readonly BmsBeatmap Beatmap;
 
     private BmsHealthProcessor? healthProcessor => resolvedHealthProcessor as BmsHealthProcessor;
 
@@ -152,58 +182,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     [Resolved]
     private ISkinSource parentSkin { get; set; } = null!;
-
-    #endregion
-
-    #region Construction
-
-    /// <inheritdoc />
-    /// <summary>
-    ///     Creates a playfield from raw hit objects.  Objects are sorted by
-    ///     start time then column.
-    /// </summary>
-    public BmsPlayfield(
-        IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, BmsLayoutVariant layoutVariant = BmsLayoutVariant.Bme7K,
-        BmsTimingMap? timingMap = null
-    )
-    {
-        activeSkin = new BmsEmbeddedSkinSource();
-        skinCache = new BmsGameplaySkinCache(activeSkin);
-
-        IReadOnlyList<BmsHitObject> hitObjectsOrdered = hitObjects
-            .OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
-        TotalColumns = Math.Max(1, totalColumns);
-        LayoutVariant = layoutVariant;
-        TimingMap = timingMap;
-
-        Anchor = Anchor.Centre;
-        Origin = Anchor.Centre;
-        RelativeSizeAxes = Axes.Both;
-
-        judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both };
-
-        Stage = new BmsStage(this);
-
-        KeySoundPlayer = new BmsKeySoundPlayer(hitObjectsOrdered, Stage.Columns.Select(c => c.HitObjectContainer).ToArray(), () => Time.Current, TotalColumns);
-
-        InternalChildren =
-        [
-            Stage,
-            KeySoundPlayer,
-            judgementDrawablePool,
-        ];
-    }
-
-    /// <inheritdoc />
-    /// <summary>
-    ///     Creates a playfield from a decoded <see cref="T:osu.Game.Rulesets.BmsRuleset.Beatmaps.BmsBeatmap">BmsBeatmap</see>.
-    /// </summary>
-    public BmsPlayfield(BmsBeatmap beatmap)
-        : this(beatmap.HitObjects, beatmap.TotalColumns, beatmap.LayoutVariant, beatmap.TimingMap)
-    {
-        this.beatmap = beatmap;
-        textEventManager = new BmsTextEventManager(beatmap.TextEvents);
-    }
 
     #endregion
 
@@ -314,18 +292,19 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // scored as POOR) — filtering by the release window here would leave the note
         // frozen at the judgement line until its tail time passed.
         var columnContainer = Stage.Columns[column.Value].HitObjectContainer;
-        DrawableBmsLongNote? heldNote = null;
+        DrawableBmsHitObject? heldNote = null;
 
         foreach (var alive in columnContainer.AliveEntries.Values)
         {
-            if (alive is not DrawableBmsLongNote d || !d.IsHoldingLongNote)
+            if (alive is not DrawableBmsHitObject d) continue;
+            if (d is not ILongNoteHolder ln || !ln.IsHoldingLongNote)
                 continue;
 
             if (heldNote == null || d.HitObject.EndTime < heldNote.HitObject.EndTime)
                 heldNote = d;
         }
 
-        if (heldNote?.TryRelease() == true)
+        if (heldNote is ILongNoteHolder ln2 && ln2.TryRelease())
         {
             // Play the LN tail's own hit sound if available.
             // Do NOT fallback to the head's sample — if the tail has no sample,
@@ -543,8 +522,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // display).
         foreach (var column in Stage.Columns)
         {
-            column.NewResult += onNewResult;
-            AddNested(column);
+            if (column is Playfield pf)
+            {
+                pf.NewResult += onNewResult;
+                AddNested(pf);
+            }
         }
 
         foreach (var result in BmsRuleset.STATIC_VALID_HIT_RESULTS)

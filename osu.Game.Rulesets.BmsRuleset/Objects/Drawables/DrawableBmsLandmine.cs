@@ -3,14 +3,16 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 
-public sealed partial class DrawableBmsLandmine : DrawableBmsHitObject
+public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCol>
+    where TCol : struct, IColumnProvider
 {
-    private bool mineHandled;
 
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Mine;
 
     // ReSharper disable once ConvertToAutoPropertyWithPrivateSetter
     protected override bool SkipFurtherUpdates => mineHandled;
+
+    private bool mineHandled;
 
     protected override void ResetKindState() => mineHandled = false;
 
