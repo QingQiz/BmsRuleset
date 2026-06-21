@@ -7,13 +7,12 @@ using osu.Framework.Platform;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
-using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
+namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 public sealed partial class BmsJudgementDisplay : CompositeDrawable, ISerialisableDrawable
 {

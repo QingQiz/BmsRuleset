@@ -6,11 +6,10 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
-using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Components;
 
@@ -57,9 +56,54 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     }
 
     [Test]
+    public void TestClearZone()
+    {
+        AddStep("set health to 80%", () => healthProcessor.Health.Value = 0.80);
+    }
+
+    [Test]
+    public void TestDrainAndRecover()
+    {
+        AddStep("set health to 100%", () => healthProcessor.Health.Value = 1.0);
+        AddStep("drain to 10%", () => healthProcessor.Health.Value = 0.10);
+        AddStep("recover to 85%", () => healthProcessor.Health.Value = 0.85);
+    }
+
+    [Test]
+    public void TestEmpty()
+    {
+        AddStep("set health to 0%", () => healthProcessor.Health.Value = 0.0);
+    }
+
+    [Test]
+    public void TestEmptyPoorDrain()
+    {
+        AddStep("set health to 80%", () => healthProcessor.Health.Value = 0.80);
+        AddStep("register empty poor", () => healthProcessor.RegisterEmptyPoor());
+        AddUntilStep("health display drained", () => healthProcessor.Health.Value, () => Is.EqualTo(0.78).Within(0.001));
+    }
+
+    [Test]
+    public void TestFullHealth()
+    {
+        AddStep("set health to 100%", () => healthProcessor.Health.Value = 1.0);
+    }
+
+    [Test]
     public void TestInitialState()
     {
         AddAssert("health is 20%", () => healthProcessor.Health.Value, () => Is.EqualTo(0.2).Within(0.001));
+    }
+
+    [Test]
+    public void TestLandmineDrain()
+    {
+        AddStep("set health to 80%", () => healthProcessor.Health.Value = 0.80);
+        AddStep("detonate landmine", () => healthProcessor.ApplyResult(new JudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
+        {
+            Type = HitResult.Meh,
+        }));
+        AddUntilStep("health display drained", () => healthProcessor.Health.Value, () => Is.EqualTo(0.55).Within(0.001));
     }
 
     [Test]
@@ -72,50 +116,5 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     public void TestYellowZone()
     {
         AddStep("set health to 50%", () => healthProcessor.Health.Value = 0.50);
-    }
-
-    [Test]
-    public void TestClearZone()
-    {
-        AddStep("set health to 80%", () => healthProcessor.Health.Value = 0.80);
-    }
-
-    [Test]
-    public void TestFullHealth()
-    {
-        AddStep("set health to 100%", () => healthProcessor.Health.Value = 1.0);
-    }
-
-    [Test]
-    public void TestEmpty()
-    {
-        AddStep("set health to 0%", () => healthProcessor.Health.Value = 0.0);
-    }
-
-    [Test]
-    public void TestDrainAndRecover()
-    {
-        AddStep("set health to 100%", () => healthProcessor.Health.Value = 1.0);
-        AddStep("drain to 10%", () => healthProcessor.Health.Value = 0.10);
-        AddStep("recover to 85%", () => healthProcessor.Health.Value = 0.85);
-    }
-
-    [Test]
-    public void TestEmptyPoorDrain()
-    {
-        AddStep("set health to 80%", () => healthProcessor.Health.Value = 0.80);
-        AddStep("register empty poor", () => healthProcessor.RegisterEmptyPoor());
-        AddUntilStep("health display drained", () => healthProcessor.Health.Value, () => Is.EqualTo(0.78).Within(0.001));
-    }
-
-    [Test]
-    public void TestLandmineDrain()
-    {
-        AddStep("set health to 80%", () => healthProcessor.Health.Value = 0.80);
-        AddStep("detonate landmine", () => healthProcessor.ApplyResult(new JudgementResult(beatmap.HitObjects[1], beatmap.HitObjects[1].CreateJudgement())
-        {
-            Type = HitResult.Meh,
-        }));
-        AddUntilStep("health display drained", () => healthProcessor.Health.Value, () => Is.EqualTo(0.55).Within(0.001));
     }
 }

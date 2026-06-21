@@ -8,9 +8,9 @@ using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 
@@ -60,8 +60,18 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
         }
     }
 
+    private readonly object sourceChangedLock = new();
+
+    private readonly List<SourceChangedSubscription> sourceChangedSubscriptions = [];
+    private readonly Dictionary<Action, int> sourceChangedLastSubscription = [];
+
     private ISkinSource? parent;
     private BmsEmbeddedSkinFallbackChain? embeddedFallbacks;
+
+    private int sourceChangedHead = -1;
+    private int sourceChangedTail = -1;
+    private int sourceChangedFreeHead = -1;
+    private int sourceChangedCount;
 
     #region Disposal
 
@@ -178,43 +188,6 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
 
         return embeddedFallbacks?.GetDrawableFactory(lookup);
     }
-
-    /// <summary>
-    /// Fired when the skin source changes.  Uses a custom slot-based backing store with
-    /// O(1) subscribe / unsubscribe instead of a plain multicast delegate, which would
-    /// degrade to O(n²) copy churn when many <see cref="SkinReloadableDrawable"/> instances
-    /// subscribe and then dispose (each <c>-=</c> copies the invocation list).
-    /// </summary>
-    public event Action? SourceChanged
-    {
-        add
-        {
-            if (value == null)
-                return;
-
-            lock (sourceChangedLock)
-                addSourceChangedHandler(value);
-        }
-
-        remove
-        {
-            if (value == null)
-                return;
-
-            lock (sourceChangedLock)
-                removeSourceChangedHandler(value);
-        }
-    }
-
-    private readonly object sourceChangedLock = new();
-
-    private readonly List<SourceChangedSubscription> sourceChangedSubscriptions = [];
-    private readonly Dictionary<Action, int> sourceChangedLastSubscription = [];
-
-    private int sourceChangedHead = -1;
-    private int sourceChangedTail = -1;
-    private int sourceChangedFreeHead = -1;
-    private int sourceChangedCount;
 
     private void addSourceChangedHandler(Action handler)
     {
@@ -343,6 +316,33 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
         {
             Array.Clear(handlers, 0, count);
             ArrayPool<Action>.Shared.Return(handlers);
+        }
+    }
+
+    /// <summary>
+    /// Fired when the skin source changes.  Uses a custom slot-based backing store with
+    /// O(1) subscribe / unsubscribe instead of a plain multicast delegate, which would
+    /// degrade to O(n²) copy churn when many <see cref="SkinReloadableDrawable"/> instances
+    /// subscribe and then dispose (each <c>-=</c> copies the invocation list).
+    /// </summary>
+    public event Action? SourceChanged
+    {
+        add
+        {
+            if (value == null)
+                return;
+
+            lock (sourceChangedLock)
+                addSourceChangedHandler(value);
+        }
+
+        remove
+        {
+            if (value == null)
+                return;
+
+            lock (sourceChangedLock)
+                removeSourceChangedHandler(value);
         }
     }
 

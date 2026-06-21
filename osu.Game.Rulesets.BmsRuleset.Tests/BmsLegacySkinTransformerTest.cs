@@ -22,16 +22,15 @@ using osu.Game.Database;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Skinning;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens.Play.HUD;
-using osu.Game.Skinning;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
-using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Play.HUD;
+using osu.Game.Skinning;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
@@ -521,6 +520,26 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestGameplaySkinCacheUsesEmbeddedFallbackFactoryWhenParentMisses()
+    {
+        var beatmap = createBeatmap();
+        using var source = new BmsEmbeddedSkinSource();
+        var parent = new TestSkinSource();
+        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+            [BMS]
+            Layout: 7K
+            NoteImage1: primary-note
+            """, ["primary-note"]), beatmap);
+
+        source.SetSources(parent, new BmsEmbeddedSkinFallbackChain(primary, null));
+
+        using var cache = new BmsGameplaySkinCache(source);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(cache.GetDrawableFactory(lookup)?.Create(), Is.Not.Null);
+    }
+
+    [Test]
     public void TestGameplaySkinCacheUsesParentDrawableBeforeEmbeddedFallbackFactory()
     {
         var beatmap = createBeatmap();
@@ -539,26 +558,6 @@ public class BmsLegacySkinTransformerTest
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
 
         Assert.That(cache.GetDrawableFactory(lookup)?.Create(), Is.SameAs(parentDrawable));
-    }
-
-    [Test]
-    public void TestGameplaySkinCacheUsesEmbeddedFallbackFactoryWhenParentMisses()
-    {
-        var beatmap = createBeatmap();
-        using var source = new BmsEmbeddedSkinSource();
-        var parent = new TestSkinSource();
-        var primary = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
-            [BMS]
-            Layout: 7K
-            NoteImage1: primary-note
-            """, ["primary-note"]), beatmap);
-
-        source.SetSources(parent, new BmsEmbeddedSkinFallbackChain(primary, null));
-
-        using var cache = new BmsGameplaySkinCache(source);
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
-
-        Assert.That(cache.GetDrawableFactory(lookup)?.Create(), Is.Not.Null);
     }
 
     [Test]

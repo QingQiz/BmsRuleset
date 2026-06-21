@@ -5,13 +5,13 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Threading;
 using osu.Game.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
+namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 public sealed partial class BmsComboCounter : CompositeDrawable, ISerialisableDrawable
 {

@@ -5,7 +5,7 @@ using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 using osuTK;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
+namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 public static class BmsDefaultHud
 {
@@ -14,10 +14,37 @@ public static class BmsDefaultHud
         if (lookup is not GlobalSkinnableContainerLookup containerLookup)
             return null;
 
-        if (containerLookup.Lookup != GlobalSkinnableContainers.MainHUDComponents)
-            return null;
+        switch (containerLookup.Lookup)
+        {
+            case GlobalSkinnableContainers.MainHUDComponents:
+                return containerLookup.Ruleset == null ? gHud() : bmsHud();
 
-        return containerLookup.Ruleset == null ? gHud() : bmsHud();
+            case GlobalSkinnableContainers.Playfield:
+                return bmsPlayfield();
+
+            case GlobalSkinnableContainers.SongSelect:
+                break;
+        }
+
+        return null;
+    }
+
+    private static Drawable bmsPlayfield()
+    {
+        return new DefaultSkinComponentsContainer(_ => { })
+        {
+            Children =
+            [
+                new BmsTextHud(),
+                new BmsHealthDisplay
+                {
+                    Anchor = Anchor.BottomRight,
+                    Origin = Anchor.BottomLeft,
+                },
+                new BmsJudgementDisplay(),
+                new BmsComboCounter(),
+            ],
+        };
     }
 
     /// <summary>
@@ -30,13 +57,6 @@ public static class BmsDefaultHud
         {
             Children =
             [
-                new BmsTextHud(),
-                new BmsHealthDisplay
-                {
-                    Anchor = Anchor.BottomLeft,
-                    Origin = Anchor.BottomLeft,
-                    Margin = new MarginPadding { Horizontal = 10, Vertical = 20 },
-                },
                 new BarHitErrorMeter
                 {
                     Anchor = Anchor.BottomCentre,
@@ -44,8 +64,6 @@ public static class BmsDefaultHud
                     Rotation = 90,
                     Scale = new Vector2(2),
                 },
-                new BmsJudgementDisplay(),
-                new BmsComboCounter(),
                 new ArgonScoreCounter
                 {
                     Anchor = Anchor.TopRight,

@@ -9,9 +9,8 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
-using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 
-namespace osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
+namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 /// <summary>
 ///     BMS-style groove gauge display that replaces osu!'s native health bar UI.
