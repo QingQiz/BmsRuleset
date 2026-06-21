@@ -3,6 +3,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Skinning.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
@@ -38,7 +39,11 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
 
         this.AddSetupUntilStep("all hit results produced",
             () => BmsRuleset.STATIC_VALID_HIT_RESULTS.All(result => Player.ScoreProcessor.Statistics.GetValueOrDefault(result) > 0));
-        this.AddSetupAssert("judgement display active", () => Playfield.Stage.JudgementArea.Count, Is.GreaterThan(0));
+        this.AddSetupAssert("judgement hud active", () =>
+        {
+            var display = Player.HUDOverlay.ChildrenOfType<BmsJudgementDisplay>().SingleOrDefault();
+            return display?.ChildrenOfType<SkinnableDrawable>().Any(d => d.Parent?.Alpha > 0 && d.Alpha > 0 && d.DrawWidth > 0 && d.DrawHeight > 0) == true;
+        });
         this.AddSetupAssert("score changed", () => Player.ScoreProcessor.TotalScore.Value, Is.GreaterThan(0));
         AddStep("skin scene complete", () => { });
     }

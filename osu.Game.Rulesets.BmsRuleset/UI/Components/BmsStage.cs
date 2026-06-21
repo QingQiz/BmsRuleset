@@ -22,8 +22,6 @@ public sealed partial class BmsStage : CompositeDrawable
 
     public IBmsColumn[] Columns { get; }
 
-    public Container JudgementArea { get; }
-
     public BmsMeasureLineContainer MeasureLineArea { get; }
 
     public float HitTargetPosition => hitTargetPosition.Value;
@@ -86,13 +84,6 @@ public sealed partial class BmsStage : CompositeDrawable
             new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.StageForeground, layoutVariant))
             {
                 RelativeSizeAxes = Axes.Both,
-            },
-            JudgementArea = new Container
-            {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.Centre,
             },
             new Container
             {
@@ -161,8 +152,6 @@ public sealed partial class BmsStage : CompositeDrawable
         hitTargetPosition.Value = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
                                   ?? HIT_TARGET_POSITION;
         hitTarget.Y = -hitTargetPosition.Value;
-        JudgementArea.Y = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ScorePosition))?.Value
-                          ?? 300 * 1.6f;
         barLineHeight.Value = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineHeight))?.Value
                               ?? 1;
         barLineColour.Value = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineColour))?.Value
@@ -205,9 +194,6 @@ public sealed partial class BmsStage : CompositeDrawable
         var nonScratchCentre = getNonScratchCentreX();
         X = (DrawWidth / 2 - nonScratchCentre) * Scale.X;
 
-        // Keep the judgement area centred over the non-scratch columns, not the
-        // stage's geometric centre (which includes the scratch lane).
-        JudgementArea.X = nonScratchCentre - DrawWidth / 2;
     }
 
     private float getNonScratchCentreX()

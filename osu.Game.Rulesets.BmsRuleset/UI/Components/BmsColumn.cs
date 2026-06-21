@@ -180,6 +180,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
                         ?? BmsStage.HIT_TARGET_POSITION);
     }
 
+    #region components
+
     private partial class DefaultBmsColumnBackground(int index, bool isScratch) : CompositeDrawable
     {
         protected override void LoadComplete()
@@ -276,4 +278,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             ];
         }
     }
+
+    #endregion
+
 }

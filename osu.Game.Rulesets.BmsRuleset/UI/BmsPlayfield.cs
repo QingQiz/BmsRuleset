@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
@@ -64,8 +63,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         Origin = Anchor.Centre;
         RelativeSizeAxes = Axes.Both;
 
-        judgementDrawablePool = new Container { Alpha = 0, RelativeSizeAxes = Axes.Both };
-
         Stage = new BmsStage(this);
 
         KeySoundPlayer = new BmsKeySoundPlayer(hitObjectsOrdered, Stage.Columns.Select(c => c.HitObjectContainer).ToArray(), () => Time.Current, TotalColumns);
@@ -74,7 +71,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         [
             Stage,
             KeySoundPlayer,
-            judgementDrawablePool,
         ];
     }
 
@@ -147,13 +143,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public BmsTimingMap? TimingMap { get; }
 
     public bool ConstantScrollActive { get; set; }
-
-    #endregion
-
-    #region Judgement display fields
-
-    private readonly Dictionary<HitResult, SkinnableDrawable> judgementDrawableCache = new();
-    private readonly Container judgementDrawablePool;
 
     #endregion
 
@@ -518,8 +507,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         populateMeasureLines();
 
-        // Subscribe to per-column NewResult events so BmsPlayfield aggregates all results (hit explosions, judgement
-        // display).
+        // Subscribe to per-column NewResult events so BmsPlayfield aggregates all results.
         foreach (var column in Stage.Columns)
         {
             if (column is Playfield pf)
@@ -527,21 +515,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                 pf.NewResult += onNewResult;
                 AddNested(pf);
             }
-        }
-
-        foreach (var result in BmsRuleset.STATIC_VALID_HIT_RESULTS)
-        {
-            var drawable = new SkinnableDrawable(
-                new SkinComponentLookup<HitResult>(result))
-            {
-                RelativeSizeAxes = Axes.None,
-                AutoSizeAxes = Axes.Both,
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-            };
-
-            judgementDrawableCache[result] = drawable;
-            judgementDrawablePool.Add(drawable);
         }
     }
 
@@ -601,7 +574,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         if (bmsHitObject.HitObject.IsMine)
         {
-            showJudgement(HitResult.Meh);
+            requestJudgementDisplay(HitResult.Meh);
             return;
         }
 
@@ -615,47 +588,22 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                 bmsHitObject.HitObject.IsLongNote)));
         }
 
-        showJudgement(result.Type);
+        requestJudgementDisplay(result.Type);
     }
 
     private void registerEmptyPoor()
     {
         scoreProcessor?.RegisterEmptyPoor();
         healthProcessor?.RegisterEmptyPoor();
-        showJudgement(HitResult.Miss);
+        requestJudgementDisplay(HitResult.Miss);
     }
 
-    /// <summary>
-    ///     Moves the pre-built <see cref="SkinnableDrawable"/> for <paramref name="result"/> from
-    ///     the hidden pool container into <see cref="BmsStage.JudgementArea"/> and replays its
-    ///     animation.  Any previously shown drawable is returned to the pool container so it stays
-    ///     loaded and ready for the next use.
-    /// </summary>
-    private void showJudgement(HitResult result)
+    private void requestJudgementDisplay(HitResult result)
     {
-        if (!judgementDrawableCache.TryGetValue(result, out var drawable))
-            return;
-
         if (result == HitResult.Meh && textEventManager.Mistake != null)
-        {
             BmsEventBus.OnTextEvent(textEventManager.Mistake);
-        }
 
-        var evicted = Stage.JudgementArea.ToArray();
-        Stage.JudgementArea.Clear(false);
-
-        foreach (var child in evicted)
-            judgementDrawablePool.Add(child);
-
-        // Move the cached drawable into the display area and replay its animation.
-        judgementDrawablePool.Remove(drawable, false);
-        Stage.JudgementArea.Add(drawable);
-
-        if (drawable.Drawable is IAnimatableJudgement animatable)
-        {
-            drawable.ResetAnimation();
-            animatable.PlayAnimation();
-        }
+        BmsEventBus.OnJudgementDisplayEvent(result);
     }
 
     #endregion

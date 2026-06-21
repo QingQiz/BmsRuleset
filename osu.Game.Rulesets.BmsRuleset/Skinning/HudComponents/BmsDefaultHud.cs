@@ -44,6 +44,7 @@ public static class BmsDefaultHud
                     Rotation = 90,
                     Scale = new Vector2(2),
                 },
+                new BmsJudgementDisplay(),
                 new BmsComboCounter(),
                 new ArgonScoreCounter
                 {
