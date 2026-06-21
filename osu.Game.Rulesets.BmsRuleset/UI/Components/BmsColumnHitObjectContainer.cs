@@ -52,13 +52,10 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             if (note is ILongNoteHolder ln)
             {
                 var endOffset = (float)((note.HitObject.ScrollPositionAtEndTime - currentScrollPos) * scale);
-
-                // Clamp the tail so it never extends in the "past" direction past the judgement line:
-                //   normal scroll (positive factor) → tail should not go below the hit target
-                //   reverse scroll (negative factor) → tail should not go above the hit target
-                var clampedEndOffset = playfield.ChartScrollFactor >= 0
-                    ? Math.Max(endOffset, 0)
-                    : Math.Min(endOffset, 0);
+                var clampedEndOffset =
+                    note.HitObject.ScrollPositionAtEndTime >= note.HitObject.ScrollPositionAtStartTime
+                        ? Math.Max(endOffset, 0)
+                        : Math.Min(endOffset, 0);
 
                 ln.UpdateBodyGeometry(y, -(hitTarget + clampedEndOffset));
             }
