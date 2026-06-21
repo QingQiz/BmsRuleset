@@ -34,12 +34,7 @@ public class BmsModNoteRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
 
     public override IconUsage? Icon => OsuIcon.ModRandom;
 
-    public override double ScoreMultiplier => 1;
-
     public override Type[] IncompatibleMods => [typeof(BmsModLaneRandom), typeof(BmsModMirror)];
-
-    private const int s_random_threshold = 40;
-    private const int h_random_threshold = 100;
 
     [SettingSource("Include Scratch", "Whether to include scratch lanes in the shuffle.")]
     public Bindable<bool> IncludeScratch { get; } = new();
@@ -49,6 +44,9 @@ public class BmsModNoteRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
 
     [SettingSource("Seed", "Use a custom seed for deterministic randomisation (required for replay consistency).", SettingControlType = typeof(SettingsNumberBox))]
     public Bindable<int?> Seed { get; } = new();
+
+    private const int s_random_threshold = 40;
+    private const int h_random_threshold = 100;
 
     public void ApplyToBeatmap(IBeatmap beatmap)
     {

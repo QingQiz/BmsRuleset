@@ -26,8 +26,6 @@ public class BmsModRotationRandom : Mod, IApplicableAfterBeatmapConversion, IHas
 
     public override IconUsage? Icon => OsuIcon.ModRandom;
 
-    public override double ScoreMultiplier => 1;
-
     public override Type[] IncompatibleMods => [typeof(BmsModLaneRandom), typeof(BmsModNoteRandom), typeof(BmsModMirror)];
 
     [SettingSource("Include Scratch", "Whether to include scratch lanes in the rotation.")]

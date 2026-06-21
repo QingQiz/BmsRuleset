@@ -24,8 +24,6 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
     public override ModType Type => ModType.DifficultyReduction;
 
-    public override double ScoreMultiplier => 1;
-
     private readonly HashSet<DrawableBmsHitObject> autoScratchLnHeads = [];
 
     private BmsPlayfield playfield = null!;

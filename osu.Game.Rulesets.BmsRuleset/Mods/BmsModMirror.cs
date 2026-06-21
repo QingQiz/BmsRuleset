@@ -16,8 +16,6 @@ public class BmsModMirror : Mod, IApplicableAfterBeatmapConversion
 
     public override ModType Type => ModType.Conversion;
 
-    public override double ScoreMultiplier => 1;
-
     public void ApplyToBeatmap(IBeatmap beatmap)
     {
         if (beatmap is BmsBeatmap bmsBeatmap)

@@ -333,12 +333,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public double CurrentScrollPosition { get; private set; }
 
     /// <summary>
-    ///     Active SCROLL factor from the chart's <c>#SCROLLxx</c> events.
-    ///     Determines display multiplier (1.0 = normal, 2.0 = 2× spread, -1.0 = reverse).
-    /// </summary>
-    public double ChartScrollFactor { get; private set; } = 1.0;
-
-    /// <summary>
     ///     Active SPEED factor from the chart's <c>#SPEEDxx</c> / channel <c>SP</c> events.
     ///     Multiplies <see cref="ScrollSpeedMultiplier"/> like a user speed adjustment.
     ///     1.0 = normal, 2.0 = scroll advances 2× faster.
@@ -523,10 +517,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         CurrentScrollPosition = ConstantScrollActive
             ? Time.Current
             : TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current;
-
-        ChartScrollFactor = ConstantScrollActive
-            ? 1.0
-            : TimingMap?.GetScrollFactorAtTime(Time.Current) ?? 1.0;
 
         ChartSpeedFactor = ConstantScrollActive
             ? 1.0

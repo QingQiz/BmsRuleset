@@ -28,7 +28,7 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset;
 
-public class BmsRuleset : Ruleset
+public partial class BmsRuleset : Ruleset
 {
     public override string Description => "BMS";
 
@@ -87,6 +87,9 @@ public class BmsRuleset : Ruleset
     {
         BmsBeatmapDecoder.Register();
     }
+
+    public override ScoreMultiplierCalculator CreateScoreMultiplierCalculator(ScoreMultiplierContext context) =>
+        new BmsScoreMultiplierCalculator(context);
 
     public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) =>
         new BmsDrawableRuleset(this, beatmap, mods);

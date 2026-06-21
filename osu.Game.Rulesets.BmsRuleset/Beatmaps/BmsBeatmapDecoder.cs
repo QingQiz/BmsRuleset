@@ -86,7 +86,7 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
 
     protected override Beatmap CreateTemplateObject() => new BmsDecodedBeatmap();
 
-    protected override void ParseStreamInto(LineBufferedReader stream, Beatmap output)
+    protected override void ParseStreamInto(LineBufferedReader stream, bool _, Beatmap output)
     {
         var lines = readLines(stream, output.BeatmapInfo.Path);
         var parseResult = BmsChartParser.Parse(lines, output.BeatmapInfo.Path, decodeBranchSelector);

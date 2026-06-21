@@ -16,8 +16,6 @@ public class BmsModBranchReplay : Mod, IApplicableToBeatmapConverter
 
     public override ModType Type => ModType.System;
 
-    public override double ScoreMultiplier => 1;
-
     public override bool UserPlayable => false;
 
     public override bool ValidForMultiplayer => false;

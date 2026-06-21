@@ -17,8 +17,6 @@ public class BmsModConstant : Mod, IApplicableToDrawableRuleset<BmsHitObject>
 
     public override ModType Type => ModType.DifficultyReduction;
 
-    public override double ScoreMultiplier => 1;
-
     public override Type[] IncompatibleMods => [];
 
     public void ApplyToDrawableRuleset(DrawableRuleset<BmsHitObject> drawableRuleset)
