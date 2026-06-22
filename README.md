@@ -184,16 +184,34 @@ Key sound of the next upcoming note in a column plays on every key press regardl
 
 ---
 
-### Gauge (Normal Gauge only)
+### Gauge
 
-- Starts at **20%**. No passive drain.
-- **Clear condition:** finish the chart at ≥ 80%.
-- `#TOTAL` controls the maximum gain rate. Default formula: `max(7.605 × N / (0.01 × N + 6.5), 160)` (LR2 formula, where
-  N = total playable notes).
-- Gain/loss per judgement: PGREAT/GREAT +`TOTAL/100/N` · GOOD +half · BAD −4% · POOR −6% · E-POOR −2%.
+The ruleset implements 6 selectable BMS gauge types covering both Groove and Survival modes.
+Default play uses the Normal gauge. Gauge types are selected via mods:
+
+> [!NOTE]
+> The gauge values and algorithms are adapted from **beatoraja** (SEVENKEYS mode), itself a reimplementation of the
+> LR2 groove gauge. The `(2 × #TOTAL − 320) / notes` recovery scaling on survival gauges (H1/H2) follows beatoraja's
+> `LIMIT_INCREMENT` modifier. Landmine damage uses the BMS spec formula.
+
+| Mod         | Acronym     | Type                 | Algorithm       | Initial HP | Clear   | Bar              |
+|-------------|-------------|----------------------|-----------------|------------|---------|------------------|
+| Assist Easy | **E2**      | Difficulty Reduction | TOTAL (#TOTAL)  | 20%        | ≥ 60%   | Groove (dynamic) |
+| Easy        | **E1**      | Difficulty Reduction | TOTAL (#TOTAL)  | 20%        | ≥ 80%   | Groove (dynamic) |
+| Normal      | *(default)* | —                    | TOTAL (#TOTAL)  | 20%        | ≥ 80%   | Groove (dynamic) |
+| Hard        | **H1**      | Difficulty Increase  | Limit Increment | 100%       | Survive | Fixed red        |
+| EX Hard     | **H2**      | Difficulty Increase  | Limit Increment | 100%       | Survive | Fixed purple     |
+| Hazard      | **H3**      | Difficulty Increase  | Fixed           | 100%       | Survive | Fixed gold       |
+
+- **Groove gauges** (E2/E1/Normal): recoverable, start at 20%, must reach clear threshold by song end. Bar colour
+  transitions from red (< 20%) → amber (< clear) → green (≥ clear) based on the active gauge's threshold.
+- **Survival gauges** (H1/H2/H3): start at 100%, damage-only (no recovery for H3). Gauge uses a fixed colour with no
+  clear line. Pass condition is purely survival (HP never hit 0).
+- Hard (H1) has **guts protection**: damage is reduced at low HP (50% → ×0.8, 40% → ×0.7, …, 10% → ×0.4).
+- `#TOTAL` controls the maximum gain rate for TOTAL-algorithm gauges. Default formula:
+  `max(7.605 × N / (0.01 × N + 6.5), 160)` (LR2 formula, where N = total playable notes).
 - Landmine damage: base-36 value ÷ 2 percent (e.g., `ZZ` = 647.5% → instant wipe).
-
-Easy / Hard / Ex-Hard / Hazard gauge variants are not yet implemented.
+- Gauge mods are mutually exclusive.
 
 ---
 
@@ -221,6 +239,11 @@ Easy / Hard / Ex-Hard / Hazard gauge variants are not yet implemented.
 | Lane Random (LR)           | RANDOM: permutes lane columns          |            |
 | Note Random (NR)           | S-RANDOM / H-RANDOM: per-note random   |            |
 | Rotation Random (RR)       | R-RANDOM: rotate + optional mirror     |            |
+| Assist Easy Gauge (E2)     | Use Assist Easy BMS gauge              |            |
+| Easy Gauge (E1)            | Use Easy BMS gauge                     |            |
+| Hard Gauge (H1)            | Use Hard BMS gauge                     |            |
+| EX Hard Gauge (H2)         | Use EX Hard BMS gauge                  |            |
+| Hazard Gauge (H3)          | Use Hazard BMS gauge                   |            |
 
 ---
 
@@ -480,11 +503,11 @@ Open the skin editor and drag the combo counter or health bar to your preferred 
 
 On the next play session the saved layout is automatically loaded.
 
-| HUD components | Description                                                                                                           |
-|----------------|-----------------------------------------------------------------------------------------------------------------------|
-| Combo          | Rolling combo counter with auto-hide when idle, configurable display threshold, and colour flash on break.            |
-| Judgement      | Per-note hit result animations (PGREAT, GREAT, GOOD, BAD, POOR) displayed as they occur.                              |
-| Health Bar     | Vertical groove gauge with danger (red), warning (amber), and safe (cyan) colour zones; clear-line indicator at 80 %. |
+| HUD components | Description                                                                                                                                                                                                                   |
+|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Combo          | Rolling combo counter with auto-hide when idle, configurable display threshold, and colour flash on break.                                                                                                                    |
+| Judgement      | Per-note hit result animations (PGREAT, GREAT, GOOD, BAD, POOR) displayed as they occur.                                                                                                                                      |
+| Health Bar     | Vertical groove gauge with gauge-aware colour zones: dynamic groove (red → amber → green at clear threshold) for TOTAL gauges, fixed profile colour for survival gauges; clear-line indicator at the gauge's clear threshold. |
 
 ### Example skin.ini (7K)
 
@@ -896,13 +919,9 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Audio**     | Hijack preview song to play BMS samples                                                  | 1(failed) |
 | **Audio**     | `#xxx97` (fgt) — dynamic BGM volume change channel                                       |           |
 | **Converter** | Mania 7K → BMS chart conversion                                                          | 3         |
-| **Gauge**     | Easy / Hard / Ex-Hard / Hazard gauge variants                                            | 2         |
 | **Gauge**     | LN-specific gauge events (head miss ≠ body drop ≠ tail miss)                             | 1         |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |
 | **Input**     | Judgement offset adjustment capability                                                   |
-| **Mods**      | Different health bar types                                                               | 2         |
-| **Mods**      | Gauge-selection mods                                                                     | 2         |
-| **Mods**      | assist options                                                                           |
 | **Mods**      | Remember last used mod combination                                                       |
 | **Mods**      | BG: make key sounds → background samples (hit results don't affect music)                | 2         
 | **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |           |

@@ -172,15 +172,31 @@ BGA 通道（`04`、`06`、`07`、`0A`–`0E`）、动态音量通道（`97`、`
 
 ---
 
-### 血量（仅普通血量）
+### 血量
 
-- 初始 **20%**，无被动衰减。
-- **通关条件：** 结束时 ≥ 80%。
-- `#TOTAL` 控制最大回复速度。默认公式：`max(7.605 × N / (0.01 × N + 6.5), 160)`（LR2 公式，N = 总可玩音符数）。
-- 各判定增减：PGREAT/GREAT +`TOTAL/100/N` · GOOD +一半 · BAD −4% · POOR −6% · E-POOR −2%。
+规则集实现了 6 种可选 BMS 血量类型，涵盖 Groove 和 Survival 两种模式。
+默认使用 Normal 血量。通过 Mod 选择不同血量类型：
+
+> [!NOTE]
+> 血量数值和算法改编自 **beatoraja**（SEVENKEYS 模式），而 beatoraja 本身是对 LR2 groove gauge 的复现。
+> Survival 血量（H1/H2）的 `(2 × #TOTAL − 320) / notes` recovery 缩放系数遵循 beatoraja 的 `LIMIT_INCREMENT` 修饰器。
+> 地雷伤害使用 BMS 规范公式。
+
+| Mod | 缩写 | 类型 | 算法 | 初始 HP | 通关 | 血条 |
+|-----|------|------|------|---------|------|------|
+| Assist Easy | **E2** | 难度降低 | TOTAL (#TOTAL) | 20% | ≥ 60% | Groove（动态） |
+| Easy | **E1** | 难度降低 | TOTAL (#TOTAL) | 20% | ≥ 80% | Groove（动态） |
+| Normal | *(默认)* | — | TOTAL (#TOTAL) | 20% | ≥ 80% | Groove（动态） |
+| Hard | **H1** | 难度增加 | Limit Increment | 100% | 存活 | 固定红色 |
+| EX Hard | **H2** | 难度增加 | Limit Increment | 100% | 存活 | 固定紫色 |
+| Hazard | **H3** | 难度增加 | Fixed | 100% | 存活 | 固定金色 |
+
+- **Groove 血量**（E2/E1/Normal）：可回复，从 20% 开始，结束时需达到通关线。血条颜色按阈值动态变化：红（< 20%）→ 黄（< 通关线）→ 绿（≥ 通关线）。
+- **Survival 血量**（H1/H2/H3）：满血开局，仅扣血（H3 无回复）。血条使用固定颜色，无 clear 线。通关条件仅为存活（HP 从未归零）。
+- Hard（H1）有 **guts 保护**：低血量时减少伤害（50% → ×0.8, 40% → ×0.7, …, 10% → ×0.4）。
+- `#TOTAL` 控制 TOTAL 算法血量的最大回复速度。默认公式：`max(7.605 × N / (0.01 × N + 6.5), 160)`（LR2 公式，N = 总可玩音符数）。
 - 地雷伤害：36进制值 ÷ 2 百分比（例如 `ZZ` = 647.5% → 直接清空）。
-
-Easy / Hard / Ex-Hard / Hazard 血量变体尚未实现。
+- 各血量 Mod 互相排斥。
 
 ---
 
@@ -206,6 +222,11 @@ Easy / Hard / Ex-Hard / Hazard 血量变体尚未实现。
 | Lane Random (LR)           | RANDOM：随机排列轨道列                 |                 |
 | Note Random (NR)           | S-RANDOM / H-RANDOM：逐音符随机        |                 |
 | Rotation Random (RR)       | R-RANDOM：旋转 + 可选镜像              |                 |
+| Assist Easy Gauge (E2)     | 使用 Assist Easy BMS 血量              |                 |
+| Easy Gauge (E1)            | 使用 Easy BMS 血量                     |                 |
+| Hard Gauge (H1)            | 使用 Hard BMS 血量                     |                 |
+| EX Hard Gauge (H2)         | 使用 EX Hard BMS 血量                  |                 |
+| Hazard Gauge (H3)          | 使用 Hazard BMS 血量                   |                 |
 
 ---
 
@@ -461,7 +482,7 @@ HUD 组件实现了 `ISerialisableDrawable`，可在游戏内通过**皮肤编�
 |----------|------|
 | 组合     | 滚动连击计数器，闲置时自动隐藏，可配置最低显示阈值，连击中断时闪烁变色。 |
 | 判定     | 逐音符命中结果动画（PGREAT、GREAT、GOOD、BAD、POOR），在判定时实时显示。 |
-| 血量条   | 纵向血量槽，按危险（红）、警告（黄）、安全（青）分色显示，80 % 处标注 clear 线。 |
+| 血量条   | 纵向血量槽，按当前血量类型自适应显示：Groove 模式按通关线分色（红→黄→绿），Survival 模式使用固定品牌色，clear 线按当前 gauge 的通关线显示。 |
 
 ### 示例 skin.ini (7K)
 

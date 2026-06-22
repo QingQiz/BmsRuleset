@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
+using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 
@@ -39,16 +41,18 @@ public partial class BmsHealthProcessor : HealthProcessor
     /// </summary>
     public bool HasEverFailed { get; private set; }
 
-    private const double bad_delta = -0.04;
-    private const double miss_delta = -0.06;
-    private const double empty_poor_delta = -0.02;
-
-    private const double initial_health = 0.2;
-
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
+    private BmsGaugeCalculator? calculator;
+
+    public BmsGaugeType GaugeType { get; private set; } = BmsGaugeType.Normal;
+
+    public BmsGaugeProfile GaugeProfile { get; private set; } = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
+
+    public Bindable<BmsGaugeDisplayProfile> DisplayProfile { get; } =
+        new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
+
     private IBeatmap? beatmap;
-    private double pgreatGain;
     private bool initialized;
 
     public override void ApplyBeatmap(IBeatmap beatmap)
@@ -63,14 +67,43 @@ public partial class BmsHealthProcessor : HealthProcessor
     public void RegisterEmptyPoor()
     {
         ensureInitialized();
-        Health.Value = Math.Max(0, Health.Value + empty_poor_delta);
+        Health.Value = calculator!.ApplyDelta(Health.Value, calculator.GetDeltaFor(HitResult.Miss, Health.Value));
+        markEverFailedIfEmpty();
+    }
+
+    public void SetGaugeType(BmsGaugeType gaugeType)
+    {
+        GaugeType = gaugeType;
+        GaugeProfile = BmsGaugeProfileFactory.Create(gaugeType);
+        DisplayProfile.Value = GaugeProfile.Display;
+        Health.MaxValue = GaugeProfile.MaxHealth;
+        Health.Value = GaugeProfile.InitialHealth;
+        initialized = false;
+    }
+
+    public bool HasPassedAtEnd()
+    {
+        if (HasEverFailed)
+            return false;
+
+        return GaugeProfile.ClearThreshold <= 0 || Health.Value >= GaugeProfile.ClearThreshold;
+    }
+
+    private void markEverFailedIfEmpty()
+    {
+        if (Health.Value > 0)
+            return;
+
+        HasEverFailed = true;
+        TriggerFailure();
     }
 
     protected override void Reset(bool storeResults)
     {
         base.Reset(storeResults);
         initialized = false;
-        Health.Value = initial_health;
+        Health.MaxValue = GaugeProfile.MaxHealth;
+        Health.Value = GaugeProfile.InitialHealth;
         HasEverFailed = false;
     }
 
@@ -101,15 +134,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             return -mine.LandmineDamagePercent / 100d;
         }
 
-        return result.Type switch
-        {
-            HitResult.Perfect => pgreatGain,
-            HitResult.Great => pgreatGain,
-            HitResult.Good => pgreatGain * 0.5,
-            HitResult.Ok => bad_delta,
-            HitResult.Meh => miss_delta,
-            _ => 0,
-        };
+        return calculator!.GetDeltaFor(result.Type, Health.Value);
     }
 
     private void ensureInitialized()
@@ -129,6 +154,6 @@ public partial class BmsHealthProcessor : HealthProcessor
             total = Math.Max(7.605 * noteCount / (0.01 * noteCount + 6.5), 160.0);
         }
 
-        pgreatGain = total / 100.0 / noteCount;
+        calculator = new BmsGaugeCalculator(GaugeProfile, total, noteCount);
     }
 }

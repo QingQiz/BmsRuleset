@@ -125,21 +125,16 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         if (scoreProcessor == null || healthProcessor == null || gameplayState == null)
             return;
 
-        // The BmsHealthProcessor tracks HasEverFailed — which remains false during
-        // autoplay simulation (ApplyBeatmap resets it) and only flips to true when HP
-        // drops to 0 during actual gameplay, even if NF mod prevents the fail screen.
-        if (healthProcessor is BmsHealthProcessor bmsHp && bmsHp.HasEverFailed)
+        if (healthProcessor is BmsHealthProcessor bmsHp)
         {
-            scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
+            if (!bmsHp.HasPassedAtEnd())
+                scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
+
             return;
         }
 
-        if (healthProcessor.Health.Value >= 0.8)
-            return;
-
-        // FailScore sets rank.Value = ScoreRank.F and score.Passed = false directly,
-        // bypassing RankFromScore so the updateRank guard never fires mid-play.
-        scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
+        if (healthProcessor.Health.Value < 0.8)
+            scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
     }
 
     [BackgroundDependencyLoader]

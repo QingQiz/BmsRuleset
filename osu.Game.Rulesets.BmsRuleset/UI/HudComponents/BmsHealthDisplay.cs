@@ -5,6 +5,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Utils;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
@@ -23,9 +25,13 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
 
     private readonly Box normalFill;
     private readonly Box clearLine;
+    private readonly Box gaugeSegment;
 
     private BindableNumber<double>? health;
     private double displayedHealth;
+
+    private readonly Bindable<BmsGaugeDisplayProfile> displayProfile =
+        new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
 
     [Resolved]
     private HealthProcessor healthProcessor { get; set; } = null!;
@@ -49,11 +55,10 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
                         RelativeSizeAxes = Axes.Both,
                         Colour = new Color4(8, 10, 14, 255),
                     },
-                    new GaugeSegment
+                    gaugeSegment = new GaugeSegment
                     {
                         Anchor = Anchor.BottomLeft,
                         Origin = Anchor.BottomLeft,
-                        Height = clear_threshold,
                         Colour = new Color4(16, 42, 52, 255),
                     },
                     normalFill = new Box
@@ -83,6 +88,10 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
         base.LoadComplete();
 
         health = healthProcessor.Health.GetBoundCopy();
+
+        if (healthProcessor is BmsHealthProcessor bmsHealthProcessor)
+            displayProfile.BindTo(bmsHealthProcessor.DisplayProfile);
+
         displayedHealth = health.Value;
         updateDisplay();
     }
@@ -101,18 +110,40 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
     private void updateDisplay()
     {
         var clampedHealth = double.IsFinite(displayedHealth) ? Math.Clamp(displayedHealth, 0, 1) : 0;
+        var profile = displayProfile.Value;
+
         normalFill.Height = (float)clampedHealth;
+        normalFill.Colour = profile.ColourMode == BmsGaugeColourMode.Fixed
+            ? profile.FillColour
+            : grooveColour(clampedHealth, profile.ClearThreshold ?? clear_threshold, profile.RedZoneThreshold);
 
-        var fillColour = clampedHealth switch
+        if (profile.ClearThreshold is double threshold)
         {
-            < 0.2 => new Color4(255, 45, 40, 255),
-            < clear_threshold => new Color4(255, 190, 45, 255),
-            _ => new Color4(45, 225, 80, 255),
-        };
+            gaugeSegment.Height = (float)threshold;
+            gaugeSegment.Alpha = 1;
+        }
+        else
+        {
+            gaugeSegment.Alpha = 0;
+        }
 
-        normalFill.Colour = fillColour;
-        clearLine.Alpha = clampedHealth >= clear_threshold ? 0.85f : 1;
+        if (profile.ShowClearLine && profile.ClearThreshold is double clearThreshold)
+        {
+            clearLine.Y = -(float)clearThreshold;
+            clearLine.Alpha = clampedHealth >= clearThreshold ? 0.85f : 1;
+        }
+        else
+        {
+            clearLine.Alpha = 0;
+        }
     }
+
+    private static Color4 grooveColour(double clampedHealth, double clearThreshold, double redZoneThreshold) => clampedHealth switch
+    {
+        var value when value < redZoneThreshold => new Color4(255, 45, 40, 255),
+        var value when value < clearThreshold => new Color4(255, 160, 30, 255),
+        _ => new Color4(45, 225, 80, 255),
+    };
 
     private sealed partial class GaugeSegment : Box
     {

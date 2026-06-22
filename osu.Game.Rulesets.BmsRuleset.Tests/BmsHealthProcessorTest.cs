@@ -4,6 +4,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 
@@ -51,7 +52,7 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
-    public void TestGaugeBadReducesHealthByFourPercent()
+    public void TestGaugeBadReducesHealthByThreePercent()
     {
         var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
@@ -73,7 +74,7 @@ public class BmsHealthProcessorTest
             Type = HitResult.Ok,
         });
 
-        var expectedHealth = Math.Max(0.0, initialHealth - 0.04);
+        var expectedHealth = Math.Max(0.0, initialHealth - 0.03);
         Assert.That(processor.Health.Value, Is.EqualTo(expectedHealth).Within(0.001));
     }
 
@@ -289,5 +290,101 @@ public class BmsHealthProcessorTest
 
         Assert.That(processor.Health.Value, Is.Zero);
         Assert.That(processor.HasFailed, Is.True);
+    }
+
+    [Test]
+    public void TestSetGaugeTypeChangesInitialHealth()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(BmsGaugeType.Hard);
+
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.Hard));
+        Assert.That(processor.Health.Value, Is.EqualTo(1).Within(0.001));
+        Assert.That(processor.DisplayProfile.Value.ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
+    }
+
+    [Test]
+    public void TestHardGaugePassesWhenNeverFailed()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(BmsGaugeType.Hard);
+
+        processor.ApplyBeatmap(new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        });
+
+        processor.Health.Value = 0.01;
+
+        Assert.That(processor.HasPassedAtEnd(), Is.True);
+    }
+
+    [Test]
+    public void TestNormalGaugeFailsBelowClearThresholdAtEnd()
+    {
+        var processor = new BmsHealthProcessor();
+
+        processor.ApplyBeatmap(new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        });
+
+        processor.Health.Value = 0.79;
+
+        Assert.That(processor.HasPassedAtEnd(), Is.False);
+    }
+
+    [Test]
+    public void TestHazardBadForcesFailure()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(BmsGaugeType.Hazard);
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+        {
+            Type = HitResult.Ok,
+        });
+
+        Assert.That(processor.Health.Value, Is.Zero);
+        Assert.That(processor.HasEverFailed, Is.True);
+        Assert.That(processor.HasPassedAtEnd(), Is.False);
+    }
+
+    [Test]
+    public void TestEmptyPoorCanTriggerFailure()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(BmsGaugeType.Hard);
+        processor.ApplyBeatmap(new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        });
+
+        processor.Health.Value = 0.01;
+        processor.RegisterEmptyPoor();
+
+        Assert.That(processor.Health.Value, Is.Zero);
+        Assert.That(processor.HasEverFailed, Is.True);
     }
 }

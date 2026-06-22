@@ -14,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
@@ -140,7 +141,7 @@ public partial class BmsRuleset : Ruleset
 
         yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total, (float)adjusted.Total, 300)
         {
-            Description = "PGREAT/GREAT=+auto%  GOOD=+auto/2%  BAD=-4%  POOR=-6%  EPOOR=-2%",
+            Description = "Gauge recovery uses #TOTAL; E2/E1/H1/H2/H3 mods select alternate BMS gauges.",
         };
     }
 
@@ -148,12 +149,34 @@ public partial class BmsRuleset : Ruleset
     {
         ModType.DifficultyReduction =>
         [
-            new BmsModNoFail(), new BmsModHalfTime(), new BmsModConstant(), new BmsModAutoScratch(),
+            new BmsModAssistEasyGauge(),
+            new BmsModEasyGauge(),
+
+            new BmsModAutoScratch(),
             new BmsModHideScratch(),
+
+            new BmsModNoFail(),
+            new BmsModHalfTime(),
+            new BmsModConstant(),
         ],
-        ModType.DifficultyIncrease => [new BmsModDoubleTime()],
+        ModType.DifficultyIncrease =>
+        [
+            new BmsModHardGauge(),
+            new BmsModExHardGauge(),
+            new BmsModHazardGauge(),
+
+            new BmsModDoubleTime(),
+        ],
         ModType.Automation => [new BmsModAutoplay(), new BmsModCinema()],
-        ModType.Conversion => [new BmsModMirror(), new BmsModSecondPlayer(), new BmsModLaneRandom(), new BmsModNoteRandom(), new BmsModRotationRandom()],
+        ModType.Conversion =>
+        [
+            new BmsModLaneRandom(),
+            new BmsModNoteRandom(),
+            new BmsModRotationRandom(),
+
+            new BmsModMirror(),
+            new BmsModSecondPlayer(),
+        ],
         ModType.System => [new BmsModBranchReplay()],
         _ => [],
     };

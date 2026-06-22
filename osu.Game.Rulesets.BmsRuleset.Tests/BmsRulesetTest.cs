@@ -9,6 +9,8 @@ using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Beatmaps;
@@ -131,5 +133,40 @@ public class BmsRulesetTest
         Assert.That(ruleset.ShortName, Is.EqualTo("bms"));
         Assert.That(ruleset.Description, Is.EqualTo("BMS"));
         Assert.That(ruleset.RulesetAPIVersionSupported, Is.Not.Null.And.Not.Empty);
+    }
+
+    [Test]
+    public void TestGaugeModsRegisteredWithExpectedAcronyms()
+    {
+        var reduction = ruleset.GetModsFor(ModType.DifficultyReduction).ToArray();
+        var increase = ruleset.GetModsFor(ModType.DifficultyIncrease).ToArray();
+
+        Assert.That(reduction.OfType<BmsModAssistEasyGauge>().Single().Acronym, Is.EqualTo("E2"));
+        Assert.That(reduction.OfType<BmsModEasyGauge>().Single().Acronym, Is.EqualTo("E1"));
+        Assert.That(increase.OfType<BmsModHardGauge>().Single().Acronym, Is.EqualTo("H1"));
+        Assert.That(increase.OfType<BmsModExHardGauge>().Single().Acronym, Is.EqualTo("H2"));
+        Assert.That(increase.OfType<BmsModHazardGauge>().Single().Acronym, Is.EqualTo("H3"));
+    }
+
+    [Test]
+    public void TestGaugeModsAreMutuallyIncompatible()
+    {
+        var hard = new BmsModHardGauge();
+
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModAssistEasyGauge)));
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModEasyGauge)));
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModExHardGauge)));
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModHazardGauge)));
+    }
+
+    [Test]
+    public void TestGaugeModAppliesGaugeTypeToHealthProcessor()
+    {
+        var processor = new BmsHealthProcessor();
+        var mod = new BmsModExHardGauge();
+
+        mod.ApplyToHealthProcessor(processor);
+
+        Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExHard));
     }
 }
