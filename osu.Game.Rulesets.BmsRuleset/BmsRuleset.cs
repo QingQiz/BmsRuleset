@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
@@ -16,6 +17,7 @@ using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI;
@@ -132,17 +134,87 @@ public partial class BmsRuleset : Ruleset
         var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
         var adjusted = BmsDifficultyInfo.FromOsuDifficulty(adjustedDifficulty);
 
-        var w = BmsHitWindows.RANK_WINDOWS_LR2[Math.Clamp(original.Rank, 0, BmsHitWindows.RANK_WINDOWS_LR2.Length - 1)];
-
         yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
         {
-            Description = $"Pgreat={w.pgreat}ms Great={w.great}ms Good={w.good}ms Bad={w.badEarly}ms",
+            Description = $"LR2 RANK {adjusted.Rank} timing windows.",
+            AdditionalMetrics = createRankMetrics(adjusted.Rank),
         };
 
         yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total, (float)adjusted.Total, 300)
         {
-            Description = "Gauge recovery uses #TOTAL; E2/E1/H1/H2/H3 mods select alternate BMS gauges.",
+            Description = createTotalDescription(beatmapInfo, adjusted, mods),
+            AdditionalMetrics = createTotalMetrics(beatmapInfo, adjusted, mods),
         };
+    }
+
+    private static LocalisableString createTotalDescription(IBeatmapInfo beatmapInfo, BmsDifficultyInfo difficulty, IReadOnlyCollection<Mod> mods)
+    {
+        var gaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
+        var profile = BmsGaugeProfileFactory.Create(gaugeType);
+        var noteCount = Math.Max(1, beatmapInfo.TotalObjectCount);
+        var calculator = new BmsGaugeCalculator(profile, difficulty.Total, noteCount);
+
+        var gutsText = profile.GutsRules.Count > 0
+            ? "\nDamage shown at initial HP; low-HP guts may reduce penalties."
+            : string.Empty;
+
+        return $"{formatGaugeName(gaugeType)} gauge\n{noteCount} objects, {formatTotal(difficulty, calculator)}{gutsText}";
+
+        static string formatGaugeName(BmsGaugeType gaugeType) => gaugeType switch
+        {
+            BmsGaugeType.AssistEasy => "Assist Easy",
+            BmsGaugeType.Easy => "Easy",
+            BmsGaugeType.Normal => "Normal",
+            BmsGaugeType.Hard => "Hard",
+            BmsGaugeType.ExHard => "ExHard",
+            BmsGaugeType.Hazard => "Hazard",
+            BmsGaugeType.Class => "Class",
+            BmsGaugeType.ExClass => "ExClass",
+            BmsGaugeType.ExHardClass => "ExHard Class",
+            _ => gaugeType.ToString(),
+        };
+
+        static string formatTotal(BmsDifficultyInfo difficulty, BmsGaugeCalculator calculator) => difficulty.Total > 0
+            ? $"#TOTAL {calculator.Total:0.###}"
+            : $"default TOTAL {calculator.Total:0.###}";
+    }
+
+    private static RulesetBeatmapAttribute.AdditionalMetric[] createRankMetrics(int rank)
+    {
+        var w = BmsHitWindows.RANK_WINDOWS_LR2[Math.Clamp(rank, 0, BmsHitWindows.RANK_WINDOWS_LR2.Length - 1)];
+        var colours = new OsuColour();
+
+        return
+        [
+            new("PGREAT", $"±{formatMilliseconds(w.pgreat)} ms", colours.ForHitResult(HitResult.Perfect)),
+            new("GREAT", $"±{formatMilliseconds(w.great)} ms", colours.ForHitResult(HitResult.Great)),
+            new("GOOD", $"±{formatMilliseconds(w.good)} ms", colours.ForHitResult(HitResult.Good)),
+            new("BAD", $"±{formatMilliseconds(w.badEarly)} ms", colours.ForHitResult(HitResult.Ok)),
+            new("E-POOR early zone", $"-{formatMilliseconds(w.emptyPoorEarly)} to -{formatMilliseconds(w.badEarly)} ms", colours.ForHitResult(HitResult.Miss)),
+        ];
+
+        static string formatMilliseconds(double value) => $"{value:0.##}";
+    }
+
+    private static RulesetBeatmapAttribute.AdditionalMetric[] createTotalMetrics(IBeatmapInfo beatmapInfo, BmsDifficultyInfo difficulty, IReadOnlyCollection<Mod> mods)
+    {
+        var gaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
+        var profile = BmsGaugeProfileFactory.Create(gaugeType);
+        var noteCount = Math.Max(1, beatmapInfo.TotalObjectCount);
+        var calculator = new BmsGaugeCalculator(profile, difficulty.Total, noteCount);
+        var referenceHealth = profile.InitialHealth;
+        var colours = new OsuColour();
+
+        return
+        [
+            new("PGREAT/GREAT", formatDelta(calculator.GetDeltaFor(HitResult.Perfect, referenceHealth)), colours.ForHitResult(HitResult.Perfect)),
+            new("GOOD", formatDelta(calculator.GetDeltaFor(HitResult.Good, referenceHealth)), colours.ForHitResult(HitResult.Good)),
+            new("BAD", formatDelta(calculator.GetDeltaFor(HitResult.Ok, referenceHealth)), colours.ForHitResult(HitResult.Ok)),
+            new("POOR", formatDelta(calculator.GetDeltaFor(HitResult.Meh, referenceHealth)), colours.ForHitResult(HitResult.Meh)),
+            new("E-POOR", formatDelta(calculator.GetDeltaFor(HitResult.Miss, referenceHealth)), colours.ForHitResult(HitResult.Miss)),
+        ];
+
+        static string formatDelta(double delta) => $"{delta * 100:+0.###;-0.###;0}%";
     }
 
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
