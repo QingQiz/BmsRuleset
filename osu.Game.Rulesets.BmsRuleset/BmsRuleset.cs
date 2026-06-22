@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
@@ -150,6 +152,69 @@ public partial class BmsRuleset : Ruleset
         };
     }
 
+    public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
+    {
+        ModType.DifficultyReduction =>
+        [
+            new BmsModAssistEasyGauge(),
+            new BmsModEasyGauge(),
+
+            new BmsModAutoScratch(),
+            new BmsModHideScratch(),
+
+            new BmsModNoFail(),
+            new BmsModHalfTime(),
+            new BmsModConstant(),
+        ],
+        ModType.DifficultyIncrease =>
+        [
+            new BmsModHardGauge(),
+            new BmsModExHardGauge(),
+            new BmsModHazardGauge(),
+
+            new BmsModDoubleTime(),
+        ],
+        ModType.Automation => [new BmsModAutoplay(), new BmsModCinema()],
+        ModType.Conversion =>
+        [
+            new BmsModLaneRandom(),
+            new BmsModNoteRandom(),
+            new BmsModRotationRandom(),
+
+            new BmsModMirror(),
+            new BmsModSecondPlayer(),
+        ],
+        ModType.System => [new BmsModBranchReplay()],
+        _ => [],
+    };
+
+    public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap) => skin switch
+    {
+        ArgonSkin or ArgonProSkin or TrianglesSkin or DefaultLegacySkin or RetroSkin => new BmsBuiltInSkinTransformer(skin),
+        Skin => new BmsLegacySkinTransformer(skin, beatmap),
+        _ => null,
+    };
+
+    public override IEnumerable<HitResult> GetValidHitResults() => STATIC_VALID_HIT_RESULTS;
+
+    public override LocalisableString GetDisplayNameForHitResult(HitResult result) =>
+        HIT_RESULT_LABELS.TryGetValue(result, out var label) ? label : base.GetDisplayNameForHitResult(result);
+
+    public override IRulesetConfigManager CreateConfig(SettingsStore? settings)
+    {
+        var config = new BmsRulesetConfigManager(settings, RulesetInfo);
+        sharedConfigManager = config;
+        return config;
+    }
+
+    public override RulesetSettingsSubsection CreateSettings() =>
+        new BmsSettingsSubsection(this);
+
+    public override IRulesetFilterCriteria CreateRulesetFilterCriteria() =>
+        new BmsFilterCriteria(sharedConfigManager);
+
+    public override Drawable CreateIcon() => new BmsRulesetIcon();
+
     private static LocalisableString createTotalDescription(IBeatmapInfo beatmapInfo, BmsDifficultyInfo difficulty, IReadOnlyCollection<Mod> mods)
     {
         var gaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
@@ -261,70 +326,31 @@ public partial class BmsRuleset : Ruleset
 
     #endregion
 
-    public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
+    private partial class BmsRulesetIcon : CompositeDrawable
     {
-        ModType.DifficultyReduction =>
-        [
-            new BmsModAssistEasyGauge(),
-            new BmsModEasyGauge(),
+        [Resolved(CanBeNull = true)]
+        private BeatmapManager? beatmapManager { get; set; }
 
-            new BmsModAutoScratch(),
-            new BmsModHideScratch(),
+        public BmsRulesetIcon()
+        {
+            AutoSizeAxes = Axes.Both;
 
-            new BmsModNoFail(),
-            new BmsModHalfTime(),
-            new BmsModConstant(),
-        ],
-        ModType.DifficultyIncrease =>
-        [
-            new BmsModHardGauge(),
-            new BmsModExHardGauge(),
-            new BmsModHazardGauge(),
+            InternalChild = new SpriteIcon
+            {
+                Icon = OsuIcon.RulesetMania,
+                Colour = Colour4.White,
+            };
+        }
 
-            new BmsModDoubleTime(),
-        ],
-        ModType.Automation => [new BmsModAutoplay(), new BmsModCinema()],
-        ModType.Conversion =>
-        [
-            new BmsModLaneRandom(),
-            new BmsModNoteRandom(),
-            new BmsModRotationRandom(),
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            if (beatmapManager == null)
+            {
+                return;
+            }
 
-            new BmsModMirror(),
-            new BmsModSecondPlayer(),
-        ],
-        ModType.System => [new BmsModBranchReplay()],
-        _ => [],
-    };
-
-    public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap) => skin switch
-    {
-        ArgonSkin or ArgonProSkin or TrianglesSkin or DefaultLegacySkin or RetroSkin => new BmsBuiltInSkinTransformer(skin),
-        Skin => new BmsLegacySkinTransformer(skin, beatmap),
-        _ => null,
-    };
-
-    public override IEnumerable<HitResult> GetValidHitResults() => STATIC_VALID_HIT_RESULTS;
-
-    public override LocalisableString GetDisplayNameForHitResult(HitResult result) =>
-        HIT_RESULT_LABELS.TryGetValue(result, out var label) ? label : base.GetDisplayNameForHitResult(result);
-
-    public override IRulesetConfigManager CreateConfig(SettingsStore? settings)
-    {
-        var config = new BmsRulesetConfigManager(settings, RulesetInfo);
-        sharedConfigManager = config;
-        return config;
+            BmsWorkingBeatmapHelper.Install(beatmapManager);
+        }
     }
-
-    public override RulesetSettingsSubsection CreateSettings() =>
-        new BmsSettingsSubsection(this);
-
-    public override IRulesetFilterCriteria CreateRulesetFilterCriteria() =>
-        new BmsFilterCriteria(sharedConfigManager);
-
-    public override Drawable CreateIcon() => new SpriteIcon
-    {
-        Icon = OsuIcon.RulesetMania,
-        Colour = Colour4.White,
-    };
 }

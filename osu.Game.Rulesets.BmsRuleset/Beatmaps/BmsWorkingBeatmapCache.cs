@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using osu.Framework.Audio;
@@ -14,11 +15,13 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
 /// <summary>
 ///     A <see cref="WorkingBeatmapCache" /> that wraps BMS beatmaps in a <see cref="BmsWorkingBeatmap" />
-///     so that <see cref="BmsPreviewTrack" /> is used as the audio track instead of a silent virtual track.
+///     so that <see cref="osu.Game.Rulesets.BmsRuleset.Audio.BmsPreviewTrack" /> is used as the audio track instead of a silent virtual track.
 ///     Non-BMS beatmaps pass through to the base implementation unchanged.
 /// </summary>
 internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
 {
+    private readonly Dictionary<Guid, BmsWorkingBeatmap> bmsWrapperCache = new();
+
     private BmsWorkingBeatmapCache(
         ITrackStore trackStore,
         AudioManager audioManager,
@@ -33,15 +36,26 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
 
     public override WorkingBeatmap GetWorkingBeatmap(BeatmapInfo? beatmapInfo)
     {
-        bool isBms = beatmapInfo?.Ruleset?.ShortName == "bms";
+        if (beatmapInfo == null) return DefaultBeatmap;
+
+        var isBms = beatmapInfo.Ruleset.ShortName == "bms";
 
         if (!isBms)
             return base.GetWorkingBeatmap(beatmapInfo);
 
+        if (bmsWrapperCache.TryGetValue(beatmapInfo.ID, out var cached))
+        {
+            return cached;
+        }
+
         var working = base.GetWorkingBeatmap(beatmapInfo);
         var audioManager = ((IStorageResourceProvider)this).AudioManager;
 
-        return new BmsWorkingBeatmap(working, audioManager);
+        var wrapper = new BmsWorkingBeatmap(working, audioManager!);
+
+        bmsWrapperCache[beatmapInfo.ID] = wrapper;
+
+        return wrapper;
     }
 
     #region Reflection-based creation
@@ -66,7 +80,8 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
 
         var defaultBeatmap = original.DefaultBeatmap;
 
-        return new BmsWorkingBeatmapCache(trackStore, audioManager, resources, files, defaultBeatmap, host, realm);
+        var wrapped = new BmsWorkingBeatmapCache(trackStore, audioManager, resources, files, defaultBeatmap, host, realm);
+        return wrapped;
     }
 
     private static T getField<T>(object target, string fieldName, BindingFlags flags)
@@ -99,6 +114,7 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
     }
 
     #endregion
+
 }
 
 /// <summary>
@@ -107,7 +123,7 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
 /// </summary>
 /// <remarks>
 ///     This is the injection point that enables BMS preview audio with zero changes to the osu!
-///     game assembly.  Call <see cref="Install" /> once after the <c>BeatmapManager</c> is created,
+///     game assembly. Call <see cref="Install" /> once after the <c>BeatmapManager</c> is created,
 ///     ideally from the host application's startup code:
 ///     <code>
 ///         var manager = new BeatmapManager(...);
@@ -116,7 +132,6 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
 /// </remarks>
 public static class BmsWorkingBeatmapHelper
 {
-    private static volatile bool installed;
     private static readonly object install_lock = new();
 
     /// <summary>
@@ -127,12 +142,8 @@ public static class BmsWorkingBeatmapHelper
     /// <returns><c>true</c> if the installation succeeded; <c>false</c> otherwise.</returns>
     public static bool Install(BeatmapManager manager)
     {
-        if (installed) return true;
-
         lock (install_lock)
         {
-            if (installed) return true;
-
             var cacheField = typeof(BeatmapManager).GetField("workingBeatmapCache",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
@@ -145,17 +156,30 @@ public static class BmsWorkingBeatmapHelper
                 return false;
             }
 
-            var original = cacheField.GetValue(manager) as WorkingBeatmapCache;
+            if (cacheField.GetValue(manager) is not WorkingBeatmapCache original) return false;
 
-            if (original == null || original is BmsWorkingBeatmapCache)
-                return original != null;
+            if (original is BmsWorkingBeatmapCache) return true;
 
             try
             {
                 var wrapped = BmsWorkingBeatmapCache.Wrap(original);
-                setReadonlyField(manager, cacheField, wrapped);
-                installed = true;
-                return true;
+
+                if (!setReadonlyField(manager, cacheField, wrapped))
+                {
+                    return false;
+                }
+
+                var installed = cacheField.GetValue(manager) is BmsWorkingBeatmapCache;
+
+                if (!installed)
+                {
+                    Logger.Log(
+                        "BMS WorkingBeatmapHelper: Field write reported success but BeatmapManager still has the original cache. "
+                        + "BMS preview-track hook will not be active.",
+                        level: LogLevel.Error);
+                }
+
+                return installed;
             }
             catch (InvalidOperationException)
             {
@@ -169,12 +193,16 @@ public static class BmsWorkingBeatmapHelper
     ///     fallback when <c>FieldInfo.SetValue</c> is blocked by runtime readonly checks
     ///     (modern .NET 5+).
     /// </summary>
-    private static void setReadonlyField(object target, FieldInfo field, object value)
+    private static bool setReadonlyField(object target, FieldInfo field, object value)
     {
         try
         {
             field.SetValue(target, value);
-            return;
+
+            if (ReferenceEquals(field.GetValue(target), value))
+            {
+                return true;
+            }
         }
         catch (FieldAccessException)
         {
@@ -184,7 +212,7 @@ public static class BmsWorkingBeatmapHelper
         {
             Logger.Error(ex, $"BMS WorkingBeatmapHelper: Failed to set readonly field '{field.Name}' via SetValue. "
                              + "BMS preview-track hook will not be active.");
-            return;
+            return false;
         }
 
         try
@@ -198,16 +226,22 @@ public static class BmsWorkingBeatmapHelper
 
             var il = dynamicMethod.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Castclass, field.DeclaringType!);
             il.Emit(OpCodes.Ldarg_1);
+            il.Emit(field.FieldType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, field.FieldType);
             il.Emit(OpCodes.Stfld, field);
             il.Emit(OpCodes.Ret);
 
             dynamicMethod.Invoke(null, [target, value]);
+
+            var success = ReferenceEquals(field.GetValue(target), value);
+            return success;
         }
         catch (Exception ex)
         {
             Logger.Error(ex, $"BMS WorkingBeatmapHelper: Failed to write readonly field '{field.Name}' via IL emit. "
                              + "BMS preview-track hook will not be active.");
+            return false;
         }
     }
 }

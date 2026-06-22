@@ -40,6 +40,7 @@ public static class BmsDefaultHud
                 {
                     Anchor = Anchor.BottomRight,
                     Origin = Anchor.BottomLeft,
+                    Margin = new MarginPadding { Left = 5 },
                 },
                 new BmsJudgementDisplay(),
                 new BmsComboCounter(),

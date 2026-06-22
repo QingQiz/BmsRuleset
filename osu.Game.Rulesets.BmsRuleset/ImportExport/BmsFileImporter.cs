@@ -640,6 +640,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                         Artist = chart.Metadata.Artist,
                         Author = new RealmUser { Username = Constant.AUTHOR },
                         Source = prepared.Directory,
+                        PreviewTime = 0,
                     },
                     Difficulty = new BeatmapDifficulty(),
                     Hash = chart.FileHash,

@@ -54,9 +54,6 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     [Resolved(CanBeNull = true)]
     private GameplayState? gameplayState { get; set; }
 
-    [Resolved(CanBeNull = true)]
-    private BeatmapManager? beatmapManager { get; set; }
-
     public static double ComputeScrollTime(double scrollSpeed) => MAX_TIME_RANGE / Math.Max(1, scrollSpeed);
 
     public override DrawableHitObject<BmsHitObject>? CreateDrawableRepresentation(BmsHitObject h) => null;
@@ -75,17 +72,6 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     {
         base.LoadComplete();
 
-        // Install the BMS preview-track hook now that we have DI access to BeatmapManager.
-        // This must run at least once per session. After installation, song-select preview
-        // audio for BMS charts will use BmsPreviewTrack instead of a silent virtual track.
-        if (beatmapManager != null)
-            BmsWorkingBeatmapHelper.Install(beatmapManager);
-
-        // Subscribe to play completion for the end-of-song gauge check.
-        // When health < 80% at song end, the rank must be F but the play should show
-        // results normally (no fail animation).  This cannot live in RankFromScore
-        // (which would lock the rank for subsequent accuracy updates) nor in
-        // CheckDefaultFailCondition (which would trigger a gameplay fail).
         if (scoreProcessor != null && healthProcessor != null && gameplayState != null)
             scoreProcessor.HasCompleted.BindValueChanged(_ => onPlayCompleted());
     }
@@ -105,7 +91,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     /// <summary>
     ///     Resolve the chart directory path from the DB-backed beatmap (where the importer stored
     ///     it), bypassing the decoder's unconditional <c>Source = "BMS"</c> override.
-    ///     <see cref="WorkingBeatmap.loadBeatmapAsync"/> copies <see cref="BeatmapInfo.BeatmapSet"/>
+    ///     <c>WorkingBeatmap.loadBeatmapAsync</c> copies <see cref="BeatmapInfo.BeatmapSet"/>
     ///     and <see cref="BeatmapInfo.ID"/> from the database but <b>not</b>
     ///     <see cref="BeatmapInfo.Metadata"/>, so the decoder override survives into gameplay.
     /// </summary>
@@ -159,5 +145,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         {
             ((BmsPlayfield)Playfield).SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
         }
+
+        BmsWorkingBeatmap.StopActivePreview();
     }
 }

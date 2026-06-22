@@ -918,7 +918,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                  |
 | **Audio**     | `#VOLWAV` (BM98) — global volume scalar                                                  |
 | **Audio**     | `HT`, `DT` should change sample/keysound clockrate                                       | 1         |
-| **Audio**     | Hijack preview song to play BMS samples                                                  | 1(failed) |
 | **Audio**     | `#xxx97` (fgt) — dynamic BGM volume change channel                                       |           |
 | **Converter** | Mania 7K → BMS chart conversion                                                          | 3         |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |
@@ -1007,4 +1006,4 @@ difficulty using the wrong converter while the carousel selection is stale.
 | LR2 BMS Option Reference           | http://hitkey.nekokan.dyndns.info/option.htm                                                                                                   |
 | BMS Gimmick Techniques (JP)        | https://note.com/numuther/n/n57bf895e7969                                                                                                      |
 | Benchmark                          | https://hitkey.nekokan.dyndns.info/bmsbench.shtml                                                                                              |
-| `#SPEED` vs `#SCROLL`              | https://hitkey.nekokan.dyndns.info/bmse_help_full/Capture/_read.htm#SAMPLEBMS                                                                  | 
+| `#SPEED` vs `#SCROLL`              | https://hitkey.nekokan.dyndns.info/bmse_help_full/Capture/_read.htm#SAMPLEBMS                                                                  |

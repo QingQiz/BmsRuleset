@@ -4,36 +4,15 @@ using System.Threading.Tasks;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
+using osu.Framework.Bindables;
 using osu.Framework.IO.Stores;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
 
-/// <summary>
-///     A <see cref="Track" /> that generates audio in real-time from BMS BGM events instead of
-///     playing a pre-recorded file.  Each BGM sample is played from the chart's filesystem directory
-///     at the correct moment using the track's virtual clock position.
-/// </summary>
-/// <remarks>
-///     <para>
-///         This track is used by <c>MusicController</c> during song select to provide a preview of
-///         a BMS chart.  Because individual BGM samples are short keysounds, the preview plays them
-///         in sequence according to the chart's timing, which gives a representative audio impression.
-///     </para>
-///     <para>
-///         Sample resolution is filesystem-only (Tier 1 of <see cref="BmsSampleStore" /> semantics).
-///         The chart directory path comes from <c>BeatmapInfo.Metadata.Source</c>, which the BMS
-///         decoder sets to the original chart folder on disk.
-///     </para>
-///     <para>
-///         Volume follows the same isolation as <see cref="BmsBackgroundAudioPlayer" />:
-///         only the aggregate track volume chain applies — no effect volume.
-///     </para>
-/// </remarks>
 public class BmsPreviewTrack : Track
 {
-
     public override bool IsRunning
     {
         get
@@ -41,6 +20,8 @@ public class BmsPreviewTrack : Track
             lock (clock) return clock.IsRunning;
         }
     }
+
+    public override bool IsDummyDevice => false;
 
     public override double CurrentTime
     {
@@ -50,10 +31,19 @@ public class BmsPreviewTrack : Track
         }
     }
 
-    private readonly StopwatchClock clock = new StopwatchClock();
+    /// <summary>
+    ///     When set, <see cref="UpdateState" /> skips BGM event processing so that
+    ///     gameplay audio (driven by <see cref="BmsBackgroundAudioPlayer" />) is
+    ///     the only source.  The track still provides clock timing for the
+    ///     <see cref="osu.Game.Screens.Play.MasterGameplayClockContainer" />.
+    /// </summary>
+    public bool SuppressEventProcessing { get; set; }
+
+    private readonly StopwatchClock clock = new();
     private readonly List<BgmEvent> sortedEvents = [];
     private readonly ISampleStore? sampleStore;
-    private readonly List<SampleChannel> activeChannels = [];
+    private readonly Dictionary<string, ISample?> resolvedSamples = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<ActiveBgm> activeChannels = [];
 
     private readonly record struct BgmEvent(double Time, string SamplePath);
 
@@ -66,7 +56,7 @@ public class BmsPreviewTrack : Track
     ///     The chart directory on disk (from <c>BeatmapInfo.Metadata.Source</c>).
     ///     May be <c>null</c> in fully-imported mode (no filesystem fallback available).
     /// </param>
-    /// <param name="audioManager">Framework audio manager, used to create a filesystem-backed sample store.</param>
+    /// <param name="audioManager">Framework audio manager, used to create filesystem-backed audio stores.</param>
     public BmsPreviewTrack(
         IReadOnlyList<BmsSampleEvent> bgmEvents,
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
@@ -74,7 +64,6 @@ public class BmsPreviewTrack : Track
         AudioManager audioManager)
         : base("bms-preview")
     {
-        // Resolve sample keys to filenames and sort by event time.
         foreach (var evt in bgmEvents)
         {
             if (sampleDefinitions.TryGetValue(evt.SampleKey, out var samplePath))
@@ -83,7 +72,6 @@ public class BmsPreviewTrack : Track
 
         sortedEvents.Sort((a, b) => a.Time.CompareTo(b.Time));
 
-        // Set up a filesystem-backed sample store reading from the chart directory.
         if (basePath != null)
         {
             var fileResources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
@@ -92,17 +80,9 @@ public class BmsPreviewTrack : Track
             fileResources.AddExtension("ogg");
 
             sampleStore = audioManager.GetSampleStore(fileResources);
-
-            // Pre-warm the sample store (synchronous) so the first preview playback is smooth.
-            foreach (var evt in sortedEvents)
-            {
-                var sample = sampleStore.Get(evt.SamplePath);
-                // Sample is now cached in the store; discard the reference.
-            }
         }
 
-        // Length: 5 seconds after the last BGM event, minimum 30 s.
-        double length = sortedEvents.Count > 0
+        var length = sortedEvents.Count > 0
             ? sortedEvents[^1].Time + 5000
             : 30000;
         Length = length;
@@ -141,11 +121,12 @@ public class BmsPreviewTrack : Track
     {
         seekOffset = Math.Clamp(seek, 0, Length);
 
-        bool success = seekOffset == seek;
+        var success = seekOffset == seek;
+        var wasRunning = IsRunning;
 
         lock (clock)
         {
-            if (success && IsRunning)
+            if (success && wasRunning)
                 clock.Restart();
             else
                 clock.Reset();
@@ -199,10 +180,10 @@ public class BmsPreviewTrack : Track
             }
         }
 
-        if (!IsRunning)
+        if (!IsRunning || SuppressEventProcessing)
             return;
 
-        double currentTime = CurrentTime;
+        var currentTime = CurrentTime;
 
         while (nextEventIndex < sortedEvents.Count)
         {
@@ -223,45 +204,91 @@ public class BmsPreviewTrack : Track
         if (sampleStore == null)
             return;
 
-        var sample = sampleStore.Get(evt.SamplePath);
+        var sample = resolveSample(evt.SamplePath);
 
         if (sample == null)
             return;
 
         var channel = sample.GetChannel();
         channel.ManualFree = true;
-
-        // Inherit the track's aggregate volume chain (master × music, no effect volume).
-        channel.AddAdjustment(AdjustableProperty.Volume, AggregateVolume);
-
         channel.Play();
-        activeChannels.Add(channel);
+
+        // channel.Play() may bind the decoded sample's aggregate chain after this call. BGM preview
+        // must follow only this Track's aggregate chain, so strip sample/effect routing again once.
+        bindPreviewVolumeAdjustments(channel);
+
+        Action<ValueChangedEvent<double>>? isolateOnBind = null;
+        isolateOnBind = _ =>
+        {
+            channel.AggregateVolume.ValueChanged -= isolateOnBind!;
+            bindPreviewVolumeAdjustments(channel);
+        };
+        channel.AggregateVolume.ValueChanged += isolateOnBind;
+
+        activeChannels.Add(new ActiveBgm(channel));
+    }
+
+    private ISample? resolveSample(string samplePath)
+    {
+        if (sampleStore == null)
+            return null;
+
+        if (resolvedSamples.TryGetValue(samplePath, out var cached))
+            return cached;
+
+        foreach (var lookup in new BmsSampleInfo(samplePath).LookupNames)
+        {
+            var sample = sampleStore.Get(lookup);
+
+            if (sample != null)
+                return resolvedSamples[samplePath] = sample;
+        }
+
+        return resolvedSamples[samplePath] = null;
+    }
+
+    private void bindPreviewVolumeAdjustments(IAdjustableAudioComponent component)
+    {
+        component.RemoveAllAdjustments(AdjustableProperty.Volume);
+        component.AddAdjustment(AdjustableProperty.Volume, AggregateVolume);
     }
 
     private void stopAllChannels()
     {
-        foreach (var ch in activeChannels)
-        {
-            ch.Stop();
-            ch.Dispose();
-        }
+        foreach (var active in activeChannels.ToArray())
+            active.StopAndDispose();
 
         activeChannels.Clear();
     }
 
     private void cleanupChannels()
     {
-        activeChannels.RemoveAll(ch => ch.IsDisposed || (ch.Played && !ch.Playing));
+        for (var i = activeChannels.Count - 1; i >= 0; i--)
+        {
+            var active = activeChannels[i];
+
+            if (active.IsDisposed)
+            {
+                activeChannels.RemoveAt(i);
+                continue;
+            }
+
+            if (active.HasFinished)
+            {
+                active.StopAndDispose();
+                activeChannels.RemoveAt(i);
+            }
+        }
     }
 
     private int findFirstEventAfter(double time)
     {
-        int low = 0;
-        int high = sortedEvents.Count;
+        var low = 0;
+        var high = sortedEvents.Count;
 
         while (low < high)
         {
-            int middle = low + (high - low) / 2;
+            var middle = low + (high - low) / 2;
 
             if (sortedEvents[middle].Time <= time)
                 low = middle + 1;
@@ -270,5 +297,21 @@ public class BmsPreviewTrack : Track
         }
 
         return low;
+    }
+
+    private sealed class ActiveBgm(SampleChannel channel)
+    {
+        public bool IsDisposed => channel.IsDisposed;
+
+        public bool HasFinished => channel.Played && !channel.Playing;
+
+        public void StopAndDispose()
+        {
+            if (!channel.IsDisposed)
+            {
+                channel.Stop();
+                channel.Dispose();
+            }
+        }
     }
 }
