@@ -19,9 +19,7 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
 {
     public bool UsesFixedAnchor { get; set; }
 
-    private const float bar_width = 30;
-    private const float bar_height = 400;
-    private const float clear_border = 0.8f;
+    private const float clear_threshold = 0.8f;
 
     private readonly Box normalFill;
     private readonly Box clearLine;
@@ -34,15 +32,16 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
 
     public BmsHealthDisplay()
     {
-        Size = new Vector2(58, bar_height);
+        Size = new Vector2(30, 500);
 
         InternalChildren =
         [
             new Container
             {
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
-                Size = new Vector2(bar_width, bar_height),
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                RelativeSizeAxes = Axes.Both,
+                Size = new Vector2(0.5f, 1f),
                 Children =
                 [
                     new Box
@@ -54,7 +53,7 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
                     {
                         Anchor = Anchor.BottomLeft,
                         Origin = Anchor.BottomLeft,
-                        Height = clear_border,
+                        Height = clear_threshold,
                         Colour = new Color4(16, 42, 52, 255),
                     },
                     normalFill = new Box
@@ -69,12 +68,11 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
                         Anchor = Anchor.BottomLeft,
                         Origin = Anchor.CentreLeft,
                         RelativeSizeAxes = Axes.X,
-                        Y = -bar_height * clear_border,
+                        RelativePositionAxes = Axes.Y,
+                        Y = -clear_threshold,
                         Height = 2,
                         Colour = new Color4(255, 240, 120, 255),
                     },
-                    new GaugeTicks(),
-                    new GaugeBorder(),
                 ],
             },
         ];
@@ -108,12 +106,12 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
         var fillColour = clampedHealth switch
         {
             < 0.2 => new Color4(255, 45, 40, 255),
-            < clear_border => new Color4(255, 190, 45, 255),
-            _ => new Color4(45, 225, 255, 255),
+            < clear_threshold => new Color4(255, 190, 45, 255),
+            _ => new Color4(45, 225, 80, 255),
         };
 
         normalFill.Colour = fillColour;
-        clearLine.Alpha = clampedHealth >= clear_border ? 0.85f : 1;
+        clearLine.Alpha = clampedHealth >= clear_threshold ? 0.85f : 1;
     }
 
     private sealed partial class GaugeSegment : Box
@@ -122,48 +120,6 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
         {
             RelativeSizeAxes = Axes.Both;
             Width = 1;
-        }
-    }
-
-    private sealed partial class GaugeTicks : CompositeDrawable
-    {
-        public GaugeTicks()
-        {
-            RelativeSizeAxes = Axes.Both;
-
-            var ticks = new Drawable[9];
-
-            for (var i = 0; i < ticks.Length; i++)
-            {
-                ticks[i] = new Box
-                {
-                    Anchor = Anchor.BottomLeft,
-                    Origin = Anchor.CentreLeft,
-                    RelativeSizeAxes = Axes.X,
-                    Width = i % 2 == 0 ? 1 : 0.55f,
-                    Height = 1,
-                    Y = -bar_height * (i + 1) / 10,
-                    Alpha = i == 7 ? 0 : 0.35f,
-                    Colour = Color4.White,
-                };
-            }
-
-            InternalChildren = ticks;
-        }
-    }
-
-    private sealed partial class GaugeBorder : CompositeDrawable
-    {
-        public GaugeBorder()
-        {
-            RelativeSizeAxes = Axes.Both;
-            InternalChildren =
-            [
-                new Box { RelativeSizeAxes = Axes.X, Height = 2, Colour = Color4.White },
-                new Box { Anchor = Anchor.BottomLeft, Origin = Anchor.BottomLeft, RelativeSizeAxes = Axes.X, Height = 2, Colour = Color4.White },
-                new Box { RelativeSizeAxes = Axes.Y, Width = 2, Colour = Color4.White },
-                new Box { Anchor = Anchor.TopRight, Origin = Anchor.TopRight, RelativeSizeAxes = Axes.Y, Width = 2, Colour = Color4.White },
-            ];
         }
     }
 }

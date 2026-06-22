@@ -452,15 +452,6 @@ If the digit textures are missing, the combo counter is silently hidden.
 | `LightingL`                 | LN hit explosion image         |
 | `LightFramePerSecond`       | Column light animation FPS     |
 
-### HUD Components
-
-The combo counter (`BmsComboCounter`) and health display (`BmsHealthDisplay`) implement
-`ISerialisableDrawable` and can be repositioned in the **Skin Editor** during gameplay.
-Open the skin editor and drag the combo counter or health bar to
-your preferred position.
-
-On the next play session the saved layout is automatically loaded.
-
 **Judgement images:**
 
 | Key         | BMS judgement |
@@ -481,6 +472,19 @@ You can also use `[Mania]` sections from a standard osu!mania skin. The ruleset 
 
 In `[Mania]` sections, use mania standard judgement names: `Hit300g` (PGREAT), `Hit300` (GREAT), `Hit200` (GOOD),
 `Hit50` (BAD), `Hit0` (POOR).
+
+### HUD Components
+
+The HUD components implement `ISerialisableDrawable` and can be repositioned in the **Skin Editor** during gameplay.
+Open the skin editor and drag the combo counter or health bar to your preferred position.
+
+On the next play session the saved layout is automatically loaded.
+
+| HUD components | Description                                                                                                           |
+|----------------|-----------------------------------------------------------------------------------------------------------------------|
+| Combo          | Rolling combo counter with auto-hide when idle, configurable display threshold, and colour flash on break.            |
+| Judgement      | Per-note hit result animations (PGREAT, GREAT, GOOD, BAD, POOR) displayed as they occur.                              |
+| Health Bar     | Vertical groove gauge with danger (red), warning (amber), and safe (cyan) colour zones; clear-line indicator at 80 %. |
 
 ### Example skin.ini (7K)
 
@@ -946,7 +950,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Skin**      | mania key image render                                                                   | 4         |
 | **Skin**      | note hit exploision render                                                               | 4         |
 | **UI**        | Lane cover / skin / movement                                                             | 2         |
-| **UI**        | Rewrite health bar — red/yellow/green gradient, no border, no overall colour change      | 2         |
 | **Perf**      | parser performance (tinny parser for importer / ProjectTickToTime(build & query))        | 4         |
 | **Perf**      | high GC pressure during importing (sr) (consider pre compute and query)                  | 3         |
 | **Perf**      | fps is not stable when a large amount of mine disposed                                   | 1         |

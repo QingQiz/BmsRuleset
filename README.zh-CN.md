@@ -431,12 +431,6 @@ DP ☆NOTHER [TT★1 TT★2]
 | `LightingL`                 | LN 命中图像      |
 | `LightFramePerSecond`       | 列灯动画 FPS         |
 
-### HUD 组件
-
-连击计数器（`BmsComboCounter`）和血量显示（`BmsHealthDisplay`）实现了
-`ISerialisableDrawable`，可在游戏内通过**皮肤编辑器**自由拖拽位置。
-在游戏中打开皮肤编辑器，拖动连击数字或血量条到合适位置，下次游玩时自动加载保存的布局。
-
 **判定图像：**
 
 | 键           | BMS 判定      |
@@ -457,6 +451,17 @@ DP ☆NOTHER [TT★1 TT★2]
 
 在 `[Mania]` 段中，使用 mania 标准判定名称：`Hit300g`（PGREAT）、`Hit300`（GREAT）、`Hit200`（GOOD）、
 `Hit50`（BAD）、`Hit0`（POOR）。
+
+### HUD 组件
+
+HUD 组件实现了 `ISerialisableDrawable`，可在游戏内通过**皮肤编辑器**自由拖拽位置。
+在游戏中打开皮肤编辑器，拖动连击数字或血量条到合适位置，下次游玩时自动加载保存的布局。
+
+| HUD 组件 | 说明 |
+|----------|------|
+| 组合     | 滚动连击计数器，闲置时自动隐藏，可配置最低显示阈值，连击中断时闪烁变色。 |
+| 判定     | 逐音符命中结果动画（PGREAT、GREAT、GOOD、BAD、POOR），在判定时实时显示。 |
+| 血量条   | 纵向血量槽，按危险（红）、警告（黄）、安全（青）分色显示，80 % 处标注 clear 线。 |
 
 ### 示例 skin.ini (7K)
 
