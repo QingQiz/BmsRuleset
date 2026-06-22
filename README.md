@@ -498,16 +498,18 @@ In `[Mania]` sections, use mania standard judgement names: `Hit300g` (PGREAT), `
 
 ### HUD Components
 
-The HUD components implement `ISerialisableDrawable` and can be repositioned in the **Skin Editor** during gameplay.
-Open the skin editor and drag the combo counter or health bar to your preferred position.
+HUD components implement `ISerialisableDrawable` and can be repositioned and resized freely in the
+**Skin Editor** during gameplay. Open the skin editor and drag any component to your preferred position.
 
 On the next play session the saved layout is automatically loaded.
 
-| HUD components | Description                                                                                                                                                                                                                   |
-|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Combo          | Rolling combo counter with auto-hide when idle, configurable display threshold, and colour flash on break.                                                                                                                    |
-| Judgement      | Per-note hit result animations (PGREAT, GREAT, GOOD, BAD, POOR) displayed as they occur.                                                                                                                                      |
-| Health Bar     | Vertical groove gauge with gauge-aware colour zones: dynamic groove (red → amber → green at clear threshold) for TOTAL gauges, fixed profile colour for survival gauges; clear-line indicator at the gauge's clear threshold. |
+Additionally, select a component in the skin editor to configure its properties in the sidebar:
+
+| HUD components | Skin editor properties                                                                                                                                                                                         |
+|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Combo          | Auto-hide delay, min visible combo.                                                                                                                                                                            |
+| Judgement      | *(none)*                                                                                                                                                                                                       |
+| Health Bar     | **Groove gauge colours** — low (red zone), mid (yellow zone), high (green zone). **Fixed gauge colours** — Hard, ExHard, Hazard, each independently editable. All colours have a colour picker in the sidebar. |
 
 ### Example skin.ini (7K)
 

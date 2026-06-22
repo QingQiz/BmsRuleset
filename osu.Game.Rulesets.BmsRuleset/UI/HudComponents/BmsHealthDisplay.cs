@@ -11,6 +11,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
+using osu.Game.Configuration;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
@@ -21,6 +22,24 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
 {
     public bool UsesFixedAnchor { get; set; }
 
+    [SettingSource("Groove low health colour", "Colour of the groove gauge in the red zone (below red zone threshold).")]
+    public BindableColour4 GrooveColourLow { get; } = new(new Color4(255, 45, 40, 255));
+
+    [SettingSource("Groove mid health colour", "Colour of the groove gauge in the yellow zone (between red zone and clear threshold).")]
+    public BindableColour4 GrooveColourMid { get; } = new(new Color4(255, 160, 30, 255));
+
+    [SettingSource("Groove high health colour", "Colour of the groove gauge above the clear threshold.")]
+    public BindableColour4 GrooveColourHigh { get; } = new(new Color4(45, 225, 80, 255));
+
+    [SettingSource("Hard gauge fill colour", "Fill colour for the Hard gauge type.")]
+    public BindableColour4 HardFillColour { get; } = new(new Color4(220, 55, 50, 255));
+
+    [SettingSource("ExHard gauge fill colour", "Fill colour for the ExHard gauge type.")]
+    public BindableColour4 ExHardFillColour { get; } = new(new Color4(195, 55, 210, 255));
+
+    [SettingSource("Hazard gauge fill colour", "Fill colour for the Hazard gauge type.")]
+    public BindableColour4 HazardFillColour { get; } = new(new Color4(255, 215, 0, 255));
+
     private const float clear_threshold = 0.8f;
 
     private readonly Box normalFill;
@@ -29,6 +48,7 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
 
     private BindableNumber<double>? health;
     private double displayedHealth;
+    private BmsHealthProcessor? bmsHealthProcessor;
 
     private readonly Bindable<BmsGaugeDisplayProfile> displayProfile =
         new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
@@ -89,8 +109,11 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
 
         health = healthProcessor.Health.GetBoundCopy();
 
-        if (healthProcessor is BmsHealthProcessor bmsHealthProcessor)
-            displayProfile.BindTo(bmsHealthProcessor.DisplayProfile);
+        if (healthProcessor is BmsHealthProcessor bmsHp)
+        {
+            bmsHealthProcessor = bmsHp;
+            displayProfile.BindTo(bmsHp.DisplayProfile);
+        }
 
         displayedHealth = health.Value;
         updateDisplay();
@@ -114,7 +137,7 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
 
         normalFill.Height = (float)clampedHealth;
         normalFill.Colour = profile.ColourMode == BmsGaugeColourMode.Fixed
-            ? profile.FillColour
+            ? resolveFixedColour(profile)
             : grooveColour(clampedHealth, profile.ClearThreshold ?? clear_threshold, profile.RedZoneThreshold);
 
         if (profile.ClearThreshold is double threshold)
@@ -138,11 +161,25 @@ public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableD
         }
     }
 
-    private static Color4 grooveColour(double clampedHealth, double clearThreshold, double redZoneThreshold) => clampedHealth switch
+    private Color4 resolveFixedColour(BmsGaugeDisplayProfile profile)
     {
-        var value when value < redZoneThreshold => new Color4(255, 45, 40, 255),
-        var value when value < clearThreshold => new Color4(255, 160, 30, 255),
-        _ => new Color4(45, 225, 80, 255),
+        if (bmsHealthProcessor == null)
+            return profile.FillColour;
+
+        return bmsHealthProcessor.GaugeType switch
+        {
+            BmsGaugeType.Hard => HardFillColour.Value,
+            BmsGaugeType.ExHard => ExHardFillColour.Value,
+            BmsGaugeType.Hazard => HazardFillColour.Value,
+            _ => profile.FillColour,
+        };
+    }
+
+    private Color4 grooveColour(double clampedHealth, double clearThreshold, double redZoneThreshold) => clampedHealth switch
+    {
+        var value when value < redZoneThreshold => GrooveColourLow.Value,
+        var value when value < clearThreshold => GrooveColourMid.Value,
+        _ => GrooveColourHigh.Value,
     };
 
     private sealed partial class GaugeSegment : Box
