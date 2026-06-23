@@ -41,7 +41,7 @@ public class BmsBeatmapDecoderTest
     {
         using var stream = typeof(BmsBeatmapDecoderTest).Assembly.GetManifestResourceStream(resourceName)
                            ?? throw new InvalidOperationException($"Missing embedded resource: {resourceName}");
-        using var reader = new osu.Game.IO.LineBufferedReader(stream);
+        using var reader = new LineBufferedReader(stream);
 
         return new BmsBeatmapDecoder().Decode(reader);
     }
@@ -1494,6 +1494,39 @@ public class BmsBeatmapDecoderTest
         Assert.That(converted.HitObjects.Single(h => h.SourceChannel == BmsChartParser.Enc("19")).Column, Is.EqualTo(6));
         Assert.That(converted.HitObjects.Single(h => h.SourceChannel == BmsChartParser.Enc("16")).Column, Is.EqualTo(7));
         Assert.That(converted.HitObjects.Single(h => h.SourceChannel == BmsChartParser.Enc("17")).Column, Is.EqualTo(8));
+    }
+
+    [Test]
+    public void TestPreviewHeaderIsPreservedInBmsData()
+    {
+        var beatmap = decode("""
+                             #TITLE Preview Header
+                             #ARTIST Tester
+                             #PREVIEW audio/preview.ogg
+                             #WAV01 kick.wav
+                             #00111:01
+                             """);
+
+        Assert.That(beatmap, Is.InstanceOf<IBmsBeatmap>());
+        Assert.That(((IBmsBeatmap)beatmap).PreviewFile, Is.EqualTo("audio/preview.ogg"));
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.PreviewFile, Is.EqualTo("audio/preview.ogg"));
+    }
+
+    [Test]
+    public void TestPreviewHeaderTrimsQuotes()
+    {
+        var beatmap = decode("""
+                             #TITLE Preview Header
+                             #ARTIST Tester
+                             #PREVIEW "audio/preview.ogg"
+                             #WAV01 kick.wav
+                             #00111:01
+                             """);
+
+        Assert.That(((IBmsBeatmap)beatmap).PreviewFile, Is.EqualTo("audio/preview.ogg"));
     }
 
     [Test]

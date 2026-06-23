@@ -6,7 +6,7 @@
         <PlatformTarget>AnyCPU</PlatformTarget>
         <RootNamespace>osu.Game.Rulesets.BmsRuleset</RootNamespace>
         <Nullable>enable</Nullable>
-        <Version>2026.621.0</Version>
+        <Version>2026.621.1</Version>
         <LangVersion>14</LangVersion>
     </PropertyGroup>
     <ItemGroup>

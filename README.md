@@ -63,41 +63,46 @@ for deletion.
 
 **Header fields decoded:**
 
-| Field                   | Command                                                                    | Description                                                             |
-|-------------------------|----------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| Title, Artist, Subtitle | `#TITLE`, `#ARTIST`, `#SUBTITLE`                                           | Subtitle appended to title as `"Title - Subtitle"`                      |
-| SubArtist               | `#SUBARTIST`                                                               | Appended to artist as `"Artist (SubArtist)"`                            |
-| Maker                   | `#MAKER`                                                                   | Mapped to beatmap Creator                                               |
-| Genre                   | `#GENRE` (also `#GENLE`)                                                   | Song style, stored in Tags                                              |
-| URL, Email              | `%URL`, `%EMAIL`                                                           | Stored in Tags                                                          |
-| Comment                 | `#COMMENT`                                                                 | Stored in Tags                                                          |
-| Play level              | `#PLAYLEVEL`                                                               | Displayed as difficulty name                                            |
-| Judge rank              | `#RANK` (0–4)                                                              | Affects hit windows, mapped to `OD`                                     |
-| Gauge total             | `#TOTAL`                                                                   | Gauge recovery coefficient, mapped to `AR`                              |
-| Base BPM (visual)       | `#BASEBPM`                                                                 | Scroll speed reference BPM, does not affect note timing                 |
-| Initial BPM             | `#BPM`                                                                     | Default 130                                                             |
-| Extended BPM table      | `#BPMxx`                                                                   | Real-number BPM (beyond 0–255 from channel `03`)                        |
-| STOP table              | `#STOPxx`                                                                  | Stop sequence durations (1 unit = 1/192 of a 4/4 measure)               |
-| Sample definitions      | `#WAVxx`                                                                   | Audio file paths (WAV/OGG)                                              |
-| Long-note type          | `#LNTYPE 1` / `#LNTYPE 2`                                                  | LN notation: 1=RDM (default), 2=MGQ                                     |
-| Long-note marker        | `#LNOBJ`                                                                   | LN end-point marker value (accumulated in HashSet)                      |
-| Text events             | `#TEXTxx`, `#SONGxx`                                                       | Displayed during gameplay on channel `99`                               |
-| Base 62 extension       | `#BASE 62`                                                                 | Case-sensitive base-62 encoding for commands and channels               |
-| Play mode               | `#PLAYER`                                                                  | Ignored                                                                 |
-| Random blocks           | `#RANDOM` / `#RONDAM` (typo tolerance), `#ENDRANDOM`, `#SETRANDOM`         | Random branch with conditional sub-blocks; `#SETRANDOM` fixes the value |
-|                         | `#IF`, `#ELSEIF`, `#ELSE`, `#ENDIF` / `#END` / `#IFEND` / `#END IF`        |                                                                         |
-| Switch blocks           | `#SWITCH`, `#ENDSW` / `#ENDSWITCH`, `#SETSWITCH`, `#CASE`, `#DEF`, `#SKIP` | Switch control flow with cases; `#SETSWITCH` fixes the value            |
-| Scroll speed            | `#SCROLLxx`                                                                | Per-segment display multiplier on scroll coordinate                     |
-| Spacing change          | `#SPEEDxx`                                                                 | Per-segment multiplier on `ScrollSpeedMultiplier`                       |
+| Field                   | Command                                                                    | Description                                                                                       |
+|-------------------------|----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| Title, Artist, Subtitle | `#TITLE`, `#ARTIST`, `#SUBTITLE`                                           | Subtitle appended to title as `"Title - Subtitle"`                                                |
+| SubArtist               | `#SUBARTIST`                                                               | Appended to artist as `"Artist (SubArtist)"`                                                      |
+| Maker                   | `#MAKER`                                                                   | Mapped to beatmap Creator                                                                         |
+| Genre                   | `#GENRE` (also `#GENLE`)                                                   | Song style, stored in Tags                                                                        |
+| URL, Email              | `%URL`, `%EMAIL`                                                           | Stored in Tags                                                                                    |
+| Comment                 | `#COMMENT`                                                                 | Stored in Tags                                                                                    |
+| Play level              | `#PLAYLEVEL`                                                               | Displayed as difficulty name                                                                      |
+| Preview audio           | `#PREVIEW`                                                                 | Declared preview file path for song select, falls back to `preview.*` then to BGM/keysound events |
+| Judge rank              | `#RANK` (0–4)                                                              | Affects hit windows, mapped to `OD`                                                               |
+| Gauge total             | `#TOTAL`                                                                   | Gauge recovery coefficient, mapped to `AR`                                                        |
+| Base BPM (visual)       | `#BASEBPM`                                                                 | Scroll speed reference BPM, does not affect note timing                                           |
+| Initial BPM             | `#BPM`                                                                     | Default 130                                                                                       |
+| Extended BPM table      | `#BPMxx`                                                                   | Real-number BPM (beyond 0–255 from channel `03`)                                                  |
+| STOP table              | `#STOPxx`                                                                  | Stop sequence durations (1 unit = 1/192 of a 4/4 measure)                                         |
+| Sample definitions      | `#WAVxx`                                                                   | Audio file paths (WAV/OGG)                                                                        |
+| Long-note type          | `#LNTYPE 1` / `#LNTYPE 2`                                                  | LN notation: 1=RDM (default), 2=MGQ                                                               |
+| Long-note marker        | `#LNOBJ`                                                                   | LN end-point marker value (accumulated in HashSet)                                                |
+| Text events             | `#TEXTxx`, `#SONGxx`                                                       | Displayed during gameplay on channel `99`                                                         |
+| Base 62 extension       | `#BASE 62`                                                                 | Case-sensitive base-62 encoding for commands and channels                                         |
+| Play mode               | `#PLAYER`                                                                  | Ignored                                                                                           |
+| Random blocks           | `#RANDOM` / `#RONDAM` (typo tolerance), `#ENDRANDOM`, `#SETRANDOM`         | Random branch with conditional sub-blocks; `#SETRANDOM` fixes the value                           |
+|                         | `#IF`, `#ELSEIF`, `#ELSE`, `#ENDIF` / `#END` / `#IFEND` / `#END IF`        |                                                                                                   |
+| Switch blocks           | `#SWITCH`, `#ENDSW` / `#ENDSWITCH`, `#SETSWITCH`, `#CASE`, `#DEF`, `#SKIP` | Switch control flow with cases; `#SETSWITCH` fixes the value                                      |
+| Scroll speed            | `#SCROLLxx`                                                                | Per-segment display multiplier on scroll coordinate                                               |
+| Spacing change          | `#SPEEDxx`                                                                 | Per-segment multiplier on `ScrollSpeedMultiplier`                                                 |
 
 **Not parsed:** `#BANNER`, `#STAGEFILE`, `#BACKBMP`, `#BMPxx`, `#BGAxx`, `#EXWAVxx`,
 `#WAVCMD`, `#VOLWAV`, `#MIDIFILE`, `#DIFFICULTY`, `#EXRANK` / `#EXRANKxx`,
-`#DEFEXRANK`, `#EXBPMxx`, `#LNMODE`, `#PREVIEW`, `#STP`, `#PATH_WAV` / `#PATH_BMP`, `#OPTION`,
+`#DEFEXRANK`, `#EXBPMxx`, `#LNMODE`, `#STP`, `#PATH_WAV` / `#PATH_BMP`, `#OPTION`,
 `#CHANGEOPTIONxx`, `#POORBGA`, `#SWBGAxx`, `#@BGAxx`, `#ARGBxx`, video commands, `#CHARFILE`,
-`#ExtChr`, `#OCT/FP`, `#MATERIALS`, `#SONGxx` / `#TEXTxx` (merged),
+`#ExtChr`, `#OCT/FP`, `#MATERIALS`
 
 BGA channels (`04`, `06`, `07`, `0A`–`0E`), dynamic volume channels (`97`, `98`),
 dynamic rank channel (`A0`), and dynamic option channel (`A6`).
+
+> [!NOTE]
+> The resolved preview source is exposed so callers can tell whether a declared single-file (`#PREVIEW` / `preview.*`) or BGM/keysound playback is active. BGM/keysound playback often gives a more representative preview; declared files may not reflect the chart's full audio content.
+> Whether a user-facing "prefer BGM/keysound preview" option is needed depends on player feedback.
 
 **Channels parsed:**
 
@@ -167,14 +172,14 @@ Key sound of the next upcoming note in a column plays on every key press regardl
 
 **Judgement tiers (beatoraja timing windows, from `#RANK`):**
 
-| Name       | EX pts | Combo        | RANK 2 (Normal) window            |
-|------------|--------|--------------|-----------------------------------|
-| **PGREAT** | 2      | kept         | ±15 ms                            |
-| **GREAT**  | 1      | kept         | ±45 ms                            |
-| **GOOD**   | 0      | kept         | ±112.5 ms                         |
-| **BAD**    | 0      | reset        | -220ms / +280ms                   |
-| **POOR**   | 0      | reset        | > +280ms                          |
-| **E-POOR** | 0      | **no break** | [-500ms,-220ms], no note consume  |
+| Name       | EX pts | Combo        | RANK 2 (Normal) window           |
+|------------|--------|--------------|----------------------------------|
+| **PGREAT** | 2      | kept         | ±15 ms                           |
+| **GREAT**  | 1      | kept         | ±45 ms                           |
+| **GOOD**   | 0      | kept         | ±112.5 ms                        |
+| **BAD**    | 0      | reset        | -220ms / +280ms                  |
+| **POOR**   | 0      | reset        | > +280ms                         |
+| **E-POOR** | 0      | **no break** | [-500ms,-220ms], no note consume |
 
 `#RANK` 0 = Very Hard (±5/15/37.5 ms, BAD -220/+280 ms) → 4 = Very Easy (±25/75/187.5 ms, BAD -220/+280 ms).
 
@@ -710,7 +715,7 @@ Commands are grouped by origin and listed with their status in this ruleset.
 
 | Command              | Status | Notes                                                                          |
 |----------------------|--------|--------------------------------------------------------------------------------|
-| `#PREVIEW`           | ✗      | Preview audio path for music selection; auto-fallback to `preview.*` in folder |
+| `#PREVIEW`           | ✓      | Preview audio path for music selection; auto-fallback to `preview.*` in folder |
 | `#LNMODE [1-3]`      | ✗      | 1=LN, 2=CN (Charge Note), 3=HCN (Hell Charge Note); locks LN type              |
 | `#RANK 4` (redef)    | ✓      | VERY EASY: 1.2× wider than EASY (#RANK 3)                                      |
 | `#DEFEXRANK` (redef) | ✗      | Overrides `#RANK`; value 100 = EASY baseline                                   |
@@ -912,18 +917,19 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 
 ## Not Yet Implemented
 
-| Area          | What is missing                                                                          | Priority  |
-|---------------|------------------------------------------------------------------------------------------|-----------|
+| Area          | What is missing                                                                          | Priority |
+|---------------|------------------------------------------------------------------------------------------|----------|
 | **Audio**     | `#WAVCMD` (MacBeat) — pitch/volume/playback-time per WAV slot                            |
 | **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                  |
 | **Audio**     | `#VOLWAV` (BM98) — global volume scalar                                                  |
-| **Audio**     | `HT`, `DT` should change sample/keysound clockrate                                       | 1         |
-| **Audio**     | `#xxx97` (fgt) — dynamic BGM volume change channel                                       |           |
-| **Converter** | Mania 7K → BMS chart conversion                                                          | 3         |
+| **Audio**     | `HT`, `DT` should change sample/keysound clockrate                                       | 1        |
+| **Audio**     | `#xxx97` (fgt) — dynamic BGM volume change channel                                       |          |
+| **Converter** | Mania 7K → BMS chart conversion                                                          | 3        |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |
 | **Input**     | Judgement offset adjustment capability                                                   |
-| **Mods**      | BG: make key sounds → background samples (hit results don't affect music)                | 2         
-| **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |           |
+| **Mods**      | BG: make key sounds → background samples (hit results don't affect music)                | 2        
+| **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |          |
+| **Mods**      | Mod for auto switch gauge type                                                           | 1        |
 | **Parser**    | `#BGAxx` / `#POORBGA` / `#SWBGAxx` / `#@BGAxx` / `#ARGBxx` — BGA definitions             |
 | **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                            |
 | **Parser**    | `#CDDA` / `#MIDIFILE` — CD / MIDI                                                        |
@@ -938,7 +944,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — metadata only                            |
 | **Parser**    | `#STP` — absolute STOP sequence                                                          |
 | **Parser**    | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — video |
-| **Parser**    | `#PREVIEW` — beatoraja preview audio path for music selection                            | 1         |
 | **Parser**    | `#LNMODE` — beatoraja long-note mode lock (LN/CN/HCN)                                    |
 | **Parser**    | `#DEFEXRANK` — fine-grained judgment width multiplier (overrides `#RANK`)                |
 | **Parser**    | `#CHARSET` — character encoding specification                                            |
@@ -951,31 +956,31 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | Channel `98` — dynamic KEY volume (counterpart to channel 97)                            |
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                |
 | **Renderer**  | BGA / movie / stagefile / background image                                               |
-| **Renderer**  | Key beams (column light during hold)                                                     | 2         |
+| **Renderer**  | Key beams (column light during hold)                                                     | 2        |
 | **Renderer**  | BGA                                                                                      |
-| **Replay**    | Replay not available                                                                     | 2         |
-| **Scoring**   | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown               | 2         |
-| **Scoring**   | ExRank support                                                                           | 3         |
-| **Scoring**   | Different judgement text colours on results screen                                       | 4         |
-| **Scoring**   | Beatmap statistics — show more info (e.g., random branch count)                          | 2         |
-| **Scoring**   | PMS judgement profile matching beatoraja `POPN_5K` / `POPN_9K`                           | 3         |
-| **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                   | 3         |
-| **Scoring**   | `#LNMODE` CN / HCN semantics and locked long-note mode                                   | 3         |
-| **Scoring**   | `#DEFEXRANK`, `#EXRANK`, and judge-window-rate support                                   | 3         |
-| **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT              | 4         |
-| **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                          | 4         |
-| **Skin**      | Column start position — value or enum (leftN, rightN, center)                            | 3         |
+| **Replay**    | Replay not available                                                                     | 2        |
+| **Scoring**   | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown               | 2        |
+| **Scoring**   | ExRank support                                                                           | 3        |
+| **Scoring**   | Different judgement text colours on results screen                                       | 4        |
+| **Scoring**   | Beatmap statistics — show more info (e.g., random branch count)                          | 2        |
+| **Scoring**   | PMS judgement profile matching beatoraja `POPN_5K` / `POPN_9K`                           | 3        |
+| **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                   | 3        |
+| **Scoring**   | `#LNMODE` CN / HCN semantics and locked long-note mode                                   | 3        |
+| **Scoring**   | `#DEFEXRANK`, `#EXRANK`, and judge-window-rate support                                   | 3        |
+| **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT              | 4        |
+| **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                          | 4        |
+| **Skin**      | Column start position — value or enum (leftN, rightN, center)                            | 3        |
 | **Skin**      | BGA position/size configuration                                                          |
 | **Skin**      | Non-legacy BMS skin — fully configurable via skin editor                                 |
 | **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                               |
-| **Skin**      | E-POOR judgement image                                                                   | 3         |
-| **Skin**      | Light position / column light                                                            | 4         |
-| **Skin**      | mania key image render                                                                   | 4         |
-| **Skin**      | note hit exploision render                                                               | 4         |
-| **UI**        | Lane cover / skin / movement                                                             | 2         |
-| **Perf**      | parser performance (tinny parser for importer / ProjectTickToTime(build & query))        | 4         |
-| **Perf**      | high GC pressure during importing (sr) (consider pre compute and query)                  | 3         |
-| **Perf**      | fps is not stable when a large amount of mine disposed                                   | 1         |
+| **Skin**      | E-POOR judgement image                                                                   | 3        |
+| **Skin**      | Light position / column light                                                            | 4        |
+| **Skin**      | mania key image render                                                                   | 4        |
+| **Skin**      | note hit exploision render                                                               | 4        |
+| **UI**        | Lane cover / skin / movement                                                             | 2        |
+| **Perf**      | parser performance (tinny parser for importer / ProjectTickToTime(build & query))        | 4        |
+| **Perf**      | high GC pressure during importing (sr) (consider pre compute and query)                  | 3        |
+| **Perf**      | fps is not stable when a large amount of mine disposed                                   | 1        |
 
 ### FIXME
 

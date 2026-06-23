@@ -65,6 +65,7 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 | URL、Email           | `%URL`、`%EMAIL`                                                                                                                       | 存入 Tags                                               |
 | 注释                 | `#COMMENT`                                                                                                                             | 存入 Tags                                               |
 | Play level           | `#PLAYLEVEL`                                                                                                                           | 作为难度名显示                                          |
+| 预览音频             | `#PREVIEW`                                                                                                                             | 谱面选择中使用的声明式预览音频路径，回退到 `preview.*` 再回退到 BGM/按键声音事件合成 |
 | 判定等级             | `#RANK`（0–4）                                                                                                                         | 影响判定窗口，映射到 `OD`                              |
 | 血量总量             | `#TOTAL`                                                                                                                               | 血量恢复系数，映射到 `AR`                              |
 | 视觉 BPM             | `#BASEBPM`                                                                                                                             | 滚动速度参考 BPM，不影响音符时序                       |
@@ -85,11 +86,15 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 
 **未解析：** `#BANNER`、`#STAGEFILE`、`#BACKBMP`、`#BMPxx`、`#BGAxx`、`#EXWAVxx`、
 `#WAVCMD`、`#VOLWAV`、`#MIDIFILE`、`#DIFFICULTY`、`#EXRANK` / `#EXRANKxx`、
-`#DEFEXRANK`、`#EXBPMxx`、`#LNMODE`、`#PREVIEW`、`#STP`、`#PATH_WAV` / `#PATH_BMP`、`#OPTION`、
+`#DEFEXRANK`、`#EXBPMxx`、`#LNMODE`、`#STP`、`#PATH_WAV` / `#PATH_BMP`、`#OPTION`、
 `#CHANGEOPTIONxx`、`#POORBGA`、`#SWBGAxx`、`#@BGAxx`、`#ARGBxx`、视频相关命令、`#CHARFILE`、
-`#ExtChr`、`#OCT/FP`、`#MATERIALS`、`#SONGxx` / `#TEXTxx`（已合并），
+`#ExtChr`、`#OCT/FP`、`#MATERIALS`
 BGA 通道（`04`、`06`、`07`、`0A`–`0E`）、动态音量通道（`97`、`98`）、
 动态判定通道（`A0`）和动态选项通道（`A6`）。
+
+> [!NOTE]
+> 解析后的预览源对外暴露，以便区分使用的是声明式单文件（`#PREVIEW` / `preview.*`）还是 BGM/按键声音播放。BGM/按键声音播放通常能给出更具代表性的预览；声明文件可能无法完整反映谱面的音频内容。
+> 是否需要"优先使用 BGM/按键声音预览"的选项取决于玩家反馈。
 
 **已解析的通道：**
 

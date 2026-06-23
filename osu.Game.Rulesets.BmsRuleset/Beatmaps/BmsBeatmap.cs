@@ -36,6 +36,8 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public BmsTextEvents TextEvents { get; set; } = new(string.Empty, []);
 
+    public string? PreviewFile { get; set; }
+
     public override IEnumerable<BeatmapStatistic> GetStatistics()
     {
         var notes = HitObjects.Count(h => !h.IsMine && !isScratch(h));

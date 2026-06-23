@@ -18,6 +18,7 @@ public sealed record BmsParseResult(
     IReadOnlyList<BmsParsedHitObject> HitObjects,
     IReadOnlyList<BmsBranchDecision> BranchDecisions,
     BmsTextEvents TextEvents,
+    string? PreviewFile = null,
     string? Genre = null,
     string? Subtitle = null,
     string? SubArtist = null,

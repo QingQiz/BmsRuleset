@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
@@ -42,10 +44,13 @@ public class BmsPreviewTrack : Track
     private readonly StopwatchClock clock = new();
     private readonly List<BgmEvent> sortedEvents = [];
     private readonly ISampleStore? sampleStore;
+    private readonly ISample? previewSample;
     private readonly Dictionary<string, ISample?> resolvedSamples = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ActiveBgm> activeChannels = [];
 
     private readonly record struct BgmEvent(double Time, string SamplePath);
+
+    private SampleChannel? previewChannel;
 
     private int nextEventIndex;
     private double seekOffset;
@@ -57,35 +62,50 @@ public class BmsPreviewTrack : Track
     ///     May be <c>null</c> in fully-imported mode (no filesystem fallback available).
     /// </param>
     /// <param name="audioManager">Framework audio manager, used to create filesystem-backed audio stores.</param>
+    /// <param name="previewFile"></param>
     public BmsPreviewTrack(
         IReadOnlyList<BmsSampleEvent> bgmEvents,
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
         string? basePath,
-        AudioManager audioManager)
+        AudioManager audioManager,
+        string? previewFile = null)
         : base("bms-preview")
     {
-        foreach (var evt in bgmEvents)
+        if (basePath == null) return;
+
+        var fileResources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
+        fileResources.AddExtension("wav");
+        fileResources.AddExtension("mp3");
+        fileResources.AddExtension("ogg");
+
+        sampleStore = audioManager.GetSampleStore(fileResources);
+
+        foreach (var candidate in getPreviewCandidates(basePath, previewFile))
         {
-            if (sampleDefinitions.TryGetValue(evt.SampleKey, out var samplePath))
-                sortedEvents.Add(new BgmEvent(evt.Time, samplePath));
+            previewSample = resolveSample(candidate);
+
+            if (previewSample == null)
+                continue;
+
+            break;
         }
 
-        sortedEvents.Sort((a, b) => a.Time.CompareTo(b.Time));
-
-        if (basePath != null)
+        if (previewSample == null)
         {
-            var fileResources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
-            fileResources.AddExtension("wav");
-            fileResources.AddExtension("mp3");
-            fileResources.AddExtension("ogg");
+            foreach (var evt in bgmEvents)
+            {
+                if (sampleDefinitions.TryGetValue(evt.SampleKey, out var samplePath))
+                    sortedEvents.Add(new BgmEvent(evt.Time, samplePath));
+            }
 
-            sampleStore = audioManager.GetSampleStore(fileResources);
+            sortedEvents.Sort((a, b) => a.Time.CompareTo(b.Time));
+            var length = sortedEvents.Count > 0
+                ? sortedEvents[^1].Time + 5000
+                : 30000;
+            Length = length;
         }
-
-        var length = sortedEvents.Count > 0
-            ? sortedEvents[^1].Time + 5000
-            : 30000;
-        Length = length;
+        else
+            Length = 30000;
     }
 
     #region Disposal
@@ -108,6 +128,7 @@ public class BmsPreviewTrack : Track
         if (Length == 0 || CurrentTime >= Length)
             return;
 
+        startPreviewChannel();
         lock (clock) clock.Start();
     }
 
@@ -115,6 +136,7 @@ public class BmsPreviewTrack : Track
     {
         lock (clock) clock.Stop();
         stopAllChannels();
+        stopPreviewChannel();
     }
 
     public override bool Seek(double seek)
@@ -134,6 +156,10 @@ public class BmsPreviewTrack : Track
 
         nextEventIndex = findFirstEventAfter(seekOffset);
         stopAllChannels();
+        stopPreviewChannel();
+
+        if (previewSample != null && wasRunning)
+            startPreviewChannel();
 
         return success;
     }
@@ -158,6 +184,7 @@ public class BmsPreviewTrack : Track
         seekOffset = 0;
         nextEventIndex = 0;
         stopAllChannels();
+        stopPreviewChannel();
 
         base.Reset();
     }
@@ -183,6 +210,9 @@ public class BmsPreviewTrack : Track
         if (!IsRunning || SuppressEventProcessing)
             return;
 
+        if (previewSample != null)
+            return;
+
         var currentTime = CurrentTime;
 
         while (nextEventIndex < sortedEvents.Count)
@@ -197,6 +227,35 @@ public class BmsPreviewTrack : Track
         }
 
         cleanupChannels();
+    }
+
+    private static IEnumerable<string> getPreviewCandidates(string basePath, string? previewFile)
+    {
+        if (!string.IsNullOrWhiteSpace(previewFile))
+            yield return previewFile;
+
+        if (!Directory.Exists(basePath))
+            yield break;
+
+        foreach (var file in Directory.EnumerateFiles(basePath)
+                     .Select(Path.GetFileName)
+                     .Where(static name => name != null
+                                           && name.StartsWith("preview", StringComparison.OrdinalIgnoreCase)
+                                           && isSupportedPreviewExtension(name))
+                     .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase))
+        {
+            yield return file!;
+        }
+
+        yield break;
+
+        static bool isSupportedPreviewExtension(string path)
+        {
+            var extension = Path.GetExtension(path);
+            return extension.Equals(".wav", StringComparison.OrdinalIgnoreCase)
+                   || extension.Equals(".ogg", StringComparison.OrdinalIgnoreCase)
+                   || extension.Equals(".mp3", StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private void playSample(BgmEvent evt)
@@ -251,6 +310,31 @@ public class BmsPreviewTrack : Track
     {
         component.RemoveAllAdjustments(AdjustableProperty.Volume);
         component.AddAdjustment(AdjustableProperty.Volume, AggregateVolume);
+    }
+
+    private void startPreviewChannel()
+    {
+        if (previewSample == null || previewChannel != null)
+            return;
+
+        previewChannel = previewSample.GetChannel();
+        previewChannel.ManualFree = true;
+        previewChannel.Play();
+        bindPreviewVolumeAdjustments(previewChannel);
+    }
+
+    private void stopPreviewChannel()
+    {
+        if (previewChannel == null)
+            return;
+
+        if (!previewChannel.IsDisposed)
+        {
+            previewChannel.Stop();
+            previewChannel.Dispose();
+        }
+
+        previewChannel = null;
     }
 
     private void stopAllChannels()

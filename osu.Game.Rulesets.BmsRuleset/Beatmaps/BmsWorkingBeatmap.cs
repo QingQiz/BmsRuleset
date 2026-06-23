@@ -92,7 +92,8 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager)
                 allEvents,
                 bmsBeatmap.SampleDefinitions,
                 Metadata.Source,
-                audioManager);
+                audioManager,
+                bmsBeatmap.PreviewFile);
 
             // Stop and remove the previous preview track before registering the new one.
             // Removing without stopping would leave its StopwatchClock running forever.

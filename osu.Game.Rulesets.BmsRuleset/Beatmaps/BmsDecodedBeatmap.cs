@@ -28,6 +28,8 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 
     public BmsTextEvents TextEvents { get; set; } = new(string.Empty, []);
 
+    public string? PreviewFile { get; set; }
+
     public string[] RawLines { get; set; } = [];
 
     public void CopyFrom(BmsParseResult parseResult)
@@ -43,5 +45,6 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
         LongNoteTailSampleEvents = parseResult.LongNoteTailSampleEvents;
         BranchDecisions = parseResult.BranchDecisions;
         TextEvents = parseResult.TextEvents;
+        PreviewFile = parseResult.PreviewFile;
     }
 }

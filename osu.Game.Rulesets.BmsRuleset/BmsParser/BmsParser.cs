@@ -133,6 +133,7 @@ internal static partial class BmsChartParser
             hitObjects,
             state.BranchDecisions.ToArray(),
             textEvents,
+            state.PreviewFile,
             state.Genre,
             state.Subtitle,
             state.SubArtist,
@@ -319,6 +320,12 @@ internal static partial class BmsChartParser
         if (cmdSpan.Equals("COMMENT", StringComparison.OrdinalIgnoreCase))
         {
             state.Comment = valueSpan.ToString();
+            return;
+        }
+
+        if (cmdSpan.Equals("PREVIEW", StringComparison.OrdinalIgnoreCase))
+        {
+            state.PreviewFile = valueSpan.Trim('"').ToString();
             return;
         }
 
@@ -1105,6 +1112,8 @@ internal static partial class BmsChartParser
         public string? Email { get; set; }
 
         public string? Comment { get; set; }
+
+        public string? PreviewFile { get; set; }
 
         public float? PlayLevel { get; set; }
 

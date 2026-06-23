@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -76,6 +77,83 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
+    public void TestDeclaredPreviewHasPriorityOverFolderPreview()
+    {
+        BmsPreviewTrack track = null!;
+
+        AddStep("create track with declared and folder preview", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-priority-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "declared.wav"), TimeSpan.FromSeconds(1));
+            writePcmWave(Path.Combine(directory, "preview.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsPreviewTrack(
+                [],
+                new Dictionary<ushort, string>(),
+                directory,
+                audio,
+                "declared.wav");
+        });
+
+        AddAssert("declared preview selected", () => getResolvedPreviewPath(track!) == "declared.wav");
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
+    public void TestMissingDeclaredPreviewFallsBackToFolderPreview()
+    {
+        BmsPreviewTrack track = null!;
+
+        AddStep("create track with missing declared preview and folder preview", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-folder-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "preview.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsPreviewTrack(
+                [],
+                new Dictionary<ushort, string>(),
+                directory,
+                audio,
+                "missing.wav");
+        });
+
+        AddAssert("folder preview selected", () => getResolvedPreviewPath(track!) == "preview.wav");
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
+    public void TestMissingSingleFilePreviewKeepsEventPreview()
+    {
+        BmsPreviewTrack track = null!;
+
+        AddStep("create track with event preview only", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-events-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsPreviewTrack(
+                [new BmsSampleEvent(0, 0, 1)],
+                new Dictionary<ushort, string> { [1] = "event.wav" },
+                directory,
+                audio,
+                "missing.wav");
+
+            track.Start();
+            invokeUpdateState(track);
+        });
+
+        AddAssert("no single preview selected", () => getResolvedPreviewPath(track!) == null);
+        AddAssert("event preview still plays", () => getActivePlaybackCount(track!) > 0);
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
     public void TestPreviewTrackIsNotDummyDevice()
     {
         BmsPreviewTrack track = null!;
@@ -132,6 +210,13 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     {
         var activeChannels = typeof(BmsPreviewTrack).GetField("activeChannels", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track);
         return ((ICollection)activeChannels!).Count;
+    }
+
+    private static string? getResolvedPreviewPath(BmsPreviewTrack track)
+    {
+        return (string?)typeof(BmsPreviewTrack)
+                        .GetField("resolvedPreviewPath", BindingFlags.Instance | BindingFlags.NonPublic)!
+                        .GetValue(track);
     }
 
     private static void writePcmWave(string path, TimeSpan duration)
