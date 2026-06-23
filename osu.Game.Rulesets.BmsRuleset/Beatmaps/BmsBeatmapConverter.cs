@@ -67,8 +67,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (!hasBmsData)
             remapColumns(converted);
 
-        // Stamp the chart-level #RANK onto every hit object so CreateHitWindows() has it.
-        stampRankOnHitObjects(converted);
+        stampJudgementContextOnHitObjects(converted);
 
         return converted;
     }
@@ -155,10 +154,13 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             []);
     }
 
-    private static void stampRankOnHitObjects(BmsBeatmap beatmap)
+    private static void stampJudgementContextOnHitObjects(BmsBeatmap beatmap)
     {
         foreach (var hitObject in beatmap.HitObjects)
+        {
             hitObject.BmsRank = beatmap.Rank;
+            hitObject.LayoutVariant = beatmap.LayoutVariant;
+        }
     }
 
     /// <summary>

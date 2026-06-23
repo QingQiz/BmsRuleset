@@ -2,7 +2,7 @@ using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.Scoring;
@@ -19,47 +19,36 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.HoldNoteHead;
 
     private bool longNoteStarted;
+    private double headJudgeOffset;
     private float? longNoteHeadFixedY;
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private Container longNoteTailContainer = null!;
 
-    public override bool TryHit()
+    public override bool TryHit(HitResult result)
     {
-        if (Judged || HitObject?.HitWindows == null || longNoteStarted)
-            return false;
-
-        var bmsWindows = (BmsHitWindows)HitObject.HitWindows;
-        var result = bmsWindows.BmsResultFor(Time.Current - HitObject.StartTime);
-
-        if (result == HitResult.None)
+        if (Judged || HitObject == null || longNoteStarted || result == HitResult.None)
             return false;
 
         longNoteStarted = true;
-        // Freeze at the judgement line position, not at the early/late-hit Y,
-        // so the LN head stays at the correct screen position during hold.
+        headJudgeOffset = Time.Current - HitObject.StartTime;
         longNoteHeadFixedY = -(Playfield?.Stage.HitTargetPosition ?? 200);
         return true;
     }
 
-    public bool TryRelease()
+    public bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable)
     {
-        if (Judged || HitObject?.HitWindows == null || !longNoteStarted)
+        if (Judged || HitObject == null || !longNoteStarted)
             return false;
 
-        var bmsWindows = (BmsHitWindows)HitObject.HitWindows;
-        var result = bmsWindows.BmsResultFor(Time.Current - HitObject.EndTime);
-
-        if (result == HitResult.None)
-        {
-            if (Time.Current > HitObject.EndTime + bmsWindows.WindowFor(HitResult.Ok))
-                return false;
-
-            ApplyResult(HitResult.Meh);
-            return true;
-        }
-
-        ApplyResult(result);
+        applyReleaseResult(tailTable, releaseOffset);
         return true;
+    }
+
+    private void applyReleaseResult(BmsJudgementWindowTable tailTable, double tailOffset)
+    {
+        var heldOffset = Math.Abs(headJudgeOffset) > Math.Abs(tailOffset) ? headJudgeOffset : tailOffset;
+        var result = tailTable.ResultForOffset(heldOffset);
+        ApplyResult(result == HitResult.None ? HitResult.Meh : result);
     }
 
     /// <summary>
@@ -116,6 +105,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     protected override void ResetKindState()
     {
         longNoteStarted = false;
+        headJudgeOffset = 0;
         longNoteHeadFixedY = null;
 
         longNoteBody.Alpha = 0;
@@ -162,18 +152,25 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     protected override void CheckForResult(bool userTriggered, double timeOffset)
     {
-        if (userTriggered || HitObject.HitWindows == null)
+        if (userTriggered || HitObject == null || Playfield == null)
             return;
 
-        var missWindow = HitObject.HitWindows.WindowFor(HitResult.Ok);
+        var headTable = BmsJudgementProfileProvider.GetTable(Playfield.LayoutVariant, HitObject.Column, HitObject.BmsRank, tail: false);
 
-        if (!longNoteStarted && Time.Current > HitObject.StartTime + missWindow)
+        if (!longNoteStarted)
         {
-            ApplyResult(HitResult.Meh);
+            if (headTable.IsPastPassivePoorOffset(Time.Current - HitObject.StartTime))
+                ApplyResult(HitResult.Meh);
+
             return;
         }
 
-        if (longNoteStarted && Time.Current > HitObject.EndTime + missWindow)
-            ApplyResult(HitResult.Meh);
+        var tailTable = BmsJudgementProfileProvider.GetTable(Playfield.LayoutVariant, HitObject.Column, HitObject.BmsRank, tail: true);
+        var tailOffset = Time.Current - HitObject.EndTime;
+
+        if (tailOffset >= 0)
+        {
+            applyReleaseResult(tailTable, tailOffset);
+        }
     }
 }

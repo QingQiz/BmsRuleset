@@ -51,7 +51,7 @@ public class BmsBeatmapConversionTest
     }
 
     [Test]
-    public void TestBmsRankStampedOnHitObject()
+    public void TestJudgementContextStampedOnHitObject()
     {
         var beatmap = new BmsBeatmap
         {
@@ -67,5 +67,6 @@ public class BmsBeatmapConversionTest
         var converted = (BmsBeatmap)converter.Convert();
 
         Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(1));
+        Assert.That(converted.HitObjects[0].LayoutVariant, Is.EqualTo(BmsLayoutVariant.Bme7K));
     }
 }

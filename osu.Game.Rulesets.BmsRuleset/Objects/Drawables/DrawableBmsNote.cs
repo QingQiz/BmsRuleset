@@ -1,4 +1,4 @@
-using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.Scoring;
 
@@ -9,27 +9,13 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
 {
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Note;
 
-    public override bool TryHit()
-    {
-        if (Judged || HitObject?.HitWindows == null)
-            return false;
-
-        var bmsWindows = (BmsHitWindows)HitObject.HitWindows;
-        var result = bmsWindows.BmsResultFor(Time.Current - HitObject.StartTime);
-
-        if (result == HitResult.None)
-            return false;
-
-        ApplyResult(result);
-        return true;
-    }
-
     protected override void CheckForResult(bool userTriggered, double timeOffset)
     {
-        if (userTriggered || HitObject.HitWindows == null)
+        if (userTriggered || HitObject == null || Playfield == null)
             return;
 
-        if (timeOffset > HitObject.HitWindows.WindowFor(HitResult.Ok))
+        var table = BmsJudgementProfileProvider.GetTable(Playfield.LayoutVariant, HitObject.Column, HitObject.BmsRank, tail: false);
+        if (table.IsPastPassivePoorOffset(timeOffset))
             ApplyResult(HitResult.Meh);
     }
 }

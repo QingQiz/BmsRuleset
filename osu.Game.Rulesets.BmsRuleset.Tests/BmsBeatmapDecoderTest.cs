@@ -8,7 +8,7 @@ using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
@@ -63,13 +63,11 @@ public class BmsBeatmapDecoderTest
         var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().ToList();
 
         var lns = hitObjects.Where(h => h.IsLongNote).ToList();
-        var windows = new BmsHitWindows(beatmap.Rank);
-        windows.SetDifficulty(0); // initialise windows from rank
-        var rankWindows = BmsHitWindows.RANK_WINDOWS_LR2[Math.Clamp(beatmap.Rank, 0, 4)];
-        var pgreat = Math.Min(rankWindows.pgreat, windows.WindowFor(HitResult.Perfect));
-        var great = Math.Min(rankWindows.great, windows.WindowFor(HitResult.Great));
-        var good = Math.Min(rankWindows.good, windows.WindowFor(HitResult.Good));
-        var bad = windows.WindowFor(HitResult.Ok);
+        var table = BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, column: 1, beatmap.Rank, tail: false);
+        var pgreat = table.FrameworkWindowFor(HitResult.Perfect);
+        var great = table.FrameworkWindowFor(HitResult.Great);
+        var good = table.FrameworkWindowFor(HitResult.Good);
+        var bad = table.LateWindowFor(HitResult.Ok);
 
         var issues = new List<string>();
 
@@ -80,12 +78,12 @@ public class BmsBeatmapDecoderTest
 
             // Check press timing
             var pressOffset = autoplayPress - ln.StartTime; // should be 0
-            var pressJudgement = windows.BmsResultFor(pressOffset);
+            var pressJudgement = table.ResultForOffset(pressOffset);
             var pressOk = pressOffset >= -pgreat && pressOffset <= pgreat;
 
             // Check release timing
             var releaseOffset = autoplayRelease - ln.EndTime; // should be 0
-            var releaseJudgement = windows.BmsResultFor(releaseOffset);
+            var releaseJudgement = table.ResultForOffset(releaseOffset);
             var releaseOk = releaseOffset >= -pgreat && releaseOffset <= pgreat;
 
             if (!pressOk || !releaseOk || pressJudgement != HitResult.Perfect || releaseJudgement != HitResult.Perfect)
@@ -119,12 +117,14 @@ public class BmsBeatmapDecoderTest
                           $"start={ln.StartTime:F0}ms end={ln.EndTime:F0}ms");
         var around190 = string.Join("\n  ", aroundCombo190);
 
-        File.WriteAllText(@"C:\Users\kali\RiderProjects\ruleset-dev\caution_ln_diag.txt",
+        var outputPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "caution_ln_diag.txt");
+
+        File.WriteAllText(outputPath,
             $"{summary}\nAll LNs PGREAT.\n" +
             $"=== Shortest LNs (dur < {great * 2:F0}ms, {shortLns.Count} total, showing first 20) ===\n  {shortLnsReport}\n" +
             $"=== LNs around combo ~190 ===\n  {around190}");
 
-        Assert.Pass("Diagnostic written to caution_ln_diag.txt");
+        Assert.Pass($"Diagnostic written to {outputPath}");
     }
 
     [Test]

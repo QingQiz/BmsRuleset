@@ -18,6 +18,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI;
@@ -128,6 +129,8 @@ public partial class BmsRuleset : Ruleset
     public override HealthProcessor CreateHealthProcessor(double drainStartTime) =>
         new BmsHealthProcessor();
 
+    #region Attributes display
+
     public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
     {
         var original = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
@@ -136,8 +139,8 @@ public partial class BmsRuleset : Ruleset
 
         yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
         {
-            Description = $"LR2 RANK {adjusted.Rank} timing windows.",
-            AdditionalMetrics = createRankMetrics(adjusted.Rank),
+            Description = $"RANK {adjusted.Rank} timing windows.",
+            AdditionalMetrics = createRankMetrics(adjusted.Rank, adjusted.KeyCount),
         };
 
         yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total, (float)adjusted.Total, 300)
@@ -179,21 +182,60 @@ public partial class BmsRuleset : Ruleset
             : $"default TOTAL {calculator.Total:0.###}";
     }
 
-    private static RulesetBeatmapAttribute.AdditionalMetric[] createRankMetrics(int rank)
+    private static RulesetBeatmapAttribute.AdditionalMetric[] createRankMetrics(int rank, int keyCount)
     {
-        var w = BmsHitWindows.RANK_WINDOWS_LR2[Math.Clamp(rank, 0, BmsHitWindows.RANK_WINDOWS_LR2.Length - 1)];
+        var layout = BmsLayout.VariantFromTotalColumns(keyCount);
         var colours = new OsuColour();
+        var metrics = new List<RulesetBeatmapAttribute.AdditionalMetric>();
 
-        return
-        [
-            new("PGREAT", $"±{formatMilliseconds(w.pgreat)} ms", colours.ForHitResult(HitResult.Perfect)),
-            new("GREAT", $"±{formatMilliseconds(w.great)} ms", colours.ForHitResult(HitResult.Great)),
-            new("GOOD", $"±{formatMilliseconds(w.good)} ms", colours.ForHitResult(HitResult.Good)),
-            new("BAD", $"±{formatMilliseconds(w.badEarly)} ms", colours.ForHitResult(HitResult.Ok)),
-            new("E-POOR early zone", $"-{formatMilliseconds(w.emptyPoorEarly)} to -{formatMilliseconds(w.badEarly)} ms", colours.ForHitResult(HitResult.Miss)),
-        ];
+        addHeadMetrics("Normal note", BmsJudgementProfileProvider.GetTable(layout, column: 1, rank: rank, tail: false));
+
+        if (tryGetScratchColumn(layout, out var scratchColumn))
+            addHeadMetrics("Scratch", BmsJudgementProfileProvider.GetTable(layout, scratchColumn, rank, tail: false));
+
+        addTailMetrics("LN tail", BmsJudgementProfileProvider.GetTable(layout, column: 1, rank: rank, tail: true));
+
+        if (tryGetScratchColumn(layout, out scratchColumn))
+            addTailMetrics("Scratch LN tail", BmsJudgementProfileProvider.GetTable(layout, scratchColumn, rank, tail: true));
+
+        return metrics.ToArray();
+
+        void addHeadMetrics(string prefix, BmsJudgementWindowTable table)
+        {
+            addJudgementMetrics(prefix, table);
+            metrics.Add(new RulesetBeatmapAttribute.AdditionalMetric($"{prefix} E-POOR early zone", $"-{formatMilliseconds(table.EarlyWindowFor(HitResult.Miss))} to -{formatMilliseconds(table.EarlyWindowFor(HitResult.Ok))} ms", colours.ForHitResult(HitResult.Miss)));
+        }
+
+        void addTailMetrics(string prefix, BmsJudgementWindowTable table)
+        {
+            addJudgementMetrics(prefix, table);
+        }
+
+        void addJudgementMetrics(string prefix, BmsJudgementWindowTable table)
+        {
+            foreach (var result in new[] { HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok })
+                metrics.Add(new RulesetBeatmapAttribute.AdditionalMetric($"{prefix} {HIT_RESULT_LABELS[result]}", formatWindow(table, result), colours.ForHitResult(result)));
+        }
+
+        static string formatWindow(BmsJudgementWindowTable table, HitResult result)
+            => $"-{formatMilliseconds(table.EarlyWindowFor(result))} to +{formatMilliseconds(table.LateWindowFor(result))} ms";
 
         static string formatMilliseconds(double value) => $"{value:0.##}";
+
+        static bool tryGetScratchColumn(BmsLayoutVariant layout, out int scratchColumn)
+        {
+            for (var column = 0; column < BmsLayout.GetTotalColumns(layout); column++)
+            {
+                if (!BmsLayout.IsScratchColumn(column, layout))
+                    continue;
+
+                scratchColumn = column;
+                return true;
+            }
+
+            scratchColumn = -1;
+            return false;
+        }
     }
 
     private static RulesetBeatmapAttribute.AdditionalMetric[] createTotalMetrics(IBeatmapInfo beatmapInfo, BmsDifficultyInfo difficulty, IReadOnlyCollection<Mod> mods)
@@ -216,6 +258,8 @@ public partial class BmsRuleset : Ruleset
 
         static string formatDelta(double delta) => $"{delta * 100:+0.###;-0.###;0}%";
     }
+
+    #endregion
 
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
     {

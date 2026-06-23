@@ -7,6 +7,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
@@ -33,7 +34,14 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         RelativeSizeAxes = Axes.X;
     }
 
-    public virtual bool TryHit() => false;
+    public virtual bool TryHit(HitResult result)
+    {
+        if (Judged || result == HitResult.None)
+            return false;
+
+        ApplyResult(result);
+        return true;
+    }
 
     public override void PlaySamples()
     {

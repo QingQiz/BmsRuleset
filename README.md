@@ -165,18 +165,18 @@ Key sound of the next upcoming note in a column plays on every key press regardl
 
 ### Judgements and Scoring
 
-**Judgement tiers (LR2 timing windows, from `#RANK`):**
+**Judgement tiers (beatoraja timing windows, from `#RANK`):**
 
 | Name       | EX pts | Combo        | RANK 2 (Normal) window            |
 |------------|--------|--------------|-----------------------------------|
-| **PGREAT** | 2      | kept         | ±18 ms                            |
-| **GREAT**  | 1      | kept         | ±40 ms                            |
-| **GOOD**   | 0      | kept         | ±100 ms                           |
-| **BAD**    | 0      | reset        | ±200 ms                           |
-| **POOR**   | 0      | reset        | < -200ms / > +200ms               |
-| **E-POOR** | 0      | **no break** | [-1000ms,-200ms], no note consume |
+| **PGREAT** | 2      | kept         | ±15 ms                            |
+| **GREAT**  | 1      | kept         | ±45 ms                            |
+| **GOOD**   | 0      | kept         | ±112.5 ms                         |
+| **BAD**    | 0      | reset        | -220ms / +280ms                   |
+| **POOR**   | 0      | reset        | > +280ms                          |
+| **E-POOR** | 0      | **no break** | [-500ms,-220ms], no note consume  |
 
-`#RANK` 0 = Very Hard (±8/24/40/200 ms) → 4 = Very Easy (±21/60/200/200 ms).
+`#RANK` 0 = Very Hard (±5/15/37.5 ms, BAD -220/+280 ms) → 4 = Very Easy (±25/75/187.5 ms, BAD -220/+280 ms).
 
 **Score:** `total EX score / max EX score × 1,000,000`
 
@@ -921,10 +921,8 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Audio**     | Hijack preview song to play BMS samples                                                  | 1(failed) |
 | **Audio**     | `#xxx97` (fgt) — dynamic BGM volume change channel                                       |           |
 | **Converter** | Mania 7K → BMS chart conversion                                                          | 3         |
-| **Gauge**     | LN-specific gauge events (head miss ≠ body drop ≠ tail miss)                             | 1         |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |
 | **Input**     | Judgement offset adjustment capability                                                   |
-| **Mods**      | Remember last used mod combination                                                       |
 | **Mods**      | BG: make key sounds → background samples (hit results don't affect music)                | 2         
 | **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |           |
 | **Parser**    | `#BGAxx` / `#POORBGA` / `#SWBGAxx` / `#@BGAxx` / `#ARGBxx` — BGA definitions             |
@@ -961,7 +959,12 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Scoring**   | ExRank support                                                                           | 3         |
 | **Scoring**   | Different judgement text colours on results screen                                       | 4         |
 | **Scoring**   | Beatmap statistics — show more info (e.g., random branch count)                          | 2         |
-| **Scoring**   | LN head judgement                                                                        | 1         |
+| **Scoring**   | PMS judgement profile matching beatoraja `POPN_5K` / `POPN_9K`                           | 3         |
+| **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                   | 3         |
+| **Scoring**   | `#LNMODE` CN / HCN semantics and locked long-note mode                                   | 3         |
+| **Scoring**   | `#DEFEXRANK`, `#EXRANK`, and judge-window-rate support                                   | 3         |
+| **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT              | 4         |
+| **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                          | 4         |
 | **Skin**      | Column start position — value or enum (leftN, rightN, center)                            | 3         |
 | **Skin**      | BGA position/size configuration                                                          |
 | **Skin**      | Non-legacy BMS skin — fully configurable via skin editor                                 |

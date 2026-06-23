@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
@@ -168,5 +169,22 @@ public class BmsRulesetTest
         mod.ApplyToHealthProcessor(processor);
 
         Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExHard));
+    }
+
+    [Test]
+    public void TestRankAttributeMetricsIncludeScratchAndLongNoteTailWindows()
+    {
+        var beatmapInfo = new BeatmapInfo();
+        new BmsDifficultyInfo { Rank = 3, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+
+        var rank = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>())
+                          .Single(attribute => attribute.Acronym == "RK");
+
+        var metrics = rank.AdditionalMetrics.ToDictionary(metric => metric.Name.ToString(), metric => metric.Value.ToString());
+
+        Assert.That(metrics["Normal note PGREAT"], Is.EqualTo("-20 to +20 ms"));
+        Assert.That(metrics["Scratch BAD"], Is.EqualTo("-230 to +290 ms"));
+        Assert.That(metrics["LN tail PGREAT"], Is.EqualTo("-120 to +120 ms"));
+        Assert.That(metrics["Scratch LN tail GOOD"], Is.EqualTo("-210 to +210 ms"));
     }
 }

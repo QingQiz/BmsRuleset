@@ -14,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
@@ -197,59 +198,42 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             return false;
 
         pressedColumns.Add(column.Value);
+
+        var columnContainer = Stage.Columns[column.Value].HitObjectContainer;
+        var candidates = new List<(DrawableBmsHitObject Drawable, BmsJudgementCandidate Candidate)>();
+
+        foreach (var alive in columnContainer.AliveEntries.Values)
+        {
+            if (alive is not DrawableBmsHitObject d
+                || d.Judged
+                || d.HitObject.IsMine)
+            {
+                continue;
+            }
+
+            candidates.Add((d, new BmsJudgementCandidate(
+                d.HitObject.StartTime,
+                d.HitObject.EndTime,
+                d.HitObject.Column,
+                d.HitObject.BmsRank,
+                d.HitObject.IsLongNote)));
+        }
+
+        var selection = BmsJudgementSelector.SelectPress(LayoutVariant, column.Value, candidates.Select(c => c.Candidate), Time.Current);
+
+        if (selection.Candidate is { } selectedCandidate)
+        {
+            var target = candidates.First(c => c.Candidate.Equals(selectedCandidate)).Drawable;
+            if (target.TryHit(selection.Result))
+            {
+                KeySoundPlayer.PlaySample(selectedCandidate.Column, target.HitObject.SamplePath);
+                return true;
+            }
+        }
+
         KeySoundPlayer.PlayKeySound(column.Value);
 
-        // Pass 1: find a hittable note — earliest unjudged note whose timing falls within
-        // a judgement window (PGREAT … BAD, or the POOR hit zone).  Picking by StartTime
-        // ensures strict sequential ordering within a column.
-        var columnContainer = Stage.Columns[column.Value].HitObjectContainer;
-        DrawableBmsHitObject? target = null;
-
-        foreach (var alive in columnContainer.AliveEntries.Values)
-        {
-            if (alive is not DrawableBmsHitObject d
-                || d.Judged
-                || d.HitObject.IsMine
-                || d.HitObject.HitWindows is not BmsHitWindows w
-                || w.BmsResultFor(Time.Current - d.HitObject.StartTime) == HitResult.None)
-            {
-                continue;
-            }
-
-            if (target == null || d.HitObject.StartTime < target.HitObject.StartTime)
-                target = d;
-        }
-
-        if (target?.TryHit() == true)
-            return true;
-
-        // Pass 2: no note was consumed — check whether the key press falls in the E-POOR
-        // zone (outside the BAD window but within the EP boundary) of the nearest note.
-        // If so, register an E-POOR; otherwise silently ignore (too early / too late).
-        DrawableBmsHitObject? nearestUnjudged = null;
-        var nearestDistance = double.MaxValue;
-
-        foreach (var alive in columnContainer.AliveEntries.Values)
-        {
-            if (alive is not DrawableBmsHitObject d
-                || d.Judged
-                || d.HitObject.IsMine
-                || d.HitObject.HitWindows is not BmsHitWindows)
-            {
-                continue;
-            }
-
-            var distance = Math.Abs(Time.Current - d.HitObject.StartTime);
-
-            if (distance < nearestDistance)
-            {
-                nearestDistance = distance;
-                nearestUnjudged = d;
-            }
-        }
-
-        if (nearestUnjudged?.HitObject.HitWindows is BmsHitWindows epoWindows &&
-            epoWindows.IsEpoZone(Time.Current - nearestUnjudged.HitObject.StartTime))
+        if (selection.IsEmptyPoor)
         {
             registerEmptyPoor();
         }
@@ -293,14 +277,15 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                 heldNote = d;
         }
 
-        if (heldNote is ILongNoteHolder ln2 && ln2.TryRelease())
+        if (heldNote is ILongNoteHolder ln2)
         {
-            // Play the LN tail's own hit sound if available.
-            // Do NOT fallback to the head's sample — if the tail has no sample,
-            // nothing is played. This matches BMS behavior where only explicitly
-            // defined tail sounds (via the terminating cell's #WAV) are heard.
-            if (!string.IsNullOrEmpty(heldNote.HitObject.TailSamplePath))
+            var tailTable = BmsJudgementProfileProvider.GetTable(LayoutVariant, heldNote.HitObject.Column, heldNote.HitObject.BmsRank, tail: true);
+            var releaseOffset = Time.Current - heldNote.HitObject.EndTime;
+
+            if (ln2.TryRelease(releaseOffset, tailTable))
+            {
                 KeySoundPlayer.PlaySample(column.Value, heldNote.HitObject.TailSamplePath);
+            }
         }
     }
 

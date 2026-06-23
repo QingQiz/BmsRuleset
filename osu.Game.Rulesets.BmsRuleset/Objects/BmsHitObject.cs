@@ -1,4 +1,5 @@
 ﻿using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -53,6 +54,8 @@ public class BmsHitObject : HitObject, IHasDuration
     /// <summary>BMS #RANK value stamped from the beatmap during conversion. 0=Very Hard, 1=Hard, 2=Normal, 3=Easy, 4=Very Easy.</summary>
     public int BmsRank { get; set; } = 2;
 
+    public BmsLayoutVariant LayoutVariant { get; set; } = BmsLayoutVariant.Bme7K;
+
     /// <summary>
     ///     Precomputed scroll position at <see cref="HitObject.StartTime"/>.
     ///     Computed once during beatmap loading via <see cref="BmsParser.BmsTimingMap.GetScrollPositionAtTime"/>.
@@ -103,13 +106,14 @@ public class BmsHitObject : HitObject, IHasDuration
         target.TailSampleKey = TailSampleKey;
         target.TailSamplePath = TailSamplePath;
         target.BmsRank = BmsRank;
+        target.LayoutVariant = LayoutVariant;
         target.ScrollPositionAtStartTime = ScrollPositionAtStartTime;
         target.ScrollPositionAtEndTime = ScrollPositionAtEndTime;
     }
 
     public override Judgement CreateJudgement() => new BmsJudgement(IsMine);
 
-    protected override BmsHitWindows CreateHitWindows() => new(BmsRank);
+    protected override BmsHitWindows CreateHitWindows() => new(BmsRank, LayoutVariant, Column);
 }
 
 public class BmsNote : BmsHitObject

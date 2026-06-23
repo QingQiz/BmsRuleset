@@ -1,3 +1,5 @@
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 
 /// <summary>
@@ -7,7 +9,7 @@ public interface ILongNoteHolder
 {
     bool IsHoldingLongNote { get; }
 
-    bool TryRelease();
+    bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable);
 
     void UpdateBodyGeometry(float headY, float endY);
 }
