@@ -31,6 +31,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset;
 
@@ -333,12 +334,13 @@ public partial class BmsRuleset : Ruleset
 
         public BmsRulesetIcon()
         {
-            AutoSizeAxes = Axes.Both;
+            Size = new Vector2(14);
 
             InternalChild = new SpriteIcon
             {
                 Icon = OsuIcon.RulesetMania,
                 Colour = Colour4.White,
+                RelativeSizeAxes = Axes.Both,
             };
         }
 

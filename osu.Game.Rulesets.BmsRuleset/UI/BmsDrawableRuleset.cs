@@ -38,6 +38,8 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     public override int Variant => (int)((BmsBeatmap)Beatmap).LayoutVariant;
 
+    private BmsPreviewTrack? previewTrackBeforePlay;
+
     [Cached]
     private BmsSampleStore sampleStore = new(
         ((BmsBeatmap)beatmap).SampleDefinitions.Values,
@@ -53,6 +55,25 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     [Resolved(CanBeNull = true)]
     private GameplayState? gameplayState { get; set; }
+
+    #region Disposal
+
+    protected override void Dispose(bool isDisposing)
+    {
+        base.Dispose(isDisposing);
+
+        if (!isDisposing || previewTrackBeforePlay == null)
+            return;
+
+        // Only restore if the preview track hasn't been replaced for a
+        // different beatmap since play started.
+        if (BmsWorkingBeatmap.ActivePreviewTrack == previewTrackBeforePlay)
+            BmsWorkingBeatmap.RestoreActivePreview();
+
+        previewTrackBeforePlay = null;
+    }
+
+    #endregion
 
     public static double ComputeScrollTime(double scrollSpeed) => MAX_TIME_RANGE / Math.Max(1, scrollSpeed);
 
@@ -146,6 +167,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             ((BmsPlayfield)Playfield).SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
         }
 
+        previewTrackBeforePlay = BmsWorkingBeatmap.ActivePreviewTrack;
         BmsWorkingBeatmap.StopActivePreview();
     }
 }

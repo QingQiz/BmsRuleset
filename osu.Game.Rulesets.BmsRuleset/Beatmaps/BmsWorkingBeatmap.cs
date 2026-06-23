@@ -21,16 +21,9 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager)
     : WorkingBeatmap(inner.BeatmapInfo, audioManager)
 {
 
-    private readonly AudioManager audioManager = audioManager;
+    internal static BmsPreviewTrack? ActivePreviewTrack { get; private set; }
 
-    /// <summary>
-    ///     Track the active preview track so we can remove it from the
-    ///     <see cref="AudioManager" /> before a new one takes its place.
-    ///     AudioManager uses a single-threaded action queue processed before
-    ///     UpdateChildren, so the removal and addition happen in the same
-    ///     cycle with no window where both tracks receive Update calls.
-    /// </summary>
-    private static BmsPreviewTrack? activePreviewTrack;
+    private readonly AudioManager audioManager = audioManager;
 
     public override bool TryTransferTrack(WorkingBeatmap target) => false;
 
@@ -41,12 +34,14 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager)
     public override Stream GetStream(string storagePath) => inner.GetStream(storagePath);
 
     /// <summary>
-    ///     Stops the currently-active preview track (if any) and removes it from the
-    ///     <see cref="AudioManager" />.  Safe to call from any thread.
+    ///     Stops the currently-active preview track (if any) — silences BGM event
+    ///     processing, mutes output, and pauses playback.  Called when gameplay
+    ///     begins so the preview does not compete with the real
+    ///     <see cref="BmsBackgroundAudioPlayer" />.
     /// </summary>
     internal static void StopActivePreview()
     {
-        var track = activePreviewTrack;
+        var track = ActivePreviewTrack;
 
         if (track == null)
             return;
@@ -54,6 +49,18 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager)
         track.SuppressEventProcessing = true;
         track.Volume.Value = 0;
         track.Stop();
+    }
+
+    internal static void RestoreActivePreview()
+    {
+        var track = ActivePreviewTrack;
+
+        if (track == null || track.IsDisposed)
+            return;
+
+        track.SuppressEventProcessing = false;
+        track.Volume.Value = 1;
+        track.Start();
     }
 
     protected override Track GetBeatmapTrack()
@@ -97,14 +104,14 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager)
 
             // Stop and remove the previous preview track before registering the new one.
             // Removing without stopping would leave its StopwatchClock running forever.
-            if (activePreviewTrack != null)
+            if (ActivePreviewTrack != null)
             {
-                activePreviewTrack.Stop();
-                audioManager.RemoveItem(activePreviewTrack);
+                ActivePreviewTrack.Stop();
+                audioManager.RemoveItem(ActivePreviewTrack);
             }
 
             audioManager.AddItem(track);
-            activePreviewTrack = track;
+            ActivePreviewTrack = track;
 
             return track;
         }
