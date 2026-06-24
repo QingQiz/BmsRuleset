@@ -581,6 +581,59 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         BmsEventBus.OnJudgementDisplayEvent(result);
     }
 
+    /// <summary>
+    ///     Registers an HCN head judgement that should not end the drawable yet.
+    /// </summary>
+    internal void RegisterLongNoteHead(DrawableBmsHitObject drawable, double eventTime, HitResult result)
+    {
+        if (drawable.HitObject == null)
+            return;
+
+        var scoreResult = scoreProcessor?.ApplyLongNoteHead(drawable.HitObject, eventTime, result);
+
+        if (scoreResult != null)
+            healthProcessor?.ApplyLongNoteHead(scoreResult);
+
+        requestJudgementDisplay(result);
+    }
+
+    /// <summary>
+    ///     Registers a synthetic long-note endpoint (CN/HCN tail) through
+    ///     the score and health processors, and triggers a visual hit explosion.
+    /// </summary>
+    internal void RegisterLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime, HitResult result)
+    {
+        if (drawable.HitObject == null)
+            return;
+
+        var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(drawable.HitObject, endpointTime, eventTime, result);
+
+        if (scoreResult != null)
+            healthProcessor?.ApplySyntheticLongNoteEndpoint(scoreResult);
+
+        if (result.IsHit())
+        {
+            var column = Math.Clamp(drawable.HitObject.Column, 0, Stage.Columns.Length - 1);
+            Stage.Columns[column].HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
+                BmsSkinComponents.HitExplosion,
+                LayoutVariant,
+                column,
+                drawable.HitObject.IsLongNote)));
+        }
+
+        requestJudgementDisplay(result);
+    }
+
+    /// <summary>
+    ///     Whether the specified column is currently pressed.
+    /// </summary>
+    internal bool IsColumnPressed(int column) => pressedColumns.Contains(column);
+
+    /// <summary>
+    ///     Applies a HellChargeNote body gauge tick for the currently pressed column.
+    /// </summary>
+    internal void ApplyHellChargeTick(bool holding, double scale = 0.5) => healthProcessor?.ApplyHellChargeTick(holding, scale);
+
     #endregion
 
 }

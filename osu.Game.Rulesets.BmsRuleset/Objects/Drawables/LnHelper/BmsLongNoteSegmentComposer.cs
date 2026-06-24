@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
+namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables.LnHelper;
 
 /// <summary>
 /// Converts source long-note body slices into drawable parts for a target body length.

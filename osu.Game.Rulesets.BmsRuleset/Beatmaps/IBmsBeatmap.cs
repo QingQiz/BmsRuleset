@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
@@ -32,6 +33,8 @@ public interface IBmsBeatmap
 
     BmsTextEvents TextEvents { get; set; }
 
+    BmsLongNoteMode LockedLongNoteMode { get; set; }
+
     string? PreviewFile { get; set; }
 }
 
@@ -50,6 +53,7 @@ internal static class BmsBeatmapExtensions
         target.LongNoteTailSampleEvents = source.LongNoteTailSampleEvents;
         target.BranchDecisions = source.BranchDecisions;
         target.TextEvents = source.TextEvents;
+        target.LockedLongNoteMode = source.LockedLongNoteMode;
         target.PreviewFile = source.PreviewFile;
     }
 }

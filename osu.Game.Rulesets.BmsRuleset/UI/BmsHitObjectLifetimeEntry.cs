@@ -2,6 +2,7 @@ using System;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -36,6 +37,8 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
     ///     How long a note stays alive after it passes the judgement line (or after its EndTime).
     /// </summary>
     private const double default_past_lifetime = 0;
+
+    private const double passive_poor_lifetime_margin = 100;
 
     /// <summary>
     ///     Mines only need a single frame to check whether the column is pressed; after that they
@@ -250,7 +253,15 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
     ///     past its EndTime so the auto-miss path in <see cref="Objects.Drawables.DrawableBmsHitObject.Update" /> can fire.
     /// </summary>
     private static double getLateWindow(BmsHitObject hitObject)
-        => hitObject.HitWindows?.WindowFor(HitResult.Ok) ?? default_past_lifetime;
+    {
+        if (hitObject.IsLongNote)
+        {
+            var tailTable = BmsJudgementProfileProvider.GetTable(hitObject.LayoutVariant, hitObject.Column, hitObject.BmsRank, tail: true);
+            return tailTable.LateWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
+        }
+
+        return hitObject.HitWindows?.WindowFor(HitResult.Ok) ?? default_past_lifetime;
+    }
 
     #endregion
 

@@ -1,3 +1,5 @@
+using osu.Game.Rulesets.BmsRuleset.Objects;
+
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 public readonly record struct BmsChartMetadata(
@@ -8,5 +10,6 @@ public readonly record struct BmsChartMetadata(
     string RawTitle,
     int Rank,
     double Total,
-    float? PlayLevel
+    float? PlayLevel,
+    BmsLongNoteMode LockedLongNoteMode = BmsLongNoteMode.Undefined
 );

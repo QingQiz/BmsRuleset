@@ -18,6 +18,8 @@ using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
@@ -47,18 +49,6 @@ public partial class BmsRuleset : Ruleset
 
     public override LocalisableString VariantDescription => "Layout";
 
-    /// <summary>
-    ///     Single source of truth for BMS judgement label names.
-    ///     Used by <see cref="GetDisplayNameForHitResult"/> and the default judgement piece.
-    ///     <list type="table">
-    ///         <item><term>Perfect</term><description>PGREAT</description></item>
-    ///         <item><term>Great</term><description>GREAT</description></item>
-    ///         <item><term>Good</term><description>GOOD</description></item>
-    ///         <item><term>Ok</term><description>BAD</description></item>
-    ///         <item><term>Meh</term><description>POOR  (note consumed: passive miss or in-POOR-zone keypress)</description></item>
-    ///         <item><term>Miss</term><description>E-POOR (Empty POOR: keypress with no note to consume)</description></item>
-    ///     </list>
-    /// </summary>
     public static readonly IReadOnlyDictionary<HitResult, string> HIT_RESULT_LABELS = new Dictionary<HitResult, string>
     {
         [HitResult.Perfect] = "PGREAT",
@@ -69,10 +59,6 @@ public partial class BmsRuleset : Ruleset
         [HitResult.Miss] = "E-POOR",
     };
 
-    /// <summary>
-    ///     Static version of <see cref="GetValidHitResults"/> for use by types that cannot hold
-    ///     a <see cref="BmsRuleset"/> instance (e.g. <see cref="UI.BmsPlayfield"/> during load).
-    /// </summary>
     public static readonly IReadOnlyList<HitResult> STATIC_VALID_HIT_RESULTS =
     [
         HitResult.Perfect,
@@ -139,12 +125,25 @@ public partial class BmsRuleset : Ruleset
         var original = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
         var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
         var adjusted = BmsDifficultyInfo.FromOsuDifficulty(adjustedDifficulty);
+        var colours = new OsuColour();
 
         yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
         {
             Description = $"RANK {adjusted.Rank} timing windows.",
             AdditionalMetrics = createRankMetrics(adjusted.Rank, adjusted.KeyCount),
         };
+
+        if (original.LockedLongNoteMode != BmsLongNoteMode.Undefined)
+        {
+            yield return new RulesetBeatmapAttribute("LNMODE", "LM", (float)original.LockedLongNoteMode, (float)original.LockedLongNoteMode, 3)
+            {
+                Description = $"Locked long-note mode: {formatLongNoteMode(original.LockedLongNoteMode)}",
+                AdditionalMetrics =
+                [
+                    new("Locked mode", formatLongNoteMode(original.LockedLongNoteMode), colours.Gray4),
+                ],
+            };
+        }
 
         yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total, (float)adjusted.Total, 300)
         {
@@ -160,7 +159,6 @@ public partial class BmsRuleset : Ruleset
             new BmsModAssistEasyGauge(),
             new BmsModEasyGauge(),
 
-            new BmsModAutoScratch(),
             new BmsModHideScratch(),
 
             new BmsModNoFail(),
@@ -175,7 +173,14 @@ public partial class BmsRuleset : Ruleset
 
             new BmsModDoubleTime(),
         ],
-        ModType.Automation => [new BmsModAutoplay(), new BmsModCinema()],
+        ModType.Automation =>
+        [
+            new BmsModAutoplay(),
+            new BmsModCinema(),
+
+            new BmsModAutoScratch(),
+            // auto switch gauge type form hard -> easy
+        ],
         ModType.Conversion =>
         [
             new BmsModLaneRandom(),
@@ -184,6 +189,12 @@ public partial class BmsRuleset : Ruleset
 
             new BmsModMirror(),
             new BmsModSecondPlayer(),
+        ],
+        ModType.Fun =>
+        [
+            new BmsModLongNote(),
+            new BmsModChargeNote(),
+            new BmsModHellChargeNote(),
         ],
         ModType.System => [new BmsModBranchReplay()],
         _ => [],
@@ -324,6 +335,14 @@ public partial class BmsRuleset : Ruleset
 
         static string formatDelta(double delta) => $"{delta * 100:+0.###;-0.###;0}%";
     }
+
+    private static string formatLongNoteMode(BmsLongNoteMode mode) => mode switch
+    {
+        BmsLongNoteMode.LongNote => "LN",
+        BmsLongNoteMode.ChargeNote => "CN",
+        BmsLongNoteMode.HellChargeNote => "HCN",
+        _ => "??",
+    };
 
     #endregion
 

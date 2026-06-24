@@ -52,12 +52,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             if (note is ILongNoteHolder ln)
             {
                 var endOffset = (float)((note.HitObject.ScrollPositionAtEndTime - currentScrollPos) * scale);
-                var clampedEndOffset =
-                    note.HitObject.ScrollPositionAtEndTime >= note.HitObject.ScrollPositionAtStartTime
-                        ? Math.Max(endOffset, 0)
-                        : Math.Min(endOffset, 0);
-
-                ln.UpdateBodyGeometry(y, -(hitTarget + clampedEndOffset));
+                ln.UpdateBodyGeometry(y, -(hitTarget + endOffset));
             }
         }
     }

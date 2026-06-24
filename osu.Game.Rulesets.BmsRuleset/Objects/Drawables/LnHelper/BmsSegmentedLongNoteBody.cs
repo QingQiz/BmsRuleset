@@ -17,7 +17,7 @@ using osuTK;
 using osuTK.Graphics;
 using RectangleF = osu.Framework.Graphics.Primitives.RectangleF;
 
-namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
+namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables.LnHelper;
 
 /// <summary>
 /// Draws a long-note body from legacy skin textures using BMS segment ordering rules.

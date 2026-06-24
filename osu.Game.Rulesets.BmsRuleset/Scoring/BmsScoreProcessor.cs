@@ -17,33 +17,10 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 {
     private static readonly Action<JudgementResult, int> set_combo_after = createComboAfterSetter();
 
+    private static readonly Action<JudgementResult, double> set_raw_time = createRawTimeSetter();
+    private static readonly Action<JudgementResult, double> set_gameplay_rate = createGameplayRateSetter();
+
     private double latestEndTime = double.MaxValue;
-
-    private static Action<JudgementResult, int> createComboAfterSetter()
-    {
-        try
-        {
-            var field = typeof(JudgementResult).GetField("<ComboAfterJudgement>k__BackingField",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-
-            if (field == null)
-            {
-                Logger.Log(
-                    "BMS ScoreProcessor: Could not find JudgementResult.ComboAfterJudgement backing field. "
-                    + "The osu! framework may have changed; BAD/POOR combo-break revert will not function correctly.",
-                    level: LogLevel.Error);
-                return (_, _) => { };
-            }
-
-            return (r, v) => field.SetValue(r, v);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "BMS ScoreProcessor: Failed to bind ComboAfterJudgement setter via reflection. "
-                             + "BAD/POOR combo-break revert will not function correctly.");
-            return (_, _) => { };
-        }
-    }
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
@@ -63,6 +40,77 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         latestEndTime = maxEndTime + lateWindow;
     }
 
+    public override int GetBaseScoreForResult(HitResult result) => result switch
+    {
+        HitResult.Perfect => 2,
+        HitResult.Great => 1,
+        _ => 0,
+    };
+
+    public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
+    {
+        return accuracy switch
+        {
+            // All PGREATs → rainbow S (DJ LEVEL MAX / perfect full combo).
+            >= 1.0 - 1e-9 when results.GetValueOrDefault(HitResult.Great) == 0 &&
+                               results.GetValueOrDefault(HitResult.Good) == 0 &&
+                               results.GetValueOrDefault(HitResult.Ok) == 0 &&
+                               results.GetValueOrDefault(HitResult.Meh) == 0
+                => ScoreRank.X,
+            // Traditional BMS DJ LEVEL thresholds expressed as EX-score ratios.
+            // AAA = 8/9 of max ≈ 0.889, AA = 7/9 ≈ 0.778, A = 6/9 ≈ 0.667.
+            // We expose S/A/B/C/D as approximate equivalents.
+            >= 8.0 / 9.0 => ScoreRank.S,
+            >= 7.0 / 9.0 => ScoreRank.A,
+            >= 6.0 / 9.0 => ScoreRank.B,
+            >= 5.0 / 9.0 => ScoreRank.C,
+            _ => ScoreRank.D,
+        };
+
+        // BMS pass/fail is determined solely by gauge at song end, not by score accuracy.
+        // ScoreRank.F is never assigned here; failure is communicated through BmsHealthProcessor.
+    }
+
+    /// <summary>
+    ///     Records an Empty POOR: a keypress that found no note to consume.
+    ///     Increments the Empty POOR counter stored under
+    ///     <see cref="HitResult.Miss"/> in the score statistics so it
+    ///     appears in the results-screen statistics and the live HUD judgement counter.
+    ///     Empty POORs do not affect EX-score, accuracy, or combo.
+    /// </summary>
+    public void RegisterEmptyPoor()
+    {
+        ScoreResultCounts[HitResult.Miss] = ScoreResultCounts.GetValueOrDefault(HitResult.Miss) + 1;
+    }
+
+    /// <summary>
+    ///     Applies a judgement result for a synthetic long-note endpoint
+    ///     (CN/HCN tail). Creates its own <see cref="JudgementResult"/> and
+    ///     runs it through the full score/accuracy/combo pipeline.
+    /// </summary>
+    public JudgementResult ApplySyntheticLongNoteEndpoint(BmsHitObject source, double endpointTime, double eventTime, HitResult type)
+    {
+        var endpoint = source.CreateSyntheticEndpoint(endpointTime);
+        var result = new JudgementResult(endpoint, endpoint.CreateJudgement());
+
+        populateSyntheticResult(result, eventTime, type);
+        ApplyResult(result);
+        return result;
+    }
+
+    /// <summary>
+    ///     Applies a long-note head judgement without requiring the drawable to enter
+    ///     its terminal judged state. HCN head POOR still has an active body afterwards.
+    /// </summary>
+    public JudgementResult ApplyLongNoteHead(BmsHitObject source, double eventTime, HitResult type)
+    {
+        var result = new JudgementResult(source, source.CreateJudgement());
+
+        populateSyntheticResult(result, eventTime, type);
+        ApplyResult(result);
+        return result;
+    }
+
     protected override void Update()
     {
         // Don't call base — JudgementProcessor.Update() checks JudgedHits == MaxHits,
@@ -74,13 +122,6 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
                 bb.Value = true;
         }
     }
-
-    public override int GetBaseScoreForResult(HitResult result) => result switch
-    {
-        HitResult.Perfect => 2,
-        HitResult.Great => 1,
-        _ => 0,
-    };
 
     /// <summary>
     ///     Scaled EX-score.  Accuracy = EXScore / MaxEXScore (0–1).
@@ -108,47 +149,78 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         }
     }
 
-    public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
-    {
-        return accuracy switch
-        {
-            // All PGREATs → rainbow S (DJ LEVEL MAX / perfect full combo).
-            >= 1.0 - 1e-9 when results.GetValueOrDefault(HitResult.Great) == 0 &&
-                               results.GetValueOrDefault(HitResult.Good) == 0 &&
-                               results.GetValueOrDefault(HitResult.Ok) == 0 &&
-                               results.GetValueOrDefault(HitResult.Meh) == 0
-                => ScoreRank.X,
-            // Traditional BMS DJ LEVEL thresholds expressed as EX-score ratios.
-            // AAA = 8/9 of max ≈ 0.889, AA = 7/9 ≈ 0.778, A = 6/9 ≈ 0.667.
-            // We expose S/A/B/C/D as approximate equivalents.
-            >= 8.0 / 9.0 => ScoreRank.S,
-            >= 7.0 / 9.0 => ScoreRank.A,
-            >= 6.0 / 9.0 => ScoreRank.B,
-            >= 5.0 / 9.0 => ScoreRank.C,
-            _ => ScoreRank.D,
-        };
-
-        // BMS pass/fail is determined solely by gauge at song end, not by score accuracy.
-        // ScoreRank.F is never assigned here; failure is communicated through BmsHealthProcessor.
-    }
-
     protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
-        => base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
+    {
+        foreach (var hitObject in base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT))
+        {
+            yield return hitObject;
+
+            if (hitObject is BmsLongNote { LongNoteMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote } longNote)
+                yield return longNote.CreateSyntheticEndpoint(longNote.EndTime);
+        }
+    }
 
     protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement is BmsJudgement { IsMine: true }
         ? HitResult.IgnoreMiss
         : base.GetSimulatedHitResult(judgement);
 
-    /// <summary>
-    ///     Records an Empty POOR: a keypress that found no note to consume.
-    ///     Increments the Empty POOR counter stored under
-    ///     <see cref="HitResult.Miss"/> in the score statistics so it
-    ///     appears in the results-screen statistics and the live HUD judgement counter.
-    ///     Empty POORs do not affect EX-score, accuracy, or combo.
-    /// </summary>
-    public void RegisterEmptyPoor()
+    private static Action<JudgementResult, int> createComboAfterSetter()
     {
-        ScoreResultCounts[HitResult.Miss] = ScoreResultCounts.GetValueOrDefault(HitResult.Miss) + 1;
+        try
+        {
+            var field = typeof(JudgementResult).GetField("<ComboAfterJudgement>k__BackingField",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            if (field == null)
+            {
+                Logger.Log(
+                    "BMS ScoreProcessor: Could not find JudgementResult.ComboAfterJudgement backing field. "
+                    + "The osu! framework may have changed; BAD/POOR combo-break revert will not function correctly.",
+                    level: LogLevel.Error);
+                return (_, _) => { };
+            }
+
+            return (r, v) => field.SetValue(r, v);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "BMS ScoreProcessor: Failed to bind ComboAfterJudgement setter via reflection. "
+                             + "BAD/POOR combo-break revert will not function correctly.");
+            return (_, _) => { };
+        }
+    }
+
+    private static Action<JudgementResult, double> createRawTimeSetter()
+    {
+        var property = typeof(JudgementResult).GetProperty("RawTime", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        if (property == null)
+        {
+            Logger.Log("BMS ScoreProcessor: Could not bind JudgementResult.RawTime; synthetic LN endpoint offsets will be zero.", level: LogLevel.Error);
+            return (_, _) => { };
+        }
+
+        return (result, rawTime) => property.SetValue(result, rawTime);
+    }
+
+    private static Action<JudgementResult, double> createGameplayRateSetter()
+    {
+        var property = typeof(JudgementResult).GetProperty("GameplayRate", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        if (property == null)
+        {
+            Logger.Log("BMS ScoreProcessor: Could not bind JudgementResult.GameplayRate; synthetic LN endpoint hit events may not support UR calculation.", level: LogLevel.Error);
+            return (_, _) => { };
+        }
+
+        return (result, gameplayRate) => property.SetValue(result, gameplayRate);
+    }
+
+    private static void populateSyntheticResult(JudgementResult result, double eventTime, HitResult type)
+    {
+        result.Type = type;
+        set_raw_time(result, eventTime);
+        set_gameplay_rate(result, 1);
     }
 
     private class JudgementOrderComparer : IComparer<HitObject>

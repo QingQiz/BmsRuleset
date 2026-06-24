@@ -35,22 +35,22 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 public partial class BmsHealthProcessor : HealthProcessor
 {
 
+    public Bindable<BmsGaugeDisplayProfile> DisplayProfile { get; } =
+        new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
+
     /// <summary>
     /// Whether HP ever dropped to 0 during this play.
     /// to determine gauge-failed rank even when NF mod prevents mid-song failure.
     /// </summary>
     public bool HasEverFailed { get; private set; }
 
-    private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
-
-    private BmsGaugeCalculator? calculator;
-
     public BmsGaugeType GaugeType { get; private set; } = BmsGaugeType.Normal;
 
     public BmsGaugeProfile GaugeProfile { get; private set; } = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
 
-    public Bindable<BmsGaugeDisplayProfile> DisplayProfile { get; } =
-        new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
+    private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
+
+    private BmsGaugeCalculator? calculator;
 
     private IBeatmap? beatmap;
     private bool initialized;
@@ -71,6 +71,36 @@ public partial class BmsHealthProcessor : HealthProcessor
         markEverFailedIfEmpty();
     }
 
+    /// <summary>
+    ///     Applies a health change from a synthetic long-note endpoint
+    ///     (CN/HCN tail), using the same judgement/health pipeline as normal results.
+    /// </summary>
+    public void ApplySyntheticLongNoteEndpoint(JudgementResult result)
+    {
+        ApplyResult(result);
+    }
+
+    public void ApplyLongNoteHead(JudgementResult result)
+    {
+        ApplyResult(result);
+    }
+
+    /// <summary>
+    ///     Applies a HellChargeNote body tick at ~200 ms cadence.
+    ///     The default scale applies half-GREAT gauge recovery or half-BAD gauge damage.
+    ///     Does not add judgement count, combo, or score.
+    /// </summary>
+    public void ApplyHellChargeTick(bool holding, double scale = 0.5)
+    {
+        ensureInitialized();
+
+        var type = holding ? HitResult.Great : HitResult.Ok;
+        var delta = calculator!.GetDeltaFor(type, Health.Value) * scale;
+
+        Health.Value = calculator.ApplyDelta(Health.Value, delta);
+        markEverFailedIfEmpty();
+    }
+
     public void SetGaugeType(BmsGaugeType gaugeType)
     {
         GaugeType = gaugeType;
@@ -87,15 +117,6 @@ public partial class BmsHealthProcessor : HealthProcessor
             return false;
 
         return GaugeProfile.ClearThreshold <= 0 || Health.Value >= GaugeProfile.ClearThreshold;
-    }
-
-    private void markEverFailedIfEmpty()
-    {
-        if (Health.Value > 0)
-            return;
-
-        HasEverFailed = true;
-        TriggerFailure();
     }
 
     protected override void Reset(bool storeResults)
@@ -135,6 +156,15 @@ public partial class BmsHealthProcessor : HealthProcessor
         }
 
         return calculator!.GetDeltaFor(result.Type, Health.Value);
+    }
+
+    private void markEverFailedIfEmpty()
+    {
+        if (Health.Value > 0)
+            return;
+
+        HasEverFailed = true;
+        TriggerFailure();
     }
 
     private void ensureInitialized()

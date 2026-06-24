@@ -373,7 +373,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             RawTitle: title,
             Rank: parsed.Rank,
             Total: parsed.Total,
-            PlayLevel: parsed.PlayLevel);
+            PlayLevel: parsed.PlayLevel,
+            LockedLongNoteMode: parsed.LockedLongNoteMode);
     }
 
     private static void applyCompletionState(ProgressNotification notification, ImportResult result)

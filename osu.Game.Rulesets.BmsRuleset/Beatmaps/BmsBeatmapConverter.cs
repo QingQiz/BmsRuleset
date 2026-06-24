@@ -62,6 +62,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             Rank = converted.Rank,
             Total = converted.Total,
             KeyCount = converted.TotalColumns,
+            LockedLongNoteMode = converted.LockedLongNoteMode,
         }.WriteToOsuDifficulty(converted);
 
         if (!hasBmsData)
@@ -157,10 +158,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
     private static void stampJudgementContextOnHitObjects(BmsBeatmap beatmap)
     {
         foreach (var hitObject in beatmap.HitObjects)
-        {
-            hitObject.BmsRank = beatmap.Rank;
-            hitObject.LayoutVariant = beatmap.LayoutVariant;
-        }
+            hitObject.Beatmap = beatmap;
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using System;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
@@ -26,6 +27,8 @@ public readonly struct BmsDifficultyInfo
     /// <summary>Playable column count (inferred from chart or CircleSize).</summary>
     public int KeyCount { get; init; }
 
+    public BmsLongNoteMode LockedLongNoteMode { get; init; }
+
     /// <summary>
     /// Reads BMS difficulty from a parse result.
     /// </summary>
@@ -35,6 +38,7 @@ public readonly struct BmsDifficultyInfo
         Rank = result.Rank,
         Total = result.Total,
         KeyCount = result.TotalColumns,
+        LockedLongNoteMode = result.LockedLongNoteMode,
     };
 
     public static BmsDifficultyInfo FromChartMetadata(BmsChartMetadata metadata) => new()
@@ -44,6 +48,7 @@ public readonly struct BmsDifficultyInfo
         Rank = metadata.Rank,
         Total = metadata.Total,
         KeyCount = metadata.KeyCount,
+        LockedLongNoteMode = metadata.LockedLongNoteMode,
     };
 
     /// <summary>
@@ -105,6 +110,7 @@ public readonly struct BmsDifficultyInfo
         Rank = OdToRank(difficulty.OverallDifficulty),
         Total = Math.Max(0, difficulty.ApproachRate),
         KeyCount = GetKeyCount(difficulty),
+        LockedLongNoteMode = (BmsLongNoteMode)Math.Clamp((int)Math.Round(difficulty.DrainRate), 0, 3),
     };
 
     /// <summary>
@@ -125,6 +131,9 @@ public readonly struct BmsDifficultyInfo
 
         beatmap.Difficulty.ApproachRate = (float)Total;
         beatmap.BeatmapInfo.Difficulty.ApproachRate = (float)Total;
+
+        beatmap.Difficulty.DrainRate = (float)LockedLongNoteMode;
+        beatmap.BeatmapInfo.Difficulty.DrainRate = (float)LockedLongNoteMode;
     }
 
     /// <summary>
@@ -140,6 +149,7 @@ public readonly struct BmsDifficultyInfo
         beatmap.Difficulty.OverallDifficulty = od;
         beatmap.Difficulty.CircleSize = KeyCount;
         beatmap.Difficulty.ApproachRate = (float)Total;
+        beatmap.Difficulty.DrainRate = (float)LockedLongNoteMode;
     }
 
     /// <summary>

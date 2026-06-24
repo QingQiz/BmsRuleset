@@ -1086,6 +1086,88 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestInvalidLnModeValueLeavesUndefined()
+    {
+        var beatmap = decode("""
+                             #LNMODE 4
+                             #BPM 120
+                             #LNTYPE 1
+                             #00151:0102
+                             """);
+        var decoded = (BmsDecodedBeatmap)beatmap;
+        var note = (BmsHitObject)beatmap.HitObjects[0];
+
+        Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
+        Assert.That(note.IsLongNote, Is.True);
+        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
+    }
+
+    [Test]
+    public void TestLnMode1ParsesAsLongNote()
+    {
+        var beatmap = decode("""
+                             #LNMODE 1
+                             #BPM 120
+                             #LNTYPE 1
+                             #00151:0102
+                             """);
+        var decoded = (BmsDecodedBeatmap)beatmap;
+        var note = (BmsHitObject)beatmap.HitObjects[0];
+
+        Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.LongNote));
+        Assert.That(note.IsLongNote, Is.True);
+        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.LongNote));
+    }
+
+    [Test]
+    public void TestLnMode2ParsesAsChargeNote()
+    {
+        var beatmap = decode("""
+                             #LNMODE 2
+                             #BPM 120
+                             #LNTYPE 1
+                             #00151:0102
+                             """);
+        var decoded = (BmsDecodedBeatmap)beatmap;
+        var note = (BmsHitObject)beatmap.HitObjects[0];
+
+        Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
+        Assert.That(note.IsLongNote, Is.True);
+        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
+    }
+
+    [Test]
+    public void TestLnMode3ParsesAsHellChargeNote()
+    {
+        var beatmap = decode("""
+                             #LNMODE 3
+                             #BPM 120
+                             #LNTYPE 1
+                             #00151:0102
+                             """);
+        var decoded = (BmsDecodedBeatmap)beatmap;
+        var note = (BmsHitObject)beatmap.HitObjects[0];
+
+        Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.HellChargeNote));
+        Assert.That(note.IsLongNote, Is.True);
+        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.HellChargeNote));
+    }
+
+    [Test]
+    public void TestLnModeValueZeroLeavesUndefined()
+    {
+        var beatmap = decode("""
+                             #LNMODE 0
+                             #BPM 120
+                             #LNTYPE 1
+                             #00151:0102
+                             """);
+        var decoded = (BmsDecodedBeatmap)beatmap;
+
+        Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
+    }
+
+    [Test]
     public void TestLnObjPairsVisibleTerminator()
     {
         var beatmap = decode("""
@@ -1228,6 +1310,21 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestLongNoteWithoutLnModeGetsUndefined()
+    {
+        // Non-long notes should not be affected
+        var beatmap = decode("""
+                             #LNMODE 2
+                             #BPM 120
+                             #00111:01
+                             """);
+        var note = (BmsHitObject)beatmap.HitObjects[0];
+
+        Assert.That(note.IsLongNote, Is.False);
+        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
+    }
+
+    [Test]
     public void TestMakerSetsAuthor()
     {
         var beatmap = decode("""
@@ -1254,6 +1351,22 @@ public class BmsBeatmapDecoderTest
         Assert.That(first.StartTime, Is.EqualTo(0).Within(0.001));
         Assert.That(second.TickInfo.Tick, Is.EqualTo(192));
         Assert.That(second.StartTime, Is.EqualTo(2000).Within(0.001));
+    }
+
+    [Test]
+    public void TestMissingLnModeLeavesUndefined()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #LNTYPE 1
+                             #00151:0102
+                             """);
+        var decoded = (BmsDecodedBeatmap)beatmap;
+        var note = (BmsHitObject)beatmap.HitObjects[0];
+
+        Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
+        Assert.That(note.IsLongNote, Is.True);
+        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
     }
 
     [Test]

@@ -65,7 +65,6 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
         hitObject.IsLongNote = parsedObject.IsLongNote;
         hitObject.IsMine = parsedObject.IsMine;
         hitObject.LandmineDamagePercent = parsedObject.LandmineDamagePercent;
-        hitObject.LandmineExplosionSamplePath = parsedObject.LandmineExplosionSamplePath;
         hitObject.TailSampleKey = parsedObject.TailSampleKey;
         hitObject.TailSamplePath = parsedObject.TailSamplePath;
         return hitObject;
@@ -102,6 +101,12 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
 
         foreach (var parsedObject in parseResult.HitObjects)
             output.HitObjects.Add(CreateHitObject(parsedObject));
+
+        if (output is IBmsBeatmap bmsBeatmap)
+        {
+            foreach (var h in output.HitObjects.OfType<BmsHitObject>())
+                h.Beatmap = bmsBeatmap;
+        }
     }
 
     private static string[] readLines(LineBufferedReader stream, string? path)

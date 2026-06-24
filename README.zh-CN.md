@@ -75,6 +75,7 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 | 采样定义             | `#WAVxx`                                                                                                                               | 音频文件路径（WAV/OGG）                                 |
 | 长音符类型           | `#LNTYPE 1` / `#LNTYPE 2`                                                                                                             | LN 记法：1=RDM（默认），2=MGQ                          |
 | 长音符标记           | `#LNOBJ`                                                                                                                               | LN 终点标记值（存储在 HashSet 中）                     |
+| 长音符锁定模式       | `#LNMODE 1` / `#LNMODE 2` / `#LNMODE 3`                                                                                               | 锁定 LN 类型：1=LN，2=CN（Charge Note），3=HCN（Hell Charge Note）     |
 | 文本事件             | `#TEXTxx`、`#SONGxx`                                                                                                                   | 游戏过程中在通道 `99` 上显示                           |
 | Base 62 扩展         | `#BASE 62`                                                                                                                             | 命令和通道的大小写敏感 base-62 编码                    |
 | 玩家模式             | `#PLAYER`                                                                                                                              | **已忽略** — 布局仅根据通道存在和文件扩展名推断        |
@@ -86,7 +87,7 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 
 **未解析：** `#BANNER`、`#STAGEFILE`、`#BACKBMP`、`#BMPxx`、`#BGAxx`、`#EXWAVxx`、
 `#WAVCMD`、`#VOLWAV`、`#MIDIFILE`、`#DIFFICULTY`、`#EXRANK` / `#EXRANKxx`、
-`#DEFEXRANK`、`#EXBPMxx`、`#LNMODE`、`#STP`、`#PATH_WAV` / `#PATH_BMP`、`#OPTION`、
+`#DEFEXRANK`、`#EXBPMxx`、`#STP`、`#PATH_WAV` / `#PATH_BMP`、`#OPTION`、
 `#CHANGEOPTIONxx`、`#POORBGA`、`#SWBGAxx`、`#@BGAxx`、`#ARGBxx`、视频相关命令、`#CHARFILE`、
 `#ExtChr`、`#OCT/FP`、`#MATERIALS`
 BGA 通道（`04`、`06`、`07`、`0A`–`0E`）、动态音量通道（`97`、`98`）、
@@ -215,23 +216,26 @@ BGA 通道（`04`、`06`、`07`、`0A`–`0E`）、动态音量通道（`97`、`
 
 ### Mods
 
-| Mod                        | 说明                                   |                 |
-|----------------------------|----------------------------------------|-----------------|
-| Autoplay                   | 自动播放                               |                 |
-| Double Time / Half Time    |                                        | 未测试          |
-| No Fail                    |                                        |                 |
-| Cinema                     |                                        | 正常            |
-| Mirror                     | 镜像键位布局                           |                 |
-| 2P                         | 将玩家布局从 1P 切换为 2P              |                 |
-| Auto Scratch /Hide Scratch | 自动/隐藏 scratch 轨道                 |                 |
-| Lane Random (LR)           | RANDOM：随机排列轨道列                 |                 |
-| Note Random (NR)           | S-RANDOM / H-RANDOM：逐音符随机        |                 |
-| Rotation Random (RR)       | R-RANDOM：旋转 + 可选镜像              |                 |
-| Assist Easy Gauge (E2)     | 使用 Assist Easy BMS 血量              |                 |
-| Easy Gauge (E1)            | 使用 Easy BMS 血量                     |                 |
-| Hard Gauge (H1)            | 使用 Hard BMS 血量                     |                 |
-| EX Hard Gauge (H2)         | 使用 EX Hard BMS 血量                  |                 |
-| Hazard Gauge (H3)          | 使用 Hazard BMS 血量                   |                 |
+| Mod                        | 说明                        |                 |
+|----------------------------|---------------------------|-----------------|
+| Autoplay                   | 自动播放                      |                 |
+| Double Time / Half Time    |                           | 未测试          |
+| No Fail                    |                           |                 |
+| Cinema                     |                           | 正常            |
+| Mirror                     | 镜像键位布局                    |                 |
+| 2P                         | 将玩家布局从 1P 切换为 2P          |                 |
+| Auto Scratch /Hide Scratch | 自动/隐藏 scratch 轨道          |                 |
+| Lane Random (LR)           | RANDOM：随机排列轨道列            |                 |
+| Note Random (NR)           | S-RANDOM / H-RANDOM：逐音符随机 |                 |
+| Rotation Random (RR)       | R-RANDOM：旋转 + 可选镜像        |                 |
+| Assist Easy Gauge (E2)     | 使用 Assist Easy BMS 血量     |                 |
+| Easy Gauge (E1)            | 使用 Easy BMS 血量            |                 |
+| Hard Gauge (H1)            | 使用 Hard BMS 血量            |                 |
+| EX Hard Gauge (H2)         | 使用 EX Hard BMS 血量         |                 |
+| Hazard Gauge (H3)          | 使用 Hazard BMS 血量          |                 |
+| Long Note (L1)             | LN 判定：LN 模式：尾部单一判定        |                 |
+| Charge Note (L2)           | LN 判定：CN 模式：头尾各自独立判分      |                 |
+| Hell Charge Note (L3)      | LN 判定：HCN 模式：CN + 持续身体血量流失      |                 |
 
 ---
 

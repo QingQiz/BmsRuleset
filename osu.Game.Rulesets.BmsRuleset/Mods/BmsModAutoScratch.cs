@@ -24,7 +24,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
     public override LocalisableString Description => "Automatically hits scratch notes.";
 
-    public override ModType Type => ModType.DifficultyReduction;
+    public override ModType Type => ModType.Automation;
 
     private readonly HashSet<DrawableBmsHitObject> autoScratchLnHeads = [];
 

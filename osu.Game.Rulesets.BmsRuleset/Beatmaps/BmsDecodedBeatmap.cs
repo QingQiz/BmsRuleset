@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
@@ -28,6 +29,8 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 
     public BmsTextEvents TextEvents { get; set; } = new(string.Empty, []);
 
+    public BmsLongNoteMode LockedLongNoteMode { get; set; }
+
     public string? PreviewFile { get; set; }
 
     public string[] RawLines { get; set; } = [];
@@ -45,6 +48,7 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
         LongNoteTailSampleEvents = parseResult.LongNoteTailSampleEvents;
         BranchDecisions = parseResult.BranchDecisions;
         TextEvents = parseResult.TextEvents;
+        LockedLongNoteMode = parseResult.LockedLongNoteMode;
         PreviewFile = parseResult.PreviewFile;
     }
 }

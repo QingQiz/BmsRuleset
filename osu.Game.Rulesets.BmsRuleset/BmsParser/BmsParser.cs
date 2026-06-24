@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -140,7 +141,8 @@ internal static partial class BmsChartParser
             state.Maker,
             state.Url,
             state.Email,
-            state.Comment);
+            state.Comment,
+            state.LnMode);
     }
 
     /// <summary>Encode a 2-char base-62 pair into a 12-bit ushort (case-sensitive).</summary>
@@ -354,6 +356,13 @@ internal static partial class BmsChartParser
         {
             if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnType))
                 state.LnType = lnType;
+            return;
+        }
+
+        if (cmdSpan.Equals("LNMODE", StringComparison.OrdinalIgnoreCase))
+        {
+            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnMode) && lnMode >= 1 && lnMode <= 3)
+                state.LnMode = (BmsLongNoteMode)lnMode;
             return;
         }
 
@@ -785,7 +794,7 @@ internal static partial class BmsChartParser
         collectVisibleObjects(notes, state, timingMap, output);
 
         foreach (var mine in mines.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-            output.Add(createMineHitObject(mine, timingMap, state.SampleDefinitions));
+            output.Add(createMineHitObject(mine, timingMap));
     }
 
     private static void collectVisibleObjects(
@@ -903,13 +912,11 @@ internal static partial class BmsChartParser
             isLongNote,
             false,
             0,
-            string.Empty,
             tailSampleKey,
             tailSamplePath);
     }
 
-    private static BmsParsedHitObject createMineHitObject(
-        RawCell mine, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions)
+    private static BmsParsedHitObject createMineHitObject(RawCell mine, BmsTimingMap timingMap)
     {
         var startTime = timingMap.ProjectTickToTime(mine.Tick);
 
@@ -924,8 +931,7 @@ internal static partial class BmsChartParser
             string.Empty,
             false,
             true,
-            parseBase36Value(mine.Value) / 2d,
-            sampleDefinitions.GetValueOrDefault((ushort)0, string.Empty), // 0 = "00"
+            parseBase36Value(mine.Value) / 2d, // 0 = "00"
             0,
             string.Empty);
     }
@@ -1126,6 +1132,8 @@ internal static partial class BmsChartParser
         public bool UseBase62 { get; set; }
 
         public int LnType { get; set; } = 1;
+
+        public BmsLongNoteMode LnMode { get; set; }
 
         // Default RANK 2 = NORMAL per BMS spec.
         public int Rank { get; set; } = 2;

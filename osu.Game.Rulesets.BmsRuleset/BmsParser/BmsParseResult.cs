@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -25,7 +26,8 @@ public sealed record BmsParseResult(
     string? Maker = null,
     string? Url = null,
     string? Email = null,
-    string? Comment = null);
+    string? Comment = null,
+    BmsLongNoteMode LockedLongNoteMode = BmsLongNoteMode.Undefined);
 
 public readonly record struct BmsBranchDecision(int MaxValue, int SelectedValue);
 
@@ -41,7 +43,6 @@ public readonly record struct BmsParsedHitObject(
     bool IsLongNote,
     bool IsMine,
     double LandmineDamagePercent,
-    string LandmineExplosionSamplePath,
     ushort TailSampleKey,
     string TailSamplePath);
 

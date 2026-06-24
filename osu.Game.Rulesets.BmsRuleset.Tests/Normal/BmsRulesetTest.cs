@@ -6,12 +6,13 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.UI;
-using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Beatmaps;
@@ -129,11 +130,35 @@ public class BmsRulesetTest
     }
 
     [Test]
-    public void TestMetadata()
+    public void TestFunModsContainAllThreeLongNoteModeMods()
     {
-        Assert.That(ruleset.ShortName, Is.EqualTo("bms"));
-        Assert.That(ruleset.Description, Is.EqualTo("BMS"));
-        Assert.That(ruleset.RulesetAPIVersionSupported, Is.Not.Null.And.Not.Empty);
+        var mods = ruleset.GetModsFor(ModType.Fun).ToArray();
+
+        Assert.That(mods.OfType<BmsModLongNote>().SingleOrDefault(), Is.Not.Null);
+        Assert.That(mods.OfType<BmsModChargeNote>().SingleOrDefault(), Is.Not.Null);
+        Assert.That(mods.OfType<BmsModHellChargeNote>().SingleOrDefault(), Is.Not.Null);
+    }
+
+    [Test]
+    public void TestGaugeModAppliesGaugeTypeToHealthProcessor()
+    {
+        var processor = new BmsHealthProcessor();
+        var mod = new BmsModExHardGauge();
+
+        mod.ApplyToHealthProcessor(processor);
+
+        Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExHard));
+    }
+
+    [Test]
+    public void TestGaugeModsAreMutuallyIncompatible()
+    {
+        var hard = new BmsModHardGauge();
+
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModAssistEasyGauge)));
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModEasyGauge)));
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModExHardGauge)));
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModHazardGauge)));
     }
 
     [Test]
@@ -150,25 +175,38 @@ public class BmsRulesetTest
     }
 
     [Test]
-    public void TestGaugeModsAreMutuallyIncompatible()
+    public void TestLnModeDisplayAttributeHiddenWhenUndefined()
     {
-        var hard = new BmsModHardGauge();
+        var beatmapInfo = new BeatmapInfo();
+        new BmsDifficultyInfo { Rank = 2, KeyCount = 9, LockedLongNoteMode = BmsLongNoteMode.Undefined }
+            .WriteToOsuDifficulty(beatmapInfo);
 
-        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModAssistEasyGauge)));
-        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModEasyGauge)));
-        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModExHardGauge)));
-        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModHazardGauge)));
+        var attributes = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>());
+        var lnModeAttr = attributes.SingleOrDefault(a => a.Acronym == "LM");
+
+        Assert.That(lnModeAttr, Is.Null);
     }
 
     [Test]
-    public void TestGaugeModAppliesGaugeTypeToHealthProcessor()
+    public void TestLnModeDisplayAttributeShowsWhenLocked()
     {
-        var processor = new BmsHealthProcessor();
-        var mod = new BmsModExHardGauge();
+        var beatmapInfo = new BeatmapInfo();
+        new BmsDifficultyInfo { Rank = 2, KeyCount = 9, LockedLongNoteMode = BmsLongNoteMode.ChargeNote }
+            .WriteToOsuDifficulty(beatmapInfo);
 
-        mod.ApplyToHealthProcessor(processor);
+        var attributes = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>());
+        var lnModeAttr = attributes.SingleOrDefault(a => a.Acronym == "LM");
 
-        Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExHard));
+        Assert.That(lnModeAttr, Is.Not.Null);
+        Assert.That(lnModeAttr.AdditionalMetrics[0].Value.ToString(), Is.EqualTo("CN"));
+    }
+
+    [Test]
+    public void TestMetadata()
+    {
+        Assert.That(ruleset.ShortName, Is.EqualTo("bms"));
+        Assert.That(ruleset.Description, Is.EqualTo("BMS"));
+        Assert.That(ruleset.RulesetAPIVersionSupported, Is.Not.Null.And.Not.Empty);
     }
 
     [Test]
@@ -178,7 +216,7 @@ public class BmsRulesetTest
         new BmsDifficultyInfo { Rank = 3, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
 
         var rank = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>())
-                          .Single(attribute => attribute.Acronym == "RK");
+            .Single(attribute => attribute.Acronym == "RK");
 
         var metrics = rank.AdditionalMetrics.ToDictionary(metric => metric.Name.ToString(), metric => metric.Value.ToString());
 

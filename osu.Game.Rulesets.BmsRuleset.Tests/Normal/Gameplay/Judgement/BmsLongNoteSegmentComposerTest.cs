@@ -1,6 +1,6 @@
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
+using osu.Game.Rulesets.BmsRuleset.Objects.Drawables.LnHelper;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
