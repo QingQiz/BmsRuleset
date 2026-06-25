@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
@@ -5,8 +7,12 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.Replays;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -14,8 +20,19 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [TestFixture]
 public partial class TestSceneBmsMods : BmsPlayerTestScene
 {
+    // Per-test replay factory; defaults to watch-only so the existing mod tests keep their
+    // "load and inspect the beatmap/playfield" behaviour. Tests that need to drive gameplay
+    // swap this before LoadPlayer.
+    private Func<BmsBeatmap, IList<ReplayFrame>> replay = BmsTestReplays.CreateWatchOnlyFrames;
+
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
-        => CreateBmsPlayer(BmsTestReplays.CreateWatchOnlyFrames);
+    {
+        // Snapshot the per-test replay, then reset to the watch-only default so a later test
+        // never inherits a previous test's custom replay.
+        var replayForThisPlayer = replay;
+        replay = BmsTestReplays.CreateWatchOnlyFrames;
+        return CreateBmsPlayer(replayForThisPlayer);
+    }
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -38,6 +55,40 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
 
         AddAssert("scratch not hidden", () => !Playfield.Stage.Columns[0].Hidden);
+    }
+
+    [Test]
+    public void TestAutoGauge()
+    {
+        // Autoplay fills every tracked gauge to full, then the replay stops pressing so the
+        // remaining notes miss and the survival tiers fail one by one — the cascade the AG
+        // mod exists to demonstrate. The 0.2 groove-tier start would otherwise drain them
+        // dead before the survival tiers fail, so the pre-fill is what makes Normal reachable.
+        const double auto_play_until = 10500;
+
+        this.AddSetupStep("load player with AG mod + autoplay-then-idle replay", () =>
+        {
+            replay = b => BmsTestReplays.CreateAutoPlayThenIdleFrames(b, auto_play_until);
+            LoadPlayer([new BmsModAutoGauge()]);
+        });
+        this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
+        this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
+
+        AddAssert("gauge starts at hardest tier (Hazard)", () =>
+            Player.GameplayState.HealthProcessor is BmsHealthProcessor hp && hp.GaugeType == BmsGaugeType.Hazard);
+
+        // Let the autoplay phase fill the gauges (the replay hits every note before the idle
+        // boundary, so no tier has failed yet).
+        AddUntilStep("autoplay phase complete", () =>
+            Player.GameplayClockContainer.CurrentTime >= auto_play_until);
+
+        // Idle: missed notes drain the survival tiers in order (Hazard, ExHard, Hard) and the
+        // active gauge steps down Hazard → ExHard → Hard → Normal. Reaching Normal is also the
+        // proof that the pre-fill worked — from the 0.2 groove start Normal would be dead long
+        // before Hard fails, so the cascade could never land on it without the autoplay buffer.
+        AddUntilStep("gauge downgraded to Normal", () =>
+            Player.GameplayState.HealthProcessor is BmsHealthProcessor hp && hp.GaugeType == BmsGaugeType.Normal);
     }
 
     [Test]

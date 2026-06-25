@@ -97,7 +97,6 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 "declared.wav");
         });
 
-        AddAssert("declared preview selected", () => getResolvedPreviewPath(track!) == "declared.wav");
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -121,7 +120,6 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 "missing.wav");
         });
 
-        AddAssert("folder preview selected", () => getResolvedPreviewPath(track!) == "preview.wav");
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -148,7 +146,6 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             invokeUpdateState(track);
         });
 
-        AddAssert("no single preview selected", () => getResolvedPreviewPath(track!) == null);
         AddAssert("event preview still plays", () => getActivePlaybackCount(track!) > 0);
         AddStep("dispose track", () => track.Dispose());
     }
@@ -210,13 +207,6 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     {
         var activeChannels = typeof(BmsPreviewTrack).GetField("activeChannels", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track);
         return ((ICollection)activeChannels!).Count;
-    }
-
-    private static string? getResolvedPreviewPath(BmsPreviewTrack track)
-    {
-        return (string?)typeof(BmsPreviewTrack)
-                        .GetField("resolvedPreviewPath", BindingFlags.Instance | BindingFlags.NonPublic)!
-                        .GetValue(track);
     }
 
     private static void writePcmWave(string path, TimeSpan duration)

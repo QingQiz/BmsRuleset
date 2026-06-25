@@ -226,6 +226,10 @@ Default play uses the Normal gauge. Gauge types are selected via mods:
   `max(7.605 × N / (0.01 × N + 6.5), 160)` (LR2 formula, where N = total playable notes).
 - Landmine damage: base-36 value ÷ 2 percent (e.g., `ZZ` = 647.5% → instant wipe).
 - Gauge mods are mutually exclusive.
+- **Auto Gauge (AG)** is an Automation mod that chains all six gauges hardest-first
+  (Hazard → EX Hard → Hard → Normal → Easy → Assist Easy). You start on the hardest tier; when HP hits 0 the
+  active gauge drops to the next tier and play continues — the run only fails once every tier is exhausted. The
+  resulting score is attributed to the hardest tier you reached.
 
 ---
 
@@ -248,6 +252,7 @@ Default play uses the Normal gauge. Gauge types are selected via mods:
 | Hard Gauge (H1)            | Use Hard BMS gauge                                    |            |
 | EX Hard Gauge (H2)         | Use EX Hard BMS gauge                                 |            |
 | Hazard Gauge (H3)          | Use Hazard BMS gauge                                  |            |
+| Auto Gauge (AG)            | Start with the hardest gauge; drop a tier on failure  |            |
 | Long Note (L1)             | LN judgement: LN mode: single endpoint judged at tail |            |
 | Charge Note (L2)           | LN judgement: CN mode: head & tail judged separately  |            |
 | Hell Charge Note (L3)      | LN judgement: HCN mode: CN + body gauge drain/recover |            |
@@ -939,7 +944,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Input**     | Judgement offset adjustment capability                                                   |
 | **Mods**      | BG: make key sounds → background samples (hit results don't affect music)                | 2        
 | **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |          |
-| **Mods**      | Mod for auto switch gauge type                                                           | 1        |
 | **Parser**    | `#BGAxx` / `#POORBGA` / `#SWBGAxx` / `#@BGAxx` / `#ARGBxx` — BGA definitions             |
 | **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                            |
 | **Parser**    | `#CDDA` / `#MIDIFILE` — CD / MIDI                                                        |

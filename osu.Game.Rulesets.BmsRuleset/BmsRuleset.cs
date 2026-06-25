@@ -179,7 +179,7 @@ public partial class BmsRuleset : Ruleset
             new BmsModCinema(),
 
             new BmsModAutoScratch(),
-            // auto switch gauge type form hard -> easy
+            new BmsModAutoGauge(),
         ],
         ModType.Conversion =>
         [

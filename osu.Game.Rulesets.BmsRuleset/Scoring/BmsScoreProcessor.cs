@@ -5,8 +5,10 @@ using System.Reflection;
 using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -163,6 +165,16 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement is BmsJudgement { IsMine: true }
         ? HitResult.IgnoreMiss
         : base.GetSimulatedHitResult(judgement);
+
+    public override void PopulateScore(ScoreInfo score)
+    {
+        base.PopulateScore(score);
+
+        // Attribution (e.g. which gauge an Auto Gauge run resolved to) is owned by the mods
+        // that introduce the behaviour, so the score processor stays free of gauge-specific logic.
+        foreach (var mod in Mods.Value.OfType<IApplicableToScorePopulation>())
+            mod.ApplyToScore(score);
+    }
 
     private static Action<JudgementResult, int> createComboAfterSetter()
     {

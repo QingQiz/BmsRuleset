@@ -106,6 +106,7 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 - `#TOTAL` 控制 TOTAL 算法血量的最大回复速度。默认公式：`max(7.605 × N / (0.01 × N + 6.5), 160)`（LR2 公式，N = 总可玩音符数）。
 - 地雷伤害：36进制值 ÷ 2 百分比（例如 `ZZ` = 647.5% → 直接清空）。
 - 各血量 Mod 互相排斥。
+- **Auto Gauge (AG)**：将六种血量按最难优先串联（Hazard → EX Hard → Hard → Normal → Easy → Assist Easy）。从最难档位开局；HP 归零时当前档位降级到下一档并继续游戏——只有所有档位都耗尽才会失败。最终成绩按所达到的最难档位归属。
 
 ---
 
@@ -128,6 +129,7 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 | Hard Gauge (H1)            | 使用 Hard BMS 血量            |                 |
 | EX Hard Gauge (H2)         | 使用 EX Hard BMS 血量         |                 |
 | Hazard Gauge (H3)          | 使用 Hazard BMS 血量          |                 |
+| Auto Gauge (AG)            | 从最难血量起；失败时降一档             |                 |
 | Long Note (L1)             | LN 判定：LN 模式：尾部单一判定        |                 |
 | Charge Note (L2)           | LN 判定：CN 模式：头尾各自独立判分      |                 |
 | Hell Charge Note (L3)      | LN 判定：HCN 模式：CN + 持续身体血量流失      |                 |

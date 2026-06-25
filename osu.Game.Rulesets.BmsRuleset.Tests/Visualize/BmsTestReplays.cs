@@ -76,6 +76,37 @@ public static partial class BmsTestReplays
         => new List<ReplayFrame> { new BmsReplayFrame(0) };
 
     /// <summary>
+    /// Autoplays every note before <paramref name="idleFromTime"/> perfectly, then stops
+    /// pressing so the remaining notes miss. Pre-filling every tracked gauge gives the
+    /// groove tiers an HP buffer they lack from their 0.2 start, isolating the Auto Gauge
+    /// cascade: survival tiers fail in order and the active gauge steps down toward Normal.
+    /// </summary>
+    public static IList<ReplayFrame> CreateAutoPlayThenIdleFrames(BmsBeatmap beatmap, double idleFromTime)
+    {
+        var actionPoints = new List<ActionPoint>();
+
+        foreach (var hitObject in beatmap.HitObjects.OrderBy(h => h.StartTime))
+        {
+            if (hitObject.StartTime >= idleFromTime)
+                break;
+
+            // Mines are passive when left unpressed; skip them so the autoplay portion
+            // doesn't detonate them and skew the gauge.
+            if (hitObject.IsMine)
+                continue;
+
+            if (BmsKeyBindingConfiguration.ActionForColumn(beatmap.LayoutVariant, hitObject.Column) is not { } action)
+                continue;
+
+            var releaseTime = (hitObject.IsLongNote ? hitObject.EndTime : hitObject.StartTime) + RELEASE_PADDING_MS;
+            actionPoints.Add(new ActionPoint(hitObject.StartTime, action, true));
+            actionPoints.Add(new ActionPoint(releaseTime, action, false));
+        }
+
+        return materialise(actionPoints);
+    }
+
+    /// <summary>
     /// Generates replay frames with deliberate timing offsets so that every
     /// <see cref="BmsRuleset.STATIC_VALID_HIT_RESULTS"/> hit result is produced,
     /// including a deliberate Empty-POOR. Long notes use scenario-based timing

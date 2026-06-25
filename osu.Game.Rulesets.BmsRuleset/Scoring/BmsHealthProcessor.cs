@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
@@ -10,30 +11,20 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 
-/// <summary>
-///     BMS-native Normal gauge health processor.
-/// </summary>
-/// <remarks>
-///     <para>
-///         <b>Normal gauge</b> rules (LR2 reference implementation):
-///         <list type="table">
-///             <listheader><term>Judgement</term><description>Gauge delta</description></listheader>
-///             <item><term>PGREAT</term><description>+(<c>#TOTAL</c> / N) %</description></item>
-///             <item><term>GREAT</term><description>+(<c>#TOTAL</c> / N) %</description></item>
-///             <item><term>GOOD</term><description>+(<c>#TOTAL</c> / N × 0.5) %</description></item>
-///             <item><term>BAD</term><description>−4 %</description></item>
-///             <item><term>POOR / MISS</term><description>−6 %</description></item>
-///         </list>
-///         Starting gauge: 20 %.
-///         Clear condition: ≥ 80 % at song end.
-///     </para>
-///     <para>
-///         When <c>#TOTAL</c> is absent or 0 the default formula
-///         <c>max(7.605 × N / (0.01 × N + 6.5), 160)</c> is used (LR2 default).
-///     </para>
-/// </remarks>
 public partial class BmsHealthProcessor : HealthProcessor
 {
+    private sealed class GaugeState
+    {
+        public BmsGaugeType GaugeType;
+        public BmsGaugeProfile Profile = null!;
+        public BmsGaugeCalculator? Calculator;
+        public double CurrentHp;
+        public bool IsHpFailed;
+    }
+
+    private readonly List<GaugeState> gaugeStates = [];
+    private int activeGaugeIndex;
+    private int endResultIndex;
 
     public Bindable<BmsGaugeDisplayProfile> DisplayProfile { get; } =
         new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
@@ -48,9 +39,15 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     public BmsGaugeProfile GaugeProfile { get; private set; } = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
 
-    private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
+    /// <summary>
+    /// The gauge type that ultimately determined pass/fail at song end.
+    /// </summary>
+    public BmsGaugeType WorstGaugeType =>
+        gaugeStates.Count > 0 && endResultIndex < gaugeStates.Count
+            ? gaugeStates[endResultIndex].GaugeType
+            : BmsGaugeType.Normal;
 
-    private BmsGaugeCalculator? calculator;
+    private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
     private IBeatmap? beatmap;
     private bool initialized;
@@ -67,7 +64,21 @@ public partial class BmsHealthProcessor : HealthProcessor
     public void RegisterEmptyPoor()
     {
         ensureInitialized();
-        Health.Value = calculator!.ApplyDelta(Health.Value, calculator.GetDeltaFor(HitResult.Miss, Health.Value));
+        syncActiveStateFromHealth();
+
+        for (var i = 0; i < gaugeStates.Count; i++)
+        {
+            var state = gaugeStates[i];
+            if (state.IsHpFailed) continue;
+
+            var delta = state.Calculator!.GetDeltaFor(HitResult.Miss, state.CurrentHp);
+            state.CurrentHp = state.Calculator.ApplyDelta(state.CurrentHp, delta);
+
+            if (state.CurrentHp <= 0)
+                state.IsHpFailed = true;
+        }
+
+        resolveActiveState();
         markEverFailedIfEmpty();
     }
 
@@ -93,21 +104,81 @@ public partial class BmsHealthProcessor : HealthProcessor
     public void ApplyHellChargeTick(bool holding, double scale = 0.5)
     {
         ensureInitialized();
+        syncActiveStateFromHealth();
 
         var type = holding ? HitResult.Great : HitResult.Ok;
-        var delta = calculator!.GetDeltaFor(type, Health.Value) * scale;
 
-        Health.Value = calculator.ApplyDelta(Health.Value, delta);
+        for (var i = 0; i < gaugeStates.Count; i++)
+        {
+            var state = gaugeStates[i];
+            if (state.IsHpFailed) continue;
+
+            var delta = state.Calculator!.GetDeltaFor(type, state.CurrentHp) * scale;
+            state.CurrentHp = state.Calculator.ApplyDelta(state.CurrentHp, delta);
+
+            if (state.CurrentHp <= 0)
+                state.IsHpFailed = true;
+        }
+
+        resolveActiveState();
         markEverFailedIfEmpty();
     }
 
     public void SetGaugeType(BmsGaugeType gaugeType)
     {
-        GaugeType = gaugeType;
-        GaugeProfile = BmsGaugeProfileFactory.Create(gaugeType);
-        DisplayProfile.Value = GaugeProfile.Display;
-        Health.MaxValue = GaugeProfile.MaxHealth;
-        Health.Value = GaugeProfile.InitialHealth;
+        // In multi-gauge (auto-gauge) mode, a duplicate type means replay dedup — skip.
+        if (gaugeStates.Count > 1 && gaugeStates.Any(s => s.GaugeType == gaugeType))
+            return;
+
+        // Single-gauge mode: replace the entire chain so that switching from
+        // Hard back to Normal (and similar transitions) works correctly.
+        gaugeStates.Clear();
+        SetGaugeTypes([gaugeType]);
+    }
+
+    /// <summary>
+    /// Sets multiple gauge types to track in parallel, sorted by difficulty descending.
+    /// Types already present in the chain are skipped (dedup).
+    /// </summary>
+    public void SetGaugeTypes(IEnumerable<BmsGaugeType> types)
+    {
+        var unique = new HashSet<BmsGaugeType>();
+        var newStates = new List<GaugeState>();
+
+        foreach (var type in types)
+        {
+            if (!unique.Add(type))
+                continue;
+
+            // Skip if already in the chain (dedup during replay).
+            if (gaugeStates.Any(s => s.GaugeType == type))
+                continue;
+
+            var profile = BmsGaugeProfileFactory.Create(type);
+            newStates.Add(new GaugeState
+            {
+                GaugeType = type,
+                Profile = profile,
+                CurrentHp = profile.InitialHealth,
+            });
+        }
+
+        if (newStates.Count == 0)
+            return;
+
+        gaugeStates.AddRange(newStates);
+        gaugeStates.Sort((a, b) => ((int)b.GaugeType).CompareTo((int)a.GaugeType));
+
+        // Sync to active state (first = hardest).
+        activeGaugeIndex = 0;
+        endResultIndex = 0;
+        var active = gaugeStates[0];
+        GaugeType = active.GaugeType;
+        GaugeProfile = active.Profile;
+        DisplayProfile.Value = active.Profile.Display;
+        Health.MaxValue = active.Profile.MaxHealth;
+        Health.Value = active.CurrentHp;
+
         initialized = false;
     }
 
@@ -116,7 +187,21 @@ public partial class BmsHealthProcessor : HealthProcessor
         if (HasEverFailed)
             return false;
 
-        return GaugeProfile.ClearThreshold <= 0 || Health.Value >= GaugeProfile.ClearThreshold;
+        for (var i = activeGaugeIndex; i < gaugeStates.Count; i++)
+        {
+            var state = gaugeStates[i];
+            if (state.IsHpFailed)
+                continue;
+
+            if (state.Profile.ClearThreshold <= 0 || state.CurrentHp >= state.Profile.ClearThreshold)
+            {
+                endResultIndex = i;
+                return true;
+            }
+        }
+
+        endResultIndex = gaugeStates.Count > 0 ? gaugeStates.Count - 1 : 0;
+        return false;
     }
 
     protected override void Reset(bool storeResults)
@@ -126,6 +211,16 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.MaxValue = GaugeProfile.MaxHealth;
         Health.Value = GaugeProfile.InitialHealth;
         HasEverFailed = false;
+
+        // Reset all gauge states to their initial values for a fresh play.
+        foreach (var state in gaugeStates)
+        {
+            state.CurrentHp = state.Profile.InitialHealth;
+            state.IsHpFailed = false;
+        }
+
+        activeGaugeIndex = 0;
+        endResultIndex = 0;
     }
 
     protected override void ApplyResultInternal(JudgementResult result)
@@ -143,19 +238,62 @@ public partial class BmsHealthProcessor : HealthProcessor
     protected override double GetHealthIncreaseFor(JudgementResult result)
     {
         ensureInitialized();
+        syncActiveStateFromHealth();
+
+        // The framework captures Health.Value BEFORE calling this method,
+        // then does Health.Value = capturedOldValue + this_return_value.
+        // We must return the net delta so the framework's arithmetic arrives
+        // at the correct value.
+        var oldHealth = Health.Value;
 
         if (result.HitObject is BmsHitObject { IsMine: true } mine)
         {
             if (result.Type != HitResult.Meh)
                 return 0;
 
+            // z.z landmine: instant-kill all layers.
             if (mine.LandmineDamagePercent >= max_landmine_damage_percent)
-                return -1;
+            {
+                foreach (var state in gaugeStates)
+                {
+                    state.CurrentHp = 0;
+                    state.IsHpFailed = true;
+                }
 
-            return -mine.LandmineDamagePercent / 100d;
+                resolveActiveState();
+                return Health.Value - oldHealth;
+            }
+
+            // Regular landmine: apply damage fraction to all non-failed states.
+            var damageFraction = mine.LandmineDamagePercent / 100.0;
+            foreach (var state in gaugeStates)
+            {
+                if (state.IsHpFailed) continue;
+
+                state.CurrentHp = Math.Max(0, state.CurrentHp - damageFraction);
+                if (state.CurrentHp <= 0)
+                    state.IsHpFailed = true;
+            }
+
+            resolveActiveState();
+            return Health.Value - oldHealth;
         }
 
-        return calculator!.GetDeltaFor(result.Type, Health.Value);
+        // Normal note: each non-failed state computes its own delta independently.
+        for (var i = 0; i < gaugeStates.Count; i++)
+        {
+            var state = gaugeStates[i];
+            if (state.IsHpFailed) continue;
+
+            var delta = state.Calculator!.GetDeltaFor(result.Type, state.CurrentHp);
+            state.CurrentHp = state.Calculator.ApplyDelta(state.CurrentHp, delta);
+
+            if (state.CurrentHp <= 0)
+                state.IsHpFailed = true;
+        }
+
+        resolveActiveState();
+        return Health.Value - oldHealth;
     }
 
     private void markEverFailedIfEmpty()
@@ -167,11 +305,34 @@ public partial class BmsHealthProcessor : HealthProcessor
         TriggerFailure();
     }
 
+    private void syncActiveStateFromHealth()
+    {
+        if (activeGaugeIndex < gaugeStates.Count)
+        {
+            var active = gaugeStates[activeGaugeIndex];
+            if (!active.IsHpFailed)
+                active.CurrentHp = Health.Value;
+        }
+    }
+
     private void ensureInitialized()
     {
         if (initialized) return;
 
         initialized = true;
+
+        // When no gauge types have been set explicitly, default to the current
+        // GaugeType (Normal) so that health calculations always have a state.
+        if (gaugeStates.Count == 0)
+        {
+            gaugeStates.Add(new GaugeState
+            {
+                GaugeType = GaugeType,
+                Profile = GaugeProfile,
+                CurrentHp = GaugeProfile.InitialHealth,
+            });
+        }
+
         var noteCount = beatmap?.HitObjects.Count(h => h is not BmsHitObject { IsMine: true }) ?? 0;
         if (noteCount == 0) noteCount = 1;
 
@@ -184,6 +345,28 @@ public partial class BmsHealthProcessor : HealthProcessor
             total = Math.Max(7.605 * noteCount / (0.01 * noteCount + 6.5), 160.0);
         }
 
-        calculator = new BmsGaugeCalculator(GaugeProfile, total, noteCount);
+        foreach (var state in gaugeStates)
+        {
+            state.Calculator = new BmsGaugeCalculator(state.Profile, total, noteCount);
+        }
+    }
+
+    private void resolveActiveState()
+    {
+        while (activeGaugeIndex < gaugeStates.Count && gaugeStates[activeGaugeIndex].IsHpFailed)
+            activeGaugeIndex++;
+
+        if (activeGaugeIndex >= gaugeStates.Count)
+        {
+            Health.Value = 0;
+            return;
+        }
+
+        var active = gaugeStates[activeGaugeIndex];
+        GaugeType = active.GaugeType;
+        GaugeProfile = active.Profile;
+        DisplayProfile.Value = active.Profile.Display;
+        Health.MaxValue = active.Profile.MaxHealth;
+        Health.Value = active.CurrentHp;
     }
 }
