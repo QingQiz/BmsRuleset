@@ -1,5 +1,6 @@
 using System;
 using osu.Framework.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.UI;
 
@@ -49,9 +50,9 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
             note.Y = y;
 
-            if (note is ILongNoteHolder ln)
+            if (note is ILongNoteHolder ln && note.HitObject is BmsLongNote longNote)
             {
-                var endOffset = (float)((note.HitObject.ScrollPositionAtEndTime - currentScrollPos) * scale);
+                var endOffset = (float)((longNote.ScrollPositionAtEndTime - currentScrollPos) * scale);
                 ln.UpdateBodyGeometry(y, -(hitTarget + endOffset));
             }
         }

@@ -47,7 +47,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                      .SelectMany(c => c.HitObjectContainer.AliveObjects)
                      .OfType<DrawableBmsHitObject>())
         {
-            if (drawable.Judged || drawable.HitObject.IsMine)
+            if (drawable.Judged || drawable.HitObject is BmsLandmine)
                 continue;
 
             if (!BmsLayout.IsScratchColumn(drawable.HitObject.Column, playfield.LayoutVariant))
@@ -61,7 +61,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                 {
                     if (now >= note.StartTime)
                     {
-                        var headTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, drawable.HitObject.Column, drawable.HitObject.BmsRank, tail: false);
+                        var headTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, drawable.HitObject.Column, drawable.HitObject.Beatmap.Rank, tail: false);
                         var headResult = headTable.ResultForOffset(now - drawable.HitObject.StartTime);
                         if (headResult != HitResult.None && drawable.TryHit(headResult))
                         {
@@ -70,18 +70,18 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                         }
                     }
                 }
-                else if (now >= note.EndTime)
+                else if (now >= ((BmsLongNote)note).EndTime)
                 {
-                    var tailTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, note.Column, note.BmsRank, tail: true);
-                    if (longNote.TryRelease(now - note.EndTime, tailTable))
-                        playfield.KeySoundPlayer.PlaySample(note.Column, note.TailSamplePath);
+                    var tailTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, note.Column, note.Beatmap.Rank, tail: true);
+                    if (longNote.TryRelease(now - ((BmsLongNote)note).EndTime, tailTable))
+                        playfield.KeySoundPlayer.PlaySample(note.Column, note is BmsLongNote ln ? ln.TailSamplePath : string.Empty);
                 }
             }
             else
             {
                 if (now >= note.StartTime)
                 {
-                    var table = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, drawable.HitObject.Column, drawable.HitObject.BmsRank, tail: false);
+                    var table = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, drawable.HitObject.Column, drawable.HitObject.Beatmap.Rank, tail: false);
                     var result = table.ResultForOffset(now - drawable.HitObject.StartTime);
                     if (result != HitResult.None)
                     {

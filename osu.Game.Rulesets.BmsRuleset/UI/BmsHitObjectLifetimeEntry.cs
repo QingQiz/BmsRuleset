@@ -83,9 +83,9 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
         // with the current LifetimeEnd would produce an intermediate
         // MaxValue that the framework may latch on to before the follow-up
         // LifetimeEnd set corrects it.
-        LifetimeEnd = hitObject.IsMine
+        LifetimeEnd = hitObject is BmsLandmine
             ? hitObject.StartTime + mine_past_lifetime
-            : hitObject.EndTime + Math.Max(pastLifetime, lateWindow + lifetime_margin);
+            : hitObject.GetEndTime() + Math.Max(pastLifetime, lateWindow + lifetime_margin);
         LifetimeStart = hitObject.StartTime - futureLifetime;
 
         lifetimeComputed = true;
@@ -254,9 +254,9 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
     /// </summary>
     private static double getLateWindow(BmsHitObject hitObject)
     {
-        if (hitObject.IsLongNote)
+        if (hitObject is BmsLongNote)
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(hitObject.LayoutVariant, hitObject.Column, hitObject.BmsRank, tail: true);
+            var tailTable = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.Beatmap.Rank, tail: true);
             return tailTable.LateWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
         }
 

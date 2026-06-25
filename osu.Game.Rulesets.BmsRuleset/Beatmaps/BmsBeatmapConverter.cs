@@ -176,7 +176,8 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         foreach (var hitObject in beatmap.HitObjects)
         {
             hitObject.ScrollPositionAtStartTime = timingMap.GetScrollPositionAtTime(hitObject.StartTime);
-            hitObject.ScrollPositionAtEndTime = timingMap.GetScrollPositionAtTime(hitObject.EndTime);
+            if (hitObject is BmsLongNote ln)
+                ln.ScrollPositionAtEndTime = timingMap.GetScrollPositionAtTime(hitObject.GetEndTime());
         }
     }
 
@@ -256,7 +257,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         BmsBeatmapDecoder.PopulateTiming(beatmap, parseResult.TimingMap.BpmEvents);
 
         foreach (var parsedObject in parseResult.HitObjects)
-            beatmap.HitObjects.Add(BmsBeatmapDecoder.CreateHitObject(parsedObject));
+            beatmap.HitObjects.Add(BmsBeatmapDecoder.CreateHitObject(parsedObject, beatmap));
 
         materialised = beatmap;
         return true;

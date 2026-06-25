@@ -11,6 +11,7 @@ using osu.Game.Graphics;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
@@ -126,8 +127,8 @@ public class BmsModNoteRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
                     lastNoteTime[col] = time;
 
                 // If this note is a long note head, mark its column as occupied.
-                if (notesToShuffle[i].IsLongNote)
-                    activeLnColumns[col] = notesToShuffle[i].EndTime;
+                if (notesToShuffle[i] is BmsLongNote)
+                    activeLnColumns[col] = ((BmsLongNote)notesToShuffle[i]).EndTime;
             }
         }
     }

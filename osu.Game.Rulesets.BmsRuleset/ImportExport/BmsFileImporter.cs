@@ -331,12 +331,13 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             if (parsed.HitObjects.Count == 0)
                 return 0;
 
-            var hitObjects = parsed.HitObjects
-                .Select(BmsBeatmapDecoder.CreateHitObject)
+            var noteTimings = parsed.HitObjects
+                .Where(h => !h.IsMine)
+                .Select(h => new BmsNoteTiming(h.Column, h.StartTime, h.IsLongNote ? h.StartTime + h.Duration : h.StartTime))
                 .ToList();
 
             return new BmsStarRatingProcessorV2()
-                .Compute(hitObjects, parsed.TotalColumns, parsed.Rank)
+                .Compute(noteTimings, parsed.TotalColumns, parsed.Rank)
                 .StarRating;
         }
         catch (Exception e)

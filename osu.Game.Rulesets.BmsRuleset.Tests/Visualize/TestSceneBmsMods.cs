@@ -8,6 +8,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
@@ -47,17 +48,6 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
             .FirstOrDefault(d => BmsLayout.IsScratchColumn(d.HitObject.Column, Playfield.LayoutVariant));
 
     [Test]
-    public void TestAutoScratch()
-    {
-        this.AddSetupStep("load player with AS mod", () => LoadPlayer([new BmsModAutoScratch()]));
-        this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
-        this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
-
-        AddAssert("scratch not hidden", () => !Playfield.Stage.Columns[0].Hidden);
-    }
-
-    [Test]
     public void TestAutoGauge()
     {
         // Autoplay fills every tracked gauge to full, then the replay stops pressing so the
@@ -92,6 +82,17 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
     }
 
     [Test]
+    public void TestAutoScratch()
+    {
+        this.AddSetupStep("load player with AS mod", () => LoadPlayer([new BmsModAutoScratch()]));
+        this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
+        this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
+
+        AddAssert("scratch not hidden", () => !Playfield.Stage.Columns[0].Hidden);
+    }
+
+    [Test]
     public void TestHideScratch()
     {
         var mod = new BmsModHideScratch();
@@ -123,7 +124,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
             var normalNotes = beatmap.HitObjects
-                .Where(h => !h.IsLongNote && !h.IsMine)
+                .Where(h => h is not BmsLongNote && h is not BmsLandmine)
                 .OrderBy(h => h.StartTime)
                 .ToList();
 
@@ -168,7 +169,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
             var normalNotes = beatmap.HitObjects
-                .Where(h => !h.IsLongNote && !h.IsMine)
+                .Where(h => h is not BmsLongNote && h is not BmsLandmine)
                 .OrderBy(h => h.StartTime)
                 .ToList();
 
@@ -193,7 +194,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
             var normalNotes = beatmap.HitObjects
-                .Where(h => !h.IsLongNote && !h.IsMine)
+                .Where(h => h is not BmsLongNote && h is not BmsLandmine)
                 .OrderBy(h => h.StartTime)
                 .ToList();
 
@@ -224,7 +225,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
             var normalNotes = beatmap.HitObjects
-                .Where(h => !h.IsLongNote && !h.IsMine)
+                .Where(h => h is not BmsLongNote && h is not BmsLandmine)
                 .ToList();
 
             // IncludeScratch=false keeps original scratch notes at column 0.
@@ -248,7 +249,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
             var normalNotes = beatmap.HitObjects
-                .Where(h => !h.IsLongNote && !h.IsMine)
+                .Where(h => h is not BmsLongNote && h is not BmsLandmine)
                 .OrderBy(h => h.StartTime)
                 .ToList();
 
@@ -277,7 +278,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
             var normalNotes = beatmap.HitObjects
-                .Where(h => !h.IsLongNote && !h.IsMine)
+                .Where(h => h is not BmsLongNote && h is not BmsLandmine)
                 .OrderBy(h => h.StartTime)
                 .ToList();
 
@@ -332,7 +333,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
             var normalNotes = beatmap.HitObjects
-                .Where(h => !h.IsLongNote && !h.IsMine)
+                .Where(h => h is not BmsLongNote && h is not BmsLandmine)
                 .OrderBy(h => h.StartTime)
                 .ToList();
 
@@ -380,7 +381,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
             var normalNotes = beatmap.HitObjects
-                .Where(h => !h.IsLongNote && !h.IsMine)
+                .Where(h => h is not BmsLongNote && h is not BmsLandmine)
                 .OrderBy(h => h.StartTime)
                 .ToList();
 
@@ -425,7 +426,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
             var normalNotes = beatmap.HitObjects
-                .Where(h => !h.IsLongNote && !h.IsMine)
+                .Where(h => h is not BmsLongNote && h is not BmsLandmine)
                 .OrderBy(h => h.StartTime)
                 .ToList();
 

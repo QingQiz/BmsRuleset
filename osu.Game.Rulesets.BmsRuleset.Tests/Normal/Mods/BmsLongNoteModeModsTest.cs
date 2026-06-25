@@ -15,7 +15,7 @@ public class BmsLongNoteModeModsTest
 
         new BmsModChargeNote().ApplyToBeatmap(beatmap);
 
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().LongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
+        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
     }
 
     [Test]
@@ -25,7 +25,7 @@ public class BmsLongNoteModeModsTest
 
         new BmsModHellChargeNote().ApplyToBeatmap(beatmap);
 
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().LongNoteMode, Is.EqualTo(BmsLongNoteMode.HellChargeNote));
+        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.HellChargeNote));
     }
 
     [Test]
@@ -35,7 +35,7 @@ public class BmsLongNoteModeModsTest
 
         new BmsModLongNote().ApplyToBeatmap(beatmap);
 
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().LongNoteMode, Is.EqualTo(BmsLongNoteMode.LongNote));
+        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.LongNote));
     }
 
     [Test]
@@ -45,7 +45,7 @@ public class BmsLongNoteModeModsTest
 
         new BmsModHellChargeNote().ApplyToBeatmap(beatmap);
 
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().LongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
+        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
     }
 
     [Test]

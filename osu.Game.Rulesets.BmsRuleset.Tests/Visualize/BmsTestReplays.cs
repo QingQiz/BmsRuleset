@@ -36,17 +36,6 @@ public static partial class BmsTestReplays
 
     private readonly record struct ActionPoint(double Time, BmsAction Action, bool Press);
 
-    public enum LnScenario
-    {
-        EarlyPress,
-        LatePress,
-        NoPress,
-        MidRelease,
-        NoRelease,
-        LateRelease,
-        EarlyRelease,
-    }
-
     /// <summary>
     /// Generates perfect autoplay replay frames via <see cref="BmsAutoGenerator"/>.
     /// </summary>
@@ -92,13 +81,13 @@ public static partial class BmsTestReplays
 
             // Mines are passive when left unpressed; skip them so the autoplay portion
             // doesn't detonate them and skew the gauge.
-            if (hitObject.IsMine)
+            if (hitObject is BmsLandmine)
                 continue;
 
             if (BmsKeyBindingConfiguration.ActionForColumn(beatmap.LayoutVariant, hitObject.Column) is not { } action)
                 continue;
 
-            var releaseTime = (hitObject.IsLongNote ? hitObject.EndTime : hitObject.StartTime) + RELEASE_PADDING_MS;
+            var releaseTime = (hitObject is BmsLongNote ln ? ln.EndTime : hitObject.StartTime) + RELEASE_PADDING_MS;
             actionPoints.Add(new ActionPoint(hitObject.StartTime, action, true));
             actionPoints.Add(new ActionPoint(releaseTime, action, false));
         }
@@ -131,11 +120,11 @@ public static partial class BmsTestReplays
             if (action == null)
                 continue;
 
-            if (hitObject.IsLongNote && tryAddLongNoteScenario(actionPoints, hitObject, action.Value))
+            if (hitObject is BmsLongNote ln && tryAddLongNoteScenario(actionPoints, ln, action.Value))
                 continue;
 
             var time = hitObject.StartTime + judgement_offsets[i % judgement_offsets.Length];
-            var releaseTime = (hitObject.IsLongNote ? hitObject.EndTime : time) + RELEASE_PADDING_MS;
+            var releaseTime = (hitObject is BmsLongNote ln2 ? ln2.EndTime : time) + RELEASE_PADDING_MS;
 
             actionPoints.Add(new ActionPoint(time, action.Value, true));
             actionPoints.Add(new ActionPoint(releaseTime, action.Value, false));
@@ -178,7 +167,7 @@ public static partial class BmsTestReplays
         actionPoints.Add(new ActionPoint(time + RELEASE_PADDING_MS, action, false));
     }
 
-    private static bool tryAddLongNoteScenario(List<ActionPoint> actionPoints, BmsHitObject hitObject, BmsAction action)
+    private static bool tryAddLongNoteScenario(List<ActionPoint> actionPoints, BmsLongNote hitObject, BmsAction action)
     {
         var index = (int)Math.Round((hitObject.StartTime - BmsTestBeatmaps.LN_SCENARIO_START_TIME) / BmsTestBeatmaps.LN_SCENARIO_SPACING);
 
@@ -227,5 +216,16 @@ public static partial class BmsTestReplays
     {
         actionPoints.Add(new ActionPoint(pressTime, action, true));
         actionPoints.Add(new ActionPoint(releaseTime, action, false));
+    }
+
+    public enum LnScenario
+    {
+        EarlyPress,
+        LatePress,
+        NoPress,
+        MidRelease,
+        NoRelease,
+        LateRelease,
+        EarlyRelease,
     }
 }

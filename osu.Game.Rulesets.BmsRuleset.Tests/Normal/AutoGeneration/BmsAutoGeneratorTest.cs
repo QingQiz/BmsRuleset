@@ -21,7 +21,7 @@ public class BmsAutoGeneratorTest
             {
                 new BmsHitObject { StartTime = 1000, Column = 1 },
                 new BmsHitObject { StartTime = 1200, Column = 1 },
-                new BmsHitObject { StartTime = 2000, Column = 2, IsLongNote = true, Duration = 500 },
+                new BmsLongNote { StartTime = 2000, Column = 2, Duration = 500 },
             },
         };
 

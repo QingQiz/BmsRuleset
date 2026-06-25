@@ -1009,6 +1009,9 @@ Switching the active ruleset from BMS to any other (or from any other to BMS) cr
 `BeatmapInvalidForRulesetException` because the beatmap title wedge tries to recalculate
 difficulty using the wrong converter while the carousel selection is stale.
 
+- auto play osu.Game.Rulesets.BmsRuleset.Tests/bms_test_songs/103_outlaw_ogg/99_outlaw_caution.bms 的时候，在465 combo的时候会miss一大段
+- 当一个 ln 判定时 是 倒着滚动的时候，在正向滚动时应该是尾部先出现，而不是头部出现的时候尾部突然出现
+
 </details>
 
 ---

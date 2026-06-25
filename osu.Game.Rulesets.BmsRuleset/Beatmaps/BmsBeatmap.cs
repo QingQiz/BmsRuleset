@@ -42,10 +42,10 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public override IEnumerable<BeatmapStatistic> GetStatistics()
     {
-        var notes = HitObjects.Count(h => !h.IsMine && !isScratch(h));
-        var holdNotes = HitObjects.Count(h => h.IsLongNote && !isScratch(h));
+        var notes = HitObjects.Count(h => h is not BmsLandmine && !isScratch(h));
+        var holdNotes = HitObjects.Count(h => h is BmsLongNote && !isScratch(h));
         var scratch = HitObjects.Count(isScratch);
-        var mines = HitObjects.Count(h => h.IsMine);
+        var mines = HitObjects.Count(h => h is BmsLandmine);
         double total = notes + holdNotes + scratch + mines;
         total = Math.Max(total, 1);
 

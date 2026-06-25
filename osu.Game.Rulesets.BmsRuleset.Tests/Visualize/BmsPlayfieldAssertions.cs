@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -33,7 +34,7 @@ public static class BmsPlayfieldAssertions
             {
                 if (d is DrawableBmsHitObject note &&
                     note.HitObject.TickInfo.Tick == tick &&
-                    (!excludeLongNotes || !note.HitObject.IsLongNote))
+                    (!excludeLongNotes || note.HitObject is not BmsLongNote))
                 {
                     return note;
                 }

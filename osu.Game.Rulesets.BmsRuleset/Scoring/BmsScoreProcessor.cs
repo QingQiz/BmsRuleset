@@ -8,7 +8,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -90,7 +89,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     ///     (CN/HCN tail). Creates its own <see cref="JudgementResult"/> and
     ///     runs it through the full score/accuracy/combo pipeline.
     /// </summary>
-    public JudgementResult ApplySyntheticLongNoteEndpoint(BmsHitObject source, double endpointTime, double eventTime, HitResult type)
+    public JudgementResult ApplySyntheticLongNoteEndpoint(BmsLongNote source, double endpointTime, double eventTime, HitResult type)
     {
         var endpoint = source.CreateSyntheticEndpoint(endpointTime);
         var result = new JudgementResult(endpoint, endpoint.CreateJudgement());
@@ -111,6 +110,16 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         populateSyntheticResult(result, eventTime, type);
         ApplyResult(result);
         return result;
+    }
+
+    public override void PopulateScore(ScoreInfo score)
+    {
+        base.PopulateScore(score);
+
+        // Attribution (e.g. which gauge an Auto Gauge run resolved to) is owned by the mods
+        // that introduce the behaviour, so the score processor stays free of gauge-specific logic.
+        foreach (var mod in Mods.Value.OfType<IApplicableToScorePopulation>())
+            mod.ApplyToScore(score);
     }
 
     protected override void Update()
@@ -157,24 +166,14 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         {
             yield return hitObject;
 
-            if (hitObject is BmsLongNote { LongNoteMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote } longNote)
+            if (hitObject is BmsLongNote longNote && longNote.Beatmap?.LockedLongNoteMode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote)
                 yield return longNote.CreateSyntheticEndpoint(longNote.EndTime);
         }
     }
 
-    protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement is BmsJudgement { IsMine: true }
+    protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement is BmsJudgement { MaxResult: HitResult.Meh }
         ? HitResult.IgnoreMiss
         : base.GetSimulatedHitResult(judgement);
-
-    public override void PopulateScore(ScoreInfo score)
-    {
-        base.PopulateScore(score);
-
-        // Attribution (e.g. which gauge an Auto Gauge run resolved to) is owned by the mods
-        // that introduce the behaviour, so the score processor stays free of gauge-specific logic.
-        foreach (var mod in Mods.Value.OfType<IApplicableToScorePopulation>())
-            mod.ApplyToScore(score);
-    }
 
     private static Action<JudgementResult, int> createComboAfterSetter()
     {

@@ -1,9 +1,9 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
@@ -22,13 +22,14 @@ public class BmsModBackgroundKeysound : Mod, IApplicableAfterBeatmapConversion
     {
         if (beatmap is not BmsBeatmap b) return;
 
-        var notes = b.HitObjects.Where(x => !x.IsMine).ToArray();
+        var notes = b.HitObjects.Where(x => x is not BmsLandmine).ToArray();
 
         var starts = notes
             .Select(x => new BmsSampleEvent(x.StartTime, x.TickInfo.Tick, x.SampleKey));
 
         var tails = notes
-            .Where(x => x.IsLongNote && x.TailSampleKey != 0)
+            .OfType<BmsLongNote>()
+            .Where(x => x.TailSampleKey != 0)
             .Select(x => new BmsSampleEvent(x.EndTime, x.TickInfo.EndTick, x.TailSampleKey));
 
         b.BackgroundSampleEvents = b.BackgroundSampleEvents.Concat(starts).Concat(tails).ToArray();
@@ -37,6 +38,10 @@ public class BmsModBackgroundKeysound : Mod, IApplicableAfterBeatmapConversion
         {
             n.SampleKey = 0;
             n.SamplePath = string.Empty;
+        }
+
+        foreach (var n in notes.OfType<BmsLongNote>())
+        {
             n.TailSampleKey = 0;
             n.TailSamplePath = string.Empty;
         }

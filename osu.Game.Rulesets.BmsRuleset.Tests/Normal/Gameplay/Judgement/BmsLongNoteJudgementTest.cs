@@ -9,6 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Objects.Drawables.LnHelper;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
@@ -162,8 +163,8 @@ public class BmsLongNoteJudgementTest
 
         var endpoint = ln.CreateSyntheticEndpoint(1500);
 
-        Assert.That(endpoint.TailSampleKey, Is.Zero);
-        Assert.That(endpoint.TailSamplePath, Is.Empty);
+        Assert.That((endpoint is BmsLongNote ? ((BmsLongNote)endpoint).TailSampleKey : 0), Is.Zero);
+        Assert.That((endpoint is BmsLongNote ? ((BmsLongNote)endpoint).TailSamplePath : string.Empty), Is.Empty);
     }
 
     [Test]
@@ -188,7 +189,7 @@ public class BmsLongNoteJudgementTest
         var endpoint = ln.CreateSyntheticEndpoint(1500);
 
         Assert.That(endpoint.Column, Is.EqualTo(5));
-        Assert.That(endpoint.BmsRank, Is.EqualTo(1));
+        Assert.That(endpoint.Beatmap.Rank, Is.EqualTo(1));
         Assert.That(endpoint.SampleKey, Is.EqualTo(77));
     }
 
@@ -222,9 +223,7 @@ public class BmsLongNoteJudgementTest
         var endpoint = ln.CreateSyntheticEndpoint(1500);
 
         Assert.That(endpoint.StartTime, Is.EqualTo(1500));
-        Assert.That(endpoint.Duration, Is.Zero);
-        Assert.That(endpoint.IsLongNote, Is.False);
-        Assert.That(endpoint.IsMine, Is.False);
+        Assert.That(endpoint.GetEndTime() - endpoint.StartTime, Is.Zero);
         Assert.That(endpoint.Column, Is.EqualTo(3));
     }
 
@@ -260,7 +259,7 @@ public class BmsLongNoteJudgementTest
         processor.ApplyBeatmap(beatmap);
 
         processor.Health.Value = 0.5;
-        var source = beatmap.HitObjects[0];
+        var source = (BmsLongNote)beatmap.HitObjects[0];
         var endpoint = source.CreateSyntheticEndpoint(1500);
         var result = new JudgementResult(endpoint, endpoint.CreateJudgement())
         {
@@ -298,7 +297,7 @@ public class BmsLongNoteJudgementTest
         processor.ApplyBeatmap(beatmap);
 
         processor.Health.Value = 0.2;
-        var source = beatmap.HitObjects[0];
+        var source = (BmsLongNote)beatmap.HitObjects[0];
         var endpoint = source.CreateSyntheticEndpoint(1500);
         var result = new JudgementResult(endpoint, endpoint.CreateJudgement())
         {

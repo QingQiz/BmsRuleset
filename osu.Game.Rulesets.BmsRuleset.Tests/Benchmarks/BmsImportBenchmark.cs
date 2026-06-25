@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 
@@ -28,12 +27,13 @@ public class BmsImportBenchmark
         if (parsed.HitObjects.Count == 0)
             return 0;
 
-        var hitObjects = parsed.HitObjects
-            .Select(BmsBeatmapDecoder.CreateHitObject)
+        var noteTimings = parsed.HitObjects
+            .Where(h => !h.IsMine)
+            .Select(h => new BmsNoteTiming(h.Column, h.StartTime, h.IsLongNote ? h.StartTime + h.Duration : h.StartTime))
             .ToList();
 
         return new BmsStarRatingProcessorV2()
-            .Compute(hitObjects, parsed.TotalColumns, parsed.Rank)
+            .Compute(noteTimings, parsed.TotalColumns, parsed.Rank)
             .StarRating;
     }
 

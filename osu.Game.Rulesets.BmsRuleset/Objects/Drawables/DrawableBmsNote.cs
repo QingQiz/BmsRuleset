@@ -14,7 +14,7 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
         if (userTriggered || HitObject == null || Playfield == null)
             return;
 
-        var table = BmsJudgementProfileProvider.GetTable(Playfield.LayoutVariant, HitObject.Column, HitObject.BmsRank, tail: false);
+        var table = BmsJudgementProfileProvider.GetTable(Playfield.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: false);
         if (table.IsPastPassivePoorOffset(timeOffset))
             ApplyResult(HitResult.Meh);
     }

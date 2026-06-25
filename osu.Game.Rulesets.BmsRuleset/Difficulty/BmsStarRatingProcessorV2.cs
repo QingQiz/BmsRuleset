@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
 
@@ -41,11 +40,11 @@ public class BmsStarRatingProcessorV2
     private int[] smoothWlA = [];
     private int[] smoothWrA = [];
 
-    public BmsStarRatingResult Compute(IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, int rank, double clockRate = 1.0)
+    public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0)
     {
         // === Basic Setup and Parsing ===
         TotalColumns = totalColumns;
-        preprocessFile(hitObjects, rank, clockRate);
+        preprocessFile(noteTimings, rank, clockRate);
         getCorners();
 
         keyUsage = getKeyUsage();
@@ -131,7 +130,6 @@ public class BmsStarRatingProcessorV2
             {
                 coeffs[m - i] = coeffs[m + i] = 0.15 + 0.10 * i;
             }
-
         }
         else
         {
@@ -140,7 +138,6 @@ public class BmsStarRatingProcessorV2
             {
                 coeffs[m - i] = coeffs[m + 1 + i] = 0.15 + 0.10 * i;
             }
-
         }
 
         coeffs[0] = coeffs[k] = outer;
@@ -370,7 +367,105 @@ public class BmsStarRatingProcessorV2
         return lo;
     }
 
-    private void preprocessFile(IReadOnlyList<BmsHitObject> hitObjects, int rank, double clockRate)
+    private static double[] toDedupedFilteredArray(List<double> sorted, double maxTime)
+    {
+        var j = 0;
+        for (var i = 0; i < sorted.Count; i++)
+        {
+            var v = sorted[i];
+            if (v >= 0 && v <= maxTime)
+            {
+                if (j == 0 || v > sorted[j - 1])
+                    sorted[j++] = v;
+            }
+        }
+
+        var result = new double[j];
+        for (var i = 0; i < j; i++)
+            result[i] = sorted[i];
+        return result;
+    }
+
+    private static double[] mergeSortedUnique(double[] a, double[] b)
+    {
+        var result = new double[a.Length + b.Length];
+        int i = 0, j = 0, k = 0;
+
+        while (i < a.Length && j < b.Length)
+        {
+            double va = a[i], vb = b[j];
+            if (va < vb)
+            {
+                if (k == 0 || va > result[k - 1])
+                    result[k++] = va;
+                i++;
+            }
+            else if (vb < va)
+            {
+                if (k == 0 || vb > result[k - 1])
+                    result[k++] = vb;
+                j++;
+            }
+            else
+            {
+                if (k == 0 || va > result[k - 1])
+                    result[k++] = va;
+                i++;
+                j++;
+            }
+        }
+
+        while (i < a.Length)
+        {
+            var v = a[i++];
+            if (k == 0 || v > result[k - 1])
+                result[k++] = v;
+        }
+
+        while (j < b.Length)
+        {
+            var v = b[j++];
+            if (k == 0 || v > result[k - 1])
+                result[k++] = v;
+        }
+
+        if (k < result.Length)
+        {
+            var trimmed = new double[k];
+            Array.Copy(result, 0, trimmed, 0, k);
+            return trimmed;
+        }
+
+        return result;
+    }
+
+
+    /// <summary>Walk forward from hint to find leftmost index with array[idx] >= value.
+    /// Values must be non-decreasing between calls with the same hint variable.</summary>
+    private static int walkForward(double[] array, double value, int hint)
+    {
+        while (hint < array.Length && array[hint] < value) hint++;
+        return hint;
+    }
+
+    /// <summary>Insertion sort in descending order. Avoids delegate allocation overhead of Array.Sort with Comparison.</summary>
+    private static void sortDescending(double[] arr, int len)
+    {
+        for (var i = 1; i < len; i++)
+        {
+            var key = arr[i];
+            var j = i - 1;
+            while (j >= 0 && arr[j] < key)
+            {
+                arr[j + 1] = arr[j];
+                j--;
+            }
+
+            arr[j + 1] = key;
+        }
+    }
+
+    private void preprocessFile(IReadOnlyList<BmsNoteTiming> noteTimings, int rank, double clockRate)
     {
         var od = BmsDifficultyInfo.RankToOd(rank);
 
@@ -380,16 +475,11 @@ public class BmsStarRatingProcessorV2
         HitLeniencyX = x;
 
         // Build note_seq as a list of tuples (column, head_time, tail_time).
-        // Mines are penalty objects that do not contribute to pattern difficulty.
         noteSeq = [];
-        foreach (var obj in hitObjects)
+        foreach (var obj in noteTimings)
         {
-            if (obj.IsMine)
-                continue;
-
             var head = Math.Floor(obj.StartTime / clockRate);
-            // Only set tail_time when IsLongNote; otherwise use -1.
-            var tail = obj.IsLongNote ? Math.Floor(obj.EndTime / clockRate) : -1;
+            var tail = obj.EndTime > obj.StartTime ? Math.Floor(obj.EndTime / clockRate) : -1;
             noteSeq.Add((obj.Column, head, tail));
         }
 
@@ -471,78 +561,6 @@ public class BmsStarRatingProcessorV2
         allCorners = mergeSortedUnique(baseCorners, aCorners);
     }
 
-    private static double[] toDedupedFilteredArray(List<double> sorted, double maxTime)
-    {
-        var j = 0;
-        for (var i = 0; i < sorted.Count; i++)
-        {
-            var v = sorted[i];
-            if (v >= 0 && v <= maxTime)
-            {
-                if (j == 0 || v > sorted[j - 1])
-                    sorted[j++] = v;
-            }
-        }
-
-        var result = new double[j];
-        for (var i = 0; i < j; i++)
-            result[i] = sorted[i];
-        return result;
-    }
-
-    private static double[] mergeSortedUnique(double[] a, double[] b)
-    {
-        var result = new double[a.Length + b.Length];
-        int i = 0, j = 0, k = 0;
-
-        while (i < a.Length && j < b.Length)
-        {
-            double va = a[i], vb = b[j];
-            if (va < vb)
-            {
-                if (k == 0 || va > result[k - 1])
-                    result[k++] = va;
-                i++;
-            }
-            else if (vb < va)
-            {
-                if (k == 0 || vb > result[k - 1])
-                    result[k++] = vb;
-                j++;
-            }
-            else
-            {
-                if (k == 0 || va > result[k - 1])
-                    result[k++] = va;
-                i++;
-                j++;
-            }
-        }
-
-        while (i < a.Length)
-        {
-            var v = a[i++];
-            if (k == 0 || v > result[k - 1])
-                result[k++] = v;
-        }
-
-        while (j < b.Length)
-        {
-            var v = b[j++];
-            if (k == 0 || v > result[k - 1])
-                result[k++] = v;
-        }
-
-        if (k < result.Length)
-        {
-            var trimmed = new double[k];
-            Array.Copy(result, 0, trimmed, 0, k);
-            return trimmed;
-        }
-
-        return result;
-    }
-
 
     private bool[][] getKeyUsage()
     {
@@ -615,32 +633,6 @@ public class BmsStarRatingProcessorV2
         }
 
         return usage;
-    }
-
-
-    /// <summary>Walk forward from hint to find leftmost index with array[idx] >= value.
-    /// Values must be non-decreasing between calls with the same hint variable.</summary>
-    private static int walkForward(double[] array, double value, int hint)
-    {
-        while (hint < array.Length && array[hint] < value) hint++;
-        return hint;
-    }
-
-    /// <summary>Insertion sort in descending order. Avoids delegate allocation overhead of Array.Sort with Comparison.</summary>
-    private static void sortDescending(double[] arr, int len)
-    {
-        for (var i = 1; i < len; i++)
-        {
-            var key = arr[i];
-            var j = i - 1;
-            while (j >= 0 && arr[j] < key)
-            {
-                arr[j + 1] = arr[j];
-                j--;
-            }
-
-            arr[j + 1] = key;
-        }
     }
 
     private double[] computeAnchor()

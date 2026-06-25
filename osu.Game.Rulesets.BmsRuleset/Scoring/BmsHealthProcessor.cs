@@ -13,21 +13,17 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 
 public partial class BmsHealthProcessor : HealthProcessor
 {
-    private sealed class GaugeState
-    {
-        public BmsGaugeType GaugeType;
-        public BmsGaugeProfile Profile = null!;
-        public BmsGaugeCalculator? Calculator;
-        public double CurrentHp;
-        public bool IsHpFailed;
-    }
-
-    private readonly List<GaugeState> gaugeStates = [];
-    private int activeGaugeIndex;
-    private int endResultIndex;
 
     public Bindable<BmsGaugeDisplayProfile> DisplayProfile { get; } =
         new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
+
+    /// <summary>
+    /// The gauge type that ultimately determined pass/fail at song end.
+    /// </summary>
+    public BmsGaugeType WorstGaugeType =>
+        gaugeStates.Count > 0 && endResultIndex < gaugeStates.Count
+            ? gaugeStates[endResultIndex].GaugeType
+            : BmsGaugeType.Normal;
 
     /// <summary>
     /// Whether HP ever dropped to 0 during this play.
@@ -39,15 +35,11 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     public BmsGaugeProfile GaugeProfile { get; private set; } = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
 
-    /// <summary>
-    /// The gauge type that ultimately determined pass/fail at song end.
-    /// </summary>
-    public BmsGaugeType WorstGaugeType =>
-        gaugeStates.Count > 0 && endResultIndex < gaugeStates.Count
-            ? gaugeStates[endResultIndex].GaugeType
-            : BmsGaugeType.Normal;
+    private readonly List<GaugeState> gaugeStates = [];
 
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
+    private int activeGaugeIndex;
+    private int endResultIndex;
 
     private IBeatmap? beatmap;
     private bool initialized;
@@ -231,7 +223,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             HasEverFailed = true;
     }
 
-    protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement is BmsJudgement { IsMine: true }
+    protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement.MaxResult == HitResult.Meh
         ? HitResult.IgnoreMiss
         : base.GetSimulatedHitResult(judgement);
 
@@ -246,7 +238,7 @@ public partial class BmsHealthProcessor : HealthProcessor
         // at the correct value.
         var oldHealth = Health.Value;
 
-        if (result.HitObject is BmsHitObject { IsMine: true } mine)
+        if (result.HitObject is BmsLandmine mine)
         {
             if (result.Type != HitResult.Meh)
                 return 0;
@@ -333,7 +325,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             });
         }
 
-        var noteCount = beatmap?.HitObjects.Count(h => h is not BmsHitObject { IsMine: true }) ?? 0;
+        var noteCount = beatmap?.HitObjects.Count(h => h is not BmsLandmine) ?? 0;
         if (noteCount == 0) noteCount = 1;
 
         double total = 0;
@@ -368,5 +360,14 @@ public partial class BmsHealthProcessor : HealthProcessor
         DisplayProfile.Value = active.Profile.Display;
         Health.MaxValue = active.Profile.MaxHealth;
         Health.Value = active.CurrentHp;
+    }
+
+    private sealed class GaugeState
+    {
+        public BmsGaugeType GaugeType;
+        public BmsGaugeProfile Profile = null!;
+        public BmsGaugeCalculator? Calculator;
+        public double CurrentHp;
+        public bool IsHpFailed;
     }
 }

@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using Decoder = osu.Game.Beatmaps.Formats.Decoder;
 
@@ -60,9 +61,9 @@ public class BmsBeatmapDecoderTest
 
         var decoded = new BmsBeatmapDecoder().Decode(reader);
         var beatmap = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
-        var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().ToList();
+        var hitObjects = beatmap.HitObjects;
 
-        var lns = hitObjects.Where(h => h.IsLongNote).ToList();
+        var lns = hitObjects.OfType<BmsLongNote>().ToList();
         var table = BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, column: 1, beatmap.Rank, tail: false);
         var pgreat = table.FrameworkWindowFor(HitResult.Perfect);
         var great = table.FrameworkWindowFor(HitResult.Great);
@@ -74,7 +75,7 @@ public class BmsBeatmapDecoderTest
         foreach (var ln in lns)
         {
             var autoplayPress = ln.StartTime;
-            var autoplayRelease = ln.EndTime; // calculateReleaseTime for LN with Duration>0
+            var autoplayRelease = ln.GetEndTime(); // calculateReleaseTime for LN with Duration>0
 
             // Check press timing
             var pressOffset = autoplayPress - ln.StartTime; // should be 0
@@ -82,7 +83,7 @@ public class BmsBeatmapDecoderTest
             var pressOk = pressOffset >= -pgreat && pressOffset <= pgreat;
 
             // Check release timing
-            var releaseOffset = autoplayRelease - ln.EndTime; // should be 0
+            var releaseOffset = autoplayRelease - ln.GetEndTime(); // should be 0
             var releaseJudgement = table.ResultForOffset(releaseOffset);
             var releaseOk = releaseOffset >= -pgreat && releaseOffset <= pgreat;
 
@@ -98,8 +99,8 @@ public class BmsBeatmapDecoderTest
 
         var summary = $"Chart: {beatmap.Metadata.Title}  Rank: {beatmap.Rank}  " +
                       $"PGREAT={pgreat}ms GREAT={great}ms GOOD={good}ms BAD={bad}ms  " +
-                      $"Total LNs: {lns.Count}  Notes: {hitObjects.Count(h => !h.IsMine && !h.IsLongNote)}  " +
-                      $"Mines: {hitObjects.Count(h => h.IsMine)}";
+                      $"Total LNs: {lns.Count}  Notes: {hitObjects.Count(h => h is not BmsLandmine && h is not BmsLongNote)}  " +
+                      $"Mines: {hitObjects.Count(h => h is BmsLandmine)}";
 
         if (issues.Count > 0)
             Assert.Fail($"{summary}\n=== LNs with timing issues ===\n{string.Join("\n", issues)}");
@@ -108,13 +109,13 @@ public class BmsBeatmapDecoderTest
         var shortLns = lns.Where(ln => ln.Duration <= great * 2).OrderBy(ln => ln.Duration).ToList();
         var shortLnsReport = string.Join("\n  ", shortLns.Take(20).Select(ln =>
             $"tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} dur={ln.Duration:F1}ms " +
-            $"start={ln.StartTime:F1}ms end={ln.EndTime:F1}ms"));
+            $"start={ln.StartTime:F1}ms end={ln.GetEndTime():F1}ms"));
 
         // Also show LNs around combo 190 (roughly 190 notes in)
-        var normalNotes = hitObjects.Where(h => !h.IsMine).ToList();
-        var aroundCombo190 = lns.Skip(Math.Max(0, normalNotes.Take(190).Count(h => h.IsLongNote) - 3)).Take(7)
+        var normalNotes = hitObjects.Where(h => h is not BmsLandmine).ToList();
+        var aroundCombo190 = lns.Skip(Math.Max(0, normalNotes.Take(190).Count(h => h is BmsLongNote) - 3)).Take(7)
             .Select(ln => $"tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} dur={ln.Duration:F1}ms " +
-                          $"start={ln.StartTime:F0}ms end={ln.EndTime:F0}ms");
+                          $"start={ln.StartTime:F0}ms end={ln.GetEndTime():F0}ms");
         var around190 = string.Join("\n  ", aroundCombo190);
 
         var outputPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "caution_ln_diag.txt");
@@ -305,7 +306,7 @@ public class BmsBeatmapDecoderTest
                              #WAV00 bomb.wav
                              #001d3:0a
                              """);
-        var mines = beatmap.HitObjects.OfType<BmsHitObject>().Where(h => h.IsMine).ToList();
+        var mines = beatmap.HitObjects.OfType<BmsLandmine>().ToList();
 
         Assert.That(mines, Has.Count.EqualTo(1), "Lowercase channel 'd3' should be recognized as mine channel");
         Assert.That(mines[0].LandmineDamagePercent, Is.EqualTo(5));
@@ -320,7 +321,7 @@ public class BmsBeatmapDecoderTest
                              #WAV00 bomb.wav
                              #001d3:0A
                              """);
-        var mines = beatmap.HitObjects.OfType<BmsHitObject>().Where(h => h.IsMine).ToList();
+        var mines = beatmap.HitObjects.OfType<BmsLandmine>().ToList();
 
         Assert.That(mines, Has.Count.EqualTo(1), "Lowercase channel 'd3' should be recognized as mine channel");
         Assert.That(mines[0].LandmineDamagePercent, Is.EqualTo(5));
@@ -337,7 +338,7 @@ public class BmsBeatmapDecoderTest
                              #WAV00 bomb.wav
                              #001D3:0a0A
                              """);
-        var mines = beatmap.HitObjects.OfType<BmsHitObject>().Where(h => h.IsMine).OrderBy(h => h.StartTime).ToList();
+        var mines = beatmap.HitObjects.OfType<BmsLandmine>().OrderBy(h => h.StartTime).ToList();
 
         Assert.That(mines, Has.Count.EqualTo(2));
         Assert.That(mines[0].LandmineDamagePercent, Is.EqualTo(5), "'0a' should decode to 5%");
@@ -356,8 +357,8 @@ public class BmsBeatmapDecoderTest
                              """);
         var mine = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(mine.IsMine, Is.True);
-        Assert.That(mine.LandmineDamagePercent, Is.EqualTo(647.5));
+        Assert.That(mine is BmsLandmine, Is.True);
+        Assert.That((mine as BmsLandmine)?.LandmineDamagePercent ?? 0, Is.EqualTo(647.5));
         // (At 647.5, the health processor triggers instant death.)
     }
 
@@ -681,13 +682,13 @@ public class BmsBeatmapDecoderTest
 
         var mine = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(mine.IsMine, Is.True);
+        Assert.That(mine is BmsLandmine, Is.True);
         Assert.That(mine.Column, Is.EqualTo(3));
         Assert.That(mine.SourceChannel, Is.EqualTo(BmsChartParser.Enc("D3")));
         Assert.That(mine.SampleKey, Is.EqualTo(BmsChartParser.Enc("1E")));
         Assert.That(mine.SamplePath, Is.Empty);
-        Assert.That(mine.LandmineDamagePercent, Is.EqualTo(25));
-        Assert.That(mine.LandmineExplosionSamplePath, Is.EqualTo("bomb.wav"));
+        Assert.That((mine as BmsLandmine)?.LandmineDamagePercent ?? 0, Is.EqualTo(25));
+        Assert.That(mine.Beatmap.SampleDefinitions.TryGetValue(0, out var p) ? p : null, Is.EqualTo("bomb.wav"));
     }
 
     [Test]
@@ -702,10 +703,10 @@ public class BmsBeatmapDecoderTest
         var mine = (BmsHitObject)beatmap.HitObjects.Single();
 
         Assert.That(beatmap.HitObjects, Has.Count.EqualTo(1));
-        Assert.That(mine.IsMine, Is.True);
+        Assert.That(mine is BmsLandmine, Is.True);
         Assert.That(mine.Column, Is.EqualTo(6));
         Assert.That(mine.SourceChannel, Is.EqualTo(BmsChartParser.Enc("E1")));
-        Assert.That(mine.LandmineDamagePercent, Is.EqualTo(5));
+        Assert.That((mine as BmsLandmine)?.LandmineDamagePercent ?? 0, Is.EqualTo(5));
     }
 
     [Test]
@@ -1098,8 +1099,8 @@ public class BmsBeatmapDecoderTest
         var note = (BmsHitObject)beatmap.HitObjects[0];
 
         Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
-        Assert.That(note.IsLongNote, Is.True);
-        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
+        Assert.That(note is BmsLongNote, Is.True);
+        Assert.That(note.Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
     }
 
     [Test]
@@ -1115,8 +1116,8 @@ public class BmsBeatmapDecoderTest
         var note = (BmsHitObject)beatmap.HitObjects[0];
 
         Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.LongNote));
-        Assert.That(note.IsLongNote, Is.True);
-        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.LongNote));
+        Assert.That(note is BmsLongNote, Is.True);
+        Assert.That(note.Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.LongNote));
     }
 
     [Test]
@@ -1132,8 +1133,8 @@ public class BmsBeatmapDecoderTest
         var note = (BmsHitObject)beatmap.HitObjects[0];
 
         Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
-        Assert.That(note.IsLongNote, Is.True);
-        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
+        Assert.That(note is BmsLongNote, Is.True);
+        Assert.That(note.Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
     }
 
     [Test]
@@ -1149,8 +1150,8 @@ public class BmsBeatmapDecoderTest
         var note = (BmsHitObject)beatmap.HitObjects[0];
 
         Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.HellChargeNote));
-        Assert.That(note.IsLongNote, Is.True);
-        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.HellChargeNote));
+        Assert.That(note is BmsLongNote, Is.True);
+        Assert.That(note.Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.HellChargeNote));
     }
 
     [Test]
@@ -1179,11 +1180,11 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.IsLongNote, Is.True);
+        Assert.That(note is BmsLongNote, Is.True);
         Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("22")));
         Assert.That(note.TickInfo.Tick, Is.EqualTo(192));
         Assert.That(note.TickInfo.EndTick, Is.EqualTo(480));
-        Assert.That(note.Duration, Is.EqualTo(3000).Within(0.001));
+        Assert.That(((BmsLongNote)note).Duration, Is.EqualTo(3000).Within(0.001));
     }
 
     [Test]
@@ -1197,11 +1198,11 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.IsLongNote, Is.True);
+        Assert.That(note is BmsLongNote, Is.True);
         Assert.That(note.Column, Is.EqualTo(1));
         Assert.That(note.TickInfo.Tick, Is.EqualTo(192));
         Assert.That(note.TickInfo.EndTick, Is.EqualTo(288));
-        Assert.That(note.Duration, Is.EqualTo(1000).Within(0.001));
+        Assert.That(((BmsLongNote)note).Duration, Is.EqualTo(1000).Within(0.001));
     }
 
     [Test]
@@ -1215,10 +1216,10 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsHitObject)beatmap.HitObjects.Single();
 
-        Assert.That(note.IsLongNote, Is.True);
+        Assert.That(note is BmsLongNote, Is.True);
         Assert.That(note.TickInfo.Tick, Is.EqualTo(192));
         Assert.That(note.TickInfo.EndTick, Is.EqualTo(288));
-        Assert.That(note.Duration, Is.EqualTo(1000).Within(0.001));
+        Assert.That(((BmsLongNote)note).Duration, Is.EqualTo(1000).Within(0.001));
     }
 
     [Test]
@@ -1249,7 +1250,7 @@ public class BmsBeatmapDecoderTest
 
         // For LNTYPE 1 with payload "0101", both head and tail have value "01",
         // so the tail sample key should not be played.
-        Assert.That(converted.HitObjects[0].IsLongNote, Is.True);
+        Assert.That(converted.HitObjects[0] is BmsLongNote, Is.True);
         Assert.That(converted.HitObjects[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("01")));
         Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(0));
     }
@@ -1284,9 +1285,9 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.IsLongNote, Is.True);
-        Assert.That(note.TailSampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
-        Assert.That(note.TailSamplePath, Is.EqualTo("tail.wav"));
+        Assert.That(note is BmsLongNote, Is.True);
+        Assert.That((note as BmsLongNote)?.TailSampleKey ?? 0, Is.EqualTo(BmsChartParser.Enc("02")));
+        Assert.That((note is BmsLongNote ? ((BmsLongNote)note).TailSamplePath : string.Empty), Is.EqualTo("tail.wav"));
     }
 
     [Test]
@@ -1301,10 +1302,10 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         var note = converted.HitObjects.Single();
 
-        Assert.That(note.IsLongNote, Is.True);
+        Assert.That(note is BmsLongNote, Is.True);
         // Terminating value "03" has no #WAV definition → TailSamplePath should be empty
-        Assert.That(note.TailSampleKey, Is.EqualTo(BmsChartParser.Enc("03")));
-        Assert.That(note.TailSamplePath, Is.Empty);
+        Assert.That((note as BmsLongNote)?.TailSampleKey ?? 0, Is.EqualTo(BmsChartParser.Enc("03")));
+        Assert.That((note is BmsLongNote ? ((BmsLongNote)note).TailSamplePath : string.Empty), Is.Empty);
         // No tail sample event either since the sample can't be resolved
         Assert.That(converted.LongNoteTailSampleEvents, Is.Empty);
     }
@@ -1320,8 +1321,10 @@ public class BmsBeatmapDecoderTest
                              """);
         var note = (BmsHitObject)beatmap.HitObjects[0];
 
-        Assert.That(note.IsLongNote, Is.False);
-        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
+        Assert.That(note is not BmsLongNote, Is.True);
+        // The beatmap's locked LN mode is independent of note type;
+        // the chart above sets LNMODE=2 (ChargeNote).
+        Assert.That(note.Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
     }
 
     [Test]
@@ -1365,8 +1368,8 @@ public class BmsBeatmapDecoderTest
         var note = (BmsHitObject)beatmap.HitObjects[0];
 
         Assert.That(decoded.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
-        Assert.That(note.IsLongNote, Is.True);
-        Assert.That(note.LongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
+        Assert.That(note is BmsLongNote, Is.True);
+        Assert.That(note.Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.Undefined));
     }
 
     [Test]
@@ -1390,16 +1393,16 @@ public class BmsBeatmapDecoderTest
         Assert.That(notes, Has.Count.EqualTo(2));
 
         // First LN: head=aa, tail=bb
-        Assert.That(notes[0].IsLongNote, Is.True);
+        Assert.That(notes[0] is BmsLongNote, Is.True);
         Assert.That(notes[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("aa")));
-        Assert.That(notes[0].TailSampleKey, Is.EqualTo(BmsChartParser.Enc("bb")));
-        Assert.That(notes[0].TailSamplePath, Is.EqualTo("onkeyup1.wav"));
+        Assert.That(((BmsLongNote)notes[0]).TailSampleKey, Is.EqualTo(BmsChartParser.Enc("bb")));
+        Assert.That(((BmsLongNote)notes[0]).TailSamplePath, Is.EqualTo("onkeyup1.wav"));
 
         // Second LN: head=cc, tail=dd
-        Assert.That(notes[1].IsLongNote, Is.True);
+        Assert.That(notes[1] is BmsLongNote, Is.True);
         Assert.That(notes[1].SampleKey, Is.EqualTo(BmsChartParser.Enc("cc")));
-        Assert.That(notes[1].TailSampleKey, Is.EqualTo(BmsChartParser.Enc("dd")));
-        Assert.That(notes[1].TailSamplePath, Is.EqualTo("onkeyup2.wav"));
+        Assert.That(((BmsLongNote)notes[1]).TailSampleKey, Is.EqualTo(BmsChartParser.Enc("dd")));
+        Assert.That(((BmsLongNote)notes[1]).TailSamplePath, Is.EqualTo("onkeyup2.wav"));
     }
 
     [Test]
@@ -1727,7 +1730,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         Assert.That(converted.Rank, Is.EqualTo(2)); // NORMAL
-        Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(2));
+        Assert.That(converted.HitObjects[0].Beatmap.Rank, Is.EqualTo(2));
     }
 
     [Test]
@@ -1742,7 +1745,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         Assert.That(converted.Rank, Is.EqualTo(1));
-        Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(1));
+        Assert.That(converted.HitObjects[0].Beatmap.Rank, Is.EqualTo(1));
     }
 
     [Test]

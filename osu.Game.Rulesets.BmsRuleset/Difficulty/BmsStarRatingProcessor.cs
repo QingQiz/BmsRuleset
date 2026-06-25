@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
 
@@ -33,11 +32,11 @@ public class BmsStarRatingProcessor
     private double[][] deltaKs = [];
     private double[] anchor = [];
 
-    public BmsStarRatingResult Compute(IReadOnlyList<BmsHitObject> hitObjects, int totalColumns, int rank, double clockRate = 1.0)
+    public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0)
     {
         // === Basic Setup and Parsing ===
         TotalColumns = totalColumns;
-        preprocessFile(hitObjects, rank, clockRate);
+        preprocessFile(noteTimings, rank, clockRate);
         getCorners();
 
         // For each column, store a boolean of its usage (whether non-empty within 150 ms) over time. Example: key_usage[k][idx].
@@ -315,7 +314,7 @@ public class BmsStarRatingProcessor
         return lo;
     }
 
-    private void preprocessFile(IReadOnlyList<BmsHitObject> hitObjects, int rank, double clockRate)
+    private void preprocessFile(IReadOnlyList<BmsNoteTiming> noteTimings, int rank, double clockRate)
     {
         var od = BmsDifficultyInfo.RankToOd(rank);
 
@@ -326,11 +325,10 @@ public class BmsStarRatingProcessor
 
         // Build note_seq as a list of tuples (column, head_time, tail_time)
         noteSeq = [];
-        foreach (var obj in hitObjects)
+        foreach (var obj in noteTimings)
         {
             var head = Math.Floor(obj.StartTime / clockRate);
-            // Only set tail_time when IsLongNote; otherwise use -1.
-            var tail = obj.IsLongNote ? Math.Floor(obj.EndTime / clockRate) : -1;
+            var tail = obj.EndTime > obj.StartTime ? Math.Floor(obj.EndTime / clockRate) : -1;
             noteSeq.Add((obj.Column, head, tail));
         }
 

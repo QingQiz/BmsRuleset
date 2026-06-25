@@ -47,9 +47,10 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
 #pragma warning restore CA2255
     internal static void RegisterOnAssemblyLoad() => Register();
 
-    internal static BmsHitObject CreateHitObject(BmsParsedHitObject parsedObject)
+    internal static BmsHitObject CreateHitObject(BmsParsedHitObject parsedObject, IBmsBeatmap beatmap)
     {
         var hitObject = BmsHitObject.CreateForKind(parsedObject.IsLongNote, parsedObject.IsMine);
+        hitObject.Beatmap = beatmap;
 
         hitObject.TickInfo = new BmsTickInfo
         {
@@ -57,16 +58,19 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
             EndTick = parsedObject.EndTick,
         };
         hitObject.StartTime = parsedObject.StartTime;
-        hitObject.Duration = parsedObject.Duration;
         hitObject.Column = parsedObject.Column;
         hitObject.SourceChannel = parsedObject.SourceChannel;
         hitObject.SampleKey = parsedObject.SampleKey;
         hitObject.SamplePath = parsedObject.SamplePath;
-        hitObject.IsLongNote = parsedObject.IsLongNote;
-        hitObject.IsMine = parsedObject.IsMine;
-        hitObject.LandmineDamagePercent = parsedObject.LandmineDamagePercent;
-        hitObject.TailSampleKey = parsedObject.TailSampleKey;
-        hitObject.TailSamplePath = parsedObject.TailSamplePath;
+        if (hitObject is BmsLandmine mine)
+            mine.LandmineDamagePercent = parsedObject.LandmineDamagePercent;
+        if (hitObject is BmsLongNote ln)
+        {
+            ln.Duration = parsedObject.Duration;
+            ln.TailSampleKey = parsedObject.TailSampleKey;
+            ln.TailSamplePath = parsedObject.TailSamplePath;
+        }
+
         return hitObject;
     }
 
@@ -99,13 +103,10 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
             bmsOutput.RawLines = lines;
         }
 
-        foreach (var parsedObject in parseResult.HitObjects)
-            output.HitObjects.Add(CreateHitObject(parsedObject));
-
         if (output is IBmsBeatmap bmsBeatmap)
         {
-            foreach (var h in output.HitObjects.OfType<BmsHitObject>())
-                h.Beatmap = bmsBeatmap;
+            foreach (var parsedObject in parseResult.HitObjects)
+                output.HitObjects.Add(CreateHitObject(parsedObject, bmsBeatmap));
         }
     }
 

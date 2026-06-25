@@ -97,7 +97,7 @@ public class BmsGameplayVirtualisationTest
     public void TestAlephAnotherCombo841LifetimeStartsBeforeVisibleWindow()
     {
         var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "Aleph-0 (by LeaF)", "_14ANOTHER.bms"));
-        var hitObject = beatmap.HitObjects.Where(h => !h.IsMine).OrderBy(h => h.StartTime).ElementAt(840);
+        var hitObject = beatmap.HitObjects.Where(h => h is not BmsLandmine).OrderBy(h => h.StartTime).ElementAt(840);
         var playfield = new BmsPlayfield(beatmap);
 
         playfield.Add(hitObject);
@@ -157,7 +157,7 @@ public class BmsGameplayVirtualisationTest
         var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "103_outlaw_ogg", "99_outlaw_caution.bms"));
         var playfield = new BmsPlayfield(beatmap);
 
-        foreach (var hitObject in beatmap.HitObjects.Where(h => !h.IsMine).Take(64))
+        foreach (var hitObject in beatmap.HitObjects.Where(h => h is not BmsLandmine).Take(64))
             playfield.Add(hitObject);
 
         playfield.RefreshAllLifetimes();
@@ -176,7 +176,7 @@ public class BmsGameplayVirtualisationTest
     public void TestOutlawScrollplusNotesAroundCombo316AreAliveBeforeFirstVisibleWindow()
     {
         var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "103_outlaw_ogg", "99_outlaw_scrollplus.bms"));
-        var playableObjects = beatmap.HitObjects.Where(h => !h.IsMine).OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
+        var playableObjects = beatmap.HitObjects.Where(h => h is not BmsLandmine).OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
         var playfield = new BmsPlayfield(beatmap);
 
         foreach (var hitObject in playableObjects.Skip(300).Take(40))

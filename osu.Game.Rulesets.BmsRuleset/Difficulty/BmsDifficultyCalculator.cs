@@ -26,21 +26,23 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
         var totalColumns = bmsBeatmap?.TotalColumns ?? BmsDifficultyInfo.GetKeyCount(beatmap.Difficulty);
         var rank = bmsBeatmap?.Rank ?? 2;
 
-        var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().ToList();
+        var noteTimings = beatmap.HitObjects
+            .OfType<BmsHitObject>()
+            .Where(h => h is not BmsLandmine)
+            .Select(h => new BmsNoteTiming(h.Column, h.StartTime, h is BmsLongNote ln ? ln.EndTime : h.StartTime))
+            .ToList();
 
         double sr = 0;
 
-        if (hitObjects.Count > 0)
+        if (noteTimings.Count > 0)
         {
-            var effectiveClockRate = clockRate;
-
             // When Auto Scratch is active, exclude scratch column notes from difficulty calculation.
             if (bmsBeatmap != null && mods.Any(m => m is BmsModAutoScratch))
-                hitObjects = hitObjects.Where(h => !BmsLayout.IsScratchColumn(h.Column, bmsBeatmap.LayoutVariant)).ToList();
+                noteTimings = noteTimings.Where(n => !BmsLayout.IsScratchColumn(n.Column, bmsBeatmap.LayoutVariant)).ToList();
 
-            if (hitObjects.Count > 0)
+            if (noteTimings.Count > 0)
             {
-                var result = StarRatingProcessor.Compute(hitObjects, totalColumns, rank, effectiveClockRate);
+                var result = StarRatingProcessor.Compute(noteTimings, totalColumns, rank, clockRate);
                 sr = result.StarRating;
             }
         }

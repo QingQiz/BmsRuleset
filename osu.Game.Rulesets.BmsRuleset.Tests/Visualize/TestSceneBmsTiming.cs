@@ -4,6 +4,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Tests.Visual;
@@ -103,7 +104,7 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
     private DrawableBmsHitObject? getCrossSpeedLongNote()
         => Playfield.AllColumnAliveObjects()
             .OfType<DrawableBmsHitObject>()
-            .FirstOrDefault(d => d.HitObject is { IsLongNote: true, TickInfo.Tick: 384 });
+            .FirstOrDefault(d => d.HitObject is BmsLongNote { TickInfo.Tick: 384 });
 
     // ── Negative BPM (reverse scroll) ──────────────────────────────────────
 

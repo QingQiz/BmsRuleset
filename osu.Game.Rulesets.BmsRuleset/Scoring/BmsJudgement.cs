@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 
@@ -17,11 +18,9 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 ///     (both passive miss and in-range early keypress that consumes the note).
 ///     Empty POOR (keypress outside all note windows) produces no <see cref="T:osu.Game.Rulesets.Judgements.JudgementResult"/>.
 /// </remarks>
-public class BmsJudgement(bool isMine = false) : Judgement
+public class BmsJudgement(BmsHitObject? source = null) : Judgement
 {
-    public bool IsMine { get; } = isMine;
-
-    public override HitResult MaxResult => IsMine ? HitResult.Meh : HitResult.Perfect;
+    public override HitResult MaxResult => source is BmsLandmine ? HitResult.Meh : HitResult.Perfect;
 
     public override HitResult MinResult => HitResult.Miss;
 }

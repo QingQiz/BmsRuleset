@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Containers;
@@ -190,7 +189,7 @@ public sealed partial class BmsKeySoundPlayer : CompositeDrawable
         {
             var hitObject = hitObjects[index];
 
-            if (hitObject.Column != column || hitObject.IsMine || hasNoteFinished(hitObject))
+            if (hitObject.Column != column || hitObject is BmsLandmine || hasNoteFinished(hitObject))
             {
                 index++;
                 continue;

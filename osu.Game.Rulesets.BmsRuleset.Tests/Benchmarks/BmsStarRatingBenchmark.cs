@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Benchmarks;
 
@@ -92,15 +91,13 @@ public class BmsStarRatingBenchmark
         return input!;
     }
 
-    private static List<BmsHitObject> toHitObjects(SrBenchmarkInput input)
+    private static List<BmsNoteTiming> toNoteTimings(SrBenchmarkInput input)
     {
-        return input.HitObjects.Select(h => new BmsHitObject
-        {
-            Column = h.Column,
-            StartTime = h.StartTime,
-            Duration = h.Duration,
-            IsLongNote = h.IsLongNote,
-        }).ToList();
+        return input.HitObjects.Select(h => new BmsNoteTiming(
+            h.Column,
+            h.StartTime,
+            h.IsLongNote ? h.StartTime + h.Duration : h.StartTime
+        )).ToList();
     }
 
     [Test]
@@ -125,19 +122,19 @@ public class BmsStarRatingBenchmark
         Parallel.ForEach(dataPaths, dataPath =>
         {
             var input = loadInput(dataPath);
-            var hitObjects = toHitObjects(input);
+            var noteTimings = toNoteTimings(input);
 
             // Warmup (not measured)
-            new BmsStarRatingProcessor().Compute(hitObjects, input.TotalColumns, input.Rank);
-            new BmsStarRatingProcessorV2().Compute(hitObjects, input.TotalColumns, input.Rank);
+            new BmsStarRatingProcessor().Compute(noteTimings, input.TotalColumns, input.Rank);
+            new BmsStarRatingProcessorV2().Compute(noteTimings, input.TotalColumns, input.Rank);
 
             // Measure old × N iterations
             var (srOld, tOld, bytesOld, gc0Old, gc1Old, gc2Old, tMinOld, tMaxOld) =
-                BmsBenchmarkHelper.MeasureAvg(() => new BmsStarRatingProcessor().Compute(hitObjects, input.TotalColumns, input.Rank).StarRating, iterations);
+                BmsBenchmarkHelper.MeasureAvg(() => new BmsStarRatingProcessor().Compute(noteTimings, input.TotalColumns, input.Rank).StarRating, iterations);
 
             // Measure new × N iterations
             var (srNew, tNew, bytesNew, gc0New, gc1New, gc2New, tMinNew, tMaxNew) =
-                BmsBenchmarkHelper.MeasureAvg(() => new BmsStarRatingProcessorV2().Compute(hitObjects, input.TotalColumns, input.Rank).StarRating, iterations);
+                BmsBenchmarkHelper.MeasureAvg(() => new BmsStarRatingProcessorV2().Compute(noteTimings, input.TotalColumns, input.Rank).StarRating, iterations);
 
             // SR consistency check
             var diff = Math.Abs(srNew - srOld);

@@ -11,6 +11,7 @@ using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 
@@ -51,7 +52,7 @@ public partial class BmsEmbeddedSongDecoderTest
         Assert.That(objects, Is.Ordered.By(nameof(BmsHitObject.StartTime)), resourceName);
         Assert.That(objects.Select(o => o.TickInfo.Tick), Is.Ordered, resourceName);
         Assert.That(objects.All(o => o.StartTime >= 0), Is.True, resourceName);
-        Assert.That(objects.All(o => o.EndTime >= o.StartTime), Is.True, resourceName);
+        Assert.That(objects.All(o => o.GetEndTime() >= o.StartTime), Is.True, resourceName);
         Assert.That(beatmap.ControlPointInfo.TimingPoints, Is.Not.Empty, resourceName);
     }
 
@@ -377,7 +378,7 @@ public partial class BmsEmbeddedSongDecoderTest
 
         Assert.That(expected.Notes, Has.Count.GreaterThan(100));
         Assert.That(objects, Has.Length.EqualTo(expected.Notes.Count));
-        Assert.That(objects.Any(o => o.IsLongNote), Is.False);
+        Assert.That(objects.Any(o => o is BmsLongNote), Is.False);
 
         var expectedFirst = expected.Notes[0];
         var actualFirst = objects[0];

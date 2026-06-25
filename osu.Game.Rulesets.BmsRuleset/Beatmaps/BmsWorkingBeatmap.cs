@@ -84,13 +84,13 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager)
 
             foreach (var obj in beatmap.HitObjects)
             {
-                if (obj is not BmsHitObject { IsMine: false } hit)
+                if (obj is not BmsHitObject hit || hit is BmsLandmine)
                     continue;
 
                 if (hit.SampleKey != 0)
                     allEvents.Add(new BmsSampleEvent(hit.StartTime, 0, hit.SampleKey));
-                if (hit.TailSampleKey != 0)
-                    allEvents.Add(new BmsSampleEvent(hit.StartTime + hit.Duration, 0, hit.TailSampleKey));
+                if (hit is BmsLongNote ln && ln.TailSampleKey != 0)
+                    allEvents.Add(new BmsSampleEvent(hit.StartTime + ln.Duration, 0, ln.TailSampleKey));
             }
 
             allEvents.Sort(static (a, b) => a.Time.CompareTo(b.Time));

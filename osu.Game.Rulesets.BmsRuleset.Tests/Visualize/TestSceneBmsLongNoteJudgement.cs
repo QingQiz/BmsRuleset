@@ -18,6 +18,7 @@ using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
@@ -79,7 +80,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         AddAssert("all visual cases labelled", () =>
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
-            var longNotes = beatmap.HitObjects.Where(h => h.IsLongNote).OrderBy(h => h.StartTime).ToArray();
+            var longNotes = beatmap.HitObjects.Where(h => h is BmsLongNote).OrderBy(h => h.StartTime).ToArray();
             var textEvents = beatmap.TextEvents.TextEvents;
 
             if (longNotes.Length != cases.Count || textEvents.Length != cases.Count)
@@ -247,7 +248,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     {
         var actionPoints = new List<ActionPoint>();
         var hitObjects = beatmap.HitObjects
-            .Where(h => h.IsLongNote)
+            .Where(h => h is BmsLongNote)
             .OrderBy(h => h.StartTime)
             .ToArray();
 
@@ -263,7 +264,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
                 actionPoints.Add(new ActionPoint(hitObject.StartTime + input.OffsetFromHead, action.Value, input.Press));
 
             if (cases[i].NeedsCleanupRelease)
-                actionPoints.Add(new ActionPoint(hitObject.EndTime + cleanup_release_delay, action.Value, false));
+                actionPoints.Add(new ActionPoint(hitObject.GetEndTime() + cleanup_release_delay, action.Value, false));
         }
 
         return materialise(actionPoints);
@@ -288,12 +289,11 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
             var tick = caseTick(i);
             var endTick = tick + 96;
 
-            beatmap.HitObjects.Add(new BmsHitObject
+            beatmap.HitObjects.Add(new BmsLongNote
             {
                 StartTime = startTime,
                 Duration = long_note_duration,
                 Column = columns[i % columns.Length],
-                IsLongNote = true,
                 TickInfo = new BmsTickInfo { Tick = tick, EndTick = endTick },
             });
 
@@ -470,11 +470,11 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     }
 
     private bool isCaseLongNoteAlive(int index)
-        => Playfield.GetAliveObjectAtTick(caseTick(index)) is DrawableBmsHitObject { HitObject.IsLongNote: true } drawable
+        => Playfield.GetAliveObjectAtTick(caseTick(index)) is DrawableBmsHitObject { HitObject: BmsLongNote } drawable
            && drawable.Alpha > 0;
 
     private DrawableBmsHitObject? getCaseLongNote(int index)
-        => Playfield.GetAliveObjectAtTick(caseTick(index)) is DrawableBmsHitObject { HitObject.IsLongNote: true } drawable
+        => Playfield.GetAliveObjectAtTick(caseTick(index)) is DrawableBmsHitObject { HitObject: BmsLongNote } drawable
             ? drawable
             : null;
 

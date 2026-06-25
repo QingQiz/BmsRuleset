@@ -17,7 +17,7 @@ public class BmsBeatmapConversionTest
             HitObjects =
             {
                 new BmsHitObject { StartTime = 1000, Column = 0 },
-                new BmsHitObject { StartTime = 2000, Column = 1, IsLongNote = true, Duration = 500 },
+                new BmsLongNote { StartTime = 2000, Column = 1, Duration = 500 },
             },
         };
         var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
@@ -41,7 +41,7 @@ public class BmsBeatmapConversionTest
             HitObjects =
             {
                 new BmsHitObject { StartTime = 1000, Column = 2 },
-                new BmsHitObject { StartTime = 2000, Column = 5, IsLongNote = true, Duration = 800 },
+                new BmsLongNote { StartTime = 2000, Column = 5, Duration = 800 },
             },
         };
         var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
@@ -66,7 +66,7 @@ public class BmsBeatmapConversionTest
         var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
         var converted = (BmsBeatmap)converter.Convert();
 
-        Assert.That(converted.HitObjects[0].BmsRank, Is.EqualTo(1));
-        Assert.That(converted.HitObjects[0].LayoutVariant, Is.EqualTo(BmsLayoutVariant.Bme7K));
+        Assert.That(converted.HitObjects[0].Beatmap.Rank, Is.EqualTo(1));
+        Assert.That(converted.HitObjects[0].Beatmap.LayoutVariant, Is.EqualTo(BmsLayoutVariant.Bme7K));
     }
 }

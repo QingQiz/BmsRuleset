@@ -47,7 +47,8 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
             .Select(x => new BmsSampleEvent(x.StartTime, x.TickInfo.Tick, x.SampleKey));
 
         var scratchEndSamples = scratchNotes
-            .Where(x => x.IsLongNote && x.TailSampleKey != 0) // have a tail sample
+            .OfType<BmsLongNote>()
+            .Where(x => x.TailSampleKey != 0) // have a tail sample
             .Select(x => new BmsSampleEvent(x.EndTime, x.TickInfo.EndTick, x.TailSampleKey));
 
         b.BackgroundSampleEvents = b.BackgroundSampleEvents.Concat(scratchStartSamples).Concat(scratchEndSamples).ToArray();

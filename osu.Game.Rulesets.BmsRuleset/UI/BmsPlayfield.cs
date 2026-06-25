@@ -206,17 +206,17 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         {
             if (alive is not DrawableBmsHitObject d
                 || d.Judged
-                || d.HitObject.IsMine)
+                || d.HitObject is BmsLandmine)
             {
                 continue;
             }
 
             candidates.Add((d, new BmsJudgementCandidate(
                 d.HitObject.StartTime,
-                d.HitObject.EndTime,
+                d.HitObject.GetEndTime(),
                 d.HitObject.Column,
-                d.HitObject.BmsRank,
-                d.HitObject.IsLongNote)));
+                d.HitObject.Beatmap.Rank,
+                d.HitObject is BmsLongNote)));
         }
 
         var selection = BmsJudgementSelector.SelectPress(LayoutVariant, column.Value, candidates.Select(c => c.Candidate), Time.Current);
@@ -273,18 +273,18 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             if (d is not ILongNoteHolder ln || !ln.IsHoldingLongNote)
                 continue;
 
-            if (heldNote == null || d.HitObject.EndTime < heldNote.HitObject.EndTime)
+            if (heldNote == null || d.HitObject.GetEndTime() < heldNote.HitObject.GetEndTime())
                 heldNote = d;
         }
 
         if (heldNote is ILongNoteHolder ln2)
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(LayoutVariant, heldNote.HitObject.Column, heldNote.HitObject.BmsRank, tail: true);
-            var releaseOffset = Time.Current - heldNote.HitObject.EndTime;
+            var tailTable = BmsJudgementProfileProvider.GetTable(LayoutVariant, heldNote.HitObject.Column, heldNote.HitObject.Beatmap.Rank, tail: true);
+            var releaseOffset = Time.Current - heldNote.HitObject.GetEndTime();
 
-            if (ln2.TryRelease(releaseOffset, tailTable))
+            if (ln2.TryRelease(releaseOffset, tailTable) && heldNote.HitObject is BmsLongNote ln)
             {
-                KeySoundPlayer.PlaySample(column.Value, heldNote.HitObject.TailSamplePath);
+                KeySoundPlayer.PlaySample(column.Value, ln.TailSamplePath);
             }
         }
     }
@@ -293,10 +293,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public void DetonateLandmine(BmsHitObject hitObject)
     {
-        if (string.IsNullOrEmpty(hitObject.LandmineExplosionSamplePath))
+        var explosionPath = hitObject.Beatmap.SampleDefinitions.TryGetValue(0, out var p) ? p : string.Empty;
+        if (string.IsNullOrEmpty(explosionPath))
             return;
 
-        KeySoundPlayer.PlayLandmineSound(hitObject.LandmineExplosionSamplePath);
+        KeySoundPlayer.PlayLandmineSound(explosionPath);
     }
 
     #endregion
@@ -547,7 +548,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (drawableHitObject is not DrawableBmsHitObject bmsHitObject)
             return;
 
-        if (bmsHitObject.HitObject.IsMine)
+        if (bmsHitObject.HitObject is BmsLandmine)
         {
             requestJudgementDisplay(HitResult.Meh);
             return;
@@ -560,7 +561,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                 BmsSkinComponents.HitExplosion,
                 LayoutVariant,
                 column,
-                bmsHitObject.HitObject.IsLongNote)));
+                bmsHitObject.HitObject is BmsLongNote)));
         }
 
         requestJudgementDisplay(result.Type);
@@ -603,10 +604,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// </summary>
     internal void RegisterLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime, HitResult result)
     {
-        if (drawable.HitObject == null)
+        if (drawable.HitObject is not BmsLongNote ln)
             return;
 
-        var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(drawable.HitObject, endpointTime, eventTime, result);
+        var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(ln, endpointTime, eventTime, result);
 
         if (scoreResult != null)
             healthProcessor?.ApplySyntheticLongNoteEndpoint(scoreResult);
@@ -618,7 +619,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                 BmsSkinComponents.HitExplosion,
                 LayoutVariant,
                 column,
-                drawable.HitObject.IsLongNote)));
+                drawable.HitObject is BmsLongNote)));
         }
 
         requestJudgementDisplay(result);
