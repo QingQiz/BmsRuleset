@@ -118,40 +118,6 @@ public partial class BmsRuleset : Ruleset
     public override HealthProcessor CreateHealthProcessor(double drainStartTime) =>
         new BmsHealthProcessor();
 
-    #region Attributes display
-
-    public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
-    {
-        var original = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
-        var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
-        var adjusted = BmsDifficultyInfo.FromOsuDifficulty(adjustedDifficulty);
-        var colours = new OsuColour();
-
-        yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
-        {
-            Description = $"RANK {adjusted.Rank} timing windows.",
-            AdditionalMetrics = createRankMetrics(adjusted.Rank, adjusted.KeyCount),
-        };
-
-        if (original.LockedLongNoteMode != BmsLongNoteMode.Undefined)
-        {
-            yield return new RulesetBeatmapAttribute("LNMODE", "LM", (float)original.LockedLongNoteMode, (float)original.LockedLongNoteMode, 3)
-            {
-                Description = $"Locked long-note mode: {formatLongNoteMode(original.LockedLongNoteMode)}",
-                AdditionalMetrics =
-                [
-                    new("Locked mode", formatLongNoteMode(original.LockedLongNoteMode), colours.Gray4),
-                ],
-            };
-        }
-
-        yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total, (float)adjusted.Total, 300)
-        {
-            Description = createTotalDescription(beatmapInfo, adjusted, mods),
-            AdditionalMetrics = createTotalMetrics(beatmapInfo, adjusted, mods),
-        };
-    }
-
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
     {
         ModType.DifficultyReduction =>
@@ -195,10 +161,45 @@ public partial class BmsRuleset : Ruleset
             new BmsModLongNote(),
             new BmsModChargeNote(),
             new BmsModHellChargeNote(),
+            new BmsModBackgroundKeysound(),
         ],
         ModType.System => [new BmsModBranchReplay()],
         _ => [],
     };
+
+    #region Attributes display
+
+    public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
+    {
+        var original = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
+        var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
+        var adjusted = BmsDifficultyInfo.FromOsuDifficulty(adjustedDifficulty);
+        var colours = new OsuColour();
+
+        yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
+        {
+            Description = $"RANK {adjusted.Rank} timing windows.",
+            AdditionalMetrics = createRankMetrics(adjusted.Rank, adjusted.KeyCount),
+        };
+
+        if (original.LockedLongNoteMode != BmsLongNoteMode.Undefined)
+        {
+            yield return new RulesetBeatmapAttribute("LNMODE", "LM", (float)original.LockedLongNoteMode, (float)original.LockedLongNoteMode, 3)
+            {
+                Description = $"Locked long-note mode: {formatLongNoteMode(original.LockedLongNoteMode)}",
+                AdditionalMetrics =
+                [
+                    new("Locked mode", formatLongNoteMode(original.LockedLongNoteMode), colours.Gray4),
+                ],
+            };
+        }
+
+        yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total, (float)adjusted.Total, 300)
+        {
+            Description = createTotalDescription(beatmapInfo, adjusted, mods),
+            AdditionalMetrics = createTotalMetrics(beatmapInfo, adjusted, mods),
+        };
+    }
 
     public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap) => skin switch
     {
