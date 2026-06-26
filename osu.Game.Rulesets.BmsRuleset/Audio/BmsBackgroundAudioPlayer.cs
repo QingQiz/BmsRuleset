@@ -32,7 +32,10 @@ namespace osu.Game.Rulesets.BmsRuleset.Audio;
 ///         keeping the forward hot path allocation- and decode-free.
 ///     </para>
 /// </remarks>
-public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPlayer.BgmEvent> sortedEvents, Bindable<bool> sourcePaused)
+public partial class BmsBackgroundAudioPlayer(
+    IReadOnlyList<BmsBackgroundAudioPlayer.BgmEvent> sortedEvents,
+    Bindable<bool> sourcePaused,
+    double rate = 1.0)
     : Component
 {
     public readonly record struct BgmEvent(double Time, string SamplePath);
@@ -79,16 +82,6 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
     }
 
     #endregion
-
-    [BackgroundDependencyLoader(true)]
-    private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
-    {
-        if (samplePlaybackDisabler == null)
-            return;
-
-        samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
-        samplePlaybackDisabled.BindValueChanged(_ => updatePlaybackBlocked(), true);
-    }
 
     protected override void LoadAsyncComplete()
     {
@@ -144,6 +137,23 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
         cleanupFinishedChannels();
     }
 
+    private static LegacyBeatmapSkin? extractBeatmapSkin(ISkin skin) => skin switch
+    {
+        LegacyBeatmapSkin beatmapSkin => beatmapSkin,
+        SkinTransformer transformer => transformer.Skin as LegacyBeatmapSkin,
+        _ => null,
+    };
+
+    [BackgroundDependencyLoader(true)]
+    private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
+    {
+        if (samplePlaybackDisabler == null)
+            return;
+
+        samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
+        samplePlaybackDisabled.BindValueChanged(_ => updatePlaybackBlocked(), true);
+    }
+
     /// <summary>
     ///     Re-seeds playback after a clock jump: drops everything currently sounding, then resumes
     ///     every sample whose [start, start+length) interval still contains the new time. Samples
@@ -166,13 +176,16 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
             if (offset < 0)
                 continue;
 
-            // No earlier event can still be sounding once we are past the longest sample.
-            if (maxLength > 0 && offset >= maxLength)
+            // offset is chart-ms (currentTime is the mod-rate-advanced gameplay clock, evt.Time is
+            // the original chart time). maxLength / length are the *stretched* samples' real-ms
+            // durations (original / rate), so multiply by rate to compare in chart-ms (= original).
+            // Without this, under DT the back portion of long samples is silently dropped on seek.
+            if (maxLength > 0 && offset >= maxLength * rate)
                 break;
 
             var length = sampleCache?.Get(evt.SamplePath)?.Length ?? 0;
 
-            if (length > 0 && offset >= length)
+            if (length > 0 && offset >= length * rate)
                 continue;
 
             if (offset < allowable_late_start)
@@ -245,6 +258,10 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
         // Tracks are not routed through the effect-volume sample chain, so a direct bind of the BGM
         // volume chain (master Volume × music VolumeTrack) is sufficient.
         bindBgmVolumeAdjustments(track);
+
+        if (Math.Abs(rate - 1.0) > 0.001)
+            track.AddAdjustment(AdjustableProperty.Tempo, new BindableDouble(rate));
+
         track.Start();
 
         activeChannels.Add(ActiveBgm.ForTrack(track));
@@ -309,13 +326,6 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
 
         beatmapTrackStore = audioManager.GetTrackStore(resources);
     }
-
-    private static LegacyBeatmapSkin? extractBeatmapSkin(ISkin skin) => skin switch
-    {
-        LegacyBeatmapSkin beatmapSkin => beatmapSkin,
-        SkinTransformer transformer => transformer.Skin as LegacyBeatmapSkin,
-        _ => null,
-    };
 
     private void updatePlaybackBlocked()
     {
@@ -407,20 +417,6 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
     /// </summary>
     private sealed class ActiveBgm
     {
-        private readonly SampleChannel? channel;
-        private readonly Track? track;
-
-        public bool Paused { get; private set; }
-
-        private ActiveBgm(SampleChannel? channel, Track? track)
-        {
-            this.channel = channel;
-            this.track = track;
-        }
-
-        public static ActiveBgm ForChannel(SampleChannel channel) => new ActiveBgm(channel, null);
-
-        public static ActiveBgm ForTrack(Track track) => new ActiveBgm(null, track);
 
         public bool IsDisposed => channel?.IsDisposed ?? track!.IsDisposed;
 
@@ -434,6 +430,21 @@ public partial class BmsBackgroundAudioPlayer(IReadOnlyList<BmsBackgroundAudioPl
                 return track!.HasCompleted || (!track.IsRunning && track.Length > 0 && track.CurrentTime >= track.Length);
             }
         }
+
+        public bool Paused { get; private set; }
+
+        private readonly SampleChannel? channel;
+        private readonly Track? track;
+
+        private ActiveBgm(SampleChannel? channel, Track? track)
+        {
+            this.channel = channel;
+            this.track = track;
+        }
+
+        public static ActiveBgm ForChannel(SampleChannel channel) => new(channel, null);
+
+        public static ActiveBgm ForTrack(Track track) => new(null, track);
 
         public void Pause()
         {

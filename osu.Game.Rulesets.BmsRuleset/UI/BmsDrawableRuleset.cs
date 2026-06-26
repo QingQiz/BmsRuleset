@@ -43,7 +43,8 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     [Cached]
     private BmsSampleStore sampleStore = new(
         ((BmsBeatmap)beatmap).SampleDefinitions.Values,
-        getSource((BmsBeatmap)beatmap)
+        getSource((BmsBeatmap)beatmap),
+        getRate(mods)
     );
 
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
@@ -121,6 +122,17 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             ?.Metadata.Source ?? b.BeatmapInfo.Metadata.Source;
 
     /// <summary>
+    ///     The active rate mod's SpeedChange (1.0 when no rate mod is selected). Used to pre-stretch
+    ///     BMS samples at load so audio follows HT/DT pitch-preserving, in sync with the rate-scaled
+    ///     chart clock.
+    /// </summary>
+    private static double getRate(IReadOnlyList<Mod>? mods)
+    {
+        var rateMod = mods?.OfType<ModRateAdjust>().FirstOrDefault();
+        return rateMod?.SpeedChange.Value ?? 1.0;
+    }
+
+    /// <summary>
     ///     Called when all hit objects have been judged (play completed).
     ///     If the gauge is failed (HP ever hit 0, even under NF survival) or the final
     ///     HP is below the Normal-mode clear threshold (80 %), stamps
@@ -160,7 +172,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             .ToList();
 
         if (events.Count > 0)
-            FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events, IsPaused));
+            FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events, IsPaused, getRate(Mods)));
 
         if (Config is BmsRulesetConfigManager config)
         {

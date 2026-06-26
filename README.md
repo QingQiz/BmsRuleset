@@ -235,29 +235,29 @@ Default play uses the Normal gauge. Gauge types are selected via mods:
 
 ## Mods
 
-| Mod                      | Description                                                     |            |
-|--------------------------|-----------------------------------------------------------------|------------|
-| Autoplay                 | auto play                                                       |            |
-| Double Time / Half Time  |                                                                 | Not Tested |
-| No Fail                  |                                                                 |            |
-| Cinema                   |                                                                 | Working    |
-| Mirror                   | Mirrors the key layout                                          |            |
-| 2P                       | change the player layout from 1P to 2P                          |            |
-| Auto Scratch (AS)        | auto play/hide scratch lane                                     |            |
-| Hide Scratch (HS)        | Remove the scratch notes and hide scratch lane                  |            |
-| Background Keysound (BK) | Play all keysounds as background audio instead of on key press. |            |
-| Lane Random (LR)         | RANDOM: permutes lane columns                                   |            |
-| Note Random (NR)         | S-RANDOM / H-RANDOM: per-note random                            |            |
-| Rotation Random (RR)     | R-RANDOM: rotate + optional mirror                              |            |
-| Assist Easy Gauge (E2)   | Use Assist Easy BMS gauge                                       |            |
-| Easy Gauge (E1)          | Use Easy BMS gauge                                              |            |
-| Hard Gauge (H1)          | Use Hard BMS gauge                                              |            |
-| EX Hard Gauge (H2)       | Use EX Hard BMS gauge                                           |            |
-| Hazard Gauge (H3)        | Use Hazard BMS gauge                                            |            |
-| Auto Gauge (AG)          | Start with the hardest gauge; drop a tier on failure            |            |
-| Long Note (L1)           | LN judgement: LN mode: single endpoint judged at tail           |            |
-| Charge Note (L2)         | LN judgement: CN mode: head & tail judged separately            |            |
-| Hell Charge Note (L3)    | LN judgement: HCN mode: CN + body gauge drain/recover           |            |
+| Mod                      | Description                                                     |         |
+|--------------------------|-----------------------------------------------------------------|---------|
+| Autoplay                 | auto play                                                       |         |
+| Double Time / Half Time  |                                                                 |         |
+| No Fail                  |                                                                 |         |
+| Cinema                   |                                                                 | Working |
+| Mirror                   | Mirrors the key layout                                          |         |
+| 2P                       | change the player layout from 1P to 2P                          |         |
+| Auto Scratch (AS)        | auto play/hide scratch lane                                     |         |
+| Hide Scratch (HS)        | Remove the scratch notes and hide scratch lane                  |         |
+| Background Keysound (BK) | Play all keysounds as background audio instead of on key press. |         |
+| Lane Random (LR)         | RANDOM: permutes lane columns                                   |         |
+| Note Random (NR)         | S-RANDOM / H-RANDOM: per-note random                            |         |
+| Rotation Random (RR)     | R-RANDOM: rotate + optional mirror                              |         |
+| Assist Easy Gauge (E2)   | Use Assist Easy BMS gauge                                       |         |
+| Easy Gauge (E1)          | Use Easy BMS gauge                                              |         |
+| Hard Gauge (H1)          | Use Hard BMS gauge                                              |         |
+| EX Hard Gauge (H2)       | Use EX Hard BMS gauge                                           |         |
+| Hazard Gauge (H3)        | Use Hazard BMS gauge                                            |         |
+| Auto Gauge (AG)          | Start with the hardest gauge; drop a tier on failure            |         |
+| Long Note (L1)           | LN judgement: LN mode: single endpoint judged at tail           |         |
+| Charge Note (L2)         | LN judgement: CN mode: head & tail judged separately            |         |
+| Hell Charge Note (L3)    | LN judgement: HCN mode: CN + body gauge drain/recover           |         |
 
 ---
 
@@ -939,7 +939,7 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Audio**     | `#WAVCMD` (MacBeat) — pitch/volume/playback-time per WAV slot                            |
 | **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                  |
 | **Audio**     | `#VOLWAV` (BM98) — global volume scalar                                                  |
-| **Audio**     | `HT`, `DT` should change sample/keysound clockrate                                       | 1        |
+| **Audio**     | `HT`, `DT` preview audio only changed the time gap between events now                    | 4        |
 | **Audio**     | `#xxx97` (fgt) — dynamic BGM volume change channel                                       |          |
 | **Converter** | Mania 7K → BMS chart conversion                                                          | 3        |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |

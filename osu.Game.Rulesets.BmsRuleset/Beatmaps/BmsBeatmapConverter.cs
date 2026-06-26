@@ -163,7 +163,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     /// <summary>
     ///     Precomputes <see cref="BmsHitObject.ScrollPositionAtStartTime"/> and
-    ///     <see cref="BmsHitObject.ScrollPositionAtEndTime"/> for every hitobject.
+    ///     <see cref="BmsLongNote.ScrollPositionAtEndTime"/> for every hitobject.
     ///     This runs once during beatmap loading, eliminating the per-frame
     ///     <see cref="BmsTimingMap.GetScrollPositionAtTime"/> calls in the drawable hot path
     ///     (which would otherwise traverse the timing-point array for every hitobject, every frame).

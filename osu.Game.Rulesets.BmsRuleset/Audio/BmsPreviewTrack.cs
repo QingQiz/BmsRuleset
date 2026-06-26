@@ -71,6 +71,15 @@ public class BmsPreviewTrack : Track
         string? previewFile = null)
         : base("bms-preview")
     {
+        // Propagate the track's aggregate rate (populated by AdjustmentsFromMods in gameplay,
+        // or by MusicController mod-track-adjustments elsewhere) into the inner StopwatchClock.
+        // BmsPreviewTrack.CurrentTime is driven by this StopwatchClock, not by Track.Rate, so
+        // without this the gameplay clock would not advance at the mod rate in the
+        // DecouplingFramedClock's source-running branch.
+        AggregateFrequency.ValueChanged += _ => updateClockRate();
+        AggregateTempo.ValueChanged += _ => updateClockRate();
+        updateClockRate();
+
         if (basePath == null) return;
 
         var fileResources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
@@ -128,7 +137,8 @@ public class BmsPreviewTrack : Track
         if (Length == 0 || CurrentTime >= Length)
             return;
 
-        startPreviewChannel();
+        if (!SuppressEventProcessing)
+            startPreviewChannel();
         lock (clock) clock.Start();
     }
 
@@ -158,7 +168,7 @@ public class BmsPreviewTrack : Track
         stopAllChannels();
         stopPreviewChannel();
 
-        if (previewSample != null && wasRunning)
+        if (previewSample != null && wasRunning && !SuppressEventProcessing)
             startPreviewChannel();
 
         return success;
@@ -256,6 +266,12 @@ public class BmsPreviewTrack : Track
                    || extension.Equals(".ogg", StringComparison.OrdinalIgnoreCase)
                    || extension.Equals(".mp3", StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    private void updateClockRate()
+    {
+        lock (clock)
+            clock.Rate = AggregateFrequency.Value * AggregateTempo.Value;
     }
 
     private void playSample(BgmEvent evt)

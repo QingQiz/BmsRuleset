@@ -9,7 +9,6 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Graphics;
 using osu.Framework.IO.Stores;
 using osu.Game.Audio;
-using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
 
@@ -20,19 +19,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Audio;
 ///     lightweight channel from it via <see cref="ISample.GetChannel" />.
 /// </summary>
 /// <remarks>
-///     Samples are resolved through a two-tier fallback:
-///     <list type="number">
-///       <item><description>
-///         <b>Filesystem</b> — when <c>basePath</c> is provided, audio files are
-///         loaded directly from the original BMS chart directory via <see cref="BmsFileResourceStore" />,
-///         bypassing Realm file storage entirely. This is used when charts were imported in
-///         external-audio mode (only BMS text files stored in Realm).
-///       </description></item>
-///       <item><description>
-///         <b>LegacyBeatmapSkin (Realm)</b> — falls back to the beatmap skin's Realm-backed
-///         resource store, matching the original fully-imported behaviour.
-///       </description></item>
-///     </list>
+///     Samples are resolved only from the original BMS chart directory on the filesystem
+///     (via <see cref="BmsFileResourceStore" />), using the path stored in
+///     <c>BeatmapInfo.Metadata.Source</c>. Charts imported in external-audio mode (BMS text
+///     in Realm, audio on disk) resolve normally; charts whose audio lives only in Realm
+///     (no filesystem <c>Source</c> path) will not resolve samples.
 /// </remarks>
 public partial class BmsSampleStore : Component
 {
@@ -60,13 +51,14 @@ public partial class BmsSampleStore : Component
 
     /// <summary>
     ///     An <see cref="ITrackStore" /> for BGM seek-back tracks, backed by the same filesystem
-    ///     store used for sample resolution.  <c>null</c> when <c>basePath</c> is not set
-    ///     (Realm-imported mode).
+    ///     store used for sample resolution.  <c>null</c> when <c>basePath</c> is not a real
+    ///     directory.
     /// </summary>
     internal ITrackStore? TrackStore { get; private set; }
 
     private readonly IReadOnlyList<string> samplePaths;
     private readonly string? basePath;
+    private readonly double rate;
 
     /// <summary>
     ///     Declared sample path (the first <see cref="BmsSampleInfo.LookupNames" /> entry) →
@@ -75,10 +67,10 @@ public partial class BmsSampleStore : Component
     /// </summary>
     private readonly Dictionary<string, ISample?> cache = new(StringComparer.OrdinalIgnoreCase);
 
-    private ISampleStore? fileSampleStore;
+    // Owned by this store (its stretched ISamples are served from cache). Disposed in Dispose.
+    private BmsSampleStretcher? stretcher;
 
-    [Resolved]
-    private ISkinSource skin { get; set; } = null!;
+    private ISampleStore? fileSampleStore;
 
     [Resolved]
     private AudioManager audioManager { get; set; } = null!;
@@ -88,28 +80,36 @@ public partial class BmsSampleStore : Component
     ///     <c>BmsBeatmap.SampleDefinitions.Values</c>).
     /// </param>
     /// <param name="basePath">
-    ///     When non-null, audio files are resolved from this directory on the real filesystem
-    ///     instead of through the Realm-backed <see cref="LegacyBeatmapSkin" />.  Pass the
-    ///     chart directory path stored in <c>BeatmapInfo.Metadata.Source</c>.
+    ///     The chart directory on the real filesystem (from <c>BeatmapInfo.Metadata.Source</c>).
+    ///     Audio files are resolved from here via <see cref="BmsFileResourceStore" />. When
+    ///     null or non-existent, no samples resolve.
     /// </param>
-    public BmsSampleStore(IEnumerable<string> samplePaths, string? basePath = null)
+    /// <param name="rate">
+    ///     When not <c>1.0</c>, every resolved sample is pitch-preserving time-stretched by this
+    ///     factor during <c>load()</c> (via <see cref="BmsSampleStretcher" />) and the cache entry
+    ///     replaced, so runtime playback is rate-adjusted with zero per-playback overhead.
+    /// </param>
+    public BmsSampleStore(IEnumerable<string> samplePaths, string? basePath = null, double rate = 1.0)
     {
         this.samplePaths = samplePaths
             .Where(p => !string.IsNullOrEmpty(p))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         this.basePath = basePath;
+        this.rate = rate;
     }
 
     #region Disposal
 
     protected override void Dispose(bool isDisposing)
     {
-        // File sample store is owned by this component (unlike skin samples which are owned
-        // by the skin itself).  Dispose it to free native BASS resources.
+        // File sample store is owned by this component.  Dispose it to free native BASS resources.
         if (fileSampleStore is IDisposable disposable)
             disposable.Dispose();
 
+        // Stretcher owns the stretched ISamples now served from cache; free their native BASS
+        // resources too. Must happen before cache.Clear() since the cache entries reference them.
+        stretcher?.Dispose();
         fileSampleStore = null;
         TrackStore = null;
         cache.Clear();
@@ -135,10 +135,9 @@ public partial class BmsSampleStore : Component
         if (cache.TryGetValue(key, out var cached))
             return cached;
 
-        // Tier 1 — filesystem (external-audio import mode).
-        // byte[] allocation (if any) happens here, during preload on the async background
-        // thread.  Playback via ISample.GetChannel() reuses the already-loaded native sample
-        // handle and allocates zero managed memory.
+        // Filesystem (external-audio import mode). byte[] allocation (if any) happens here,
+        // during preload on the async background thread.  Playback via ISample.GetChannel()
+        // reuses the already-loaded native sample handle and allocates zero managed memory.
         if (fileSampleStore != null)
         {
             foreach (var lookup in sampleInfo.LookupNames)
@@ -150,45 +149,15 @@ public partial class BmsSampleStore : Component
             }
         }
 
-        // Tier 2 — LegacyBeatmapSkin (Realm-backed import mode).
-        var beatmapSkins = skin.AllSources
-            .Select(extractBeatmapSkin)
-            .Where(s => s != null)
-            .ToArray();
-
-        // Skin not ready yet (no beatmap sources): do NOT cache, so a later request can retry.
-        if (beatmapSkins.Length == 0)
-            return null;
-
-        ISample? resolved = null;
-
-        foreach (var beatmapSkin in beatmapSkins)
-        {
-            resolved = beatmapSkin!.GetSample(sampleInfo);
-
-            if (resolved != null)
-                break;
-        }
-
-        return cache[key] = resolved;
+        return cache[key] = null;
     }
-
-    private static LegacyBeatmapSkin? extractBeatmapSkin(ISkin skin) => skin switch
-    {
-        LegacyBeatmapSkin beatmapSkin => beatmapSkin,
-        SkinTransformer transformer => transformer.Skin as LegacyBeatmapSkin,
-        _ => null,
-    };
 
     [BackgroundDependencyLoader]
     private void load()
     {
         // Runs on the async load thread (the "click play → loading screen" phase), so the
         // disk read + decode of every sample happens off the gameplay hot path.
-        //
-        // Only create filesystem-backed stores when basePath is a real directory.
-        // Old imports have basePath = "BMS" (a sentinel, not a real path) and store audio
-        // in Realm — those must fall through to Tier 2 (LegacyBeatmapSkin).
+        // Only create the filesystem-backed store when basePath is a real directory.
         if (!string.IsNullOrEmpty(basePath) && Directory.Exists(basePath))
         {
             var fileResources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
@@ -202,5 +171,52 @@ public partial class BmsSampleStore : Component
 
         foreach (var path in samplePaths)
             Get(path);
+
+        // Pre-stretch pass: when rate != 1, replace each resolved cache entry with a pitch-preserving
+        // stretch. Done after (not during) resolution so the stretcher decodes the source bytes once
+        // per sample and the runtime Get() path stays untouched (callers receive stretched samples
+        // transparently). Absent samples (cached null) are skipped, preserving their "absent" state.
+        if (!(Math.Abs(rate - 1.0) > 0.001))
+            return;
+
+        var sourceBytes = buildSourceByteStore();
+
+        if (sourceBytes != null)
+        {
+            stretcher = new BmsSampleStretcher(audioManager);
+
+            foreach (var path in samplePaths)
+            {
+                var key = new BmsSampleInfo(path).LookupNames.FirstOrDefault();
+
+                if (string.IsNullOrEmpty(key))
+                    continue;
+
+                if (!cache.TryGetValue(key, out var existing) || existing == null)
+                    continue;
+
+                var stretched = stretcher.Stretch(sourceBytes, path, rate);
+
+                if (stretched != null)
+                    cache[key] = stretched;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Builds a byte resource store over the chart directory so the stretcher can decode
+    ///     source audio. Returns null when <c>basePath</c> is not a real directory (no samples
+    ///     to pre-stretch).
+    /// </summary>
+    private IResourceStore<byte[]>? buildSourceByteStore()
+    {
+        if (string.IsNullOrEmpty(basePath) || !Directory.Exists(basePath))
+            return null;
+
+        var fileResources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
+        fileResources.AddExtension("wav");
+        fileResources.AddExtension("mp3");
+        fileResources.AddExtension("ogg");
+        return fileResources;
     }
 }

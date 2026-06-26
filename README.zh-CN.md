@@ -120,7 +120,7 @@ BMS 谱面并将其标记为删除。
 | Mod                      | 说明                         |     |
 |--------------------------|----------------------------|-----|
 | Autoplay                 | 自动播放                       |     |
-| Double Time / Half Time  |                            | 未测试 |
+| Double Time / Half Time  |                            | |
 | No Fail                  |                            |     |
 | Cinema                   |                            | 正常  |
 | Mirror                   | 镜像键位布局                     |     |
