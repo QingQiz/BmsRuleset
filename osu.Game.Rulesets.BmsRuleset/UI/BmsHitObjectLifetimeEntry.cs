@@ -221,7 +221,21 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
 
     private bool isVisibleAt(BmsHitObject hitObject, BmsTimingMap timingMap, double time)
     {
-        var progress = hitObject.ScrollPositionAtStartTime - timingMap.GetScrollPositionAtTime(time);
+        if (isVisibleAtPosition(hitObject.ScrollPositionAtStartTime, timingMap, time))
+            return true;
+
+        // An LN's body spans from the head's to the tail's scroll position. Under negative scroll
+        // the tail is the leading edge and appears before the head, so the body is on screen — and
+        // the entry must already be alive — while the tail is visible even if the head isn't yet.
+        if (hitObject is BmsLongNote ln)
+            return isVisibleAtPosition(ln.ScrollPositionAtEndTime, timingMap, time);
+
+        return false;
+    }
+
+    private bool isVisibleAtPosition(double scrollPosition, BmsTimingMap timingMap, double time)
+    {
+        var progress = scrollPosition - timingMap.GetScrollPositionAtTime(time);
         return progress <= visibleScrollDistanceAt(timingMap, time);
     }
 

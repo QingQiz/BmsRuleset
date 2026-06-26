@@ -16,7 +16,7 @@ public class BmsGameplayVirtualisationTest
     [Test]
     public void TestPlayfieldRoutesHitObjectsToPerColumnContainers()
     {
-        var playfield = new BmsPlayfield(new BmsBeatmap
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -24,7 +24,7 @@ public class BmsGameplayVirtualisationTest
             {
                 new BmsHitObject { StartTime = 1000, Column = 1 },
             },
-        });
+        }));
 
         // Top-level HitObjectContainer is the default (empty) one from Playfield base.
         Assert.That(playfield.HitObjectContainer.GetType().Name, Is.EqualTo("HitObjectContainer"));
@@ -76,13 +76,13 @@ public class BmsGameplayVirtualisationTest
             StartTime = timingMap.ProjectTickToTime(192),
             Column = 1,
         };
-        var playfield = new BmsPlayfield(new BmsBeatmap
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
             TimingMap = timingMap,
             HitObjects = { hitObject },
-        });
+        }));
 
         playfield.Add(hitObject);
         playfield.RefreshAllLifetimes();
@@ -132,13 +132,13 @@ public class BmsGameplayVirtualisationTest
         };
         hitObject.ScrollPositionAtStartTime = timingMap.GetScrollPositionAtTime(hitObject.StartTime);
 
-        var beatmap = new BmsBeatmap
+        var beatmap = attachBeatmap(new BmsBeatmap
         {
             TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
             LayoutVariant = BmsLayoutVariant.Bme7K,
             TimingMap = timingMap,
             HitObjects = { hitObject },
-        };
+        });
         var playfield = new BmsPlayfield(beatmap);
 
         playfield.Add(hitObject);
@@ -201,6 +201,19 @@ public class BmsGameplayVirtualisationTest
         using var reader = new LineBufferedReader(stream);
         var decoded = new BmsBeatmapDecoder().Decode(reader);
         return (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+    }
+
+    /// <summary>
+    ///     Attaches the beatmap to each of its hit objects. The decoder/converter does this for real
+    ///     charts, but synthetic beatmaps built inline in tests skip that step — and lifetime code
+    ///     (e.g. BmsHitObjectLifetimeEntry.getEarlyBadWindow) reads Beatmap.Rank/LayoutVariant, so
+    ///     leaving it null NREs. This mirrors BmsBeatmapConverter's attachment loop.
+    /// </summary>
+    private static BmsBeatmap attachBeatmap(BmsBeatmap beatmap)
+    {
+        foreach (BmsHitObject ho in beatmap.HitObjects)
+            ho.Beatmap = beatmap;
+        return beatmap;
     }
 
     private static string findTestSongsRoot([CallerFilePath] string sourceFile = "")
