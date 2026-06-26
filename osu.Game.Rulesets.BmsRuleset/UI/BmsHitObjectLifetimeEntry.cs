@@ -25,7 +25,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
     /// <summary>
     ///     Minimum visible window — no note should appear for less than this many ms before its hit time.
     /// </summary>
-    private const double minimum_future_lifetime = 0;
+    private const double minimum_future_lifetime = 100;
 
     /// <summary>
     ///     Extra margin added to computed lifetimes so the note is fully visible (not clipped at the
@@ -128,16 +128,30 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
 
     private double computeFutureLifetime(BmsHitObject hitObject)
     {
+        // Floor the future lifetime at the early BAD (Ok) window so the entry is alive before the
+        // earliest moment a press can be judged.
+        var floor = Math.Max(getEarlyBadWindow(hitObject), minimum_future_lifetime);
         var timingMap = getTimingMap();
 
         if (useConstantScrollFallback(hitObject, timingMap))
-            return computeConstantScrollFutureLifetime();
+            return Math.Max(floor, computeConstantScrollFutureLifetime());
 
         var visibleTime = findEarliestVisibleWindowStart(hitObject, timingMap!);
 
         return !double.IsFinite(visibleTime)
-            ? computeConstantScrollFutureLifetime()
-            : Math.Max(minimum_future_lifetime, hitObject.StartTime - visibleTime + lifetime_margin);
+            ? Math.Max(floor, computeConstantScrollFutureLifetime())
+            : Math.Max(floor, hitObject.StartTime - visibleTime + lifetime_margin);
+    }
+
+    /// <summary>
+    ///     The early BAD (Ok) hit window for this object's head judgement — the furthest ahead of
+    ///     <see cref="HitObject.StartTime" /> at which a press can still be judged. Used as the
+    ///     minimum future lifetime so the entry is alive for any hittable press.
+    /// </summary>
+    private static double getEarlyBadWindow(BmsHitObject hitObject)
+    {
+        var table = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.Beatmap.Rank, tail: false);
+        return Math.Abs(table.EarlyWindowFor(HitResult.Ok));
     }
 
     private bool useConstantScrollFallback(BmsHitObject hitObject, BmsTimingMap? timingMap)
@@ -235,8 +249,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
     private double computeConstantScrollFutureLifetime()
     {
         var speed = Math.Max(0.001, playfield.ScrollSpeed);
-        return Math.Max(minimum_future_lifetime,
-            BmsDrawableRuleset.ComputeScrollTime(speed) * currentScrollRangeScale() + lifetime_margin);
+        return BmsDrawableRuleset.ComputeScrollTime(speed) * currentScrollRangeScale() + lifetime_margin;
     }
 
     #endregion
