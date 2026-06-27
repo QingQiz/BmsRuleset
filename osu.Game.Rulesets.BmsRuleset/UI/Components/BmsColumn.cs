@@ -30,7 +30,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     public bool IsScratch { get; }
 
-    public Container HitExplosionArea { get; }
+    // Owned by the column but parented to a stage-level layer (above the judgement line) by BmsStage,
+    // so hit explosions render on top of the stage hitTarget instead of behind it.
+    public Container HitExplosionArea { get; } = new Container { RelativeSizeAxes = Axes.Y, Masking = true };
 
     /// <summary>
     ///     When <c>true</c>, this column is hidden from layout — zero width, zero
@@ -86,7 +88,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
                 RelativeSizeAxes = Axes.Both,
                 CentreComponent = false,
             },
-            HitExplosionArea = new Container { RelativeSizeAxes = Axes.Both },
             hitTarget = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, layoutVariant, index), _ => new DefaultBmsHitTarget(IsScratch))
             {
                 RelativeSizeAxes = Axes.X,

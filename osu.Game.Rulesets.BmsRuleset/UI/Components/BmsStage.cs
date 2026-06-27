@@ -38,6 +38,18 @@ public sealed partial class BmsStage : CompositeDrawable
     private readonly Drawable leftBorder;
     private readonly Drawable rightBorder;
     private readonly SkinnableDrawable hitTarget;
+
+    // Stage-level flow mirroring columnFlow; holds each column's HitExplosionArea so hit explosions
+    // render in front of (not behind) the stage hitTarget. Width/margin are synced to the columns
+    // each frame so the flow lays the areas out exactly over their columns (no manual positioning).
+    private readonly FillFlowContainer hitExplosionLayer = new()
+    {
+        RelativeSizeAxes = Axes.Y,
+        AutoSizeAxes = Axes.X,
+        Direction = FillDirection.Horizontal,
+        Spacing = new Vector2(COLUMN_SPACING, 0),
+    };
+
     private readonly BmsLayoutVariant layoutVariant;
 
     [Resolved]
@@ -96,6 +108,8 @@ public sealed partial class BmsStage : CompositeDrawable
                     rightBorder = new Box { Anchor = Anchor.TopRight, Origin = Anchor.TopRight },
                 ],
             },
+            // Drawn last so hit explosions sit above the judgement line, bar lines and stage foreground.
+            hitExplosionLayer,
         ];
 
         for (var i = 0; i < playfield.TotalColumns; i++)
@@ -113,6 +127,21 @@ public sealed partial class BmsStage : CompositeDrawable
         {
             for (var i = 0; i < playfield.TotalColumns; i++)
                 columnFlow.Add((Drawable)Columns[i]);
+        }
+
+        // Reparent each column's explosion container into the stage-level flow (in the same visual
+        // order as the columns above) so it renders above the judgement line. The flow mirrors
+        // columnFlow; width/margin are synced in Update() so each area overlays its column.
+        if (BmsLayout.Is2P(layoutVariant))
+        {
+            for (var i = 1; i < playfield.TotalColumns; i++)
+                hitExplosionLayer.Add(Columns[i].HitExplosionArea);
+            hitExplosionLayer.Add(Columns[0].HitExplosionArea);
+        }
+        else
+        {
+            for (var i = 0; i < playfield.TotalColumns; i++)
+                hitExplosionLayer.Add(Columns[i].HitExplosionArea);
         }
     }
 
@@ -138,6 +167,21 @@ public sealed partial class BmsStage : CompositeDrawable
         // Hide Scratch mod, where computing this once during skin load left the columns
         // off-centre by half a column width).
         updateStageCentre();
+        positionHitExplosionAreas();
+    }
+
+    private void positionHitExplosionAreas()
+    {
+        // The explosion areas live in a stage-level FillFlow mirroring columnFlow, so keeping each
+        // area's width and margin equal to its column's is enough for the flow to lay them out
+        // exactly over the columns — including layout changes, Hide Scratch, and 2P reordering.
+        for (var i = 0; i < Columns.Length; i++)
+        {
+            var col = (Drawable)Columns[i];
+            var area = Columns[i].HitExplosionArea;
+            area.Width = col.DrawWidth;
+            area.Margin = col.Margin;
+        }
     }
 
     [BackgroundDependencyLoader]
@@ -193,7 +237,6 @@ public sealed partial class BmsStage : CompositeDrawable
     {
         var nonScratchCentre = getNonScratchCentreX();
         X = (DrawWidth / 2 - nonScratchCentre) * Scale.X;
-
     }
 
     private float getNonScratchCentreX()

@@ -395,6 +395,7 @@ Write one `[BMS]` section per layout you want to support. The `Layout:` key is r
 | `ScorePosition` | Judgement popup Y                           | `250`   |
 | `ComboPosition` | Combo counter Y from top                    | `300`   |
 | `JudgementLine` | Show white line at hit position (`1`/`0`)   | `1`     |
+| `KeysUnderNotes`| Draw key images under notes (`1`/`0`)       | `0`     |
 
 **Column geometry:**
 
@@ -479,15 +480,18 @@ If the digit textures are missing, the combo counter is silently hidden.
 
 **Stage and effects:**
 
-| Key                         | Description                    |
-|-----------------------------|--------------------------------|
-| `StageHint`                 | Hit target image               |
-| `StageLeft` / `StageRight`  | Left/right stage border images |
-| `StageBottom`               | Bottom stage foreground image  |
-| `StageLight` / `LightImage` | Column light/glow image        |
-| `LightingN`                 | Normal hit explosion image     |
-| `LightingL`                 | LN hit explosion image         |
-| `LightFramePerSecond`       | Column light animation FPS     |
+| Key                   | Description                                                          |
+|-----------------------|----------------------------------------------------------------------|
+| `StageHint`           | Hit target image                                                     |
+| `StageLeft`           | Left stage border image                                              |
+| `StageRight`          | Right stage border image                                             |
+| `StageBottom`         | Bottom stage foreground image                                        |
+| `StageLight`          | Column light/glow image (shown while key is held)                    |
+| `LightingN`           | Normal hit explosion image                                           |
+| `LightingL`           | LN hit explosion image (also pulses during LN hold)                  |
+| `LightingNWidth`      | Normal explosion scale widths, comma-separated per column           |
+| `LightingLWidth`      | LN explosion scale widths, comma-separated per column               |
+| `LightFramePerSecond` | Column light animation FPS (alias: `StageLightFramePerSecond`)      |
 
 **Judgement images:**
 
@@ -498,6 +502,25 @@ If the digit textures are missing, the combo counter is silently hidden.
 | `HitGood`   | GOOD          |
 | `HitBad`    | BAD           |
 | `HitPoor`   | POOR / E-POOR |
+
+#### Frame Animations (N-suffix)
+
+Most image assets can be provided as multi-frame animations. Append `-0`, `-1`, `-2`, … to the
+texture name:
+
+```
+lightingN-0.png
+lightingN-1.png
+lightingN-2.png
+```
+
+If frames are found, they play as an animation at the rate specified by `LightFramePerSecond`
+(for `StageLight`) or a frame-length derived from frame count (for `LightingN`/`LightingL`).
+If only a single frame (the plain name, e.g. `lightingN.png`) is found, it is used as a static
+sprite.
+
+This works for any image key: `NoteImage`, `KeyImage`/`KeyImageD`, `StageLight`, `LightingN`,
+`LightingL`, `StageHint`, judgement images, etc.
 
 #### osu!mania Skin Compatibility
 
@@ -539,6 +562,7 @@ HitPosition : 440
 LightPosition : 440
 ScorePosition : 250
 JudgementLine : 1
+KeysUnderNotes : 0
 
 LightFramePerSecond : 40
 ColumnWidth : 45,45,45,45,45,45,45,45
@@ -585,8 +609,14 @@ KeyImage7 : mania-key1
 KeyImage7D : mania-key1D
 
 StageHint : mania-stage-hint
+StageLeft : stage-left
+StageRight : stage-right
+StageBottom : stage-bottom
+StageLight : stage-light
 LightingN : lightingN
 LightingL : lightingL
+LightingNWidth : 50,50,50,50,50,50,50,50
+LightingLWidth : 50,50,50,50,50,50,50,50
 
 HitPGreat : j-pgreat
 HitGreat : j-great
@@ -963,15 +993,15 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | `#CHARSET` — character encoding specification                                            |
 | **Parser**    | `#ExtChr` — BM98 extended character sprite display                                       |
 | **Parser**    | `#BMP00` — special POOR-judgment bitmap                                                  |
-| **Parser**    | Channel `04`/`06`/`07`/`0A`–`0E` — BGA layers                                            |
+| **Parser**    | Channel `04`/`06`/`07`/`0A`–`0E` — BGA layers                                            | 1        |
 | **Parser**    | Channel `17` / `27` — free-zone keys                                                     |
 | **Parser**    | Channel `31`–`49` — invisible notes                                                      |
-| **Parser**    | Channel `97` — dynamic BGM volume                                                        |
-| **Parser**    | Channel `98` — dynamic KEY volume (counterpart to channel 97)                            |
+| **Parser**    | Channel `97` — dynamic BGM volume                                                        | 1.5      |
+| **Parser**    | Channel `98` — dynamic KEY volume (counterpart to channel 97)                            | 1.5      | 
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                |
-| **Renderer**  | BGA / movie / stagefile / background image                                               |
+| **Renderer**  | BGA / movie / stagefile / background image                                               | 1        |
 | **Renderer**  | Key beams (column light during hold)                                                     | 2        |
-| **Renderer**  | BGA                                                                                      |
+| **Renderer**  | BGA                                                                                      | 1        |
 | **Replay**    | Replay not available                                                                     | 2        |
 | **Scoring**   | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown               | 2        |
 | **Scoring**   | ExRank support                                                                           | 3        |
@@ -981,13 +1011,10 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT              | 4        |
 | **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                          | 4        |
 | **Skin**      | Column start position — value or enum (leftN, rightN, center)                            | 3        |
-| **Skin**      | BGA position/size configuration                                                          |
+| **Skin**      | BGA position/size configuration (HUD)                                                    |
 | **Skin**      | Non-legacy BMS skin — fully configurable via skin editor                                 |
 | **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                               |
 | **Skin**      | E-POOR judgement image                                                                   | 3        |
-| **Skin**      | Light position / column light                                                            | 4        |
-| **Skin**      | mania key image render                                                                   | 4        |
-| **Skin**      | note hit exploision render                                                               | 4        |
 | **UI**        | Lane cover / skin / movement                                                             | 2        |
 | **Perf**      | parser performance (tinny parser for importer / ProjectTickToTime(build & query))        | 4        |
 | **Perf**      | high GC pressure during importing (sr) (consider pre compute and query)                  | 3        |

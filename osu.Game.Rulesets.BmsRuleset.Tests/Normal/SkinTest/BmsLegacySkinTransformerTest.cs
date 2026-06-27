@@ -452,6 +452,17 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestEmbeddedLegacyOldProvidesManiaKeyTexture()
+    {
+        // The Classic skin has no mania-key of its own; its key area is served by the embedded
+        // LegacyOld fallback, so that fallback must actually resolve the mania-key textures.
+        using var skin = new BmsEmbeddedSkin(BmsEmbeddedSkinKind.LegacyOld, new DummyRenderer());
+        Assert.That(skin.GetTexture("mania-key1", default, default), Is.Not.Null);
+        Assert.That(skin.GetTexture("mania-key1D", default, default), Is.Not.Null);
+        Assert.That(skin.GetTexture("mania-keyS", default, default), Is.Not.Null);
+    }
+
+    [Test]
     public void TestEmbeddedSkinSourceFallsBackFromModernToLegacy()
     {
         var beatmap = createBeatmap();

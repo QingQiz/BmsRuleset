@@ -12,6 +12,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
@@ -239,7 +240,9 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
             frameLength,
             scale?.Value ?? 1,
             colour?.Value ?? Color4.White,
-            hitPosition?.Value ?? 0));
+            // Fall back to the stage's default hit position for skins without a skin.ini HitPosition
+            // so the explosion lands at the judgement line instead of the very bottom.
+            hitPosition?.Value ?? BmsStage.HIT_TARGET_POSITION));
     }
 
     private bool hasAnimation(string name) => GetLegacyAnimation(name) != null;

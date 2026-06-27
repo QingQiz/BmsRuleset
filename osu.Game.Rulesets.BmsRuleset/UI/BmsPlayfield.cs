@@ -557,11 +557,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (result.IsHit)
         {
             var column = Math.Clamp(bmsHitObject.HitObject.Column, 0, Stage.Columns.Length - 1);
-            Stage.Columns[column].HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
-                BmsSkinComponents.HitExplosion,
-                LayoutVariant,
-                column,
-                bmsHitObject.HitObject is BmsLongNote)));
+            TriggerHitExplosion(column, bmsHitObject.HitObject is BmsLongNote);
         }
 
         requestJudgementDisplay(result.Type);
@@ -615,14 +611,35 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (result.IsHit())
         {
             var column = Math.Clamp(drawable.HitObject.Column, 0, Stage.Columns.Length - 1);
-            Stage.Columns[column].HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
-                BmsSkinComponents.HitExplosion,
-                LayoutVariant,
-                column,
-                drawable.HitObject is BmsLongNote)));
+            TriggerHitExplosion(column, drawable.HitObject is BmsLongNote);
         }
 
         requestJudgementDisplay(result);
+    }
+
+    /// <summary>
+    /// Number of hit explosions fired by LN hold pulses (not head/tail). Exposed for tests to
+    /// verify the hold re-triggers the hit light throughout a long note, not just at its endpoints.
+    /// </summary>
+    internal int HoldExplosionCount { get; private set; }
+
+    /// <summary>
+    /// Spawns a hit explosion (hit light) for <paramref name="column"/>. Used for note hits, LN
+    /// head/tail endpoints, and the repeating hit light fired throughout an LN hold.
+    /// </summary>
+    internal void TriggerHitExplosion(int column, bool isLongNote, bool isHold = false)
+    {
+        if ((uint)column >= (uint)Stage.Columns.Length)
+            return;
+
+        if (isHold)
+            HoldExplosionCount++;
+
+        Stage.Columns[column].HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
+            BmsSkinComponents.HitExplosion,
+            LayoutVariant,
+            column,
+            isLongNote)));
     }
 
     /// <summary>

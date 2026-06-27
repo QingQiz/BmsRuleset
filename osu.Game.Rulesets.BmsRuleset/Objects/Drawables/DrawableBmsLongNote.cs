@@ -5,6 +5,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables.LnHelper;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -38,12 +39,17 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private const double passive_poor_lifetime_margin = 100;
     private const double tail_visibility_grace = 50;
 
+    // Re-trigger the LN hit light this often while holding so the explosion pulses throughout the
+    // hold instead of only firing at the head and tail.
+    private const double hold_explosion_interval = BmsLegacySkinTransformer.HIT_EXPLOSION_FADE_IN_DURATION;
+
     private readonly BmsLongNoteVisualState visualState = new();
     private readonly BmsHellChargeBodyTracker hellChargeTracker = new();
 
     private bool headJudged;
     private bool longNoteStarted;
     private double headJudgeOffset;
+    private double lastHoldExplosionTime;
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private Container longNoteTailContainer = null!;
 
@@ -62,6 +68,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         headJudged = true;
         longNoteStarted = result != HitResult.Meh;
+        // Seed so the first hold pulse fires as soon as the hold begins, without relying on a
+        // sentinel that would overflow the elapsed-time check.
+        lastHoldExplosionTime = Time.Current - hold_explosion_interval;
         headJudgeOffset = Time.Current - HitObject.StartTime;
         pinVisualHeadToJudgementLine();
         hellChargeTracker.Reset();
@@ -271,6 +280,16 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         if (HitObject == null || Playfield == null)
             return;
+
+        // Pulse the LN hit light (lightingL) throughout the hold so the explosion re-triggers
+        // while holding, not just at the head and tail endpoints.
+        if (longNoteStarted && !tailJudged
+                            && Time.Current >= HitObject.StartTime && Time.Current <= ln.EndTime
+                            && Time.Current - lastHoldExplosionTime >= hold_explosion_interval)
+        {
+            Playfield.TriggerHitExplosion(HitObject.Column, true, isHold: true);
+            lastHoldExplosionTime = Time.Current;
+        }
 
         if (isChargeMode && longNoteStarted && !tailJudged)
         {

@@ -5,6 +5,7 @@ using osu.Framework.Input.Events;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
@@ -50,7 +51,9 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
         {
             Anchor = Anchor.BottomCentre,
             Origin = Anchor.TopCentre,
-            Y = -(transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? 0),
+            // Fall back to the stage's default hit position when the skin has no skin.ini HitPosition
+            // (e.g. the built-in Classic skin) — otherwise 0 would park the key area off the bottom edge.
+            Y = -(transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? BmsStage.HIT_TARGET_POSITION),
             RelativeSizeAxes = Axes.X,
             AutoSizeAxes = Axes.Y,
             Children =

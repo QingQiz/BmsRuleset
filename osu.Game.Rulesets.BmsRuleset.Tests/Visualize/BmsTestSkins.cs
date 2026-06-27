@@ -19,19 +19,24 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 /// </summary>
 public static partial class BmsTestSkins
 {
-    public enum SkinKind
-    {
-        Argon,
-        Classic,
-    }
 
     /// <summary>
     /// Creates an <see cref="ISkinSource"/> for the given <see cref="SkinKind"/>.
     /// </summary>
     public static ISkinSource CreateSkinSource(SkinKind kind, IStorageResourceProvider resources)
-        => new SkinProvidingContainer(kind == SkinKind.Classic
-            ? new DefaultLegacySkin(resources)
-            : new ArgonSkin(resources));
+        => kind == SkinKind.Legacy
+            ? BmsTestLegacySkin.CreateSkinSource(resources)
+            : new SkinProvidingContainer(kind == SkinKind.Classic
+                ? new DefaultLegacySkin(resources)
+                : new ArgonSkin(resources));
+
+    public enum SkinKind
+    {
+        Argon,
+        Classic,
+        // A synthetic legacy skin with a comprehensive skin.ini; see BmsTestLegacySkin.
+        Legacy,
+    }
 
     /// <inheritdoc />
     /// <summary>
@@ -45,6 +50,13 @@ public static partial class BmsTestSkins
         Func<BmsBeatmap, IList<ReplayFrame>>? createReplay)
         : TestPlayer(allowPause: false, showResults: false)
     {
+
+        /// <summary>
+        /// The cached skin source, exposed so visual scenes can assert against the active skin's
+        /// config and drawable factories (e.g. <see cref="TestSceneBmsSkins.TestLegacySkin"/>).
+        /// </summary>
+        public ISkinSource SkinSource => skinSource;
+
         [Cached(typeof(ISkinSource))]
         private readonly ISkinSource skinSource = skinSource;
 

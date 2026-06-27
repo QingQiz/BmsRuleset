@@ -273,6 +273,7 @@ DP ☆NOTHER [TT★1 TT★2]
 | `ScorePosition` | 判定弹出 Y              | `250` |
 | `ComboPosition` | 连击数字距顶部 Y           | `300` |
 | `JudgementLine` | 在判定位置显示白线（`1`/`0`）  | `1`   |
+| `KeysUnderNotes`| 按键图像绘制在音符之上（`1`/`0`） | `0`   |
 
 **列几何：**
 
@@ -356,15 +357,18 @@ DP ☆NOTHER [TT★1 TT★2]
 
 **Stage与特效：**
 
-| 键                           | 说明           |
-|-----------------------------|--------------|
-| `StageHint`                 | 判定目标图像       |
-| `StageLeft` / `StageRight`  | 左/右Stage边框图像 |
-| `StageBottom`               | 底部Stage前景图像  |
-| `StageLight` / `LightImage` | 列灯/发光图像      |
-| `LightingN`                 | 普通命中图像       |
-| `LightingL`                 | LN 命中图像      |
-| `LightFramePerSecond`       | 列灯动画 FPS     |
+| 键                   | 说明                                                          |
+|---------------------|--------------------------------------------------------------|
+| `StageHint`         | 判定目标图像                                                     |
+| `StageLeft`         | 左 Stage 边框图像                                               |
+| `StageRight`        | 右 Stage 边框图像                                               |
+| `StageBottom`       | 底部 Stage 前景图像                                              |
+| `StageLight`        | 列灯/发光图像（按键按住时显示）                                          |
+| `LightingN`         | 普通命中爆炸图像                                                   |
+| `LightingL`         | LN 命中爆炸图像（LN 按住期间也会脉冲触发）                                  |
+| `LightingNWidth`    | 普通爆炸缩放宽度，逐列逗号分隔                                            |
+| `LightingLWidth`    | LN 爆炸缩放宽度，逐列逗号分隔                                            |
+| `LightFramePerSecond` | 列灯动画 FPS（别名：`StageLightFramePerSecond`）                  |
 
 **判定图像：**
 
@@ -375,6 +379,23 @@ DP ☆NOTHER [TT★1 TT★2]
 | `HitGood`   | GOOD          |
 | `HitBad`    | BAD           |
 | `HitPoor`   | POOR / E-POOR |
+
+#### 帧动画（N 后缀）
+
+大多数图像资源可以作为多帧动画提供。在纹理名后追加 `-0`、`-1`、`-2`、…：
+
+```
+lightingN-0.png
+lightingN-1.png
+lightingN-2.png
+```
+
+如果找到帧序列，则按 `LightFramePerSecond`（`StageLight`）或根据帧数推导的帧长
+（`LightingN`/`LightingL`）播放动画。如果仅有单帧（即直接使用名称，如 `lightingN.png`），
+则作为静态精灵图使用。
+
+适用于任何图像键：`NoteImage`、`KeyImage`/`KeyImageD`、`StageLight`、`LightingN`、
+`LightingL`、`StageHint`、判定图像等。
 
 #### osu!mania 皮肤兼容
 
@@ -416,6 +437,7 @@ HitPosition : 440
 LightPosition : 440
 ScorePosition : 250
 JudgementLine : 1
+KeysUnderNotes : 0
 
 LightFramePerSecond : 40
 ColumnWidth : 45,45,45,45,45,45,45,45
@@ -462,8 +484,14 @@ KeyImage7 : mania-key1
 KeyImage7D : mania-key1D
 
 StageHint : mania-stage-hint
+StageLeft : stage-left
+StageRight : stage-right
+StageBottom : stage-bottom
+StageLight : stage-light
 LightingN : lightingN
 LightingL : lightingL
+LightingNWidth : 50,50,50,50,50,50,50,50
+LightingLWidth : 50,50,50,50,50,50,50,50
 
 HitPGreat : j-pgreat
 HitGreat : j-great
