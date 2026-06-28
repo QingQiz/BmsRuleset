@@ -151,6 +151,38 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
+    public void TestRestoreAfterSuppressedPlaybackDoesNotCatchUpPastEvents()
+    {
+        BmsPreviewTrack track = null!;
+
+        AddStep("create suppressed track advanced past first event", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-suppressed-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsPreviewTrack(
+                [
+                    new BmsSampleEvent(1000, 0, 1),
+                    new BmsSampleEvent(3000, 0, 1),
+                ],
+                new Dictionary<ushort, string> { [1] = "event.wav" },
+                directory,
+                audio);
+
+            track.SuppressEventProcessing = true;
+            setSeekOffset(track, 2000);
+            track.SuppressEventProcessing = false;
+            track.Start();
+            invokeUpdateState(track);
+        });
+
+        AddAssert("past event was skipped", () => getActivePlaybackCount(track!) == 0);
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
     public void TestPreviewTrackIsNotDummyDevice()
     {
         BmsPreviewTrack track = null!;
@@ -207,6 +239,11 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     {
         var activeChannels = typeof(BmsPreviewTrack).GetField("activeChannels", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track);
         return ((ICollection)activeChannels!).Count;
+    }
+
+    private static void setSeekOffset(BmsPreviewTrack track, double seekOffset)
+    {
+        typeof(BmsPreviewTrack).GetField("seekOffset", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(track, seekOffset);
     }
 
     private static void writePcmWave(string path, TimeSpan duration)

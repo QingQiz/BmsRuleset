@@ -39,7 +39,22 @@ public class BmsPreviewTrack : Track
     ///     the only source.  The track still provides clock timing for the
     ///     <see cref="osu.Game.Screens.Play.MasterGameplayClockContainer" />.
     /// </summary>
-    public bool SuppressEventProcessing { get; set; }
+    public bool SuppressEventProcessing
+    {
+        get => suppressEventProcessing;
+        set
+        {
+            if (suppressEventProcessing == value)
+                return;
+
+            suppressEventProcessing = value;
+
+            if (!suppressEventProcessing)
+                // Gameplay advances this clock while BGM/key sample events are muted, so restoring
+                // preview must resume from the current position rather than replaying the muted gap.
+                nextEventIndex = findFirstEventAfter(CurrentTime);
+        }
+    }
 
     private readonly StopwatchClock clock = new();
     private readonly List<BgmEvent> sortedEvents = [];
@@ -52,6 +67,7 @@ public class BmsPreviewTrack : Track
 
     private SampleChannel? previewChannel;
 
+    private bool suppressEventProcessing;
     private int nextEventIndex;
     private double seekOffset;
 
