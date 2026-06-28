@@ -123,6 +123,12 @@ public static partial class BmsTestReplays
             if (hitObject is BmsLongNote ln && tryAddLongNoteScenario(actionPoints, ln, action.Value))
                 continue;
 
+            if (hitObject is BmsLongNote skinCoverageLn)
+            {
+                addHold(actionPoints, action.Value, skinCoverageLn.StartTime, skinCoverageLn.EndTime + RELEASE_PADDING_MS);
+                continue;
+            }
+
             var time = hitObject.StartTime + judgement_offsets[i % judgement_offsets.Length];
             var releaseTime = (hitObject is BmsLongNote ln2 ? ln2.EndTime : time) + RELEASE_PADDING_MS;
 

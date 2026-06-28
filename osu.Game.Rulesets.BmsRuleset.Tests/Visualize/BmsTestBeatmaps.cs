@@ -18,10 +18,11 @@ public static partial class BmsTestBeatmaps
 {
     public const double INIT_HEALTH = 0.2;
     public const double FIRST_NOTE_TIME = 2500;
-    public const double NORM_SCENARIO_START_TIME = FIRST_NOTE_TIME + 6000;
+    public const double NORM_SCENARIO_START_TIME = FIRST_NOTE_TIME + 9000;
     public const double LN_SCENARIO_START_TIME = FIRST_NOTE_TIME;
     public const double LN_SCENARIO_SPACING = 700;
     public const double LN_SCENARIO_DURATION = 800;
+    public const double LN_SKIN_COVERAGE_START_TIME = FIRST_NOTE_TIME + 5600;
 
     /// <summary>
     /// Creates a synthetic <see cref="BmsBeatmap"/> with normal notes (varied columns and timing),
@@ -69,6 +70,29 @@ public static partial class BmsTestBeatmaps
                 StartTime = LN_SCENARIO_START_TIME + i * LN_SCENARIO_SPACING,
                 Column = lnScenarioColumns[i],
                 Duration = LN_SCENARIO_DURATION,
+                TickInfo = new BmsTickInfo { Tick = nextTick++, EndTick = nextTick++ },
+            });
+        }
+
+        (int column, double duration)[] lnSkinCoverage =
+        [
+            (0, 800),
+            (1, 1600),
+            (2, 220),
+            (3, 60),
+            (4, 1500),
+            (5, 140),
+            (6, 24),
+            (7, 500),
+        ];
+
+        foreach (var (column, duration) in lnSkinCoverage)
+        {
+            beatmap.HitObjects.Add(new BmsLongNote
+            {
+                StartTime = LN_SKIN_COVERAGE_START_TIME,
+                Column = column,
+                Duration = duration,
                 TickInfo = new BmsTickInfo { Tick = nextTick++, EndTick = nextTick++ },
             });
         }

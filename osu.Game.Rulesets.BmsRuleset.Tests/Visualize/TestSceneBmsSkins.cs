@@ -1,16 +1,24 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.IO;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
+using osu.Game.Rulesets.BmsRuleset.Objects.Drawables.LnHelper;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
+using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
@@ -46,6 +54,8 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         this.AddSetupUntilStep("gameplay hud loaded", () => Player.HUDOverlay.IsLoaded);
         this.AddSetupUntilStep("hud skin components loaded", () => Player.HUDOverlay.ChildrenOfType<SkinnableContainer>().All(c => c.ComponentsLoaded));
         this.AddSetupUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
+        if (kind == BmsTestSkins.SkinKind.Legacy)
+            addLegacySkinRuntimeCoverageAssertions();
 
         this.AddSetupUntilStep("all hit results produced",
             () => BmsRuleset.STATIC_VALID_HIT_RESULTS.All(result => Player.ScoreProcessor.Statistics.GetValueOrDefault(result) > 0));
@@ -56,6 +66,30 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         });
         this.AddSetupAssert("score changed", () => Player.ScoreProcessor.TotalScore.Value, Is.GreaterThan(0));
         AddStep("skin scene complete", () => { });
+    }
+
+    private void addLegacySkinRuntimeCoverageAssertions()
+    {
+        const int animated_body_column = 1;
+        const int animated_tail_column = 7;
+
+        this.AddSetupUntilStep("legacy LN skin coverage held", () =>
+            Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SKIN_COVERAGE_START_TIME + 95);
+        this.AddSetupAssert("animated LN body uses first frame when not held", () =>
+        {
+            var body = longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column));
+            body.UpdateBody(Math.Max(1, body.DrawHeight), false, false);
+            return bodyAnimationFrameCount(body) == 2 && currentBodyAnimationFrame(body) == 0;
+        });
+        this.AddSetupAssert("held LN body uses normal tint", () =>
+            longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column)) is { } body
+            && (Color4)body.Colour == Color4.White
+            && body.ChildrenOfType<Sprite>().Any(s => s.Alpha > 0 && s.Texture != null));
+        this.AddSetupUntilStep("animated LN body advances frames while held", () =>
+            bodyAnimationFrameCount(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 2
+            && currentBodyAnimationFrame(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 1);
+        this.AddSetupAssert("animated LN tail renders multi-frame drawable", () =>
+            liveSkinCoverageLongNote(animated_tail_column)?.ChildrenOfType<TextureAnimation>().Any(a => a.FrameCount == 2) == true);
     }
 
     private void assertLegacySkinConfigResolves()
@@ -93,11 +127,21 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             () => Is.EqualTo(Enumerable.Range(0, BmsTestLegacySkin.COLUMN_COUNT).Select(BmsTestLegacySkin.NoteImage).ToArray()));
 
         AddAssert("hold note body image resolves",
-            () => getConfigString(LegacyManiaSkinConfigurationLookups.HoldNoteBodyImage, BmsSkinComponents.HoldNoteBody, 1, skin()),
+            () => getConfigString(LegacyManiaSkinConfigurationLookups.HoldNoteBodyImage, BmsSkinComponents.HoldNoteBody, 0, skin()),
             () => Is.EqualTo(BmsTestLegacySkin.HOLD_NOTE_BODY_IMAGE));
+        AddAssert("animated hold note body images resolve per column",
+            () => BmsTestLegacySkin.ANIMATED_HOLD_BODY_COLUMNS
+                .Select(c => getConfigString(LegacyManiaSkinConfigurationLookups.HoldNoteBodyImage, BmsSkinComponents.HoldNoteBody, c, skin()))
+                .ToArray(),
+            () => Is.EqualTo(BmsTestLegacySkin.ANIMATED_HOLD_BODY_COLUMNS.Select(BmsTestLegacySkin.HoldNoteBodyImage).ToArray()));
         AddAssert("hold note tail image resolves",
             () => getConfigString(LegacyManiaSkinConfigurationLookups.HoldNoteTailImage, BmsSkinComponents.HoldNoteTail, 1, skin()),
             () => Is.EqualTo(BmsTestLegacySkin.HOLD_NOTE_TAIL_IMAGE));
+        AddAssert("animated hold note tail images resolve per column",
+            () => BmsTestLegacySkin.ANIMATED_HOLD_TAIL_COLUMNS
+                .Select(c => getConfigString(LegacyManiaSkinConfigurationLookups.HoldNoteTailImage, BmsSkinComponents.HoldNoteTail, c, skin()))
+                .ToArray(),
+            () => Is.EqualTo(BmsTestLegacySkin.ANIMATED_HOLD_TAIL_COLUMNS.Select(BmsTestLegacySkin.HoldNoteTailImage).ToArray()));
         AddAssert("mine image resolves",
             () => getConfigString(LegacyManiaSkinConfigurationLookups.Hit100, BmsSkinComponents.Mine, 1, skin()),
             () => Is.EqualTo(BmsTestLegacySkin.MINE_IMAGE));
@@ -215,9 +259,38 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         IBmsGameplaySkinDrawableSource factorySource()
             => ((BmsTestSkins.SkinnedTestPlayer)Player).SkinSource.AllSources.OfType<BmsLegacySkinTransformer>().FirstOrDefault();
 
+        ISkinSource skinSource()
+            => ((BmsTestSkins.SkinnedTestPlayer)Player).SkinSource;
+
         AddAssert("note factory produces resolved note piece",
             () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1))?.Create(),
             Is.TypeOf<BmsResolvedNotePiece>);
+        AddAssert("animated note factories produce multi-frame animations",
+            () => BmsTestLegacySkin.ANIMATED_NOTE_COLUMNS.All(c =>
+                (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, c))?.Create() as BmsResolvedNotePiece)
+                ?.ChildrenOfType<TextureAnimation>().SingleOrDefault()?.FrameCount == 2));
+        AddAssert("animated hold body textures resolve as animation frames",
+            () => BmsTestLegacySkin.ANIMATED_HOLD_BODY_COLUMNS.All(c =>
+            {
+                var textures = BmsLongNoteBodySource.Resolve(
+                    skinSource(),
+                    new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, c),
+                    ((IStorageResourceProvider)this).Renderer);
+
+                return textures?.Kind == BmsLongNoteBodyTextureKind.AnimationFrames && textures.Value.Textures.Length == 2;
+            }));
+        AddAssert("1x1 hold tail factories resolve per column",
+            () => BmsTestLegacySkin.ONE_PIXEL_TAIL_COLUMNS.All(c =>
+            {
+                var sprite = (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, BmsLayoutVariant.Bme7K, c))?.Create() as BmsResolvedNotePiece)
+                    ?.ChildrenOfType<Sprite>().SingleOrDefault();
+
+                return sprite?.Texture?.DisplayWidth == 1 && sprite.Texture.DisplayHeight == 1;
+            }));
+        AddAssert("animated hold tail factories produce multi-frame animations",
+            () => BmsTestLegacySkin.ANIMATED_HOLD_TAIL_COLUMNS.All(c =>
+                (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, BmsLayoutVariant.Bme7K, c))?.Create() as BmsResolvedNotePiece)
+                ?.ChildrenOfType<TextureAnimation>().SingleOrDefault()?.FrameCount == 2));
         AddAssert("explosion factory produces resolved explosion",
             () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1))?.Create(),
             Is.TypeOf<LegacyBmsHitExplosion>);
@@ -277,6 +350,41 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             : new BmsSkinConfigurationLookup(lookup);
 
         return source.GetConfig<BmsSkinConfigurationLookup, string>(skinLookup)?.Value;
+    }
+
+    private DrawableBmsHitObject liveSkinCoverageLongNote(int column)
+    {
+        var hitObject = ((BmsBeatmap)Player.GameplayState.Beatmap).HitObjects.OfType<BmsLongNote>().Single(h =>
+            h.Column == column && h.StartTime == BmsTestBeatmaps.LN_SKIN_COVERAGE_START_TIME);
+
+        return Playfield.GetAliveObjectAtTick(hitObject.TickInfo.Tick);
+    }
+
+    private static BmsSegmentedLongNoteBody longNoteBodyOf(DrawableBmsHitObject longNote)
+    {
+        if (longNote == null)
+            return null;
+
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        return (BmsSegmentedLongNoteBody)longNote.GetType().GetField("longNoteBody", flags)!.GetValue(longNote)!;
+    }
+
+    private static int bodyAnimationFrameCount(BmsSegmentedLongNoteBody body)
+    {
+        if (body == null)
+            return 0;
+
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        return ((Array)body.GetType().GetField("bodyFrames", flags)!.GetValue(body)!).Length;
+    }
+
+    private static int currentBodyAnimationFrame(BmsSegmentedLongNoteBody body)
+    {
+        if (body == null)
+            return -1;
+
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        return (int)body.GetType().GetField("currentFrameIndex", flags)!.GetValue(body)!;
     }
 
     [Test]

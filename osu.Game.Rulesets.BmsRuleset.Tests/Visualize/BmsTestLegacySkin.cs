@@ -62,6 +62,11 @@ public static class BmsTestLegacySkin
     public const string JUDGEMENT_BAD_IMAGE = "j-bad";
     public const string JUDGEMENT_POOR_IMAGE = "j-poor";
 
+    public static readonly int[] ANIMATED_NOTE_COLUMNS = [1, 6];
+    public static readonly int[] ANIMATED_HOLD_BODY_COLUMNS = [1, 2, 3];
+    public static readonly int[] ANIMATED_HOLD_TAIL_COLUMNS = [7];
+    public static readonly int[] ONE_PIXEL_TAIL_COLUMNS = [4, 5];
+
     public static Color4 ExpectedColumnLineColour => toColour(column_line_colour);
 
     public static Color4 ExpectedJudgementLineColour => toColour(judgement_line_colour);
@@ -131,12 +136,29 @@ public static class BmsTestLegacySkin
         (220, 0, 220), (0, 180, 180), (220, 110, 0), (110, 0, 220),
     ];
 
+    // Each animated LN body column uses a separate palette so visual-test failures are attributable
+    // to a lane at a glance instead of every animated body looking like the same asset.
+    private static readonly Dictionary<int, ((byte r, byte g, byte b) frame0, (byte r, byte g, byte b) frame1)> hold_body_animation_colours = new()
+    {
+        [1] = ((255, 80, 80), (255, 180, 80)),
+        [2] = ((80, 255, 120), (80, 200, 255)),
+        [3] = ((180, 80, 255), (255, 80, 200)),
+    };
+
     private static readonly (byte r, byte g, byte b, byte a) column_line_colour = (255, 255, 255, 50);
     private static readonly (byte r, byte g, byte b, byte a) judgement_line_colour = (255, 255, 255, 255);
     private static readonly (byte r, byte g, byte b, byte a) barline_colour = (0, 255, 0, 255);
     private static readonly (byte r, byte g, byte b, byte a) combo_break_colour = (255, 0, 0, 255);
 
     public static string NoteImage(int column) => $"note{column}";
+
+    public static string HoldNoteBodyImage(int column) => ANIMATED_HOLD_BODY_COLUMNS.Contains(column) ? $"note{column}-ln-body" : HOLD_NOTE_BODY_IMAGE;
+
+    public static string HoldNoteTailImage(int column) => ANIMATED_HOLD_TAIL_COLUMNS.Contains(column)
+        ? $"note{column}-ln-tail"
+        : ONE_PIXEL_TAIL_COLUMNS.Contains(column)
+            ? $"note{column}-ln-tail-1x1"
+            : HOLD_NOTE_TAIL_IMAGE;
 
     public static string KeyImage(int column) => $"key{column}";
 
@@ -203,6 +225,12 @@ public static class BmsTestLegacySkin
         s.AppendLine();
         for (var c = 0; c < COLUMN_COUNT; c++)
             s.AppendLine($"NoteImage{c}: {NoteImage(c)}");
+        foreach (var c in ANIMATED_HOLD_BODY_COLUMNS)
+            s.AppendLine($"NoteImage{c}L: {HoldNoteBodyImage(c)}");
+        foreach (var c in ANIMATED_HOLD_TAIL_COLUMNS)
+            s.AppendLine($"NoteImage{c}T: {HoldNoteTailImage(c)}");
+        foreach (var c in ONE_PIXEL_TAIL_COLUMNS)
+            s.AppendLine($"NoteImage{c}T: {HoldNoteTailImage(c)}");
         s.AppendLine($"NoteImageL: {HOLD_NOTE_BODY_IMAGE}");
         s.AppendLine($"NoteImageT: {HOLD_NOTE_TAIL_IMAGE}");
         s.AppendLine($"MineImage: {MINE_IMAGE}");
@@ -245,11 +273,35 @@ public static class BmsTestLegacySkin
         for (var c = 0; c < COLUMN_COUNT; c++)
         {
             var note = note_colour[c];
-            dict[NoteImage(c)] = solidPng(note.r, note.g, note.b);
+
+            if (ANIMATED_NOTE_COLUMNS.Contains(c))
+            {
+                dict[$"{NoteImage(c)}-0"] = solidPng(note.r, note.g, note.b);
+                dict[$"{NoteImage(c)}-1"] = solidPng((byte)Math.Min(255, note.r + 35), (byte)Math.Min(255, note.g + 35), (byte)Math.Min(255, note.b + 35));
+            }
+            else
+                dict[NoteImage(c)] = solidPng(note.r, note.g, note.b);
+
             dict[KeyImage(c)] = solidPng(note.r, note.g, note.b);
             // "Down" key state uses a high-contrast white so the pressed state is unmistakable
             // when the autoplay replay presses a key (the up-state is vivid coloured).
             dict[KeyImageDown(c)] = solidPng(255, 255, 255);
+        }
+
+        foreach (var c in ANIMATED_HOLD_BODY_COLUMNS)
+        {
+            var (frame0, frame1) = hold_body_animation_colours[c];
+            dict[$"{HoldNoteBodyImage(c)}-0"] = solidPng(frame0.r, frame0.g, frame0.b);
+            dict[$"{HoldNoteBodyImage(c)}-1"] = solidPng(frame1.r, frame1.g, frame1.b);
+        }
+
+        foreach (var c in ONE_PIXEL_TAIL_COLUMNS)
+            dict[HoldNoteTailImage(c)] = solidPng(255, 255, 255, 1);
+
+        foreach (var c in ANIMATED_HOLD_TAIL_COLUMNS)
+        {
+            dict[$"{HoldNoteTailImage(c)}-0"] = solidPng(255, 255, 255);
+            dict[$"{HoldNoteTailImage(c)}-1"] = solidPng(255, 120, 255);
         }
 
         dict[HOLD_NOTE_BODY_IMAGE] = solidPng(200, 200, 200);
