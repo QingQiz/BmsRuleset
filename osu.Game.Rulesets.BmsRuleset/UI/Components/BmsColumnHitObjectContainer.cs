@@ -9,11 +9,13 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 {
 
-    private readonly BmsPlayfield playfield;
+    private readonly BmsScrollController scrollController;
+    private readonly Func<float> getHitTargetPosition;
 
-    public BmsColumnHitObjectContainer(BmsPlayfield playfield)
+    internal BmsColumnHitObjectContainer(BmsScrollController scrollController, Func<float> getHitTargetPosition)
     {
-        this.playfield = playfield;
+        this.scrollController = scrollController;
+        this.getHitTargetPosition = getHitTargetPosition;
         RelativeSizeAxes = Axes.Both;
     }
 
@@ -21,12 +23,12 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     ///     Re-compute lifetimes for every entry in this container.
     ///     Triggered on load completion and whenever the user adjusts the scroll speed.
     /// </summary>
-    public void RefreshAllEntries()
+    public void RefreshAllEntries(double? currentTime = null)
     {
         foreach (var entry in Entries)
         {
             if (entry is BmsHitObjectLifetimeEntry bmsEntry)
-                bmsEntry.RefreshLifetime();
+                bmsEntry.RefreshLifetime(currentTime);
         }
     }
 
@@ -34,9 +36,9 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     {
         base.UpdateAfterChildrenLife();
 
-        var currentScrollPos = playfield.CurrentScrollPosition;
-        var hitTarget = playfield.Stage.HitTargetPosition;
-        var scale = playfield.ScrollSpeedMultiplier / Math.Max(1.0, playfield.ScrollRange)
+        var currentScrollPos = scrollController.CurrentScrollPosition;
+        var hitTarget = getHitTargetPosition();
+        var scale = scrollController.ScrollSpeedMultiplier / Math.Max(1.0, scrollController.ScrollRange)
                     * Math.Max(1f, DrawHeight - hitTarget);
 
         // Position all alive entries in this column

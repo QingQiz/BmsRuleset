@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -33,8 +32,6 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) : DrawableRuleset<BmsHitObject>(ruleset, beatmap, mods)
 {
     public new PassThroughInputManager KeyBindingInputManager => base.KeyBindingInputManager;
-
-    public const double MAX_TIME_RANGE = 11485;
 
     public override int Variant => (int)((BmsBeatmap)Beatmap).LayoutVariant;
 
@@ -84,7 +81,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     #endregion
 
-    public static double ComputeScrollTime(double scrollSpeed) => MAX_TIME_RANGE / Math.Max(1, scrollSpeed);
+    public static double ComputeScrollTime(double scrollSpeed) => BmsScrollController.ComputeScrollTime(scrollSpeed);
 
     public override DrawableHitObject<BmsHitObject>? CreateDrawableRepresentation(BmsHitObject h) => null;
 
@@ -184,7 +181,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
         if (Config is BmsRulesetConfigManager config)
         {
-            ((BmsPlayfield)Playfield).SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
+            ((BmsPlayfield)Playfield).ScrollController.SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
         }
 
         previewTrackBeforePlay = BmsWorkingBeatmap.ActivePreviewTrack;

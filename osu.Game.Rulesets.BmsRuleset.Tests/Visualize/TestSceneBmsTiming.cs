@@ -146,10 +146,10 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
         AddUntilStep("normal speed spacing measurable", () => Playfield.SpacingBetweenTicks(192, 240, excludeLongNotes: true), () => Is.GreaterThan(1));
         AddStep("capture normal speed spacing", () => normalSpeedSpacing = Playfield.SpacingBetweenTicks(192, 240, excludeLongNotes: true));
 
-        AddStep("increase scroll speed", () => Playfield.AdjustScrollSpeed(0.5));
+        AddStep("increase scroll speed", () => Playfield.ScrollController.AdjustScrollSpeed(0.5));
         AddAssert("scroll speed increased", () => Playfield.ScrollSpeed, () => Is.GreaterThan(8));
         AddUntilStep("spacing increased", () => Playfield.SpacingBetweenTicks(192, 240, excludeLongNotes: true), () => Is.GreaterThan(normalSpeedSpacing));
-        AddStep("decrease scroll speed", () => Playfield.AdjustScrollSpeed(-0.5));
+        AddStep("decrease scroll speed", () => Playfield.ScrollController.AdjustScrollSpeed(-0.5));
         AddAssert("scroll speed restored", () => Playfield.ScrollSpeed, () => Is.EqualTo(8).Within(0.001));
 
         AddStep("seek fast BPM", () => seekToTick(384));

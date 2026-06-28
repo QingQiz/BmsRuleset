@@ -9,7 +9,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
-internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfield playfield)
+internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollController scrollController)
     : HitObjectLifetimeEntry(hitObject)
 {
 
@@ -68,7 +68,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
     ///     Called once on <c>Add</c> (during loading) and again whenever the user
     ///     adjusts the scroll speed in-game.
     /// </summary>
-    public void RefreshLifetime()
+    public void RefreshLifetime(double? currentTime = null)
     {
         if (HitObject is not BmsHitObject hitObject)
             return;
@@ -76,6 +76,10 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
         var futureLifetime = computeFutureLifetime(hitObject);
         var pastLifetime = computePastLifetime();
         var lateWindow = getLateWindow(hitObject);
+        var lifetimeStart = hitObject.StartTime - futureLifetime;
+
+        if (currentTime is double now && now >= LifetimeStart && now <= LifetimeEnd)
+            lifetimeStart = Math.Min(lifetimeStart, now);
 
         lifetimeComputed = false;
 
@@ -86,7 +90,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
         LifetimeEnd = hitObject is BmsLandmine
             ? hitObject.StartTime + mine_past_lifetime
             : hitObject.GetEndTime() + Math.Max(pastLifetime, lateWindow + lifetime_margin);
-        LifetimeStart = hitObject.StartTime - futureLifetime;
+        LifetimeStart = lifetimeStart;
 
         lifetimeComputed = true;
     }
@@ -158,7 +162,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
 
     private bool useConstantScrollFallback(BmsHitObject hitObject, BmsTimingMap? timingMap)
     {
-        if (playfield.ConstantScrollActive || timingMap == null)
+        if (scrollController.ConstantScrollActive || timingMap == null)
             return true;
 
         // Notes with Tick == EndTick == 0 and a non-zero StartTime have no meaningful scroll
@@ -253,9 +257,9 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
         if (!double.IsFinite(speedFactor) || speedFactor < 0.001)
             return double.PositiveInfinity;
 
-        return BmsDrawableRuleset.ComputeScrollTime(BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED)
+        return BmsScrollController.ComputeScrollTime(BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED)
                * currentScrollRangeScale()
-               / Math.Max(0.001, playfield.ScrollSpeed / BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED * speedFactor);
+               / Math.Max(0.001, scrollController.ScrollSpeed / BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED * speedFactor);
     }
 
     /// <summary>
@@ -264,8 +268,8 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
     /// </summary>
     private double computeConstantScrollFutureLifetime()
     {
-        var speed = Math.Max(0.001, playfield.ScrollSpeed);
-        return BmsDrawableRuleset.ComputeScrollTime(speed) * currentScrollRangeScale() + lifetime_margin;
+        var speed = Math.Max(0.001, scrollController.ScrollSpeed);
+        return BmsScrollController.ComputeScrollTime(speed) * currentScrollRangeScale() + lifetime_margin;
     }
 
     #endregion
@@ -296,9 +300,9 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
 
     #region Playfield helpers
 
-    private double currentScrollRangeScale() => playfield.ScrollRangeScale > 0 ? playfield.ScrollRangeScale : 1;
+    private double currentScrollRangeScale() => scrollController.ScrollRangeScale > 0 ? scrollController.ScrollRangeScale : 1;
 
-    private BmsTimingMap? getTimingMap() => playfield.TimingMap;
+    private BmsTimingMap? getTimingMap() => scrollController.TimingMap;
 
     #endregion
 

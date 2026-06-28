@@ -9,7 +9,7 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
 {
 
     private readonly Box line;
-    private BmsPlayfield? playfield;
+    private BmsScrollController? scrollController;
     private BmsStage? stage;
 
     // Two coordinate representations of the same measure line:
@@ -30,9 +30,9 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
         };
     }
 
-    internal void Apply(BmsMeasureLineContainer.MeasureLineInfo info, BmsPlayfield playfield, BmsStage stage)
+    internal void Apply(BmsMeasureLineContainer.MeasureLineInfo info, BmsScrollController scrollController, BmsStage stage)
     {
-        this.playfield = playfield;
+        this.scrollController = scrollController;
         this.stage = stage;
         scrollAtTick = info.ScrollPosition;
         timeAtTick = info.Time;
@@ -42,15 +42,15 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
     {
         base.Update();
 
-        if (Parent == null || playfield == null || stage == null || !stage.IsLoaded || stage.DrawHeight <= 0)
+        if (Parent == null || scrollController == null || stage == null || !stage.IsLoaded || stage.DrawHeight <= 0)
         {
             Alpha = 0;
             return;
         }
 
-        var progress = playfield.ConstantScrollActive
-            ? timeAtTick - playfield.Time.Current
-            : scrollAtTick - playfield.CurrentScrollPosition;
+        var progress = scrollController.ConstantScrollActive
+            ? timeAtTick - scrollController.CurrentScrollPosition
+            : scrollAtTick - scrollController.CurrentScrollPosition;
 
         // Once the measure start has passed the judgement line (progress < 0),
         // the measure line should no longer be displayed.
@@ -60,7 +60,7 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
             return;
         }
 
-        var y = playfield.YForScrollProgress(progress, stage.DrawHeight);
+        var y = scrollController.YForScrollProgress(progress, stage.DrawHeight, stage.HitTargetPosition);
 
         if (!float.IsFinite(y))
         {

@@ -22,6 +22,6 @@ public class BmsModConstant : Mod, IApplicableToDrawableRuleset<BmsHitObject>
     public void ApplyToDrawableRuleset(DrawableRuleset<BmsHitObject> drawableRuleset)
     {
         if (drawableRuleset.Playfield is BmsPlayfield playfield)
-            playfield.ConstantScrollActive = true;
+            playfield.ScrollController.ConstantScrollActive = true;
     }
 }

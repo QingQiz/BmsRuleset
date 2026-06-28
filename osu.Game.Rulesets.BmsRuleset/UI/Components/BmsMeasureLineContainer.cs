@@ -20,16 +20,16 @@ public sealed partial class BmsMeasureLineContainer : Container
 
     private MeasureLineInfo[] lines = [];
     private bool scrollPositionsMonotonic = true;
-    private BmsPlayfield? playfield;
+    private BmsScrollController? scrollController;
     private BmsStage? stage;
 
-    public void SetTimingMap(BmsTimingMap? timingMap, BmsPlayfield owner, BmsStage ownerStage)
+    internal void SetTimingMap(BmsTimingMap? timingMap, BmsScrollController owner, BmsStage ownerStage)
     {
         Clear(false);
         activeLines.Clear();
         pooledLines.Clear();
 
-        playfield = owner;
+        scrollController = owner;
         stage = ownerStage;
 
         if (timingMap == null)
@@ -52,15 +52,15 @@ public sealed partial class BmsMeasureLineContainer : Container
     {
         base.Update();
 
-        if (playfield == null || stage == null || lines.Length == 0)
+        if (scrollController == null || stage == null || lines.Length == 0)
             return;
 
-        var current = playfield.ConstantScrollActive ? playfield.Time.Current : playfield.CurrentScrollPosition;
-        var future = playfield.MeasureLineFutureWindow + future_margin;
+        var current = scrollController.CurrentScrollPosition;
+        var future = scrollController.MeasureLineFutureWindow + future_margin;
         var min = current - past_margin;
         var max = current + future;
 
-        if (playfield.ConstantScrollActive)
+        if (scrollController.ConstantScrollActive)
             updateRangeByTime(min, max);
         else if (scrollPositionsMonotonic)
             updateRangeByScroll(min, max);
@@ -138,11 +138,11 @@ public sealed partial class BmsMeasureLineContainer : Container
 
     private void showLine(int index)
     {
-        if (activeLines.ContainsKey(index) || playfield == null || stage == null)
+        if (activeLines.ContainsKey(index) || scrollController == null || stage == null)
             return;
 
         var line = pooledLines.Count > 0 ? pooledLines.Pop() : new BmsMeasureLine();
-        line.Apply(lines[index], playfield, stage);
+        line.Apply(lines[index], scrollController, stage);
         activeLines[index] = line;
         Add(line);
     }

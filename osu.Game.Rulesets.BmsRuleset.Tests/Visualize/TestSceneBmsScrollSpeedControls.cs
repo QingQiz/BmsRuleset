@@ -48,11 +48,11 @@ public partial class TestSceneBmsScrollSpeedControls : BmsPlayerTestScene
         AddUntilStep("spacing measurable", () => Playfield.SpacingBetweenTicks(firstTick, secondTick), () => Is.GreaterThan(1));
         AddStep("capture spacing", () => normalSpacing = Playfield.SpacingBetweenTicks(firstTick, secondTick));
 
-        AddStep("press up", () => Playfield.AdjustScrollSpeed(1));
+        AddStep("press up", () => Playfield.ScrollController.AdjustScrollSpeed(1));
         AddUntilStep("scroll speed increased", () => Playfield.ScrollSpeed, () => Is.EqualTo(10).Within(0.001));
         AddUntilStep("spacing visibly increased", () => Playfield.SpacingBetweenTicks(firstTick, secondTick), () => Is.GreaterThan(normalSpacing * 1.1f));
 
-        AddStep("press down", () => Playfield.AdjustScrollSpeed(-1));
+        AddStep("press down", () => Playfield.ScrollController.AdjustScrollSpeed(-1));
         AddUntilStep("scroll speed restored", () => Playfield.ScrollSpeed, () => Is.EqualTo(8).Within(0.001));
     }
 
@@ -68,7 +68,7 @@ public partial class TestSceneBmsScrollSpeedControls : BmsPlayerTestScene
         // to clear so a later visibility rise is unambiguously the scroll-speed notification.
         AddUntilStep("initial text hud banner faded", () => Player.HUDOverlay.ChildrenOfType<BmsTextHud>().SingleOrDefault()?.Alpha == 0);
 
-        AddStep("increase scroll speed", () => Playfield.AdjustScrollSpeed(1));
+        AddStep("increase scroll speed", () => Playfield.ScrollController.AdjustScrollSpeed(1));
         AddUntilStep("text hud shows the change", () => Player.HUDOverlay.ChildrenOfType<BmsTextHud>().SingleOrDefault()?.Alpha > 0);
     }
 }

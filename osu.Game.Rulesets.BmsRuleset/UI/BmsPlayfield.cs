@@ -53,6 +53,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         TotalColumns = Math.Max(1, beatmap.TotalColumns);
         LayoutVariant = beatmap.LayoutVariant;
         TimingMap = beatmap.TimingMap;
+        ScrollController = new BmsScrollController(TimingMap);
+        ScrollController.ScrollSpeedChanged += onScrollSpeedChanged;
 
         Anchor = Anchor.Centre;
         Origin = Anchor.Centre;
@@ -72,6 +74,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     protected override void Dispose(bool isDisposing)
     {
+        ScrollController.ScrollSpeedChanged -= onScrollSpeedChanged;
         NewResult -= onNewResult;
         parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
         skinCache.Dispose();
@@ -132,7 +135,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public BmsTimingMap? TimingMap { get; }
 
-    public bool ConstantScrollActive { get; set; }
+    internal BmsScrollController ScrollController { get; }
 
     #endregion
 
@@ -174,11 +177,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         switch (e.Action)
         {
             case BmsAction.IncreaseScrollSpeed:
-                AdjustScrollSpeed(1);
+                ScrollController.AdjustScrollSpeed(1);
                 return true;
 
             case BmsAction.DecreaseScrollSpeed:
-                AdjustScrollSpeed(-1);
+                ScrollController.AdjustScrollSpeed(-1);
                 return true;
         }
 
@@ -216,162 +219,24 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region Scroll Speed
 
-    /// <summary>
-    ///     Final applied scroll speed = <see cref="configuredScrollSpeed"/> × multiplier preset.
-    /// </summary>
-    public double ScrollSpeed { get; private set; } = default_scroll_speed;
+    public double ScrollSpeed => ScrollController.ScrollSpeed;
 
-    /// <summary>
-    ///     The judgement line's current position on the scroll-coordinate axis.
-    ///     In tick mode this advances at a rate proportional to the active BPM;
-    ///     in constant-scroll mode this is simply Time.Current (linear).
-    ///     When a note's scroll position equals this value, the note is at the
-    ///     judgement line and its Y = <c>parentHeight - HitTargetPosition</c>.
-    /// </summary>
-    public double CurrentScrollPosition { get; private set; }
-
-    /// <summary>
-    ///     Active SPEED factor from the chart's <c>#SPEEDxx</c> / channel <c>SP</c> events.
-    ///     Multiplies <see cref="ScrollSpeedMultiplier"/> like a user speed adjustment.
-    ///     1.0 = normal, 2.0 = scroll advances 2× faster.
-    /// </summary>
-    public double ChartSpeedFactor { get; private set; } = 1.0;
-
-    /// <summary>
-    ///     Visible scroll window size in tick-based scroll units.
-    ///     A note this far ahead of <see cref="CurrentScrollPosition"/> sits at
-    ///     the top edge of the playfield (i.e. Y ≈ 0).
-    /// </summary>
-    public double ScrollRange => baseScrollRange * ScrollRangeScale;
-
-    /// <summary>
-    ///     Normalises the scroll range so the visual speed at the default scroll
-    ///     speed matches osu!mania's baseline (computed once from the stage's
-    ///     <see cref="BmsStage.HIT_TARGET_POSITION"/>).
-    /// </summary>
-    public double ScrollRangeScale { get; private set; }
-
-    /// <summary>
-    ///     Scroll range at default speed.  Visible window = this ÷ SpeedMultiplier.
-    /// </summary>
-    private static double baseScrollRange => BmsDrawableRuleset.ComputeScrollTime(default_scroll_speed);
-
-    /// <summary>
-    ///     Ratio of the current scroll speed to the default.
-    ///     Scales the pixel-per-scroll-unit mapping in <see cref="YForScrollProgress"/>.
-    /// </summary>
-    /// <summary>
-    ///     Effective scroll speed ratio = user speed × chart SPEED factor.
-    /// </summary>
-    public double ScrollSpeedMultiplier => ScrollSpeed / default_scroll_speed * ChartSpeedFactor;
-
-    public double MeasureLineFutureWindow
+    private void onScrollSpeedChanged(double multiplier)
     {
-        get
-        {
-            var multiplier = Math.Abs(ScrollSpeedMultiplier);
-
-            if (!double.IsFinite(multiplier) || multiplier < 0.001)
-                return 30000;
-
-            return Math.Max(500, ScrollRange / multiplier);
-        }
-    }
-
-    /// <summary>
-    ///     Converts a scroll progress value (distance from the judgement line in scroll
-    ///     coordinate space) into a Y pixel position relative to the container's top.
-    ///     The progress is zero when the object is at the judgement line, positive when
-    ///     above it (yet to be hit), and negative when below (already past).
-    /// </summary>
-    /// <param name="progress">
-    ///     Distance from the judgement line in scroll-coordinate space.
-    ///     0 = at judgement line, positive = above (yet to hit), negative = below (past).
-    /// </param>
-    /// <param name="parentHeight">
-    ///     Total pixel height of the column container. The returned Y is relative to this.
-    /// </param>
-    /// <param name="noteHeight">
-    ///     Pixel height of the note. Subtracted so the note sits on rather than covers the judgement line.
-    /// </param>
-    public float YForScrollProgress(double progress, double parentHeight, double noteHeight = 0)
-        => (float)(parentHeight - Stage.HitTargetPosition - progress * scrollCoordinateScale(parentHeight) - noteHeight);
-
-    private double scrollCoordinateScale(double parentHeight)
-    {
-        var range = Math.Max(1.0, ScrollRange);
-        var hitTarget = Stage.HitTargetPosition;
-        var travelDistance = Math.Max(1f, (float)(parentHeight - hitTarget));
-        return ScrollSpeedMultiplier / range * travelDistance;
-    }
-
-    /// <summary>
-    ///     BMS default scroll speed (≈8.0ms of visible time per pixel at 1.0×).
-    ///     Used as the normalisation denominator for <see cref="ScrollSpeedMultiplier"/>.
-    /// </summary>
-    private const double default_scroll_speed = BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED;
-
-    /// <summary>
-    ///     In-game scroll speed multiplier presets cycled by
-    ///     <see cref="AdjustScrollSpeed"/> via Up/Down keys.
-    ///     Index 9 is the base 1.0× (configured speed).
-    /// </summary>
-    private static readonly double[] scroll_speed_multipliers =
-    [
-        0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
-        1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75,
-        3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
-    ];
-
-    private const int default_multiplier_index = 9; // 1.0×
-
-    /// <summary>
-    ///     Scroll speed configured in the settings (before the in-game multiplier preset is applied).
-    /// </summary>
-    private double configuredScrollSpeed = default_scroll_speed;
-
-    /// <summary>
-    ///     Index into <see cref="scroll_speed_multipliers"/> for the current in-game preset.
-    /// </summary>
-    private int currentMultiplierIndex = default_multiplier_index;
-
-    public void SetConfiguredScrollSpeed(double speed)
-    {
-        configuredScrollSpeed = speed;
-        setScrollSpeedFromMultiplierIndex(false);
-    }
-
-    /// <summary>
-    ///     Cycles the scroll speed through <see cref="scroll_speed_multipliers"/>
-    ///     presets relative to the configured base speed.
-    ///     <paramref name="delta"/> is treated as direction (positive = faster, negative = slower).
-    /// </summary>
-    public void AdjustScrollSpeed(double delta)
-    {
-        var direction = delta > 0 ? 1 : -1;
-        var newIndex = Math.Clamp(currentMultiplierIndex + direction, 0, scroll_speed_multipliers.Length - 1);
-
-        if (newIndex != currentMultiplierIndex)
-        {
-            currentMultiplierIndex = newIndex;
-            setScrollSpeedFromMultiplierIndex();
-        }
-    }
-
-    private void setScrollSpeedFromMultiplierIndex(bool fireEvent = true)
-    {
-        ScrollSpeed = configuredScrollSpeed * scroll_speed_multipliers[currentMultiplierIndex];
-        if (fireEvent)
-            gameplayEvents.RaiseScrollSpeedChanged(scroll_speed_multipliers[currentMultiplierIndex]);
+        gameplayEvents.RaiseScrollSpeedChanged(multiplier);
+        // The framework's default lifetime starts at hit time; BMS scroll needs notes alive
+        // before then so near-future objects can be positioned and judged.
         RefreshAllLifetimes();
     }
 
     internal void RefreshAllLifetimes()
     {
+        var currentTime = IsLoaded ? Time.Current : (double?)null;
+
         foreach (var column in Stage.Columns)
         {
             if (column.HitObjectContainer is BmsColumnHitObjectContainer container)
-                container.RefreshAllEntries();
+                container.RefreshAllEntries(currentTime);
         }
     }
 
@@ -382,16 +247,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [BackgroundDependencyLoader(true)]
     private void load()
     {
-        // Compute the mania-matching scroll-range scale once at load.
-        // HitTargetPosition is constant per layout variant, so this never changes.
-        const float reference_scroll_distance = 768f - 124.8f; // 768 - legacy DEFAULT_HIT_POSITION
-        ScrollRangeScale = (768f - Stage.HitTargetPosition) / reference_scroll_distance;
+        ScrollController.SetHitTargetPosition(Stage.HitTargetPosition);
 
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
         updateEmbeddedSkinFallback();
     }
 
-    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject, this);
+    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject, ScrollController);
 
     protected override void LoadComplete()
     {
@@ -408,17 +270,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                 AddNested(pf);
             }
         }
+
+        RefreshAllLifetimes();
     }
 
     protected override void Update()
     {
-        CurrentScrollPosition = ConstantScrollActive
-            ? Time.Current
-            : TimingMap?.GetScrollPositionAtTime(Time.Current) ?? Time.Current;
-
-        ChartSpeedFactor = ConstantScrollActive
-            ? 1.0
-            : TimingMap?.GetSpeedFactorAtTime(Time.Current) ?? 1.0;
+        ScrollController.Update(Time.Current);
 
         base.Update();
 
@@ -435,7 +293,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (TimingMap == null)
             return;
 
-        Stage.MeasureLineArea.SetTimingMap(TimingMap, this, Stage);
+        Stage.MeasureLineArea.SetTimingMap(TimingMap, ScrollController, Stage);
     }
 
     private void updateStageScale()

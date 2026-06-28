@@ -64,7 +64,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal float HitTargetPosition => ParentPlayfield.Stage.HitTargetPosition;
 
-    internal double ScrollSpeedMultiplier => ParentPlayfield.ScrollSpeedMultiplier;
+    internal double ScrollSpeedMultiplier => ParentPlayfield.ScrollController.ScrollSpeedMultiplier;
 
     protected BmsPlayfield ParentPlayfield { get; }
 
@@ -138,10 +138,10 @@ public partial class BmsColumn : Playfield, IBmsColumn
         keysUnderNotes ? key_area_under_notes_depth : key_area_over_notes_depth;
 
     protected override HitObjectContainer CreateHitObjectContainer()
-        => new BmsColumnHitObjectContainer(ParentPlayfield);
+        => new BmsColumnHitObjectContainer(ParentPlayfield.ScrollController, () => HitTargetPosition);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
-        => new BmsHitObjectLifetimeEntry(hitObject, ParentPlayfield);
+        => new BmsHitObjectLifetimeEntry(hitObject, ParentPlayfield.ScrollController);
 
     protected override void LoadComplete()
     {
