@@ -27,6 +27,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     // hold instead of only firing at the head and tail endpoints.
     private const double hold_explosion_interval = BmsLegacySkinTransformer.HIT_EXPLOSION_FADE_IN_DURATION;
 
+    // Body+tail fade to this alpha when the head is judged but the key is released before the tail judged
+    private const float released_alpha = 0.4f;
+
     private readonly BmsLongNoteVisualState visualState = new();
     private readonly BmsLongNoteJudgementController controller = new();
 
@@ -85,9 +88,10 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (Math.Abs(longNoteBody.Height - bodyHeight) > 0.5f)
             longNoteBody.Height = Math.Max(1, bodyHeight);
 
+        var releasedEarly =
+            controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !isHoldingBody();
         longNoteBody.UpdateBody(bodyHeight, tailAtTop, controller.LongNoteStarted);
-        longNoteBody.Alpha = bodyHeight > 0 ? 1 : 0;
-        longNoteBody.Colour = shouldGreyBody() ? new Color4(128, 128, 128, 255) : Color4.White;
+        longNoteBody.Alpha = bodyHeight > 0 ? (releasedEarly ? released_alpha : 1f) : 0;
 
         if (Math.Abs(longNoteTailContainer.Y - tailOffset) > 0.5f)
             longNoteTailContainer.Y = tailOffset;
@@ -95,7 +99,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (Math.Abs(longNoteTailContainer.Height - Height) > 0.5f)
             longNoteTailContainer.Height = Height;
 
-        longNoteTailContainer.Alpha = 1;
+        longNoteTailContainer.Alpha = releasedEarly ? released_alpha : 1f;
     }
 
     protected override void ResetKindState()
@@ -196,57 +200,31 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         controller.UpdatePostResult(Time.Current, Time.Elapsed, ParentColumn?.IsPressed == true);
     }
 
-    private bool shouldGreyBody()
-        => controller.LongNoteStarted
-           && HitObject != null
-           && Time.Current < ln.EndTime
-           && !isHoldingBody();
-
     private bool isHoldingBody()
         => controller.LongNoteStarted
            && HitObject != null
            && ParentColumn?.IsPressed == true;
 
-    private int bodyDirectionBeforeTailPasses(float realHeadY, float realTailY)
-    {
-        if (HitObject == null)
-            return Math.Sign(realTailY - realHeadY);
-
-        return BmsLongNoteGeometry.BodyDirectionBeforeTailPasses(
+    private int bodyDirectionBeforeTailPasses(float realHeadY, float realTailY) => HitObject == null
+        ? Math.Sign(realTailY - realHeadY)
+        : BmsLongNoteGeometry.BodyDirectionBeforeTailPasses(
             ((BmsLongNote)HitObject).ScrollPositionAtEndTime - HitObject.ScrollPositionAtStartTime,
             ln.Duration,
             ScrollSpeedMultiplier,
             realHeadY,
             realTailY);
-    }
-
-    private void clearVisualIfTailWasNotPoor(HitResult tailResult)
-    {
-        // The longNoteStarted=false that lived here in the original now lives on the controller
-        // (it owns that state); this hook only owns the visual clear.
-        if (tailResult == HitResult.Meh)
-            return;
-
-        visualState.Reset();
-        longNoteBody.Alpha = 0;
-        longNoteTailContainer.Alpha = 0;
-        this.FadeOut();
-        LifetimeEnd = Time.Current;
-    }
-
-    private void pinVisualHeadToJudgementLine() => visualState.PinHead(-HitTargetPosition);
 
     // --- IBmsLongNoteHooks: side-effects driven by the judgement controller. ---
 
     void IBmsLongNoteHooks.OnUserHeadJudged()
     {
-        pinVisualHeadToJudgementLine();
+        visualState.PinHead(-HitTargetPosition);
         lastHoldExplosionTime = Time.Current - hold_explosion_interval;
     }
 
     void IBmsLongNoteHooks.OnHellChargeHeadPoor(double eventTime, double lifetimeEnd)
     {
-        pinVisualHeadToJudgementLine();
+        visualState.PinHead(-HitTargetPosition);
         Alpha = 1;
         LifetimeEnd = lifetimeEnd;
         scoring?.ApplyLongNoteHead(this, eventTime, HitResult.Meh);
@@ -256,7 +234,16 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         => ApplyResult(result);
 
     void IBmsLongNoteHooks.ClearVisualIfTailWasNotPoor(HitResult tailResult)
-        => clearVisualIfTailWasNotPoor(tailResult);
+    {
+        if (tailResult == HitResult.Meh)
+            return;
+
+        visualState.Reset();
+        longNoteBody.Alpha = 0;
+        longNoteTailContainer.Alpha = 0;
+        this.FadeOut();
+        LifetimeEnd = Time.Current;
+    }
 
     void IBmsLongNoteHooks.ApplySyntheticTailEndpoint(double endpointTime, double eventTime, HitResult result)
         => scoring?.ApplySyntheticLongNoteEndpoint(this, endpointTime, eventTime, result);

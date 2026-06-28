@@ -12,7 +12,6 @@ using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Tests.Visual;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
@@ -81,8 +80,14 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         return (Drawable)longNote.GetType().GetField("longNoteBody", flags)!.GetValue(longNote)!;
     }
 
+    private static Drawable longNoteTailContainerOf(DrawableBmsHitObject longNote)
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        return (Drawable)longNote.GetType().GetField("longNoteTailContainer", flags)!.GetValue(longNote)!;
+    }
+
     [Test]
-    public void TestBodyTintTracksHeldState()
+    public void TestBodyAlphaTracksHeldState()
     {
         AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
@@ -90,16 +95,22 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
         AddStep("seek before long note", () => Player.GameplayClockContainer.Seek(start_time - 100));
         AddUntilStep("held body before release", () => Player.GameplayClockContainer.CurrentTime >= start_time + 300);
-        AddAssert("held body uses normal tint", () =>
+        AddAssert("held body and tail are fully opaque", () =>
         {
             var longNote = Playfield.GetAliveObjectAtTick(tick);
-            return longNote != null && (Color4)longNoteBodyOf(longNote).Colour == Color4.White;
+            return longNote != null
+                   && longNoteBodyOf(longNote).Alpha == 1f
+                   && longNoteTailContainerOf(longNote).Alpha == 1f;
         });
         AddUntilStep("released body before tail", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + early_release_offset + 120);
-        AddAssert("released body is grey", () =>
+        // Released-early fades body+tail together (matches DrawableBmsLongNote.released_alpha) instead
+        // of greying only the body, so a coloured tail no longer clashes with a grey body.
+        AddAssert("released body and tail are faded", () =>
         {
             var longNote = Playfield.GetAliveObjectAtTick(tick);
-            return longNote != null && (Color4)longNoteBodyOf(longNote).Colour == new Color4(128, 128, 128, 255);
+            return longNote != null
+                   && longNoteBodyOf(longNote).Alpha == 0.4f
+                   && longNoteTailContainerOf(longNote).Alpha == 0.4f;
         });
     }
 
