@@ -76,7 +76,7 @@ public sealed partial class BmsStage : CompositeDrawable
 
         InternalChildren =
         [
-            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.StageBackground, layoutVariant), _ => new DefaultBmsStageBackground())
+            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.StageBackground, layoutVariant))
             {
                 RelativeSizeAxes = Axes.Both,
             },
@@ -255,20 +255,5 @@ public sealed partial class BmsStage : CompositeDrawable
         }
 
         return min == float.MaxValue ? DrawWidth / 2 : (min + max) / 2;
-    }
-
-    private partial class DefaultBmsStageBackground : CompositeDrawable
-    {
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            InternalChild = new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-                Colour = Color4.Black,
-                Alpha = 0.35f,
-            };
-        }
     }
 }

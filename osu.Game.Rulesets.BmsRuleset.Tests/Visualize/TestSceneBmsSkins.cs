@@ -220,7 +220,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             Is.TypeOf<BmsResolvedNotePiece>);
         AddAssert("explosion factory produces resolved explosion",
             () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1))?.Create(),
-            Is.TypeOf<BmsResolvedHitExplosion>);
+            Is.TypeOf<LegacyBmsHitExplosion>);
         AddAssert("key area factory produces legacy key area",
             () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1))?.Create(),
             Is.TypeOf<LegacyBmsKeyArea>);
@@ -234,7 +234,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         // N-suffix frame animations: the explosion (lightingN-0/1/2) and column light (stage-light-0/1)
         // are provided as multi-frame textures; verify the runtime picks them up as animations.
         AddAssert("explosion is a multi-frame animation",
-            () => (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1))?.Create() as BmsResolvedHitExplosion)
+            () => (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1))?.Create() as LegacyBmsHitExplosion)
                 ?.ChildrenOfType<TextureAnimation>().SingleOrDefault()?.FrameCount,
             () => Is.EqualTo(3));
         AddAssert("column light is a multi-frame animation",

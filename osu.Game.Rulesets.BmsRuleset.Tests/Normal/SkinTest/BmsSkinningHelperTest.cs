@@ -19,8 +19,10 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Skinning;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -56,6 +58,8 @@ public class BmsSkinningHelperTest
 
         public Dictionary<LegacyManiaSkinConfigurationLookups, float> FloatConfigs { get; init; } = new();
 
+        public Dictionary<LegacyManiaSkinConfigurationLookups, bool> BoolConfigs { get; init; } = new();
+
         public virtual Drawable GetDrawableComponent(ISkinComponentLookup lookup) => null;
 
         public virtual Texture GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT)
@@ -79,6 +83,9 @@ public class BmsSkinningHelperTest
 
                 if (typeof(TValue) == typeof(float) && FloatConfigs.TryGetValue(bmsLookup.Lookup, out var number))
                     return SkinUtils.As<TValue>(new Bindable<float>(number));
+
+                if (typeof(TValue) == typeof(bool) && BoolConfigs.TryGetValue(bmsLookup.Lookup, out var flag))
+                    return SkinUtils.As<TValue>(new Bindable<bool>(flag));
             }
 
             return null;
@@ -282,7 +289,7 @@ public class BmsSkinningHelperTest
 
         skin.ExplosionScale.Value = 2;
 
-        Assert.That(((BmsResolvedHitExplosion)factory!.Create()).ResolvedScale, Is.EqualTo(2));
+        Assert.That(((LegacyBmsHitExplosion)factory!.Create()).ResolvedScale, Is.EqualTo(2));
     }
 
     [Test]
@@ -406,7 +413,14 @@ public class BmsSkinningHelperTest
     }
 
     [Test]
-    public void TestLegacyTransformerCreatesResolvedNoteAndExplosionDrawables()
+    public void TestKeysUnderNotesDepthPolicyPlacesKeyAreaBehindNotes()
+    {
+        Assert.That(BmsColumn.DepthForKeyArea(keysUnderNotes: true), Is.GreaterThan(BmsColumn.HIT_OBJECT_DEPTH));
+        Assert.That(BmsColumn.DepthForKeyArea(keysUnderNotes: false), Is.LessThan(BmsColumn.HIT_OBJECT_DEPTH));
+    }
+
+    [Test]
+    public void TestLegacyTransformerCreatesResolvedNoteAndLegacyExplosionDrawables()
     {
         var skin = new CountingTextureSkin(renderer);
         skin.TextureSizes["mania-key1"] = (1, 1);
@@ -425,7 +439,7 @@ public class BmsSkinningHelperTest
             new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1));
 
         Assert.That(noteFactory?.Create(), Is.TypeOf<BmsResolvedNotePiece>());
-        Assert.That(explosionFactory?.Create(), Is.TypeOf<BmsResolvedHitExplosion>());
+        Assert.That(explosionFactory?.Create(), Is.TypeOf<LegacyBmsHitExplosion>());
     }
 
     [Test]

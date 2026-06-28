@@ -4,9 +4,7 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
-using osu.Game.Skinning;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
 
@@ -60,47 +58,6 @@ internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
         {
             DefaultFrameLength = 1000 / 60d,
             Loop = looping,
-        };
-
-        foreach (var texture in textures)
-            animation.AddFrame(texture);
-
-        return animation;
-    }
-}
-
-internal sealed partial class BmsResolvedHitExplosion : CompositeDrawable
-{
-    public float ResolvedScale { get; }
-
-    public BmsResolvedHitExplosion(Texture[] textures, double frameLength, float scale, Color4 colour, float hitPosition)
-    {
-        ResolvedScale = scale;
-        RelativeSizeAxes = Axes.Both;
-
-        InternalChild = createTextureDrawable(textures, frameLength).With(d =>
-        {
-            d.Anchor = Anchor.BottomCentre;
-            d.Origin = Anchor.Centre;
-            d.Y = -hitPosition;
-            d.Blending = BlendingParameters.Additive;
-            d.Colour = LegacyColourCompatibility.DisallowZeroAlpha(colour);
-            d.Scale = new Vector2(scale);
-        });
-    }
-
-    private static Drawable createTextureDrawable(Texture[] textures, double frameLength)
-    {
-        if (textures.Length == 0)
-            return Empty();
-
-        if (textures.Length == 1)
-            return new Sprite { Texture = textures[0] };
-
-        var animation = new TextureAnimation
-        {
-            DefaultFrameLength = frameLength,
-            Loop = false,
         };
 
         foreach (var texture in textures)

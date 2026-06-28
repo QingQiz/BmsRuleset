@@ -12,11 +12,9 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
-using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 
@@ -191,12 +189,16 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsColumnBackground(this, bmsLookup)),
             BmsSkinComponents.HitTarget when bmsLookup.ColumnIndex == null && hasAnimation(GetHitTargetImageName())
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsHitTarget(this)),
+            BmsSkinComponents.HitTarget when bmsLookup.ColumnIndex != null
+                => new BmsResolvedDrawableFactory(() => new LegacyBmsColumnHitTarget(this, bmsLookup)),
             BmsSkinComponents.KeyArea when hasAnimation(GetKeyImageName(bmsLookup, false))
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsKeyArea(this, bmsLookup)),
             BmsSkinComponents.Mine
                 => createNoteFactory(bmsLookup),
             BmsSkinComponents.HitExplosion
-                => createHitExplosionFactory(bmsLookup),
+                => hasAnimation(GetHitExplosionImageName(bmsLookup))
+                    ? new BmsResolvedDrawableFactory(() => new LegacyBmsHitExplosion(this, bmsLookup))
+                    : null,
             BmsSkinComponents.StageBackground when hasAnyAnimation(GetStageBackgroundImageNames())
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsStageBackground(this)),
             BmsSkinComponents.StageForeground when hasAnimation(GetStageForegroundImageName())
@@ -218,31 +220,6 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
 
         var widthForNoteHeightScale = GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale)?.Value;
         return new BmsResolvedDrawableFactory(() => new BmsResolvedNotePiece(textures, widthForNoteHeightScale));
-    }
-
-    private BmsResolvedDrawableFactory? createHitExplosionFactory(BmsSkinComponentLookup lookup)
-    {
-        var textures = this.GetTextures(GetHitExplosionImageName(lookup), default, default, true, "-", null, out _)
-            .Where(t => t.DisplayWidth > 0 && t.DisplayHeight > 0)
-            .ToArray();
-
-        if (textures.Length == 0)
-            return null;
-
-        var frameLength = Math.Max(1000 / 60.0, 170.0 / textures.Length);
-        var scale = GetManiaConfig<float>(
-            lookup.IsLongNote ? LegacyManiaSkinConfigurationLookups.HoldNoteLightScale : LegacyManiaSkinConfigurationLookups.ExplosionScale, lookup);
-        var colour = GetManiaConfig<Color4>(LegacyManiaSkinConfigurationLookups.ColumnLightColour, lookup);
-        var hitPosition = GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition);
-
-        return new BmsResolvedDrawableFactory(() => new BmsResolvedHitExplosion(
-            textures,
-            frameLength,
-            scale?.Value ?? 1,
-            colour?.Value ?? Color4.White,
-            // Fall back to the stage's default hit position for skins without a skin.ini HitPosition
-            // so the explosion lands at the judgement line instead of the very bottom.
-            hitPosition?.Value ?? BmsStage.HIT_TARGET_POSITION));
     }
 
     private bool hasAnimation(string name) => GetLegacyAnimation(name) != null;

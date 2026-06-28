@@ -432,6 +432,33 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestEmbeddedFallbackProvidesCodeDefaultGameplayComponents()
+    {
+        using var source = new BmsEmbeddedSkinSource();
+        var parent = new TestSkinSource();
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+        };
+
+        source.SetSources(parent, BmsEmbeddedSkinFallbackFactory.Create(parent.AllSources, beatmap, new DummyRenderer()));
+
+        foreach (var lookup in new[]
+                 {
+                     new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, BmsLayoutVariant.Bme7K, 1),
+                     new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1),
+                     new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, BmsLayoutVariant.Bme7K, 1),
+                     new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, BmsLayoutVariant.Bme7K),
+                     new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1),
+                     new BmsSkinComponentLookup(BmsSkinComponents.StageBackground, BmsLayoutVariant.Bme7K),
+                 })
+        {
+            Assert.That(((IBmsGameplaySkinDrawableSource)source).GetDrawableFactory(lookup)?.Create(), Is.Not.Null, lookup.Component.ToString());
+        }
+    }
+
+    [Test]
     public void TestEmbeddedFallbackUsesLegacyForLegacyBuiltInSkins()
     {
         Assert.That(BmsEmbeddedSkinFallbackFactory.GetEmbeddedSkinKind([new BmsBuiltInSkinTransformer(new DefaultLegacySkin(DefaultLegacySkin.CreateInfo(), storage_resources))]),
@@ -609,7 +636,7 @@ public class BmsLegacySkinTransformerTest
         Assert.That(skin.GetDrawableComponent(lookup), Is.Not.Null);
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget)), Is.Not.Null);
-        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, BmsLayoutVariant.Bme7K, 1)), Is.Null);
+        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
         Assert.That(skin.GetDrawableComponent(new SkinComponentLookup<HitResult>(HitResult.Perfect)), Is.Not.Null);
     }

@@ -20,6 +20,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 /// </remarks>
 internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
 {
+    public float ResolvedScale { get; }
+
     public LegacyBmsHitExplosion(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup)
     {
         RelativeSizeAxes = Axes.Both;
@@ -37,6 +39,7 @@ internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
                     ?? 1;
         var colour = transformer.GetManiaConfig<Color4>(LegacyManiaSkinConfigurationLookups.ColumnLightColour, lookup)?.Value ?? Color4.White;
         var hitPosition = transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? BmsStage.HIT_TARGET_POSITION;
+        ResolvedScale = scale;
 
         InternalChild = transformer.GetAnimation(transformer.GetHitExplosionImageName(lookup), true, false, frameLength: frameLength)?.With(d =>
         {

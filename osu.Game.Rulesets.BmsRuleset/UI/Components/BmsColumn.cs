@@ -2,15 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
-using osu.Framework.Input.Bindings;
-using osu.Framework.Input.Events;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
@@ -21,7 +16,6 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 
@@ -64,9 +58,15 @@ public partial class BmsColumn : Playfield, IBmsColumn
         }
     }
 
+    internal const float HIT_OBJECT_DEPTH = 0;
+
     protected BmsPlayfield ParentPlayfield { get; }
 
+    private const float key_area_under_notes_depth = 1;
+    private const float key_area_over_notes_depth = -1;
+
     private readonly BmsLayoutVariant layoutVariant;
+    private readonly SkinnableDrawable keyArea;
     private readonly SkinnableDrawable hitTarget;
 
     private BmsColumnKeySound? keySound;
@@ -85,19 +85,20 @@ public partial class BmsColumn : Playfield, IBmsColumn
         Width = defaultColumnWidth(index, layoutVariant);
         Masking = true;
         BorderThickness = 0;
+        HitObjectContainer.Depth = HIT_OBJECT_DEPTH;
 
         InternalChildren =
         [
-            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, index), _ => new DefaultBmsColumnBackground(index, IsScratch))
+            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, index))
             {
                 RelativeSizeAxes = Axes.Both,
             },
-            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, layoutVariant, index), _ => new DefaultBmsKeyArea(index, layoutVariant, IsScratch))
+            keyArea = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, layoutVariant, index))
             {
                 RelativeSizeAxes = Axes.Both,
                 CentreComponent = false,
             },
-            hitTarget = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, layoutVariant, index), _ => new DefaultBmsHitTarget(IsScratch))
+            hitTarget = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, layoutVariant, index))
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
@@ -127,6 +128,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
         var genericType = typeof(BmsColumnGeneric<>).MakeGenericType(providerType);
         return (BmsColumn)Activator.CreateInstance(genericType, index, playfield)!;
     }
+
+    internal static float DepthForKeyArea(bool keysUnderNotes) =>
+        keysUnderNotes ? key_area_under_notes_depth : key_area_over_notes_depth;
 
     protected override HitObjectContainer CreateHitObjectContainer()
         => new BmsColumnHitObjectContainer(ParentPlayfield);
@@ -208,14 +212,12 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
         hitTarget.Y = -(skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
                         ?? BmsStage.HIT_TARGET_POSITION);
+
+        var keysUnderNotes = skin.GetConfig<BmsSkinConfigurationLookup, bool>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.KeysUnderNotes))?.Value ?? false;
+        ChangeInternalChildDepth(keyArea, DepthForKeyArea(keysUnderNotes));
     }
 
     #region Hit explosions / landmine
-
-    /// <summary>
-    /// Number of hit explosions fired by LN hold pulses in this column. Exposed for tests.
-    /// </summary>
-    public int HoldExplosionCount { get; private set; }
 
     /// <summary>
     /// Spawns a hit explosion (hit light) in this column. Used for note hits (via this column's
@@ -224,9 +226,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
     /// </summary>
     public void TriggerHitExplosion(bool isLongNote, bool isHold = false)
     {
-        if (isHold)
-            HoldExplosionCount++;
-
         HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
             BmsSkinComponents.HitExplosion,
             layoutVariant,
@@ -341,107 +340,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
             if (ln2.TryRelease(releaseOffset, tailTable) && heldNote.HitObject is BmsLongNote ln)
                 keySound?.PlaySample(ln.TailSamplePath);
-        }
-    }
-
-    #endregion
-
-    #region components
-
-    private partial class DefaultBmsColumnBackground(int index, bool isScratch) : CompositeDrawable
-    {
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            InternalChild = new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-                Colour = isScratch
-                    ? Color4.DarkSlateBlue.Opacity(0.26f)
-                    : index % 2 == 0
-                        ? Color4.Black.Opacity(0.28f)
-                        : Color4.White.Opacity(0.05f),
-            };
-        }
-    }
-
-    private sealed partial class DefaultBmsHitTarget : CompositeDrawable
-    {
-        private readonly bool isScratch;
-
-        public DefaultBmsHitTarget(bool isScratch)
-        {
-            this.isScratch = isScratch;
-            Height = isScratch ? 5 : 3;
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            InternalChild = new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-                Colour = Color4.White.Opacity(isScratch ? 0.85f : 0.65f),
-            };
-        }
-    }
-
-    /// <inheritdoc cref="CompositeDrawable" />
-    /// <summary>
-    ///     Default code-drawn key area that shows at the bottom of each column and
-    ///     brightens briefly when the bound key is pressed.
-    /// </summary>
-    private sealed partial class DefaultBmsKeyArea(int columnIndex, BmsLayoutVariant layoutVariant, bool isScratch)
-        : CompositeDrawable, IKeyBindingHandler<BmsAction>
-    {
-
-        private Box light = null!;
-
-        public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
-        {
-            if (BmsKeyBindingConfiguration.ActionToColumn(e.Action, layoutVariant) != columnIndex)
-                return false;
-
-            light.FadeIn(10);
-            return false;
-        }
-
-        public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
-        {
-            if (BmsKeyBindingConfiguration.ActionToColumn(e.Action, layoutVariant) != columnIndex)
-                return;
-
-            light.FadeOut(120);
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Anchor = Anchor.BottomCentre;
-            Origin = Anchor.BottomCentre;
-
-            InternalChildren =
-            [
-                new Box
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 60,
-                    Colour = isScratch ? Color4.DarkSlateBlue.Opacity(0.55f) : Color4.White.Opacity(0.08f),
-                },
-                light = new Box
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 60,
-                    Colour = Color4.White.Opacity(0.45f),
-                    Blending = BlendingParameters.Additive,
-                    Alpha = 0,
-                },
-            ];
         }
     }
 
