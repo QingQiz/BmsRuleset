@@ -6,15 +6,20 @@
         <PlatformTarget>AnyCPU</PlatformTarget>
         <RootNamespace>osu.Game.Rulesets.BmsRuleset</RootNamespace>
         <Nullable>enable</Nullable>
-        <Version>2026.621.2</Version>
+        <Version>$(OsuBase).$(RulesetRevision)</Version>
         <LangVersion>14</LangVersion>
     </PropertyGroup>
     <ItemGroup>
         <EmbeddedResource Include="Resources\**" WithCulture="false"/>
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="ppy.osu.Game" Version="2026.621.0"/>
         <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0"/>
+    </ItemGroup>
+    <ItemGroup Condition="'$(UseLocalOsu)' != 'true'">
+        <PackageReference Include="ppy.osu.Game" Version="$(OsuVersion)"/>
+    </ItemGroup>
+    <ItemGroup Condition="'$(UseLocalOsu)' == 'true'">
+        <ProjectReference Include="..\..\osu\osu.Game\osu.Game.csproj"/>
     </ItemGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="osu.Game.Rulesets.BmsRuleset.Tests"/>
