@@ -25,6 +25,8 @@ public sealed partial class BmsJudgementDisplay : CompositeDrawable, ISerialisab
     [Cached(typeof(ISkinSource))]
     private readonly BmsEmbeddedSkinSource activeSkin = new();
 
+    private IBmsGameplayEvents? gameplayEvents;
+
     [Resolved]
     private DrawableRuleset drawableRuleset { get; set; } = null!;
 
@@ -59,7 +61,8 @@ public sealed partial class BmsJudgementDisplay : CompositeDrawable, ISerialisab
 
     protected override void Dispose(bool isDisposing)
     {
-        BmsEventBus.JudgementDisplayEvent -= showJudgement;
+        if (gameplayEvents != null)
+            gameplayEvents.JudgementDisplayed -= showJudgement;
         parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
         activeSkin.DisposeEmbeddedSkins();
 
@@ -72,7 +75,10 @@ public sealed partial class BmsJudgementDisplay : CompositeDrawable, ISerialisab
     {
         base.LoadComplete();
 
-        BmsEventBus.JudgementDisplayEvent += showJudgement;
+        gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
+
+        if (gameplayEvents != null)
+            gameplayEvents.JudgementDisplayed += showJudgement;
     }
 
     [BackgroundDependencyLoader]

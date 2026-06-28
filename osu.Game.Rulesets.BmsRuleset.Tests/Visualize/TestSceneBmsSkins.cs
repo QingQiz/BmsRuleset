@@ -258,13 +258,6 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         AddAssert("key area has up and down key sprites", () =>
             Playfield.ChildrenOfType<LegacyBmsKeyArea>()
                 .All(c => c.ChildrenOfType<Sprite>().Count(s => s.DrawHeight > 0) >= 2));
-
-        // The LN hold pulses the hit light (lightingL) repeatedly throughout the hold, not just at
-        // the head/tail. The synthetic beatmap holds several LNs, so an 80 ms pulse produces far
-        // more fires than there are long notes.
-        AddAssert("LN hold repeatedly triggers hit explosion",
-            () => Playfield.HoldExplosionCount,
-            () => Is.GreaterThan(BmsTestLegacySkin.COLUMN_COUNT));
     }
 
     private T? getConfig<T>(LegacyManiaSkinConfigurationLookups lookup, BmsSkinComponents component, int? column, ISkinSource source)

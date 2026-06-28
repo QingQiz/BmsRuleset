@@ -1,21 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
-using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
@@ -35,7 +30,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 ///     judgement display, scroll-speed HUD, and input routing for all BMS layout variants.
 /// </summary>
 [Cached]
-public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
+[Cached(typeof(IBmsScoring))]
+public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>, IBmsScoring
 {
 
     #region Constants
@@ -54,8 +50,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         activeSkin = new BmsEmbeddedSkinSource();
         skinCache = new BmsGameplaySkinCache(activeSkin);
 
-        var hitObjectsOrdered = beatmap.HitObjects
-            .OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToArray();
         TotalColumns = Math.Max(1, beatmap.TotalColumns);
         LayoutVariant = beatmap.LayoutVariant;
         TimingMap = beatmap.TimingMap;
@@ -66,12 +60,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         Stage = new BmsStage(this);
 
-        KeySoundPlayer = new BmsKeySoundPlayer(hitObjectsOrdered, Stage.Columns.Select(c => c.HitObjectContainer).ToArray(), () => Time.Current, TotalColumns);
-
         InternalChildren =
         [
             Stage,
-            KeySoundPlayer,
         ];
     }
 
@@ -120,13 +111,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region BmsEvents
 
-    public BmsKeySoundPlayer KeySoundPlayer { get; }
-
     private readonly BmsTextEventManager textEventManager;
 
     private void triggerEvents()
     {
-        textEventManager.Update(Time.Current, BmsEventBus.OnTextEvent);
+        textEventManager.Update(Time.Current, gameplayEvents.RaiseText);
     }
 
     #endregion
@@ -173,11 +162,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [Resolved]
     private ISkinSource parentSkin { get; set; } = null!;
 
+    [Resolved]
+    private IBmsGameplayEvents gameplayEvents { get; set; } = null!;
+
     #endregion
 
     #region Input
-
-    private readonly HashSet<int> pressedColumns = [];
 
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
     {
@@ -197,48 +187,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (column == null || column.Value >= TotalColumns)
             return false;
 
-        pressedColumns.Add(column.Value);
+        var outcome = Stage.Columns[column.Value].HandlePress(Time.Current);
 
-        var columnContainer = Stage.Columns[column.Value].HitObjectContainer;
-        var candidates = new List<(DrawableBmsHitObject Drawable, BmsJudgementCandidate Candidate)>();
-
-        foreach (var alive in columnContainer.AliveEntries.Values)
-        {
-            if (alive is not DrawableBmsHitObject d
-                || d.Judged
-                || d.HitObject is BmsLandmine)
-            {
-                continue;
-            }
-
-            candidates.Add((d, new BmsJudgementCandidate(
-                d.HitObject.StartTime,
-                d.HitObject.GetEndTime(),
-                d.HitObject.Column,
-                d.HitObject.Beatmap.Rank,
-                d.HitObject is BmsLongNote)));
-        }
-
-        var selection = BmsJudgementSelector.SelectPress(LayoutVariant, column.Value, candidates.Select(c => c.Candidate), Time.Current);
-
-        if (selection.Candidate is { } selectedCandidate)
-        {
-            var target = candidates.First(c => c.Candidate.Equals(selectedCandidate)).Drawable;
-            if (target.TryHit(selection.Result))
-            {
-                KeySoundPlayer.PlaySample(selectedCandidate.Column, target.HitObject.SamplePath);
-                return true;
-            }
-        }
-
-        KeySoundPlayer.PlayKeySound(column.Value);
-
-        if (selection.IsEmptyPoor)
-        {
+        if (outcome == PressOutcome.EmptyPoor)
             registerEmptyPoor();
-        }
 
-        return false;
+        return outcome == PressOutcome.Hit;
     }
 
     public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
@@ -255,49 +209,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (column == null || column.Value >= TotalColumns)
             return;
 
-        if (!pressedColumns.Contains(column.Value))
-            return;
-
-        pressedColumns.Remove(column.Value);
-
-        // Release: find the earliest held LN in this column and let it judge the key-up.
-        // We must include LNs released before the tail window (an early release is a drop,
-        // scored as POOR) — filtering by the release window here would leave the note
-        // frozen at the judgement line until its tail time passed.
-        var columnContainer = Stage.Columns[column.Value].HitObjectContainer;
-        DrawableBmsHitObject? heldNote = null;
-
-        foreach (var alive in columnContainer.AliveEntries.Values)
-        {
-            if (alive is not DrawableBmsHitObject d) continue;
-            if (d is not ILongNoteHolder ln || !ln.IsHoldingLongNote)
-                continue;
-
-            if (heldNote == null || d.HitObject.GetEndTime() < heldNote.HitObject.GetEndTime())
-                heldNote = d;
-        }
-
-        if (heldNote is ILongNoteHolder ln2)
-        {
-            var tailTable = BmsJudgementProfileProvider.GetTable(LayoutVariant, heldNote.HitObject.Column, heldNote.HitObject.Beatmap.Rank, tail: true);
-            var releaseOffset = Time.Current - heldNote.HitObject.GetEndTime();
-
-            if (ln2.TryRelease(releaseOffset, tailTable) && heldNote.HitObject is BmsLongNote ln)
-            {
-                KeySoundPlayer.PlaySample(column.Value, ln.TailSamplePath);
-            }
-        }
-    }
-
-    public bool IsColumnPressedForLandmine(int column) => pressedColumns.Contains(column);
-
-    public void DetonateLandmine(BmsHitObject hitObject)
-    {
-        var explosionPath = hitObject.Beatmap.SampleDefinitions.TryGetValue(0, out var p) ? p : string.Empty;
-        if (string.IsNullOrEmpty(explosionPath))
-            return;
-
-        KeySoundPlayer.PlayLandmineSound(explosionPath);
+        Stage.Columns[column.Value].HandleRelease(Time.Current);
     }
 
     #endregion
@@ -450,7 +362,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         ScrollSpeed = configuredScrollSpeed * scroll_speed_multipliers[currentMultiplierIndex];
         if (fireEvent)
-            BmsEventBus.OnScrollSpeedChangeEvent(scroll_speed_multipliers[currentMultiplierIndex]);
+            gameplayEvents.RaiseScrollSpeedChanged(scroll_speed_multipliers[currentMultiplierIndex]);
         RefreshAllLifetimes();
     }
 
@@ -554,12 +466,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             return;
         }
 
-        if (result.IsHit)
-        {
-            var column = Math.Clamp(bmsHitObject.HitObject.Column, 0, Stage.Columns.Length - 1);
-            TriggerHitExplosion(column, bmsHitObject.HitObject is BmsLongNote);
-        }
-
         requestJudgementDisplay(result.Type);
     }
 
@@ -573,15 +479,15 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     private void requestJudgementDisplay(HitResult result)
     {
         if (result == HitResult.Meh && textEventManager.Mistake != null)
-            BmsEventBus.OnTextEvent(textEventManager.Mistake);
+            gameplayEvents.RaiseText(textEventManager.Mistake);
 
-        BmsEventBus.OnJudgementDisplayEvent(result);
+        gameplayEvents.RaiseJudgementDisplayed(result);
     }
 
     /// <summary>
     ///     Registers an HCN head judgement that should not end the drawable yet.
     /// </summary>
-    internal void RegisterLongNoteHead(DrawableBmsHitObject drawable, double eventTime, HitResult result)
+    public void ApplyLongNoteHead(DrawableBmsHitObject drawable, double eventTime, HitResult result)
     {
         if (drawable.HitObject == null)
             return;
@@ -598,7 +504,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     ///     Registers a synthetic long-note endpoint (CN/HCN tail) through
     ///     the score and health processors, and triggers a visual hit explosion.
     /// </summary>
-    internal void RegisterLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime, HitResult result)
+    public void ApplySyntheticLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime, HitResult result)
     {
         if (drawable.HitObject is not BmsLongNote ln)
             return;
@@ -611,46 +517,16 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (result.IsHit())
         {
             var column = Math.Clamp(drawable.HitObject.Column, 0, Stage.Columns.Length - 1);
-            TriggerHitExplosion(column, drawable.HitObject is BmsLongNote);
+            Stage.Columns[column].TriggerHitExplosion(drawable.HitObject is BmsLongNote);
         }
 
         requestJudgementDisplay(result);
     }
 
     /// <summary>
-    /// Number of hit explosions fired by LN hold pulses (not head/tail). Exposed for tests to
-    /// verify the hold re-triggers the hit light throughout a long note, not just at its endpoints.
-    /// </summary>
-    internal int HoldExplosionCount { get; private set; }
-
-    /// <summary>
-    /// Spawns a hit explosion (hit light) for <paramref name="column"/>. Used for note hits, LN
-    /// head/tail endpoints, and the repeating hit light fired throughout an LN hold.
-    /// </summary>
-    internal void TriggerHitExplosion(int column, bool isLongNote, bool isHold = false)
-    {
-        if ((uint)column >= (uint)Stage.Columns.Length)
-            return;
-
-        if (isHold)
-            HoldExplosionCount++;
-
-        Stage.Columns[column].HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
-            BmsSkinComponents.HitExplosion,
-            LayoutVariant,
-            column,
-            isLongNote)));
-    }
-
-    /// <summary>
-    ///     Whether the specified column is currently pressed.
-    /// </summary>
-    internal bool IsColumnPressed(int column) => pressedColumns.Contains(column);
-
-    /// <summary>
     ///     Applies a HellChargeNote body gauge tick for the currently pressed column.
     /// </summary>
-    internal void ApplyHellChargeTick(bool holding, double scale = 0.5) => healthProcessor?.ApplyHellChargeTick(holding, scale);
+    public void ApplyHellChargeTick(bool holding, double scale = 0.5) => healthProcessor?.ApplyHellChargeTick(holding, scale);
 
     #endregion
 

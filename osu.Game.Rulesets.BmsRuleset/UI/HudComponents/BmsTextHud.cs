@@ -4,6 +4,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Graphics;
+using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 
@@ -15,6 +16,11 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
 
     private SpriteText mainText = null!;
     private SpriteText arrowText = null!;
+
+    private IBmsGameplayEvents? gameplayEvents;
+
+    [Resolved]
+    private DrawableRuleset drawableRuleset { get; set; } = null!;
 
     public BmsTextHud()
     {
@@ -28,8 +34,12 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
 
     protected override void Dispose(bool isDisposing)
     {
-        BmsEventBus.TextEvent -= showText;
-        BmsEventBus.ScrollSpeedChangeEvent -= showScrollSpeed;
+        if (gameplayEvents != null)
+        {
+            gameplayEvents.Text -= showText;
+            gameplayEvents.ScrollSpeedChanged -= showScrollSpeed;
+        }
+
         base.Dispose(isDisposing);
     }
 
@@ -38,8 +48,14 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
     protected override void LoadComplete()
     {
         base.LoadComplete();
-        BmsEventBus.TextEvent += showText;
-        BmsEventBus.ScrollSpeedChangeEvent += showScrollSpeed;
+        gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
+
+        if (gameplayEvents != null)
+        {
+            gameplayEvents.Text += showText;
+            gameplayEvents.ScrollSpeedChanged += showScrollSpeed;
+        }
+
         mainText.Text = "Game Start";
         this.Delay(1000).FadeOut(1000);
     }

@@ -5,6 +5,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -23,6 +24,12 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     [Resolved(CanBeNull = true)]
     protected BmsPlayfield? Playfield { get; private set; }
+
+    [Resolved(CanBeNull = true)]
+    protected IBmsScoring? Scoring { get; private set; }
+
+    [Resolved(CanBeNull = true)]
+    protected BmsColumn? ParentColumn { get; private set; }
 
     protected int Column { get; init; } = -1;
 

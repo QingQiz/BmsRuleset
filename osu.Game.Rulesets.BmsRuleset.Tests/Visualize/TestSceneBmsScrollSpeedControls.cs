@@ -1,8 +1,9 @@
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -53,5 +54,21 @@ public partial class TestSceneBmsScrollSpeedControls : BmsPlayerTestScene
 
         AddStep("press down", () => Playfield.AdjustScrollSpeed(-1));
         AddUntilStep("scroll speed restored", () => Playfield.ScrollSpeed, () => Is.EqualTo(8).Within(0.001));
+    }
+
+    [Test]
+    public void TestScrollSpeedChangeShowsTextHud()
+    {
+        this.AddSetupStep("load Argon player", LoadPlayer);
+        this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
+        this.AddSetupUntilStep("text hud loaded", () => Player.HUDOverlay.ChildrenOfType<BmsTextHud>().SingleOrDefault() != null);
+
+        // The HUD shows a "Game Start" banner on load that fades out ~2s later. Wait for it
+        // to clear so a later visibility rise is unambiguously the scroll-speed notification.
+        AddUntilStep("initial text hud banner faded", () => Player.HUDOverlay.ChildrenOfType<BmsTextHud>().SingleOrDefault()?.Alpha == 0);
+
+        AddStep("increase scroll speed", () => Playfield.AdjustScrollSpeed(1));
+        AddUntilStep("text hud shows the change", () => Player.HUDOverlay.ChildrenOfType<BmsTextHud>().SingleOrDefault()?.Alpha > 0);
     }
 }

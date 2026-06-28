@@ -38,6 +38,14 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     public override int Variant => (int)((BmsBeatmap)Beatmap).LayoutVariant;
 
+    // HUD components live in Player.HUDOverlay (a sibling of this DrawableRuleset under Player),
+    // so they cannot resolve the local [Cached] above. They reach this instance via the
+    // DrawableRuleset the Player caches for them — same cast pattern as BmsJudgementDisplay.
+    public IBmsGameplayEvents GameplayEvents => gameplayEvents;
+
+    [Cached(typeof(IBmsGameplayEvents))]
+    private readonly BmsGameplayEvents gameplayEvents = new();
+
     private BmsPreviewTrack? previewTrackBeforePlay;
 
     [Cached]

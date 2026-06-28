@@ -23,9 +23,9 @@ public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCo
 
         mineHandled = true;
 
-        if (Playfield?.IsColumnPressedForLandmine(HitObject.Column) == true)
+        if (ParentColumn?.IsPressed == true)
         {
-            Playfield.DetonateLandmine(HitObject);
+            ParentColumn?.DetonateLandmine(HitObject);
             ApplyResult(HitResult.Meh);
         }
         else

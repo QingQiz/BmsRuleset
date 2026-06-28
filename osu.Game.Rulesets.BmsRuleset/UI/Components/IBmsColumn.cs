@@ -18,4 +18,12 @@ public interface IBmsColumn
     Container HitExplosionArea { get; }
 
     bool Hidden { get; set; }
+
+    void TriggerHitExplosion(bool isLongNote, bool isHold = false);
+
+    void PlaySample(string samplePath);
+
+    PressOutcome HandlePress(double time);
+
+    void HandleRelease(double time);
 }

@@ -150,6 +150,8 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
     /// </summary>
     private static double getEarlyBadWindow(BmsHitObject hitObject)
     {
+        if (hitObject is BmsLandmine) return 0;
+
         var table = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.Beatmap.Rank, tail: false);
         return Math.Abs(table.EarlyWindowFor(HitResult.Ok));
     }
