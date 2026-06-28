@@ -55,6 +55,8 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
                 var endOffset = (float)((longNote.ScrollPositionAtEndTime - currentScrollPos) * scale);
                 ln.UpdateBodyGeometry(y, -(hitTarget + endOffset));
             }
+
+            note.UpdateColumnFrame();
         }
     }
 }

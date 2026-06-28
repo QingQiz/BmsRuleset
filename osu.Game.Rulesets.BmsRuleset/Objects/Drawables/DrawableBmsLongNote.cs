@@ -1,12 +1,13 @@
 using System;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables.LnHelper;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osuTK.Graphics;
@@ -54,6 +55,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private Container longNoteTailContainer = null!;
 
     private bool tailJudged;
+
+    [Resolved(CanBeNull = true)]
+    private IBmsLnScoring? scoring { get; set; }
 
     public override bool TryHit(HitResult result)
     {
@@ -170,8 +174,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     {
         base.OnApply();
 
-        if (HitObject != null && Playfield != null)
-            longNoteBody.SetSkinLookup(Playfield.LayoutVariant, Column);
+        if (HitObject != null)
+            longNoteBody.SetSkinLookup(LayoutVariant, Column);
     }
 
     protected override void AddKindDrawablesBeforeNote()
@@ -195,7 +199,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
                 [
                     new BmsCachedSkinnableDrawable(
                         new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail,
-                            Playfield?.LayoutVariant ?? BmsLayoutVariant.Bme7K, Column))
+                            LayoutVariant, Column))
                     {
                         ComponentAnchor = Anchor.BottomCentre,
                     },
@@ -206,10 +210,10 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     protected override void CheckForResult(bool userTriggered, double timeOffset)
     {
-        if (userTriggered || HitObject == null || Playfield == null)
+        if (userTriggered || HitObject == null)
             return;
 
-        var headTable = BmsJudgementProfileProvider.GetTable(Playfield.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: false);
+        var headTable = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: false);
 
         if (!longNoteStarted)
         {
@@ -226,7 +230,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             {
                 // CN: missed head -> POOR for head, then another POOR for tail
                 ApplyResult(HitResult.Meh);
-                Scoring?.ApplySyntheticLongNoteEndpoint(this, ln.EndTime, Time.Current, HitResult.Meh);
+                scoring?.ApplySyntheticLongNoteEndpoint(this, ln.EndTime, Time.Current, HitResult.Meh);
                 tailJudged = true;
                 return;
             }
@@ -236,7 +240,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             return;
         }
 
-        var tailTable = BmsJudgementProfileProvider.GetTable(Playfield.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: true);
+        var tailTable = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: true);
         var tailOffset = Time.Current - ln.EndTime;
 
         if (isChargeMode)
@@ -274,11 +278,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         base.UpdateHitStateTransforms(state);
     }
 
-    protected override void Update()
+    protected override void UpdateKindPostResultState()
     {
-        base.Update();
-
-        if (HitObject == null || Playfield == null)
+        if (HitObject == null)
             return;
 
         // Pulse the LN hit light (lightingL) throughout the hold so the explosion re-triggers
@@ -293,7 +295,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         if (isChargeMode && longNoteStarted && !tailJudged)
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(Playfield.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: true);
+            var tailTable = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: true);
             var tailOffset = Time.Current - ln.EndTime;
 
             if (tailTable.IsPastPassivePoorOffset(tailOffset))
@@ -320,7 +322,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             return;
 
         var holding = ParentColumn?.IsPressed == true;
-        hellChargeTracker.Update(elapsed, holding, (h, s) => Scoring?.ApplyHellChargeTick(h, s));
+        hellChargeTracker.Update(elapsed, holding, (h, s) => scoring?.ApplyHellChargeTick(h, s));
     }
 
     private void applyLongNoteReleaseResult(BmsJudgementWindowTable tailTable, double tailOffset)
@@ -341,7 +343,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         var result = tailTable.ResultForOffset(tailOffset);
         var endpointResult = result == HitResult.None ? HitResult.Meh : result;
-        Scoring?.ApplySyntheticLongNoteEndpoint(this, ln.EndTime, eventTime, endpointResult);
+        scoring?.ApplySyntheticLongNoteEndpoint(this, ln.EndTime, eventTime, endpointResult);
         tailJudged = true;
         clearVisualIfTailWasNotPoor(endpointResult);
     }
@@ -365,7 +367,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         return BmsLongNoteGeometry.BodyDirectionBeforeTailPasses(
             ((BmsLongNote)HitObject).ScrollPositionAtEndTime - HitObject.ScrollPositionAtStartTime,
             ln.Duration,
-            Playfield?.ScrollSpeedMultiplier ?? 1,
+            ScrollSpeedMultiplier,
             realHeadY,
             realTailY);
     }
@@ -396,10 +398,10 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         Alpha = 1;
         LifetimeEnd = chargeTailLifetimeEnd();
 
-        Scoring?.ApplyLongNoteHead(this, Time.Current, HitResult.Meh);
+        scoring?.ApplyLongNoteHead(this, Time.Current, HitResult.Meh);
     }
 
-    private void pinVisualHeadToJudgementLine() => visualState.PinHead(-(Playfield?.Stage.HitTargetPosition ?? 200));
+    private void pinVisualHeadToJudgementLine() => visualState.PinHead(-HitTargetPosition);
 
     private double chargeTailLifetimeEnd()
     {
@@ -407,7 +409,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             return Time.Current;
 
         var tailTable = BmsJudgementProfileProvider.GetTable(
-            Playfield?.LayoutVariant ?? HitObject.Beatmap.LayoutVariant,
+            HitObject.Beatmap.LayoutVariant,
             HitObject.Column,
             HitObject.Beatmap.Rank,
             tail: true);

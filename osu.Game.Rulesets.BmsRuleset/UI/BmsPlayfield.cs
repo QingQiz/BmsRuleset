@@ -30,8 +30,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 ///     judgement display, scroll-speed HUD, and input routing for all BMS layout variants.
 /// </summary>
 [Cached]
-[Cached(typeof(IBmsScoring))]
-public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>, IBmsScoring
+[Cached(typeof(IBmsLnScoring))]
+public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>, IBmsLnScoring
 {
 
     #region Constants

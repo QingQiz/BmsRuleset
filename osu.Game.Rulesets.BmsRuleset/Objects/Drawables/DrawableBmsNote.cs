@@ -11,10 +11,10 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
 
     protected override void CheckForResult(bool userTriggered, double timeOffset)
     {
-        if (userTriggered || HitObject == null || Playfield == null)
+        if (userTriggered || HitObject == null)
             return;
 
-        var table = BmsJudgementProfileProvider.GetTable(Playfield.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: false);
+        var table = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: false);
         if (table.IsPastPassivePoorOffset(timeOffset))
             ApplyResult(HitResult.Meh);
     }

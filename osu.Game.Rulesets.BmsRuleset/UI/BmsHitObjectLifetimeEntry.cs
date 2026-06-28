@@ -279,7 +279,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsPlayfiel
 
     /// <summary>
     ///     The BAD (late) hit-window for this object.  The entry must stay alive at least this long
-    ///     past its EndTime so the auto-miss path in <see cref="Objects.Drawables.DrawableBmsHitObject.Update" /> can fire.
+    ///     past its EndTime so the auto-miss path in <see cref="Objects.Drawables.DrawableBmsHitObject.UpdateColumnFrame" /> can fire.
     /// </summary>
     private static double getLateWindow(BmsHitObject hitObject)
     {

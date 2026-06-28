@@ -3,7 +3,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
-public interface IBmsScoring
+public interface IBmsLnScoring
 {
     /// <summary>Registers an HCN head judgement that should not end the drawable yet.</summary>
     void ApplyLongNoteHead(DrawableBmsHitObject drawable, double eventTime, HitResult result);

@@ -60,12 +60,17 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal const float HIT_OBJECT_DEPTH = 0;
 
+    internal BmsLayoutVariant LayoutVariant { get; }
+
+    internal float HitTargetPosition => ParentPlayfield.Stage.HitTargetPosition;
+
+    internal double ScrollSpeedMultiplier => ParentPlayfield.ScrollSpeedMultiplier;
+
     protected BmsPlayfield ParentPlayfield { get; }
 
     private const float key_area_under_notes_depth = 1;
     private const float key_area_over_notes_depth = -1;
 
-    private readonly BmsLayoutVariant layoutVariant;
     private readonly SkinnableDrawable keyArea;
     private readonly SkinnableDrawable hitTarget;
 
@@ -78,27 +83,27 @@ public partial class BmsColumn : Playfield, IBmsColumn
     {
         ParentPlayfield = playfield;
         Index = index;
-        layoutVariant = playfield.LayoutVariant;
-        IsScratch = BmsLayout.IsScratchColumn(index, layoutVariant);
+        LayoutVariant = playfield.LayoutVariant;
+        IsScratch = BmsLayout.IsScratchColumn(index, LayoutVariant);
 
         RelativeSizeAxes = Axes.Y;
-        Width = defaultColumnWidth(index, layoutVariant);
+        Width = defaultColumnWidth(index, LayoutVariant);
         Masking = true;
         BorderThickness = 0;
         HitObjectContainer.Depth = HIT_OBJECT_DEPTH;
 
         InternalChildren =
         [
-            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, index))
+            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, LayoutVariant, index))
             {
                 RelativeSizeAxes = Axes.Both,
             },
-            keyArea = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, layoutVariant, index))
+            keyArea = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, LayoutVariant, index))
             {
                 RelativeSizeAxes = Axes.Both,
                 CentreComponent = false,
             },
-            hitTarget = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, layoutVariant, index))
+            hitTarget = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, LayoutVariant, index))
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
@@ -172,9 +177,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
         if (Hidden)
             return;
 
-        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, Index);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, LayoutVariant, Index);
         Width = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, lookup))?.Value
-                ?? defaultColumnWidth(Index, layoutVariant);
+                ?? defaultColumnWidth(Index, LayoutVariant);
 
         // For 2P/scratch-on-right, ColumnSpacing indices must be remapped to follow
         // visual column order [keys…, scratch] rather than BMS index order.
@@ -183,7 +188,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
         if (BmsLayout.Is2P(lookup.LayoutVariant) && lookup.ColumnIndex is int colIdx)
         {
-            var totalCols = BmsLayout.GetTotalColumns(layoutVariant);
+            var totalCols = BmsLayout.GetTotalColumns(LayoutVariant);
             (spacingLeftCol, spacingRightCol) = BmsLayout.RemapColum2PGapIdx(colIdx, totalCols);
         }
         else
@@ -193,11 +198,11 @@ public partial class BmsColumn : Playfield, IBmsColumn
         }
 
         var spacingLookupLeft = spacingLeftCol != null
-            ? new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, spacingLeftCol.Value)
+            ? new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, LayoutVariant, spacingLeftCol.Value)
             : null;
 
         var spacingLookupRight = spacingRightCol != null
-            ? new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, spacingRightCol.Value)
+            ? new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, LayoutVariant, spacingRightCol.Value)
             : null;
 
         Margin = new MarginPadding
@@ -228,7 +233,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
     {
         HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
             BmsSkinComponents.HitExplosion,
-            layoutVariant,
+            LayoutVariant,
             Index,
             isLongNote)));
     }
@@ -293,7 +298,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
                 d.HitObject is BmsLongNote)));
         }
 
-        var selection = BmsJudgementSelector.SelectPress(layoutVariant, Index, candidates.Select(c => c.Candidate), time);
+        var selection = BmsJudgementSelector.SelectPress(LayoutVariant, Index, candidates.Select(c => c.Candidate), time);
 
         if (selection.Candidate is { } selectedCandidate)
         {
@@ -335,7 +340,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
         if (heldNote is ILongNoteHolder ln2)
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(layoutVariant, Index, heldNote.HitObject.Beatmap.Rank, tail: true);
+            var tailTable = BmsJudgementProfileProvider.GetTable(LayoutVariant, Index, heldNote.HitObject.Beatmap.Rank, tail: true);
             var releaseOffset = time - heldNote.HitObject.GetEndTime();
 
             if (ln2.TryRelease(releaseOffset, tailTable) && heldNote.HitObject is BmsLongNote ln)

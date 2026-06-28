@@ -34,6 +34,18 @@ public class BmsGameplayVirtualisationTest
     }
 
     [Test]
+    public void TestDrawableBmsHitObjectsDoNotReferenceBmsPlayfield()
+    {
+        var drawablesPath = Path.Combine(findSourceRoot(), "osu.Game.Rulesets.BmsRuleset", "Objects", "Drawables");
+        var references = Directory.GetFiles(drawablesPath, "DrawableBms*.cs")
+            .Where(file => File.ReadAllText(file).Contains("BmsPlayfield"))
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        Assert.That(references, Is.Empty);
+    }
+
+    [Test]
     public void TestDecoderCreatesTypedHitObjects()
     {
         using var stream = new MemoryStream("""
@@ -251,6 +263,21 @@ public class BmsGameplayVirtualisationTest
         }
 
         return string.Empty;
+    }
+
+    private static string findSourceRoot([CallerFilePath] string sourceFile = "")
+    {
+        var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile) ?? string.Empty);
+
+        while (directory != null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "osu.Game.Rulesets.BmsRuleset")))
+                return directory.FullName;
+
+            directory = directory.Parent;
+        }
+
+        return TestContext.CurrentContext.TestDirectory;
     }
 
     private static double findFirstVisibleTime(BmsBeatmap beatmap, BmsHitObject hitObject)
