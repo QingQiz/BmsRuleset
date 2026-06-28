@@ -14,98 +14,39 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 
-public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCol>, ILongNoteHolder
+public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCol>, ILongNoteHolder, IBmsLongNoteHooks
     where TCol : struct, IColumnProvider
 {
-
-    public bool IsHoldingLongNote => longNoteStarted && !tailJudged;
+    public bool IsHoldingLongNote => controller.LongNoteStarted && !controller.TailJudged;
 
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.HoldNoteHead;
 
     private BmsLongNote ln => (BmsLongNote)HitObject;
 
-    private BmsLongNoteMode mode
-    {
-        get
-        {
-            var beatmap = HitObject?.Beatmap;
-            return beatmap == null || beatmap.LockedLongNoteMode == BmsLongNoteMode.Undefined
-                ? BmsLongNoteMode.LongNote
-                : beatmap.LockedLongNoteMode;
-        }
-    }
-
-    private bool isChargeMode => mode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote;
-
-    private const double passive_poor_lifetime_margin = 100;
-    private const double tail_visibility_grace = 50;
-
     // Re-trigger the LN hit light this often while holding so the explosion pulses throughout the
-    // hold instead of only firing at the head and tail.
+    // hold instead of only firing at the head and tail endpoints.
     private const double hold_explosion_interval = BmsLegacySkinTransformer.HIT_EXPLOSION_FADE_IN_DURATION;
 
     private readonly BmsLongNoteVisualState visualState = new();
-    private readonly BmsHellChargeBodyTracker hellChargeTracker = new();
+    private readonly BmsLongNoteJudgementController controller = new();
 
-    private bool headJudged;
-    private bool longNoteStarted;
-    private double headJudgeOffset;
     private double lastHoldExplosionTime;
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private Container longNoteTailContainer = null!;
-
-    private bool tailJudged;
 
     [Resolved(CanBeNull = true)]
     private IBmsLnScoring? scoring { get; set; }
 
     public override bool TryHit(HitResult result)
     {
-        if (Judged || HitObject == null || headJudged || longNoteStarted || result == HitResult.None)
+        if (Judged || HitObject == null)
             return false;
 
-        if (mode == BmsLongNoteMode.HellChargeNote && result == HitResult.Meh)
-        {
-            startHellChargeBodyAfterHeadPoor();
-            return true;
-        }
-
-        headJudged = true;
-        longNoteStarted = result != HitResult.Meh;
-        // Seed so the first hold pulse fires as soon as the hold begins, without relying on a
-        // sentinel that would overflow the elapsed-time check.
-        lastHoldExplosionTime = Time.Current - hold_explosion_interval;
-        headJudgeOffset = Time.Current - HitObject.StartTime;
-        pinVisualHeadToJudgementLine();
-        hellChargeTracker.Reset();
-
-        // CN/HCN score the head and tail as separate beatoraja-style events.
-        if (isChargeMode)
-            ApplyResult(result);
-
-        return true;
+        return controller.TryHit(Time.Current, result);
     }
 
     public bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable)
-    {
-        if (HitObject == null || !longNoteStarted || tailJudged)
-            return false;
-
-        if (!isChargeMode)
-        {
-            if (Judged)
-                return false;
-
-            applyLongNoteReleaseResult(tailTable, releaseOffset);
-            return true;
-        }
-
-        if (mode == BmsLongNoteMode.HellChargeNote)
-            hellChargeTracker.MarkReleased();
-
-        applyChargeTailResult(tailTable, releaseOffset, Time.Current);
-        return true;
-    }
+        => HitObject != null && controller.TryRelease(Time.Current, releaseOffset, tailTable);
 
     /// <summary>
     /// Called by BmsColumnHitObjectContainer every frame with pre-computed
@@ -144,7 +85,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (Math.Abs(longNoteBody.Height - bodyHeight) > 0.5f)
             longNoteBody.Height = Math.Max(1, bodyHeight);
 
-        longNoteBody.UpdateBody(bodyHeight, tailAtTop, longNoteStarted);
+        longNoteBody.UpdateBody(bodyHeight, tailAtTop, controller.LongNoteStarted);
         longNoteBody.Alpha = bodyHeight > 0 ? 1 : 0;
         longNoteBody.Colour = shouldGreyBody() ? new Color4(128, 128, 128, 255) : Color4.White;
 
@@ -159,13 +100,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     protected override void ResetKindState()
     {
-        headJudged = false;
-        longNoteStarted = false;
-        tailJudged = false;
-        headJudgeOffset = 0;
-        hellChargeTracker.Reset();
+        controller.Reset();
         visualState.Reset();
-
         longNoteBody.Alpha = 0;
         longNoteTailContainer.Alpha = 0;
     }
@@ -175,7 +111,10 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         base.OnApply();
 
         if (HitObject != null)
+        {
+            controller.Bind((BmsLongNote)HitObject, this);
             longNoteBody.SetSkinLookup(LayoutVariant, Column);
+        }
     }
 
     protected override void AddKindDrawablesBeforeNote()
@@ -213,46 +152,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (userTriggered || HitObject == null)
             return;
 
-        var headTable = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: false);
-
-        if (!longNoteStarted)
-        {
-            if (!headTable.IsPastPassivePoorOffset(Time.Current - HitObject.StartTime))
-                return;
-
-            if (mode == BmsLongNoteMode.HellChargeNote)
-            {
-                startHellChargeBodyAfterHeadPoor();
-                return;
-            }
-
-            if (isChargeMode)
-            {
-                // CN: missed head -> POOR for head, then another POOR for tail
-                ApplyResult(HitResult.Meh);
-                scoring?.ApplySyntheticLongNoteEndpoint(this, ln.EndTime, Time.Current, HitResult.Meh);
-                tailJudged = true;
-                return;
-            }
-
-            ApplyResult(HitResult.Meh);
-            tailJudged = true;
-            return;
-        }
-
-        var tailTable = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: true);
-        var tailOffset = Time.Current - ln.EndTime;
-
-        if (isChargeMode)
-        {
-            if (tailTable.IsPastPassivePoorOffset(tailOffset))
-                applyChargeTailResult(tailTable, tailOffset, Time.Current);
-
-            return;
-        }
-
-        if (tailOffset >= 0)
-            applyLongNoteReleaseResult(tailTable, tailOffset);
+        controller.CheckPassiveResult(Time.Current);
     }
 
     // Keep CN/HCN visuals alive after head judgement
@@ -261,16 +161,16 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (state == ArmedState.Hit && HitObject != null && Time.Current < ln.EndTime)
         {
             Alpha = 1;
-            LifetimeEnd = isChargeMode ? chargeTailLifetimeEnd() : ln.EndTime;
+            LifetimeEnd = controller.IsChargeMode ? controller.ChargeTailLifetimeEnd() : ln.EndTime;
             return;
         }
 
-        if (isChargeMode && state == ArmedState.Hit && !tailJudged)
+        if (controller.IsChargeMode && state == ArmedState.Hit && !controller.TailJudged)
         {
             Alpha = 1;
 
             if (HitObject != null)
-                LifetimeEnd = chargeTailLifetimeEnd();
+                LifetimeEnd = controller.ChargeTailLifetimeEnd();
 
             return;
         }
@@ -283,79 +183,27 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (HitObject == null)
             return;
 
-        // Pulse the LN hit light (lightingL) throughout the hold so the explosion re-triggers
-        // while holding, not just at the head and tail endpoints.
-        if (longNoteStarted && !tailJudged
-                            && Time.Current >= HitObject.StartTime && Time.Current <= ln.EndTime
-                            && Time.Current - lastHoldExplosionTime >= hold_explosion_interval)
+        // Hold-explosion pulse runs first, matching the original per-frame order (pulse, then
+        // charge-tail passive miss, retire, HCN tick). It reads pre-mutation controller state.
+        if (controller.LongNoteStarted && !controller.TailJudged
+                                       && Time.Current >= HitObject.StartTime && Time.Current <= ln.EndTime
+                                       && Time.Current - lastHoldExplosionTime >= hold_explosion_interval)
         {
             ParentColumn?.TriggerHitExplosion(true, isHold: true);
             lastHoldExplosionTime = Time.Current;
         }
 
-        if (isChargeMode && longNoteStarted && !tailJudged)
-        {
-            var tailTable = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.Beatmap.Rank, tail: true);
-            var tailOffset = Time.Current - ln.EndTime;
-
-            if (tailTable.IsPastPassivePoorOffset(tailOffset))
-                applyChargeTailResult(tailTable, tailOffset, Time.Current);
-        }
-
-        if (longNoteStarted && Time.Current > ln.EndTime + tail_visibility_grace && (!isChargeMode || tailJudged))
-        {
-            longNoteStarted = false;
-            this.FadeOut();
-            LifetimeEnd = Time.Current;
-            return;
-        }
-
-        if (mode != BmsLongNoteMode.HellChargeNote || !longNoteStarted)
-            return;
-
-        if (Time.Current < HitObject.StartTime || Time.Current > ln.EndTime)
-            return;
-
-        var elapsed = boundedHellChargeElapsed();
-
-        if (elapsed <= 0)
-            return;
-
-        var holding = ParentColumn?.IsPressed == true;
-        hellChargeTracker.Update(elapsed, holding, (h, s) => scoring?.ApplyHellChargeTick(h, s));
-    }
-
-    private void applyLongNoteReleaseResult(BmsJudgementWindowTable tailTable, double tailOffset)
-    {
-        var heldOffset = Math.Abs(headJudgeOffset) > Math.Abs(tailOffset) ? headJudgeOffset : tailOffset;
-        var result = tailTable.ResultForOffset(heldOffset);
-        var endpointResult = result == HitResult.None ? HitResult.Meh : result;
-
-        ApplyResult(endpointResult);
-        tailJudged = true;
-        clearVisualIfTailWasNotPoor(endpointResult);
-    }
-
-    private void applyChargeTailResult(BmsJudgementWindowTable tailTable, double tailOffset, double eventTime)
-    {
-        if (HitObject == null || tailJudged)
-            return;
-
-        var result = tailTable.ResultForOffset(tailOffset);
-        var endpointResult = result == HitResult.None ? HitResult.Meh : result;
-        scoring?.ApplySyntheticLongNoteEndpoint(this, ln.EndTime, eventTime, endpointResult);
-        tailJudged = true;
-        clearVisualIfTailWasNotPoor(endpointResult);
+        controller.UpdatePostResult(Time.Current, Time.Elapsed, ParentColumn?.IsPressed == true);
     }
 
     private bool shouldGreyBody()
-        => longNoteStarted
+        => controller.LongNoteStarted
            && HitObject != null
            && Time.Current < ln.EndTime
            && !isHoldingBody();
 
     private bool isHoldingBody()
-        => longNoteStarted
+        => controller.LongNoteStarted
            && HitObject != null
            && ParentColumn?.IsPressed == true;
 
@@ -374,10 +222,11 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     private void clearVisualIfTailWasNotPoor(HitResult tailResult)
     {
+        // The longNoteStarted=false that lived here in the original now lives on the controller
+        // (it owns that state); this hook only owns the visual clear.
         if (tailResult == HitResult.Meh)
             return;
 
-        longNoteStarted = false;
         visualState.Reset();
         longNoteBody.Alpha = 0;
         longNoteTailContainer.Alpha = 0;
@@ -385,47 +234,39 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         LifetimeEnd = Time.Current;
     }
 
-    private void startHellChargeBodyAfterHeadPoor()
-    {
-        if (HitObject == null || headJudged)
-            return;
-
-        headJudged = true;
-        longNoteStarted = true;
-        headJudgeOffset = Time.Current - HitObject.StartTime;
-        pinVisualHeadToJudgementLine();
-        hellChargeTracker.Reset();
-        Alpha = 1;
-        LifetimeEnd = chargeTailLifetimeEnd();
-
-        scoring?.ApplyLongNoteHead(this, Time.Current, HitResult.Meh);
-    }
-
     private void pinVisualHeadToJudgementLine() => visualState.PinHead(-HitTargetPosition);
 
-    private double chargeTailLifetimeEnd()
+    // --- IBmsLongNoteHooks: side-effects driven by the judgement controller. ---
+
+    void IBmsLongNoteHooks.OnUserHeadJudged()
     {
-        if (HitObject == null)
-            return Time.Current;
-
-        var tailTable = BmsJudgementProfileProvider.GetTable(
-            HitObject.Beatmap.LayoutVariant,
-            HitObject.Column,
-            HitObject.Beatmap.Rank,
-            tail: true);
-
-        return ln.EndTime + tailTable.LateWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
+        pinVisualHeadToJudgementLine();
+        lastHoldExplosionTime = Time.Current - hold_explosion_interval;
     }
 
-    private double boundedHellChargeElapsed()
+    void IBmsLongNoteHooks.OnHellChargeHeadPoor(double eventTime, double lifetimeEnd)
     {
-        if (HitObject == null)
-            return 0;
+        pinVisualHeadToJudgementLine();
+        Alpha = 1;
+        LifetimeEnd = lifetimeEnd;
+        scoring?.ApplyLongNoteHead(this, eventTime, HitResult.Meh);
+    }
 
-        var frameStart = Time.Current - Time.Elapsed;
-        var start = Math.Max(frameStart, HitObject.StartTime);
-        var end = Math.Min(Time.Current, ln.EndTime);
+    void IBmsLongNoteHooks.ApplyJudgementResult(HitResult result)
+        => ApplyResult(result);
 
-        return Math.Max(0, end - start);
+    void IBmsLongNoteHooks.ClearVisualIfTailWasNotPoor(HitResult tailResult)
+        => clearVisualIfTailWasNotPoor(tailResult);
+
+    void IBmsLongNoteHooks.ApplySyntheticTailEndpoint(double endpointTime, double eventTime, HitResult result)
+        => scoring?.ApplySyntheticLongNoteEndpoint(this, endpointTime, eventTime, result);
+
+    void IBmsLongNoteHooks.ApplyHellChargeTick(bool holding, double scale)
+        => scoring?.ApplyHellChargeTick(holding, scale);
+
+    void IBmsLongNoteHooks.Retire()
+    {
+        this.FadeOut();
+        LifetimeEnd = Time.Current;
     }
 }
