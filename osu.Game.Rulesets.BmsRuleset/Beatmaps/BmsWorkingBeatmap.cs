@@ -1,9 +1,12 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Beatmaps;
+using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
@@ -17,19 +20,23 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 ///     overrides <see cref="GetBeatmapTrack" /> to return a <see cref="BmsPreviewTrack" />
 ///     for BMS charts.  All other members are delegated to the inner working beatmap.
 /// </summary>
-public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager)
-    : WorkingBeatmap(inner.BeatmapInfo, audioManager)
+public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, TextureStore? externalTextureStore = null)
+    : WorkingBeatmap(createWrapperBeatmapInfo(inner), audioManager)
 {
 
     internal static BmsPreviewTrack? ActivePreviewTrack { get; private set; }
 
     private readonly AudioManager audioManager = audioManager;
 
+    private bool externalBackgroundResolved;
+    private List<string> resolvedBackgroundPaths = null!;
+    private List<string> resolvedPanelBackgroundPaths = null!;
+
     public override bool TryTransferTrack(WorkingBeatmap target) => false;
 
-    public override Texture GetBackground() => inner.GetBackground();
+    public override Texture GetBackground() => getExternalBackground(false) ?? inner.GetBackground();
 
-    public override Texture GetPanelBackground() => inner.GetPanelBackground();
+    public override Texture GetPanelBackground() => getExternalBackground(true) ?? inner.GetPanelBackground();
 
     public override Stream GetStream(string storagePath) => inner.GetStream(storagePath);
 
@@ -103,11 +110,11 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager)
                 bmsBeatmap.PreviewFile);
 
             // Stop and remove the previous preview track before registering the new one.
-            // Removing without stopping would leave its StopwatchClock running forever.
+            // Disposing via the audio update loop also releases the per-chart SampleStore.
             if (ActivePreviewTrack != null)
             {
                 ActivePreviewTrack.Stop();
-                audioManager.RemoveItem(ActivePreviewTrack);
+                ActivePreviewTrack.Dispose();
             }
 
             audioManager.AddItem(track);
@@ -126,4 +133,146 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager)
     protected override Storyboard GetStoryboard() => inner.Storyboard;
 
     protected override Waveform GetWaveform() => inner.Waveform;
+
+    private static BeatmapInfo createWrapperBeatmapInfo(WorkingBeatmap inner)
+    {
+        var beatmapInfo = inner.BeatmapInfo.Clone();
+        beatmapInfo.Metadata = inner.BeatmapInfo.Metadata.DeepClone();
+        beatmapInfo.BeatmapSet = cloneBeatmapSetInfo(beatmapInfo.BeatmapSet, beatmapInfo);
+        var backgroundPaths = resolveExternalBackgroundPaths(inner, false);
+        var panelBackgroundPaths = resolveExternalBackgroundPaths(inner, true);
+        applyExternalBackgroundMarker(beatmapInfo, backgroundPaths.FirstOrDefault(), panelBackgroundPaths.FirstOrDefault());
+
+        return beatmapInfo;
+    }
+
+    private static BeatmapSetInfo? cloneBeatmapSetInfo(BeatmapSetInfo? source, BeatmapInfo owner)
+    {
+        if (source == null)
+            return null;
+
+        var clone = new BeatmapSetInfo
+        {
+            ID = source.ID,
+            OnlineID = source.OnlineID,
+            DateAdded = source.DateAdded,
+            DateSubmitted = source.DateSubmitted,
+            DateRanked = source.DateRanked,
+            Status = source.Status,
+            DeletePending = source.DeletePending,
+            Hash = source.Hash,
+            Protected = source.Protected,
+        };
+
+        foreach (var file in source.Files)
+            clone.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = file.File.Hash }, file.Filename));
+
+        clone.Beatmaps.Add(owner);
+
+        return clone;
+    }
+
+    private static void applyExternalBackgroundMarker(BeatmapInfo beatmapInfo, string? backgroundPath, string? panelBackgroundPath)
+    {
+        var markerPath = panelBackgroundPath ?? backgroundPath;
+
+        if (markerPath == null)
+            return;
+
+        // Song-select panels check this metadata before loading textures, so it must be ready
+        // as soon as the wrapper is constructed rather than on first GetBackground().
+        beatmapInfo.Metadata.BackgroundFile = markerPath;
+
+        if (beatmapInfo.BeatmapSet?.GetFile(markerPath) == null)
+            beatmapInfo.BeatmapSet?.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = $"{backgroundPath}|{panelBackgroundPath}" }, markerPath));
+    }
+
+    private static List<string> resolveExternalBackgroundPaths(WorkingBeatmap inner, bool preferBanner)
+    {
+        var paths = new List<string>();
+
+        // Source is only a directory for external-audio charts; bail before touching
+        // inner.Beatmap so normal imports don't pay for a decode just to resolve backgrounds.
+        if (string.IsNullOrWhiteSpace(inner.Metadata.Source) || !Directory.Exists(inner.Metadata.Source))
+            return paths;
+
+        if (inner.Beatmap is not IBmsBeatmap bmsBeatmap)
+            return paths;
+
+        var baseFullPath = Path.GetFullPath(inner.Metadata.Source);
+
+        foreach (var candidate in getBackgroundCandidates(bmsBeatmap, preferBanner))
+        {
+            string fullPath;
+
+            try
+            {
+                fullPath = Path.GetFullPath(Path.Combine(baseFullPath, candidate));
+            }
+            catch (Exception)
+            {
+                // #STAGEFILE / #BACKBMP / #BANNER values are chart-controlled and only
+                // quote-trimmed by the parser; illegal path characters would otherwise throw
+                // and crash background loading for the whole chart.
+                continue;
+            }
+
+            if (BmsFileResourceStore.IsPathInsideDirectory(fullPath, baseFullPath) && File.Exists(fullPath))
+                paths.Add(fullPath);
+        }
+
+        return paths;
+    }
+
+    private static IEnumerable<string> getBackgroundCandidates(IBmsBeatmap bmsBeatmap, bool preferBanner)
+    {
+        if (preferBanner && !string.IsNullOrWhiteSpace(bmsBeatmap.Banner))
+            yield return bmsBeatmap.Banner;
+
+        foreach (var candidate in bmsBeatmap.GetSongSelectBackgroundCandidates())
+        {
+            if (preferBanner && string.Equals(candidate, bmsBeatmap.Banner, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            yield return candidate;
+        }
+    }
+
+    private Texture? getExternalBackground(bool preferBanner)
+    {
+        ensureExternalBackgroundResolved();
+
+        if (externalTextureStore == null)
+            return null;
+
+        var paths = preferBanner ? resolvedPanelBackgroundPaths : resolvedBackgroundPaths;
+
+        // Try each candidate in priority order so a corrupt or unreadable primary asset
+        // (e.g. a broken #STAGEFILE) still falls back to #BACKBMP / #BANNER instead of
+        // caching a permanent miss for the wrapper's lifetime.
+        foreach (var path in paths)
+        {
+            var texture = externalTextureStore.Get(path);
+
+            if (texture != null)
+                return texture;
+        }
+
+        return null;
+    }
+
+    private void ensureExternalBackgroundResolved()
+    {
+        if (externalBackgroundResolved)
+            return;
+
+        externalBackgroundResolved = true;
+
+        resolvedBackgroundPaths = resolveExternalBackgroundPaths(inner, false);
+        resolvedPanelBackgroundPaths = resolveExternalBackgroundPaths(inner, true);
+
+        var backgroundPath = resolvedBackgroundPaths.FirstOrDefault();
+        var panelBackgroundPath = resolvedPanelBackgroundPaths.FirstOrDefault();
+        applyExternalBackgroundMarker(BeatmapInfo, backgroundPath, panelBackgroundPath);
+    }
 }

@@ -13,12 +13,9 @@ public class BmsHitWindows(int rank = 2, BmsLayoutVariant layout = BmsLayoutVari
     private readonly int rank = Math.Clamp(rank, 0, 4);
     private BmsJudgementWindowTable table = createTable(Math.Clamp(rank, 0, 4), layout, column);
 
-    private static BmsJudgementWindowTable createTable(int clampedRank, BmsLayoutVariant layout, int column)
-        => BmsJudgementProfileProvider.GetTable(layout, column, clampedRank, tail: false);
-
     public override bool IsHitResultAllowed(HitResult result) => result switch
     {
-        HitResult.Perfect or HitResult.Great or HitResult.Good or HitResult.Ok or HitResult.Meh => true,
+        HitResult.Perfect or HitResult.Great or HitResult.Good or HitResult.Ok or HitResult.Meh or HitResult.Miss => true,
         _ => false,
     };
 
@@ -46,4 +43,6 @@ public class BmsHitWindows(int rank = 2, BmsLayoutVariant layout = BmsLayoutVari
         _ => 0,
     };
 
+    private static BmsJudgementWindowTable createTable(int clampedRank, BmsLayoutVariant layout, int column)
+        => BmsJudgementProfileProvider.GetTable(layout, column, clampedRank, tail: false);
 }

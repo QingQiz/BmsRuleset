@@ -1,26 +1,29 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.IO;
+using osu.Game.Rulesets.BmsRuleset.Audio;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
-/// <summary>
-///     A <see cref="WorkingBeatmapCache" /> that wraps BMS beatmaps in a <see cref="BmsWorkingBeatmap" />
-///     so that <see cref="osu.Game.Rulesets.BmsRuleset.Audio.BmsPreviewTrack" /> is used as the audio track instead of a silent virtual track.
-///     Non-BMS beatmaps pass through to the base implementation unchanged.
-/// </summary>
 internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
 {
-    private readonly Dictionary<Guid, BmsWorkingBeatmap> bmsWrapperCache = new();
+    private readonly Dictionary<Guid, WeakReference<BmsWorkingBeatmap>> bmsWrapperCache = new();
+
+    // One weakly-cached texture store per external chart directory. Live wrappers keep their
+    // store alive, while abandoned external directories don't accumulate for the cache lifetime.
+    private readonly Dictionary<string, WeakReference<LargeTextureStore>> externalTextureStores = new();
+    private readonly object externalTextureStoreLock = new();
 
     private BmsWorkingBeatmapCache(
         ITrackStore trackStore,
@@ -32,6 +35,7 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
         RealmAccess realm)
         : base(trackStore, audioManager, resources, files, defaultBeatmap, host, realm)
     {
+        OnInvalidated += onInvalidated;
     }
 
     public override WorkingBeatmap GetWorkingBeatmap(BeatmapInfo? beatmapInfo)
@@ -43,30 +47,90 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
         if (!isBms)
             return base.GetWorkingBeatmap(beatmapInfo);
 
-        if (bmsWrapperCache.TryGetValue(beatmapInfo.ID, out var cached))
+        lock (bmsWrapperCache)
         {
-            return cached;
+            if (bmsWrapperCache.TryGetValue(beatmapInfo.ID, out var weak))
+            {
+                if (weak.TryGetTarget(out var cached))
+                    return cached;
+
+                // Dead weak reference — drop the tombstone before rebuilding.
+                bmsWrapperCache.Remove(beatmapInfo.ID);
+            }
         }
 
         var working = base.GetWorkingBeatmap(beatmapInfo);
         var audioManager = ((IStorageResourceProvider)this).AudioManager;
 
-        var wrapper = new BmsWorkingBeatmap(working, audioManager!);
+        // External-audio charts keep their images in Metadata.Source on disk rather than realm
+        // storage; give the wrapper a store sandboxed to that directory. Normal imports have no
+        // such directory and fall back to inner.GetBackground() (realm).
+        TextureStore? externalStore = null;
 
-        bmsWrapperCache[beatmapInfo.ID] = wrapper;
+        if (!string.IsNullOrWhiteSpace(working.Metadata.Source) && Directory.Exists(working.Metadata.Source))
+            externalStore = getOrCreateExternalTextureStore(working.Metadata.Source);
+
+        var wrapper = new BmsWorkingBeatmap(working, audioManager!, externalStore);
+
+        lock (bmsWrapperCache)
+            bmsWrapperCache[beatmapInfo.ID] = new WeakReference<BmsWorkingBeatmap>(wrapper);
 
         return wrapper;
     }
 
+    private TextureStore getOrCreateExternalTextureStore(string basePath)
+    {
+        basePath = Path.GetFullPath(basePath);
+
+        lock (externalTextureStoreLock)
+        {
+            if (externalTextureStores.TryGetValue(basePath, out var weak))
+            {
+                if (weak.TryGetTarget(out var cached))
+                    return cached;
+
+                externalTextureStores.Remove(basePath);
+            }
+
+            pruneDeadExternalTextureStores();
+
+            var store = new LargeTextureStore(
+                ((IStorageResourceProvider)this).Renderer,
+                ((IStorageResourceProvider)this).CreateTextureLoaderStore(new BmsFileResourceStore(basePath)));
+
+            externalTextureStores[basePath] = new WeakReference<LargeTextureStore>(store);
+            return store;
+        }
+    }
+
+    private void pruneDeadExternalTextureStores()
+    {
+        List<string>? deadPaths = null;
+
+        foreach (var pair in externalTextureStores)
+        {
+            if (pair.Value.TryGetTarget(out _))
+                continue;
+
+            deadPaths ??= [];
+            deadPaths.Add(pair.Key);
+        }
+
+        if (deadPaths == null)
+            return;
+
+        foreach (var path in deadPaths)
+            externalTextureStores.Remove(path);
+    }
+
+    private void onInvalidated(WorkingBeatmap working)
+    {
+        lock (bmsWrapperCache)
+            bmsWrapperCache.Remove(working.BeatmapInfo.ID);
+    }
+
     #region Reflection-based creation
 
-    /// <summary>
-    ///     Wraps an existing <see cref="WorkingBeatmapCache" /> by replacing its internal state
-    ///     in a new <see cref="BmsWorkingBeatmapCache" /> instance.
-    /// </summary>
-    /// <param name="original">The cache instance to wrap. Must be a <see cref="WorkingBeatmapCache" />.</param>
-    /// <returns>A new <see cref="BmsWorkingBeatmapCache" /> with the same backing stores.</returns>
-    /// <exception cref="InvalidOperationException">If a required private field is missing.</exception>
     internal static BmsWorkingBeatmapCache Wrap(WorkingBeatmapCache original)
     {
         const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;

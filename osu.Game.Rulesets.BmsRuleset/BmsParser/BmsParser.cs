@@ -142,7 +142,10 @@ internal static partial class BmsChartParser
             state.Url,
             state.Email,
             state.Comment,
-            state.LnMode);
+            state.LnMode,
+            state.StageFile,
+            state.BackBmp,
+            state.Banner);
     }
 
     /// <summary>Encode a 2-char base-62 pair into a 12-bit ushort (case-sensitive).</summary>
@@ -328,6 +331,24 @@ internal static partial class BmsChartParser
         if (cmdSpan.Equals("PREVIEW", StringComparison.OrdinalIgnoreCase))
         {
             state.PreviewFile = valueSpan.Trim('"').ToString();
+            return;
+        }
+
+        if (cmdSpan.Equals("STAGEFILE", StringComparison.OrdinalIgnoreCase))
+        {
+            state.StageFile = valueSpan.Trim('"').ToString();
+            return;
+        }
+
+        if (cmdSpan.Equals("BACKBMP", StringComparison.OrdinalIgnoreCase))
+        {
+            state.BackBmp = valueSpan.Trim('"').ToString();
+            return;
+        }
+
+        if (cmdSpan.Equals("BANNER", StringComparison.OrdinalIgnoreCase))
+        {
+            state.Banner = valueSpan.Trim('"').ToString();
             return;
         }
 
@@ -1120,6 +1141,12 @@ internal static partial class BmsChartParser
         public string? Comment { get; set; }
 
         public string? PreviewFile { get; set; }
+
+        public string? StageFile { get; set; }
+
+        public string? BackBmp { get; set; }
+
+        public string? Banner { get; set; }
 
         public float? PlayLevel { get; set; }
 

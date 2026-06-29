@@ -147,6 +147,9 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
         if (!string.IsNullOrWhiteSpace(parseResult.Maker))
             output.Metadata.Author.Username = parseResult.Maker;
 
+        if (string.IsNullOrWhiteSpace(output.Metadata.BackgroundFile))
+            output.Metadata.BackgroundFile = firstSongSelectBackground(parseResult) ?? string.Empty;
+
         var tags = string.Join(" ",
             new[] { parseResult.Genre, parseResult.Url, parseResult.Email, parseResult.Comment }
                 .Where(t => !string.IsNullOrWhiteSpace(t)));
@@ -157,5 +160,18 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
                 : $"{output.Metadata.Tags} {tags}";
 
         BmsDifficultyInfo.FromParseResult(parseResult).WriteToOsuDifficulty(output);
+    }
+
+    private static string? firstSongSelectBackground(BmsParseResult parseResult)
+    {
+        if (!string.IsNullOrWhiteSpace(parseResult.StageFile))
+            return parseResult.StageFile;
+
+        if (!string.IsNullOrWhiteSpace(parseResult.BackBmp))
+            return parseResult.BackBmp;
+
+        return !string.IsNullOrWhiteSpace(parseResult.Banner)
+            ? parseResult.Banner
+            : null;
     }
 }

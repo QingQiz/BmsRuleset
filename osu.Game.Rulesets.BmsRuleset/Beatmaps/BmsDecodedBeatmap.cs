@@ -33,6 +33,12 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 
     public string? PreviewFile { get; set; }
 
+    public string? StageFile { get; set; }
+
+    public string? BackBmp { get; set; }
+
+    public string? Banner { get; set; }
+
     public string[] RawLines { get; set; } = [];
 
     public void CopyFrom(BmsParseResult parseResult)
@@ -50,5 +56,8 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
         TextEvents = parseResult.TextEvents;
         LockedLongNoteMode = parseResult.LockedLongNoteMode;
         PreviewFile = parseResult.PreviewFile;
+        StageFile = parseResult.StageFile;
+        BackBmp = parseResult.BackBmp;
+        Banner = parseResult.Banner;
     }
 }

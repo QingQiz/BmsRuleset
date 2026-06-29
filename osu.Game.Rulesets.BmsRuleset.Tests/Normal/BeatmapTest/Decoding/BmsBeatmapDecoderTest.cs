@@ -1914,6 +1914,57 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestSongSelectBackgroundFallsBackToBackBmpThenBanner()
+    {
+        var withBackBmp = (IBmsBeatmap)decode("""
+                                             #TITLE Background Header
+                                             #BACKBMP back.bmp
+                                             #BANNER banner.png
+                                             #WAV01 kick.wav
+                                             #00111:01
+                                             """);
+
+        Assert.That(((Beatmap)withBackBmp).Metadata.BackgroundFile, Is.EqualTo("back.bmp"));
+        Assert.That(withBackBmp.GetSongSelectBackgroundCandidates(), Is.EqualTo(new[] { "back.bmp", "banner.png" }));
+
+        var bannerOnly = (IBmsBeatmap)decode("""
+                                            #TITLE Background Header
+                                            #BANNER banner.png
+                                            #WAV01 kick.wav
+                                            #00111:01
+                                            """);
+
+        Assert.That(((Beatmap)bannerOnly).Metadata.BackgroundFile, Is.EqualTo("banner.png"));
+        Assert.That(bannerOnly.GetSongSelectBackgroundCandidates(), Is.EqualTo(new[] { "banner.png" }));
+    }
+
+    [Test]
+    public void TestSongSelectBackgroundHeadersArePreservedInFallbackOrder()
+    {
+        var beatmap = decode("""
+                             #TITLE Background Header
+                             #ARTIST Tester
+                             #BANNER banner.png
+                             #BACKBMP back.bmp
+                             #STAGEFILE stage.jpg
+                             #WAV01 kick.wav
+                             #00111:01
+                             """);
+
+        Assert.That(beatmap.Metadata.BackgroundFile, Is.EqualTo("stage.jpg"));
+        Assert.That(beatmap, Is.InstanceOf<IBmsBeatmap>());
+
+        var bmsBeatmap = (IBmsBeatmap)beatmap;
+        Assert.That(bmsBeatmap.StageFile, Is.EqualTo("stage.jpg"));
+        Assert.That(bmsBeatmap.BackBmp, Is.EqualTo("back.bmp"));
+        Assert.That(bmsBeatmap.Banner, Is.EqualTo("banner.png"));
+        Assert.That(bmsBeatmap.GetSongSelectBackgroundCandidates(), Is.EqualTo(new[] { "stage.jpg", "back.bmp", "banner.png" }));
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        Assert.That(converted.GetSongSelectBackgroundCandidates(), Is.EqualTo(new[] { "stage.jpg", "back.bmp", "banner.png" }));
+    }
+
+    [Test]
     public void TestSparseSevenKeyChartStoresKeyCountMetadata()
     {
         var beatmap = decode("""

@@ -40,6 +40,12 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public string? PreviewFile { get; set; }
 
+    public string? StageFile { get; set; }
+
+    public string? BackBmp { get; set; }
+
+    public string? Banner { get; set; }
+
     public override IEnumerable<BeatmapStatistic> GetStatistics()
     {
         var notes = HitObjects.Count(h => h is not BmsLandmine && !isScratch(h));

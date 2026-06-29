@@ -36,6 +36,12 @@ public interface IBmsBeatmap
     BmsLongNoteMode LockedLongNoteMode { get; set; }
 
     string? PreviewFile { get; set; }
+
+    string? StageFile { get; set; }
+
+    string? BackBmp { get; set; }
+
+    string? Banner { get; set; }
 }
 
 internal static class BmsBeatmapExtensions
@@ -55,5 +61,20 @@ internal static class BmsBeatmapExtensions
         target.TextEvents = source.TextEvents;
         target.LockedLongNoteMode = source.LockedLongNoteMode;
         target.PreviewFile = source.PreviewFile;
+        target.StageFile = source.StageFile;
+        target.BackBmp = source.BackBmp;
+        target.Banner = source.Banner;
+    }
+
+    public static IEnumerable<string> GetSongSelectBackgroundCandidates(this IBmsBeatmap beatmap)
+    {
+        if (!string.IsNullOrWhiteSpace(beatmap.StageFile))
+            yield return beatmap.StageFile;
+
+        if (!string.IsNullOrWhiteSpace(beatmap.BackBmp))
+            yield return beatmap.BackBmp;
+
+        if (!string.IsNullOrWhiteSpace(beatmap.Banner))
+            yield return beatmap.Banner;
     }
 }

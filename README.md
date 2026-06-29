@@ -76,6 +76,8 @@ for deletion.
 | Comment                 | `#COMMENT`                                                                 | Stored in Tags                                                                                    |
 | Play level              | `#PLAYLEVEL`                                                               | Displayed as difficulty name                                                                      |
 | Preview audio           | `#PREVIEW`                                                                 | Declared preview file path for song select, falls back to `preview.*` then to BGM/keysound events |
+| Banner image            | `#BANNER`                                                                  | Song select card image, fallback chain: #STAGEFILE -> #BACKBMP                                    |
+| Background image        | `#STAGEFILE`                                                               | Song select background image, fallback chain: #BACKBMP -> #BANNER                                 |
 | Judge rank              | `#RANK` (0–4)                                                              | Affects hit windows, mapped to `OD`                                                               |
 | Gauge total             | `#TOTAL`                                                                   | Gauge recovery coefficient, mapped to `AR`                                                        |
 | Base BPM (visual)       | `#BASEBPM`                                                                 | Scroll speed reference BPM, does not affect note timing                                           |
@@ -95,7 +97,7 @@ for deletion.
 | Scroll speed            | `#SCROLLxx`                                                                | Per-segment display multiplier on scroll coordinate                                               |
 | Spacing change          | `#SPEEDxx`                                                                 | Per-segment multiplier on `ScrollSpeedMultiplier`                                                 |
 
-**Not parsed:** `#BANNER`, `#STAGEFILE`, `#BACKBMP`, `#BMPxx`, `#BGAxx`, `#EXWAVxx`,
+**Not parsed:** `#BMPxx`, `#BGAxx`, `#EXWAVxx`,
 `#WAVCMD`, `#VOLWAV`, `#MIDIFILE`, `#DIFFICULTY`, `#EXRANK` / `#EXRANKxx`,
 `#DEFEXRANK`, `#EXBPMxx`, `#STP`, `#PATH_WAV` / `#PATH_BMP`, `#OPTION`,
 `#CHANGEOPTIONxx`, `#POORBGA`, `#SWBGAxx`, `#@BGAxx`, `#ARGBxx`, video commands, `#CHARFILE`,
@@ -387,15 +389,15 @@ Write one `[BMS]` section per layout you want to support. The `Layout:` key is r
 
 **Layout and positions:**
 
-| Key             | Description                                 | Example |
-|-----------------|---------------------------------------------|---------|
-| `Layout`        | Layout identifier (required)                | `7K`    |
-| `HitPosition`   | Hit target Y from bottom (480-height space) | `440`   |
-| `LightPosition` | Column key-light Y                          | `440`   |
-| `ScorePosition` | Judgement popup Y                           | `250`   |
-| `ComboPosition` | Combo counter Y from top                    | `300`   |
-| `JudgementLine` | Show white line at hit position (`1`/`0`)   | `1`     |
-| `KeysUnderNotes`| Draw key images under notes (`1`/`0`)       | `0`     |
+| Key              | Description                                 | Example |
+|------------------|---------------------------------------------|---------|
+| `Layout`         | Layout identifier (required)                | `7K`    |
+| `HitPosition`    | Hit target Y from bottom (480-height space) | `440`   |
+| `LightPosition`  | Column key-light Y                          | `440`   |
+| `ScorePosition`  | Judgement popup Y                           | `250`   |
+| `ComboPosition`  | Combo counter Y from top                    | `300`   |
+| `JudgementLine`  | Show white line at hit position (`1`/`0`)   | `1`     |
+| `KeysUnderNotes` | Draw key images under notes (`1`/`0`)       | `0`     |
 
 **Column geometry:**
 
@@ -480,18 +482,18 @@ If the digit textures are missing, the combo counter is silently hidden.
 
 **Stage and effects:**
 
-| Key                   | Description                                                          |
-|-----------------------|----------------------------------------------------------------------|
-| `StageHint`           | Hit target image                                                     |
-| `StageLeft`           | Left stage border image                                              |
-| `StageRight`          | Right stage border image                                             |
-| `StageBottom`         | Bottom stage foreground image                                        |
-| `StageLight`          | Column light/glow image (shown while key is held)                    |
-| `LightingN`           | Normal hit explosion image                                           |
-| `LightingL`           | LN hit explosion image (also pulses during LN hold)                  |
-| `LightingNWidth`      | Normal explosion scale widths, comma-separated per column           |
-| `LightingLWidth`      | LN explosion scale widths, comma-separated per column               |
-| `LightFramePerSecond` | Column light animation FPS (alias: `StageLightFramePerSecond`)      |
+| Key                   | Description                                                    |
+|-----------------------|----------------------------------------------------------------|
+| `StageHint`           | Hit target image                                               |
+| `StageLeft`           | Left stage border image                                        |
+| `StageRight`          | Right stage border image                                       |
+| `StageBottom`         | Bottom stage foreground image                                  |
+| `StageLight`          | Column light/glow image (shown while key is held)              |
+| `LightingN`           | Normal hit explosion image                                     |
+| `LightingL`           | LN hit explosion image (also pulses during LN hold)            |
+| `LightingNWidth`      | Normal explosion scale widths, comma-separated per column      |
+| `LightingLWidth`      | LN explosion scale widths, comma-separated per column          |
+| `LightFramePerSecond` | Column light animation FPS (alias: `StageLightFramePerSecond`) |
 
 **Judgement images:**
 
@@ -671,14 +673,14 @@ Commands are grouped by origin and listed with their status in this ruleset.
 
 | Command      | Status | Notes                                        |
 |--------------|--------|----------------------------------------------|
-| `#STAGEFILE` | ✗      | Splash screen (640x480) shown during loading |
+| `#STAGEFILE` | ✓      | Splash screen (640x480) shown during loading |
 
 #### 1.4 DDR (Delight Delight Reduplication) Extensions
 
 | Command        | Status | Notes                                                    |
 |----------------|--------|----------------------------------------------------------|
 | `#STOPxx`      | ✓      | Stop sequence duration (1 unit = 1/192 of a 4/4 measure) |
-| `#BACKBMP`     | ✗      | Background image displayed behind gameplay area          |
+| `#BACKBMP`     | ✓      | Background image displayed behind gameplay area          |
 | `#WAVxx` (ogg) | ✓      | Ogg Vorbis support via same `#WAVxx` command             |
 
 #### 1.5 nanasigroove Extensions
@@ -687,7 +689,7 @@ Commands are grouped by origin and listed with their status in this ruleset.
 |-------------------------------------------|--------|--------------------------------------------------------------|
 | `#SUBTITLE`                               | ✓      | Explicit subtitle                                            |
 | `#DIFFICULTY [1-5]`                       | —      | Difficulty classification index                              |
-| `#BANNER`                                 | ✗      | Banner image for music selection                             |
+| `#BANNER`                                 | ✓      | Banner image for music selection                             |
 | `#RANK 4`                                 | ✓      | VERY EASY judgment; 1.2× wider than EASY                     |
 | `#DEFEXRANK`                              | ✗      | Fine-grained judgment width multiplier (100 = EASY baseline) |
 | `#EXRANKxx`                               | ✗      | Extended rank values for dynamic rank change (channel A0)    |
@@ -986,7 +988,7 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | `#OCT/FP` — octave / pedal                                                               |
 | **Parser**    | `#OPTION` — forced option                                                                |
 | **Parser**    | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                       |
-| **Parser**    | `#STAGEFILE`, `#BANNER`, `#BACKBMP`, `#MOVIE` — metadata only                            |
+| **Parser**    | `#MOVIE` — metadata only                                                                 |          | 
 | **Parser**    | `#STP` — absolute STOP sequence                                                          |
 | **Parser**    | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — video |
 | **Parser**    | `#DEFEXRANK` — fine-grained judgment width multiplier (overrides `#RANK`)                |
@@ -999,7 +1001,7 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | Channel `97` — dynamic BGM volume                                                        | 1.5      |
 | **Parser**    | Channel `98` — dynamic KEY volume (counterpart to channel 97)                            | 1.5      | 
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                |
-| **Renderer**  | BGA / movie / stagefile / background image                                               | 1        |
+| **Renderer**  | BGA / movie                                                                              | 1        |
 | **Renderer**  | Key beams (column light during hold)                                                     | 2        |
 | **Renderer**  | BGA                                                                                      | 1        |
 | **Replay**    | Replay not available                                                                     | 2        |

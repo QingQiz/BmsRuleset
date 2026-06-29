@@ -27,7 +27,10 @@ public sealed record BmsParseResult(
     string? Url = null,
     string? Email = null,
     string? Comment = null,
-    BmsLongNoteMode LockedLongNoteMode = BmsLongNoteMode.Undefined);
+    BmsLongNoteMode LockedLongNoteMode = BmsLongNoteMode.Undefined,
+    string? StageFile = null,
+    string? BackBmp = null,
+    string? Banner = null);
 
 public readonly record struct BmsBranchDecision(int MaxValue, int SelectedValue);
 

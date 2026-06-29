@@ -40,6 +40,15 @@ public class BmsHitWindowsTest
     }
 
     [Test]
+    public void TestHitWindowsIncludeMiss()
+    {
+        var windows = new BmsHitWindows();
+
+        Assert.That(windows.IsHitResultAllowed(HitResult.Miss), Is.True);
+        Assert.That(windows.GetAllAvailableWindows(), Has.Some.Matches<(HitResult result, double length)>(window => window.result == HitResult.Miss));
+    }
+
+    [Test]
     public void TestHitWindowUsesLayoutAndColumnProfile()
     {
         var fiveKey = new BmsHitWindows(rank: 3, BmsLayoutVariant.Bms5K, column: 1);
