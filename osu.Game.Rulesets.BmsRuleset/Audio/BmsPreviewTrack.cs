@@ -41,15 +41,15 @@ public class BmsPreviewTrack : Track
     /// </summary>
     public bool SuppressEventProcessing
     {
-        get => suppressEventProcessing;
+        get;
         set
         {
-            if (suppressEventProcessing == value)
+            if (field == value)
                 return;
 
-            suppressEventProcessing = value;
+            field = value;
 
-            if (!suppressEventProcessing)
+            if (!field)
                 // Gameplay advances this clock while BGM/key sample events are muted, so restoring
                 // preview must resume from the current position rather than replaying the muted gap.
                 nextEventIndex = findFirstEventAfter(CurrentTime);
@@ -67,7 +67,6 @@ public class BmsPreviewTrack : Track
 
     private SampleChannel? previewChannel;
 
-    private bool suppressEventProcessing;
     private int nextEventIndex;
     private double seekOffset;
 
@@ -124,6 +123,18 @@ public class BmsPreviewTrack : Track
             }
 
             sortedEvents.Sort((a, b) => a.Time.CompareTo(b.Time));
+
+            if (sortedEvents.Count > 0 && sortedEvents[0].Time > 0)
+            {
+                var leadIn = sortedEvents[0].Time;
+
+                for (var i = 0; i < sortedEvents.Count; i++)
+                {
+                    var evt = sortedEvents[i];
+                    sortedEvents[i] = evt with { Time = evt.Time - leadIn };
+                }
+            }
+
             var length = sortedEvents.Count > 0
                 ? sortedEvents[^1].Time + 5000
                 : 30000;
@@ -180,7 +191,7 @@ public class BmsPreviewTrack : Track
                 clock.Reset();
         }
 
-        nextEventIndex = findFirstEventAfter(seekOffset);
+        nextEventIndex = seekOffset == 0 ? 0 : findFirstEventAfter(seekOffset);
         stopAllChannels();
         stopPreviewChannel();
 

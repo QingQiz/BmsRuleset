@@ -48,6 +48,32 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
+    public void TestLeadingEmptyTimelineIsTrimmedForEventPreview()
+    {
+        BmsPreviewTrack track = null!;
+
+        AddStep("create track with delayed first event", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-trim-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsPreviewTrack(
+                [new BmsSampleEvent(2000, 0, 1)],
+                new Dictionary<ushort, string> { [1] = "test.wav" },
+                directory,
+                audio);
+
+            track.Start();
+            invokeUpdateState(track);
+        });
+
+        AddAssert("first audible event plays immediately", () => getActivePlaybackCount(track!) > 0);
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
     public void TestDeclaredWavResolvesOggFallbackFile()
     {
         BmsPreviewTrack track = null!;
