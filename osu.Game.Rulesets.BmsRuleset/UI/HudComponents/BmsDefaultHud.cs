@@ -58,6 +58,12 @@ public static class BmsDefaultHud
         {
             Children =
             [
+                new BmsBgaDisplay
+                {
+                    AutoSizeToParent = true,
+                    RenderOutsideHudVisibility = true,
+                    Depth = float.MaxValue,
+                },
                 new BarHitErrorMeter
                 {
                     Anchor = Anchor.BottomCentre,

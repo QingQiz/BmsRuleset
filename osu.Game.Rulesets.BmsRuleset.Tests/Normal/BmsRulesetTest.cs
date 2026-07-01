@@ -37,7 +37,6 @@ public class BmsRulesetTest
         var mods = ruleset.GetModsFor(ModType.Automation).ToArray();
 
         Assert.That(mods.OfType<BmsModAutoplay>().SingleOrDefault(), Is.Not.Null);
-        Assert.That(mods.OfType<BmsModCinema>().SingleOrDefault(), Is.Not.Null);
     }
 
     [Test]

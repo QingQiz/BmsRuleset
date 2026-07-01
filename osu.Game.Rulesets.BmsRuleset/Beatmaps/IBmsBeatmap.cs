@@ -33,6 +33,8 @@ public interface IBmsBeatmap
 
     BmsTextEvents TextEvents { get; set; }
 
+    BmsBgaTimeline Bga { get; set; }
+
     BmsLongNoteMode LockedLongNoteMode { get; set; }
 
     string? PreviewFile { get; set; }
@@ -59,6 +61,7 @@ internal static class BmsBeatmapExtensions
         target.LongNoteTailSampleEvents = source.LongNoteTailSampleEvents;
         target.BranchDecisions = source.BranchDecisions;
         target.TextEvents = source.TextEvents;
+        target.Bga = source.Bga;
         target.LockedLongNoteMode = source.LockedLongNoteMode;
         target.PreviewFile = source.PreviewFile;
         target.StageFile = source.StageFile;

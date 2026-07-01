@@ -8,12 +8,14 @@
         <Nullable>enable</Nullable>
         <Version>$(OsuBase).$(RulesetRevision)</Version>
         <LangVersion>14</LangVersion>
+        <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     </PropertyGroup>
     <ItemGroup>
         <EmbeddedResource Include="Resources\**" WithCulture="false"/>
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0"/>
+        <PackageReference Include="ILRepack" Version="2.0.45" PrivateAssets="all"/>
     </ItemGroup>
     <ItemGroup Condition="'$(UseLocalOsu)' != 'true'">
         <PackageReference Include="ppy.osu.Game" Version="$(OsuVersion)"/>
@@ -29,5 +31,24 @@
             Include="..\osu.Game.Rulesets.BmsRuleset.SourceGeneration\osu.Game.Rulesets.BmsRuleset.SourceGeneration.csproj"
             OutputItemType="Analyzer"
             ReferenceOutputAssembly="false" />
+        <ProjectReference
+            Include="..\osu.Game.Rulesets.BmsRuleset.Decoders\PLMpegSharp\PLMpegSharp.csproj"
+            PrivateAssets="all" />
     </ItemGroup>
+
+  <Target Name="MergePlmpegSharp" AfterTargets="Build">
+    <PropertyGroup>
+      <_PlmpegSharpDll>$(TargetDir)PLMpegSharp.dll</_PlmpegSharpDll>
+      <_ILRepackLog>$(TargetDir)ilrepack.log</_ILRepackLog>
+    </PropertyGroup>
+    <ItemGroup>
+      <_LibDirs Include="@(ReferencePath->'%(RootDir)%(Directory)')" />
+      <_LibDirs Include="@(ReferenceDependencyPaths->'%(RootDir)%(Directory)')" />
+      <_LibDirs Include="$(TargetDir)" />
+      <_LibDirsUnique Include="@(_LibDirs->Distinct())" />
+    </ItemGroup>
+    <Exec Command="&quot;$(ILRepack)&quot; /internalize /out:&quot;$(TargetPath)&quot; &quot;$(TargetPath)&quot; &quot;$(_PlmpegSharpDll)&quot; /log:&quot;$(_ILRepackLog)&quot; @(_LibDirsUnique->'/lib:%(Identity)', ' ')" />
+    <Delete Files="$(_PlmpegSharpDll)" Condition="Exists('$(_PlmpegSharpDll)')" />
+    <Delete Files="$(TargetDir)PLMpegSharp.pdb" Condition="Exists('$(TargetDir)PLMpegSharp.pdb')" />
+  </Target>
 </Project>

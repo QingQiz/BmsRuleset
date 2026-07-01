@@ -27,6 +27,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
@@ -343,6 +344,29 @@ public class BmsLegacySkinTransformerTest
     public void TestBmsHealthDisplayDoesNotInheritOsuHealthDisplay()
     {
         Assert.That(new BmsHealthDisplay(), Is.Not.InstanceOf<HealthDisplay>());
+    }
+
+    [Test]
+    public void TestBgaDisplayIsPlacedBehindNativePlayfield()
+    {
+        Assert.That(new BmsBgaDisplay(), Is.InstanceOf<ISerialisableDrawable>());
+
+        var rulesetHud = BmsDefaultHud.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo));
+        var playfieldHud = BmsDefaultHud.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.Playfield, new BmsRuleset().RulesetInfo));
+
+        Assert.That(rulesetHud, Is.Not.Null);
+        Assert.That(playfieldHud, Is.Not.Null);
+
+        // The BGA lives in the MainHUD container (skin-editable) and is rehosted behind the
+        // playfield at runtime via RenderOutsideHudVisibility — not placed in the Playfield
+        // container directly. The Playfield container therefore holds no BmsBgaDisplay.
+        var bga = rulesetHud!.ChildrenOfType<BmsBgaDisplay>().SingleOrDefault();
+        Assert.That(bga, Is.Not.Null);
+        Assert.That(bga!.AutoSizeToParent, Is.True);
+        Assert.That(bga.RenderOutsideHudVisibility, Is.True);
+        Assert.That(bga.Depth, Is.EqualTo(float.MaxValue));
+
+        Assert.That(playfieldHud!.ChildrenOfType<BmsBgaDisplay>(), Is.Empty);
     }
 
     [Test]

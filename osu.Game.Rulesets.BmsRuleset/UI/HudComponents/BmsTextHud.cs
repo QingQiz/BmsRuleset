@@ -4,6 +4,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Graphics;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK.Graphics;
@@ -14,13 +15,18 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
 {
     public bool UsesFixedAnchor { get; set; }
 
-    private SpriteText mainText = null!;
-    private SpriteText arrowText = null!;
+    private readonly SpriteText mainText;
+    private readonly SpriteText arrowText;
 
     private IBmsGameplayEvents? gameplayEvents;
 
     [Resolved]
     private DrawableRuleset drawableRuleset { get; set; } = null!;
+
+    // Null in tests / non-OsuGame hosts. When the skin editor is open the HUD is forced visible so the
+    // (otherwise alpha=0) text box can be positioned and sized.
+    [Resolved(CanBeNull = true)]
+    private SkinEditorOverlay? skinEditorOverlay { get; set; }
 
     public BmsTextHud()
     {
@@ -28,41 +34,7 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
         Origin = Anchor.TopCentre;
         Y = 36;
         AutoSizeAxes = Axes.Both;
-    }
 
-    #region Disposal
-
-    protected override void Dispose(bool isDisposing)
-    {
-        if (gameplayEvents != null)
-        {
-            gameplayEvents.Text -= showText;
-            gameplayEvents.ScrollSpeedChanged -= showScrollSpeed;
-        }
-
-        base.Dispose(isDisposing);
-    }
-
-    #endregion
-
-    protected override void LoadComplete()
-    {
-        base.LoadComplete();
-        gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
-
-        if (gameplayEvents != null)
-        {
-            gameplayEvents.Text += showText;
-            gameplayEvents.ScrollSpeedChanged += showScrollSpeed;
-        }
-
-        mainText.Text = "Game Start";
-        this.Delay(1000).FadeOut(1000);
-    }
-
-    [BackgroundDependencyLoader]
-    private void load()
-    {
         InternalChildren =
         [
             new Box
@@ -93,6 +65,62 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
         ];
     }
 
+    #region Disposal
+
+    protected override void Dispose(bool isDisposing)
+    {
+        if (gameplayEvents != null)
+        {
+            gameplayEvents.Text -= showText;
+            gameplayEvents.ScrollSpeedChanged -= showScrollSpeed;
+        }
+
+        base.Dispose(isDisposing);
+    }
+
+    #endregion
+
+    protected override void LoadComplete()
+    {
+        base.LoadComplete();
+        gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
+
+        if (gameplayEvents != null)
+        {
+            gameplayEvents.Text += showText;
+            gameplayEvents.ScrollSpeedChanged += showScrollSpeed;
+        }
+
+        if (skinEditorOverlay != null)
+            skinEditorOverlay.State.BindValueChanged(_ => updateEditModeVisibility(), true);
+        else
+            applyEditModeVisibility(false);
+    }
+
+    private void updateEditModeVisibility() => applyEditModeVisibility(skinEditorOverlay?.State.Value == Visibility.Visible);
+
+    private void applyEditModeVisibility(bool isEditing)
+    {
+        ClearTransforms();
+
+        if (isEditing)
+        {
+            // Skin editor: stable, fully-visible placeholder so the box can be dragged/sized.
+            arrowText.Text = string.Empty;
+            arrowText.Colour = Color4.White;
+            mainText.Text = "Sample Text Event";
+            mainText.Colour = Color4.White;
+            Alpha = 1;
+            return;
+        }
+
+        mainText.Text = "Game Start";
+
+        // FadeOut runs on the transform clock; only schedule once loaded (no-op pre-load / in unit tests).
+        if (LoadState == LoadState.Loaded)
+            this.Delay(1000).FadeOut(1000);
+    }
+
     private void showScrollSpeed(double multiplier)
     {
         var delta = multiplier - 1;
@@ -117,6 +145,10 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
 
     private void animateShow(double displayDurationMs)
     {
+        // Keep the edit-mode placeholder stable; don't fade out from gameplay text events while editing.
+        if (skinEditorOverlay?.State.Value == Visibility.Visible)
+            return;
+
         ClearTransforms();
         this.FadeIn(80).Delay(displayDurationMs).FadeOut(300);
     }

@@ -142,7 +142,6 @@ public partial class BmsRuleset : Ruleset
         ModType.Automation =>
         [
             new BmsModAutoplay(),
-            new BmsModCinema(),
 
             new BmsModAutoScratch(),
             new BmsModAutoGauge(),

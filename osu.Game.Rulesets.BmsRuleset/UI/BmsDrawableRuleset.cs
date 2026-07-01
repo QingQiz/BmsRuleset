@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Input;
 using osu.Game.Beatmaps;
 using osu.Game.Input.Handlers;
@@ -34,6 +35,15 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     public new PassThroughInputManager KeyBindingInputManager => base.KeyBindingInputManager;
 
     public override int Variant => (int)((BmsBeatmap)Beatmap).LayoutVariant;
+
+    public string BeatmapSourceDirectory => getSource((BmsBeatmap)Beatmap);
+
+    public BindableDouble BgaDim { get; } = new(0.7)
+    {
+        MinValue = 0,
+        MaxValue = 1,
+        Precision = 0.01,
+    };
 
     // HUD components live in Player.HUDOverlay (a sibling of this DrawableRuleset under Player),
     // so they cannot resolve the local [Cached] above. They reach this instance via the
@@ -181,6 +191,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
         if (Config is BmsRulesetConfigManager config)
         {
+            config.BindWith(BmsRulesetSetting.BgaDim, BgaDim);
             ((BmsPlayfield)Playfield).ScrollController.SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
         }
 

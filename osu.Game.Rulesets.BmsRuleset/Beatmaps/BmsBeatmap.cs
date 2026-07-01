@@ -36,6 +36,8 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public BmsTextEvents TextEvents { get; set; } = new(string.Empty, []);
 
+    public BmsBgaTimeline Bga { get; set; } = new(new Dictionary<ushort, string>(), new Dictionary<ushort, BmsBgaDefinition>(), [], [], BmsPoorBgaMode.Replace);
+
     public BmsLongNoteMode LockedLongNoteMode { get; set; }
 
     public string? PreviewFile { get; set; }

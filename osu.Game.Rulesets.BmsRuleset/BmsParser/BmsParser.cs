@@ -114,6 +114,7 @@ internal static partial class BmsChartParser
         longNoteTailSampleEvents.Sort(default(SampleEventComparer));
 
         var textEvents = collectTextEvents(state, measureStarts, timingMap);
+        var bga = collectBga(state, measureStarts, timingMap);
 
         var bgSampleEvents = new List<BmsSampleEvent>(state.ChannelLines.Count / 10);
         collectBackgroundSampleEvents(state, measureStarts, timingMap, bgSampleEvents);
@@ -134,6 +135,7 @@ internal static partial class BmsChartParser
             hitObjects,
             state.BranchDecisions.ToArray(),
             textEvents,
+            bga,
             state.PreviewFile,
             state.Genre,
             state.Subtitle,
@@ -352,6 +354,14 @@ internal static partial class BmsChartParser
             return;
         }
 
+        if (cmdSpan.Equals("POORBGA", StringComparison.OrdinalIgnoreCase))
+        {
+            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var poorMode)
+                && poorMode >= 0 && poorMode <= 2)
+                state.PoorBgaMode = (BmsPoorBgaMode)poorMode;
+            return;
+        }
+
         if (cmdSpan.Equals("PLAYLEVEL", StringComparison.OrdinalIgnoreCase))
         {
             if (tryParseDouble(valueSpan, out var difficulty))
@@ -430,6 +440,20 @@ internal static partial class BmsChartParser
             return;
         }
 
+        if (cmdSpan.Length == 5 && cmdSpan.StartsWith("BMP", StringComparison.OrdinalIgnoreCase)
+                                && valueSpan.Length > 0)
+        {
+            state.BitmapDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = valueSpan.Trim('"').ToString();
+            return;
+        }
+
+        if (cmdSpan.Length == 5 && cmdSpan.StartsWith("BGA", StringComparison.OrdinalIgnoreCase)
+                                && tryParseBgaDefinition(valueSpan, state.UseBase62, out var bgaDefinition))
+        {
+            state.BgaDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = bgaDefinition;
+            return;
+        }
+
         if (cmdSpan.Length == 6 && cmdSpan.StartsWith("STOP", StringComparison.OrdinalIgnoreCase)
                                 && tryParseDouble(valueSpan, out var stopValue) && stopValue > 0)
         {
@@ -493,6 +517,57 @@ internal static partial class BmsChartParser
                 output.Add(new BmsSampleEvent(timingMap.ProjectTickToTime(tick), tick, value));
             }
         }
+    }
+
+    private static BmsBgaTimeline collectBga(ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
+    {
+        var events = new List<BmsBgaEvent>();
+        var opacityEvents = new List<BmsBgaOpacityEvent>();
+
+        foreach (var line in state.ChannelLines)
+        {
+            if (tryMapBgaLayer(line.Channel, out var layer))
+            {
+                foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+                    events.Add(new BmsBgaEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, cell.Value, layer, cell.Sequence));
+
+                continue;
+            }
+
+            if (!tryMapBgaOpacityLayer(line.Channel, out var opacityLayer))
+                continue;
+
+            foreach (var cell in expandCells(line, measureStarts, false, false))
+                opacityEvents.Add(new BmsBgaOpacityEvent(timingMap.ProjectTickToTime(cell.Tick), cell.Tick, opacityLayer, parseHexByte(cell.Value) / 255f, cell.Sequence));
+        }
+
+        events.Sort(static (a, b) =>
+        {
+            var cmp = a.Time.CompareTo(b.Time);
+            if (cmp != 0) return cmp;
+
+            cmp = a.Tick.CompareTo(b.Tick);
+            if (cmp != 0) return cmp;
+
+            return a.Sequence.CompareTo(b.Sequence);
+        });
+        opacityEvents.Sort(static (a, b) =>
+        {
+            var cmp = a.Time.CompareTo(b.Time);
+            if (cmp != 0) return cmp;
+
+            cmp = a.Tick.CompareTo(b.Tick);
+            if (cmp != 0) return cmp;
+
+            return a.Sequence.CompareTo(b.Sequence);
+        });
+
+        return new BmsBgaTimeline(
+            new Dictionary<ushort, string>(state.BitmapDefinitions),
+            new Dictionary<ushort, BmsBgaDefinition>(state.BgaDefinitions),
+            events,
+            opacityEvents,
+            state.PoorBgaMode);
     }
 
     private static BmsTextEvents collectTextEvents(
@@ -1016,6 +1091,34 @@ internal static partial class BmsChartParser
         return BmsLayout.TryMapVisibleChannel(visibleKey, totalColumns, out column);
     }
 
+    private static bool tryMapBgaLayer(ushort channel, out BmsBgaLayer layer)
+    {
+        layer = channel switch
+        {
+            CH_04 => BmsBgaLayer.Base,
+            CH_06 => BmsBgaLayer.Poor,
+            CH_07 => BmsBgaLayer.Layer1,
+            CH_0A => BmsBgaLayer.Layer2,
+            _ => default,
+        };
+
+        return channel is CH_04 or CH_06 or CH_07 or CH_0A;
+    }
+
+    private static bool tryMapBgaOpacityLayer(ushort channel, out BmsBgaLayer layer)
+    {
+        layer = channel switch
+        {
+            CH_0B => BmsBgaLayer.Base,
+            CH_0C => BmsBgaLayer.Layer1,
+            CH_0D => BmsBgaLayer.Layer2,
+            CH_0E => BmsBgaLayer.Poor,
+            _ => default,
+        };
+
+        return channel is CH_0B or CH_0C or CH_0D or CH_0E;
+    }
+
     private static double bpmAtTick(long tick, IReadOnlyList<TimingEvent> timingEvents)
     {
         var lo = 0;
@@ -1041,11 +1144,47 @@ internal static partial class BmsChartParser
     private static double? parseHexBpm(ushort value) =>
         Hi(value) * 16 + Lo(value) is var bpm and > 0 ? bpm : null;
 
+    /// <summary>Decode an unsigned byte from a 2-char encoded hex value.</summary>
+    private static int parseHexByte(ushort value) => Math.Clamp(Hi(value) * 16 + Lo(value), 0, 255);
+
     /// <summary>Decode a base-36 integer from an encoded cell value (mine damage).</summary>
     private static int parseBase36Value(ushort value) => Hi(value) * 36 + Lo(value);
 
     private static bool tryParseDouble(ReadOnlySpan<char> value, out double result) =>
         double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out result);
+
+    private static bool tryParseBgaDefinition(ReadOnlySpan<char> value, bool useBase62, out BmsBgaDefinition definition)
+    {
+        definition = default;
+
+        var parts = value.ToString().Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 7 || parts[0].Length < 2)
+            return false;
+
+        if (!int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var x1)
+            || !int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var y1)
+            || !int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out var x2)
+            || !int.TryParse(parts[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out var y2)
+            || !int.TryParse(parts[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out var dx)
+            || !int.TryParse(parts[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out var dy))
+            return false;
+
+        var width = x2 - x1;
+        var height = y2 - y1;
+
+        if (width <= 0 || height <= 0)
+            return false;
+
+        definition = new BmsBgaDefinition(
+            encodeValue(useBase62, parts[0][0], parts[0][1]),
+            x1,
+            y1,
+            width,
+            height,
+            dx,
+            dy);
+        return true;
+    }
 
     private static int denominatorFor(double value)
     {
@@ -1091,8 +1230,16 @@ internal static partial class BmsChartParser
     // ReSharper disable once UnusedMember.Local
     private const ushort CH_02 = (0 << 6) | 2;
     private const ushort CH_03 = (0 << 6) | 3;
+    private const ushort CH_04 = (0 << 6) | 4;
+    private const ushort CH_06 = (0 << 6) | 6;
+    private const ushort CH_07 = (0 << 6) | 7;
     private const ushort CH_08 = (0 << 6) | 8;
     private const ushort CH_09 = (0 << 6) | 9;
+    private const ushort CH_0A = (0 << 6) | 10;
+    private const ushort CH_0B = (0 << 6) | 11;
+    private const ushort CH_0C = (0 << 6) | 12;
+    private const ushort CH_0D = (0 << 6) | 13;
+    private const ushort CH_0E = (0 << 6) | 14;
     private const ushort CH_99 = (9 << 6) | 9;
     private const ushort CH_SC = (28 << 6) | 12; // 'S','C'
     private const ushort CH_SP = (28 << 6) | 25; // 'S','P'
@@ -1114,9 +1261,13 @@ internal static partial class BmsChartParser
 
         public Dictionary<ushort, string> SampleDefinitions { get; } = new();
 
+        public Dictionary<ushort, string> BitmapDefinitions { get; } = new();
+
+        public Dictionary<ushort, BmsBgaDefinition> BgaDefinitions { get; } = new();
+
         public Dictionary<ushort, string> TextDefinitions { get; } = new();
 
-        public HashSet<ushort> LnObjValues { get; } = new();
+        public HashSet<ushort> LnObjValues { get; } = [];
 
         public List<RawChannelLine> ChannelLines { get; } = [];
 
@@ -1149,6 +1300,8 @@ internal static partial class BmsChartParser
         public string? Banner { get; set; }
 
         public float? PlayLevel { get; set; }
+
+        public BmsPoorBgaMode PoorBgaMode { get; set; }
 
         public double InitialBpm { get; set; } = 130;
 

@@ -19,6 +19,7 @@ public sealed record BmsParseResult(
     IReadOnlyList<BmsParsedHitObject> HitObjects,
     IReadOnlyList<BmsBranchDecision> BranchDecisions,
     BmsTextEvents TextEvents,
+    BmsBgaTimeline Bga,
     string? PreviewFile = null,
     string? Genre = null,
     string? Subtitle = null,
@@ -55,6 +56,41 @@ public sealed record BmsSampleEvent(double Time, long Tick, ushort SampleKey);
 public sealed record BmsTextEvent(double Time, long Tick, string Text);
 
 public sealed record BmsTextEvents(string? MistakeText, BmsTextEvent[] TextEvents);
+
+public sealed record BmsBgaTimeline(
+    IReadOnlyDictionary<ushort, string> BitmapDefinitions,
+    IReadOnlyDictionary<ushort, BmsBgaDefinition> BgaDefinitions,
+    IReadOnlyList<BmsBgaEvent> Events,
+    IReadOnlyList<BmsBgaOpacityEvent> OpacityEvents,
+    BmsPoorBgaMode PoorMode);
+
+public readonly record struct BmsBgaDefinition(
+    ushort BitmapKey,
+    int SourceX,
+    int SourceY,
+    int SourceWidth,
+    int SourceHeight,
+    int DestinationX,
+    int DestinationY);
+
+public sealed record BmsBgaEvent(double Time, long Tick, ushort DefinitionKey, BmsBgaLayer Layer, int Sequence);
+
+public sealed record BmsBgaOpacityEvent(double Time, long Tick, BmsBgaLayer Layer, float Opacity, int Sequence);
+
+public enum BmsBgaLayer
+{
+    Base,
+    Poor,
+    Layer1,
+    Layer2,
+}
+
+public enum BmsPoorBgaMode
+{
+    Replace = 0,
+    Add = 1,
+    Off = 2,
+}
 
 public readonly record struct BmsScrollEvent(long Tick, double Factor, int Sequence);
 

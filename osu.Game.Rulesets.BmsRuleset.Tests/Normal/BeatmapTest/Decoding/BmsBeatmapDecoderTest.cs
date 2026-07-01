@@ -1965,6 +1965,98 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestBgaDefinitionsAndEventsAreParsed()
+    {
+        var beatmap = (IBmsBeatmap)decode("""
+                                          #BPM 120
+                                          #BMP01 back.png
+                                          #BGA02 01 4 8 68 72 12 16
+                                          #00104:0200
+                                          #00107:0001
+                                          #0010A:0002
+                                          #00111:01
+                                          """);
+
+        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("back.png"));
+
+        var definition = beatmap.Bga.BgaDefinitions[BmsChartParser.Enc("02")];
+        Assert.That(definition.BitmapKey, Is.EqualTo(BmsChartParser.Enc("01")));
+        Assert.That(definition.SourceX, Is.EqualTo(4));
+        Assert.That(definition.SourceY, Is.EqualTo(8));
+        Assert.That(definition.SourceWidth, Is.EqualTo(64));
+        Assert.That(definition.SourceHeight, Is.EqualTo(64));
+        Assert.That(definition.DestinationX, Is.EqualTo(12));
+        Assert.That(definition.DestinationY, Is.EqualTo(16));
+
+        Assert.That(beatmap.Bga.Events.Select(e => (e.Layer, e.DefinitionKey, e.Tick)), Is.EqualTo(new[]
+        {
+            (BmsBgaLayer.Base, BmsChartParser.Enc("02"), 192L),
+            (BmsBgaLayer.Layer1, BmsChartParser.Enc("01"), 288L),
+            (BmsBgaLayer.Layer2, BmsChartParser.Enc("02"), 288L),
+        }));
+    }
+
+    [Test]
+    public void TestBgaOpacityChannelsAreParsedSeparatelyFromBitmapEvents()
+    {
+        var beatmap = (IBmsBeatmap)decode("""
+                                          #BPM 120
+                                          #BMP01 back.png
+                                          #0010B:FF
+                                          #0010C:80
+                                          #0010D:40
+                                          #0010E:20
+                                          #00111:01
+                                          """);
+
+        Assert.That(beatmap.Bga.Events, Is.Empty);
+        Assert.That(beatmap.Bga.OpacityEvents.Select(e => (e.Layer, e.Opacity, e.Tick)), Is.EqualTo(new[]
+        {
+            (BmsBgaLayer.Base, 1f, 192L),
+            (BmsBgaLayer.Layer1, 128 / 255f, 192L),
+            (BmsBgaLayer.Layer2, 64 / 255f, 192L),
+            (BmsBgaLayer.Poor, 32 / 255f, 192L),
+        }));
+    }
+
+    [Test]
+    public void TestPoorBgaHeadersAreParsed()
+    {
+        var beatmap = (IBmsBeatmap)decode("""
+                                          #BPM 120
+                                          #POORBGA 1
+                                          #BMP00 poor.png
+                                          #BMP01 base.png
+                                          #00104:01
+                                          #00111:01
+                                          """);
+
+        Assert.That(beatmap.Bga.PoorMode, Is.EqualTo(BmsPoorBgaMode.Add));
+        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("00")], Is.EqualTo("poor.png"));
+    }
+
+    [Test]
+    public void TestBgaDataSurvivesConversion()
+    {
+        var decoded = decode("""
+                             #BPM 120
+                             #BMPaa lower.png
+                             #BMPAA upper.png
+                             #00104:aaAA
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Bga.BitmapDefinitions[BmsChartParser.Enc("AA")], Is.EqualTo("upper.png"));
+        Assert.That(converted.Bga.Events.Select(e => e.DefinitionKey), Is.EqualTo(new[]
+        {
+            BmsChartParser.Enc("AA"),
+            BmsChartParser.Enc("AA"),
+        }));
+    }
+
+    [Test]
     public void TestSparseSevenKeyChartStoresKeyCountMetadata()
     {
         var beatmap = decode("""

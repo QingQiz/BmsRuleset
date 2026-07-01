@@ -133,6 +133,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public override Quad SkinnableComponentScreenSpaceDrawQuad => Stage.ScreenSpaceDrawQuad;
 
+    internal void AddBehindStage(Drawable drawable) => AddInternal(drawable);
+
     public BmsTimingMap? TimingMap { get; }
 
     internal BmsScrollController ScrollController { get; }

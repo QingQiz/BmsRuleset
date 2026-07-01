@@ -215,6 +215,12 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 KeyboardStep = 0.1f,
                 LabelFormat = v => RulesetSettingsStrings.ScrollSpeedTooltip((int)BmsDrawableRuleset.ComputeScrollTime(v), v),
             }),
+            new SettingsItemV2(new FormSliderBar<double>
+            {
+                Caption = "BGA dim",
+                Current = manager.GetBindable<double>(BmsRulesetSetting.BgaDim),
+                DisplayAsPercentage = true,
+            }),
             new SettingsItemV2(new FormCheckBox
             {
                 Caption = "Show BMS 5K",

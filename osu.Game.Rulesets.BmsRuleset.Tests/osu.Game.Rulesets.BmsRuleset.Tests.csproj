@@ -23,5 +23,7 @@
         <OutputType>WinExe</OutputType>
         <TargetFramework>net8.0</TargetFramework>
         <RootNamespace>osu.Game.Rulesets.BmsRuleset.Tests</RootNamespace>
+        <!-- Needed for FFmpeg.AutoGen pointer APIs in the BGA video probe test. -->
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 </Project>

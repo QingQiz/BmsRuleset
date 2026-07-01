@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>PLMpegSharp</RootNamespace>
+    <AssemblyName>PLMpegSharp</AssemblyName>
+    <!-- Vendored decoder: ILRepack-merged (internalized) into the ruleset assembly at build time,
+         so this DLL never ships standalone and doesn't need its own docs. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>
