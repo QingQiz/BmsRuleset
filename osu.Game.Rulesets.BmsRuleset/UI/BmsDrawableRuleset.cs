@@ -161,7 +161,10 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
         if (healthProcessor is BmsHealthProcessor bmsHp)
         {
-            if (!bmsHp.HasPassedAtEnd())
+            var passed = bmsHp.HasPassedAtEnd();
+            scoreProcessor.PopulateScore(gameplayState.Score.ScoreInfo);
+
+            if (!passed)
                 scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
 
             return;

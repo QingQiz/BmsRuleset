@@ -55,12 +55,13 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
         if (resolvedHealthProcessor is null)
             return;
 
-        // Normal (the baseline gauge) has no mod; CreateForType returns null and we leave the score as-is.
+        score.Mods = score.Mods.Where(m => m is not BmsModGauge).ToArray();
+
+        // Normal is represented by AG alone, so an earlier live-population attribution must be removed.
         var mod = BmsModGauge.CreateForType(resolvedHealthProcessor.WorstGaugeType);
         if (mod is null)
             return;
 
-        if (score.Mods.All(m => m.GetType() != mod.GetType()))
-            score.Mods = score.Mods.Append(mod).ToArray();
+        score.Mods = score.Mods.Append(mod).ToArray();
     }
 }

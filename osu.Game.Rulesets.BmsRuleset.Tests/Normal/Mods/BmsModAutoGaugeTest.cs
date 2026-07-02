@@ -17,20 +17,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods;
 public class BmsModAutoGaugeTest
 {
     [Test]
-    public void TestAutoGaugeIncompatibleWithHardGauge()
-    {
-        var autoGauge = new BmsModAutoGauge();
-        var hardGauge = new BmsModHardGauge();
-
-        Assert.That(autoGauge.IncompatibleMods, Does.Contain(typeof(BmsModHardGauge)));
-    }
-
-    [Test]
-    public void TestAutoGaugeIncompatibleWithBmsModGauge()
+    public void TestAutoGaugeAllowsResolvedGaugeAttribution()
     {
         var autoGauge = new BmsModAutoGauge();
 
-        Assert.That(autoGauge.IncompatibleMods, Does.Contain(typeof(BmsModGauge)));
+        Assert.That(autoGauge.IncompatibleMods, Does.Not.Contain(typeof(BmsModGauge)));
+        Assert.That(autoGauge.IncompatibleMods, Does.Not.Contain(typeof(BmsModHardGauge)));
     }
 
     [Test]
@@ -66,6 +58,37 @@ public class BmsModAutoGaugeTest
         autoGauge.ApplyToScore(score);
 
         Assert.That(score.Mods.Count(m => m is BmsModExHardGauge), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestAutoGaugeAttributionReplacesEarlierResolvedGauge()
+    {
+        var hp = new BmsHealthProcessor();
+        var autoGauge = new BmsModAutoGauge();
+        autoGauge.ApplyToHealthProcessor(hp);
+
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        hp.ApplyBeatmap(beatmap);
+
+        var score = new ScoreInfo { Mods = new Mod[] { autoGauge } };
+
+        autoGauge.ApplyToScore(score);
+        Assert.That(score.Mods, Has.One.TypeOf<BmsModHazardGauge>());
+
+        hp.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+            { Type = HitResult.Ok });
+        hp.HasPassedAtEnd();
+
+        autoGauge.ApplyToScore(score);
+
+        Assert.That(score.Mods, Has.None.TypeOf<BmsModHazardGauge>());
+        Assert.That(score.Mods, Has.One.TypeOf<BmsModExHardGauge>());
+        Assert.That(score.Mods, Contains.Item(autoGauge));
     }
 
     [Test]
