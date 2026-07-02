@@ -101,6 +101,21 @@ public class BmsBgaDisplaySizingTest
     }
 
     [Test]
+    public void TestSourceDisposalDoesNotSynchronouslyRemoveRehostedHost()
+    {
+        using var source = new BmsBgaDisplay();
+        using var parent = new Container();
+        var host = createRehostedDisplayHost();
+
+        parent.Add(host);
+        setRehostedDisplayHost(source, host);
+
+        source.Dispose();
+
+        Assert.That(parent.Children, Does.Contain(host));
+    }
+
+    [Test]
     public void TestBgaDimDefaultsToSeventyPercent()
     {
         using var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
@@ -263,6 +278,22 @@ public class BmsBgaDisplaySizingTest
         Assert.That(field, Is.Not.Null);
 
         field!.SetValue(source, clone);
+    }
+
+    private static Container createRehostedDisplayHost()
+    {
+        var type = typeof(BmsBgaDisplay).GetNestedType("RehostedDisplayHost", BindingFlags.NonPublic);
+        Assert.That(type, Is.Not.Null);
+
+        return (Container)Activator.CreateInstance(type!)!;
+    }
+
+    private static void setRehostedDisplayHost(BmsBgaDisplay source, Container host)
+    {
+        var field = typeof(BmsBgaDisplay).GetField("rehostedDisplayHost", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.That(field, Is.Not.Null);
+
+        field!.SetValue(source, host);
     }
 
     private static void bindBgaDim(BmsBgaDisplay display)

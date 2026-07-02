@@ -39,15 +39,7 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
     /// <summary>
     /// Incompatible with all other gauge mods (same mutual-exclusion set as <see cref="BmsModGauge"/>).
     /// </summary>
-    public override Type[] IncompatibleMods { get; } =
-    [
-        typeof(BmsModGauge),
-        typeof(BmsModAssistEasyGauge),
-        typeof(BmsModEasyGauge),
-        typeof(BmsModHardGauge),
-        typeof(BmsModExHardGauge),
-        typeof(BmsModHazardGauge),
-    ];
+    public override Type[] IncompatibleMods { get; } = [];
 
     public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
     {

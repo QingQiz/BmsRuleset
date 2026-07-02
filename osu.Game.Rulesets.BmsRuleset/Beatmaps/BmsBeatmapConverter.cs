@@ -29,7 +29,9 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     public override bool CanConvert() =>
         Beatmap is BmsDecodedBeatmap { RawLines.Length: > 0 }
-        || (Beatmap.HitObjects.Any() && Beatmap.HitObjects.All(h => h is BmsHitObject));
+        // Song select can ask the active ruleset for statistics while its selected beatmap is stale.
+        // Returning an empty BMS conversion is less disruptive than logging a conversion exception.
+        || Beatmap.HitObjects.Any();
 
     protected override Beatmap<BmsHitObject> CreateBeatmap() => new BmsBeatmap();
 

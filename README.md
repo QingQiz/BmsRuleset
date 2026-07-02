@@ -1059,7 +1059,7 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
        .<updateCountStatistics>b__0()
 ```
 
-Switching the active ruleset from BMS to any other (or from any other to BMS) crashes with
+Switching the active ruleset from BMS to any other crashes with
 `BeatmapInvalidForRulesetException` because the beatmap title wedge tries to recalculate
 difficulty using the wrong converter while the carousel selection is stale.
 

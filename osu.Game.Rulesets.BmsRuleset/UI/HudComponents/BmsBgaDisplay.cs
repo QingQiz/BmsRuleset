@@ -12,7 +12,6 @@ using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
-using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
@@ -78,7 +77,7 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
     private bool poorLayerVisible;
     private IBmsGameplayEvents? gameplayEvents;
     private BmsBgaDisplay? rehostedDisplay;
-    private Container? rehostedDisplayHost;
+    private RehostedDisplayHost? rehostedDisplayHost;
     private IBindable<double>? bgaDim;
     private readonly bool isRehostedDisplay;
 
@@ -183,7 +182,7 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
     {
         textures?.Dispose();
         resources?.Dispose();
-        rehostedDisplayHost?.RemoveAndDisposeImmediately();
+        rehostedDisplayHost?.RemoveFromParentOnUpdate();
         rehostedDisplayHost = null;
         rehostedDisplay = null;
 
@@ -276,7 +275,7 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
         };
         if (bgaDim != null)
             rehostedDisplay.applyBgaDim(bgaDim.Value);
-        rehostedDisplayHost = new Container
+        rehostedDisplayHost = new RehostedDisplayHost
         {
             Depth = float.MaxValue,
             Child = rehostedDisplay,
@@ -618,6 +617,51 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
         public void Dispose()
         {
             externalStore?.Dispose();
+        }
+    }
+
+    private sealed partial class RehostedDisplayHost : Container
+    {
+        private bool removalQueued;
+        private Drawable? removalParent;
+
+        public void RemoveFromParentOnUpdate()
+        {
+            if (IsDisposed || removalQueued)
+                return;
+
+            removalQueued = true;
+
+            removalParent = Parent;
+
+            if (removalParent == null)
+            {
+                Dispose();
+                return;
+            }
+
+            // Parent update runs before child traversal, so the host leaves the tree before it can be updated again.
+            removalParent.OnUpdate += removeFromParent;
+        }
+
+        private void removeFromParent(Drawable parent)
+        {
+            parent.OnUpdate -= removeFromParent;
+            removalParent = null;
+
+            if (!IsDisposed)
+                this.RemoveAndDisposeImmediately();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (removalParent != null)
+            {
+                removalParent.OnUpdate -= removeFromParent;
+                removalParent = null;
+            }
+
+            base.Dispose(isDisposing);
         }
     }
 }

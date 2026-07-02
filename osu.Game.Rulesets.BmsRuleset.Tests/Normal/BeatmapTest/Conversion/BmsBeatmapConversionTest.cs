@@ -3,6 +3,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Conversion;
 
@@ -31,6 +32,21 @@ public class BmsBeatmapConversionTest
         var converter = new BmsRuleset().CreateBeatmapConverter(new Beatmap());
 
         Assert.That(converter.CanConvert(), Is.False);
+    }
+
+    [Test]
+    public void TestBeatmapConverterAllowsForeignHitObjectsForSongSelectStatistics()
+    {
+        var beatmap = new Beatmap
+        {
+            HitObjects =
+            {
+                new HitObject { StartTime = 1000 },
+            },
+        };
+        var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
+
+        Assert.That(converter.CanConvert(), Is.True);
     }
 
     [Test]
