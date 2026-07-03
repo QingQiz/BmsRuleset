@@ -912,6 +912,22 @@ internal static partial class BmsChartParser
         ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap,
         List<BmsParsedHitObject> output)
     {
+        var (notes, lnCells, mines) = collectPlayableCells(state, totalColumns, measureStarts);
+
+        if (state.LnType == 2)
+            collectLnType2Objects(lnCells, timingMap, state.SampleDefinitions, output);
+        else
+            collectLnType1Objects(lnCells, timingMap, state.SampleDefinitions, output);
+
+        collectVisibleObjects(notes, state, timingMap, output);
+
+        foreach (var mine in mines.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
+            output.Add(createMineHitObject(mine, timingMap));
+    }
+
+    private static (List<RawCell> Notes, List<RawCell> LnCells, List<RawCell> Mines) collectPlayableCells(
+        ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts)
+    {
         var notes = new List<RawCell>();
         var lnCells = new List<RawCell>();
         var mines = new List<RawCell>();
@@ -927,29 +943,20 @@ internal static partial class BmsChartParser
 
             if (tryMapLongNoteChannel(line.Channel, totalColumns, out column))
             {
-                var includeZeroCells = state.LnType == 2;
-                foreach (var cell in expandCells(line, measureStarts, includeZeroCells, state.UseBase62))
+                foreach (var cell in expandCells(line, measureStarts, state.LnType == 2, state.UseBase62))
                     lnCells.Add(cell with { Column = column });
                 continue;
             }
 
             if (tryMapLandmineChannel(line.Channel, totalColumns, out column))
             {
-                // Mine damage channels (D*, E*) use 36-base values — unaffected by #BASE 62.
+                // Mine channels keep their base-36 value semantics regardless of #BASE 62.
                 foreach (var cell in expandCells(line, measureStarts, false, false))
                     mines.Add(cell with { Column = column });
             }
         }
 
-        if (state.LnType == 2)
-            collectLnType2Objects(lnCells, timingMap, state.SampleDefinitions, output);
-        else
-            collectLnType1Objects(lnCells, timingMap, state.SampleDefinitions, output);
-
-        collectVisibleObjects(notes, state, timingMap, output);
-
-        foreach (var mine in mines.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-            output.Add(createMineHitObject(mine, timingMap));
+        return (notes, lnCells, mines);
     }
 
     private static void collectVisibleObjects(

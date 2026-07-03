@@ -9,6 +9,7 @@ using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
@@ -61,6 +62,101 @@ public class BmsBeatmapDecoderTest
         {
             ReferenceBpmMode = referenceBpmMode,
         }.Convert();
+
+    [TestCase("Aleph-0 (by LeaF)", "_7NORMAL.bms")]
+    [TestCase("Aleph-0 (by LeaF)", "_14ANOTHER.bms")]
+    [TestCase("Destr0yer (by 削除 feat. Nikki Simmons)", "destr0yer_starnother.bms")]
+    public void TestImportSummaryMatchesFullParserForRealSamples(string directoryName, string fileName)
+    {
+        var path = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, directoryName, fileName);
+        var lines = BmsChartParser.ReadAllLines(File.ReadAllBytes(path));
+
+        var parsed = BmsChartParser.Parse(lines, path, _ => 1);
+        var summary = BmsChartParser.ParseImportSummary(lines, path, _ => 1);
+        var expectedMetadata = extractImportMetadata(parsed, path);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(summary.Metadata, Is.EqualTo(expectedMetadata));
+            Assert.That(summary.Bpm, Is.EqualTo(computeImportedBpm(parsed)).Within(0.000001));
+            Assert.That(summary.Length, Is.EqualTo(computeImportedLength(parsed)).Within(0.000001));
+            Assert.That(summary.TotalObjectCount, Is.EqualTo(parsed.HitObjects.Count));
+            Assert.That(summary.EndTimeObjectCount, Is.EqualTo(parsed.HitObjects.Count(h => h.IsLongNote)));
+            Assert.That(summary.StarRatingNoteTimings.Count, Is.EqualTo(parsed.HitObjects.Count(h => !h.IsMine)));
+            Assert.That(computeStarRating(summary.StarRatingNoteTimings, summary.Metadata.KeyCount, summary.Metadata.Rank),
+                Is.EqualTo(computeStarRating(parsed.HitObjects
+                    .Where(h => !h.IsMine)
+                    .Select(h => new BmsNoteTiming(h.Column, h.StartTime, h.IsLongNote ? h.StartTime + h.Duration : h.StartTime))
+                    .ToList(), parsed.TotalColumns, parsed.Rank)).Within(0.000001));
+        });
+    }
+
+    private static BmsChartMetadata extractImportMetadata(BmsParseResult parsed, string path)
+    {
+        var title = parsed.Title ?? Path.GetFileNameWithoutExtension(path);
+        var diffName = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(parsed.Subtitle))
+            diffName = parsed.Subtitle.Trim().Trim('[', ']', '-', '(', ')');
+
+        var setTitle = BmsChartParser.InferTitle(title.Trim());
+        if (string.IsNullOrEmpty(diffName))
+            diffName = title[setTitle.Length..].Trim().Trim('[', ']', '-', '(', ')');
+
+        if (string.IsNullOrEmpty(diffName))
+            diffName = Path.GetFileNameWithoutExtension(path);
+
+        return new BmsChartMetadata(
+            Artist: parsed.Artist ?? string.Empty,
+            DifficultyName: diffName,
+            KeyCount: parsed.TotalColumns,
+            RawTitle: title,
+            Rank: parsed.Rank,
+            Total: parsed.Total,
+            PlayLevel: parsed.PlayLevel,
+            LockedLongNoteMode: parsed.LockedLongNoteMode);
+    }
+
+    private static double computeImportedBpm(BmsParseResult parsed)
+    {
+        var bpms = parsed.TimingMap.BpmEvents;
+        if (bpms.Count == 0)
+            return 0;
+
+        if (bpms.Count == 1)
+            return Math.Round(bpms[0].Bpm, 1);
+
+        double totalWeight = 0;
+        double weightedSum = 0;
+
+        for (var i = 0; i < bpms.Count; i++)
+        {
+            var time = bpms[i].Time;
+            var nextTime = i + 1 < bpms.Count ? bpms[i + 1].Time : parsed.HitObjects.Count > 0 ? parsed.HitObjects[^1].StartTime + parsed.HitObjects[^1].Duration : 60000;
+            var duration = nextTime - time;
+
+            if (duration <= 0)
+                continue;
+
+            weightedSum += bpms[i].Bpm * duration;
+            totalWeight += duration;
+        }
+
+        return totalWeight > 0 ? Math.Round(weightedSum / totalWeight, 1) : Math.Round(bpms[0].Bpm, 1);
+    }
+
+    private static double computeImportedLength(BmsParseResult parsed)
+    {
+        if (parsed.HitObjects.Count == 0)
+            return 0;
+
+        var last = parsed.HitObjects[^1];
+        var endTime = last.StartTime + last.Duration;
+        return endTime > 0 ? endTime : 0;
+    }
+
+    private static double computeStarRating(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank) =>
+        noteTimings.Count == 0 ? 0 : new BmsStarRatingProcessorV2().Compute(noteTimings, totalColumns, rank).StarRating;
 
     [Test]
     public void DiagnoseLnAutoplayTimingForCautionChart()

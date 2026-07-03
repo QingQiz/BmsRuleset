@@ -1043,7 +1043,7 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                                                                    |
 | **Skin**      | E-POOR judgement image                                                                                                        | 3        |
 | **UI**        | Lane cover / skin / movement                                                                                                  | 2        |
-| **Perf**      | parser performance (tinny parser for importer / ProjectTickToTime(build & query))                                             | 4        |
+| **Perf**      | parser performance (ProjectTickToTime(build & query))                                                                         | 4        |
 | **Perf**      | high GC pressure during importing (sr) (consider pre compute and query)                                                       | 3        |
 | **Perf**      | fps is not stable when a large amount of mine disposed                                                                        | 4        |
 

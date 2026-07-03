@@ -230,18 +230,18 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             var content = bytes[i];
             var md5 = allMd5[i];
             var lines = BmsChartParser.ReadAllLines(content);
-            var parsed = BmsChartParser.Parse(lines, path, _ => 1);
+            var summary = BmsChartParser.ParseImportSummary(lines, path, _ => 1);
 
             return (
                 Index: i,
                 Content: content,
                 Md5: md5,
-                StarRating: computeStarRating(parsed),
-                Metadata: extractMetadata(parsed, path),
-                Bpm: computeBpm(parsed),
-                Length: computeLength(parsed),
-                TotalObjectCount: parsed.HitObjects.Count,
-                EndTimeObjectCount: parsed.HitObjects.Count(h => h.IsLongNote)
+                StarRating: computeStarRating(summary),
+                summary.Metadata,
+                summary.Bpm,
+                summary.Length,
+                summary.TotalObjectCount,
+                summary.EndTimeObjectCount
             );
         }).ToArray();
 
@@ -263,81 +263,18 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     }
 
     /// <summary>
-    ///     Compute the average BPM from the timing map of an already-parsed chart.
-    /// </summary>
-    private static double computeBpm(BmsParseResult parsed)
-    {
-        try
-        {
-            var bpms = parsed.TimingMap.BpmEvents;
-            if (bpms.Count == 0) return 0;
-
-            // Use the weighted average, or just the first BPM if only one.
-            if (bpms.Count == 1)
-                return Math.Round(bpms[0].Bpm, 1);
-
-            // Weighted average: sum(bpm * duration) / total_duration.
-            double totalWeight = 0;
-            double weightedSum = 0;
-            for (var i = 0; i < bpms.Count; i++)
-            {
-                var time = bpms[i].Time;
-                var nextTime = i + 1 < bpms.Count ? bpms[i + 1].Time : (parsed.HitObjects.Count > 0 ? parsed.HitObjects[^1].StartTime + parsed.HitObjects[^1].Duration : 60000);
-                var dur = nextTime - time;
-                if (dur > 0)
-                {
-                    weightedSum += bpms[i].Bpm * dur;
-                    totalWeight += dur;
-                }
-            }
-
-            return totalWeight > 0 ? Math.Round(weightedSum / totalWeight, 1) : Math.Round(bpms[0].Bpm, 1);
-        }
-        catch (Exception e)
-        {
-            Logger.Log($"BMS import: BPM computation failed: {e.Message}");
-            return 0;
-        }
-    }
-
-    /// <summary>
-    ///     Compute the beatmap length (ms) from the last hit object end time.
-    /// </summary>
-    private static double computeLength(BmsParseResult parsed)
-    {
-        try
-        {
-            if (parsed.HitObjects.Count == 0) return 0;
-
-            var last = parsed.HitObjects[^1];
-            var endTime = last.StartTime + last.Duration;
-            return endTime > 0 ? endTime : 0;
-        }
-        catch (Exception e)
-        {
-            Logger.Log($"BMS import: Length computation failed: {e.Message}");
-            return 0;
-        }
-    }
-
-    /// <summary>
     ///     Compute star rating from an already-parsed chart.  Returns 0 on failure
     ///     (malformed chart, unsupported layout) — the import continues regardless.
     /// </summary>
-    private static double computeStarRating(BmsParseResult parsed)
+    private static double computeStarRating(BmsImportSummary summary)
     {
         try
         {
-            if (parsed.HitObjects.Count == 0)
+            if (summary.StarRatingNoteTimings.Count == 0)
                 return 0;
 
-            var noteTimings = parsed.HitObjects
-                .Where(h => !h.IsMine)
-                .Select(h => new BmsNoteTiming(h.Column, h.StartTime, h.IsLongNote ? h.StartTime + h.Duration : h.StartTime))
-                .ToList();
-
             return new BmsStarRatingProcessorV2()
-                .Compute(noteTimings, parsed.TotalColumns, parsed.Rank)
+                .Compute(summary.StarRatingNoteTimings, summary.Metadata.KeyCount, summary.Metadata.Rank)
                 .StarRating;
         }
         catch (Exception e)
@@ -345,37 +282,6 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             Logger.Log($"BMS import: SR computation failed: {e.Message}");
             return 0;
         }
-    }
-
-    private static BmsChartMetadata extractMetadata(BmsParseResult parsed, string? path)
-    {
-        var title = parsed.Title ?? (path == null ? string.Empty : Path.GetFileNameWithoutExtension(path));
-
-        // inferSetTitle: strip trailing [difficulty] bracket.
-        var setTitle = BmsChartParser.InferTitle(title.Trim());
-
-        // inferDifficultyName: extract from subtitle → title → filename.
-        var diffName = string.Empty;
-        if (!string.IsNullOrWhiteSpace(parsed.Subtitle))
-            diffName = parsed.Subtitle.Trim().Trim('[', ']', '-', '(', ')');
-        if (string.IsNullOrEmpty(diffName))
-            diffName = title[setTitle.Length..].Trim().Trim('[', ']', '-', '(', ')');
-        if (string.IsNullOrEmpty(diffName))
-            diffName = path == null ? title : Path.GetFileNameWithoutExtension(path);
-
-        // Key count from the full parse (avoids re-scanning channels).
-        var keyCount = parsed.TotalColumns;
-
-        return new BmsChartMetadata(
-            SetTitle: setTitle,
-            Artist: parsed.Artist ?? string.Empty,
-            DifficultyName: diffName,
-            KeyCount: keyCount,
-            RawTitle: title,
-            Rank: parsed.Rank,
-            Total: parsed.Total,
-            PlayLevel: parsed.PlayLevel,
-            LockedLongNoteMode: parsed.LockedLongNoteMode);
     }
 
     private static void applyCompletionState(ProgressNotification notification, ImportResult result)
@@ -625,10 +531,6 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     beatmapSetInfo.Files.Add(new RealmNamedFileUsage(realmFileByHash[chart.FileHash], fileName));
             }
 
-            // Compute the common set title from all chart raw titles via LCP.
-            var commonSetTitle = BmsChartParser.InferCommonSetTitle(
-                chartImports.Select(c => c.Metadata.RawTitle).ToArray());
-
             // Create beatmap infos.
             foreach (var chart in chartImports)
             {
@@ -638,7 +540,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     Ruleset = rulesetInfo,
                     Metadata = new BeatmapMetadata
                     {
-                        Title = commonSetTitle.Length > 0 ? commonSetTitle : chart.Metadata.SetTitle,
+                        Title = chart.Metadata.RawTitle,
                         Artist = chart.Metadata.Artist,
                         Author = new RealmUser { Username = Constant.AUTHOR },
                         Source = prepared.Directory,
