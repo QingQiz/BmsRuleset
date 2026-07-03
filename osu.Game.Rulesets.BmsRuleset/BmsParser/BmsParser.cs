@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -27,14 +28,6 @@ internal static partial class BmsChartParser
     private readonly record struct RawChannelLine(int Measure, ushort Channel, string Line, int PayloadStart, int PayloadLength, int Sequence);
 
     private readonly record struct RawCell(long Tick, ushort Channel, ushort Value, int Sequence, int Column);
-
-    private readonly record struct TimingEvent(long Tick, double Bpm, double Time, int Sequence = 0);
-
-    private readonly record struct StopEvent(long Tick, double Duration, double StopValue, double Bpm, int Sequence);
-
-    private readonly record struct ScrollEvent(long Tick, double Factor, int Sequence);
-
-    private readonly record struct SpeedEvent(long Tick, double Factor, int Sequence);
 
     /// <summary>Extract the high 6-bit digit (the "tens" place).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -102,10 +95,10 @@ internal static partial class BmsChartParser
         var timingMap = new BmsTimingMap(
             tickResolution,
             measures,
-            timingEvents.Select(e => new BmsBpmEvent(e.Tick, e.Bpm, e.Time, e.Sequence)),
-            stopEvents.Select(e => new BmsStopEvent(e.Tick, e.Duration, e.StopValue, e.Bpm, e.Sequence)),
-            scrollEvents.Select(e => new BmsScrollEvent(e.Tick, e.Factor, e.Sequence)),
-            speedEvents.Select(e => new BmsSpeedEvent(e.Tick, e.Factor, e.Sequence)),
+            timingEvents,
+            stopEvents,
+            scrollEvents,
+            speedEvents,
             scrollReferenceBpm);
         var sampleDefinitions = new Dictionary<ushort, string>(state.SampleDefinitions);
 
@@ -647,9 +640,9 @@ internal static partial class BmsChartParser
         return result;
     }
 
-    private static List<TimingEvent> collectTimingEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts, int tickResolution)
+    private static List<BmsBpmEvent> collectTimingEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts, int tickResolution)
     {
-        var events = new List<TimingEvent>
+        var events = new List<BmsBpmEvent>
         {
             new(0, Math.Max(state.InitialBpm, 1), 0),
         };
@@ -682,7 +675,7 @@ internal static partial class BmsChartParser
                 var bpm = isHexChannel ? parseHexBpm(value) : state.BpmDefinitions.GetValueOrDefault(value);
 
                 if (bpm is not 0 and not null)
-                    events.Add(new TimingEvent(tick, bpm.Value, 0, line.Sequence + i));
+                    events.Add(new BmsBpmEvent(tick, bpm.Value, 0, line.Sequence + i));
             }
         }
 
@@ -708,7 +701,7 @@ internal static partial class BmsChartParser
 
     private static double resolveScrollReferenceBpm(
         ParseState state,
-        IReadOnlyList<TimingEvent> timingEvents,
+        IReadOnlyList<BmsBpmEvent> timingEvents,
         IReadOnlyDictionary<int, long> measureStarts,
         int totalColumns,
         BmsReferenceBpmMode mode)
@@ -730,7 +723,7 @@ internal static partial class BmsChartParser
 
     private static double resolveMainBpm(
         ParseState state,
-        IReadOnlyList<TimingEvent> timingEvents,
+        IReadOnlyList<BmsBpmEvent> timingEvents,
         IReadOnlyDictionary<int, long> measureStarts,
         int totalColumns,
         double fallbackBpm)
@@ -767,9 +760,9 @@ internal static partial class BmsChartParser
         }
     }
 
-    private static List<StopEvent> collectStopEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts, List<TimingEvent> timingEvents)
+    private static List<BmsStopEvent> collectStopEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts, List<BmsBpmEvent> timingEvents)
     {
-        var events = new List<StopEvent>();
+        var events = new List<BmsStopEvent>();
 
         foreach (var line in state.ChannelLines)
         {
@@ -796,16 +789,16 @@ internal static partial class BmsChartParser
                 var bpm = bpmAtTick(tick, timingEvents);
                 var duration = stopValue * 60000 / (bpm * 48);
 
-                events.Add(new StopEvent(tick, duration, stopValue, bpm, line.Sequence + i));
+                events.Add(new BmsStopEvent(tick, duration, stopValue, bpm, line.Sequence + i));
             }
         }
 
         return events.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToList();
     }
 
-    private static List<ScrollEvent> collectScrollEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts)
+    private static List<BmsScrollEvent> collectScrollEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts)
     {
-        var events = new List<ScrollEvent>();
+        var events = new List<BmsScrollEvent>();
 
         foreach (var line in state.ChannelLines)
         {
@@ -829,16 +822,16 @@ internal static partial class BmsChartParser
                     continue;
 
                 var tick = mStart + mLength * i / pairCount;
-                events.Add(new ScrollEvent(tick, factor, line.Sequence + i));
+                events.Add(new BmsScrollEvent(tick, factor, line.Sequence + i));
             }
         }
 
         return events.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToList();
     }
 
-    private static List<SpeedEvent> collectSpeedEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts)
+    private static List<BmsSpeedEvent> collectSpeedEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts)
     {
-        var events = new List<SpeedEvent>();
+        var events = new List<BmsSpeedEvent>();
 
         foreach (var line in state.ChannelLines)
         {
@@ -862,14 +855,14 @@ internal static partial class BmsChartParser
                     continue;
 
                 var tick = mStart + mLength * i / pairCount;
-                events.Add(new SpeedEvent(tick, factor, line.Sequence + i));
+                events.Add(new BmsSpeedEvent(tick, factor, line.Sequence + i));
             }
         }
 
         return events.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToList();
     }
 
-    private static List<TimingEvent> applyStopOffsetsToTimingEvents(List<TimingEvent> timingEvents, IReadOnlyList<StopEvent> stopEvents)
+    private static List<BmsBpmEvent> applyStopOffsetsToTimingEvents(List<BmsBpmEvent> timingEvents, IReadOnlyList<BmsStopEvent> stopEvents)
     {
         if (stopEvents.Count == 0)
             return timingEvents;
@@ -1185,7 +1178,7 @@ internal static partial class BmsChartParser
         return channel is CH_0B or CH_0C or CH_0D or CH_0E;
     }
 
-    private static double bpmAtTick(long tick, IReadOnlyList<TimingEvent> timingEvents)
+    private static double bpmAtTick(long tick, IReadOnlyList<BmsBpmEvent> timingEvents)
     {
         var lo = 0;
         var hi = timingEvents.Count - 1;

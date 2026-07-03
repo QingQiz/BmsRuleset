@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
+namespace osu.Game.Rulesets.BmsRuleset.Configuration;
 
 public enum BmsReferenceBpmMode
 {
