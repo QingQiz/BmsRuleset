@@ -66,6 +66,14 @@ namespace PLMpegSharp
             _demux = new Demux(DataBuffer.CreateWithMemory(bytes));
             _videoPacketType = PacketStartCode.Invalid;
             InitDecoders();
+
+            // BGA files sometimes ship as raw MPEG-1 video elementary streams (they begin
+            // with the sequence-header start code 00 00 01 B3) instead of an MPEG-PS program
+            // stream (which begins with a Pack header 00 00 01 BA that Demux requires). When
+            // the PS demuxer finds no video stream, feed the bytes straight to a VideoDecoder
+            // so these files still play instead of faulting with "headers were not found".
+            if (_videoDecoder == null)
+                InitRawVideoDecoder(bytes);
         }
 
         #endregion
@@ -111,6 +119,17 @@ namespace PLMpegSharp
             {
                 _videoBuffer?.SignalEnd();
             }
+        }
+
+        private void InitRawVideoDecoder(byte[] bytes)
+        {
+            // The PS demux already failed above, so treat initialization as done either way;
+            // this stops the VideoDecoder property from re-running the PS scan on every read.
+            _has_decoders = true;
+
+            var decoder = new VideoDecoder(DataBuffer.CreateWithMemory(bytes));
+            if (decoder.HasHeader)
+                _videoDecoder = decoder;
         }
 
         #endregion

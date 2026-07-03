@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 #nullable enable
 using NUnit.Framework;
+using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Mpeg;
 using PLMpegSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -106,6 +108,36 @@ public class BmsMpegDecoderSmokeTest
         Assert.That(BmsMpegVideoDecoder.TryCreate([1, 2, 3, 4], out var decoder, out var error), Is.False);
         Assert.That(decoder, Is.Null);
         Assert.That(error, Does.Contain("MPEG"));
+    }
+
+    [Test]
+    public void TestPlayerParsesRawMpeg1VideoElementaryStream()
+    {
+        // Some BGA files (e.g. B.B.K.K.B.K.K/01.mpg) are raw MPEG-1 video elementary
+        // streams: they begin with the sequence-header start code (00 00 01 B3) and carry
+        // no MPEG-PS Pack/System wrapper (00 00 01 BA/BB) that the Demuxer requires. With
+        // only a sequence header and no picture data this still proves the Player falls
+        // back to the raw-ES path and parses dimensions/framerate instead of faulting.
+        var bytes = makeRawMpeg1ElementaryStream();
+
+        var player = new Player(bytes);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(player.Width, Is.EqualTo(256));
+            Assert.That(player.Height, Is.EqualTo(256));
+            Assert.That(player.Framerate, Is.EqualTo(30.0));
+        });
+    }
+
+    [Test]
+    public void TestWrapperAcceptsRawMpeg1VideoElementaryStream()
+    {
+        var bytes = makeRawMpeg1ElementaryStream();
+
+        Assert.That(BmsMpegVideoDecoder.TryCreate(bytes, out var decoder, out var error), Is.True, error);
+        Assert.That(decoder, Is.Not.Null);
+        decoder!.Dispose();
     }
 
     [Test]
@@ -225,6 +257,21 @@ public class BmsMpegDecoderSmokeTest
         Assert.That(source.Stats.IsFaulted, Is.False);
     }
 
+    [Test]
+    public void TestDrawableReadsSeekableStreamFromBeginning()
+    {
+        var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
+        using var stream = new MemoryStream(bytes);
+        stream.Position = stream.Length;
+
+        using var drawable = new BmsMpegVideoDrawable(stream, new ManualClock(), 0);
+        typeof(BmsMpegVideoDrawable).GetMethod("load", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(drawable, [null]);
+
+        Assert.That(waitUntil(() => drawable.Stats.DecodedFrames > 0 || drawable.Stats.IsFaulted, TimeSpan.FromSeconds(3)), Is.True);
+        Assert.That(drawable.Stats.IsFaulted, Is.False, drawable.Stats.FaultMessage);
+        Assert.That(drawable.Stats.DecodedFrames, Is.GreaterThan(0));
+    }
+
     private static string locateTestSongFile(string songFolder, string fileName)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -253,6 +300,19 @@ public class BmsMpegDecoderSmokeTest
         }
 
         return false;
+    }
+
+    // Minimal raw MPEG-1 video elementary stream: a sequence header (start code 00 00 01 B3)
+    // describing 256x256 @ 30fps with default quantiser matrices, then zero padding. There
+    // are no MPEG-PS Pack/System headers and no picture data — enough to exercise the raw-ES
+    // detection path without shipping a real (copyrighted) BGA fixture alongside the tests.
+    private static byte[] makeRawMpeg1ElementaryStream()
+    {
+        var bytes = new byte[256];
+        bytes[0] = 0x00; bytes[1] = 0x00; bytes[2] = 0x01; bytes[3] = 0xB3; // sequence_header_code
+        bytes[4] = 0x10; bytes[5] = 0x01; bytes[6] = 0x00;                  // horizontal=256, vertical=256
+        bytes[7] = 0x15;                                                    // aspect_ratio=1, frame_rate_code=5 (30fps)
+        return bytes;
     }
 
 }

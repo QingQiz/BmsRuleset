@@ -1997,6 +1997,27 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestVideoBgaAndPoorBgaEventsAreParsed()
+    {
+        var beatmap = (IBmsBeatmap)decode("""
+                                          #BPM 180
+                                          #BMP01 _aragami_bga.mpg
+                                          #BMP02 _miss.bmp
+                                          #00104:0000000000010000
+                                          #00106:0000000000020000
+                                          #00111:01
+                                          """);
+
+        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("_aragami_bga.mpg"));
+        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("_miss.bmp"));
+        Assert.That(beatmap.Bga.Events.Select(e => (e.Layer, e.DefinitionKey, e.Tick)), Is.EqualTo(new[]
+        {
+            (BmsBgaLayer.Base, BmsChartParser.Enc("01"), 312L),
+            (BmsBgaLayer.Poor, BmsChartParser.Enc("02"), 312L),
+        }));
+    }
+
+    [Test]
     public void TestBgaOpacityChannelsAreParsedSeparatelyFromBitmapEvents()
     {
         var beatmap = (IBmsBeatmap)decode("""

@@ -51,6 +51,9 @@ internal sealed partial class BmsMpegVideoDrawable : CompositeDrawable
         this.renderer = renderer;
 
         using var memory = new MemoryStream();
+        if (stream.CanSeek)
+            stream.Position = 0;
+
         stream.CopyTo(memory);
         frameSource = new BmsMpegVideoFrameSource(memory.ToArray());
         frameSource.Start();
