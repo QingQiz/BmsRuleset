@@ -25,6 +25,7 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.Settings.Sections.Maintenance;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Rulesets.BmsRuleset.Screens;
@@ -214,6 +215,11 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Current = manager.GetBindable<double>(BmsRulesetSetting.ScrollSpeed),
                 KeyboardStep = 0.1f,
                 LabelFormat = v => RulesetSettingsStrings.ScrollSpeedTooltip((int)BmsDrawableRuleset.ComputeScrollTime(v), v),
+            }),
+            new SettingsItemV2(new FormEnumDropdown<BmsReferenceBpmMode>
+            {
+                Caption = "Reference BPM",
+                Current = manager.GetBindable<BmsReferenceBpmMode>(BmsRulesetSetting.ReferenceBpmMode),
             }),
             new SettingsItemV2(new FormSliderBar<double>
             {

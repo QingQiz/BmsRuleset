@@ -38,6 +38,14 @@ public class BmsBeatmapDecoderTest
         return new BmsBeatmapDecoder(randomValueSelector).Decode(reader);
     }
 
+    private static Beatmap decode(string text, BmsReferenceBpmMode referenceBpmMode)
+    {
+        using var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(text));
+        using var reader = new LineBufferedReader(memoryStream);
+
+        return new BmsBeatmapDecoder(referenceBpmMode: referenceBpmMode).Decode(reader);
+    }
+
     private static Beatmap decodeResource(string resourceName)
     {
         using var stream = typeof(BmsBeatmapDecoderTest).Assembly.GetManifestResourceStream(resourceName)
@@ -46,6 +54,12 @@ public class BmsBeatmapDecoderTest
 
         return new BmsBeatmapDecoder().Decode(reader);
     }
+
+    private static BmsBeatmap convert(Beatmap beatmap, BmsReferenceBpmMode referenceBpmMode) =>
+        (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset())
+        {
+            ReferenceBpmMode = referenceBpmMode,
+        }.Convert();
 
     [Test]
     public void DiagnoseLnAutoplayTimingForCautionChart()
@@ -430,6 +444,71 @@ public class BmsBeatmapDecoderTest
         var timingMap = converted.TimingMap!;
 
         Assert.That(timingMap.ScrollReferenceBpm, Is.EqualTo(150).Within(0.000001));
+    }
+
+    [Test]
+    public void TestReferenceBpmModeUsesMaxBpmWhenBaseBpmIsMissing()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #BPM01 240
+                             #BPM02 90
+                             #00108:01
+                             #00208:02
+                             #00311:01
+                             """, referenceBpmMode: BmsReferenceBpmMode.MaxBpm);
+        var converted = convert(beatmap, BmsReferenceBpmMode.MaxBpm);
+
+        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(240).Within(0.000001));
+    }
+
+    [Test]
+    public void TestReferenceBpmModeUsesMinBpmWhenBaseBpmIsMissing()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #BPM01 240
+                             #BPM02 90
+                             #00108:01
+                             #00208:02
+                             #00311:01
+                             """, referenceBpmMode: BmsReferenceBpmMode.MinBpm);
+        var converted = convert(beatmap, BmsReferenceBpmMode.MinBpm);
+
+        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(90).Within(0.000001));
+    }
+
+    [Test]
+    public void TestReferenceBpmModeUsesMainBpmWhenBaseBpmIsMissing()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #BPM01 180
+                             #BPM02 90
+                             #00111:01010101
+                             #00208:01
+                             #00211:0101
+                             #00308:02
+                             #00311:010101010101
+                             """, referenceBpmMode: BmsReferenceBpmMode.MainBpm);
+        var converted = convert(beatmap, BmsReferenceBpmMode.MainBpm);
+
+        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(90).Within(0.000001));
+    }
+
+    [Test]
+    public void TestBaseBpmOverridesReferenceBpmMode()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #BASEBPM 200
+                             #BPM01 240
+                             #00108:01
+                             #00211:01
+                             """, referenceBpmMode: BmsReferenceBpmMode.MaxBpm);
+        var converted = convert(beatmap, BmsReferenceBpmMode.MaxBpm);
+
+        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(200).Within(0.000001));
     }
 
     [Test]

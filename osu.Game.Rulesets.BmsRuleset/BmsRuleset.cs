@@ -219,6 +219,9 @@ public partial class BmsRuleset : Ruleset
         return config;
     }
 
+    internal static BmsReferenceBpmMode CurrentReferenceBpmMode =>
+        sharedConfigManager?.Get<BmsReferenceBpmMode>(BmsRulesetSetting.ReferenceBpmMode) ?? BmsReferenceBpmMode.MainBpm;
+
     public override RulesetSettingsSubsection CreateSettings() =>
         new BmsSettingsSubsection(this);
 

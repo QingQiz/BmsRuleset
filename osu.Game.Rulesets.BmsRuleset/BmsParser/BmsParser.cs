@@ -48,7 +48,11 @@ internal static partial class BmsChartParser
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ushort Pack(int hi, int lo) => (ushort)((hi << 6) | lo);
 
-    public static BmsParseResult Parse(IEnumerable<string> lines, string? path = null, Func<int, int>? randomValueSelector = null)
+    public static BmsParseResult Parse(
+        IEnumerable<string> lines,
+        string? path = null,
+        Func<int, int>? randomValueSelector = null,
+        BmsReferenceBpmMode referenceBpmMode = BmsReferenceBpmMode.StartBpm)
     {
         var state = new ParseState();
         var commentStripper = new BmsCommentStripper();
@@ -90,6 +94,10 @@ internal static partial class BmsChartParser
 
         var scrollEvents = collectScrollEvents(state, measureStarts);
         var speedEvents = collectSpeedEvents(state, measureStarts);
+        var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
+        var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
+
+        var scrollReferenceBpm = resolveScrollReferenceBpm(state, timingEvents, measureStarts, totalColumns, referenceBpmMode);
 
         var timingMap = new BmsTimingMap(
             tickResolution,
@@ -98,10 +106,7 @@ internal static partial class BmsChartParser
             stopEvents.Select(e => new BmsStopEvent(e.Tick, e.Duration, e.StopValue, e.Bpm, e.Sequence)),
             scrollEvents.Select(e => new BmsScrollEvent(e.Tick, e.Factor, e.Sequence)),
             speedEvents.Select(e => new BmsSpeedEvent(e.Tick, e.Factor, e.Sequence)),
-            state.BaseBpm);
-
-        var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
-        var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
+            scrollReferenceBpm);
         var sampleDefinitions = new Dictionary<ushort, string>(state.SampleDefinitions);
 
         // Pre-size output lists to avoid AddWithResize during collection.
@@ -699,6 +704,67 @@ internal static partial class BmsChartParser
         }
 
         return ordered;
+    }
+
+    private static double resolveScrollReferenceBpm(
+        ParseState state,
+        IReadOnlyList<TimingEvent> timingEvents,
+        IReadOnlyDictionary<int, long> measureStarts,
+        int totalColumns,
+        BmsReferenceBpmMode mode)
+    {
+        if (state.BaseBpm > 0)
+            return state.BaseBpm;
+
+        var positiveBpms = timingEvents.Select(e => Math.Abs(e.Bpm)).Where(b => b > 0).ToArray();
+        var startBpm = positiveBpms.Length > 0 ? positiveBpms[0] : 130;
+
+        return mode switch
+        {
+            BmsReferenceBpmMode.MaxBpm => positiveBpms.Length > 0 ? positiveBpms.Max() : startBpm,
+            BmsReferenceBpmMode.MainBpm => resolveMainBpm(state, timingEvents, measureStarts, totalColumns, startBpm),
+            BmsReferenceBpmMode.MinBpm => positiveBpms.Length > 0 ? positiveBpms.Min() : startBpm,
+            _ => startBpm,
+        };
+    }
+
+    private static double resolveMainBpm(
+        ParseState state,
+        IReadOnlyList<TimingEvent> timingEvents,
+        IReadOnlyDictionary<int, long> measureStarts,
+        int totalColumns,
+        double fallbackBpm)
+    {
+        var counts = new Dictionary<double, int>();
+        var firstTickByBpm = new Dictionary<double, long>();
+
+        foreach (var tick in collectPlayableNoteTicks(state, measureStarts, totalColumns))
+        {
+            var bpm = Math.Abs(bpmAtTick(tick, timingEvents));
+            if (bpm <= 0)
+                continue;
+
+            counts[bpm] = counts.GetValueOrDefault(bpm) + 1;
+
+            firstTickByBpm.TryAdd(bpm, tick);
+        }
+
+        return counts.Count == 0
+            ? fallbackBpm
+            : counts.OrderByDescending(kv => kv.Value).ThenBy(kv => firstTickByBpm[kv.Key]).First().Key;
+    }
+
+    private static IEnumerable<long> collectPlayableNoteTicks(ParseState state, IReadOnlyDictionary<int, long> measureStarts, int totalColumns)
+    {
+        foreach (var line in state.ChannelLines)
+        {
+            if (BmsLayout.TryMapVisibleChannel(line.Channel, totalColumns, out _)
+                || tryMapLongNoteChannel(line.Channel, totalColumns, out _))
+            {
+                foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+                    yield return cell.Tick;
+            }
+        }
     }
 
     private static List<StopEvent> collectStopEvents(ParseState state, IReadOnlyDictionary<int, long> measureStarts, List<TimingEvent> timingEvents)

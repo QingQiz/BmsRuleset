@@ -27,6 +27,8 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     public Func<int, int>? BranchRandomValueSelector { get; init; }
 
+    public BmsReferenceBpmMode? ReferenceBpmMode { get; init; }
+
     public override bool CanConvert() =>
         Beatmap is BmsDecodedBeatmap { RawLines.Length: > 0 }
         // Song select can ask the active ruleset for statistics while its selected beatmap is stale.
@@ -232,7 +234,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (!string.IsNullOrWhiteSpace(BranchReplayDecisions))
             selector = BmsChartParser.CreateReplayDecisionSelector(BmsChartParser.DeserialiseBranchDecisions(BranchReplayDecisions));
 
-        var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector);
+        var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector, ReferenceBpmMode ?? BmsRuleset.CurrentReferenceBpmMode);
         var beatmap = new BmsDecodedBeatmap
         {
             BeatmapInfo = decoded.BeatmapInfo,

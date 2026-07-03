@@ -1,4 +1,5 @@
 using osu.Game.Configuration;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.Configuration;
 
 namespace osu.Game.Rulesets.BmsRuleset.Configuration;
@@ -16,6 +17,7 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
 
         SetDefault(BmsRulesetSetting.LastImportPath, "C:\\");
         SetDefault(BmsRulesetSetting.ScrollSpeed, DEFAULT_SCROLL_SPEED, 1.0, MAX_SCROLL_SPEED, 0.1);
+        SetDefault(BmsRulesetSetting.ReferenceBpmMode, BmsReferenceBpmMode.MainBpm);
         SetDefault(BmsRulesetSetting.BgaDim, 0.7, 0, 1, 0.01);
 
         SetDefault(BmsRulesetSetting.ShowBms5K, true);
@@ -33,6 +35,7 @@ public enum BmsRulesetSetting
 {
     LastImportPath,
     ScrollSpeed,
+    ReferenceBpmMode,
     BgaDim,
     ShowBms5K,
     ShowBme7K,

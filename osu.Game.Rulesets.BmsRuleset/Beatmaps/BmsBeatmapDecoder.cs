@@ -20,12 +20,15 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 /// Decoder also does a deterministic branch-1 materialisation to create a usable cached BmsDecodedBeatmap preview/metadata objec
 /// </summary>
 /// <param name="randomValueSelector"></param>
-public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Decoder<Beatmap>
+/// <param name="referenceBpmMode"></param>
+public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsReferenceBpmMode? referenceBpmMode = null) : Decoder<Beatmap>
 {
     private static readonly object registration_lock = new();
 
     // The decoded beatmap is cached before play starts; only playable conversion should roll runtime branches.
     private Func<int, int> decodeBranchSelector => randomValueSelector ?? (_ => 1);
+
+    private BmsReferenceBpmMode effectiveReferenceBpmMode => referenceBpmMode ?? BmsRuleset.CurrentReferenceBpmMode;
 
     private static bool registered;
 
@@ -92,7 +95,7 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null) : Dec
     protected override void ParseStreamInto(LineBufferedReader stream, bool _, Beatmap output)
     {
         var lines = readLines(stream, output.BeatmapInfo.Path);
-        var parseResult = BmsChartParser.Parse(lines, output.BeatmapInfo.Path, decodeBranchSelector);
+        var parseResult = BmsChartParser.Parse(lines, output.BeatmapInfo.Path, decodeBranchSelector, effectiveReferenceBpmMode);
 
         applyMetadata(output, parseResult);
         PopulateTiming(output, parseResult.TimingMap.BpmEvents);
