@@ -210,17 +210,15 @@ internal static partial class BmsChartParser
     private static BmsChartMetadata extractImportMetadata(ParseState state, int totalColumns, string? path)
     {
         var title = state.Title ?? (path == null ? string.Empty : Path.GetFileNameWithoutExtension(path));
-        var diffName = string.Empty;
 
-        if (!string.IsNullOrWhiteSpace(state.Subtitle))
-            diffName = state.Subtitle.Trim().Trim('[', ']', '-', '(', ')');
-
-        var setTitle = InferTitle(title.Trim());
-        if (string.IsNullOrEmpty(diffName))
-            diffName = title[setTitle.Length..].Trim().Trim('[', ']', '-', '(', ')');
-
-        if (string.IsNullOrEmpty(diffName))
-            diffName = path == null ? title : Path.GetFileNameWithoutExtension(path);
+        // Only the #SUBTITLE-derived name is known per-chart. The title-vs-difficulty
+        // split is deferred to the set level (BmsFileImporter), where
+        // InferCommonSetTitle gives the authoritative base title across all charts in
+        // the folder — a per-chart InferTitle guess here would diverge for truncated
+        // or outlier titles.
+        var diffName = string.IsNullOrWhiteSpace(state.Subtitle)
+            ? string.Empty
+            : StripDifficultyDelimiters(state.Subtitle);
 
         return new BmsChartMetadata(
             Artist: state.Artist ?? string.Empty,

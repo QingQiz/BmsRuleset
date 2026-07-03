@@ -251,6 +251,43 @@ public partial class BmsFileImporterTest
     }
 
     [Test]
+    public void TestImportedBeatmapsShareCleanSetTitleAndSetRelativeDifficultyName()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+
+            var importer = new BmsFileImporter(realm, storage);
+            var directory = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Aleph-0 (by LeaF)");
+
+            await importer.Import(directory).ConfigureAwait(false);
+
+            var result = realm.Run(r =>
+            {
+                var set = r.All<BeatmapSetInfo>().Single();
+
+                return (
+                    SetTitle: set.Metadata.Title,
+                    BeatmapTitles: set.Beatmaps.Select(b => b.Metadata.Title).ToArray(),
+                    DifficultyNames: set.Beatmaps.Select(b => b.DifficultyName).ToArray());
+            });
+
+            // Every beatmap carries the clean common set title — not whichever raw
+            // #TITLE sorted first — so the set displays "Aleph-0".
+            Assert.That(result.SetTitle, Is.EqualTo("Aleph-0"));
+            Assert.That(result.BeatmapTitles, Is.All.EqualTo("Aleph-0"));
+
+            // DifficultyName is the suffix split relative to that set title, so the
+            // mixed spacing ("Aleph-0 [Dirty Pattern]" vs "Aleph-0[NORMAL]") still
+            // yields clean difficulty names. The raw #TITLE is preserved upstream in
+            // BmsChartMetadata.RawTitle for this split.
+            Assert.That(result.DifficultyNames, Does.Contain("NORMAL"));
+            Assert.That(result.DifficultyNames, Does.Contain("14ANOTHER"));
+            Assert.That(result.DifficultyNames, Does.Contain("Dirty Pattern"));
+        });
+    }
+
+    [Test]
     public void TestImportSingleBmsFileDoesNotImportSiblingResources()
     {
         runImportTest(async (realm, storage) =>

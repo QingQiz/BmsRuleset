@@ -531,17 +531,27 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     beatmapSetInfo.Files.Add(new RealmNamedFileUsage(realmFileByHash[chart.FileHash], fileName));
             }
 
+            // The clean common set title. Serves double duty: it's the displayed
+            // set/beatmap title (osu! has no separate set-level metadata —
+            // BeatmapSetInfo.Metadata is Beatmaps.FirstOrDefault().Metadata), and it's
+            // the authoritative base for splitting each chart's raw #TITLE into (base,
+            // difficulty suffix). The raw #TITLE stays in BmsChartMetadata.RawTitle for
+            // that split.
+            var setTitle = BmsChartParser.InferCommonSetTitle(chartImports.Select(c => c.Metadata.RawTitle).ToArray());
+
             // Create beatmap infos.
             foreach (var chart in chartImports)
             {
+                var metadata = chart.Metadata with { DifficultyName = resolveDifficultyName(chart, setTitle) };
+
                 var beatmapInfo = new BeatmapInfo
                 {
-                    DifficultyName = chart.Metadata.DifficultyName,
+                    DifficultyName = metadata.DifficultyName,
                     Ruleset = rulesetInfo,
                     Metadata = new BeatmapMetadata
                     {
-                        Title = chart.Metadata.RawTitle,
-                        Artist = chart.Metadata.Artist,
+                        Title = setTitle,
+                        Artist = metadata.Artist,
                         Author = new RealmUser { Username = Constant.AUTHOR },
                         Source = prepared.Directory,
                         PreviewTime = 0,
@@ -555,7 +565,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     TotalObjectCount = chart.TotalObjectCount,
                     EndTimeObjectCount = chart.EndTimeObjectCount,
                 };
-                var diff = BmsDifficultyInfo.FromChartMetadata(chart.Metadata);
+                var diff = BmsDifficultyInfo.FromChartMetadata(metadata);
                 diff.WriteToOsuDifficulty(beatmapInfo);
 
                 DifficultyNameUpdater.GetDifficultyName(beatmapInfo, out var markerStr);
@@ -578,6 +588,22 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         {
             Logger.Error(e, $"BMS import: failed to import {prepared.Directory}: {e.Message}");
             return false;
+        }
+
+        // Derive DifficultyName for one chart, given the set's common base title.
+        // Priority: #SUBTITLE (author's explicit label) > InferDifficultyName
+        // (set-relative suffix; outliers that don't share the base use their raw
+        // title; single-chart sets fall back to a per-chart InferTitle split) > filename.
+        static string resolveDifficultyName(ChartImport chart, string setTitle)
+        {
+            if (!string.IsNullOrEmpty(chart.Metadata.DifficultyName))
+                return chart.Metadata.DifficultyName;
+
+            var inferred = BmsChartParser.InferDifficultyName(chart.Metadata.RawTitle, setTitle);
+            if (!string.IsNullOrEmpty(inferred))
+                return inferred;
+
+            return Path.GetFileNameWithoutExtension(chart.Path);
         }
     }
 

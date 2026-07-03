@@ -94,17 +94,13 @@ public class BmsBeatmapDecoderTest
     private static BmsChartMetadata extractImportMetadata(BmsParseResult parsed, string path)
     {
         var title = parsed.Title ?? Path.GetFileNameWithoutExtension(path);
-        var diffName = string.Empty;
 
-        if (!string.IsNullOrWhiteSpace(parsed.Subtitle))
-            diffName = parsed.Subtitle.Trim().Trim('[', ']', '-', '(', ')');
-
-        var setTitle = BmsChartParser.InferTitle(title.Trim());
-        if (string.IsNullOrEmpty(diffName))
-            diffName = title[setTitle.Length..].Trim().Trim('[', ']', '-', '(', ')');
-
-        if (string.IsNullOrEmpty(diffName))
-            diffName = Path.GetFileNameWithoutExtension(path);
+        // Must mirror production extractImportMetadata: only the #SUBTITLE-derived
+        // name is known per-chart; the title-vs-difficulty split is deferred to the
+        // set level (BmsFileImporter.resolveDifficultyName).
+        var diffName = string.IsNullOrWhiteSpace(parsed.Subtitle)
+            ? string.Empty
+            : BmsChartParser.StripDifficultyDelimiters(parsed.Subtitle);
 
         return new BmsChartMetadata(
             Artist: parsed.Artist ?? string.Empty,
