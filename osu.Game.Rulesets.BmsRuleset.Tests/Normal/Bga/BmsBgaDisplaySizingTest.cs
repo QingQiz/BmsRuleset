@@ -256,6 +256,32 @@ public class BmsBgaDisplaySizingTest
         }
     }
 
+    [Test]
+    public void TestPreloadedBgaResourceServesResolvedFallbackFromCache()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"{nameof(BmsBgaDisplaySizingTest)}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var preferredPath = Path.Combine(directory, "movie.mp4");
+            File.WriteAllBytes(Path.Combine(directory, "movie.mpg"), [1]);
+            File.WriteAllBytes(preferredPath, [2]);
+
+            using var store = createBgaResourceStore(directory);
+            invokePreload(store, ["movie.mpg"]);
+            File.Delete(preferredPath);
+
+            using var stream = invokeGetStream(store, "movie.mpg");
+
+            Assert.That(stream.ReadByte(), Is.EqualTo(2));
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     private static void applyBgaDim(BmsBgaDisplay display, double dim)
     {
         var method = typeof(BmsBgaDisplay).GetMethod("applyBgaDim", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -337,6 +363,14 @@ public class BmsBgaDisplaySizingTest
         Assert.That(stream, Is.Not.Null);
 
         return (Stream)stream!;
+    }
+
+    private static void invokePreload(IDisposable store, string[] names)
+    {
+        var method = store.GetType().GetMethod("Preload", BindingFlags.Instance | BindingFlags.Public);
+        Assert.That(method, Is.Not.Null);
+
+        method!.Invoke(store, [names]);
     }
 
     private static Sprite createFullCanvasSprite(Texture texture)

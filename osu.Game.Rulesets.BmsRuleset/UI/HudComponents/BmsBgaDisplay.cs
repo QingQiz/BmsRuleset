@@ -214,6 +214,28 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
         resources = new BmsBgaResourceStore(bmsDrawableRuleset.BeatmapSourceDirectory, workingBeatmap);
         textures = new TextureStore(host.Renderer, host.CreateTextureLoaderStore(resources), false, scaleAdjust: 1);
 
+        preloadBgaResources();
+    }
+
+    private void preloadBgaResources()
+    {
+        if (bga == null || resources == null || textures == null)
+            return;
+
+        var declaredPaths = bga.BitmapDefinitions.Values
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        resources.Preload(declaredPaths);
+
+        foreach (var path in declaredPaths)
+        {
+            var resolvedPath = resources.ResolveLookup(path);
+
+            if (resolvedPath != null && !isVideo(resolvedPath))
+                textures.Get(resolvedPath);
+        }
     }
 
     private void bindBgaDim()
@@ -497,48 +519,71 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
             ? new BmsFileResourceStore(sourceDirectory)
             : null;
 
+        private readonly object cacheLock = new();
+        private readonly Dictionary<string, byte[]?> cache = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string?> resolvedLookups = new(StringComparer.OrdinalIgnoreCase);
+
+        public void Preload(IEnumerable<string> names)
+        {
+            foreach (var name in names)
+                Get(name);
+        }
+
         public byte[] Get(string? name)
         {
-            using var stream = GetStream(name);
-            if (stream == null)
+            if (string.IsNullOrWhiteSpace(name))
                 return null!;
+
+            lock (cacheLock)
+            {
+                if (cache.TryGetValue(name, out var cached))
+                    return cached!;
+            }
+
+            var resolved = ResolveLookup(name);
+
+            if (resolved == null)
+            {
+                setCache(name, null);
+                return null!;
+            }
+
+            lock (cacheLock)
+            {
+                if (cache.TryGetValue(resolved, out var resolvedCached))
+                {
+                    cache[name] = resolvedCached;
+                    return resolvedCached!;
+                }
+            }
+
+            using var stream = openResourceStream(resolved);
+            if (stream == null)
+            {
+                setCache(name, null);
+                return null!;
+            }
 
             using var memory = new MemoryStream();
             stream.CopyTo(memory);
-            return memory.ToArray();
+            var bytes = memory.ToArray();
+
+            lock (cacheLock)
+            {
+                cache[name] = bytes;
+                cache[resolved] = bytes;
+            }
+
+            return bytes;
         }
 
         public Task<byte[]> GetAsync(string? name, CancellationToken cancellationToken = default) =>
             Task.Run(() => Get(name), cancellationToken);
 
-        public Stream? GetStream(string? name)
+        public Stream GetStream(string? name)
         {
-            if (string.IsNullOrWhiteSpace(name))
-                return null;
-
-            foreach (var lookup in getBgaResourceLookups(name))
-            {
-                if (externalStore?.GetStream(lookup) is { } externalStream)
-                {
-                    return externalStream;
-                }
-
-                foreach (var workingBeatmapLookup in getWorkingBeatmapLookups(lookup))
-                {
-                    try
-                    {
-                        if (workingBeatmap?.Value.GetStream(workingBeatmapLookup) is { } stream)
-                        {
-                            return stream;
-                        }
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-            }
-
-            return null;
+            var bytes = Get(name);
+            return new MemoryStream(bytes, false);
         }
 
         public string? ResolveLookup(string? name)
@@ -546,35 +591,66 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
             if (string.IsNullOrWhiteSpace(name))
                 return null;
 
+            lock (cacheLock)
+            {
+                if (resolvedLookups.TryGetValue(name, out var cached))
+                    return cached;
+            }
+
             foreach (var lookup in getBgaResourceLookups(name))
             {
-                using (var externalStream = externalStore?.GetStream(lookup))
+                lock (cacheLock)
                 {
-                    if (externalStream != null)
+                    if (cache.TryGetValue(lookup, out var cachedBytes) && cachedBytes != null)
+                    {
+                        resolvedLookups[name] = lookup;
                         return lookup;
+                    }
                 }
 
-                foreach (var workingBeatmapLookup in getWorkingBeatmapLookups(lookup))
-                {
-                    Stream? stream = null;
+                using var stream = openResourceStream(lookup);
 
-                    try
-                    {
-                        stream = workingBeatmap?.Value.GetStream(workingBeatmapLookup);
-                        if (stream != null)
-                            return workingBeatmapLookup;
-                    }
-                    catch (Exception)
-                    {
-                    }
-                    finally
-                    {
-                        stream?.Dispose();
-                    }
+                if (stream != null)
+                {
+                    setResolvedLookup(name, lookup);
+                    return lookup;
+                }
+            }
+
+            setResolvedLookup(name, null);
+            return null;
+        }
+
+        private Stream? openResourceStream(string name)
+        {
+            if (externalStore?.GetStream(name) is { } externalStream)
+                return externalStream;
+
+            foreach (var workingBeatmapLookup in getWorkingBeatmapLookups(name))
+            {
+                try
+                {
+                    if (workingBeatmap?.Value.GetStream(workingBeatmapLookup) is { } stream)
+                        return stream;
+                }
+                catch (Exception)
+                {
                 }
             }
 
             return null;
+        }
+
+        private void setCache(string name, byte[]? bytes)
+        {
+            lock (cacheLock)
+                cache[name] = bytes;
+        }
+
+        private void setResolvedLookup(string name, string? resolved)
+        {
+            lock (cacheLock)
+                resolvedLookups[name] = resolved;
         }
 
         private static IEnumerable<string> getBgaResourceLookups(string name)
