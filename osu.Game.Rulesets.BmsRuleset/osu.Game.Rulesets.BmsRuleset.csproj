@@ -16,6 +16,8 @@
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="FFmpeg.AutoGen" Version="4.3.0.1" />
+        <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.45" PrivateAssets="all" />
+        <PackageReference Include="Lib.Harmony" Version="2.4.2"/>
         <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0"/>
     </ItemGroup>
     <!-- Detect the build host's OS via the same RuntimeInformation API the runtime loader
@@ -50,6 +52,7 @@
     </ItemGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="osu.Game.Rulesets.BmsRuleset.Tests"/>
+        <InternalsVisibleTo Include="MonoMod.Utils.Cil.ILGeneratorProxy"/>
     </ItemGroup>
     <ItemGroup>
         <ProjectReference
@@ -57,4 +60,26 @@
             OutputItemType="Analyzer"
             ReferenceOutputAssembly="false" />
     </ItemGroup>
+    <Target Name="RepackBmsRuleset" AfterTargets="Build">
+        <ItemGroup>
+            <BmsHarmonyAssembly Include="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == '0Harmony'" />
+            <BmsRepackLibraryPath Include="@(ReferencePath->'%(RootDir)%(Directory)')" />
+            <BmsRepackLibraryPath Include="$(TargetDir)" />
+            <BmsRepackInternalizeExclude Include="^HarmonyLib\." />
+            <BmsRepackInternalizeExclude Include="^MonoMod\." />
+            <BmsRepackInputAssemblies Include="$(TargetPath)" />
+            <BmsRepackInputAssemblies Include="@(BmsHarmonyAssembly)" />
+        </ItemGroup>
+        <Error Condition="'@(BmsHarmonyAssembly)' == ''" Text="Unable to locate 0Harmony.dll for BMS ruleset repack. Restore Lib.Harmony before building with BmsRepackRuleset=true." />
+        <ILRepack
+            Parallel="true"
+            Internalize="true"
+            InternalizeExclude="@(BmsRepackInternalizeExclude)"
+            RenameInternalized="true"
+            InputAssemblies="@(BmsRepackInputAssemblies)"
+            LibraryPath="@(BmsRepackLibraryPath)"
+            TargetKind="Dll"
+            OutputFile="$(TargetPath)" />
+        <Message Importance="high" Text="Repacked BMS ruleset: $(TargetPath)" />
+    </Target>
 </Project>

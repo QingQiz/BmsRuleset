@@ -25,7 +25,6 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.Settings.Sections.Maintenance;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Rulesets.BmsRuleset.Screens;
@@ -88,9 +87,6 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
     [Resolved(CanBeNull = true)]
     private IPerformFromScreenRunner? performer { get; set; }
-
-    [Resolved(CanBeNull = true)]
-    private IBeatmapUpdater? beatmapUpdater { get; set; }
 
     [Resolved(CanBeNull = true)]
     private BeatmapManager? beatmapManager { get; set; }

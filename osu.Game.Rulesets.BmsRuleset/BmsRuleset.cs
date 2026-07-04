@@ -24,6 +24,7 @@ using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Settings;
+using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Configuration;
@@ -79,6 +80,7 @@ public partial class BmsRuleset : Ruleset
     static BmsRuleset()
     {
         BmsBeatmapDecoder.Register();
+        BmsSongSelectLampPatcher.InstallOnce();
     }
 
     public override ScoreMultiplierCalculator CreateScoreMultiplierCalculator(ScoreMultiplierContext context) =>
@@ -214,9 +216,7 @@ public partial class BmsRuleset : Ruleset
 
     public override IRulesetConfigManager CreateConfig(SettingsStore? settings)
     {
-        var config = new BmsRulesetConfigManager(settings, RulesetInfo);
-        sharedConfigManager = config;
-        return config;
+        return sharedConfigManager = new BmsRulesetConfigManager(settings, RulesetInfo);
     }
 
     internal static BmsReferenceBpmMode CurrentReferenceBpmMode =>
