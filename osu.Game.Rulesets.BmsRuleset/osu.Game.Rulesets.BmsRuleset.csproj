@@ -6,6 +6,7 @@
         <PlatformTarget>AnyCPU</PlatformTarget>
         <RootNamespace>osu.Game.Rulesets.BmsRuleset</RootNamespace>
         <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Version>$(OsuBase).$(RulesetRevision)</Version>
         <LangVersion>14</LangVersion>
         <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
@@ -14,8 +15,32 @@
         <EmbeddedResource Include="Resources\**" WithCulture="false"/>
     </ItemGroup>
     <ItemGroup>
+        <PackageReference Include="FFmpeg.AutoGen" Version="4.3.0.1" />
         <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0"/>
-        <PackageReference Include="ILRepack" Version="2.0.45" PrivateAssets="all"/>
+    </ItemGroup>
+    <!-- Detect the build host's OS via the same RuntimeInformation API the runtime loader
+         uses (BmsSupplementalFFmpegFuncs.current_platform), so a build embeds only the one
+         native backend that platform will select. Without this gate a Windows build would
+         also carry the committed Linux .so (~4 MB of dead bytes the loader never touches). -->
+    <PropertyGroup>
+        <BmsNativeHostIsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</BmsNativeHostIsWindows>
+        <BmsNativeHostIsLinux>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))</BmsNativeHostIsLinux>
+        <BmsNativeHostIsMacOS>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</BmsNativeHostIsMacOS>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(BmsNativeHostIsWindows)' == 'True' And Exists('..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\windows-x64\bms-ffmpeg.dll')">
+        <EmbeddedResource Include="..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\windows-x64\bms-ffmpeg.dll">
+            <LogicalName>bms-ffmpeg.win-x64.dll</LogicalName>
+        </EmbeddedResource>
+    </ItemGroup>
+    <ItemGroup Condition="'$(BmsNativeHostIsLinux)' == 'True' And Exists('..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\linux-x64\bms-ffmpeg.so')">
+        <EmbeddedResource Include="..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\linux-x64\bms-ffmpeg.so">
+            <LogicalName>bms-ffmpeg.linux-x64.so</LogicalName>
+        </EmbeddedResource>
+    </ItemGroup>
+    <ItemGroup Condition="'$(BmsNativeHostIsMacOS)' == 'True' And Exists('..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\osx\bms-ffmpeg.dylib')">
+        <EmbeddedResource Include="..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\osx\bms-ffmpeg.dylib">
+            <LogicalName>bms-ffmpeg.osx.dylib</LogicalName>
+        </EmbeddedResource>
     </ItemGroup>
     <ItemGroup Condition="'$(UseLocalOsu)' != 'true'">
         <PackageReference Include="ppy.osu.Game" Version="$(OsuVersion)"/>
@@ -31,24 +56,5 @@
             Include="..\osu.Game.Rulesets.BmsRuleset.SourceGeneration\osu.Game.Rulesets.BmsRuleset.SourceGeneration.csproj"
             OutputItemType="Analyzer"
             ReferenceOutputAssembly="false" />
-        <ProjectReference
-            Include="..\osu.Game.Rulesets.BmsRuleset.Decoders\PLMpegSharp\PLMpegSharp.csproj"
-            PrivateAssets="all" />
     </ItemGroup>
-
-  <Target Name="MergePlmpegSharp" AfterTargets="Build">
-    <PropertyGroup>
-      <_PlmpegSharpDll>$(TargetDir)PLMpegSharp.dll</_PlmpegSharpDll>
-      <_ILRepackLog>$(TargetDir)ilrepack.log</_ILRepackLog>
-    </PropertyGroup>
-    <ItemGroup>
-      <_LibDirs Include="@(ReferencePath->'%(RootDir)%(Directory)')" />
-      <_LibDirs Include="@(ReferenceDependencyPaths->'%(RootDir)%(Directory)')" />
-      <_LibDirs Include="$(TargetDir)" />
-      <_LibDirsUnique Include="@(_LibDirs->Distinct())" />
-    </ItemGroup>
-    <Exec Command="&quot;$(ILRepack)&quot; /internalize /out:&quot;$(TargetPath)&quot; &quot;$(TargetPath)&quot; &quot;$(_PlmpegSharpDll)&quot; /log:&quot;$(_ILRepackLog)&quot; @(_LibDirsUnique->'/lib:%(Identity)', ' ')" />
-    <Delete Files="$(_PlmpegSharpDll)" Condition="Exists('$(_PlmpegSharpDll)')" />
-    <Delete Files="$(TargetDir)PLMpegSharp.pdb" Condition="Exists('$(TargetDir)PLMpegSharp.pdb')" />
-  </Target>
 </Project>

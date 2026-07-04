@@ -14,7 +14,7 @@ using NUnit.Framework;
 using osu.Framework.Graphics.Video;
 using osu.Framework.Logging;
 using osu.Framework.Testing;
-using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Mpeg;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -47,7 +47,7 @@ public partial class TestSceneBmsBgaVideoProbe : OsuTestScene
 
     private string? bgaPath;
     private Video? video;
-    private BmsMpegVideoDrawable? fallback;
+    private BmsSupplementalVideoDrawable? fallback;
 
     [Test]
     public void TestProbeBgaVideo()
@@ -106,7 +106,7 @@ public partial class TestSceneBmsBgaVideoProbe : OsuTestScene
         AddStep("create MPEG fallback drawable", () =>
         {
             var stream = File.OpenRead(bgaPath!);
-            Child = fallback = new BmsMpegVideoDrawable(stream, Clock, Clock.CurrentTime)
+            Child = fallback = new BmsSupplementalVideoDrawable(stream, Clock, Clock.CurrentTime)
             {
                 RelativeSizeAxes = Axes.Both,
                 FillMode = FillMode.Stretch,

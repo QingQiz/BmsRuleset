@@ -12,7 +12,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
-using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Mpeg;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;
 
@@ -34,14 +34,14 @@ public class BmsBgaDisplaySizingTest
     }
 
     [Test]
-    public void TestMpegVideoChildSpriteFitsAspect()
+    public void TestSupplementalVideoChildSpriteFitsAspect()
     {
-        // The MPEG drawable is a CompositeDrawable whose child Sprite renders the texture.
+        // The supplemental drawable is a CompositeDrawable whose child Sprite renders the texture.
         // Aspect-fit must be set on that child, not the parent — flipping the parent to Fit
         // would double-letterbox (the composite would letterbox, then the child again).
-        var drawable = new BmsMpegVideoDrawable(new MemoryStream(), new StopwatchClock(), 0);
+        var drawable = new BmsSupplementalVideoDrawable(new MemoryStream(), new StopwatchClock(), 0);
 
-        var spriteField = typeof(BmsMpegVideoDrawable).GetField("sprite", BindingFlags.NonPublic | BindingFlags.Instance);
+        var spriteField = typeof(BmsSupplementalVideoDrawable).GetField("sprite", BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.That(spriteField, Is.Not.Null);
 
         var sprite = (Sprite)spriteField!.GetValue(drawable)!;

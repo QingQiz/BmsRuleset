@@ -19,6 +19,7 @@ using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
@@ -68,6 +69,7 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
     private BmsBgaTimeline? bga;
     private BmsBgaResourceStore? resources;
     private TextureStore? textures;
+    private BmsBgaVideoPreloader? videoPreloader;
     private BmsBgaEvent[] events = [];
     private BmsBgaOpacityEvent[] opacityEvents = [];
     private int nextEventIndex;
@@ -182,6 +184,8 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
     {
         textures?.Dispose();
         resources?.Dispose();
+        // Idempotent: the shell and the rehosted display share one preloader, so Dispose fires twice.
+        videoPreloader?.Dispose();
         rehostedDisplayHost?.RemoveFromParentOnUpdate();
         rehostedDisplayHost = null;
         rehostedDisplay = null;
@@ -214,6 +218,11 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
         resources = new BmsBgaResourceStore(bmsDrawableRuleset.BeatmapSourceDirectory, workingBeatmap);
         textures = new TextureStore(host.Renderer, host.CreateTextureLoaderStore(resources), false, scaleAdjust: 1);
 
+        // Reuse a preloader handed over from the HUD shell when this display is the rehosted renderer,
+        // so the loading screen only spawns one decoder per video (the shell warms; the rehosted
+        // display consumes). ??= leaves a shared instance intact and creates one otherwise.
+        videoPreloader ??= new BmsBgaVideoPreloader();
+
         preloadBgaResources();
     }
 
@@ -232,8 +241,16 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
         foreach (var path in declaredPaths)
         {
             var resolvedPath = resources.ResolveLookup(path);
+            if (resolvedPath == null)
+                continue;
 
-            if (resolvedPath != null && !isVideo(resolvedPath))
+            // Videos: warm the supplemental decoder on the loader thread now so the first gameplay
+            // frame doesn't pay FFmpeg init + first-frame latency. Images: upload into the texture
+            // store as before. Files the supplemental probe rejects are left for the factory's lazy
+            // path (framework/missing) — no warm source is created for them.
+            if (isVideo(resolvedPath))
+                videoPreloader?.Preload(resolvedPath, resources.Get(resolvedPath));
+            else
                 textures.Get(resolvedPath);
         }
     }
@@ -295,6 +312,9 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
             Depth = float.MaxValue,
             RenderOutsideHudVisibility = false,
         };
+        // The shell warmed the videos during loading; hand the preloader to the rehosted renderer so
+        // createVideo consumes those warm sources instead of re-creating decoders on the game thread.
+        rehostedDisplay.videoPreloader = videoPreloader;
         if (bgaDim != null)
             rehostedDisplay.applyBgaDim(bgaDim.Value);
         rehostedDisplayHost = new RehostedDisplayHost
@@ -481,11 +501,19 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
 
     private Drawable? createVideo(string path, double eventStartTime)
     {
+        var clock = drawableRuleset?.FrameStableClock ?? Clock;
+
+        // Hand off the source warmed during loading — no stream open, no FFmpeg init, no first-frame
+        // wait on the game thread. Falls through to the factory for files that weren't warmed
+        // (framework-routed, probe-rejected, or a second hit after the one-shot warm source was taken).
+        if (videoPreloader?.TryCreateDrawable(path, clock, eventStartTime, out var warmDrawable) == true)
+            return warmDrawable;
+
         var stream = resources?.GetStream(path);
         if (stream == null)
             return null;
 
-        return BmsBgaVideoFactory.Create(path, stream, drawableRuleset?.FrameStableClock ?? Clock, eventStartTime);
+        return BmsBgaVideoFactory.Create(path, stream, clock, eventStartTime);
     }
 
     private static bool isVideo(string path) => video_extensions.Contains(Path.GetExtension(path));

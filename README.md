@@ -1027,7 +1027,7 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                                                     |
 | **Renderer**  | BGA scaling — aspect-fit (letterbox) is the default; stretch / no-expand overrides not exposed (minimal scope)                | 3        |
 | **Renderer**  | Video BGA time-base — starts at event time, not absolute song time (may deviate from LR2 for mid-song switches)               | 2        |
-| **Renderer**  | Video BGA robustness — missing `.m4v`/`.m1v`/`.m2v`/`.tga` exts vs beatoraja; MPEG-1 decoder does not Rewind on backward seek | 3        |
+| **Renderer**  | Video BGA robustness — supplemental FFmpeg handles legacy MPEG-1/2 BGA on platforms with packaged native artifacts; framework video remains the path for modern formats | 3        |
 | **Renderer**  | POOR BGA duration hardcoded 500ms (beatoraja uses config-driven `misslayerDuration`)                                          | 3        |
 | **Renderer**  | Key beams (column light during hold)                                                                                          | 2        |
 | **Replay**    | Replay not available                                                                                                          | 2        |

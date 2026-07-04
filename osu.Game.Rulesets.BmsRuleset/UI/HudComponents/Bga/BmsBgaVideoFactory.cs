@@ -1,46 +1,44 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Video;
 using osu.Framework.Timing;
-using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Mpeg;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga;
 
 internal static class BmsBgaVideoFactory
 {
-    private static readonly List<string> mpeg_ext = [".mpg", ".mpeg", ".m1v"];
+    private static readonly IReadOnlyList<IBmsBgaVideoProvider> providers =
+    [
+        new SupplementalBmsBgaVideoProvider(),
+        new FrameworkBmsBgaVideoProvider(),
+        new MissingBmsBgaVideoProvider(),
+    ];
 
-    public static bool UsesMpegFallback(string path)
+    // Test-only: opens the file so the codec-probing provider can inspect real bytes. Production
+    // routing goes through Create(), which receives the stream the caller already opened.
+    public static string SelectProviderName(string path)
     {
-        var extension = Path.GetExtension(path);
-        return mpeg_ext.Contains(extension, StringComparer.OrdinalIgnoreCase);
+        using var stream = File.OpenRead(path);
+        var request = new BmsBgaVideoRequest(path, stream, new ManualFramedClock(), 0);
+        return selectProvider(request).Name;
     }
 
-    public static Drawable Create(string path, Stream stream, IFrameBasedClock clock, double eventStartTime)
+    public static Drawable? Create(string path, Stream stream, IFrameBasedClock clock, double eventStartTime)
     {
-        if (UsesMpegFallback(path))
+        var request = new BmsBgaVideoRequest(path, stream, clock, eventStartTime);
+        return selectProvider(request).Create(request);
+    }
+
+    private static IBmsBgaVideoProvider selectProvider(BmsBgaVideoRequest request)
+    {
+        foreach (var provider in providers)
         {
-            return new BmsMpegVideoDrawable(stream, clock, eventStartTime)
-            {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                RelativeSizeAxes = Axes.Both,
-                FillMode = FillMode.Stretch,
-            };
+            if (provider.CanCreate(request))
+                return provider;
         }
 
-        return new Video(stream, startAtCurrentTime: false)
-        {
-            Clock = clock,
-            PlaybackPosition = Math.Max(0, clock.CurrentTime - eventStartTime),
-            Anchor = Anchor.Centre,
-            Origin = Anchor.Centre,
-            RelativeSizeAxes = Axes.Both,
-            FillMode = FillMode.Fit,
-            Loop = true,
-        };
+        throw new InvalidOperationException("The missing-video provider must accept every request.");
     }
 }

@@ -5,7 +5,7 @@ using osu.Framework.Graphics.Textures;
 using osuTK.Graphics.ES30;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Mpeg;
+namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video;
 
 internal sealed class BmsPooledTextureUpload(ArrayPool<Rgba32> pool, Rgba32[] pixels, int width, int height, int level = 0)
     : ITextureUpload

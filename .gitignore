@@ -348,3 +348,8 @@ FodyWeavers.xsd
 desktop.ini
 .claude
 .bms_file_cache.json
+
+# Supplemental FFmpeg native build (build-win.sh / build-linux.sh / build-osx.sh) — source tarball + unpacked build dirs.
+# The committed windows-x64/bms-ffmpeg.dll, linux-x64/bms-ffmpeg.so and osx/bms-ffmpeg.dylib are the shipped artifacts and stay tracked.
+/osu.Game.Rulesets.BmsRuleset.Native/ffmpeg/ffmpeg-*.tar.*
+/osu.Game.Rulesets.BmsRuleset.Native/ffmpeg/*-build/

@@ -4,15 +4,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Mpeg;
+namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
 
-internal sealed class BmsMpegVideoFrameSource(byte[] data, int maxQueuedFrames = 3) : IDisposable
+internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueuedFrames = 3) : IDisposable
 {
     private const double decode_ahead_seconds = 0.10;
     private const double stale_before_target_seconds = 0.20;
 
     private readonly int maxQueuedFrames = Math.Max(1, maxQueuedFrames);
-    private readonly ConcurrentQueue<BmsMpegVideoFrame> queuedFrames = new();
+    private readonly ConcurrentQueue<BmsSupplementalVideoFrame> queuedFrames = new();
     private readonly AutoResetEvent wakeSignal = new(false);
     private readonly CancellationTokenSource cancellation = new();
     private Task? worker;
@@ -23,7 +23,7 @@ internal sealed class BmsMpegVideoFrameSource(byte[] data, int maxQueuedFrames =
     private volatile bool isFaulted;
     private string? faultMessage;
 
-    public BmsMpegVideoFrameSourceStats Stats => new(
+    public BmsSupplementalVideoFrameSourceStats Stats => new(
         decodedFrames,
         droppedFrames,
         isFaulted,
@@ -43,7 +43,7 @@ internal sealed class BmsMpegVideoFrameSource(byte[] data, int maxQueuedFrames =
         wakeSignal.Set();
     }
 
-    public bool TryTakeLatestFrame(out BmsMpegVideoFrame? frame)
+    public bool TryTakeLatestFrame(out BmsSupplementalVideoFrame? frame)
     {
         frame = null;
         var targetTime = readTargetTime();
@@ -71,7 +71,7 @@ internal sealed class BmsMpegVideoFrameSource(byte[] data, int maxQueuedFrames =
 
     private void runWorker()
     {
-        if (!BmsMpegVideoDecoder.TryCreate(data, out var decoder, out var error))
+        if (!BmsSupplementalVideoDecoder.TryCreate(data, out var decoder, out var error))
         {
             fault(error);
             return;
@@ -128,9 +128,9 @@ internal sealed class BmsMpegVideoFrameSource(byte[] data, int maxQueuedFrames =
 
     private void fault(string? message)
     {
-        faultMessage = message ?? "MPEG decoder failed.";
+        faultMessage = message ?? "Supplemental video decoder failed.";
         isFaulted = true;
-        Logger.Log($"[BGA] MPEG fallback faulted: {faultMessage}", "bms-bga");
+        Logger.Log($"[BGA] Supplemental video path faulted: {faultMessage}", "bms-bga");
     }
 
     public void Dispose()
@@ -154,7 +154,7 @@ internal sealed class BmsMpegVideoFrameSource(byte[] data, int maxQueuedFrames =
     }
 }
 
-internal readonly record struct BmsMpegVideoFrameSourceStats(
+internal readonly record struct BmsSupplementalVideoFrameSourceStats(
     int DecodedFrames,
     int DroppedFrames,
     bool IsFaulted,
