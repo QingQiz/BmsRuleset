@@ -257,22 +257,30 @@ internal static partial class BmsChartParser
             }
         }
 
-        // Attempt command line: #KEYWORD value
+        applyCommandLine(span, state, CommandParseMode.Full);
+    }
+
+    private enum CommandParseMode
+    {
+        Full,
+        ImportSummary,
+    }
+
+    private static void applyCommandLine(ReadOnlySpan<char> span, ParseState state, CommandParseMode mode)
+    {
         var cmdStart = 1;
         while (cmdStart < span.Length && span[cmdStart] == ' ') cmdStart++;
         if (cmdStart >= span.Length) return;
 
-        // Find end of command (first whitespace)
         var cmdEnd = cmdStart;
         while (cmdEnd < span.Length && span[cmdEnd] != ' ' && span[cmdEnd] != '\t') cmdEnd++;
-
-        // Require at least one whitespace after command
         if (cmdEnd >= span.Length) return;
 
-        var cmdSpan = span[cmdStart..cmdEnd];
-        var valueSpan = span[(cmdEnd + 1)..].Trim();
+        applyCommand(span[cmdStart..cmdEnd], span[(cmdEnd + 1)..].Trim(), state, mode);
+    }
 
-        // Match commands using span comparisons (zero-alloc).
+    private static void applyCommand(ReadOnlySpan<char> cmdSpan, ReadOnlySpan<char> valueSpan, ParseState state, CommandParseMode mode)
+    {
         if (cmdSpan.Equals("TITLE", StringComparison.OrdinalIgnoreCase))
         {
             state.Title = valueSpan.ToString();
@@ -328,38 +336,6 @@ internal static partial class BmsChartParser
             return;
         }
 
-        if (cmdSpan.Equals("PREVIEW", StringComparison.OrdinalIgnoreCase))
-        {
-            state.PreviewFile = valueSpan.Trim('"').ToString();
-            return;
-        }
-
-        if (cmdSpan.Equals("STAGEFILE", StringComparison.OrdinalIgnoreCase))
-        {
-            state.StageFile = valueSpan.Trim('"').ToString();
-            return;
-        }
-
-        if (cmdSpan.Equals("BACKBMP", StringComparison.OrdinalIgnoreCase))
-        {
-            state.BackBmp = valueSpan.Trim('"').ToString();
-            return;
-        }
-
-        if (cmdSpan.Equals("BANNER", StringComparison.OrdinalIgnoreCase))
-        {
-            state.Banner = valueSpan.Trim('"').ToString();
-            return;
-        }
-
-        if (cmdSpan.Equals("POORBGA", StringComparison.OrdinalIgnoreCase))
-        {
-            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var poorMode)
-                && poorMode >= 0 && poorMode <= 2)
-                state.PoorBgaMode = (BmsPoorBgaMode)poorMode;
-            return;
-        }
-
         if (cmdSpan.Equals("PLAYLEVEL", StringComparison.OrdinalIgnoreCase))
         {
             if (tryParseDouble(valueSpan, out var difficulty))
@@ -371,13 +347,6 @@ internal static partial class BmsChartParser
         {
             if (tryParseDouble(valueSpan, out var bpm) && bpm != 0)
                 state.InitialBpm = bpm;
-            return;
-        }
-
-        if (cmdSpan.Equals("BASEBPM", StringComparison.OrdinalIgnoreCase))
-        {
-            if (tryParseDouble(valueSpan, out var baseBpm) && baseBpm > 0)
-                state.BaseBpm = baseBpm;
             return;
         }
 
@@ -431,6 +400,55 @@ internal static partial class BmsChartParser
             return;
         }
 
+        if (cmdSpan.Length == 6 && cmdSpan.StartsWith("STOP", StringComparison.OrdinalIgnoreCase)
+                                && tryParseDouble(valueSpan, out var stopValue) && stopValue > 0)
+        {
+            state.StopDefinitions[encodeValue(state.UseBase62, cmdSpan[4], cmdSpan[5])] = stopValue;
+            return;
+        }
+
+        if (mode != CommandParseMode.Full)
+            return;
+
+        if (cmdSpan.Equals("PREVIEW", StringComparison.OrdinalIgnoreCase))
+        {
+            state.PreviewFile = valueSpan.Trim('"').ToString();
+            return;
+        }
+
+        if (cmdSpan.Equals("STAGEFILE", StringComparison.OrdinalIgnoreCase))
+        {
+            state.StageFile = valueSpan.Trim('"').ToString();
+            return;
+        }
+
+        if (cmdSpan.Equals("BACKBMP", StringComparison.OrdinalIgnoreCase))
+        {
+            state.BackBmp = valueSpan.Trim('"').ToString();
+            return;
+        }
+
+        if (cmdSpan.Equals("BANNER", StringComparison.OrdinalIgnoreCase))
+        {
+            state.Banner = valueSpan.Trim('"').ToString();
+            return;
+        }
+
+        if (cmdSpan.Equals("POORBGA", StringComparison.OrdinalIgnoreCase))
+        {
+            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var poorMode)
+                && poorMode >= 0 && poorMode <= 2)
+                state.PoorBgaMode = (BmsPoorBgaMode)poorMode;
+            return;
+        }
+
+        if (cmdSpan.Equals("BASEBPM", StringComparison.OrdinalIgnoreCase))
+        {
+            if (tryParseDouble(valueSpan, out var baseBpm) && baseBpm > 0)
+                state.BaseBpm = baseBpm;
+            return;
+        }
+
         if (cmdSpan.Length == 5 && cmdSpan.StartsWith("WAV", StringComparison.OrdinalIgnoreCase)
                                 && valueSpan.Length > 0)
         {
@@ -449,13 +467,6 @@ internal static partial class BmsChartParser
                                 && tryParseBgaDefinition(valueSpan, state.UseBase62, out var bgaDefinition))
         {
             state.BgaDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = bgaDefinition;
-            return;
-        }
-
-        if (cmdSpan.Length == 6 && cmdSpan.StartsWith("STOP", StringComparison.OrdinalIgnoreCase)
-                                && tryParseDouble(valueSpan, out var stopValue) && stopValue > 0)
-        {
-            state.StopDefinitions[encodeValue(state.UseBase62, cmdSpan[4], cmdSpan[5])] = stopValue;
             return;
         }
 

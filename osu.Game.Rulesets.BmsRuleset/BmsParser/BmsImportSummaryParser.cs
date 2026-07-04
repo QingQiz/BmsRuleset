@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -136,69 +134,7 @@ internal static partial class BmsChartParser
             }
         }
 
-        var cmdStart = 1;
-        while (cmdStart < span.Length && span[cmdStart] == ' ') cmdStart++;
-        if (cmdStart >= span.Length) return;
-
-        var cmdEnd = cmdStart;
-        while (cmdEnd < span.Length && span[cmdEnd] != ' ' && span[cmdEnd] != '\t') cmdEnd++;
-        if (cmdEnd >= span.Length) return;
-
-        var cmdSpan = span[cmdStart..cmdEnd];
-        var valueSpan = span[(cmdEnd + 1)..].Trim();
-
-        if (cmdSpan.Equals("TITLE", StringComparison.OrdinalIgnoreCase))
-            state.Title = valueSpan.ToString();
-        else if (cmdSpan.Equals("ARTIST", StringComparison.OrdinalIgnoreCase))
-            state.Artist = valueSpan.ToString();
-        else if (cmdSpan.Equals("SUBTITLE", StringComparison.OrdinalIgnoreCase))
-            state.Subtitle = valueSpan.ToString();
-        else if (cmdSpan.Equals("PLAYLEVEL", StringComparison.OrdinalIgnoreCase))
-        {
-            if (tryParseDouble(valueSpan, out var difficulty))
-                state.PlayLevel = (float)difficulty;
-        }
-        else if (cmdSpan.Equals("BPM", StringComparison.OrdinalIgnoreCase))
-        {
-            if (tryParseDouble(valueSpan, out var bpm) && bpm != 0)
-                state.InitialBpm = bpm;
-        }
-        else if (cmdSpan.Equals("BASE", StringComparison.OrdinalIgnoreCase))
-        {
-            if (valueSpan.Length >= 2 && valueSpan[..2].Equals("62", StringComparison.Ordinal))
-                state.UseBase62 = true;
-        }
-        else if (cmdSpan.Equals("LNTYPE", StringComparison.OrdinalIgnoreCase))
-        {
-            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnType))
-                state.LnType = lnType;
-        }
-        else if (cmdSpan.Equals("LNMODE", StringComparison.OrdinalIgnoreCase))
-        {
-            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnMode) && lnMode >= 1 && lnMode <= 3)
-                state.LnMode = (BmsLongNoteMode)lnMode;
-        }
-        else if (cmdSpan.Equals("RANK", StringComparison.OrdinalIgnoreCase))
-        {
-            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rank) && rank >= 0 && rank <= 4)
-                state.Rank = rank;
-        }
-        else if (cmdSpan.Equals("TOTAL", StringComparison.OrdinalIgnoreCase))
-        {
-            if (tryParseDouble(valueSpan, out var total) && total > 0)
-                state.Total = total;
-        }
-        else if (cmdSpan.Equals("LNOBJ", StringComparison.OrdinalIgnoreCase))
-        {
-            if (valueSpan.Length >= 2)
-                state.LnObjValues.Add(encodeValue(state.UseBase62, valueSpan[0], valueSpan[1]));
-        }
-        else if (cmdSpan.Length == 5 && cmdSpan.StartsWith("BPM", StringComparison.OrdinalIgnoreCase)
-                                     && tryParseDouble(valueSpan, out var extendedBpm) && extendedBpm != 0)
-            state.BpmDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = extendedBpm;
-        else if (cmdSpan.Length == 6 && cmdSpan.StartsWith("STOP", StringComparison.OrdinalIgnoreCase)
-                                     && tryParseDouble(valueSpan, out var stopValue) && stopValue > 0)
-            state.StopDefinitions[encodeValue(state.UseBase62, cmdSpan[4], cmdSpan[5])] = stopValue;
+        applyCommandLine(span, state, CommandParseMode.ImportSummary);
     }
 
     private static bool isImportChannel(ushort channel)

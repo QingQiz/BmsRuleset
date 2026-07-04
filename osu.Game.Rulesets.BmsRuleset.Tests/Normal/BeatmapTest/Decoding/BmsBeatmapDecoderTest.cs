@@ -91,6 +91,28 @@ public class BmsBeatmapDecoderTest
         });
     }
 
+    [Test]
+    public void TestImportSummaryMatchesFullParserForSharedHeaderCommands()
+    {
+        const string path = "shared-header.bms";
+        var lines = """
+                    #TITLE Shared Title
+                    #ARTIST Shared Artist
+                    #SUBTITLE [Shared Difficulty]
+                    #PLAYLEVEL 12.5
+                    #RANK 3
+                    #TOTAL 240
+                    #LNMODE 2
+                    #BPM 150
+                    #00111:01
+                    """.Split('\n');
+
+        var parsed = BmsChartParser.Parse(lines, path, _ => 1);
+        var summary = BmsChartParser.ParseImportSummary(lines, path, _ => 1);
+
+        Assert.That(summary.Metadata, Is.EqualTo(extractImportMetadata(parsed, path)));
+    }
+
     private static BmsChartMetadata extractImportMetadata(BmsParseResult parsed, string path)
     {
         var title = parsed.Title ?? Path.GetFileNameWithoutExtension(path);
