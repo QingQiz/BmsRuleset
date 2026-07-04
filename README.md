@@ -80,7 +80,7 @@ for deletion.
 | Background image        | `#STAGEFILE`                                                               | Song select background image, fallback chain: #BACKBMP -> #BANNER                                 |
 | Judge rank              | `#RANK` (0–4)                                                              | Affects hit windows, mapped to `OD`                                                               |
 | Gauge total             | `#TOTAL`                                                                   | Gauge recovery coefficient, mapped to `AR`                                                        |
-| Base BPM (visual)       | `#BASEBPM`                                                                 | Scroll speed reference BPM, does not affect note timing                                           |
+| Base BPM (visual)       | `#BASEBPM`                                                                 | Scroll speed reference BPM, does not affect note timing; overrides the Reference BPM setting      |
 | Initial BPM             | `#BPM`                                                                     | Default 130                                                                                       |
 | Extended BPM table      | `#BPMxx`                                                                   | Real-number BPM (beyond 0–255 from channel `03`)                                                  |
 | STOP table              | `#STOPxx`                                                                  | Stop sequence durations (1 unit = 1/192 of a 4/4 measure)                                         |
@@ -275,6 +275,7 @@ Default play uses the Normal gauge. Gauge types are selected via mods:
 | Setting              | Default | Range    | Description                                                                                                                |
 |----------------------|---------|----------|----------------------------------------------------------------------------------------------------------------------------|
 | Scroll Speed         | 8.0     | 1.0–60.0 | Note fall speed. In-game `Up`/`Down` keys adjust temporarily. Keys are rebindable under Settings → Key Bindings → osu!BMS. |
+| Reference BPM        | Main BPM | enum     | Scroll speed reference BPM used when a chart has no `#BASEBPM`: Start BPM, Max BPM, Main BPM, or Min BPM. Main BPM uses the BPM with the most playable notes; ties use the earliest occurrence. |
 | BGA Dim              | 0.7     | 0–1      | Background animation dim. 0 = full brightness, 1 = hidden (BGA still present, just invisible)                              |
 | Show 5K / 7K / 9K    | ✓       | on/off   | Toggle visibility of single-play layouts in song select                                                                    |
 | Show DP 5K / 7K / 9K | ✓       | on/off   | Toggle visibility of double-play layouts in song select                                                                    |
@@ -779,7 +780,7 @@ Commands are grouped by origin and listed with their status in this ruleset.
 | Command         | Status | Notes                                                                    |
 |-----------------|--------|--------------------------------------------------------------------------|
 | `#EXBPMxx`      | ✗      | `#BPMxx` alias (BMSC parser bug workaround)                              |
-| `#BASEBPM`      | ✓      | Visual scroll speed reference BPM (does not affect timing)               |
+| `#BASEBPM`      | ✓      | Visual scroll speed reference BPM (does not affect timing); overrides the Reference BPM setting |
 | `#SONGxx`       | ✓      | Song-related text (merged with `#TEXTxx`)                                |
 | `#MAKER`        | ✓      | Charter/noter name                                                       |
 | `#EXWAVxx`      | ✗      | Extended WAV with pan/volume/frequency (nanasi)                          |
