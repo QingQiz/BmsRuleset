@@ -1,8 +1,13 @@
+using System;
+using System.Collections.Generic;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.Mods;
 using osuTK;
 using osuTK.Graphics;
 
@@ -15,6 +20,11 @@ public sealed partial class BmsLampDisplay : CompositeDrawable
     private readonly OsuSpriteText label;
 
     private BmsLamp lamp;
+
+    internal Action? SelectedModsChanged { private get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private IBindable<IReadOnlyList<Mod>>? selectedMods { get; set; }
 
     public BmsLamp Lamp
     {
@@ -64,6 +74,24 @@ public sealed partial class BmsLampDisplay : CompositeDrawable
         this.showLabel = showLabel;
         updateVisuals();
     }
+
+    protected override void LoadComplete()
+    {
+        base.LoadComplete();
+
+        if (selectedMods != null)
+            selectedMods.ValueChanged += selectedModsChanged;
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        if (selectedMods != null)
+            selectedMods.ValueChanged -= selectedModsChanged;
+
+        base.Dispose(isDisposing);
+    }
+
+    private void selectedModsChanged(ValueChangedEvent<IReadOnlyList<Mod>> _) => SelectedModsChanged?.Invoke();
 
     protected override void Update()
     {
