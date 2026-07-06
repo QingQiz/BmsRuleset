@@ -11,6 +11,7 @@ namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 internal static partial class BmsChartParser
 {
     private const int base_tick_resolution = 192;
+    private const ushort midi_file_sample_key = ushort.MaxValue;
 
     // ── Base-62 6-bit encoding ───────────────────────────────────────────
 
@@ -116,6 +117,7 @@ internal static partial class BmsChartParser
 
         var bgSampleEvents = new List<BmsSampleEvent>(state.ChannelLines.Count / 10);
         collectBackgroundSampleEvents(state, measureStarts, timingMap, bgSampleEvents);
+        collectMidiFileBackgroundSampleEvent(state, sampleDefinitions, bgSampleEvents);
 
         return new BmsParseResult(
             state.Title,
@@ -416,6 +418,12 @@ internal static partial class BmsChartParser
             return;
         }
 
+        if (cmdSpan.Equals("MIDIFILE", StringComparison.OrdinalIgnoreCase))
+        {
+            state.MidiFile = valueSpan.Trim('"').ToString();
+            return;
+        }
+
         if (cmdSpan.Equals("STAGEFILE", StringComparison.OrdinalIgnoreCase))
         {
             state.StageFile = valueSpan.Trim('"').ToString();
@@ -526,6 +534,16 @@ internal static partial class BmsChartParser
                 output.Add(new BmsSampleEvent(timingMap.ProjectTickToTime(tick), tick, value));
             }
         }
+    }
+
+    private static void collectMidiFileBackgroundSampleEvent(
+        ParseState state, IDictionary<ushort, string> sampleDefinitions, List<BmsSampleEvent> output)
+    {
+        if (string.IsNullOrWhiteSpace(state.MidiFile))
+            return;
+
+        sampleDefinitions[midi_file_sample_key] = state.MidiFile;
+        output.Add(new BmsSampleEvent(0, 0, midi_file_sample_key));
     }
 
     private static BmsBgaTimeline collectBga(ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
@@ -1369,6 +1387,8 @@ internal static partial class BmsChartParser
         public string? Comment { get; set; }
 
         public string? PreviewFile { get; set; }
+
+        public string? MidiFile { get; set; }
 
         public string? StageFile { get; set; }
 

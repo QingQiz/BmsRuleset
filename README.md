@@ -101,7 +101,7 @@ for deletion.
 | Spacing change          | `#SPEEDxx`                                                                 | Per-segment multiplier on `ScrollSpeedMultiplier`                                                 |
 
 **Not parsed:** `#EXWAVxx`,
-`#WAVCMD`, `#VOLWAV`, `#MIDIFILE`, `#DIFFICULTY`, `#EXRANK` / `#EXRANKxx`,
+`#WAVCMD`, `#VOLWAV`, `#DIFFICULTY`, `#EXRANK` / `#EXRANKxx`,
 `#DEFEXRANK`, `#EXBPMxx`, `#STP`, `#PATH_WAV` / `#PATH_BMP`, `#OPTION`,
 `#CHANGEOPTIONxx`, `#SWBGAxx`, `#@BGAxx`, `#ARGBxx`, `#CHARFILE`,
 `#ExtChr`, `#OCT/FP`, `#MATERIALS`
@@ -665,7 +665,7 @@ Commands are grouped by origin and listed with their status in this ruleset.
 | `#TITLE`        | ✓      |                                                                               |
 | `#ARTIST`       | ✓      |                                                                               |
 | `#BPM`          | ✓      | Initial BPM (default 130)                                                     |
-| `#MIDIFILE`     | ✗      | MIDI background music                                                         |
+| `#MIDIFILE`     | ✓      | Background audio file, played from the start of the chart                     |
 | `#PLAYLEVEL`    | ✓      | Difficulty level displayed as difficulty name                                 |
 | `#RANK [0-3]`   | ✓      | Judgment: 0=Very Hard, 1=Hard, 2=Normal, 3=Easy; also accepts 4 (Very Easy)   |
 | `#VOLWAV`       | ✗      | Global volume scalar (0–100) for WAV playback                                 |
@@ -1006,7 +1006,7 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | `#BGAOFF` — disable BGA for the chart                                                                                         | 2        |
 | **Parser**    | BMSON support                                                                                                                 |
 | **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                                                                 |
-| **Parser**    | `#CDDA` / `#MIDIFILE` — CD / MIDI                                                                                             |
+| **Parser**    | `#CDDA` — CD audio                                                                                                             |
 | **Parser**    | `#CHARFILE` / `#ExtChr` — character / skin                                                                                    |
 | **Parser**    | `#EXBPMxx` — `#BPMxx` alias (BMSC parser bug workaround)                                                                      |
 | **Parser**    | `#EXRANK` / channel `A0` — extended rank definition                                                                           |

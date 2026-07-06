@@ -1840,6 +1840,28 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestMidiFileHeaderCreatesBackgroundSampleEventAtStart()
+    {
+        var beatmap = decode("""
+                             #TITLE Midi File Header
+                             #ARTIST Tester
+                             #MIDIFILE "audio/midi-bgm.ogg"
+                             #WAV01 kick.wav
+                             #00111:01
+                             """);
+
+        var bmsBeatmap = (IBmsBeatmap)beatmap;
+        var midiEvent = bmsBeatmap.BackgroundSampleEvents.Single(e => e.Time == 0 && e.Tick == 0);
+
+        Assert.That(bmsBeatmap.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        midiEvent = converted.BackgroundSampleEvents.Single(e => e.Time == 0 && e.Tick == 0);
+
+        Assert.That(converted.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
+    }
+
+    [Test]
     public void TestRandomDecisionsCanVaryBetweenDecodes()
     {
         const string chart = """
