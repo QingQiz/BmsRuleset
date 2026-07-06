@@ -120,7 +120,7 @@ public static partial class BmsSongSelectLampPatcher
 
             if (!displays.TryGetValue(rankDisplay, out var display))
             {
-                display = new BmsLampDisplay(lamp, showLabel: false, cornerRadius: 0, masking: false)
+                display = new BmsLampDisplay(lamp)
                 {
                     Anchor = Anchor.TopLeft,
                     Origin = Anchor.TopLeft,
@@ -167,10 +167,10 @@ public static partial class BmsSongSelectLampPatcher
         return realm.Run(r =>
         {
             var localScores = r.All<ScoreInfo>()
-                               .Where(s => s.BeatmapHash == beatmap.Hash && !s.DeletePending)
-                               .ToArray()
-                               .Where(s => s.UserID == localUser.Value.Id || s.UserID <= 1)
-                               .Where(s => ruleset.Value.Equals(s.Ruleset));
+                .Where(s => s.BeatmapHash == beatmap.Hash && !s.DeletePending)
+                .ToArray()
+                .Where(s => s.UserID == localUser.Value.Id || s.UserID <= 1)
+                .Where(s => ruleset.Value.Equals(s.Ruleset));
 
             return BmsLampScoreSelector.SelectBest(localScores, selectedMods.Value)?.DeepClone();
         });

@@ -14,10 +14,10 @@ public static class BmsLampScoreSelector
             .MaxBy(score => (score.TotalScore, -score.Date.UtcDateTime.Ticks));
 
     private static bool matchesSelectedMods(ScoreInfo score, IReadOnlyList<Mod> selectedMods) =>
-        has<BmsModHideScratch>(score.Mods) == has<BmsModHideScratch>(selectedMods)
-        && has<BmsModAutoScratch>(score.Mods) == has<BmsModAutoScratch>(selectedMods)
-        && has<BmsModConstant>(score.Mods) == has<BmsModConstant>(selectedMods)
-        && rateMod(score.Mods) == rateMod(selectedMods);
+        has<BmsModHideScratch>(score.Mods) == has<BmsModHideScratch>(selectedMods) &&
+        has<BmsModAutoScratch>(score.Mods) == has<BmsModAutoScratch>(selectedMods) &&
+        has<BmsModConstant>(score.Mods) == has<BmsModConstant>(selectedMods) &&
+        rateMod(score.Mods) == rateMod(selectedMods);
 
     private static bool has<TMod>(IEnumerable<Mod> mods)
         where TMod : Mod => mods.Any(mod => mod is TMod);
