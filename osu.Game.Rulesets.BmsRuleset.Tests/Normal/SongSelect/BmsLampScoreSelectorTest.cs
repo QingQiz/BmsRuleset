@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;
@@ -92,6 +95,15 @@ public class BmsLampScoreSelectorTest
         Assert.That(BmsLampScoreSelector.SelectBest([laterScore, lowerScore, earlierScore], []), Is.SameAs(earlierScore));
     }
 
+    [Test]
+    public void TestBetterLampBeatsHigherScore()
+    {
+        var highScoreClear = score(1_000, ScoreRank.D, stats((HitResult.Perfect, 1), (HitResult.Ok, 1)));
+        var lowScoreHardClear = score(900, ScoreRank.D, stats((HitResult.Perfect, 1), (HitResult.Ok, 1)), new BmsModHardGauge());
+
+        Assert.That(BmsLampScoreSelector.SelectBest([highScoreClear, lowScoreHardClear], []), Is.SameAs(lowScoreHardClear));
+    }
+
     private static ScoreInfo score(long totalScore, params Mod[] mods) =>
         score(totalScore, DateTimeOffset.UtcNow, mods);
 
@@ -101,6 +113,24 @@ public class BmsLampScoreSelectorTest
         Date = date,
         Mods = mods,
     };
+
+    private static ScoreInfo score(long totalScore, ScoreRank rank, Dictionary<HitResult, int> statistics, params Mod[] mods)
+    {
+        var score = BmsLampScoreSelectorTest.score(totalScore, mods);
+        score.Rank = rank;
+        score.Statistics = statistics;
+        return score;
+    }
+
+    private static Dictionary<HitResult, int> stats(params (HitResult result, int count)[] entries)
+    {
+        var statistics = new Dictionary<HitResult, int>();
+
+        foreach (var (result, count) in entries)
+            statistics[result] = count;
+
+        return statistics;
+    }
 
     private static Mod create(Type type) => (Mod)Activator.CreateInstance(type)!;
 

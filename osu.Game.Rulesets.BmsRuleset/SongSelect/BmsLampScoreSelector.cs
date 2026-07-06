@@ -11,7 +11,22 @@ public static class BmsLampScoreSelector
 {
     public static ScoreInfo? SelectBest(IEnumerable<ScoreInfo> scores, IReadOnlyList<Mod> selectedMods) =>
         scores.Where(score => matchesSelectedMods(score, selectedMods))
-            .MaxBy(score => (score.TotalScore, -score.Date.UtcDateTime.Ticks));
+            .MaxBy(score => (lampPriority(BmsLampCalculator.Calculate(score)), score.TotalScore, -score.Date.UtcDateTime.Ticks));
+
+    private static int lampPriority(BmsLamp lamp) => lamp switch
+    {
+        BmsLamp.NoPlay => 0,
+        BmsLamp.Failed => 1,
+        BmsLamp.AssistClear => 2,
+        BmsLamp.EasyClear => 3,
+        BmsLamp.Clear => 4,
+        BmsLamp.HardClear => 5,
+        BmsLamp.ExHardClear => 6,
+        BmsLamp.FullCombo => 7,
+        BmsLamp.Perfect => 8,
+        BmsLamp.Max => 9,
+        _ => throw new ArgumentOutOfRangeException(nameof(lamp), lamp, null),
+    };
 
     private static bool matchesSelectedMods(ScoreInfo score, IReadOnlyList<Mod> selectedMods) =>
         has<BmsModHideScratch>(score.Mods) == has<BmsModHideScratch>(selectedMods) &&
