@@ -31,16 +31,16 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     private BeatmapManager iconBeatmapManager = null!;
 
     [Test]
-    public void TestInstallWrapsEachBeatmapManagerInstance()
+    public void TestInstallWrapsEachBeatmapManagerResultWithoutReplacingManagerCache()
     {
-        AddAssert("first manager is wrapped", installAndCheckNewManager);
-        AddAssert("second manager is also wrapped", installAndCheckNewManager);
+        AddAssert("first manager returns wrapped BMS beatmap without cache replacement", installAndCheckNewManager);
+        AddAssert("second manager returns wrapped BMS beatmap without cache replacement", installAndCheckNewManager);
     }
 
     [Test]
-    public void TestRulesetIconInstallsSongSelectPreviewHook()
+    public void TestRulesetInitialisationInstallsSongSelectPreviewHook()
     {
-        AddStep("load ruleset icon with beatmap manager", () =>
+        AddStep("initialise ruleset with beatmap manager", () =>
         {
             iconBeatmapManager = createBeatmapManager();
 
@@ -55,7 +55,14 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             };
         });
 
-        AddUntilStep("icon installed hook", () => getWorkingBeatmapCache(iconBeatmapManager) is BmsWorkingBeatmapCache);
+        AddUntilStep("preview hook installed", () =>
+        {
+            var beatmapSet = new BeatmapSetInfo();
+            var beatmapInfo = createBeatmapInfo(beatmapSet, string.Empty, "icon-test.bms");
+
+            return iconBeatmapManager.GetWorkingBeatmap(beatmapInfo) is BmsWorkingBeatmap
+                   && getWorkingBeatmapCache(iconBeatmapManager).GetType() == typeof(WorkingBeatmapCache);
+        });
     }
 
     [Test]
@@ -113,8 +120,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddStep("create external texture store", () =>
         {
             var manager = createBeatmapManager();
-            BmsWorkingBeatmapHelper.Install(manager);
-            cache = (BmsWorkingBeatmapCache)getWorkingBeatmapCache(manager);
+            cache = new BmsWorkingBeatmapCache(getWorkingBeatmapCache(manager));
             var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-texture-store-{Guid.NewGuid()}");
 
             Directory.CreateDirectory(directory);
@@ -329,8 +335,8 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     private static WeakReference createExternalTextureStoreReference(BmsWorkingBeatmapCache cache, string directory)
     {
         var store = typeof(BmsWorkingBeatmapCache)
-                    .GetMethod("getOrCreateExternalTextureStore", BindingFlags.Instance | BindingFlags.NonPublic)!
-                    .Invoke(cache, [directory]);
+            .GetMethod("getOrCreateExternalTextureStore", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(cache, [directory]);
 
         return new WeakReference(store);
     }
@@ -345,9 +351,12 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     private bool installAndCheckNewManager()
     {
         var manager = createBeatmapManager();
+        var beatmapSet = new BeatmapSetInfo();
+        var beatmapInfo = createBeatmapInfo(beatmapSet, string.Empty, "install-test.bms");
 
-        return BmsWorkingBeatmapHelper.Install(manager)
-               && getWorkingBeatmapCache(manager) is BmsWorkingBeatmapCache;
+        return BmsWorkingBeatmapPatcher.InstallOnce()
+               && manager.GetWorkingBeatmap(beatmapInfo) is BmsWorkingBeatmap
+               && getWorkingBeatmapCache(manager).GetType() == typeof(WorkingBeatmapCache);
     }
 
     private BeatmapManager createBeatmapManager() => new(LocalStorage, Realm, null, audio, Resources, host, Beatmap.Default);

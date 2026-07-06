@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
@@ -34,7 +32,6 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
-using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset;
 
@@ -81,6 +78,7 @@ public partial class BmsRuleset : Ruleset
     {
         BmsBeatmapDecoder.Register();
         BmsSongSelectLampPatcher.InstallOnce();
+        BmsWorkingBeatmapPatcher.InstallOnce();
     }
 
     public override ScoreMultiplierCalculator CreateScoreMultiplierCalculator(ScoreMultiplierContext context) =>
@@ -228,7 +226,11 @@ public partial class BmsRuleset : Ruleset
     public override IRulesetFilterCriteria CreateRulesetFilterCriteria() =>
         new BmsFilterCriteria(sharedConfigManager);
 
-    public override Drawable CreateIcon() => new BmsRulesetIcon();
+    public override Drawable CreateIcon() => new SpriteIcon
+    {
+        Icon = OsuIcon.RulesetMania,
+        Colour = Colour4.White,
+    };
 
     private static LocalisableString createTotalDescription(IBeatmapInfo beatmapInfo, BmsDifficultyInfo difficulty, IReadOnlyCollection<Mod> mods)
     {
@@ -349,32 +351,4 @@ public partial class BmsRuleset : Ruleset
 
     #endregion
 
-    private partial class BmsRulesetIcon : CompositeDrawable
-    {
-        [Resolved(CanBeNull = true)]
-        private BeatmapManager? beatmapManager { get; set; }
-
-        public BmsRulesetIcon()
-        {
-            Size = new Vector2(14);
-
-            InternalChild = new SpriteIcon
-            {
-                Icon = OsuIcon.RulesetMania,
-                Colour = Colour4.White,
-                RelativeSizeAxes = Axes.Both,
-            };
-        }
-
-        [BackgroundDependencyLoader]
-        private void load()
-        {
-            if (beatmapManager == null)
-            {
-                return;
-            }
-
-            BmsWorkingBeatmapHelper.Install(beatmapManager);
-        }
-    }
 }

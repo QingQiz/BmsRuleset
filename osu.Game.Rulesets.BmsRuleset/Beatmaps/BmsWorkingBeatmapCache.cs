@@ -1,23 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
-using System.Reflection.Emit;
-using osu.Framework.Audio;
-using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.IO.Stores;
-using osu.Framework.Logging;
-using osu.Framework.Platform;
 using osu.Game.Beatmaps;
-using osu.Game.Database;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
-internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
+internal sealed class BmsWorkingBeatmapCache
 {
+    private readonly IStorageResourceProvider resources;
     private readonly Dictionary<Guid, WeakReference<BmsWorkingBeatmap>> bmsWrapperCache = new();
 
     // One weakly-cached texture store per external chart directory. Live wrappers keep their
@@ -25,42 +18,25 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
     private readonly Dictionary<string, WeakReference<LargeTextureStore>> externalTextureStores = new();
     private readonly object externalTextureStoreLock = new();
 
-    private BmsWorkingBeatmapCache(
-        ITrackStore trackStore,
-        AudioManager audioManager,
-        IResourceStore<byte[]> resources,
-        IResourceStore<byte[]> files,
-        WorkingBeatmap defaultBeatmap,
-        GameHost host,
-        RealmAccess realm)
-        : base(trackStore, audioManager, resources, files, defaultBeatmap, host, realm)
+    public BmsWorkingBeatmapCache(WorkingBeatmapCache inner)
     {
-        OnInvalidated += onInvalidated;
+        resources = inner;
+        inner.OnInvalidated += onInvalidated;
     }
 
-    public override WorkingBeatmap GetWorkingBeatmap(BeatmapInfo? beatmapInfo)
+    public WorkingBeatmap Wrap(WorkingBeatmap working)
     {
-        if (beatmapInfo == null) return DefaultBeatmap;
-
-        var isBms = beatmapInfo.Ruleset.ShortName == "bms";
-
-        if (!isBms)
-            return base.GetWorkingBeatmap(beatmapInfo);
-
         lock (bmsWrapperCache)
         {
-            if (bmsWrapperCache.TryGetValue(beatmapInfo.ID, out var weak))
+            if (bmsWrapperCache.TryGetValue(working.BeatmapInfo.ID, out var weak))
             {
                 if (weak.TryGetTarget(out var cached))
                     return cached;
 
-                // Dead weak reference — drop the tombstone before rebuilding.
-                bmsWrapperCache.Remove(beatmapInfo.ID);
+                // Dead weak reference: drop the tombstone before rebuilding.
+                bmsWrapperCache.Remove(working.BeatmapInfo.ID);
             }
         }
-
-        var working = base.GetWorkingBeatmap(beatmapInfo);
-        var audioManager = ((IStorageResourceProvider)this).AudioManager;
 
         // External-audio charts keep their images in Metadata.Source on disk rather than realm
         // storage; give the wrapper a store sandboxed to that directory. Normal imports have no
@@ -70,10 +46,10 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
         if (!string.IsNullOrWhiteSpace(working.Metadata.Source) && Directory.Exists(working.Metadata.Source))
             externalStore = getOrCreateExternalTextureStore(working.Metadata.Source);
 
-        var wrapper = new BmsWorkingBeatmap(working, audioManager!, externalStore);
+        var wrapper = new BmsWorkingBeatmap(working, resources.AudioManager!, externalStore);
 
         lock (bmsWrapperCache)
-            bmsWrapperCache[beatmapInfo.ID] = new WeakReference<BmsWorkingBeatmap>(wrapper);
+            bmsWrapperCache[working.BeatmapInfo.ID] = new WeakReference<BmsWorkingBeatmap>(wrapper);
 
         return wrapper;
     }
@@ -95,8 +71,8 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
             pruneDeadExternalTextureStores();
 
             var store = new LargeTextureStore(
-                ((IStorageResourceProvider)this).Renderer,
-                ((IStorageResourceProvider)this).CreateTextureLoaderStore(new BmsFileResourceStore(basePath)));
+                resources.Renderer,
+                resources.CreateTextureLoaderStore(new BmsFileResourceStore(basePath)));
 
             externalTextureStores[basePath] = new WeakReference<LargeTextureStore>(store);
             return store;
@@ -127,185 +103,5 @@ internal class BmsWorkingBeatmapCache : WorkingBeatmapCache
     {
         lock (bmsWrapperCache)
             bmsWrapperCache.Remove(working.BeatmapInfo.ID);
-    }
-
-    #region Reflection-based creation
-
-    internal static BmsWorkingBeatmapCache Wrap(WorkingBeatmapCache original)
-    {
-        const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
-
-        var trackStore = getField<ITrackStore>(original, "trackStore", flags);
-        var audioManager = getField<AudioManager>(original, "audioManager", flags);
-        var resources = getField<IResourceStore<byte[]>>(original, "resources", flags);
-        var files = getField<IResourceStore<byte[]>>(original, "files", flags);
-        var host = getField<GameHost>(original, "host", flags);
-        var realm = getField<RealmAccess>(original, "realm", flags);
-
-        var defaultBeatmap = original.DefaultBeatmap;
-
-        var wrapped = new BmsWorkingBeatmapCache(trackStore, audioManager, resources, files, defaultBeatmap, host, realm);
-        return wrapped;
-    }
-
-    private static T getField<T>(object target, string fieldName, BindingFlags flags)
-    {
-        var field = target.GetType().GetField(fieldName, flags);
-
-        if (field == null)
-        {
-            Logger.Log(
-                $"BMS WorkingBeatmapCache: Cannot find private field '{fieldName}' on {target.GetType().Name}. "
-                + "The osu! framework may have changed; the BMS preview-track hook needs updating.",
-                level: LogLevel.Error);
-            throw new InvalidOperationException(
-                $"Cannot find private field '{fieldName}' on {target.GetType().Name}. "
-                + "The osu! framework may have changed; the BMS preview-track hook needs updating.");
-        }
-
-        var value = field.GetValue(target);
-
-        if (value == null)
-        {
-            Logger.Log(
-                $"BMS WorkingBeatmapCache: Field '{fieldName}' on {target.GetType().Name} is null — unexpected.",
-                level: LogLevel.Error);
-            throw new InvalidOperationException(
-                $"Field '{fieldName}' on {target.GetType().Name} is null — unexpected.");
-        }
-
-        return (T)value;
-    }
-
-    #endregion
-
-}
-
-/// <summary>
-///     Static helper that patches a <see cref="BeatmapManager" /> via reflection to replace its
-///     private <c>workingBeatmapCache</c> field with a <see cref="BmsWorkingBeatmapCache" />.
-/// </summary>
-/// <remarks>
-///     This is the injection point that enables BMS preview audio with zero changes to the osu!
-///     game assembly. Call <see cref="Install" /> once after the <c>BeatmapManager</c> is created,
-///     ideally from the host application's startup code:
-///     <code>
-///         var manager = new BeatmapManager(...);
-///         BmsWorkingBeatmapHelper.Install(manager);
-///     </code>
-/// </remarks>
-public static class BmsWorkingBeatmapHelper
-{
-    private static readonly object install_lock = new();
-
-    /// <summary>
-    ///     Replace the private <c>workingBeatmapCache</c> inside <paramref name="manager" />
-    ///     with a BMS-aware wrapper.  Safe to call multiple times (idempotent).
-    /// </summary>
-    /// <param name="manager">The beatmap manager whose cache should be wrapped.</param>
-    /// <returns><c>true</c> if the installation succeeded; <c>false</c> otherwise.</returns>
-    public static bool Install(BeatmapManager manager)
-    {
-        lock (install_lock)
-        {
-            var cacheField = typeof(BeatmapManager).GetField("workingBeatmapCache",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-
-            if (cacheField == null)
-            {
-                Logger.Log(
-                    "BMS WorkingBeatmapHelper: Cannot find private field 'workingBeatmapCache' on BeatmapManager. "
-                    + "The osu! framework may have changed; BMS preview audio will not be available.",
-                    level: LogLevel.Error);
-                return false;
-            }
-
-            if (cacheField.GetValue(manager) is not WorkingBeatmapCache original) return false;
-
-            if (original is BmsWorkingBeatmapCache) return true;
-
-            try
-            {
-                var wrapped = BmsWorkingBeatmapCache.Wrap(original);
-
-                if (!setReadonlyField(manager, cacheField, wrapped))
-                {
-                    return false;
-                }
-
-                var installed = cacheField.GetValue(manager) is BmsWorkingBeatmapCache;
-
-                if (!installed)
-                {
-                    Logger.Log(
-                        "BMS WorkingBeatmapHelper: Field write reported success but BeatmapManager still has the original cache. "
-                        + "BMS preview-track hook will not be active.",
-                        level: LogLevel.Error);
-                }
-
-                return installed;
-            }
-            catch (InvalidOperationException)
-            {
-                return false;
-            }
-        }
-    }
-
-    /// <summary>
-    ///     Writes to a (potentially readonly) instance field, using a <c>DynamicMethod</c>
-    ///     fallback when <c>FieldInfo.SetValue</c> is blocked by runtime readonly checks
-    ///     (modern .NET 5+).
-    /// </summary>
-    private static bool setReadonlyField(object target, FieldInfo field, object value)
-    {
-        try
-        {
-            field.SetValue(target, value);
-
-            if (ReferenceEquals(field.GetValue(target), value))
-            {
-                return true;
-            }
-        }
-        catch (FieldAccessException)
-        {
-            // Modern .NET may block SetValue on init-only / readonly fields; fall through to IL emit.
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, $"BMS WorkingBeatmapHelper: Failed to set readonly field '{field.Name}' via SetValue. "
-                             + "BMS preview-track hook will not be active.");
-            return false;
-        }
-
-        try
-        {
-            var dynamicMethod = new DynamicMethod(
-                $"WriteField_{field.Name}",
-                null,
-                [typeof(object), typeof(object)],
-                typeof(FieldInfo).Module,
-                true);
-
-            var il = dynamicMethod.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Castclass, field.DeclaringType!);
-            il.Emit(OpCodes.Ldarg_1);
-            il.Emit(field.FieldType.IsValueType ? OpCodes.Unbox_Any : OpCodes.Castclass, field.FieldType);
-            il.Emit(OpCodes.Stfld, field);
-            il.Emit(OpCodes.Ret);
-
-            dynamicMethod.Invoke(null, [target, value]);
-
-            var success = ReferenceEquals(field.GetValue(target), value);
-            return success;
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, $"BMS WorkingBeatmapHelper: Failed to write readonly field '{field.Name}' via IL emit. "
-                             + "BMS preview-track hook will not be active.");
-            return false;
-        }
     }
 }

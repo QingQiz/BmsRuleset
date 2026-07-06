@@ -59,7 +59,6 @@ public static partial class BmsSongSelectLampPatcher
             var missingMembers = new[]
             {
                 (name: "PanelLocalRankDisplay.setRankFromScore", member: target),
-                (name: "BmsSongSelectLampPatcher.postfix", member: postfixMethod),
                 (name: "PanelLocalRankDisplay.ruleset", member: rulesetProperty),
                 (name: "PanelLocalRankDisplay.Beatmap", member: beatmapProperty),
                 (name: "PanelLocalRankDisplay.realm", member: realmProperty),
