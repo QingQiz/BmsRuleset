@@ -1027,7 +1027,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | Channel `98` — dynamic KEY volume (counterpart to channel 97)                                                                 | 1.5      | 
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                                                     |
 | **Renderer**  | POOR BGA duration hardcoded 500ms (beatoraja uses config-driven `misslayerDuration`)                                          | 3        |
-| **Replay**    | Replay not available                                                                                                          | 2        |
 | **Scoring**   | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown                                                    | 2        |
 | **Scoring**   | ExRank support                                                                                                                | 3        |
 | **Scoring**   | Different judgement text colours on results screen                                                                            | 4        |

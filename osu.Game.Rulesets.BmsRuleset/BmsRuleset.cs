@@ -19,6 +19,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
@@ -79,6 +80,7 @@ public partial class BmsRuleset : Ruleset
     {
         BmsBeatmapDecoder.Register();
         BmsEditorPatcher.InstallOnce();
+        BmsReplayPatcher.InstallOnce();
         BmsSongSelectLampPatcher.InstallOnce();
         BmsWorkingBeatmapPatcher.InstallOnce();
     }

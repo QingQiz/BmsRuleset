@@ -9,9 +9,17 @@ public class BmsReplayFrame : ReplayFrame
 {
     public const double BRANCH_DECISION_FRAME_TIME = -1000000000;
 
-    public List<BmsAction> Actions { get; } = [];
+    // deserialization requires a setter
+    // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
+    public List<BmsAction> Actions { get; set; } = [];
 
     public string BranchDecisions { get; set; } = string.Empty;
+
+    // deserialization requires a default ctor
+    // ReSharper disable once UnusedMember.Global
+    public BmsReplayFrame()
+    {
+    }
 
     public BmsReplayFrame(double time, params BmsAction[] actions)
         : base(time)
