@@ -43,8 +43,8 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
     }
 
     /// <summary>
-    /// Resolves <paramref name="name"/> against <see cref="basePath"/> to a canonical full path,
-    /// returning false if the result falls outside <see cref="basePath"/> or does not exist.
+    /// Resolves <paramref name="name"/> against <c>basePath</c> to a canonical full path,
+    /// returning false if the result falls outside <c>basePath</c> or does not exist.
     /// </summary>
     private bool tryResolve(string? name, out string path)
     {

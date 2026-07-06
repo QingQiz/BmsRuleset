@@ -1,3 +1,5 @@
+#nullable enable
+
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Scoring;

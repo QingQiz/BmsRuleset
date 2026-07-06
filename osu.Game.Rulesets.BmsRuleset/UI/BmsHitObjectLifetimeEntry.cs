@@ -102,7 +102,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
     /// <summary>
     ///     Once <see cref="RefreshLifetime"/> has computed a scroll-speed-aware
     ///     value, reject subsequent overwrites from
-    ///     <see cref="HitObjectLifetimeEntry.SetInitialLifetime"/>
+    ///     <c>HitObjectLifetimeEntry.SetInitialLifetime</c>
     ///     (triggered by <c>DefaultsApplied</c> / <c>StartTimeBindable</c>)
     ///     that would reset <c>LifetimeStart</c> to the default offset.
     /// </summary>
@@ -113,7 +113,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
     }
 
     /// <summary>
-    ///     <see cref="DrawableHitObject{TObject}.UpdateState"/> unconditionally sets
+    ///     <c>DrawableHitObject.UpdateState</c> unconditionally sets
     ///     <c>LifetimeEnd = double.MaxValue</c> on every state transition.
     ///     For entries whose state stays Idle until hit — such
     ///     as mines — the follow-up conditional at line 487 does not fire,
