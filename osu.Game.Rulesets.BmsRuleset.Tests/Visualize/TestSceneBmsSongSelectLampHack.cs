@@ -39,6 +39,9 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
     private ScoreManager scoreManager = null!;
     private RealmDetachedBeatmapStore beatmapStore = null!;
     private osu.Game.Screens.Select.SongSelect songSelect = null!;
+    private BeatmapSetInfo lampBeatmapSet = null!;
+
+    private static readonly BmsLamp[] all_lamps = Enum.GetValues<BmsLamp>();
 
     private BeatmapCarousel carousel => songSelect.ChildrenOfType<BeatmapCarousel>().Single();
 
@@ -111,104 +114,136 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
             config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.Title);
             config.SetValue(OsuSetting.SongSelectGroupMode, GroupMode.None);
 
+            lampBeatmapSet = null!;
             songSelect = null!;
         });
 
+        AddStep("delete all scores", () => scoreManager.Delete());
         AddStep("delete all beatmaps", () => beatmaps.Delete());
     }
 
     [Test]
     public void TestAllLamps()
     {
-        AddStep("import 9 BMS beatmaps", () =>
+        importLampBeatmapSet();
+        importLampScores();
+        loadSongSelect();
+
+        AddAssert("patch installed", () => BmsSongSelectLampPatcher.IsInstalled);
+        AddUntilStep("BMS ruleset active", () => Ruleset.Value.ShortName == "bms");
+        AddUntilStep("all lamp panels are realised", () => lampRankDisplays().Count(), () => Is.EqualTo(all_lamps.Length));
+        AddUntilStep("all real panels have BMS lamps", () => visibleLampDisplays().Count(), () => Is.EqualTo(all_lamps.Length));
+        AddAssert("all lamp states are represented", () => visibleLampDisplays().Select(lampFromDisplay).OrderBy(l => l).SequenceEqual(all_lamps.OrderBy(l => l)));
+        AddAssert("played lamps keep stock rank", () => playedRankDisplays().All(hasVisibleStockRank));
+        AddAssert("no-play lamp has no stock rank", () => noPlayRankDisplay() is { } display && hasNoStockRank(display));
+        AddAssert("ruleset mark hidden by every lamp", () => lampRankDisplays().All(hasHiddenRulesetMark));
+        AddAssert("lamps render as panel backgrounds", () => lampPanels().All(panel =>
+        {
+            var lampDrawable = panel.ChildrenOfType<BmsLampDisplay>().SingleOrDefault(l => l.Alpha > 0);
+            return lampDrawable != null && getBackgroundContainer(panel) == lampDrawable.Parent;
+        }));
+        AddAssert("lamps fill their song select cards", () => lampPanels().All(panel =>
+        {
+            var lampDrawable = panel.ChildrenOfType<BmsLampDisplay>().SingleOrDefault(l => l.Alpha > 0);
+
+            return lampDrawable != null
+                   && Math.Abs(lampDrawable.ScreenSpaceDrawQuad.Width - panel.TopLevelContent.ScreenSpaceDrawQuad.Width) < 0.5f
+                   && Math.Abs(lampDrawable.ScreenSpaceDrawQuad.Height - panel.TopLevelContent.ScreenSpaceDrawQuad.Height) < 0.5f;
+        }));
+        AddAssert("all lamps fit on screen", () => lampPanels().All(panel =>
+            panel.ScreenSpaceDrawQuad.AABBFloat.Top >= 0 && panel.ScreenSpaceDrawQuad.AABBFloat.Bottom <= DrawHeight));
+    }
+
+    private void importLampBeatmapSet()
+    {
+        AddStep("import one BMS set with all lamp difficulties", () =>
         {
             var bmsRuleset = rulesets.AvailableRulesets.Single(r => r.ShortName == "bms");
-            for (var i = 0; i < Enum.GetValues<BmsLamp>().Length; i++)
-                beatmaps.Import(createBeatmapSet(bmsRuleset));
+            var imported = beatmaps.Import(createBeatmapSet(bmsRuleset));
+
+            Assert.That(imported, Is.Not.Null);
+            lampBeatmapSet = imported!.Value.Detach();
+
+            Beatmap.Value = beatmaps.GetWorkingBeatmap(lampBeatmapSet.Beatmaps[all_lamps.Length / 2], true);
         });
 
-        AddUntilStep("wait for lamp beatmaps", () => beatmaps.GetAllUsableBeatmapSets().SelectMany(s => s.Beatmaps).Count() >= Enum.GetValues<BmsLamp>().Length);
+        AddUntilStep("wait for lamp beatmap set", () =>
+            beatmaps.GetAllUsableBeatmapSets().Any(set => set.OnlineID == lampBeatmapSet.OnlineID && set.Beatmaps.Count == all_lamps.Length));
+    }
 
+    private void importLampScores()
+    {
         AddStep("import one score per played lamp", () =>
         {
-            var lamps = Enum.GetValues<BmsLamp>();
-            var allBeatmaps = beatmaps.GetAllUsableBeatmapSets().SelectMany(s => s.Beatmaps).ToList();
-            for (var i = 0; i < lamps.Length; i++)
+            foreach (var (lamp, beatmap) in beatmapsForLamps())
             {
-                if (lamps[i] != BmsLamp.NoPlay)
-                    scoreManager.Import(createScoreForLamp(allBeatmaps[i], lamps[i]));
+                if (lamp == BmsLamp.NoPlay)
+                    continue;
+
+                Assert.That(scoreManager.Import(createScoreForLamp(beatmap, lamp)), Is.Not.Null);
             }
         });
 
-        loadSongSelect();
-
-        AddAssert("patch installed", () => BmsSongSelectLampPatcher.IsInstalled);
-        AddUntilStep("BMS ruleset active", () => Ruleset.Value.ShortName == "bms");
-        AddUntilStep("real local rank display loaded", () => localRankDisplays().Any());
-        // The carousel only realises visible panels, so this asserts at least one lamp renders;
-        // scroll the test browser to inspect every lamp state.
-        AddUntilStep("real panel has BMS lamp", () => panelWithVisibleLamp() != null);
-        AddAssert("stock rank still visible beside lamp", () => localRankDisplays().Any(hasVisibleStockRank));
-        AddAssert("ruleset mark hidden by lamp", () => localRankDisplays().Any(hasHiddenRulesetMark));
-        AddAssert("lamp rendered as panel background", () =>
+        AddUntilStep("wait for lamp scores", () => Realm.Run(r =>
         {
-            var panel = panelWithVisibleLamp();
-            var lampDrawable = panel?.ChildrenOfType<BmsLampDisplay>().SingleOrDefault(l => l.Alpha > 0);
-
-            return panel != null && lampDrawable != null && getBackgroundContainer(panel) == lampDrawable.Parent;
-        });
-        AddAssert("lamp fills the song select card", () =>
-        {
-            var panel = panelWithVisibleLamp();
-            var lampDrawable = panel?.ChildrenOfType<BmsLampDisplay>().SingleOrDefault(l => l.Alpha > 0);
-
-            return panel != null && lampDrawable != null
-                                 && Math.Abs(lampDrawable.ScreenSpaceDrawQuad.Width - panel.TopLevelContent.ScreenSpaceDrawQuad.Width) < 0.5f
-                                 && Math.Abs(lampDrawable.ScreenSpaceDrawQuad.Height - panel.TopLevelContent.ScreenSpaceDrawQuad.Height) < 0.5f;
-        });
-    }
-
-    [Test]
-    public void TestUnplayedBeatmapHasGrayLamp()
-    {
-        AddStep("import BMS beatmap with no score", () =>
-        {
-            var bmsRuleset = rulesets.AvailableRulesets.Single(r => r.ShortName == "bms");
-            beatmaps.Import(createBeatmapSet(bmsRuleset));
-        });
-
-        AddUntilStep("wait for beatmap", () => beatmaps.GetAllUsableBeatmapSets().SelectMany(s => s.Beatmaps).Any());
-
-        loadSongSelect();
-
-        AddAssert("patch installed", () => BmsSongSelectLampPatcher.IsInstalled);
-        AddUntilStep("BMS ruleset active", () => Ruleset.Value.ShortName == "bms");
-        AddUntilStep("real local rank display loaded", () => localRankDisplays().Any());
-        AddAssert("BMS lamp visible on unplayed panel", () => panelWithVisibleLamp() != null);
-        AddAssert("ruleset mark hidden by no-play lamp", () => localRankDisplays().Any(hasHiddenRulesetMark));
-        AddAssert("no stock rank on unplayed panel", () => localRankDisplays().Any(hasNoStockRank));
+            var hashes = lampBeatmapSet.Beatmaps.Select(b => b.Hash).ToArray();
+            return r.All<ScoreInfo>().AsEnumerable().Count(score => hashes.Contains(score.BeatmapHash) && !score.DeletePending);
+        }), () => Is.EqualTo(all_lamps.Length - 1));
     }
 
     private void loadSongSelect()
     {
         AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
-        AddUntilStep("wait for carousel filtering", () => !carousel.IsFiltering);
+        AddUntilStep("wait for carousel presentation", () => songSelect.CarouselItemsPresented && !songSelect.IsFiltering);
+        AddStep("scope to lamp beatmap set", () => songSelect.ScopeToBeatmapSet(lampBeatmapSet));
+        AddUntilStep("wait for scoped carousel", () => !songSelect.IsFiltering
+                                                       && carousel.Criteria?.SelectedBeatmapSet != null
+                                                       && carousel.Criteria.SelectedBeatmapSet.Equals(lampBeatmapSet)
+                                                       && carousel.MatchedBeatmapsCount == all_lamps.Length);
     }
 
-    private IEnumerable<PanelLocalRankDisplay> localRankDisplays() => carousel.ChildrenOfType<PanelLocalRankDisplay>();
+    private IEnumerable<(BmsLamp lamp, BeatmapInfo beatmap)> beatmapsForLamps() =>
+        all_lamps.Zip(lampBeatmapSet.Beatmaps.OrderBy(b => b.OnlineID), (lamp, beatmap) => (lamp, beatmap));
 
-    private Panel panelWithVisibleLamp() =>
-        carousel.ChildrenOfType<Panel>().FirstOrDefault(panel => panel.ChildrenOfType<BmsLampDisplay>().Any(lamp => lamp.Alpha > 0));
+    private IEnumerable<Panel> lampPanels() =>
+        carousel.ChildrenOfType<Panel>()
+            .Where(panel => panel.ChildrenOfType<PanelLocalRankDisplay>().Any(display => isLampBeatmap(display.Beatmap)));
+
+    private IEnumerable<PanelLocalRankDisplay> lampRankDisplays() =>
+        lampPanels().Select(panel => panel.ChildrenOfType<PanelLocalRankDisplay>().Single());
+
+    private IEnumerable<PanelLocalRankDisplay> playedRankDisplays() =>
+        lampRankDisplays().Where(display => display.Beatmap != null && lampForBeatmap(display.Beatmap) != BmsLamp.NoPlay);
+
+    private PanelLocalRankDisplay noPlayRankDisplay() =>
+        lampRankDisplays().SingleOrDefault(display => display.Beatmap != null && lampForBeatmap(display.Beatmap) == BmsLamp.NoPlay);
+
+    private IEnumerable<BmsLampDisplay> visibleLampDisplays() =>
+        lampPanels().SelectMany(panel => panel.ChildrenOfType<BmsLampDisplay>().Where(lamp => lamp.Alpha > 0));
+
+    private bool isLampBeatmap(BeatmapInfo beatmap) =>
+        beatmap != null && lampBeatmapSet.Beatmaps.Any(b => b.Hash == beatmap.Hash);
+
+    private BmsLamp lampForBeatmap(BeatmapInfo beatmap)
+    {
+        foreach (var (lamp, lampBeatmap) in beatmapsForLamps())
+        {
+            if (lampBeatmap.Hash == beatmap.Hash)
+                return lamp;
+        }
+
+        throw new InvalidOperationException($"Beatmap {beatmap} is not part of the lamp set.");
+    }
 
     private static bool hasVisibleStockRank(PanelLocalRankDisplay display) =>
         display.ChildrenOfType<UpdateableRank>().Any(rank => rank.Rank != null && rank.Alpha > 0);
 
-    private static bool hasHiddenRulesetMark(PanelLocalRankDisplay display) =>
-        getIconContainer(parentPanel(display))?.Alpha == 0;
-
-    private static bool hasVisibleRulesetMark(PanelLocalRankDisplay display) =>
-        getIconContainer(parentPanel(display))?.Alpha > 0;
+    private static bool hasHiddenRulesetMark(PanelLocalRankDisplay display)
+    {
+        var iconContainer = getIconContainer(parentPanel(display));
+        return iconContainer != null && iconContainer.Alpha == 0;
+    }
 
     private static bool hasNoStockRank(PanelLocalRankDisplay display) => !hasVisibleStockRank(display);
 
@@ -233,9 +268,11 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
 
     private static Drawable getBackgroundContainer(Panel panel) => background_container_field.GetValue(panel) as Drawable;
 
-    // Maps each lamp to a score whose Rank/Statistics/Mods BmsLampCalculator resolves to that lamp.
-    // Gauge lamps include HitResult.Ok so the clear-quality checks (MAX/PERFECT/FULL COMBO) don't
-    // override the gauge-derived lamp.
+    private static readonly FieldInfo lamp_field =
+        typeof(BmsLampDisplay).GetField("lamp", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+    private static BmsLamp lampFromDisplay(BmsLampDisplay display) => (BmsLamp)lamp_field.GetValue(display)!;
+
     private ScoreInfo createScoreForLamp(BeatmapInfo beatmap, BmsLamp lamp) => lamp switch
     {
         BmsLamp.Failed => createScore(beatmap, ScoreRank.F, stats((HitResult.Perfect, 50))),
@@ -278,12 +315,11 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
     private static BeatmapSetInfo createBeatmapSet(RulesetInfo ruleset)
     {
         var id = nextTestId++;
-        var hash = Guid.NewGuid().ToString();
 
         var metadata = new BeatmapMetadata
         {
             Artist = "BMS Test Artist",
-            Title = $"BMS Song Select Lamp {id}",
+            Title = $"BMS Song Select Lamps {id}",
             Author =
             {
                 Username = "BMS Test Author",
@@ -297,22 +333,27 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
             DateAdded = DateTimeOffset.UtcNow,
         };
 
-        set.Beatmaps.Add(new BeatmapInfo(ruleset)
+        for (var i = 0; i < all_lamps.Length; i++)
         {
-            OnlineID = (id + 1) * 1000,
-            BeatmapSet = set,
-            DifficultyName = "Real Song Select",
-            StarRating = 5,
-            Length = 30000,
-            BPM = 150,
-            Hash = hash,
-            MD5Hash = hash,
-            Metadata = metadata,
-            Difficulty = new BeatmapDifficulty
+            var hash = Guid.NewGuid().ToString();
+
+            set.Beatmaps.Add(new BeatmapInfo(ruleset)
             {
-                OverallDifficulty = 8,
-            },
-        });
+                OnlineID = (id + 1) * 1000 + i,
+                BeatmapSet = set,
+                DifficultyName = $"{i:00} {all_lamps[i]}",
+                StarRating = 1 + i * 0.5,
+                Length = 30000,
+                BPM = 150,
+                Hash = hash,
+                MD5Hash = hash,
+                Metadata = metadata,
+                Difficulty = new BeatmapDifficulty
+                {
+                    OverallDifficulty = 8,
+                },
+            });
+        }
 
         return set;
     }
