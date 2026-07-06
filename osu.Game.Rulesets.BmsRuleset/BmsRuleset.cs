@@ -14,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Editor;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
@@ -77,6 +78,7 @@ public partial class BmsRuleset : Ruleset
     static BmsRuleset()
     {
         BmsBeatmapDecoder.Register();
+        BmsEditorPatcher.InstallOnce();
         BmsSongSelectLampPatcher.InstallOnce();
         BmsWorkingBeatmapPatcher.InstallOnce();
     }

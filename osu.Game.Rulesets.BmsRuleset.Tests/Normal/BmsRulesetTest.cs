@@ -1,10 +1,16 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
+using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
+using osu.Game.Rulesets.BmsRuleset.Editor;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
@@ -123,6 +129,25 @@ public class BmsRulesetTest
     }
 
     [Test]
+    public void TestInitialisationInstallsEditorDisablePatch()
+    {
+        Assert.That(BmsEditorPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
+    public void TestEditorDisablePatchPostsNotification()
+    {
+        var dependencies = new DependencyContainer();
+        var notifications = new TestNotificationOverlay();
+        dependencies.CacheAs<INotificationOverlay>(notifications);
+
+        BmsEditorPatcher.PostEditorUnavailableNotification(dependencies);
+
+        Assert.That(notifications.PostedNotifications.Single(), Is.TypeOf<SimpleNotification>());
+        Assert.That(notifications.PostedNotifications.Single().Text.ToString(), Is.EqualTo("The BMS editor is not supported yet."));
+    }
+
+    [Test]
     public void TestEmptyPoorDisplayNameIsEPoor()
     {
         Assert.That(ruleset.GetDisplayNameForHitResult(HitResult.Miss).ToString(), Is.EqualTo("E-POOR"));
@@ -223,5 +248,20 @@ public class BmsRulesetTest
         Assert.That(metrics["Scratch BAD"], Is.EqualTo("-230 to +290 ms"));
         Assert.That(metrics["LN tail PGREAT"], Is.EqualTo("-120 to +120 ms"));
         Assert.That(metrics["Scratch LN tail GOOD"], Is.EqualTo("-210 to +210 ms"));
+    }
+
+    private class TestNotificationOverlay : INotificationOverlay
+    {
+        public List<Notification> PostedNotifications { get; } = new();
+
+        public void Post(Notification notification) => PostedNotifications.Add(notification);
+
+        public void Hide()
+        {
+        }
+
+        public IBindable<int> UnreadCount { get; } = new Bindable<int>();
+
+        public IEnumerable<Notification> AllNotifications => PostedNotifications;
     }
 }
