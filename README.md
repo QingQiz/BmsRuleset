@@ -57,7 +57,7 @@ for deletion.
 
 ---
 
-## Implemented BMS Features
+## Features
 
 <details>
 <summary>click to open tech details</summary>
@@ -156,24 +156,24 @@ dynamic rank change (`A0`), dynamic option change (`A6`).
 > `1/1024` is the smallest value that can be accurately represented. Smaller values may round to 0 ticks, collapsing all
 > events in that measure to the same position.
 
----
-
-### Layout and Lanes
-
-Layout is inferred from channel presence and file extension (`.pms` → PMS variants; P2 channels present → Double Play;
-channels `18`/`19` present → 7K). `#PLAYER` is ignored.
-
----
-
-### Note Types
-
-| Type            | Behaviour                                                                                                                       |
-|-----------------|---------------------------------------------------------------------------------------------------------------------------------|
-| **Normal note** | Press the key as it reaches the hit line                                                                                        |
-| **Long note**   | Press and hold until the tail passes the hit line; dropping early results in POOR                                               |
-| **Landmine**    | Do **not** press — holding the column key when it crosses the hit line drains the gauge and plays the `#WAV00` explosion sample |
-
 </details>
+
+---
+
+### Clear Lamps
+
+BMS beatmap panels show a clear lamp based on your best matching local score. Lamps cover the usual BMS result states:
+No Play, Failed, Assist Clear, Easy Clear, Clear, Hard Clear, EX Hard Clear, Full Combo, Perfect, and Max.
+
+The lamp follows the currently selected gameplay-affecting mods when possible. For example, a score set with
+Hide Scratch, Auto Scratch, Constant, Half Time, or Double Time is only used for the lamp when the matching mod setup is
+selected in song select.
+
+### Song Preview
+
+Song select preview audio is generated from the original BMS folder rather than from a stored osu! audio file. The ruleset
+first tries a declared `#PREVIEW` file, then a `preview.*` file in the chart folder, and finally falls back to the chart's
+BGM/keysound event timeline. This makes charts without a dedicated preview file still audible in song select.
 
 ---
 
@@ -1026,9 +1026,7 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | Channel `97` — dynamic BGM volume                                                                                             | 1.5      |
 | **Parser**    | Channel `98` — dynamic KEY volume (counterpart to channel 97)                                                                 | 1.5      | 
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                                                     |
-| **Renderer**  | BGA scaling — aspect-fit (letterbox) is the default; stretch / no-expand overrides not exposed (minimal scope)                | 3        |
 | **Renderer**  | POOR BGA duration hardcoded 500ms (beatoraja uses config-driven `misslayerDuration`)                                          | 3        |
-| **Renderer**  | Key beams (column light during hold)                                                                                          | 2        |
 | **Replay**    | Replay not available                                                                                                          | 2        |
 | **Scoring**   | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown                                                    | 2        |
 | **Scoring**   | ExRank support                                                                                                                | 3        |

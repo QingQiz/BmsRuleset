@@ -12,7 +12,10 @@
 - Do NOT run benchmark tests without asking. Benchmarks can take minutes and consume significant resources.
 - Always run tests with `--filter` arguments — never run the full unfiltered test suite.
 
+## Git Style
+
+- Match the existing commit subject style: `type(scope): summary` when a focused scope helps, or `type: summary` when it does not.
+
 ## Comment Style
 
 - Write **why**-type comments (the rationale, intent, or non-obvious trade-off), not **what**-type comments (restating what the code already says).
-

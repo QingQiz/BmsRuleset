@@ -53,6 +53,24 @@ BMS 谱面并将其标记为删除。
 
 ---
 
+## 选歌功能
+
+### Clear Lamps
+
+BMS 谱面面板会根据最匹配的本地最好成绩显示 clear lamp。Lamp 覆盖常见 BMS 结果状态：
+No Play、Failed、Assist Clear、Easy Clear、Clear、Hard Clear、EX Hard Clear、Full Combo、Perfect 和 Max。
+
+Lamp 会尽可能跟随当前选择的、会影响游玩的 mod。例如，带有 Hide Scratch、Auto Scratch、Constant、Half Time
+或 Double Time 的成绩，只会在选歌界面选择了对应 mod 组合时用于 lamp 显示。
+
+### 歌曲预览
+
+选歌界面的预览音频从原始 BMS 文件夹生成，而不是从已存入 osu! 的音频文件读取。规则集会先尝试声明的
+`#PREVIEW` 文件，然后尝试谱面文件夹中的 `preview.*` 文件，最后回退到谱面的 BGM/keysound 事件时间线。
+因此，即使谱面没有专用预览文件，在选歌界面也仍然可以听到预览。
+
+---
+
 ## 输入与键位
 
 默认键位（可在 **设置 → Key Bindings → osu!BMS** 中重新绑定）：
