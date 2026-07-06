@@ -186,10 +186,85 @@ public class BmsStarRatingBenchmark
             var key = s < 1.5 ? "<1.5x" : s < 2 ? "1.5-2x" : s < 3 ? "2-3x" : s < 4 ? "3-4x" : s < 5 ? "4-5x" : s < 7 ? "5-7x" : "7x+";
             buckets[key] = buckets.GetValueOrDefault(key) + 1;
         }
+
         foreach (var (k, v) in buckets.OrderBy(kv => kv.Key))
             Console.WriteLine($"  {k}: {v} charts ({100.0 * v / finalResults.Count:F1}%)");
 
         // Fail if any SR mismatches
+        var failureList = failures.ToList();
+        if (failureList.Count > 0)
+        {
+            foreach (var f in failureList)
+                Console.WriteLine($"  SR MISMATCH: {f}");
+            Assert.Fail($"{failureList.Count} SR value mismatches detected.");
+        }
+    }
+
+    [Test]
+    public void CompareV2VsV3All()
+    {
+        ensureBenchmarkData();
+
+        var dataPaths = Directory.GetFiles(data_dir, "*.json");
+        if (dataPaths.Length == 0)
+        {
+            Assert.Warn("No benchmark data found.");
+            return;
+        }
+
+        Console.WriteLine($"Comparing V2 vs V3 across {dataPaths.Length} charts, {iterations} iterations each...");
+        Console.WriteLine();
+
+        var results = new ConcurrentBag<(string name, double v2Time, double v3Time, double speedup, double memPct, double memV2, double memV3)>();
+        var failures = new ConcurrentBag<string>();
+        var consoleLock = new object();
+
+        Parallel.ForEach(dataPaths, dataPath =>
+        {
+            var input = loadInput(dataPath);
+            var noteTimings = toNoteTimings(input);
+
+            new BmsStarRatingProcessorV2().Compute(noteTimings, input.TotalColumns, input.Rank);
+            new BmsStarRatingProcessorV3().Compute(noteTimings, input.TotalColumns, input.Rank);
+
+            var (srV2, tV2, bytesV2, gc0V2, gc1V2, gc2V2, tMinV2, tMaxV2) =
+                BmsBenchmarkHelper.MeasureAvg(() => new BmsStarRatingProcessorV2().Compute(noteTimings, input.TotalColumns, input.Rank).StarRating, iterations);
+
+            var (srV3, tV3, bytesV3, gc0V3, gc1V3, gc2V3, tMinV3, tMaxV3) =
+                BmsBenchmarkHelper.MeasureAvg(() => new BmsStarRatingProcessorV3().Compute(noteTimings, input.TotalColumns, input.Rank).StarRating, iterations);
+
+            var diff = Math.Abs(srV3 - srV2);
+            var srStatus = diff < 1e-12 ? "OK" : diff < 1e-9 ? "~" : "FAIL";
+            if (diff >= 1e-9)
+                failures.Add($"{Path.GetFileName(dataPath)}: v2={srV2:F10} v3={srV3:F10}");
+
+            var chartName = Path.GetFileNameWithoutExtension(dataPath);
+            var speedup = tV2 / tV3;
+            var memPct = 100.0 * bytesV3 / bytesV2;
+
+            lock (consoleLock)
+            {
+                Console.WriteLine($"Chart: {chartName}");
+                Console.WriteLine($"  Notes:    {input.HitObjects.Count,8}");
+                Console.WriteLine($"  Columns:  {input.TotalColumns,8}");
+                Console.WriteLine($"  Time avg  {tV2,8:F2}ms -> {tV3,8:F2}ms ({speedup,5:F2}x)");
+                Console.WriteLine($"  Memory    {bytesV2 / 1024,8:F0}KB -> {bytesV3 / 1024,8:F0}KB ({memPct,5:F1}%)");
+                Console.WriteLine($"  GC Gen0   {gc0V2,8:F1} -> {gc0V3,8:F1}");
+                Console.WriteLine($"  SR         {srV2,10:F6} -> {srV3,10:F6}  {srStatus}");
+            }
+
+            results.Add((chartName, tV2, tV3, speedup, memPct, bytesV2, bytesV3));
+        });
+
+        var finalResults = results.ToList();
+        Console.WriteLine();
+        Console.WriteLine("=== V2 vs V3 AGGREGATE ===");
+        Console.WriteLine($"Charts:    {finalResults.Count,10}");
+        Console.WriteLine($"Iterations:{iterations,10}");
+        Console.WriteLine($"{"",30} {"V2",16} {"V3",16} {"Change",12}");
+        Console.WriteLine($"{"Time avg (ms)",-30} {finalResults.Average(r => r.v2Time),16:F2} {finalResults.Average(r => r.v3Time),16:F2} {finalResults.Average(r => r.speedup),10:F2}x");
+        Console.WriteLine($"{"Memory (KB) avg",-30} {finalResults.Average(r => r.memV2) / 1024,16:F0} {finalResults.Average(r => r.memV3) / 1024,16:F0} {finalResults.Average(r => r.memPct),10:F1}%");
+
         var failureList = failures.ToList();
         if (failureList.Count > 0)
         {

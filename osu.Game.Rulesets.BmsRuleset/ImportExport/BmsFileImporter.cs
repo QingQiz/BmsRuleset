@@ -273,7 +273,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             if (summary.StarRatingNoteTimings.Count == 0)
                 return 0;
 
-            return new BmsStarRatingProcessorV2()
+            return new BmsStarRatingProcessorV3()
                 .Compute(summary.StarRatingNoteTimings, summary.Metadata.KeyCount, summary.Metadata.Rank)
                 .StarRating;
         }
