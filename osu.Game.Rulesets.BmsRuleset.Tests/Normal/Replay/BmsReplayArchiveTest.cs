@@ -1,9 +1,15 @@
+using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Text;
 using NUnit.Framework;
 using osu.Game.Extensions;
 using osu.Game.Models;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Replay;
@@ -31,10 +37,11 @@ public class BmsReplayArchiveTest
 
         using var archive = BmsReplayArchive.Create(original);
         var replayFile = new RealmFile { Hash = "abcdef" };
-        original.ScoreInfo.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
+        var readTarget = new ScoreInfo();
+        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
 
         var restored = BmsReplayArchive.ReadScore(
-            original.ScoreInfo,
+            readTarget,
             new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
 
         var frames = restored.Replay.Frames.Cast<BmsReplayFrame>().ToArray();
@@ -42,6 +49,118 @@ public class BmsReplayArchiveTest
         Assert.That(frames, Has.Length.EqualTo(2));
         Assert.That(frames[0].IsEquivalentTo(original.Replay.Frames[0]), Is.True);
         Assert.That(frames[1].IsEquivalentTo(original.Replay.Frames[1]), Is.True);
+    }
+
+    [Test]
+    public void TestHitEventsRoundTripThroughArchive()
+    {
+        var original = createScore();
+
+        original.ScoreInfo.HitEvents =
+        [
+            new HitEvent(-12, 1, HitResult.Great, new BmsNote { StartTime = 1000, Column = 2 }, null, null),
+            new HitEvent(34, 1.25, HitResult.Ok, new BmsLongNote { StartTime = 2000, Duration = 500, Column = 4 }, null, null),
+            new HitEvent(0, 1, HitResult.Meh, new BmsLandmine { StartTime = 3000, Column = 1, LandmineDamagePercent = 50 }, null, null),
+            new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = 4000 }, null, null),
+        ];
+
+        using var archive = BmsReplayArchive.Create(original);
+        var replayFile = new RealmFile { Hash = "abcdef" };
+        var readTarget = new ScoreInfo();
+        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
+
+        var restored = BmsReplayArchive.ReadScore(
+            readTarget,
+            new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
+
+        Assert.That(restored.ScoreInfo.HitEvents, Has.Count.EqualTo(4));
+        assertHitEvent(restored.ScoreInfo.HitEvents[0], -12, 1, HitResult.Great, typeof(BmsNote), 1000, 2);
+        assertHitEvent(restored.ScoreInfo.HitEvents[1], 34, 1.25, HitResult.Ok, typeof(BmsLongNote), 2000, 4);
+        assertHitEvent(restored.ScoreInfo.HitEvents[2], 0, 1, HitResult.Meh, typeof(BmsLandmine), 3000, 1);
+        Assert.That(((BmsLongNote)restored.ScoreInfo.HitEvents[1].HitObject).Duration, Is.EqualTo(500));
+        Assert.That(((BmsLandmine)restored.ScoreInfo.HitEvents[2].HitObject).LandmineDamagePercent, Is.EqualTo(50));
+
+        // Empty POOR: round-trips as a base HitObject (no BmsHitObject), preserving press time + Miss.
+        var emptyPoor = restored.ScoreInfo.HitEvents[3];
+        Assert.That(emptyPoor.TimeOffset, Is.EqualTo(0));
+        Assert.That(emptyPoor.GameplayRate, Is.EqualTo(1));
+        Assert.That(emptyPoor.Result, Is.EqualTo(HitResult.Miss));
+        Assert.That(emptyPoor.HitObject, Is.TypeOf<HitObject>());
+        Assert.That(emptyPoor.HitObject, Is.Not.TypeOf<BmsHitObject>());
+        Assert.That(emptyPoor.HitObject.StartTime, Is.EqualTo(4000));
+    }
+
+    [Test]
+    public void TestArchiveIsGzipCompressed()
+    {
+        using var archive = BmsReplayArchive.Create(createScore());
+        byte[] bytes = archive.Get(BmsReplayArchive.FILENAME);
+
+        Assert.That(bytes.Length, Is.GreaterThanOrEqualTo(2));
+        Assert.That(bytes[0], Is.EqualTo((byte)0x1f));
+        Assert.That(bytes[1], Is.EqualTo((byte)0x8b));
+    }
+
+    [Test]
+    public void TestReadScoreHandlesLegacyPlainJsonArchive()
+    {
+        // Stand in for an archive written before the gzip switch: decompress a current archive
+        // back to plain JSON, then hand that plain JSON to ReadScore. Verifies the gzip-magic
+        // fallback so old scores/replays load instead of crashing.
+        var original = createScore();
+        original.ScoreInfo.HitEvents =
+        [
+            new HitEvent(-12, 1, HitResult.Great, new BmsNote { StartTime = 1000, Column = 2 }, null, null),
+            new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = 2000 }, null, null),
+        ];
+
+        using var gzipArchive = BmsReplayArchive.Create(original);
+        byte[] gzipBytes = gzipArchive.Get(BmsReplayArchive.FILENAME);
+
+        byte[] plainJsonBytes;
+        using (var decompressed = new MemoryStream())
+        {
+            using (var gz = new GZipStream(new MemoryStream(gzipBytes), CompressionMode.Decompress))
+                gz.CopyTo(decompressed);
+            plainJsonBytes = decompressed.ToArray();
+        }
+
+        // Plain JSON starts with '{', not the gzip magic 0x1f 0x8b — confirms the legacy path is taken.
+        Assert.That(plainJsonBytes[0], Is.EqualTo((byte)'{'));
+
+        var replayFile = new RealmFile { Hash = "abcdef" };
+        var readTarget = new ScoreInfo();
+        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
+
+        var restored = BmsReplayArchive.ReadScore(
+            readTarget,
+            new TestResourceStore(replayFile.GetStoragePath(), plainJsonBytes));
+
+        Assert.That(restored.Replay.Frames, Has.Count.EqualTo(1));
+        Assert.That(restored.ScoreInfo.HitEvents, Has.Count.EqualTo(2));
+        assertHitEvent(restored.ScoreInfo.HitEvents[0], -12, 1, HitResult.Great, typeof(BmsNote), 1000, 2);
+        Assert.That(restored.ScoreInfo.HitEvents[1].Result, Is.EqualTo(HitResult.Miss));
+        Assert.That(restored.ScoreInfo.HitEvents[1].HitObject, Is.TypeOf<HitObject>());
+        Assert.That(restored.ScoreInfo.HitEvents[1].HitObject.StartTime, Is.EqualTo(2000));
+    }
+
+    [Test]
+    public void TestReadScoreHandlesArchiveMissingHitEventsField()
+    {
+        // A pre-HitEvents archive (e.g. released 2026.624.3) has no hit_events field at all.
+        // osu!'s DefaultValueHandling.IgnoreAndPopulate populates the absent field with the type
+        // default (null), so ReadScore must degrade to "no hit events" instead of throwing
+        // ArgumentNullException at .Select — this is the regression guard for that crash.
+        byte[] legacyBytes = Encoding.UTF8.GetBytes("""{"version":1,"has_received_all_frames":true,"frames":[]}""");
+
+        var replayFile = new RealmFile { Hash = "abcdef" };
+        var readTarget = new ScoreInfo();
+        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
+
+        var restored = BmsReplayArchive.ReadScore(readTarget, new TestResourceStore(replayFile.GetStoragePath(), legacyBytes));
+
+        Assert.That(restored.Replay.Frames, Is.Empty);
+        Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
     }
 
     [Test]
@@ -76,6 +195,16 @@ public class BmsReplayArchiveTest
             },
         },
     };
+
+    private static void assertHitEvent(HitEvent hitEvent, double offset, double gameplayRate, HitResult result, Type hitObjectType, double startTime, int column)
+    {
+        Assert.That(hitEvent.TimeOffset, Is.EqualTo(offset));
+        Assert.That(hitEvent.GameplayRate, Is.EqualTo(gameplayRate));
+        Assert.That(hitEvent.Result, Is.EqualTo(result));
+        Assert.That(hitEvent.HitObject, Is.TypeOf(hitObjectType));
+        Assert.That(hitEvent.HitObject.StartTime, Is.EqualTo(startTime));
+        Assert.That(((BmsHitObject)hitEvent.HitObject).Column, Is.EqualTo(column));
+    }
 
     private sealed class TestResourceStore(string filename, byte[] content) : osu.Framework.IO.Stores.IResourceStore<byte[]>
     {

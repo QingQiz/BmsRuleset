@@ -331,7 +331,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private void registerEmptyPoor()
     {
-        scoreProcessor?.RegisterEmptyPoor();
+        scoreProcessor?.RegisterEmptyPoor(Time.Current);
         healthProcessor?.RegisterEmptyPoor();
         requestJudgementDisplay(HitResult.Miss);
     }

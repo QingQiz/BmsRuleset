@@ -20,6 +20,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Result;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
@@ -33,6 +34,8 @@ using osu.Game.Rulesets.Filter;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.Scoring;
+using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset;
@@ -82,6 +85,7 @@ public partial class BmsRuleset : Ruleset
         BmsEditorPatcher.InstallOnce();
         BmsReplayPatcher.InstallOnce();
         BmsSongSelectLampPatcher.InstallOnce();
+        BmsRankingHitResultColourPatcher.InstallOnce();
         BmsWorkingBeatmapPatcher.InstallOnce();
     }
 
@@ -121,6 +125,14 @@ public partial class BmsRuleset : Ruleset
 
     public override HealthProcessor CreateHealthProcessor(double drainStartTime) =>
         new BmsHealthProcessor();
+
+    public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) =>
+    [
+        new("Gauge History", () => new BmsGaugeHistoryGraph(score, playableBeatmap), requiresHitEvents: true),
+        new("Timeline", () => new BmsTimelineStatistic(score, playableBeatmap), requiresHitEvents: true),
+        new("Hit Scatter", () => new BmsHitScatterStatistic(score.HitEvents), requiresHitEvents: true),
+        new("Hit Offset", () => new BmsHitOffsetStatistic(score.HitEvents, playableBeatmap), requiresHitEvents: true),
+    ];
 
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
     {
@@ -288,7 +300,6 @@ public partial class BmsRuleset : Ruleset
     private static RulesetBeatmapAttribute.AdditionalMetric[] createRankMetrics(double rate, int keyCount)
     {
         var layout = BmsLayout.VariantFromTotalColumns(keyCount);
-        var colours = new OsuColour();
         var metrics = new List<RulesetBeatmapAttribute.AdditionalMetric>();
 
         addHeadMetrics("Normal note", BmsJudgementProfileProvider.GetTable(layout, column: 1, judgementRate: rate, tail: false));
@@ -306,7 +317,7 @@ public partial class BmsRuleset : Ruleset
         void addHeadMetrics(string prefix, BmsJudgementWindowTable table)
         {
             addJudgementMetrics(prefix, table);
-            metrics.Add(new RulesetBeatmapAttribute.AdditionalMetric($"{prefix} E-POOR early zone", $"-{formatMilliseconds(table.EarlyWindowFor(HitResult.Miss))} to -{formatMilliseconds(table.EarlyWindowFor(HitResult.Ok))} ms", colours.ForHitResult(HitResult.Miss)));
+            metrics.Add(new RulesetBeatmapAttribute.AdditionalMetric($"{prefix} E-POOR early zone", $"-{formatMilliseconds(table.EarlyWindowFor(HitResult.Miss))} to -{formatMilliseconds(table.EarlyWindowFor(HitResult.Ok))} ms", BmsHitResultColours.ForHitResult(HitResult.Miss)));
         }
 
         void addTailMetrics(string prefix, BmsJudgementWindowTable table)
@@ -317,7 +328,7 @@ public partial class BmsRuleset : Ruleset
         void addJudgementMetrics(string prefix, BmsJudgementWindowTable table)
         {
             foreach (var result in new[] { HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok })
-                metrics.Add(new RulesetBeatmapAttribute.AdditionalMetric($"{prefix} {HIT_RESULT_LABELS[result]}", formatWindow(table, result), colours.ForHitResult(result)));
+                metrics.Add(new RulesetBeatmapAttribute.AdditionalMetric($"{prefix} {HIT_RESULT_LABELS[result]}", formatWindow(table, result), BmsHitResultColours.ForHitResult(result)));
         }
 
         static string formatWindow(BmsJudgementWindowTable table, HitResult result)
@@ -348,15 +359,14 @@ public partial class BmsRuleset : Ruleset
         var noteCount = Math.Max(1, beatmapInfo.TotalObjectCount);
         var calculator = new BmsGaugeCalculator(profile, difficulty.Total, noteCount);
         var referenceHealth = profile.InitialHealth;
-        var colours = new OsuColour();
 
         return
         [
-            new("PGREAT/GREAT", formatDelta(calculator.GetDeltaFor(HitResult.Perfect, referenceHealth)), colours.ForHitResult(HitResult.Perfect)),
-            new("GOOD", formatDelta(calculator.GetDeltaFor(HitResult.Good, referenceHealth)), colours.ForHitResult(HitResult.Good)),
-            new("BAD", formatDelta(calculator.GetDeltaFor(HitResult.Ok, referenceHealth)), colours.ForHitResult(HitResult.Ok)),
-            new("POOR", formatDelta(calculator.GetDeltaFor(HitResult.Meh, referenceHealth)), colours.ForHitResult(HitResult.Meh)),
-            new("E-POOR", formatDelta(calculator.GetDeltaFor(HitResult.Miss, referenceHealth)), colours.ForHitResult(HitResult.Miss)),
+            new("PGREAT/GREAT", formatDelta(calculator.GetDeltaFor(HitResult.Perfect, referenceHealth)), BmsHitResultColours.ForHitResult(HitResult.Perfect)),
+            new("GOOD", formatDelta(calculator.GetDeltaFor(HitResult.Good, referenceHealth)), BmsHitResultColours.ForHitResult(HitResult.Good)),
+            new("BAD", formatDelta(calculator.GetDeltaFor(HitResult.Ok, referenceHealth)), BmsHitResultColours.ForHitResult(HitResult.Ok)),
+            new("POOR", formatDelta(calculator.GetDeltaFor(HitResult.Meh, referenceHealth)), BmsHitResultColours.ForHitResult(HitResult.Meh)),
+            new("E-POOR", formatDelta(calculator.GetDeltaFor(HitResult.Miss, referenceHealth)), BmsHitResultColours.ForHitResult(HitResult.Miss)),
         ];
 
         static string formatDelta(double delta) => $"{delta * 100:+0.###;-0.###;0}%";

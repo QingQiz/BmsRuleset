@@ -1,0 +1,172 @@
+using System.Linq;
+using NUnit.Framework;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Result;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
+using osuTK;
+
+namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result;
+
+[TestFixture]
+public class BmsGaugeHistoryGraphTest
+{
+    [Test]
+    public void TestAutoGaugeCreatesParallelGaugeSeries()
+    {
+        var series = BmsGaugeHistoryGraph.CreateSeries(
+            new ScoreInfo
+            {
+                Mods = [new BmsModAutoGauge(), new BmsModHardGauge()],
+                HitEvents = [new HitEvent(0, 1, HitResult.Ok, new BmsNote { StartTime = 1000 }, null, null)],
+            },
+            createBeatmap());
+
+        Assert.That(series.Select(s => s.Name), Is.EqualTo([
+            "Hazard",
+            "ExHard",
+            "Hard",
+            "Normal",
+            "Easy",
+            "Assist Easy",
+        ]));
+
+        Assert.That(series.Single(s => s.Name == "Hazard").Points.Last().Health, Is.Zero);
+        Assert.That(series.Single(s => s.Name == "ExHard").Points.Last().Health, Is.GreaterThan(0));
+
+        var finalGauge = series.Single(s => s.Name == "Hard");
+
+        Assert.That(finalGauge.IsFinalUsedGauge, Is.True);
+        Assert.That(finalGauge.LineRadius, Is.GreaterThan(series.Where(s => !s.IsFinalUsedGauge).Max(s => s.LineRadius)));
+    }
+
+    [Test]
+    public void TestGaugeModCreatesSingleGaugeSeries()
+    {
+        var series = BmsGaugeHistoryGraph.CreateSeries(
+            new ScoreInfo
+            {
+                Mods = [new BmsModHardGauge()],
+                HitEvents = [new HitEvent(0, 1, HitResult.Great, new BmsNote { StartTime = 1000 }, null, null)],
+            },
+            createBeatmap());
+
+        Assert.That(series, Has.Count.EqualTo(1));
+        Assert.That(series.Single().Name, Is.EqualTo("Hard"));
+        Assert.That(series.Single().IsFinalUsedGauge, Is.True);
+        Assert.That(series.Single().Points.Last().Time, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestEmptyPoorFailureLocksExHardSeriesAtZero()
+    {
+        var processor = new BmsScoreProcessor();
+
+        for (var i = 0; i < 13; i++)
+            processor.RegisterEmptyPoor(1000 + i * 100);
+
+        var score = new ScoreInfo { Mods = [new BmsModExHardGauge()] };
+        processor.PopulateScore(score);
+        score.HitEvents.Add(new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 3000 }, null, null));
+
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap()).Single();
+
+        Assert.That(series.Name, Is.EqualTo("ExHard"));
+        Assert.That(series.Points.Last().Health, Is.Zero);
+    }
+
+    [Test]
+    public void TestSurvivalGaugeFailurePointIsRecordedAtZeroHealthEvent()
+    {
+        var series = BmsGaugeHistoryGraph.CreateSeries(
+            new ScoreInfo
+            {
+                Mods = [new BmsModExHardGauge()],
+                HitEvents =
+                [
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 1000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 2000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 3000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 4000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 5000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 6000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 7000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 8000 }, null, null),
+                ],
+            },
+            createBeatmap()).Single();
+
+        Assert.That(series.FailurePoint, Is.Not.Null);
+        Assert.That(series.FailurePoint!.Value.Time, Is.EqualTo(0.875f).Within(0.001));
+        Assert.That(series.FailurePoint.Value.Health, Is.Zero);
+    }
+
+    [Test]
+    public void TestGrooveGaugeFailurePointIsRecordedAtZeroHealthEvent()
+    {
+        var series = BmsGaugeHistoryGraph.CreateSeries(
+            new ScoreInfo
+            {
+                HitEvents =
+                [
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 1000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 2000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 3000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 4000 }, null, null),
+                    new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 5000 }, null, null),
+                ],
+            },
+            createBeatmap()).Single();
+
+        Assert.That(series.FailurePoint, Is.Not.Null);
+        Assert.That(series.FailurePoint!.Value.Time, Is.EqualTo(0.8f).Within(0.001));
+        Assert.That(series.FailurePoint.Value.Health, Is.Zero);
+    }
+
+    [Test]
+    public void TestGrooveGaugeFailurePointIsRecordedAtEndWhenBelowClearThreshold()
+    {
+        var series = BmsGaugeHistoryGraph.CreateSeries(
+            new ScoreInfo
+            {
+                HitEvents = [new HitEvent(0, 1, HitResult.Good, new BmsNote { StartTime = 1000 }, null, null)],
+            },
+            createBeatmap()).Single();
+
+        Assert.That(series.FailurePoint, Is.Not.Null);
+        Assert.That(series.FailurePoint!.Value.Time, Is.EqualTo(1));
+        Assert.That(series.FailurePoint.Value.Health, Is.LessThan(0.8f));
+        Assert.That(series.FailurePoint.Value.Health, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void TestEndFailureMarkerStaysOnRightAxis()
+    {
+        var graphSize = new Vector2(300, 180);
+        var points = new[]
+        {
+            new BmsGaugeHistoryGraph.GaugePoint(0, 0.2f),
+            new BmsGaugeHistoryGraph.GaugePoint(1, 0.4f),
+        };
+
+        var position = BmsGaugeHistoryGraph.CalculateFailureMarkerPosition(points, points[^1], 2, graphSize);
+
+        Assert.That(position.X, Is.LessThanOrEqualTo(graphSize.X));
+    }
+
+    private static BmsBeatmap createBeatmap() => new()
+    {
+        LayoutVariant = BmsLayoutVariant.Bme7K,
+        TotalColumns = 8,
+        Total = 200,
+        HitObjects =
+        {
+            new BmsNote { StartTime = 1000 },
+            new BmsNote { StartTime = 2000 },
+        },
+    };
+}

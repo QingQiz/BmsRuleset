@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -138,6 +139,18 @@ public class BmsScoreProcessorTest
 
         processor.RegisterEmptyPoor();
         Assert.That(processor.Combo.Value, Is.EqualTo(1), "E-POOR must not break combo");
+    }
+
+    [Test]
+    public void TestRegisterEmptyPoorRecordsHitEventAtPressTime()
+    {
+        var processor = new BmsScoreProcessor();
+
+        processor.RegisterEmptyPoor(1234);
+
+        Assert.That(processor.HitEvents, Has.Count.EqualTo(1));
+        Assert.That(processor.HitEvents.Single().Result, Is.EqualTo(HitResult.Miss));
+        Assert.That(processor.HitEvents.Single().HitObject.StartTime, Is.EqualTo(1234));
     }
 
     [Test]

@@ -20,6 +20,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     private static readonly Action<JudgementResult, double> set_raw_time = createRawTimeSetter();
     private static readonly Action<JudgementResult, double> set_gameplay_rate = createGameplayRateSetter();
+    private static readonly Action<BmsScoreProcessor, HitEvent> add_hit_event = createHitEventAdder();
 
     private double latestEndTime = double.MaxValue;
 
@@ -82,6 +83,12 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     public void RegisterEmptyPoor()
     {
         ScoreResultCounts[HitResult.Miss] = ScoreResultCounts.GetValueOrDefault(HitResult.Miss) + 1;
+    }
+
+    public void RegisterEmptyPoor(double eventTime)
+    {
+        RegisterEmptyPoor();
+        add_hit_event(this, new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = eventTime }, null, null));
     }
 
     /// <summary>
@@ -225,6 +232,21 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         }
 
         return (result, gameplayRate) => property.SetValue(result, gameplayRate);
+    }
+
+    private static Action<BmsScoreProcessor, HitEvent> createHitEventAdder()
+    {
+        var field = typeof(ScoreProcessor).GetField("hitEvents", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        if (field == null)
+        {
+            Logger.Log(
+                "BMS ScoreProcessor: Could not bind ScoreProcessor hitEvents. Empty POORs will be missing from result statistics.",
+                level: LogLevel.Error);
+            return (_, _) => { };
+        }
+
+        return (processor, hitEvent) => ((List<HitEvent>)field.GetValue(processor)!).Add(hitEvent);
     }
 
     private static void populateSyntheticResult(JudgementResult result, double eventTime, HitResult type)

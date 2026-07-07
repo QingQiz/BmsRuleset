@@ -5,6 +5,7 @@ using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
+using osu.Game.Graphics;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -15,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Result;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
@@ -22,7 +24,9 @@ using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
 using osu.Game.Tests.Beatmaps;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 
@@ -142,6 +146,12 @@ public class BmsRulesetTest
     }
 
     [Test]
+    public void TestInitialisationInstallsRankingHitResultColourPatch()
+    {
+        Assert.That(BmsRankingHitResultColourPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
     public void TestEditorDisablePatchPostsNotification()
     {
         var dependencies = new DependencyContainer();
@@ -158,6 +168,37 @@ public class BmsRulesetTest
     public void TestEmptyPoorDisplayNameIsEPoor()
     {
         Assert.That(ruleset.GetDisplayNameForHitResult(HitResult.Miss).ToString(), Is.EqualTo("E-POOR"));
+    }
+
+    [Test]
+    public void TestFrameworkHitResultColoursRemainOsuDefaults()
+    {
+        var colours = new OsuColour();
+
+        Assert.That(colours.ForHitResult(HitResult.Good), Is.EqualTo(colours.GreenLight));
+        Assert.That(colours.ForHitResult(HitResult.Ok), Is.EqualTo(colours.Green));
+        Assert.That(colours.ForHitResult(HitResult.Meh), Is.EqualTo(colours.Yellow));
+        Assert.That(colours.ForHitResult(HitResult.Miss), Is.EqualTo(colours.Red));
+    }
+
+    [Test]
+    public void TestBmsHitResultColoursUseBmsJudgementSemantics()
+    {
+        var colours = new OsuColour();
+
+        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Good), Is.EqualTo(colours.Green));
+        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Ok), Is.EqualTo(colours.Yellow));
+        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Meh), Is.EqualTo(colours.Red));
+        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Miss), Is.EqualTo(Color4.Gray));
+    }
+
+    [Test]
+    public void TestScoreResultColoursUseBmsSemanticsOnlyForBmsScores()
+    {
+        var colours = new OsuColour();
+
+        Assert.That(BmsHitResultColours.ForScore(new ScoreInfo { Ruleset = new RulesetInfo { ShortName = "bms" } }, HitResult.Meh), Is.EqualTo(colours.Red));
+        Assert.That(BmsHitResultColours.ForScore(new ScoreInfo { Ruleset = new RulesetInfo { ShortName = "mania" } }, HitResult.Meh), Is.EqualTo(colours.Yellow));
     }
 
     [Test]

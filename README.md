@@ -1007,6 +1007,10 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                  |
 | **Audio**     | `HT`, `DT` preview audio only changed the time gap between events now                    | 4        |
 | **Converter** | Mania 7K → BMS chart conversion                                                          | 3        |
+| **Gauge**     | Hard gauge HP reaches 0 at edge cases but score statistics report it as cleared          | 0        |
+| **Gauge**     | Normal gauge fail mark position is incorrect — too far to the right                      | 0        |
+| **Import**    | Duplicate MD5 charts within the same song set are allowed to be imported                 | 0        |
+| **Import**    | UTF-8 decoded filenames fail to find files — encoding mismatch (see `D:\BMS\LargePack\BMS\Amnehilesie`) | 0        |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |
 | **Input**     | Judgement offset adjustment capability                                                   |
 | **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |          |
@@ -1036,8 +1040,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Parser**    | Channel `31`–`49` — invisible notes                                                      |
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                |
 | **Renderer**  | POOR BGA duration hardcoded 500ms (beatoraja uses config-driven `misslayerDuration`)     | 3        |
-| **Scoring**   | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown               | 2        |
-| **Scoring**   | Different judgement text colours on results screen                                       | 4        |
 | **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                   | 3        |
 | **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT              | 4        |
 | **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                          | 4        |
@@ -1046,6 +1048,8 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                               |
 | **Skin**      | E-POOR judgement image                                                                   | 3        |
 | **UI**        | Lane cover / skin / movement                                                             | 2        |
+| **UI**        | First LN appearance in a chart causes the player UI to freeze                            | 0        |
+| **UI**        | Result screen ring-shaped ACC diagram with per-stage requirements does not match actual implementation | 0        |
 | **Perf**      | fps is not stable when a large amount of mine disposed                                   | 4        |
 
 ### FIXME

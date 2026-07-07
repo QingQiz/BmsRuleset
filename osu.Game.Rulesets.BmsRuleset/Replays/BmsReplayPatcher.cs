@@ -4,11 +4,14 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using HarmonyLib;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Database;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Ranking.Statistics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Replays;
 
@@ -37,6 +40,8 @@ public static class BmsReplayPatcher
             var importScorePostfixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(importScorePostfix));
             var getScoreTarget = AccessTools.Method(typeof(ScoreImporter), nameof(ScoreImporter.GetScore), [typeof(ScoreInfo)]);
             var getScorePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(getScorePrefix));
+            var statisticsPanelPopulateTarget = AccessTools.Method(typeof(StatisticsPanel), "populateStatistics", [typeof(ValueChangedEvent<ScoreInfo?>)]);
+            var statisticsPanelPopulatePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(statisticsPanelPopulatePrefix));
 
             playerScoreManagerProperty = AccessTools.Property(typeof(Player), "scoreManager");
             modelManagerRealmProperty = AccessTools.Property(typeof(ModelManager<ScoreInfo>), "Realm");
@@ -49,6 +54,8 @@ public static class BmsReplayPatcher
                 (name: "BmsReplayPatcher.importScorePostfix", member: importScorePostfixMethod),
                 (name: "ScoreImporter.GetScore", member: getScoreTarget),
                 (name: "BmsReplayPatcher.getScorePrefix", member: getScorePrefixMethod),
+                (name: "StatisticsPanel.populateStatistics", member: statisticsPanelPopulateTarget),
+                (name: "BmsReplayPatcher.statisticsPanelPopulatePrefix", member: statisticsPanelPopulatePrefixMethod),
                 (name: "Player.scoreManager", member: playerScoreManagerProperty),
                 (name: "ModelManager<ScoreInfo>.Realm", member: modelManagerRealmProperty),
                 (name: "RealmArchiveModelImporter<ScoreInfo>.Files", member: scoreImporterFilesField),
@@ -64,6 +71,7 @@ public static class BmsReplayPatcher
             var harmony = new Harmony(harmony_id);
             harmony.Patch(importScoreTarget, postfix: new HarmonyMethod(importScorePostfixMethod));
             harmony.Patch(getScoreTarget, prefix: new HarmonyMethod(getScorePrefixMethod));
+            harmony.Patch(statisticsPanelPopulateTarget, prefix: new HarmonyMethod(statisticsPanelPopulatePrefixMethod));
             IsInstalled = true;
         }
         catch (Exception e)
@@ -167,6 +175,36 @@ public static class BmsReplayPatcher
         }
 
         return false;
+    }
+
+    private static void statisticsPanelPopulatePrefix(StatisticsPanel __instance, ValueChangedEvent<ScoreInfo?> score)
+    {
+        var scoreInfo = score.NewValue;
+
+        if (scoreInfo == null || scoreInfo.HitEvents.Count > 0 || !isBmsScore(scoreInfo))
+            return;
+
+        // CompositeDrawable.Dependencies is populated during InjectDependencies, which the framework
+        // runs before the BackgroundDependencyLoader that first fires this callback. We read it here
+        // directly rather than capturing it via a separate InjectDependencies patch — Harmony patches
+        // on the base Drawable.InjectDependencies don't reliably fire for CompositeDrawable's sealed
+        // override, since the override's `base.InjectDependencies()` call is JIT-inlined early.
+        var dependencies = __instance.Dependencies;
+
+        if (dependencies == null || !dependencies.TryGet<ScoreManager>(out var scoreManager))
+            return;
+
+        try
+        {
+            var scoreWithReplay = scoreManager.GetScore(scoreInfo);
+
+            if (scoreWithReplay?.ScoreInfo.HitEvents.Count > 0)
+                scoreInfo.HitEvents = scoreWithReplay.ScoreInfo.HitEvents;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "BMS replay patch failed to restore hit events for the statistics panel.");
+        }
     }
     // ReSharper restore InconsistentNaming
 

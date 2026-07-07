@@ -1,0 +1,373 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
+using osu.Game.Beatmaps;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
+using osuTK;
+using osuTK.Graphics;
+
+namespace osu.Game.Rulesets.BmsRuleset.Result;
+
+public sealed partial class BmsTimelineStatistic : CompositeDrawable
+{
+    private const int bucket_count = 200;
+    private const float subplot_height = 96;
+    private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
+
+    private static readonly OsuColour colours = new();
+
+    private static readonly Color4 note_colour = colours.Blue;
+    private static readonly Color4 ln_colour = colours.GreenLight;
+    private static readonly Color4 scratch_colour = colours.Yellow;
+    private static readonly Color4 mine_colour = colours.Red;
+    private static readonly Color4 fast_colour = new(90, 175, 255, 255);
+    private static readonly Color4 late_colour = new(255, 130, 92, 255);
+    private static readonly Color4 failed_colour = new(70, 70, 70, 255);
+
+    private readonly TimelineData data;
+
+    public BmsTimelineStatistic(ScoreInfo score, IBeatmap playableBeatmap)
+    {
+        RelativeSizeAxes = Axes.X;
+        AutoSizeAxes = Axes.Y;
+
+        data = CreateData(score, playableBeatmap);
+    }
+
+    [BackgroundDependencyLoader]
+    private void load()
+    {
+        InternalChild = new FillFlowContainer
+        {
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y,
+            Direction = FillDirection.Vertical,
+            Spacing = new Vector2(0, 8),
+            Children =
+            [
+                createSubplot("Notes", data.Notes, null),
+                createSubplot("Judgement", data.Judgements, data.FailureFraction),
+                createSubplot("Fast/Late", data.FastLate, data.FailureFraction),
+            ],
+        };
+    }
+
+    internal static TimelineData CreateData(ScoreInfo score, IBeatmap playableBeatmap)
+    {
+        var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
+
+        var beatmapMax = playableBeatmap.HitObjects.Count == 0 ? 0 : playableBeatmap.HitObjects.Max(h => h.StartTime);
+        var hitEvents = score.HitEvents.ToArray();
+        var hitEventsMax = hitEvents.Length == 0 ? 0 : hitEvents.Max(e => e.HitObject.StartTime);
+        var duration = Math.Max(1, Math.Max(beatmapMax, hitEventsMax));
+
+        var notes = createNotesSubplot(playableBeatmap, variant, duration);
+        var judgements = createJudgementSubplot(hitEvents, duration);
+        var fastLate = createFastLateSubplot(hitEvents, duration);
+        var failure = score.Passed ? null : findFailureFraction(score, playableBeatmap, duration);
+
+        return new TimelineData(notes, judgements, fastLate, failure);
+    }
+
+    private static SubplotData createNotesSubplot(IBeatmap playableBeatmap, BmsLayoutVariant variant, double duration)
+    {
+        var note = new int[bucket_count];
+        var ln = new int[bucket_count];
+        var scratch = new int[bucket_count];
+        var mine = new int[bucket_count];
+
+        foreach (var h in playableBeatmap.HitObjects.OfType<BmsHitObject>())
+        {
+            var b = bucketFor(h.StartTime, duration);
+
+            switch (classifyNote(h, variant))
+            {
+                case NoteKind.Note: note[b]++; break;
+
+                case NoteKind.LongNote: ln[b]++; break;
+
+                case NoteKind.Scratch: scratch[b]++; break;
+
+                case NoteKind.Mine: mine[b]++; break;
+            }
+        }
+
+        return new SubplotData([
+            new CategoryData("note", note_colour, note),
+            new CategoryData("ln", ln_colour, ln),
+            new CategoryData("Scratch", scratch_colour, scratch),
+            new CategoryData("mine", mine_colour, mine),
+        ]);
+    }
+
+    private static SubplotData createJudgementSubplot(IReadOnlyList<HitEvent> hitEvents, double duration)
+    {
+        var perfect = new int[bucket_count];
+        var great = new int[bucket_count];
+        var good = new int[bucket_count];
+        var ok = new int[bucket_count];
+        var meh = new int[bucket_count];
+
+        foreach (var e in hitEvents.Where(isBmsHit))
+        {
+            var b = bucketFor(e.HitObject.StartTime, duration);
+
+            switch (e.Result)
+            {
+                case HitResult.Perfect: perfect[b]++; break;
+
+                case HitResult.Great: great[b]++; break;
+
+                case HitResult.Good: good[b]++; break;
+
+                case HitResult.Ok: ok[b]++; break;
+
+                case HitResult.Meh: meh[b]++; break;
+                // Miss (E-Poor) excluded — IsHit() filters it out.
+            }
+        }
+
+        return new SubplotData([
+            new CategoryData("Poor", BmsHitResultColours.ForHitResult(HitResult.Meh), meh),
+            new CategoryData("Bad", BmsHitResultColours.ForHitResult(HitResult.Ok), ok),
+            new CategoryData("Good", BmsHitResultColours.ForHitResult(HitResult.Good), good),
+            new CategoryData("Great", BmsHitResultColours.ForHitResult(HitResult.Great), great),
+            new CategoryData("Perfect", BmsHitResultColours.ForHitResult(HitResult.Perfect), perfect),
+        ]);
+    }
+
+    private static SubplotData createFastLateSubplot(IReadOnlyList<HitEvent> hitEvents, double duration)
+    {
+        var fast = new int[bucket_count];
+        var late = new int[bucket_count];
+
+        foreach (var e in hitEvents.Where(isBmsHit))
+        {
+            var b = bucketFor(e.HitObject.StartTime, duration);
+
+            if (e.TimeOffset < 0) fast[b]++;
+            else if (e.TimeOffset > 0) late[b]++;
+        }
+
+        return new SubplotData([
+            new CategoryData("fast", fast_colour, fast),
+            new CategoryData("late", late_colour, late),
+        ]);
+    }
+
+    // Returns the time fraction at which the player's gauge first hit 0 (game over), or null if it never did.
+    private static double? findFailureFraction(ScoreInfo score, IBeatmap playableBeatmap, double duration)
+    {
+        var ordered = score.HitEvents.OrderBy(e => e.HitObject.StartTime).ToArray();
+        if (ordered.Length == 0) return null;
+
+        var gaugeType = score.Mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
+        var profile = BmsGaugeProfileFactory.Create(gaugeType);
+        var noteCount = Math.Max(1, playableBeatmap.HitObjects.Count(h => h is not BmsLandmine));
+        var total = playableBeatmap is BmsBeatmap bms ? bms.Total : 0;
+        var calculator = new BmsGaugeCalculator(profile, total, noteCount);
+
+        var health = profile.InitialHealth;
+
+        foreach (var e in ordered)
+        {
+            health = applyGaugeDelta(e, calculator, health);
+
+            if (health <= 0)
+                return Math.Clamp(e.HitObject.StartTime / duration, 0, 1);
+        }
+
+        return null;
+    }
+
+    private static double applyGaugeDelta(HitEvent e, BmsGaugeCalculator calculator, double health)
+    {
+        if (e.HitObject is BmsLandmine mine)
+        {
+            if (e.Result != HitResult.Meh) return health;
+
+            return mine.LandmineDamagePercent >= max_landmine_damage_percent ? 0 : Math.Max(0, health - mine.LandmineDamagePercent / 100);
+        }
+
+        return calculator.ApplyDelta(health, calculator.GetDeltaFor(e.Result, health));
+    }
+
+    private static bool isBmsHit(HitEvent e) => e.HitObject is BmsHitObject and not BmsLandmine && e.Result.IsBasic() && e.Result.IsHit();
+
+    private static int bucketFor(double time, double duration) => Math.Clamp((int)Math.Floor(time / duration * bucket_count), 0, bucket_count - 1);
+
+    // mine takes priority, then the scratch lane, then long-note vs short note.
+    private static NoteKind classifyNote(BmsHitObject h, BmsLayoutVariant variant)
+    {
+        if (h is BmsLandmine) return NoteKind.Mine;
+        if (BmsLayout.IsScratchColumn(h.Column, variant)) return NoteKind.Scratch;
+        if (h is BmsLongNote) return NoteKind.LongNote;
+
+        return NoteKind.Note;
+    }
+
+    private static Drawable createSubplot(string title, SubplotData subplot, double? failureFraction) => new FillFlowContainer
+    {
+        RelativeSizeAxes = Axes.X,
+        AutoSizeAxes = Axes.Y,
+        Direction = FillDirection.Vertical,
+        Spacing = new Vector2(0, 2),
+        Children =
+        [
+            createLegend(title, subplot),
+            createPlot(subplot, failureFraction),
+        ],
+    };
+
+    private static Drawable createLegend(string title, SubplotData subplot)
+    {
+        var items = new List<Drawable>
+        {
+            new OsuSpriteText
+            {
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                Text = title,
+                Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+            },
+        };
+
+        foreach (var c in subplot.Categories)
+        {
+            items.Add(new FillFlowContainer
+            {
+                AutoSizeAxes = Axes.Both,
+                Direction = FillDirection.Horizontal,
+                Spacing = new Vector2(4, 0),
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                Children =
+                [
+                    new Circle
+                    {
+                        Size = new Vector2(8),
+                        Colour = c.Colour,
+                        Anchor = Anchor.CentreLeft,
+                        Origin = Anchor.CentreLeft,
+                    },
+                    new OsuSpriteText
+                    {
+                        Text = c.Label,
+                        Anchor = Anchor.CentreLeft,
+                        Origin = Anchor.CentreLeft,
+                        Font = OsuFont.GetFont(size: 11),
+                    },
+                ],
+            });
+        }
+
+        return new FillFlowContainer
+        {
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y,
+            Direction = FillDirection.Horizontal,
+            Spacing = new Vector2(10, 0),
+            Children = items,
+        };
+    }
+
+    private static Drawable createPlot(SubplotData subplot, double? failureFraction)
+    {
+        var maxTotal = Math.Max(1, Enumerable.Range(0, bucket_count)
+            .Select(b => subplot.Categories.Sum(c => c.Buckets[b]))
+            .DefaultIfEmpty(0)
+            .Max());
+
+        var children = new List<Drawable>
+        {
+            new Box { RelativeSizeAxes = Axes.Both, Colour = Color4.Black, Alpha = 0.18f },
+            new GridContainer
+            {
+                RelativeSizeAxes = Axes.Both,
+                ColumnDimensions = Enumerable.Range(0, bucket_count).Select(_ => new Dimension()).ToArray(),
+                Content = new[] { Enumerable.Range(0, bucket_count).Select(b => createBar(subplot, b, maxTotal)).ToArray() },
+            },
+        };
+
+        if (failureFraction is { } frac && frac < 1)
+        {
+            children.Add(new Box
+            {
+                RelativeSizeAxes = Axes.Both,
+                Anchor = Anchor.TopRight,
+                Origin = Anchor.TopRight,
+                Width = (float)(1 - frac),
+                Height = 1,
+                Colour = failed_colour,
+                Alpha = 0.6f,
+            });
+        }
+
+        return new Container
+        {
+            RelativeSizeAxes = Axes.X,
+            Height = subplot_height,
+            Children = children,
+        };
+    }
+
+    private static Drawable createBar(SubplotData subplot, int bucket, int maxTotal)
+    {
+        var bar = new Container { RelativeSizeAxes = Axes.Both };
+        var total = subplot.Categories.Sum(c => c.Buckets[bucket]);
+
+        if (total == 0) return bar;
+
+        float cumulative = 0;
+
+        // Categories are ordered bottom-to-top; first iterated sits at the bottom.
+        foreach (var cat in subplot.Categories)
+        {
+            var count = cat.Buckets[bucket];
+            if (count == 0) continue;
+
+            var height = (float)count / maxTotal;
+            bar.Add(new Box
+            {
+                RelativeSizeAxes = Axes.Both,
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
+                RelativePositionAxes = Axes.Y,
+                Y = -cumulative,
+                Height = height,
+                Colour = cat.Colour,
+                Alpha = 0.86f,
+            });
+            cumulative += height;
+        }
+
+        return bar;
+    }
+
+    private enum NoteKind
+    {
+        Note,
+        LongNote,
+        Scratch,
+        Mine
+    }
+
+    internal sealed record TimelineData(SubplotData Notes, SubplotData Judgements, SubplotData FastLate, double? FailureFraction);
+
+    internal sealed record SubplotData(IReadOnlyList<CategoryData> Categories);
+
+    internal sealed record CategoryData(string Label, Color4 Colour, int[] Buckets);
+}
