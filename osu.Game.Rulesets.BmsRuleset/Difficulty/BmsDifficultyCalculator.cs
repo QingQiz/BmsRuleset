@@ -5,6 +5,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty.Skills;
@@ -19,12 +20,13 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
     protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate)
     {
         var bmsBeatmap = beatmap as BmsBeatmap;
+        var storedDifficulty = bmsBeatmap == null ? BmsDifficultyInfo.FromOsuDifficulty(beatmap.Difficulty) : default;
 
         // When called from CalculateTimed, beatmap is a ProgressiveCalculationBeatmap wrapper
         // (not a BmsBeatmap), so the cast above returns null. In that case, derive TotalColumns
-        // from the difficulty metadata (CircleSize was set to TotalColumns by the converter).
-        var totalColumns = bmsBeatmap?.TotalColumns ?? BmsDifficultyInfo.GetKeyCount(beatmap.Difficulty);
-        var rank = bmsBeatmap?.Rank ?? 2;
+        // and judgement difficulty from the difficulty metadata written by the converter.
+        var totalColumns = bmsBeatmap?.TotalColumns ?? storedDifficulty.KeyCount;
+        var rank = bmsBeatmap?.Rank ?? storedDifficulty.Rank;
 
         var noteTimings = beatmap.HitObjects
             .OfType<BmsHitObject>()
@@ -42,7 +44,12 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 
             if (noteTimings.Count > 0)
             {
-                var result = StarRatingProcessor.Compute(noteTimings, totalColumns, rank, clockRate);
+                var layout = bmsBeatmap?.LayoutVariant ?? BmsLayout.VariantFromTotalColumns(totalColumns);
+                var exRank = bmsBeatmap != null ? bmsBeatmap.ExRank : storedDifficulty.ExRank;
+                var judgementRate = exRank is { } exRankValue
+                    ? BmsJudgementProfileProvider.RateForExRank(layout, exRankValue)
+                    : BmsJudgementProfileProvider.RateForRank(layout, rank);
+                var result = StarRatingProcessor.Compute(noteTimings, totalColumns, rank, clockRate, layout, judgementRate);
                 sr = result.StarRating;
             }
         }

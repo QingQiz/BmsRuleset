@@ -5,8 +5,16 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NUnit.Framework;
+using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
+using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+using osu.Game.Rulesets.Difficulty.Skills;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Tests.Beatmaps;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Difficulty;
 
@@ -20,6 +28,22 @@ public class BmsStarRatingProcessorTest
 
         Assert.That(property, Is.Not.Null);
         Assert.That(property!.PropertyType, Is.EqualTo(typeof(BmsStarRatingProcessorV3)));
+    }
+
+    [Test]
+    public void TestDifficultyCalculatorWrapperPathUsesEncodedExRank()
+    {
+        var beatmap = new Beatmap();
+        new BmsDifficultyInfo { Rank = 0, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmap);
+        beatmap.HitObjects.AddRange(createSimpleHitObjects());
+
+        var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
+        var method = typeof(BmsDifficultyCalculator).GetMethod("CreateDifficultyAttributes", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        Assert.That(method, Is.Not.Null);
+        method!.Invoke(calculator, [beatmap, Array.Empty<Mod>(), Array.Empty<Skill>(), 1.0]);
+
+        Assert.That(calculator.StarRatingProcessor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(90)).Within(1e-12));
     }
 
     [Test]
@@ -84,6 +108,34 @@ public class BmsStarRatingProcessorTest
         Assert.That(actual, Is.EqualTo(reference).Within(1e-10));
     }
 
+    [TestCase(BmsLayoutVariant.Bme7K, 2, 45)]
+    [TestCase(BmsLayoutVariant.Bms5K, 2, 37.5)]
+    [TestCase(BmsLayoutVariant.Pms9K, 2, 35)]
+    public void TestStarRatingProcessorV3HitLeniencyUsesBmsGreatWindow(BmsLayoutVariant layout, int rank, double greatWindow)
+    {
+        var totalColumns = BmsLayout.GetTotalColumns(layout);
+        var noteTimings = createSimpleNoteTimings(totalColumns);
+        var processor = new BmsStarRatingProcessorV3();
+
+        processor.Compute(noteTimings, totalColumns, rank, 1.0, layout);
+
+        Assert.That(processor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(greatWindow)).Within(1e-12));
+    }
+
+    [Test]
+    public void TestStarRatingProcessorV3HitLeniencyUsesExplicitJudgementRate()
+    {
+        var layout = BmsLayoutVariant.Bme7K;
+        var totalColumns = BmsLayout.GetTotalColumns(layout);
+        var noteTimings = createSimpleNoteTimings(totalColumns);
+        var processor = new BmsStarRatingProcessorV3();
+        var judgementRate = BmsJudgementProfileProvider.RateForExRank(layout, 200);
+
+        processor.Compute(noteTimings, totalColumns, 2, 1.0, layout, judgementRate);
+
+        Assert.That(processor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(90)).Within(1e-12));
+    }
+
     [Test]
     public void TestStarRatingProcessorV3ReusesScratchAcrossDifferentChartSizes()
     {
@@ -115,7 +167,8 @@ public class BmsStarRatingProcessorTest
         var lnSeqField = processorType.GetField("lnSeq", BindingFlags.NonPublic | BindingFlags.Instance);
         var tailSeqField = processorType.GetField("tailSeq", BindingFlags.NonPublic | BindingFlags.Instance);
         var totalColumnsProperty = processorType.GetProperty("TotalColumns", BindingFlags.Public | BindingFlags.Instance);
-        var preprocessMethod = processorType.GetMethod("preprocessFile", BindingFlags.NonPublic | BindingFlags.Instance);
+        var preprocessMethod = processorType.GetMethod("preprocessFile", BindingFlags.NonPublic | BindingFlags.Instance, null,
+            [typeof(IReadOnlyList<BmsNoteTiming>), typeof(int), typeof(double), typeof(BmsLayoutVariant), typeof(double?)], null);
         var clearMethod = processorType.GetMethod("clearWorkingState", BindingFlags.NonPublic | BindingFlags.Instance);
 
         Assert.Multiple(() =>
@@ -151,7 +204,7 @@ public class BmsStarRatingProcessorTest
         try
         {
             totalColumnsProperty!.SetValue(processor, 2);
-            preprocessMethod!.Invoke(processor, [noteTimings, 2, 1.0]);
+            preprocessMethod!.Invoke(processor, [noteTimings, 2, 1.0, BmsLayoutVariant.Bme7K, null]);
 
             var noteSeq = (Array)noteSeqField!.GetValue(processor)!;
             var noteSeqByColumn = (Array)noteSeqByColumnField!.GetValue(processor)!;
@@ -186,7 +239,8 @@ public class BmsStarRatingProcessorTest
         var lnSeqField = processorType.GetField("lnSeq", BindingFlags.NonPublic | BindingFlags.Instance);
         var tailSeqField = processorType.GetField("tailSeq", BindingFlags.NonPublic | BindingFlags.Instance);
         var totalColumnsProperty = processorType.GetProperty("TotalColumns", BindingFlags.Public | BindingFlags.Instance);
-        var preprocessMethod = processorType.GetMethod("preprocessFile", BindingFlags.NonPublic | BindingFlags.Instance);
+        var preprocessMethod = processorType.GetMethod("preprocessFile", BindingFlags.NonPublic | BindingFlags.Instance, null,
+            [typeof(IReadOnlyList<BmsNoteTiming>), typeof(int), typeof(double), typeof(BmsLayoutVariant), typeof(double?)], null);
         var clearMethod = processorType.GetMethod("clearWorkingState", BindingFlags.NonPublic | BindingFlags.Instance);
 
         Assert.Multiple(() =>
@@ -210,7 +264,7 @@ public class BmsStarRatingProcessorTest
         try
         {
             totalColumnsProperty!.SetValue(processor, 2);
-            preprocessMethod!.Invoke(processor, [noteTimings, 2, 1.0]);
+            preprocessMethod!.Invoke(processor, [noteTimings, 2, 1.0, BmsLayoutVariant.Bme7K, null]);
 
             var lnSeq = (Array)lnSeqField!.GetValue(processor)!;
             var tailSeq = (Array)tailSeqField!.GetValue(processor)!;
@@ -449,6 +503,20 @@ public class BmsStarRatingProcessorTest
         ];
     }
 
+    private static List<BmsNoteTiming> createSimpleNoteTimings(int totalColumns) =>
+    [
+        new BmsNoteTiming(0, 0, 0),
+        new BmsNoteTiming(Math.Min(1, totalColumns - 1), 180, 180),
+        new BmsNoteTiming(Math.Min(2, totalColumns - 1), 360, 720),
+    ];
+
+    private static IEnumerable<BmsHitObject> createSimpleHitObjects() =>
+    [
+        new BmsNote { Column = 0, StartTime = 0 },
+        new BmsNote { Column = 1, StartTime = 180 },
+        new BmsLongNote { Column = 2, StartTime = 360, Duration = 360 },
+    ];
+
     private static SrBenchmarkInput loadBenchmarkInput(string fileName)
     {
         var path = Path.GetFullPath(Path.Combine(
@@ -487,6 +555,12 @@ public class BmsStarRatingProcessorTest
 
         var r = result - 0.22;
         return 1 + Math.Min(result - 0.18, 5 * r * r * r);
+    }
+
+    private static double computeExpectedHitLeniency(double greatWindowMs)
+    {
+        var x = 0.3 * Math.Sqrt(greatWindowMs / 500.0);
+        return Math.Min(x, 0.6 * (x - 0.09) + 0.09);
     }
 
     private static List<BmsNoteTiming> toNoteTimings(SrBenchmarkInput input)

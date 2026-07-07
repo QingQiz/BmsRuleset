@@ -16,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.ImportExport;
@@ -273,8 +274,13 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             if (summary.StarRatingNoteTimings.Count == 0)
                 return 0;
 
+            var layout = BmsLayout.VariantFromTotalColumns(summary.Metadata.KeyCount);
+            var judgementRate = summary.Metadata.ExRank is { } exRank
+                ? BmsJudgementProfileProvider.RateForExRank(layout, exRank)
+                : BmsJudgementProfileProvider.RateForRank(layout, summary.Metadata.Rank);
+
             return new BmsStarRatingProcessorV3()
-                .Compute(summary.StarRatingNoteTimings, summary.Metadata.KeyCount, summary.Metadata.Rank)
+                .Compute(summary.StarRatingNoteTimings, summary.Metadata.KeyCount, summary.Metadata.Rank, layout: layout, judgementRate: judgementRate)
                 .StarRating;
         }
         catch (Exception e)

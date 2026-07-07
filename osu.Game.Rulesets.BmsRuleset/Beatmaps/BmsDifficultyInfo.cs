@@ -61,11 +61,10 @@ public readonly struct BmsDifficultyInfo
     };
 
     /// <summary>
-    /// OverallDifficulty carries the judgement difficulty. The integer #RANK (0-4) maps
-    /// to OD 5-10. When #DEFEXRANK/#EXRANK overrides RANK, the percentage is stored as
+    /// OverallDifficulty carries the judgement difficulty. The integer #RANK is stored
+    /// directly as OD 0-4. When #DEFEXRANK/#EXRANK overrides RANK, the percentage is stored as
     /// <see cref="exrank_od_sentinel"/> + pct, so the two encodings never collide
-    /// (EXRANK OD ≥ 100, RANK OD ≤ 10). The sentinel keeps RANK — the common case — on
-    /// its original OD values for backward compatibility.
+    /// (EXRANK OD ≥ 100, RANK OD ≤ 4).
     /// </summary>
     private const double exrank_od_sentinel = 100;
 

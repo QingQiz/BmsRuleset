@@ -260,7 +260,7 @@ public class BmsRulesetTest
     [Test]
     public void TestExRankRoundTripsThroughOverallDifficulty()
     {
-        // EXRANK encodes into OD as sentinel + pct (>= 100), kept distinct from RANK OD (5-10).
+        // EXRANK encodes into OD as sentinel + pct (>= 100), kept distinct from RANK OD (0-4).
         var beatmapInfo = new BeatmapInfo();
         new BmsDifficultyInfo { Rank = 2, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
 
@@ -277,7 +277,7 @@ public class BmsRulesetTest
         var beatmapInfo = new BeatmapInfo();
         new BmsDifficultyInfo { Rank = 0, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
 
-        Assert.That(beatmapInfo.Difficulty.OverallDifficulty, Is.EqualTo(10f));
+        Assert.That(beatmapInfo.Difficulty.OverallDifficulty, Is.EqualTo(0f));
         var decoded = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
         Assert.That(decoded.Rank, Is.EqualTo(0));
         Assert.That(decoded.ExRank, Is.Null);

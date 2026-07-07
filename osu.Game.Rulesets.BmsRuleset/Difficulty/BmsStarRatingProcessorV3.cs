@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
 
@@ -209,20 +210,20 @@ public class BmsStarRatingProcessorV3
         }
     }
 
-    public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0)
-        => compute(noteTimings, totalColumns, rank, clockRate);
+    public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null)
+        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate);
 
-    public double ComputeStarRating(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0)
-        => compute(noteTimings, totalColumns, rank, clockRate).StarRating;
+    public double ComputeStarRating(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null)
+        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate).StarRating;
 
-    private BmsStarRatingResult compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate)
+    private BmsStarRatingResult compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate)
     {
         // === Basic Setup and Parsing ===
         if (totalColumns > 64)
             throw new ArgumentOutOfRangeException(nameof(totalColumns), totalColumns, "Bitmask active-column tracking supports at most 64 columns.");
 
         TotalColumns = totalColumns;
-        preprocessFile(noteTimings, rank, clockRate);
+        preprocessFile(noteTimings, rank, clockRate, layout, judgementRate);
         getCorners();
 
         var baseCount = baseCorners.Length;
@@ -602,14 +603,9 @@ public class BmsStarRatingProcessorV3
         public int Compare((double time, double change) x, (double time, double change) y) => x.time.CompareTo(y.time);
     }
 
-    private void preprocessFile(IReadOnlyList<BmsNoteTiming> noteTimings, int rank, double clockRate)
+    private void preprocessFile(IReadOnlyList<BmsNoteTiming> noteTimings, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate)
     {
-        var od = BmsDifficultyInfo.RankToOd(rank);
-
-        // Hit leniency x
-        var x = 0.3 * Math.Sqrt((64.5 - Math.Ceiling(od * 3.0)) / 500.0);
-        x = Math.Min(x, 0.6 * (x - 0.09) + 0.09);
-        HitLeniencyX = x;
+        HitLeniencyX = judgementRate.HasValue ? BmsHitLeniency.FromJudgementRate(judgementRate.Value, layout) : BmsHitLeniency.FromRank(rank, layout);
 
         var sortedNotes = new List<(int column, double head, double tail, int order)>(noteTimings.Count);
         for (var i = 0; i < noteTimings.Count; i++)

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
 
@@ -32,11 +32,11 @@ public class BmsStarRatingProcessor
     private double[][] deltaKs = [];
     private double[] anchor = [];
 
-    public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0)
+    public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null)
     {
         // === Basic Setup and Parsing ===
         TotalColumns = totalColumns;
-        preprocessFile(noteTimings, rank, clockRate);
+        preprocessFile(noteTimings, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate);
         getCorners();
 
         // For each column, store a boolean of its usage (whether non-empty within 150 ms) over time. Example: key_usage[k][idx].
@@ -314,14 +314,9 @@ public class BmsStarRatingProcessor
         return lo;
     }
 
-    private void preprocessFile(IReadOnlyList<BmsNoteTiming> noteTimings, int rank, double clockRate)
+    private void preprocessFile(IReadOnlyList<BmsNoteTiming> noteTimings, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate)
     {
-        var od = BmsDifficultyInfo.RankToOd(rank);
-
-        // Hit leniency x
-        var x = 0.3 * Math.Pow((64.5 - Math.Ceiling(od * 3.0)) / 500.0, 0.5);
-        x = Math.Min(x, 0.6 * (x - 0.09) + 0.09);
-        HitLeniencyX = x;
+        HitLeniencyX = judgementRate.HasValue ? BmsHitLeniency.FromJudgementRate(judgementRate.Value, layout) : BmsHitLeniency.FromRank(rank, layout);
 
         // Build note_seq as a list of tuples (column, head_time, tail_time)
         noteSeq = [];

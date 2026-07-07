@@ -22,7 +22,9 @@ public class BmsHitObject : HitObject
     public double JudgementRate { get; set; } = double.NaN;
 
     public double EffectiveJudgementRate => double.IsNaN(JudgementRate)
-        ? BmsJudgementProfileProvider.RateForRank(Beatmap.LayoutVariant, Beatmap.Rank)
+        ? Beatmap.ExRank is { } exRank
+            ? BmsJudgementProfileProvider.RateForExRank(Beatmap.LayoutVariant, exRank)
+            : BmsJudgementProfileProvider.RateForRank(Beatmap.LayoutVariant, Beatmap.Rank)
         : JudgementRate;
 
     /// <summary>
