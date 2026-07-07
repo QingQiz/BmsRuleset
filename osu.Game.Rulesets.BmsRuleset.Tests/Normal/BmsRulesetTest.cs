@@ -257,6 +257,51 @@ public class BmsRulesetTest
         Assert.That(metrics["Scratch LN tail GOOD"], Is.EqualTo("-210 to +210 ms"));
     }
 
+    [Test]
+    public void TestExRankRoundTripsThroughOverallDifficulty()
+    {
+        // EXRANK encodes into OD as sentinel + pct (>= 100), kept distinct from RANK OD (5-10).
+        var beatmapInfo = new BeatmapInfo();
+        new BmsDifficultyInfo { Rank = 2, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+
+        Assert.That(beatmapInfo.Difficulty.OverallDifficulty, Is.EqualTo(300f).Within(0.001));
+
+        var decoded = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
+        Assert.That(decoded.ExRank, Is.EqualTo(200).Within(0.001));
+        Assert.That(decoded.Rank, Is.EqualTo(2)); // normalised to NORMAL while EXRANK is the source of truth
+    }
+
+    [Test]
+    public void TestRankRoundTripsUnchangedThroughOverallDifficulty()
+    {
+        var beatmapInfo = new BeatmapInfo();
+        new BmsDifficultyInfo { Rank = 0, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+
+        Assert.That(beatmapInfo.Difficulty.OverallDifficulty, Is.EqualTo(10f));
+        var decoded = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
+        Assert.That(decoded.Rank, Is.EqualTo(0));
+        Assert.That(decoded.ExRank, Is.Null);
+    }
+
+    [Test]
+    public void TestExRankDisplayAttributeShowsPercentageHeadlineAndScaledWindows()
+    {
+        var beatmapInfo = new BeatmapInfo();
+        new BmsDifficultyInfo { Rank = 2, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+
+        var attributes = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>());
+        var exRankAttr = attributes.SingleOrDefault(a => a.Acronym == "EX");
+
+        Assert.That(exRankAttr, Is.Not.Null, "EXRANK attribute should be shown when ExRank is set");
+        Assert.That(attributes.SingleOrDefault(a => a.Acronym == "RK"), Is.Null, "RANK attribute should be hidden in EXRANK mode");
+        Assert.That(exRankAttr.AdjustedValue, Is.EqualTo(200f));
+        Assert.That(exRankAttr.MaxValue, Is.EqualTo(200f));
+
+        // EXRANK 200 -> rate 1.5 -> 7K head PGREAT 20 * 1.5 = +/-30ms.
+        var metrics = exRankAttr.AdditionalMetrics.ToDictionary(m => m.Name.ToString(), m => m.Value.ToString());
+        Assert.That(metrics["Normal note PGREAT"], Is.EqualTo("-30 to +30 ms"));
+    }
+
     private class TestNotificationOverlay : INotificationOverlay
     {
         public List<Notification> PostedNotifications { get; } = new();

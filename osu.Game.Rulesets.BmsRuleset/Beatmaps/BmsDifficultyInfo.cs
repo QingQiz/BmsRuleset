@@ -21,6 +21,13 @@ public readonly struct BmsDifficultyInfo
     /// <summary>#RANK — gauge difficulty: 0=VeryHard, 1=Hard, 2=Normal, 3=Easy, 4=VeryEasy.</summary>
     public int Rank { get; init; }
 
+    /// <summary>
+    /// #DEFEXRANK / #EXRANK — judgement difficulty as a percentage (100 = RANK 2 / NORMAL),
+    /// or null when the chart only specifies <see cref="Rank"/>. When set, it overrides
+    /// <see cref="Rank"/> for judgement-window scaling.
+    /// </summary>
+    public double? ExRank { get; init; }
+
     /// <summary>#TOTAL — gauge recovery coefficient. Zero means default formula.</summary>
     public double Total { get; init; }
 
@@ -36,6 +43,7 @@ public readonly struct BmsDifficultyInfo
     {
         PlayLevel = result.PlayLevel,
         Rank = result.Rank,
+        ExRank = result.DefaultExRank,
         Total = result.Total,
         KeyCount = result.TotalColumns,
         LockedLongNoteMode = result.LockedLongNoteMode,
@@ -46,35 +54,34 @@ public readonly struct BmsDifficultyInfo
         ParsedName = metadata.DifficultyName,
         PlayLevel = metadata.PlayLevel,
         Rank = metadata.Rank,
+        ExRank = metadata.ExRank,
         Total = metadata.Total,
         KeyCount = metadata.KeyCount,
         LockedLongNoteMode = metadata.LockedLongNoteMode,
     };
 
     /// <summary>
-    /// Converts BMS #RANK to osu! OverallDifficulty.
+    /// OverallDifficulty carries the judgement difficulty. The integer #RANK (0-4) maps
+    /// to OD 5-10. When #DEFEXRANK/#EXRANK overrides RANK, the percentage is stored as
+    /// <see cref="exrank_od_sentinel"/> + pct, so the two encodings never collide
+    /// (EXRANK OD ≥ 100, RANK OD ≤ 10). The sentinel keeps RANK — the common case — on
+    /// its original OD values for backward compatibility.
     /// </summary>
-    public static float RankToOd(int rank) => rank switch
-    {
-        0 => 10f,
-        1 => 8f,
-        2 => 7f,
-        3 => 6f,
-        4 => 5f,
-        _ => 7f,
-    };
+    private const double exrank_od_sentinel = 100;
 
     /// <summary>
-    /// Converts osu! OverallDifficulty back to the closest BMS #RANK.
+    /// Encodes <see cref="Rank"/> / <see cref="ExRank"/> into an osu! OverallDifficulty value.
     /// </summary>
-    public static int OdToRank(float od) => od switch
-    {
-        >= 9.5f => 0,
-        >= 7.5f => 1,
-        >= 6.5f => 2,
-        >= 5.5f => 3,
-        _ => 4,
-    };
+    public static float EncodeOverallDifficulty(int rank, double? exRank)
+        => exRank is { } pct ? (float)(exrank_od_sentinel + pct) : rank;
+
+    /// <summary>
+    /// Decodes <see cref="Rank"/> and <see cref="ExRank"/> from an osu! OverallDifficulty value.
+    /// When the OD carries an EXRANK percentage, <see cref="Rank"/> is normalised to 2 (NORMAL),
+    /// since the chart's #RANK is overridden and not recoverable from OD alone.
+    /// </summary>
+    public static (int rank, double? exRank) DecodeFromOverallDifficulty(float od)
+        => od >= exrank_od_sentinel ? (2, od - exrank_od_sentinel) : ((int)Math.Round(od), null);
 
     /// <summary>
     /// Converts the BMS difficulty to a display name string suitable for
@@ -105,13 +112,18 @@ public readonly struct BmsDifficultyInfo
     /// <see cref="Total"/> is stored in <see cref="IBeatmapDifficultyInfo.ApproachRate"/>.
     /// <see cref="PlayLevel"/> cannot be recovered from this source.
     /// </summary>
-    public static BmsDifficultyInfo FromOsuDifficulty(IBeatmapDifficultyInfo difficulty) => new()
+    public static BmsDifficultyInfo FromOsuDifficulty(IBeatmapDifficultyInfo difficulty)
     {
-        Rank = OdToRank(difficulty.OverallDifficulty),
-        Total = Math.Max(0, difficulty.ApproachRate),
-        KeyCount = GetKeyCount(difficulty),
-        LockedLongNoteMode = (BmsLongNoteMode)Math.Clamp((int)Math.Round(difficulty.DrainRate), 0, 3),
-    };
+        var (rank, exRank) = DecodeFromOverallDifficulty(difficulty.OverallDifficulty);
+        return new BmsDifficultyInfo
+        {
+            Rank = rank,
+            ExRank = exRank,
+            Total = Math.Max(0, difficulty.ApproachRate),
+            KeyCount = GetKeyCount(difficulty),
+            LockedLongNoteMode = (BmsLongNoteMode)Math.Clamp((int)Math.Round(difficulty.DrainRate), 0, 3),
+        };
+    }
 
     /// <summary>
     /// Writes BMS difficulty parameters to an osu! <see cref="IBeatmap"/>.
@@ -122,7 +134,7 @@ public readonly struct BmsDifficultyInfo
     {
         beatmap.BeatmapInfo.DifficultyName = ToDisplayName();
 
-        var od = RankToOd(Rank);
+        var od = EncodeOverallDifficulty(Rank, ExRank);
         beatmap.Difficulty.OverallDifficulty = od;
         beatmap.BeatmapInfo.Difficulty.OverallDifficulty = od;
 
@@ -145,7 +157,7 @@ public readonly struct BmsDifficultyInfo
     {
         beatmap.DifficultyName = ToDisplayName();
 
-        var od = RankToOd(Rank);
+        var od = EncodeOverallDifficulty(Rank, ExRank);
         beatmap.Difficulty.OverallDifficulty = od;
         beatmap.Difficulty.CircleSize = KeyCount;
         beatmap.Difficulty.ApproachRate = (float)Total;

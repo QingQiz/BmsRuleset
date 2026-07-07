@@ -15,6 +15,9 @@ public interface IBmsBeatmap
     /// <summary>BMS #RANK value: 0=Very Hard, 1=Hard, 2=Normal (default), 3=Easy, 4=Very Easy.</summary>
     int Rank { get; set; }
 
+    /// <summary>BMS #DEFEXRANK / #EXRANK percentage (100 = NORMAL), or null when only #RANK is set.</summary>
+    double? ExRank { get; set; }
+
     /// <summary>
     ///     BMS #TOTAL value: gauge recovery coefficient.
     ///     Zero means the default formula <c>7.605 × N / (0.01 × N + 6.5)</c> applies, where N is the total note count.
@@ -54,6 +57,7 @@ internal static class BmsBeatmapExtensions
         target.TotalColumns = source.TotalColumns;
         target.LayoutVariant = source.LayoutVariant;
         target.Rank = source.Rank;
+        target.ExRank = source.ExRank;
         target.Total = source.Total;
         target.TimingMap = source.TimingMap;
         target.SampleDefinitions = source.SampleDefinitions;

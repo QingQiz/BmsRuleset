@@ -172,18 +172,35 @@ public partial class BmsRuleset : Ruleset
 
     #region Attributes display
 
+    /// <summary>Bar maximum for the EXRANK attribute (200% = full bar; 100% = NORMAL at midpoint).</summary>
+    private const float exrank_display_max = 200;
+
     public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
     {
         var original = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
         var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
         var adjusted = BmsDifficultyInfo.FromOsuDifficulty(adjustedDifficulty);
         var colours = new OsuColour();
+        var layout = BmsLayout.VariantFromTotalColumns(adjusted.KeyCount);
 
-        yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
+        if (adjusted.ExRank is { } exRank)
         {
-            Description = $"RANK {adjusted.Rank} timing windows.",
-            AdditionalMetrics = createRankMetrics(adjusted.Rank, adjusted.KeyCount),
-        };
+            var rate = BmsJudgementProfileProvider.RateForExRank(layout, exRank);
+            yield return new RulesetBeatmapAttribute("EXRANK", "EX", (float)original.ExRank.GetValueOrDefault(exRank), (float)exRank, exrank_display_max)
+            {
+                Description = $"EXRANK {exRank:0.##}% timing windows.",
+                AdditionalMetrics = createRankMetrics(rate, adjusted.KeyCount),
+            };
+        }
+        else
+        {
+            var rate = BmsJudgementProfileProvider.RateForRank(layout, adjusted.Rank);
+            yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
+            {
+                Description = $"RANK {adjusted.Rank} timing windows.",
+                AdditionalMetrics = createRankMetrics(rate, adjusted.KeyCount),
+            };
+        }
 
         if (original.LockedLongNoteMode != BmsLongNoteMode.Undefined)
         {
@@ -268,21 +285,21 @@ public partial class BmsRuleset : Ruleset
             : $"default TOTAL {calculator.Total:0.###}";
     }
 
-    private static RulesetBeatmapAttribute.AdditionalMetric[] createRankMetrics(int rank, int keyCount)
+    private static RulesetBeatmapAttribute.AdditionalMetric[] createRankMetrics(double rate, int keyCount)
     {
         var layout = BmsLayout.VariantFromTotalColumns(keyCount);
         var colours = new OsuColour();
         var metrics = new List<RulesetBeatmapAttribute.AdditionalMetric>();
 
-        addHeadMetrics("Normal note", BmsJudgementProfileProvider.GetTable(layout, column: 1, rank: rank, tail: false));
+        addHeadMetrics("Normal note", BmsJudgementProfileProvider.GetTable(layout, column: 1, judgementRate: rate, tail: false));
 
         if (tryGetScratchColumn(layout, out var scratchColumn))
-            addHeadMetrics("Scratch", BmsJudgementProfileProvider.GetTable(layout, scratchColumn, rank, tail: false));
+            addHeadMetrics("Scratch", BmsJudgementProfileProvider.GetTable(layout, scratchColumn, rate, tail: false));
 
-        addTailMetrics("LN tail", BmsJudgementProfileProvider.GetTable(layout, column: 1, rank: rank, tail: true));
+        addTailMetrics("LN tail", BmsJudgementProfileProvider.GetTable(layout, column: 1, judgementRate: rate, tail: true));
 
         if (tryGetScratchColumn(layout, out scratchColumn))
-            addTailMetrics("Scratch LN tail", BmsJudgementProfileProvider.GetTable(layout, scratchColumn, rank, tail: true));
+            addTailMetrics("Scratch LN tail", BmsJudgementProfileProvider.GetTable(layout, scratchColumn, rate, tail: true));
 
         return metrics.ToArray();
 

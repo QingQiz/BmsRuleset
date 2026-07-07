@@ -31,7 +31,8 @@ public sealed record BmsParseResult(
     BmsLongNoteMode LockedLongNoteMode = BmsLongNoteMode.Undefined,
     string? StageFile = null,
     string? BackBmp = null,
-    string? Banner = null);
+    string? Banner = null,
+    double? DefaultExRank = null);
 
 public readonly record struct BmsBranchDecision(int MaxValue, int SelectedValue);
 

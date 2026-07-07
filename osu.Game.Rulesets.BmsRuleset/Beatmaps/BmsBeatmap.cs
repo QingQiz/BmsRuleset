@@ -18,6 +18,9 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
     /// <summary>BMS #RANK value: 0=Very Hard, 1=Hard, 2=Normal (default), 3=Easy, 4=Very Easy.</summary>
     public int Rank { get; set; } = 2;
 
+    /// <summary>BMS #DEFEXRANK / #EXRANK percentage (100 = NORMAL), or null when only #RANK is set.</summary>
+    public double? ExRank { get; set; }
+
     /// <summary>
     ///     BMS #TOTAL value: gauge recovery coefficient.
     ///     Zero means the default formula applies.

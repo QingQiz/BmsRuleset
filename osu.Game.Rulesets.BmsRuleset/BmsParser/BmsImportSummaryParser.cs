@@ -164,7 +164,8 @@ internal static partial class BmsChartParser
             Rank: state.Rank,
             Total: state.Total,
             PlayLevel: state.PlayLevel,
-            LockedLongNoteMode: state.LnMode);
+            LockedLongNoteMode: state.LnMode,
+            ExRank: state.DefaultExRank);
     }
 
     private static double computeImportBpm(IReadOnlyList<BmsBpmEvent> bpms, double finalObjectEndTime)

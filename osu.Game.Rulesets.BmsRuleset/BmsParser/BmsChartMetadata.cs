@@ -10,5 +10,6 @@ public readonly record struct BmsChartMetadata(
     int Rank,
     double Total,
     float? PlayLevel,
-    BmsLongNoteMode LockedLongNoteMode = BmsLongNoteMode.Undefined
+    BmsLongNoteMode LockedLongNoteMode = BmsLongNoteMode.Undefined,
+    double? ExRank = null
 );

@@ -15,6 +15,8 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
 
     public int Rank { get; set; } = 2;
 
+    public double? ExRank { get; set; }
+
     public double Total { get; set; }
 
     public BmsTimingMap? TimingMap { get; set; }
@@ -50,6 +52,7 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
         TotalColumns = parseResult.TotalColumns;
         LayoutVariant = parseResult.LayoutVariant;
         Rank = parseResult.Rank;
+        ExRank = parseResult.DefaultExRank;
         Total = parseResult.Total;
         SampleDefinitions = parseResult.SampleDefinitions;
         BackgroundSampleEvents = parseResult.BackgroundSampleEvents;

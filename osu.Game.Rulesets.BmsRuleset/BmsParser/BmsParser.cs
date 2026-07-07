@@ -154,7 +154,8 @@ internal static partial class BmsChartParser
             state.LnMode,
             state.StageFile,
             state.BackBmp,
-            state.Banner);
+            state.Banner,
+            state.DefaultExRank);
     }
 
     /// <summary>Encode a 2-char base-62 pair into a 12-bit ushort (case-sensitive).</summary>

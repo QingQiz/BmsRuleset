@@ -65,6 +65,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         new BmsDifficultyInfo
         {
             Rank = converted.Rank,
+            ExRank = converted.ExRank,
             Total = converted.Total,
             KeyCount = converted.TotalColumns,
             LockedLongNoteMode = converted.LockedLongNoteMode,
