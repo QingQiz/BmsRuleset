@@ -294,7 +294,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
                 d.HitObject.StartTime,
                 d.HitObject.GetEndTime(),
                 d.HitObject.Column,
-                d.HitObject.Beatmap.Rank,
+                d.HitObject.EffectiveJudgementRate,
                 d.HitObject is BmsLongNote)));
         }
 
@@ -340,7 +340,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
         if (heldNote is ILongNoteHolder ln2)
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(LayoutVariant, Index, heldNote.HitObject.Beatmap.Rank, tail: true);
+            var tailTable = BmsJudgementProfileProvider.GetTable(LayoutVariant, Index, heldNote.HitObject.EffectiveJudgementRate, tail: true);
             var releaseOffset = time - heldNote.HitObject.GetEndTime();
 
             if (ln2.TryRelease(releaseOffset, tailTable) && heldNote.HitObject is BmsLongNote ln)

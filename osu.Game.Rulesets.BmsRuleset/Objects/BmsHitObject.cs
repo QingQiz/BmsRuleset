@@ -1,5 +1,6 @@
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -17,6 +18,12 @@ public class BmsHitObject : HitObject
     public ushort SampleKey { get; set; }
 
     public string SamplePath { get; set; } = string.Empty;
+
+    public double JudgementRate { get; set; } = double.NaN;
+
+    public double EffectiveJudgementRate => double.IsNaN(JudgementRate)
+        ? BmsJudgementProfileProvider.RateForRank(Beatmap.LayoutVariant, Beatmap.Rank)
+        : JudgementRate;
 
     /// <summary>
     ///     Precomputed scroll position at <see cref="HitObject.StartTime"/>.
@@ -50,7 +57,7 @@ public class BmsHitObject : HitObject
 
     public override Judgement CreateJudgement() => new BmsJudgement(this);
 
-    protected override BmsHitWindows CreateHitWindows() => new(Beatmap.Rank, Beatmap.LayoutVariant, Column);
+    protected override BmsHitWindows CreateHitWindows() => new(Beatmap.Rank, Beatmap.LayoutVariant, Column, EffectiveJudgementRate);
 
     protected virtual void CopyTo(BmsHitObject target)
     {
@@ -60,6 +67,7 @@ public class BmsHitObject : HitObject
         target.SourceChannel = SourceChannel;
         target.SampleKey = SampleKey;
         target.SamplePath = SamplePath;
+        target.JudgementRate = JudgementRate;
         target.ScrollPositionAtStartTime = ScrollPositionAtStartTime;
         target.Beatmap = Beatmap;
     }

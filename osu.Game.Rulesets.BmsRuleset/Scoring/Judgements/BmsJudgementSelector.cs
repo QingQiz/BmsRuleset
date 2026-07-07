@@ -19,7 +19,7 @@ public static class BmsJudgementSelector
 
         foreach (var candidate in candidates.OrderBy(c => c.StartTime).ThenBy(c => c.Column))
         {
-            var table = BmsJudgementProfileProvider.GetTable(layout, candidate.Column, candidate.Rank, tail: false);
+            var table = BmsJudgementProfileProvider.GetTable(layout, candidate.Column, candidate.JudgementRate, tail: false);
             var offset = inputTime - candidate.StartTime;
             var result = table.ResultForOffset(offset);
 
@@ -54,7 +54,7 @@ public static class BmsJudgementSelector
         HitResult currentResult,
         HitResult nextResult)
     {
-        var table = BmsJudgementProfileProvider.GetTable(layout, next.Column, next.Rank, tail: false);
+        var table = BmsJudgementProfileProvider.GetTable(layout, next.Column, next.JudgementRate, tail: false);
         var nextOffset = inputTime - next.StartTime;
         var currentDTime = current.StartTime - inputTime;
         var goodEarlyDTime = table.GoodEarlyDTime;

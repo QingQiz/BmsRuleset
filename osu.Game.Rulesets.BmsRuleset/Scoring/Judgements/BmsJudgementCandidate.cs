@@ -6,7 +6,7 @@ public readonly record struct BmsJudgementCandidate(
     double StartTime,
     double EndTime,
     int Column,
-    int Rank,
+    double JudgementRate,
     bool IsLongNote);
 
 public readonly record struct BmsJudgementSelection(

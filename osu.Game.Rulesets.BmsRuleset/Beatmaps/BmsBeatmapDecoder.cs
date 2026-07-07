@@ -66,6 +66,7 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
         hitObject.SourceChannel = parsedObject.SourceChannel;
         hitObject.SampleKey = parsedObject.SampleKey;
         hitObject.SamplePath = parsedObject.SamplePath;
+        hitObject.JudgementRate = parsedObject.JudgementRate;
         if (hitObject is BmsLandmine mine)
             mine.LandmineDamagePercent = parsedObject.LandmineDamagePercent;
         if (hitObject is BmsLongNote ln)

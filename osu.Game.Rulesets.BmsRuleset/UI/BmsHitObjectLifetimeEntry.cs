@@ -156,7 +156,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
     {
         if (hitObject is BmsLandmine) return 0;
 
-        var table = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.Beatmap.Rank, tail: false);
+        var table = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
         return Math.Abs(table.EarlyWindowFor(HitResult.Ok));
     }
 
@@ -289,7 +289,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
     {
         if (hitObject is BmsLongNote)
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.Beatmap.Rank, tail: true);
+            var tailTable = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: true);
             return tailTable.LateWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
         }
 

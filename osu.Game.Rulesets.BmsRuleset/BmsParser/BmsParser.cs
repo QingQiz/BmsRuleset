@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -29,6 +30,8 @@ internal static partial class BmsChartParser
     private readonly record struct RawChannelLine(int Measure, ushort Channel, string Line, int PayloadStart, int PayloadLength, int Sequence);
 
     private readonly record struct RawCell(long Tick, ushort Channel, ushort Value, int Sequence, int Column);
+
+    private readonly record struct BmsJudgementRateEvent(long Tick, double Rate, int Sequence);
 
     /// <summary>Extract the high 6-bit digit (the "tens" place).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -115,9 +118,13 @@ internal static partial class BmsChartParser
         var textEvents = collectTextEvents(state, measureStarts, timingMap);
         var bga = collectBga(state, measureStarts, timingMap);
 
+        var judgementRateEvents = collectJudgementRateEvents(state, measureStarts, layoutVariant);
+
         var bgSampleEvents = new List<BmsSampleEvent>(state.ChannelLines.Count / 10);
         collectBackgroundSampleEvents(state, measureStarts, timingMap, bgSampleEvents);
         collectMidiFileBackgroundSampleEvent(state, sampleDefinitions, bgSampleEvents);
+
+        applyJudgementRates(hitObjects, judgementRateEvents);
 
         return new BmsParseResult(
             state.Title,
@@ -369,7 +376,19 @@ internal static partial class BmsChartParser
         if (cmdSpan.Equals("RANK", StringComparison.OrdinalIgnoreCase))
         {
             if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rank) && rank >= 0 && rank <= 4)
+            {
                 state.Rank = rank;
+                state.DefaultExRank = null;
+            }
+
+            return;
+        }
+
+        if (cmdSpan.Equals("DEFEXRANK", StringComparison.OrdinalIgnoreCase)
+            || cmdSpan.Equals("EXRANK", StringComparison.OrdinalIgnoreCase))
+        {
+            if (tryParseDouble(valueSpan, out var exRank) && exRank >= 0)
+                state.DefaultExRank = exRank;
             return;
         }
 
@@ -406,6 +425,13 @@ internal static partial class BmsChartParser
                                 && tryParseDouble(valueSpan, out var stopValue) && stopValue > 0)
         {
             state.StopDefinitions[encodeValue(state.UseBase62, cmdSpan[4], cmdSpan[5])] = stopValue;
+            return;
+        }
+
+        if (cmdSpan.Length == 8 && cmdSpan.StartsWith("EXRANK", StringComparison.OrdinalIgnoreCase)
+                                && tryParseDouble(valueSpan, out var exRankDefinition) && exRankDefinition >= 0)
+        {
+            state.ExRankDefinitions[encodeValue(state.UseBase62, cmdSpan[6], cmdSpan[7])] = exRankDefinition;
             return;
         }
 
@@ -954,6 +980,53 @@ internal static partial class BmsChartParser
             output.Add(createMineHitObject(mine, timingMap));
     }
 
+    private static List<BmsJudgementRateEvent> collectJudgementRateEvents(
+        ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsLayoutVariant layoutVariant)
+    {
+        var events = new List<BmsJudgementRateEvent>
+        {
+            new(long.MinValue, initialJudgementRate(state, layoutVariant), -1),
+        };
+
+        foreach (var line in state.ChannelLines)
+        {
+            if (line.Channel != CH_A0)
+                continue;
+
+            foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+            {
+                if (state.ExRankDefinitions.TryGetValue(cell.Value, out var exRank))
+                    events.Add(new BmsJudgementRateEvent(cell.Tick, BmsJudgementProfileProvider.RateForExRank(layoutVariant, exRank), cell.Sequence));
+            }
+        }
+
+        events.Sort(default(JudgementRateEventComparer));
+        return events;
+    }
+
+    private static double initialJudgementRate(ParseState state, BmsLayoutVariant layoutVariant) =>
+        state.DefaultExRank is { } exRank
+            ? BmsJudgementProfileProvider.RateForExRank(layoutVariant, exRank)
+            : BmsJudgementProfileProvider.RateForRank(layoutVariant, state.Rank);
+
+    private static void applyJudgementRates(List<BmsParsedHitObject> hitObjects, IReadOnlyList<BmsJudgementRateEvent> judgementRateEvents)
+    {
+        if (judgementRateEvents.Count == 0)
+            return;
+
+        var eventIndex = 0;
+
+        for (var i = 0; i < hitObjects.Count; i++)
+        {
+            var hitObject = hitObjects[i];
+
+            while (eventIndex + 1 < judgementRateEvents.Count && judgementRateEvents[eventIndex + 1].Tick <= hitObject.Tick)
+                eventIndex++;
+
+            hitObjects[i] = hitObject with { JudgementRate = judgementRateEvents[eventIndex].Rate };
+        }
+    }
+
     private static (List<RawCell> Notes, List<RawCell> LnCells, List<RawCell> Mines) collectPlayableCells(
         ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts)
     {
@@ -1336,6 +1409,7 @@ internal static partial class BmsChartParser
     private const ushort CH_0D = (0 << 6) | 13;
     private const ushort CH_0E = (0 << 6) | 14;
     private const ushort CH_99 = (9 << 6) | 9;
+    private const ushort CH_A0 = (10 << 6) | 0;
     private const ushort CH_SC = (28 << 6) | 12; // 'S','C'
     private const ushort CH_SP = (28 << 6) | 25; // 'S','P'
 
@@ -1353,6 +1427,8 @@ internal static partial class BmsChartParser
         public Dictionary<ushort, double> ScrollDefinitions { get; } = new();
 
         public Dictionary<ushort, double> SpeedDefinitions { get; } = new();
+
+        public Dictionary<ushort, double> ExRankDefinitions { get; } = new();
 
         public Dictionary<ushort, string> SampleDefinitions { get; } = new();
 
@@ -1415,6 +1491,8 @@ internal static partial class BmsChartParser
         // Default RANK 2 = NORMAL per BMS spec.
         public int Rank { get; set; } = 2;
 
+        public double? DefaultExRank { get; set; }
+
         /// <summary>BMS #TOTAL value: gauge recovery coefficient. Zero means use the default formula.</summary>
         public double Total { get; set; }
 
@@ -1447,6 +1525,17 @@ internal static partial class BmsChartParser
             if (cmp != 0) return cmp;
 
             return a.Tick.CompareTo(b.Tick);
+        }
+    }
+
+    private struct JudgementRateEventComparer : IComparer<BmsJudgementRateEvent>
+    {
+        public int Compare(BmsJudgementRateEvent a, BmsJudgementRateEvent b)
+        {
+            var cmp = a.Tick.CompareTo(b.Tick);
+            if (cmp != 0) return cmp;
+
+            return a.Sequence.CompareTo(b.Sequence);
         }
     }
 }

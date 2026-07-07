@@ -40,6 +40,18 @@ public class BmsHitWindowsTest
     }
 
     [Test]
+    public void TestHitWindowCanUseExRankPercentage()
+    {
+        var windows = new BmsHitWindows(judgementRate: 1.5);
+        windows.SetDifficulty(5);
+
+        Assert.That(windows.WindowFor(HitResult.Perfect), Is.EqualTo(30).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Great), Is.EqualTo(90).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Good), Is.EqualTo(225).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Ok), Is.EqualTo(280).Within(0.001));
+    }
+
+    [Test]
     public void TestHitWindowsIncludeMiss()
     {
         var windows = new BmsHitWindows();

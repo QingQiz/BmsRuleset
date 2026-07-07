@@ -283,13 +283,17 @@ public class BmsStarRatingProcessorTest
     [Test]
     public void TestStarRatingProcessorV3SortedPercentileHelperPreservesExactThresholdCrossingSemantics()
     {
-        var helperMethod = typeof(BmsStarRatingProcessorV3).GetMethod("computePercentileSumsFromSorted", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(double[]), typeof(int)], null);
+        var helperMethod = typeof(BmsStarRatingProcessorV3).GetMethod("computePercentileSumsFromSorted", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(double[]), typeof(int), typeof(double)], null);
 
         Assert.That(helperMethod, Is.Not.Null);
 
         static (double p93Sum, double p83Sum) invokeHelper(MethodInfo method, double[] sortedDifficulty, double[] sortedWeights)
         {
-            var tuple = ((double p93Sum, double p83Sum))method.Invoke(null, [sortedDifficulty, sortedWeights, sortedDifficulty.Length])!;
+            double totalWeight = 0;
+            for (var i = 0; i < sortedWeights.Length; i++)
+                totalWeight += sortedWeights[i];
+
+            var tuple = ((double p93Sum, double p83Sum))method.Invoke(null, [sortedDifficulty, sortedWeights, sortedDifficulty.Length, totalWeight])!;
             return tuple;
         }
 

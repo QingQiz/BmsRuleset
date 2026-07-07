@@ -86,7 +86,7 @@ internal sealed class BmsLongNoteJudgementController
 
     public void CheckPassiveResult(double currentTime)
     {
-        var headTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.Beatmap.Rank, tail: false);
+        var headTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.EffectiveJudgementRate, tail: false);
 
         if (!LongNoteStarted)
         {
@@ -113,7 +113,7 @@ internal sealed class BmsLongNoteJudgementController
             return;
         }
 
-        var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.Beatmap.Rank, tail: true);
+        var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.EffectiveJudgementRate, tail: true);
         var tailOffset = currentTime - ln.EndTime;
 
         if (IsChargeMode)
@@ -130,7 +130,7 @@ internal sealed class BmsLongNoteJudgementController
 
     public double ChargeTailLifetimeEnd()
     {
-        var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.Beatmap.Rank, tail: true);
+        var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.EffectiveJudgementRate, tail: true);
         return ln.EndTime + tailTable.LateWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
     }
 
@@ -143,7 +143,7 @@ internal sealed class BmsLongNoteJudgementController
     {
         if (IsChargeMode && LongNoteStarted && !TailJudged)
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.Beatmap.Rank, tail: true);
+            var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.EffectiveJudgementRate, tail: true);
             var tailOffset = currentTime - ln.EndTime;
 
             if (tailTable.IsPastPassivePoorOffset(tailOffset))

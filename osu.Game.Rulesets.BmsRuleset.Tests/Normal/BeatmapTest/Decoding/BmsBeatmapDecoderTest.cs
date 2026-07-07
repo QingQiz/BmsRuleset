@@ -1978,6 +1978,154 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestDefExRankSetsInitialJudgementRate()
+    {
+        var beatmap = decode("""
+                             #RANK 0
+                             #DEFEXRANK 200
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(1.5).Within(0.0001));
+    }
+
+    [Test]
+    public void TestBareExRankSetsInitialJudgementRate()
+    {
+        var beatmap = decode("""
+                             #EXRANK 150
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(1.125).Within(0.0001));
+    }
+
+    [Test]
+    public void TestRankAfterDefExRankRestoresRankJudgementRate()
+    {
+        var beatmap = decode("""
+                             #DEFEXRANK 200
+                             #RANK 0
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(0.25).Within(0.0001));
+    }
+
+    [Test]
+    public void TestChannelA0ChangesJudgementRateForFollowingNotes()
+    {
+        var beatmap = decode("""
+                             #RANK 2
+                             #EXRANKAA 200
+                             #EXRANKBB 50
+                             #BPM 120
+                             #001A0:AA00BB00
+                             #00111:01010101
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.HitObjects.Select(h => h.JudgementRate), Is.EqualTo([1.5, 1.5, 0.375, 0.375]).Within(0.0001));
+    }
+
+    [Test]
+    public void TestChannelA0UndefinedReferenceDoesNotChangeJudgementRate()
+    {
+        var beatmap = decode("""
+                             #RANK 2
+                             #EXRANKAA 200
+                             #BPM 120
+                             #001A0:AA00CC00
+                             #00111:01010101
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.HitObjects.Select(h => h.JudgementRate), Is.EqualTo([1.5, 1.5, 1.5, 1.5]).Within(0.0001));
+    }
+
+    [Test]
+    public void TestDefExRank100EqualsNormalRank()
+    {
+        // spec: "Value 100 corresponds to #RANK 2 (NORMAL)". DEFEXRANK anchors to NORMAL,
+        // not to the chart's #RANK — so #RANK 3 + #DEFEXRANK 100 must yield the NORMAL
+        // rate (0.75), not the RANK 3 rate (1.0).
+        var beatmap = decode("""
+                             #RANK 3
+                             #DEFEXRANK 100
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
+    }
+
+    [Test]
+    public void TestOmittedRankAndDefExRankDefaultsToNormal()
+    {
+        // spec: "When both omitted, #RANK 2 applies" → NORMAL rate 0.75 for BME 7K.
+        var beatmap = decode("""
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
+    }
+
+    [Test]
+    public void TestDefExRankAcceptsDecimalValue()
+    {
+        // spec: "Decimal fractions allowed". 87.5 → 0.75 * 87.5 / 100 = 0.65625.
+        var beatmap = decode("""
+                             #DEFEXRANK 87.5
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(0.65625).Within(0.0001));
+    }
+
+    [Test]
+    public void TestExRankWithIndexDoesNotSetDefaultExRank()
+    {
+        // #EXRANKAA (8 chars) is a per-index definition for #xxxA0, NOT the bare #EXRANK
+        // default (iBMSC 3.0 alias of #DEFEXRANK). Unreferenced here and with no bare
+        // #EXRANK/#DEFEXRANK/#RANK, the initial rate stays at the RANK 2 default (0.75).
+        var beatmap = decode("""
+                             #EXRANKAA 200
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
+    }
+
+    [Test]
     public void TestScrollAndSpeedFactorsIndependent()
     {
         // SCROLL affects scroll position rate. SPEED does NOT — it's a display multiplier.
@@ -2141,7 +2289,7 @@ public class BmsBeatmapDecoderTest
                                              """);
 
         Assert.That(((Beatmap)withBackBmp).Metadata.BackgroundFile, Is.EqualTo("back.bmp"));
-        Assert.That(withBackBmp.GetSongSelectBackgroundCandidates(), Is.EqualTo(new[] { "back.bmp", "banner.png" }));
+        Assert.That(withBackBmp.GetSongSelectBackgroundCandidates(), Is.EqualTo(["back.bmp", "banner.png"]));
 
         var bannerOnly = (IBmsBeatmap)decode("""
                                             #TITLE Background Header
@@ -2151,7 +2299,7 @@ public class BmsBeatmapDecoderTest
                                             """);
 
         Assert.That(((Beatmap)bannerOnly).Metadata.BackgroundFile, Is.EqualTo("banner.png"));
-        Assert.That(bannerOnly.GetSongSelectBackgroundCandidates(), Is.EqualTo(new[] { "banner.png" }));
+        Assert.That(bannerOnly.GetSongSelectBackgroundCandidates(), Is.EqualTo(["banner.png"]));
     }
 
     [Test]
@@ -2174,10 +2322,10 @@ public class BmsBeatmapDecoderTest
         Assert.That(bmsBeatmap.StageFile, Is.EqualTo("stage.jpg"));
         Assert.That(bmsBeatmap.BackBmp, Is.EqualTo("back.bmp"));
         Assert.That(bmsBeatmap.Banner, Is.EqualTo("banner.png"));
-        Assert.That(bmsBeatmap.GetSongSelectBackgroundCandidates(), Is.EqualTo(new[] { "stage.jpg", "back.bmp", "banner.png" }));
+        Assert.That(bmsBeatmap.GetSongSelectBackgroundCandidates(), Is.EqualTo(["stage.jpg", "back.bmp", "banner.png"]));
 
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        Assert.That(converted.GetSongSelectBackgroundCandidates(), Is.EqualTo(new[] { "stage.jpg", "back.bmp", "banner.png" }));
+        Assert.That(converted.GetSongSelectBackgroundCandidates(), Is.EqualTo(["stage.jpg", "back.bmp", "banner.png"]));
     }
 
     [Test]
@@ -2204,12 +2352,11 @@ public class BmsBeatmapDecoderTest
         Assert.That(definition.DestinationX, Is.EqualTo(12));
         Assert.That(definition.DestinationY, Is.EqualTo(16));
 
-        Assert.That(beatmap.Bga.Events.Select(e => (e.Layer, e.DefinitionKey, e.Tick)), Is.EqualTo(new[]
-        {
+        Assert.That(beatmap.Bga.Events.Select(e => (e.Layer, e.DefinitionKey, e.Tick)), Is.EqualTo([
             (BmsBgaLayer.Base, BmsChartParser.Enc("02"), 192L),
             (BmsBgaLayer.Layer1, BmsChartParser.Enc("01"), 288L),
             (BmsBgaLayer.Layer2, BmsChartParser.Enc("02"), 288L),
-        }));
+        ]));
     }
 
     [Test]
@@ -2226,11 +2373,10 @@ public class BmsBeatmapDecoderTest
 
         Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("_aragami_bga.mpg"));
         Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("_miss.bmp"));
-        Assert.That(beatmap.Bga.Events.Select(e => (e.Layer, e.DefinitionKey, e.Tick)), Is.EqualTo(new[]
-        {
+        Assert.That(beatmap.Bga.Events.Select(e => (e.Layer, e.DefinitionKey, e.Tick)), Is.EqualTo([
             (BmsBgaLayer.Base, BmsChartParser.Enc("01"), 312L),
             (BmsBgaLayer.Poor, BmsChartParser.Enc("02"), 312L),
-        }));
+        ]));
     }
 
     [Test]
@@ -2247,13 +2393,12 @@ public class BmsBeatmapDecoderTest
                                           """);
 
         Assert.That(beatmap.Bga.Events, Is.Empty);
-        Assert.That(beatmap.Bga.OpacityEvents.Select(e => (e.Layer, e.Opacity, e.Tick)), Is.EqualTo(new[]
-        {
+        Assert.That(beatmap.Bga.OpacityEvents.Select(e => (e.Layer, e.Opacity, e.Tick)), Is.EqualTo([
             (BmsBgaLayer.Base, 1f, 192L),
             (BmsBgaLayer.Layer1, 128 / 255f, 192L),
             (BmsBgaLayer.Layer2, 64 / 255f, 192L),
             (BmsBgaLayer.Poor, 32 / 255f, 192L),
-        }));
+        ]));
     }
 
     [Test]
@@ -2286,11 +2431,10 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
 
         Assert.That(converted.Bga.BitmapDefinitions[BmsChartParser.Enc("AA")], Is.EqualTo("upper.png"));
-        Assert.That(converted.Bga.Events.Select(e => e.DefinitionKey), Is.EqualTo(new[]
-        {
+        Assert.That(converted.Bga.Events.Select(e => e.DefinitionKey), Is.EqualTo([
             BmsChartParser.Enc("AA"),
             BmsChartParser.Enc("AA"),
-        }));
+        ]));
     }
 
     [Test]

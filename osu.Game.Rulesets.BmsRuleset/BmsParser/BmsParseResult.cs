@@ -48,7 +48,8 @@ public readonly record struct BmsParsedHitObject(
     bool IsMine,
     double LandmineDamagePercent,
     ushort TailSampleKey,
-    string TailSamplePath);
+    string TailSamplePath,
+    double JudgementRate = 0.75);
 
 public sealed record BmsSampleEvent(double Time, long Tick, ushort SampleKey);
 

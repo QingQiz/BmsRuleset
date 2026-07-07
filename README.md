@@ -78,7 +78,7 @@ for deletion.
 | Preview audio           | `#PREVIEW`                                                                 | Declared preview file path for song select, falls back to `preview.*` then to BGM/keysound events |
 | Banner image            | `#BANNER`                                                                  | Song select card image, fallback chain: #STAGEFILE -> #BACKBMP                                    |
 | Background image        | `#STAGEFILE`                                                               | Song select background image, fallback chain: #BACKBMP -> #BANNER                                 |
-| Judge rank              | `#RANK` (0–4)                                                              | Affects hit windows, mapped to `OD`                                                               |
+| Judge rank              | `#RANK` (0–4), `#DEFEXRANK`, `#EXRANK` / `#EXRANKxx`                       | Affects hit windows; `#RANK` is mapped to `OD`                                                    |
 | Gauge total             | `#TOTAL`                                                                   | Gauge recovery coefficient, mapped to `AR`                                                        |
 | Base BPM (visual)       | `#BASEBPM`                                                                 | Scroll speed reference BPM, does not affect note timing; overrides the Reference BPM setting      |
 | Initial BPM             | `#BPM`                                                                     | Default 130                                                                                       |
@@ -93,7 +93,6 @@ for deletion.
 | Long-note lock mode     | `#LNMODE 1` / `#LNMODE 2` / `#LNMODE 3`                                    | Locks LN type: 1=LN, 2=CN (Charge Note), 3=HCN (Hell Charge Note)                                 |
 | Text events             | `#TEXTxx`, `#SONGxx`                                                       | Displayed during gameplay on channel `99`                                                         |
 | Base 62 extension       | `#BASE 62`                                                                 | Case-sensitive base-62 encoding for commands and channels                                         |
-| Play mode               | `#PLAYER`                                                                  | Ignored                                                                                           |
 | Random blocks           | `#RANDOM` / `#RONDAM` (typo tolerance), `#ENDRANDOM`, `#SETRANDOM`         | Random branch with conditional sub-blocks; `#SETRANDOM` fixes the value                           |
 |                         | `#IF`, `#ELSEIF`, `#ELSE`, `#ENDIF` / `#END` / `#IFEND` / `#END IF`        |                                                                                                   |
 | Switch blocks           | `#SWITCH`, `#ENDSW` / `#ENDSWITCH`, `#SETSWITCH`, `#CASE`, `#DEF`, `#SKIP` | Switch control flow with cases; `#SETSWITCH` fixes the value                                      |
@@ -101,13 +100,11 @@ for deletion.
 | Spacing change          | `#SPEEDxx`                                                                 | Per-segment multiplier on `ScrollSpeedMultiplier`                                                 |
 
 **Not parsed:** `#EXWAVxx`,
-`#WAVCMD`, `#VOLWAV`, `#DIFFICULTY`, `#EXRANK` / `#EXRANKxx`,
-`#DEFEXRANK`, `#EXBPMxx`, `#STP`, `#PATH_WAV` / `#PATH_BMP`, `#OPTION`,
+`#WAVCMD`, `#EXBPMxx`, `#STP`, `#PATH_WAV` / `#PATH_BMP`, `#OPTION`,
 `#CHANGEOPTIONxx`, `#SWBGAxx`, `#@BGAxx`, `#ARGBxx`, `#CHARFILE`,
 `#ExtChr`, `#OCT/FP`, `#MATERIALS`
 
-dynamic volume channels (`97`, `98`),
-dynamic rank channel (`A0`), and dynamic option channel (`A6`).
+dynamic option channel (`A6`).
 
 > [!NOTE]
 > The resolved preview source is exposed so callers can tell whether a declared single-file (`#PREVIEW` / `preview.*`)
@@ -115,6 +112,14 @@ dynamic rank channel (`A0`), and dynamic option channel (`A6`).
 > may
 > not reflect the chart's full audio content.
 > Whether a user-facing "prefer BGM/keysound preview" option is needed depends on player feedback.
+
+**Header ignored:**
+
+| Command       | Description                                           | Why                                           |
+|---------------|-------------------------------------------------------|-----------------------------------------------|
+| `#PLAYER`     | Player layout: 1=Single, 2=Couple, 3=Double, 4=Battle | Layout is inferred from channel usage instead |
+| `#DIFFICULTY` | Difficulty classification index (1–5)                 | Star Rating can reference difficulty instead  |
+| `#VOLWAV`     | Global volume scalar (0–100) for WAV playback         | Too dependent on implementation or hardware   |
 
 **Channels parsed:**
 
@@ -126,6 +131,7 @@ dynamic rank channel (`A0`), and dynamic option channel (`A6`).
 | `08`      | Extended BPM change (`#BPMxx` lookup)           |
 | `09`      | STOP event (`#STOPxx` lookup)                   |
 | `99`      | TEXT event (`#TEXTxx`/`#SONGxx` lookup)         |
+| `A0`      | Dynamic rank change (`#EXRANKxx` lookup)        |
 | `SC`      | SCROLL factor change (`#SCROLLxx` lookup)       |
 | `SP`      | SPEED factor change (`#SPEEDxx` lookup)         |
 | `04`      | BGA base layer (`#BMPxx`/`#BGAxx`)              |
@@ -146,15 +152,20 @@ dynamic rank channel (`A0`), and dynamic option channel (`A6`).
 | `D1`–`D9` | Landmine / mine — P1 (base-36 encoded)          |
 | `E1`–`E9` | Landmine / mine — P2 (base-36 encoded)          |
 
-**Not parsed:** invisible note channels (`31`–`39`, `41`–`49`),
-dynamic BGM volume (`97`), dynamic KEY volume (`98`),
-dynamic rank change (`A0`), dynamic option change (`A6`).
+**Not parsed:** invisible note channels (`31`–`39`, `41`–`49`), dynamic option change (`A6`).
 
 > Channel `02` controls per-measure length (time signature changes), defined by `#xxx02`. A value of `1` means standard
 > length (4/4), `0.5` half length, `2` double length.
 > Measure duration (ms) = `#xxx02 × 240000 / BPM` (at a fixed BPM).
 > `1/1024` is the smallest value that can be accurately represented. Smaller values may round to 0 ticks, collapsing all
 > events in that measure to the same position.
+
+**Channels ignored:**
+
+| Channel | Meaning                           | Why      |
+|---------|-----------------------------------|----------|
+| `97`    | Dynamic BGM volume change channel | Rare use |
+| `98`    | Dynamic KEY volume change channel | Rare use |
 
 </details>
 
@@ -171,9 +182,10 @@ selected in song select.
 
 ### Song Preview
 
-Song select preview audio is generated from the original BMS folder rather than from a stored osu! audio file. The ruleset
-first tries a declared `#PREVIEW` file, then a `preview.*` file in the chart folder, and finally falls back to the chart's
-BGM/keysound event timeline. This makes charts without a dedicated preview file still audible in song select.
+Song select preview audio is generated from the original BMS folder rather than from a stored osu! audio file. The
+ruleset first tries a declared `#PREVIEW` file, then a `preview.*` file in the chart folder, and finally falls back to
+the chart's BGM/keysound event timeline. This makes charts without a dedicated preview file still audible in song
+select.
 
 ---
 
@@ -189,7 +201,7 @@ Key sound of the next upcoming note in a column plays on every key press regardl
 
 ## Judgements and Scoring
 
-**Judgement tiers (beatoraja timing windows, from `#RANK`):**
+**Judgement tiers (beatoraja timing windows, from `#RANK` / EXRANK):**
 
 | Name       | EX pts | Combo        | RANK 2 (Normal) window           |
 |------------|--------|--------------|----------------------------------|
@@ -201,6 +213,9 @@ Key sound of the next upcoming note in a column plays on every key press regardl
 | **E-POOR** | 0      | **no break** | [-500ms,-220ms], no note consume |
 
 `#RANK` 0 = Very Hard (±5/15/37.5 ms, BAD -220/+280 ms) → 4 = Very Easy (±25/75/187.5 ms, BAD -220/+280 ms).
+`#DEFEXRANK` and bare `#EXRANK` set the initial judge-window width as a percentage where `100` matches Normal
+(`#RANK 2`). Indexed `#EXRANKxx` values can be applied mid-chart through channel `A0`; undefined `A0` references leave
+the current window unchanged.
 
 **Score:** `total EX score / max EX score × 1,000,000`
 
@@ -272,13 +287,13 @@ Default play uses the Normal gauge. Gauge types are selected via mods:
 
 ## Settings
 
-| Setting              | Default | Range    | Description                                                                                                                |
-|----------------------|---------|----------|----------------------------------------------------------------------------------------------------------------------------|
-| Scroll Speed         | 8.0     | 1.0–60.0 | Note fall speed. In-game `Up`/`Down` keys adjust temporarily. Keys are rebindable under Settings → Key Bindings → osu!BMS. |
+| Setting              | Default  | Range    | Description                                                                                                                                                                                     |
+|----------------------|----------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Scroll Speed         | 8.0      | 1.0–60.0 | Note fall speed. In-game `Up`/`Down` keys adjust temporarily. Keys are rebindable under Settings → Key Bindings → osu!BMS.                                                                      |
 | Reference BPM        | Main BPM | enum     | Scroll speed reference BPM used when a chart has no `#BASEBPM`: Start BPM, Max BPM, Main BPM, or Min BPM. Main BPM uses the BPM with the most playable notes; ties use the earliest occurrence. |
-| BGA Dim              | 0.7     | 0–1      | Background animation dim. 0 = full brightness, 1 = hidden (BGA still present, just invisible)                              |
-| Show 5K / 7K / 9K    | ✓       | on/off   | Toggle visibility of single-play layouts in song select                                                                    |
-| Show DP 5K / 7K / 9K | ✓       | on/off   | Toggle visibility of double-play layouts in song select                                                                    |
+| BGA Dim              | 0.7      | 0–1      | Background animation dim. 0 = full brightness, 1 = hidden (BGA still present, just invisible)                                                                                                   |
+| Show 5K / 7K / 9K    | ✓        | on/off   | Toggle visibility of single-play layouts in song select                                                                                                                                         |
+| Show DP 5K / 7K / 9K | ✓        | on/off   | Toggle visibility of double-play layouts in song select                                                                                                                                         |
 
 Layout visibility filters are applied live in song select — uncheck a layout to hide all beatmaps of that type.
 
@@ -660,7 +675,7 @@ Commands are grouped by origin and listed with their status in this ruleset.
 
 | Command         | Status | Notes                                                                         |
 |-----------------|--------|-------------------------------------------------------------------------------|
-| `#PLAYER [1-4]` | —      | 1=Single, 2=Couple, 3=Double, 4=Battle; ignored here, layout inferred instead |
+| `#PLAYER [1-4]` | -      | 1=Single, 2=Couple, 3=Double, 4=Battle; ignored here, layout inferred instead |
 | `#GENRE`        | ✓      | Also accepts `#GENLE` typo                                                    |
 | `#TITLE`        | ✓      |                                                                               |
 | `#ARTIST`       | ✓      |                                                                               |
@@ -668,7 +683,7 @@ Commands are grouped by origin and listed with their status in this ruleset.
 | `#MIDIFILE`     | ✓      | Background audio file, played from the start of the chart                     |
 | `#PLAYLEVEL`    | ✓      | Difficulty level displayed as difficulty name                                 |
 | `#RANK [0-3]`   | ✓      | Judgment: 0=Very Hard, 1=Hard, 2=Normal, 3=Easy; also accepts 4 (Very Easy)   |
-| `#VOLWAV`       | ✗      | Global volume scalar (0–100) for WAV playback                                 |
+| `#VOLWAV`       | -      | Global volume scalar (0–100) for WAV playback                                 |
 | `#WAVxx`        | ✓      | Audio file definitions (xx = 00–ZZ base-62)                                   |
 | `#BMPxx`        | ✓      | Bitmap image/video definitions (xx = 00–FF hex, later extended to base-62)    |
 | `#BMP00`        | ✓      | Special: shown on POOR judgment                                               |
@@ -696,20 +711,20 @@ Commands are grouped by origin and listed with their status in this ruleset.
 
 #### 1.5 nanasigroove Extensions
 
-| Command                                   | Status | Notes                                                        |
-|-------------------------------------------|--------|--------------------------------------------------------------|
-| `#SUBTITLE`                               | ✓      | Explicit subtitle                                            |
-| `#DIFFICULTY [1-5]`                       | —      | Difficulty classification index                              |
-| `#BANNER`                                 | ✓      | Banner image for music selection                             |
-| `#RANK 4`                                 | ✓      | VERY EASY judgment; 1.2× wider than EASY                     |
-| `#DEFEXRANK`                              | ✗      | Fine-grained judgment width multiplier (100 = EASY baseline) |
-| `#EXRANKxx`                               | ✗      | Extended rank values for dynamic rank change (channel A0)    |
-| `#WAV00`                                  | ✓      | Explosion sound for landmine objects (Dx/Ex channels)        |
-| `#SWITCH` / `#ENDSW`                      | ✓      | Switch control-flow block                                    |
-| `#CASE` / `#SKIP` / `#DEF` / `#SETSWITCH` | ✓      | Sub-commands within switch block                             |
-| `#OPTION`                                 | ✗      | Forced gameplay option                                       |
-| `#CHANGEOPTIONxx`                         | ✗      | Dynamic option change during play (channel A6)               |
-| `#BMPxx` (base-36/base-62)                | ✓      | Extended BMP index range using the active value encoding     |
+| Command                                   | Status | Notes                                                     |
+|-------------------------------------------|--------|-----------------------------------------------------------|
+| `#SUBTITLE`                               | ✓      | Explicit subtitle                                         |
+| `#DIFFICULTY [1-5]`                       | -      | Difficulty classification index                           |
+| `#BANNER`                                 | ✓      | Banner image for music selection                          |
+| `#RANK 4`                                 | ✓      | VERY EASY judgment; 1.2× wider than EASY                  |
+| `#DEFEXRANK`                              | ✓      | Fine-grained judgment width percentage (100 = Normal)     |
+| `#EXRANKxx`                               | ✓      | Extended rank values for dynamic rank change (channel A0) |
+| `#WAV00`                                  | ✓      | Explosion sound for landmine objects (Dx/Ex channels)     |
+| `#SWITCH` / `#ENDSW`                      | ✓      | Switch control-flow block                                 |
+| `#CASE` / `#SKIP` / `#DEF` / `#SETSWITCH` | ✓      | Sub-commands within switch block                          |
+| `#OPTION`                                 | ✗      | Forced gameplay option                                    |
+| `#CHANGEOPTIONxx`                         | ✗      | Dynamic option change during play (channel A6)            |
+| `#BMPxx` (base-36/base-62)                | ✓      | Extended BMP index range using the active value encoding  |
 
 #### 1.6 LR2 (Lunatic Rave 2) Extensions
 
@@ -773,42 +788,42 @@ Commands are grouped by origin and listed with their status in this ruleset.
 | `#PREVIEW`           | ✓      | Preview audio path for music selection; auto-fallback to `preview.*` in folder |
 | `#LNMODE [1-3]`      | ✓      | 1=LN, 2=CN (Charge Note), 3=HCN (Hell Charge Note); locks LN type              |
 | `#RANK 4` (redef)    | ✓      | VERY EASY: 1.2× wider than EASY (#RANK 3)                                      |
-| `#DEFEXRANK` (redef) | ✗      | Overrides `#RANK`; value 100 = EASY baseline                                   |
+| `#DEFEXRANK` (redef) | ✓      | Overrides `#RANK`; value 100 = Normal baseline                                 |
 
 #### 1.15 Generalized / Modern Extensions
 
-| Command         | Status | Notes                                                                    |
-|-----------------|--------|--------------------------------------------------------------------------|
-| `#EXBPMxx`      | ✗      | `#BPMxx` alias (BMSC parser bug workaround)                              |
+| Command         | Status | Notes                                                                                           |
+|-----------------|--------|-------------------------------------------------------------------------------------------------|
+| `#EXBPMxx`      | ✗      | `#BPMxx` alias (BMSC parser bug workaround)                                                     |
 | `#BASEBPM`      | ✓      | Visual scroll speed reference BPM (does not affect timing); overrides the Reference BPM setting |
-| `#SONGxx`       | ✓      | Song-related text (merged with `#TEXTxx`)                                |
-| `#MAKER`        | ✓      | Charter/noter name                                                       |
-| `#EXWAVxx`      | ✗      | Extended WAV with pan/volume/frequency (nanasi)                          |
-| `#EXBMPxx`      | ✗      | Extended BMP definition slot                                             |
-| `#EXRANK`       | ✗      | Extended rank definition header                                          |
-| `#POORBGA`      | ✓      | POOR BGA display mode (0=Replace, 1=Add, 2=Off)                          |
-| `#SWBGAxx`      | ✗      | Switchable BGA definition                                                |
-| `#@BGAxx`       | ✗      | Extended BGA crop with dest w/h (9 fields); only 7-field `#BGAxx` parsed |
-| `#ARGBxx`       | ✗      | ARGB color/alpha definition for BGA elements                             |
-| `#POORBGAxx`    | ✗      | Per-slot POOR BGA crop definition (distinct from scalar `#POORBGA` mode) |
-| `#BGAEXPAND`    | ✗      | Global BGA scaling: 0=stretch, 1=keep aspect, 2=no expand                |
-| `#BGAOFF`       | ✗      | Disable BGA for the chart                                                |
-| `#SCROLLxx`     | ✓      | Scroll speed change definitions; per-segment visual multiplier           |
-| `#SPEEDxx`      | ✓      | Spacing change definitions via ChartSpeedFactor`                         |
-| `#VIDEOFILE`    | ✗      | Video file path                                                          |
-| `#MOVIE`        | ✗      | Movie file path                                                          |
-| `#SEEKxx`       | ✗      | Seek position for video                                                  |
-| `#VIDEOf/s`     | ✗      | Video frame rate setting                                                 |
-| `#VIDEOCOLORS`  | ✗      | Video color configuration                                                |
-| `#VIDEODLY`     | ✗      | Video delay setting                                                      |
-| `#OCT/FP`       | ✗      | Octave/FootPedal play mode flag                                          |
-| `MATERIALS`     | ✗      | Materials section marker                                                 |
-| `#MATERIALSWAV` | ✗      | Materials audio definition                                               |
-| `#MATERIALSBMP` | ✗      | Materials image definition                                               |
-| `#DIVIDEPROP`   | ✗      | Divide property configuration                                            |
-| `#CHARSET`      | ✗      | Character encoding specification                                         |
-| `#CDDA`         | ✗      | CD audio track reference                                                 |
-| `#ExtChr`       | ✗      | BM98 proprietary: extended character sprite display                      |
+| `#SONGxx`       | ✓      | Song-related text (merged with `#TEXTxx`)                                                       |
+| `#MAKER`        | ✓      | Charter/noter name                                                                              |
+| `#EXWAVxx`      | ✗      | Extended WAV with pan/volume/frequency (nanasi)                                                 |
+| `#EXBMPxx`      | ✗      | Extended BMP definition slot                                                                    |
+| `#EXRANK`       | ✓      | Bare `#EXRANK` sets the initial judge-window percentage; indexed `#EXRANKxx` feeds channel A0   |
+| `#POORBGA`      | ✓      | POOR BGA display mode (0=Replace, 1=Add, 2=Off)                                                 |
+| `#SWBGAxx`      | ✗      | Switchable BGA definition                                                                       |
+| `#@BGAxx`       | ✗      | Extended BGA crop with dest w/h (9 fields); only 7-field `#BGAxx` parsed                        |
+| `#ARGBxx`       | ✗      | ARGB color/alpha definition for BGA elements                                                    |
+| `#POORBGAxx`    | ✗      | Per-slot POOR BGA crop definition (distinct from scalar `#POORBGA` mode)                        |
+| `#BGAEXPAND`    | ✗      | Global BGA scaling: 0=stretch, 1=keep aspect, 2=no expand                                       |
+| `#BGAOFF`       | ✗      | Disable BGA for the chart                                                                       |
+| `#SCROLLxx`     | ✓      | Scroll speed change definitions; per-segment visual multiplier                                  |
+| `#SPEEDxx`      | ✓      | Spacing change definitions via ChartSpeedFactor`                                                |
+| `#VIDEOFILE`    | ✗      | Video file path                                                                                 |
+| `#MOVIE`        | ✗      | Movie file path                                                                                 |
+| `#SEEKxx`       | ✗      | Seek position for video                                                                         |
+| `#VIDEOf/s`     | ✗      | Video frame rate setting                                                                        |
+| `#VIDEOCOLORS`  | ✗      | Video color configuration                                                                       |
+| `#VIDEODLY`     | ✗      | Video delay setting                                                                             |
+| `#OCT/FP`       | ✗      | Octave/FootPedal play mode flag                                                                 |
+| `MATERIALS`     | ✗      | Materials section marker                                                                        |
+| `#MATERIALSWAV` | ✗      | Materials audio definition                                                                      |
+| `#MATERIALSBMP` | ✗      | Materials image definition                                                                      |
+| `#DIVIDEPROP`   | ✗      | Divide property configuration                                                                   |
+| `#CHARSET`      | ✗      | Character encoding specification                                                                |
+| `#CDDA`         | ✗      | CD audio track reference                                                                        |
+| `#ExtChr`       | ✗      | BM98 proprietary: extended character sprite display                                             |
 
 ### 2. Channel Identifiers
 
@@ -821,8 +836,8 @@ Commands are grouped by origin and listed with their status in this ruleset.
 | `03`    | BPM (hex)          | ✓      | Integer BPM 0–255 via hex values                      |
 | `08`    | Extended BPM       | ✓      | Real-number BPM via `#BPMxx` lookup                   |
 | `09`    | STOP sequence      | ✓      | Freeze duration via `#STOPxx` lookup                  |
-| `97`    | Dynamic BGM volume | ✗      | BGM volume change mid-chart (fgt)                     |
-| `98`    | Dynamic KEY volume | ✗      | Key sound volume change mid-chart (counterpart to 97) |
+| `97`    | Dynamic BGM volume | -      | BGM volume change mid-chart (fgt)                     |
+| `98`    | Dynamic KEY volume | -      | Key sound volume change mid-chart (counterpart to 97) |
 
 #### 2.2 BGA (Background Animation)
 
@@ -905,7 +920,7 @@ Commands are grouped by origin and listed with their status in this ruleset.
 | Channel | Name          | Status | Description                                          |
 |---------|---------------|--------|------------------------------------------------------|
 | `99`    | TEXT Display  | ✓      | In-game text via `#TEXTxx` / `#SONGxx`               |
-| `A0`    | RANK Change   | ✗      | Dynamic rank change via `#EXRANKxx` (nanasigroove)   |
+| `A0`    | RANK Change   | ✓      | Dynamic rank change via `#EXRANKxx` (nanasigroove)   |
 | `A6`    | OPTION Change | ✗      | Dynamic option change via `#CHANGEOPTIONxx`          |
 | `SC`    | SCROLL Change | ✓      | Applies `#SCROLLxx` factor to scroll coordinates     |
 | `SP`    | SPEED Change  | ✓      | Applies `#SPEEDxx` factor to `ScrollSpeedMultiplier` |
@@ -986,60 +1001,52 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 <details>
 <summary>click to open tech details</summary>
 
-| Area          | What is missing                                                                                                               | Priority |
-|---------------|-------------------------------------------------------------------------------------------------------------------------------|----------|
-| **Audio**     | `#WAVCMD` (MacBeat) — pitch/volume/playback-time per WAV slot                                                                 |
-| **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                                                       |
-| **Audio**     | `#VOLWAV` (BM98) — global volume scalar                                                                                       |
-| **Audio**     | `HT`, `DT` preview audio only changed the time gap between events now                                                         | 4        |
-| **Audio**     | `#xxx97` (fgt) — dynamic BGM volume change channel                                                                            |          |
-| **Converter** | Mania 7K → BMS chart conversion                                                                                               | 3        |
-| **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                                                         |
-| **Input**     | Judgement offset adjustment capability                                                                                        |
-| **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)                                                |          |
-| **Parser**    | `#@BGAxx` — extended BGA crop with dest w/h (9 fields); only 7-field `#BGAxx` parsed                                          | 2        |
-| **Parser**    | `#SWBGAxx` — switchable BGA definition                                                                                        | 3        |
-| **Parser**    | `#ARGBxx` — ARGB color/alpha definition for BGA elements                                                                      | 3        |
-| **Parser**    | `#EXBMPxx` — extended BMP definition slot                                                                                     | 3        |
-| **Parser**    | `#POORBGAxx` — per-slot POOR BGA crop definition (distinct from scalar `#POORBGA` mode)                                       | 2        |
-| **Parser**    | `#BGAEXPAND` — global BGA scaling mode (0=stretch, 1=keep aspect, 2=no expand)                                                | 2        |
-| **Parser**    | `#BGAOFF` — disable BGA for the chart                                                                                         | 2        |
-| **Parser**    | BMSON support                                                                                                                 |
-| **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                                                                 |
-| **Parser**    | `#CDDA` — CD audio                                                                                                             |
-| **Parser**    | `#CHARFILE` / `#ExtChr` — character / skin                                                                                    |
-| **Parser**    | `#EXBPMxx` — `#BPMxx` alias (BMSC parser bug workaround)                                                                      |
-| **Parser**    | `#EXRANK` / channel `A0` — extended rank definition                                                                           |
-| **Parser**    | `#EXWAVxx`, `#WAVCMD`, `#VOLWAV` — advanced audio controls                                                                    |
-| **Parser**    | `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — resource groups                                            |
-| **Parser**    | `#OCT/FP` — octave / pedal                                                                                                    |
-| **Parser**    | `#OPTION` — forced option                                                                                                     |
-| **Parser**    | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                                                            |
-| **Parser**    | `#MOVIE` — metadata only                                                                                                      |          | 
-| **Parser**    | `#STP` — absolute STOP sequence                                                                                               |
-| **Parser**    | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — video                                      |
-| **Parser**    | `#DEFEXRANK` — fine-grained judgment width multiplier (overrides `#RANK`)                                                     |
-| **Parser**    | `#CHARSET` — character encoding specification                                                                                 |
-| **Parser**    | `#ExtChr` — BM98 extended character sprite display                                                                            |
-| **Parser**    | Channel `17` / `27` — free-zone keys                                                                                          |
-| **Parser**    | Channel `31`–`49` — invisible notes                                                                                           |
-| **Parser**    | Channel `97` — dynamic BGM volume                                                                                             | 1.5      |
-| **Parser**    | Channel `98` — dynamic KEY volume (counterpart to channel 97)                                                                 | 1.5      | 
-| **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                                                     |
-| **Renderer**  | POOR BGA duration hardcoded 500ms (beatoraja uses config-driven `misslayerDuration`)                                          | 3        |
-| **Scoring**   | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown                                                    | 2        |
-| **Scoring**   | ExRank support                                                                                                                | 3        |
-| **Scoring**   | Different judgement text colours on results screen                                                                            | 4        |
-| **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                                                        | 3        |
-| **Scoring**   | `#DEFEXRANK`, `#EXRANK`, and judge-window-rate support                                                                        | 3        |
-| **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT                                                   | 4        |
-| **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                                                               | 4        |
-| **Skin**      | Column start position — value or enum (leftN, rightN, center)                                                                 | 3        |
-| **Skin**      | Non-legacy BMS skin — fully configurable via skin editor                                                                      |
-| **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                                                                    |
-| **Skin**      | E-POOR judgement image                                                                                                        | 3        |
-| **UI**        | Lane cover / skin / movement                                                                                                  | 2        |
-| **Perf**      | fps is not stable when a large amount of mine disposed                                                                        | 4        |
+| Area          | What is missing                                                                          | Priority |
+|---------------|------------------------------------------------------------------------------------------|----------|
+| **Audio**     | `#WAVCMD` (MacBeat) — pitch/volume/playback-time per WAV slot                            |
+| **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                  |
+| **Audio**     | `HT`, `DT` preview audio only changed the time gap between events now                    | 4        |
+| **Converter** | Mania 7K → BMS chart conversion                                                          | 3        |
+| **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |
+| **Input**     | Judgement offset adjustment capability                                                   |
+| **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |          |
+| **Parser**    | `#@BGAxx` — extended BGA crop with dest w/h (9 fields); only 7-field `#BGAxx` parsed     | 2        |
+| **Parser**    | `#SWBGAxx` — switchable BGA definition                                                   | 3        |
+| **Parser**    | `#ARGBxx` — ARGB color/alpha definition for BGA elements                                 | 3        |
+| **Parser**    | `#EXBMPxx` — extended BMP definition slot                                                | 3        |
+| **Parser**    | `#POORBGAxx` — per-slot POOR BGA crop definition (distinct from scalar `#POORBGA` mode)  | 2        |
+| **Parser**    | `#BGAEXPAND` — global BGA scaling mode (0=stretch, 1=keep aspect, 2=no expand)           | 2        |
+| **Parser**    | `#BGAOFF` — disable BGA for the chart                                                    | 2        |
+| **Parser**    | BMSON support                                                                            |
+| **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                            |
+| **Parser**    | `#CDDA` — CD audio                                                                       |
+| **Parser**    | `#CHARFILE` / `#ExtChr` — character / skin                                               |
+| **Parser**    | `#EXBPMxx` — `#BPMxx` alias (BMSC parser bug workaround)                                 |
+| **Parser**    | `#EXWAVxx`, `#WAVCMD` — advanced audio controls                                          |
+| **Parser**    | `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — resource groups       |
+| **Parser**    | `#OCT/FP` — octave / pedal                                                               |
+| **Parser**    | `#OPTION` — forced option                                                                |
+| **Parser**    | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                       |
+| **Parser**    | `#MOVIE` — metadata only                                                                 |          |
+| **Parser**    | `#STP` — absolute STOP sequence                                                          |
+| **Parser**    | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — video |
+| **Parser**    | `#CHARSET` — character encoding specification                                            |
+| **Parser**    | `#ExtChr` — BM98 extended character sprite display                                       |
+| **Parser**    | Channel `17` / `27` — free-zone keys                                                     |
+| **Parser**    | Channel `31`–`49` — invisible notes                                                      |
+| **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                |
+| **Renderer**  | POOR BGA duration hardcoded 500ms (beatoraja uses config-driven `misslayerDuration`)     | 3        |
+| **Scoring**   | Results screen — EX score, DJ LEVEL, clear type, gauge end % are not shown               | 2        |
+| **Scoring**   | Different judgement text colours on results screen                                       | 4        |
+| **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                   | 3        |
+| **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT              | 4        |
+| **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                          | 4        |
+| **Skin**      | Column start position — value or enum (leftN, rightN, center)                            | 3        |
+| **Skin**      | Non-legacy BMS skin — fully configurable via skin editor                                 |
+| **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                               |
+| **Skin**      | E-POOR judgement image                                                                   | 3        |
+| **UI**        | Lane cover / skin / movement                                                             | 2        |
+| **Perf**      | fps is not stable when a large amount of mine disposed                                   | 4        |
 
 ### FIXME
 

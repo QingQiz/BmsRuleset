@@ -61,7 +61,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                 {
                     if (now >= note.StartTime)
                     {
-                        var headTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, drawable.HitObject.Column, drawable.HitObject.Beatmap.Rank, tail: false);
+                        var headTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, drawable.HitObject.Column, drawable.HitObject.EffectiveJudgementRate, tail: false);
                         var headResult = headTable.ResultForOffset(now - drawable.HitObject.StartTime);
                         if (headResult != HitResult.None && drawable.TryHit(headResult))
                         {
@@ -72,7 +72,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                 }
                 else if (now >= ((BmsLongNote)note).EndTime)
                 {
-                    var tailTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, note.Column, note.Beatmap.Rank, tail: true);
+                    var tailTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, note.Column, note.EffectiveJudgementRate, tail: true);
                     if (longNote.TryRelease(now - ((BmsLongNote)note).EndTime, tailTable))
                         playfield.Stage.Columns[note.Column].PlaySample(note is BmsLongNote ln ? ln.TailSamplePath : string.Empty);
                 }
@@ -81,7 +81,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
             {
                 if (now >= note.StartTime)
                 {
-                    var table = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, drawable.HitObject.Column, drawable.HitObject.Beatmap.Rank, tail: false);
+                    var table = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, drawable.HitObject.Column, drawable.HitObject.EffectiveJudgementRate, tail: false);
                     var result = table.ResultForOffset(now - drawable.HitObject.StartTime);
                     if (result != HitResult.None)
                     {
