@@ -1010,7 +1010,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Audio**     | `HT`, `DT` preview audio only changed the time gap between events now                    | 4        |
 | **Converter** | Mania 7K → BMS chart conversion                                                          | 3        |
 | **Gauge**     | Hard gauge HP reaches 0 at edge cases but score statistics report it as cleared          | 0        |
-| **Gauge**     | Normal gauge fail mark position is incorrect — too far to the right                      | 0        |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |
 | **Input**     | Judgement offset adjustment capability                                                   |
 | **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |          |

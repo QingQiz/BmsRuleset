@@ -158,6 +158,22 @@ public class BmsGaugeHistoryGraphTest
         Assert.That(position.X, Is.LessThanOrEqualTo(graphSize.X));
     }
 
+    [Test]
+    public void TestEndFailureMarkerCentreStaysOnFailurePoint()
+    {
+        var graphSize = new Vector2(300, 180);
+        var points = new[]
+        {
+            new BmsGaugeHistoryGraph.GaugePoint(0, 0.2f),
+            new BmsGaugeHistoryGraph.GaugePoint(1, 0.4f),
+        };
+
+        var position = BmsGaugeHistoryGraph.CalculateFailureMarkerPosition(points, points[^1], 2, graphSize);
+
+        Assert.That(position.X, Is.EqualTo(graphSize.X).Within(0.001));
+        Assert.That(position.Y, Is.EqualTo(graphSize.Y * 0.6f).Within(0.001));
+    }
+
     private static BmsBeatmap createBeatmap() => new()
     {
         LayoutVariant = BmsLayoutVariant.Bme7K,

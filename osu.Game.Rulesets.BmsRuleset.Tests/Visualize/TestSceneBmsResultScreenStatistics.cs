@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
@@ -81,6 +82,80 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         assertText("Hit Scatter");
         assertText("E-POOR");
         assertText("+200 ms");
+    }
+
+    [Test]
+    public void TestGaugeFailureMarkerCentresAlignWithFailurePoints()
+    {
+        BmsGaugeHistoryGraph normalGraph = null!;
+        BmsGaugeHistoryGraph hardGraph = null!;
+        BmsBeatmap normalBeatmap = null!;
+        BmsBeatmap hardBeatmap = null!;
+        ScoreInfo normalScore = null!;
+        ScoreInfo hardScore = null!;
+
+        AddStep("load gauge failure graphs", () =>
+        {
+            normalScore = new ScoreInfo
+            {
+                HitEvents = [new HitEvent(0, 1, HitResult.Good, new BmsNote { StartTime = 1000 }, null, null)],
+            };
+
+            normalBeatmap = new BmsBeatmap
+            {
+                LayoutVariant = BmsLayoutVariant.Bme7K,
+                TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bme7K),
+                Total = 200,
+                HitObjects =
+                {
+                    new BmsNote { StartTime = 1000 },
+                    new BmsNote { StartTime = 2000 },
+                },
+            };
+
+            var hardEvents = Enumerable.Range(0, 20)
+                                       .Select(i => new HitEvent(0, 1, HitResult.Meh, new BmsNote { StartTime = 1000 + i * 100 }, null, null))
+                                       .ToList();
+
+            hardScore = new ScoreInfo
+            {
+                Mods = [new BmsModHardGauge()],
+                HitEvents = hardEvents,
+            };
+
+            hardBeatmap = new BmsBeatmap
+            {
+                LayoutVariant = BmsLayoutVariant.Bme7K,
+                TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bme7K),
+                Total = 200,
+            };
+
+            foreach (var hitEvent in hardEvents)
+                hardBeatmap.HitObjects.Add(new BmsNote { StartTime = hitEvent.HitObject.StartTime });
+
+            Child = new FillFlowContainer
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Width = 720,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new osuTK.Vector2(0, 24),
+                Children =
+                [
+                    normalGraph = new BmsGaugeHistoryGraph(normalScore, normalBeatmap),
+                    hardGraph = new BmsGaugeHistoryGraph(hardScore, hardBeatmap),
+                ],
+            };
+        });
+
+        AddUntilStep("gauge graphs loaded", () => normalGraph.IsLoaded && normalGraph.DrawHeight > 0 && hardGraph.IsLoaded && hardGraph.DrawHeight > 0);
+        AddUntilStep("gauge plots allow overflow", () => !gaugePlotFor(normalGraph).Masking && !gaugePlotFor(hardGraph).Masking);
+        AddUntilStep("normal line has room past end", () => gaugePathExtendsPastRightEdge(normalGraph));
+        AddUntilStep("hard line has room below bottom", () => gaugePathExtendsBelowBottomEdge(hardGraph));
+        AddUntilStep("hard line stops at failure point", () => gaugePathEndsAtFailurePoint(hardGraph, hardScore, hardBeatmap));
+        AddUntilStep("normal failure marker centre aligns", () => failureMarkerCentreAlignsWithFailurePoint(normalGraph, normalScore, normalBeatmap));
+        AddUntilStep("hard failure marker centre aligns", () => failureMarkerCentreAlignsWithFailurePoint(hardGraph, hardScore, hardBeatmap));
     }
 
     [Test]
@@ -394,6 +469,75 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                  .Where(b => Math.Abs(b.Alpha - 0.18f) < 0.001f && b.DrawWidth > 100 && b.DrawHeight > 80)
                  .OrderByDescending(b => b.DrawWidth * b.DrawHeight)
                  .First();
+
+    private static Box gaugePlotBackgroundFor(Drawable statistic) =>
+        statistic.ChildrenOfType<Box>()
+                 .Where(b => Math.Abs(b.Alpha - 0.22f) < 0.001f && b.DrawWidth > 100 && b.DrawHeight > 80)
+                 .OrderByDescending(b => b.DrawWidth * b.DrawHeight)
+                 .First();
+
+    private static Container gaugePlotFor(Drawable statistic) =>
+        (Container)gaugePlotBackgroundFor(statistic).Parent!;
+
+    private static SmoothPath gaugePathFor(Drawable statistic) =>
+        statistic.ChildrenOfType<SmoothPath>().Single(p => p.Name?.Contains("gauge history") == true);
+
+    private static Container failureMarkerFor(Drawable statistic) =>
+        statistic.ChildrenOfType<Container>()
+                 .Single(c => Math.Abs(c.DrawWidth - BmsGaugeHistoryGraph.FAILURE_MARKER_SIZE) < 0.5f
+                              && Math.Abs(c.DrawHeight - BmsGaugeHistoryGraph.FAILURE_MARKER_SIZE) < 0.5f
+                              && c.ChildrenOfType<Box>().Count(b => Math.Abs(Math.Abs(b.Rotation) - 45) < 0.001f) == 4);
+
+    private static bool gaugePathExtendsPastRightEdge(Drawable statistic)
+    {
+        var plot = gaugePlotBackgroundFor(statistic).ScreenSpaceDrawQuad.AABBFloat;
+        var path = gaugePathFor(statistic);
+        var pathBounds = path.ScreenSpaceDrawQuad.AABBFloat;
+
+        return pathBounds.Right >= plot.Right + path.PathRadius - 0.5f;
+    }
+
+    private static bool gaugePathExtendsBelowBottomEdge(Drawable statistic)
+    {
+        var plot = gaugePlotBackgroundFor(statistic).ScreenSpaceDrawQuad.AABBFloat;
+        var path = gaugePathFor(statistic);
+        var pathBounds = path.ScreenSpaceDrawQuad.AABBFloat;
+
+        return pathBounds.Bottom >= plot.Bottom + path.PathRadius - 0.5f;
+    }
+
+    private static bool gaugePathEndsAtFailurePoint(BmsGaugeHistoryGraph graph, ScoreInfo score, BmsBeatmap beatmap)
+    {
+        var failurePoint = BmsGaugeHistoryGraph.CreateSeries(score, beatmap).Single().FailurePoint;
+        if (failurePoint == null)
+            return false;
+
+        var path = gaugePathFor(graph);
+        var pathEnd = path.ToScreenSpace(path.Vertices[^1]);
+        var plot = gaugePlotBackgroundFor(graph).ScreenSpaceDrawQuad.AABBFloat;
+        var expectedX = plot.Left + failurePoint.Value.Time * plot.Width;
+        var expectedY = plot.Top + (1 - failurePoint.Value.Health) * plot.Height;
+
+        return Math.Abs(pathEnd.X - expectedX) < 0.5f
+               && Math.Abs(pathEnd.Y - expectedY) < 0.5f;
+    }
+
+    private static bool failureMarkerCentreAlignsWithFailurePoint(BmsGaugeHistoryGraph graph, ScoreInfo score, BmsBeatmap beatmap)
+    {
+        var failurePoint = BmsGaugeHistoryGraph.CreateSeries(score, beatmap).Single().FailurePoint;
+        if (failurePoint == null)
+            return false;
+
+        var plot = gaugePlotBackgroundFor(graph).ScreenSpaceDrawQuad.AABBFloat;
+        var marker = failureMarkerFor(graph).ScreenSpaceDrawQuad.AABBFloat;
+        var markerCentreX = (marker.Left + marker.Right) / 2;
+        var markerCentreY = (marker.Top + marker.Bottom) / 2;
+        var expectedX = plot.Left + failurePoint.Value.Time * plot.Width;
+        var expectedY = plot.Top + (1 - failurePoint.Value.Health) * plot.Height;
+
+        return Math.Abs(markerCentreX - expectedX) < 0.5f
+               && Math.Abs(markerCentreY - expectedY) < 0.5f;
+    }
 
     private partial class TestBmsSoloResultsScreen : SoloResultsScreen
     {

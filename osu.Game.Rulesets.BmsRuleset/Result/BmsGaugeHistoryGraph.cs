@@ -28,6 +28,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
     private const float final_line_radius = 2.0f;
     private const float secondary_line_radius = 1.2f;
     private const float secondary_line_alpha = 0.55f;
+    internal const float FAILURE_MARKER_SIZE = 13;
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
     private static readonly BmsGaugeType[] auto_gauge_chain =
@@ -110,10 +111,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
 
         foreach (var gauge in series)
         {
-            graph.Add(new GaugePath(gauge.Points)
+            graph.Add(new GaugePath(pointsForPath(gauge))
             {
-                AutoSizeAxes = Axes.None,
-                RelativeSizeAxes = Axes.Both,
                 PathRadius = gauge.LineRadius,
                 Colour = gauge.Colour,
                 Alpha = gauge.LineAlpha,
@@ -125,6 +124,24 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         }
 
         return graph;
+    }
+
+    private static IReadOnlyList<GaugePoint> pointsForPath(GaugeSeries gauge)
+    {
+        if (gauge.FailurePoint is not { } failurePoint)
+            return gauge.Points;
+
+        var points = new List<GaugePoint>();
+
+        foreach (var point in gauge.Points)
+        {
+            points.Add(point);
+
+            if (samePoint(point, failurePoint))
+                break;
+        }
+
+        return points;
     }
 
     private static Drawable createFailureMarker(GaugeSeries gauge, GaugePoint failurePoint)
@@ -338,60 +355,14 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         GaugePoint failurePoint,
         float pathRadius,
         Vector2 size)
-    {
-        var failureIndex = -1;
-
-        for (var i = 0; i < points.Count; i++)
-        {
-            if (Math.Abs(points[i].Time - failurePoint.Time) < 0.0001f
-                && Math.Abs(points[i].Health - failurePoint.Health) < 0.0001f)
-            {
-                failureIndex = i;
-                break;
-            }
-        }
-
-        if (failureIndex <= 0)
-            return positionFor(failurePoint, size);
-
-        var previous = positionFor(points[failureIndex - 1], size);
-        var current = positionFor(failurePoint, size);
-        var delta = current - previous;
-        var length = delta.Length;
-
-        if (length <= 0)
-            return current;
-
-        var direction = delta / length;
-        var perpendicular = new Vector2(-direction.Y, direction.X);
-        var axisPoint = current;
-        var t = 1f;
-
-        if (failurePoint.Health <= 0 && delta.Y > 0)
-        {
-            var centreY = size.Y - Math.Abs(perpendicular.Y) * pathRadius;
-            t = Math.Min(t, Math.Clamp((centreY - previous.Y) / delta.Y, 0, 1));
-        }
-
-        if (failurePoint.Time >= 1 && delta.X > 0)
-        {
-            var centreX = size.X - Math.Abs(perpendicular.X) * pathRadius;
-            t = Math.Min(t, Math.Clamp((centreX - previous.X) / delta.X, 0, 1));
-        }
-        else if (failurePoint.Time <= 0 && delta.X < 0)
-        {
-            var centreX = Math.Abs(perpendicular.X) * pathRadius;
-            t = Math.Min(t, Math.Clamp((centreX - previous.X) / delta.X, 0, 1));
-        }
-
-        if (t < 1)
-            axisPoint = previous + delta * t;
-
-        return axisPoint;
-    }
+        => positionFor(failurePoint, size);
 
     private static Vector2 positionFor(GaugePoint point, Vector2 size) =>
         new(point.Time * size.X, (1 - point.Health) * size.Y);
+
+    private static bool samePoint(GaugePoint first, GaugePoint second) =>
+        Math.Abs(first.Time - second.Time) < 0.0001f
+        && Math.Abs(first.Health - second.Health) < 0.0001f;
 
     private partial class GaugePath : SmoothPath
     {
@@ -401,7 +372,21 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         public GaugePath(IReadOnlyList<GaugePoint> points)
         {
             this.points = points;
+            AutoSizeAxes = Axes.None;
             AddLayout(verticesCache);
+        }
+
+        public override float PathRadius
+        {
+            get => base.PathRadius;
+            set
+            {
+                if (base.PathRadius == value)
+                    return;
+
+                base.PathRadius = value;
+                verticesCache.Invalidate();
+            }
         }
 
         protected override void Update()
@@ -420,15 +405,19 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             ClearVertices();
 
             var size = Parent!.DrawSize;
+            var padding = PathRadius;
+
+            Size = size + new Vector2(padding * 2);
+            Position = new Vector2(-padding);
 
             foreach (var point in points)
-                AddVertex(new Vector2(point.Time * size.X, (1 - point.Health) * size.Y));
+                AddVertex(new Vector2(point.Time * size.X + padding, (1 - point.Health) * size.Y + padding));
         }
     }
 
     private partial class GaugeFailureMarker : Container
     {
-        public const float SIZE = 13;
+        public const float SIZE = FAILURE_MARKER_SIZE;
 
         private readonly IReadOnlyList<GaugePoint> points;
         private readonly GaugePoint failurePoint;
