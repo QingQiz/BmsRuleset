@@ -28,6 +28,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     private const float x_axis_height = 28;
     private const float label_width = 96;
     private const double minimum_offset_range = 150;
+    private const double empty_poor_scatter_offset = -280;
 
     private static readonly Color4 early_colour = new(90, 175, 255, 255);
     private static readonly Color4 late_colour = new(255, 130, 92, 255);
@@ -114,7 +115,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     {
         var points = hitEvents
             .Where(isScatterHit)
-            .Select(e => new ScatterPoint(e.HitObject.StartTime, e.TimeOffset, e.Result))
+            .Select(e => new ScatterPoint(e.HitObject.StartTime, offsetFor(e), e.Result))
             .OrderBy(p => p.Time)
             .ToArray();
 
@@ -125,6 +126,8 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
 
         return new ScatterData(points, duration, offsetRange, ticks);
     }
+
+    private static double offsetFor(HitEvent e) => e.Result == HitResult.Miss ? empty_poor_scatter_offset : e.TimeOffset;
 
     private static bool isScatterHit(HitEvent e)
     {

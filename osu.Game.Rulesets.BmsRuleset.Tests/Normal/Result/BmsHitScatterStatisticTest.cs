@@ -26,7 +26,7 @@ public class BmsHitScatterStatisticTest
                 new HitEvent(5, 1, HitResult.Great, new HitObject { StartTime = 3500 }, null, null),
             ]);
 
-        Assert.That(statistics.Overall.Points.Select(p => p.Offset), Is.EqualTo(new[] { -12, 8, 30, -20, 100 }));
+        Assert.That(statistics.Overall.Points.Select(p => p.Offset), Is.EqualTo(new[] { -12, 8, 30, -20, -300 }));
         Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(new[] { "Scratch", "Key 1", "Key 2", "Key 3", "Key 4", "Key 5" }));
         Assert.That(statistics.Keys[0].Data.Points.Select(p => p.Offset), Is.EqualTo(new[] { -12, 8 }));
         Assert.That(statistics.Keys[1].Data.Points.Select(p => p.Offset), Is.EqualTo(new[] { 30, -20 }));
@@ -54,8 +54,18 @@ public class BmsHitScatterStatisticTest
         }));
 
         Assert.That(data.Points.Select(p => p.Time), Is.EqualTo(new[] { 1000, 2000, 3000, 3500 }));
-        Assert.That(data.Points.Select(p => p.Offset), Is.EqualTo(new[] { -12, 28, 90, 0 }));
+        Assert.That(data.Points.Select(p => p.Offset), Is.EqualTo(new[] { -12, 28, -300, -300 }));
         Assert.That(data.Duration, Is.EqualTo(3500));
+    }
+
+    [Test]
+    public void TestEmptyPoorIsPinnedToEarlyPoorOffset()
+    {
+        var data = BmsHitScatterStatistic.CreateData([
+            new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = 1000 }, null, null),
+        ]);
+
+        Assert.That(data.Points.Single().Offset, Is.EqualTo(-300));
     }
 
     [Test]
