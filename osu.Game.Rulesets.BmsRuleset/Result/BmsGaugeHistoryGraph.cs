@@ -428,6 +428,9 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         Math.Abs(first.Time - second.Time) < 0.0001f
         && Math.Abs(first.Health - second.Health) < 0.0001f;
 
+    private static bool sameSize(Vector2 first, Vector2 second) =>
+        Math.Abs(first.X - second.X) < 0.001f && Math.Abs(first.Y - second.Y) < 0.001f;
+
     internal partial class GaugePath : SmoothPath
     {
         private readonly IReadOnlyList<GaugePoint> points;
@@ -489,12 +492,9 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             foreach (var point in points)
                 AddVertex(new Vector2(point.Time * size.X + padding, (1 - point.Health) * size.Y + padding));
         }
-
-        private static bool sameSize(Vector2 first, Vector2 second) =>
-            Math.Abs(first.X - second.X) < 0.001f && Math.Abs(first.Y - second.Y) < 0.001f;
     }
 
-    private partial class GaugeFailureMarker : Container
+    internal partial class GaugeFailureMarker : Container
     {
         public const float SIZE = FAILURE_MARKER_SIZE;
 
@@ -502,6 +502,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         private readonly GaugePoint failurePoint;
         private readonly float pathRadius;
         private readonly LayoutValue positionCache = new(Invalidation.RequiredParentSizeToFit);
+        private Vector2 lastParentSize = new(float.NaN);
 
         public GaugeFailureMarker(IReadOnlyList<GaugePoint> points, GaugePoint failurePoint, float pathRadius)
         {
@@ -519,17 +520,28 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         {
             base.Update();
 
+            if (Parent == null)
+                return;
+
+            var parentSize = Parent.DrawSize;
+
+            // RequiredParentSizeToFit only fires when this marker's own size changes, but the
+            // marker is a fixed square — a parent (graph) resize never invalidates the cache, so
+            // the position would stick at its first-computed value. Detect the resize manually.
+            if (!sameSize(parentSize, lastParentSize))
+                positionCache.Invalidate();
+
             if (positionCache.IsValid)
                 return;
 
-            updatePosition();
+            updatePosition(parentSize);
             positionCache.Validate();
         }
 
-        private void updatePosition()
+        private void updatePosition(Vector2 parentSize)
         {
-            var size = Parent!.DrawSize;
-            Position = CalculateFailureMarkerPosition(points, failurePoint, pathRadius, size);
+            lastParentSize = parentSize;
+            Position = CalculateFailureMarkerPosition(points, failurePoint, pathRadius, parentSize);
         }
     }
 }

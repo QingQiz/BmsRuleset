@@ -190,6 +190,39 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
     }
 
     [Test]
+    public void TestGaugeFailureMarkerRepositionsWhenParentWidthChanges()
+    {
+        Container markerContainer = null!;
+        BmsGaugeHistoryGraph.GaugeFailureMarker marker = null!;
+
+        AddStep("load failure marker", () =>
+        {
+            var failurePoint = new BmsGaugeHistoryGraph.GaugePoint(0.5f, 0f);
+
+            Child = markerContainer = new Container
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Width = 720,
+                Height = 180,
+                Child = marker = new BmsGaugeHistoryGraph.GaugeFailureMarker(
+                    [new BmsGaugeHistoryGraph.GaugePoint(0, 0.5f), failurePoint],
+                    failurePoint,
+                    1.2f),
+            };
+        });
+
+        AddUntilStep("marker loaded", () => marker.IsLoaded && marker.Position.X > 0);
+        AddUntilStep("initial marker position matches parent width", () =>
+            Math.Abs(marker.Position.X - 0.5f * markerContainer.DrawWidth) < 0.5f);
+
+        AddStep("shrink parent", () => markerContainer.Width = 360);
+
+        AddUntilStep("marker follows shrunken parent width", () =>
+            Math.Abs(marker.Position.X - 0.5f * markerContainer.DrawWidth) < 0.5f);
+    }
+
+    [Test]
     public void TestHitOffsetStatisticTogglesKeyChartsOnClick()
     {
         BmsHitOffsetStatistic hitOffsetStatistic = null!;
