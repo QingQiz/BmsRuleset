@@ -154,18 +154,20 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
 
     private Drawable createGraph()
     {
+        var plotBackground = new Box
+        {
+            RelativeSizeAxes = Axes.Both,
+            Colour = Color4.Black,
+            Alpha = 0.22f,
+        };
+
         var graph = new Container
         {
             RelativeSizeAxes = Axes.X,
             Height = graph_height,
             Children =
             [
-                new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Color4.Black,
-                    Alpha = 0.22f,
-                },
+                plotBackground,
                 createHorizontalLine(0.2f, "80%"),
                 createHorizontalLine(0.5f, "50%"),
             ],
@@ -173,7 +175,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
 
         foreach (var gauge in series)
         {
-            graph.Add(new GaugePath(pointsForPath(gauge))
+            graph.Add(new GaugePath(pointsForPath(gauge), 0)
             {
                 PathRadius = gauge.LineRadius,
                 Colour = gauge.Colour,
@@ -426,14 +428,17 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         Math.Abs(first.Time - second.Time) < 0.0001f
         && Math.Abs(first.Health - second.Health) < 0.0001f;
 
-    private partial class GaugePath : SmoothPath
+    internal partial class GaugePath : SmoothPath
     {
         private readonly IReadOnlyList<GaugePoint> points;
+        private readonly float verticalPadding;
         private readonly LayoutValue verticesCache = new(Invalidation.RequiredParentSizeToFit);
+        private Vector2 lastParentSize = new(float.NaN);
 
-        public GaugePath(IReadOnlyList<GaugePoint> points)
+        public GaugePath(IReadOnlyList<GaugePoint> points, float verticalPadding)
         {
             this.points = points;
+            this.verticalPadding = verticalPadding;
             AutoSizeAxes = Axes.None;
             AddLayout(verticesCache);
         }
@@ -455,26 +460,38 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         {
             base.Update();
 
+            if (Parent == null)
+                return;
+
+            var parentSize = Parent.DrawSize;
+
+            if (!sameSize(parentSize, lastParentSize))
+                verticesCache.Invalidate();
+
             if (verticesCache.IsValid)
                 return;
 
-            updateVertices();
+            updateVertices(parentSize);
             verticesCache.Validate();
         }
 
-        private void updateVertices()
+        private void updateVertices(Vector2 parentSize)
         {
             ClearVertices();
 
-            var size = Parent!.DrawSize;
+            var size = new Vector2(parentSize.X, parentSize.Y - verticalPadding * 2);
             var padding = PathRadius;
 
             Size = size + new Vector2(padding * 2);
-            Position = new Vector2(-padding);
+            Position = new Vector2(-padding, verticalPadding - padding);
+            lastParentSize = parentSize;
 
             foreach (var point in points)
                 AddVertex(new Vector2(point.Time * size.X + padding, (1 - point.Health) * size.Y + padding));
         }
+
+        private static bool sameSize(Vector2 first, Vector2 second) =>
+            Math.Abs(first.X - second.X) < 0.001f && Math.Abs(first.Y - second.Y) < 0.001f;
     }
 
     private partial class GaugeFailureMarker : Container

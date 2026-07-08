@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
@@ -151,11 +150,43 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
         AddUntilStep("gauge graphs loaded", () => normalGraph.IsLoaded && normalGraph.DrawHeight > 0 && hardGraph.IsLoaded && hardGraph.DrawHeight > 0);
         AddUntilStep("gauge plots allow overflow", () => !gaugePlotFor(normalGraph).Masking && !gaugePlotFor(hardGraph).Masking);
-        AddUntilStep("normal line has room past end", () => gaugePathExtendsPastRightEdge(normalGraph));
         AddUntilStep("hard line has room below bottom", () => gaugePathExtendsBelowBottomEdge(hardGraph));
         AddUntilStep("hard line stops at failure point", () => gaugePathEndsAtFailurePoint(hardGraph, hardScore, hardBeatmap));
         AddUntilStep("normal failure marker centre aligns", () => failureMarkerCentreAlignsWithFailurePoint(normalGraph, normalScore, normalBeatmap));
         AddUntilStep("hard failure marker centre aligns", () => failureMarkerCentreAlignsWithFailurePoint(hardGraph, hardScore, hardBeatmap));
+    }
+
+    [Test]
+    public void TestGaugePathUpdatesWhenParentWidthChanges()
+    {
+        Container pathContainer = null!;
+        BmsGaugeHistoryGraph.GaugePath path = null!;
+
+        AddStep("load gauge path", () =>
+        {
+            Child = pathContainer = new Container
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Width = 720,
+                Height = 180,
+                Child = path = new BmsGaugeHistoryGraph.GaugePath(
+                [
+                    new BmsGaugeHistoryGraph.GaugePoint(0, 0.5f),
+                    new BmsGaugeHistoryGraph.GaugePoint(1, 0.5f),
+                ], 0)
+                {
+                    PathRadius = 1.2f,
+                },
+            };
+        });
+
+        AddUntilStep("path loaded", () => path.IsLoaded && path.Vertices.Count > 0);
+        AddUntilStep("initial path matches parent width", () => Math.Abs(path.Vertices[^1].X - (pathContainer.DrawWidth + path.PathRadius)) < 0.5f);
+
+        AddStep("shrink parent", () => pathContainer.Width = 360);
+
+        AddUntilStep("path follows shrunken parent width", () => Math.Abs(path.Vertices[^1].X - (pathContainer.DrawWidth + path.PathRadius)) < 0.5f);
     }
 
     [Test]
@@ -479,23 +510,14 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
     private static Container gaugePlotFor(Drawable statistic) =>
         (Container)gaugePlotBackgroundFor(statistic).Parent!;
 
-    private static SmoothPath gaugePathFor(Drawable statistic) =>
-        statistic.ChildrenOfType<SmoothPath>().Single(p => p.Name?.Contains("gauge history") == true);
+    private static BmsGaugeHistoryGraph.GaugePath gaugePathFor(Drawable statistic) =>
+        statistic.ChildrenOfType<BmsGaugeHistoryGraph.GaugePath>().Single(p => p.Name?.Contains("gauge history") == true);
 
     private static Container failureMarkerFor(Drawable statistic) =>
         statistic.ChildrenOfType<Container>()
                  .Single(c => Math.Abs(c.DrawWidth - BmsGaugeHistoryGraph.FAILURE_MARKER_SIZE) < 0.5f
                               && Math.Abs(c.DrawHeight - BmsGaugeHistoryGraph.FAILURE_MARKER_SIZE) < 0.5f
                               && c.ChildrenOfType<Box>().Count(b => Math.Abs(Math.Abs(b.Rotation) - 45) < 0.001f) == 4);
-
-    private static bool gaugePathExtendsPastRightEdge(Drawable statistic)
-    {
-        var plot = gaugePlotBackgroundFor(statistic).ScreenSpaceDrawQuad.AABBFloat;
-        var path = gaugePathFor(statistic);
-        var pathBounds = path.ScreenSpaceDrawQuad.AABBFloat;
-
-        return pathBounds.Right >= plot.Right + path.PathRadius - 0.5f;
-    }
 
     private static bool gaugePathExtendsBelowBottomEdge(Drawable statistic)
     {
