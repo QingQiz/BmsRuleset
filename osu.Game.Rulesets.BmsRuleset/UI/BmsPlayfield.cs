@@ -253,6 +253,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
         updateEmbeddedSkinFallback();
+        skinCache.WarmLongNoteTextures(Beatmap, host.Renderer);
     }
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject, ScrollController);

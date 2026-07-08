@@ -15,6 +15,7 @@ using osu.Framework.IO.Stores;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
@@ -96,9 +97,12 @@ public class BmsSkinningHelperTest
     {
         public int TextureLookups { get; private set; }
 
+        public List<string> TextureLookupNames { get; } = [];
+
         public override Texture GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT)
         {
             TextureLookups++;
+            TextureLookupNames.Add(componentName);
             return base.GetTexture(componentName, wrapModeS, wrapModeT);
         }
     }
@@ -324,6 +328,45 @@ public class BmsSkinningHelperTest
 
         Assert.That(cache.GetLongNoteBodyTextureSet(lookup, renderer), Is.Not.Null);
         Assert.That(skin.TextureLookups, Is.EqualTo(lookupsAfterFirstResolve));
+    }
+
+    [Test]
+    public void TestGameplaySkinCacheWarmsLongNoteTexturesForBeatmapColumns()
+    {
+        var skin = new CountingTextureSkin(renderer)
+        {
+            TextureSizes =
+            {
+                ["mania-key1"] = (20, 20),
+                ["mania-note1H"] = (20, 20),
+                ["mania-note1L-0"] = (20, 100),
+                ["mania-note1T"] = (20, 20),
+                ["mania-note2H"] = (20, 20),
+                ["mania-note2L-0"] = (20, 100),
+                ["mania-note2T"] = (20, 20),
+            },
+        };
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects =
+            {
+                new BmsLongNote { Column = 1, StartTime = 1000, Duration = 500 },
+                new BmsNote { Column = 2, StartTime = 1000 },
+            },
+        };
+        var source = new TestSkinSource(new BmsLegacySkinTransformer(skin, beatmap));
+        using var cache = new BmsGameplaySkinCache(source);
+
+        cache.WarmLongNoteTextures(beatmap, renderer);
+
+        Assert.That(skin.TextureLookupNames, Does.Contain("mania-note1H"));
+        Assert.That(skin.TextureLookupNames, Does.Contain("mania-note1L-0"));
+        Assert.That(skin.TextureLookupNames, Does.Contain("mania-note1T"));
+        Assert.That(skin.TextureLookupNames, Does.Not.Contain("mania-note2H"));
+        Assert.That(skin.TextureLookupNames, Does.Not.Contain("mania-note2L-0"));
+        Assert.That(skin.TextureLookupNames, Does.Not.Contain("mania-note2T"));
     }
 
     [Test]
