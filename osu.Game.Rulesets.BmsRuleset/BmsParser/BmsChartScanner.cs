@@ -55,9 +55,11 @@ internal static partial class BmsChartParser
             if (lcp.Length == 0) break;
         }
 
-        // Trim back to the last suffix boundary — the point where a
-        // per-difficulty suffix starts (space + opener). Only trim if a quorum
-        // of titles has a matching closer after that position (real suffix).
+        // Trim back to the last suffix boundary — the point where a per-difficulty
+        // suffix starts. A suffix opener may be glued directly to the base title
+        // (e.g. "コモリヌ[SP ANOTHER]", "secret:mirage(SP NORMAL)"), so bracket pairs
+        // don't require a space before the opener. Symmetric delimiters (- ~ ") still
+        // do, otherwise a base title like "Aleph-0" would have its inner '-' stripped.
         for (var i = lcp.Length - 1; i >= 0; i--)
         {
             var c = lcp[i];
@@ -73,33 +75,45 @@ internal static partial class BmsChartParser
                 _ => '\0',
             };
 
-            if (closer != '\0' && (i == 0 || lcp[i - 1] == ' '))
+            if (closer == '\0')
+                continue;
+
+            var symmetric = c == closer;
+            if (symmetric && i != 0 && lcp[i - 1] != ' ')
+                continue;
+
+            // A title can lack the closer when its #TITLE was truncated mid-suffix —
+            // most commonly the // line-comment cutting "[7key//Assault]" down to
+            // "[7key". For bracket pairs, such a truncated opener-plus-content still
+            // counts as evidence of a suffix; only a bare dangling opener with empty
+            // content (e.g. a literal "Song [") does not. Symmetric delimiters have no
+            // separate closer to truncate, so they're excluded. Require a quorum so a
+            // single outlier can't manufacture a suffix boundary on its own.
+            var withCloser = 0;
+            var suffixesDiffer = false;
+            string? firstSuffix = null;
+
+            foreach (var t in core)
             {
-                // A title can lack the closer when its #TITLE was truncated
-                // mid-suffix (e.g. by the comment stripper cutting at a ';').
-                // Require a quorum — not all — to have the closer, so one
-                // truncated outlier can't keep a dangling opener attached.
-                var withCloser = 0;
-                var suffixesDiffer = false;
-                string? firstSuffix = null;
+                if (t.Length <= i)
+                    continue;
 
-                foreach (var t in core)
-                {
-                    if (t.Length <= i || t.IndexOf(closer, i) < 0)
-                        continue;
+                var hasCloser = t.IndexOf(closer, i) >= 0;
+                var truncatedSuffix = !symmetric && !hasCloser && t.Length > i + 1;
+                if (!hasCloser && !truncatedSuffix)
+                    continue;
 
-                    withCloser++;
-                    var suffix = t[i..];
-                    firstSuffix ??= suffix;
-                    if (suffix != firstSuffix)
-                        suffixesDiffer = true;
-                }
+                withCloser++;
+                var suffix = t[i..];
+                firstSuffix ??= suffix;
+                if (suffix != firstSuffix)
+                    suffixesDiffer = true;
+            }
 
-                if (withCloser >= quorum && suffixesDiffer)
-                {
-                    lcp = lcp[..(i == 0 ? 0 : i)];
-                    break;
-                }
+            if (withCloser >= quorum && suffixesDiffer)
+            {
+                lcp = lcp[..(i == 0 ? 0 : i)];
+                break;
             }
         }
 

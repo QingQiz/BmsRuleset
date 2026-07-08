@@ -296,6 +296,56 @@ public class BmsSetTitleTest
             Is.EqualTo("Aleph-0"));
     }
 
+    // ── Suffix glued to base (no space) with a shared inner prefix ──
+    // When per-difficulty suffixes share a prefix INSIDE the brackets
+    // ("[SP ANOTHER]" / "[SP HYPER]"), the LCP extends past the opener
+    // ("Title[SP "), so the trailing-opener strip can't catch it on its own.
+    // The boundary trim must still strip back to the base despite the glue.
+
+    [Test]
+    public void TestBracketSuffixNoSpaceSharedPrefix()
+    {
+        Assert.That(
+            BmsChartParser.InferCommonSetTitle([
+                "Title[SP ANOTHER]",
+                "Title[SP HYPER]",
+                "Title[SP NORMAL]"
+            ]),
+            Is.EqualTo("Title"));
+    }
+
+    [Test]
+    public void TestParenSuffixNoSpaceSharedPrefix()
+    {
+        Assert.That(
+            BmsChartParser.InferCommonSetTitle([
+                "Title(SP ANOTHER)",
+                "Title(SP HYPER)",
+                "Title(SP NORMAL)"
+            ]),
+            Is.EqualTo("Title"));
+    }
+
+    [Test]
+    public void TestTruncatedSuffixMajorityMustNotKeepOpener()
+    {
+        // A // line-comment can truncate a bracketed suffix mid-content — e.g.
+        // "[7key//Assault]" → "[7key" (dangling opener, no closer). When this hits
+        // a MAJORITY of charts, the closer-quorum would fail on the intact titles
+        // alone; the truncated opener-plus-content must still count as suffix
+        // evidence so the set title collapses to the base rather than "Title [".
+        Assert.That(
+            BmsChartParser.InferCommonSetTitle([
+                "Title [7key",
+                "Title [14key",
+                "Title [5key",
+                "Title [32]",
+                "Title [FEATHER]",
+                "Title"
+            ]),
+            Is.EqualTo("Title"));
+    }
+
     // ── Empty / whitespace titles are skipped during inference ──
 
     [Test]
