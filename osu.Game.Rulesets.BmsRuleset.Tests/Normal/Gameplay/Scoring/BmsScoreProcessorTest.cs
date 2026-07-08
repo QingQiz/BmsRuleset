@@ -59,6 +59,22 @@ public class BmsScoreProcessorTest
     }
 
     [Test]
+    [TestCase(ScoreRank.X, 1.0)]
+    [TestCase(ScoreRank.XH, 1.0)]
+    [TestCase(ScoreRank.S, 8.0 / 9.0)]
+    [TestCase(ScoreRank.SH, 8.0 / 9.0)]
+    [TestCase(ScoreRank.A, 7.0 / 9.0)]
+    [TestCase(ScoreRank.B, 6.0 / 9.0)]
+    [TestCase(ScoreRank.C, 5.0 / 9.0)]
+    [TestCase(ScoreRank.D, 0.0)]
+    public void TestAccuracyCutoffFromRankUsesBmsDjLevelThresholds(ScoreRank rank, double expectedAccuracy)
+    {
+        var processor = new BmsScoreProcessor();
+
+        Assert.That(processor.AccuracyCutoffFromRank(rank), Is.EqualTo(expectedAccuracy).Within(1e-9));
+    }
+
+    [Test]
     public void TestScoreProcessorBadBreaksCombo()
     {
         var processor = new BmsScoreProcessor();

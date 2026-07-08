@@ -1050,7 +1050,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                               |
 | **Skin**      | E-POOR judgement image                                                                   | 3        |
 | **UI**        | Lane cover / skin / movement                                                             | 2        |
-| **UI**        | Result screen ring-shaped ACC diagram with per-stage requirements does not match actual implementation | 0        |
 | **Perf**      | fps is not stable when a large amount of mine disposed                                   | 4        |
 
 ### FIXME

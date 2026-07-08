@@ -16,6 +16,13 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 
 public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 {
+    private const double accuracy_cutoff_x = 1;
+    private const double accuracy_cutoff_s = 8.0 / 9.0;
+    private const double accuracy_cutoff_a = 7.0 / 9.0;
+    private const double accuracy_cutoff_b = 6.0 / 9.0;
+    private const double accuracy_cutoff_c = 5.0 / 9.0;
+    private const double accuracy_cutoff_d = 0;
+
     private static readonly Action<JudgementResult, int> set_combo_after = createComboAfterSetter();
 
     private static readonly Action<JudgementResult, double> set_raw_time = createRawTimeSetter();
@@ -62,16 +69,27 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             // Traditional BMS DJ LEVEL thresholds expressed as EX-score ratios.
             // AAA = 8/9 of max ≈ 0.889, AA = 7/9 ≈ 0.778, A = 6/9 ≈ 0.667.
             // We expose S/A/B/C/D as approximate equivalents.
-            >= 8.0 / 9.0 => ScoreRank.S,
-            >= 7.0 / 9.0 => ScoreRank.A,
-            >= 6.0 / 9.0 => ScoreRank.B,
-            >= 5.0 / 9.0 => ScoreRank.C,
+            >= accuracy_cutoff_s => ScoreRank.S,
+            >= accuracy_cutoff_a => ScoreRank.A,
+            >= accuracy_cutoff_b => ScoreRank.B,
+            >= accuracy_cutoff_c => ScoreRank.C,
             _ => ScoreRank.D,
         };
 
         // BMS pass/fail is determined solely by gauge at song end, not by score accuracy.
         // ScoreRank.F is never assigned here; failure is communicated through BmsHealthProcessor.
     }
+
+    public override double AccuracyCutoffFromRank(ScoreRank rank) => rank switch
+    {
+        ScoreRank.X or ScoreRank.XH => accuracy_cutoff_x,
+        ScoreRank.S or ScoreRank.SH => accuracy_cutoff_s,
+        ScoreRank.A => accuracy_cutoff_a,
+        ScoreRank.B => accuracy_cutoff_b,
+        ScoreRank.C => accuracy_cutoff_c,
+        ScoreRank.D => accuracy_cutoff_d,
+        _ => throw new ArgumentOutOfRangeException(nameof(rank), rank, null),
+    };
 
     /// <summary>
     ///     Records an Empty POOR: a keypress that found no note to consume.
