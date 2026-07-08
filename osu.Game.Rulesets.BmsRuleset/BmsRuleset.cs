@@ -130,7 +130,7 @@ public partial class BmsRuleset : Ruleset
     [
         new("Gauge History", () => new BmsGaugeHistoryGraph(score, playableBeatmap), requiresHitEvents: true),
         new("Timeline", () => new BmsTimelineStatistic(score, playableBeatmap), requiresHitEvents: true),
-        new("Hit Scatter", () => new BmsHitScatterStatistic(score.HitEvents), requiresHitEvents: true),
+        new("Hit Scatter", () => new BmsHitScatterStatistic(score.HitEvents, playableBeatmap), requiresHitEvents: true),
         new("Hit Offset", () => new BmsHitOffsetStatistic(score.HitEvents, playableBeatmap), requiresHitEvents: true),
     ];
 

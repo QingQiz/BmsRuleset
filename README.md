@@ -171,6 +171,15 @@ dynamic option channel (`A6`).
 
 ---
 
+### Song Preview
+
+Song select preview audio is generated from the original BMS folder rather than from a stored osu! audio file. The
+ruleset first tries a declared `#PREVIEW` file, then a `preview.*` file in the chart folder, and finally falls back to
+the chart's BGM/keysound event timeline. This makes charts without a dedicated preview file still audible in song
+select.
+
+---
+
 ### Clear Lamps
 
 BMS beatmap panels show a clear lamp based on your best matching local score. Lamps cover the usual BMS result states:
@@ -179,13 +188,6 @@ No Play, Failed, Assist Clear, Easy Clear, Clear, Hard Clear, EX Hard Clear, Ful
 The lamp follows the currently selected gameplay-affecting mods when possible. For example, a score set with
 Hide Scratch, Auto Scratch, Constant, Half Time, or Double Time is only used for the lamp when the matching mod setup is
 selected in song select.
-
-### Song Preview
-
-Song select preview audio is generated from the original BMS folder rather than from a stored osu! audio file. The
-ruleset first tries a declared `#PREVIEW` file, then a `preview.*` file in the chart folder, and finally falls back to
-the chart's BGM/keysound event timeline. This makes charts without a dedicated preview file still audible in song
-select.
 
 ---
 

@@ -5,8 +5,12 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Input.Events;
+using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.Objects;
@@ -18,58 +22,92 @@ namespace osu.Game.Rulesets.BmsRuleset.Result;
 
 public sealed partial class BmsHitScatterStatistic : CompositeDrawable
 {
-    private const float graph_height = 220;
+    private const float graph_height = 200;
+    private const float key_graph_height = 140;
     private const float axis_width = 52;
     private const float x_axis_height = 28;
+    private const float label_width = 96;
     private const double minimum_offset_range = 150;
 
     private static readonly Color4 early_colour = new(90, 175, 255, 255);
     private static readonly Color4 late_colour = new(255, 130, 92, 255);
 
-    private readonly ScatterData data;
+    private readonly HitScatterStatistics statistics;
+    private FillFlowContainer content = null!;
+    private bool expanded;
 
-    public BmsHitScatterStatistic(IReadOnlyList<HitEvent> hitEvents)
+    public BmsHitScatterStatistic(IReadOnlyList<HitEvent> hitEvents, IBeatmap playableBeatmap)
     {
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        data = CreateData(hitEvents);
+        statistics = CreateStatistics(playableBeatmap, hitEvents);
     }
+
+    public override bool HandlePositionalInput => true;
 
     [BackgroundDependencyLoader]
     private void load()
     {
-        InternalChild = new FillFlowContainer
+        InternalChild = content = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.X,
             AutoSizeAxes = Axes.Y,
             Direction = FillDirection.Vertical,
             Spacing = new Vector2(0, 8),
-            Children =
-            [
-                createLegend(),
-                new GridContainer
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = graph_height + x_axis_height,
-                    ColumnDimensions =
-                    [
-                        new Dimension(GridSizeMode.Absolute, axis_width),
-                        new Dimension(),
-                    ],
-                    RowDimensions =
-                    [
-                        new Dimension(GridSizeMode.Absolute, graph_height),
-                        new Dimension(GridSizeMode.Absolute, x_axis_height),
-                    ],
-                    Content = new[]
-                    {
-                        new[] { createYAxis(), createPlot() },
-                        new[] { Empty(), createXAxis() },
-                    },
-                },
-            ],
         };
+
+        rebuild();
+    }
+
+    internal static HitScatterStatistics CreateStatistics(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents)
+    {
+        var scatterHits = hitEvents.Where(isScatterHit).ToArray();
+        var bmsHitEvents = scatterHits.Where(e => e.HitObject is BmsHitObject).ToArray();
+
+        var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
+        var totalColumns = playableBeatmap is BmsBeatmap { TotalColumns: > 0 } bmsWithColumns
+            ? bmsWithColumns.TotalColumns
+            : Math.Max(BmsLayout.GetTotalColumns(variant), bmsHitEvents.Select(e => ((BmsHitObject)e.HitObject).Column + 1).DefaultIfEmpty(0).Max());
+
+        var hitsByColumn = bmsHitEvents.ToLookup(e => ((BmsHitObject)e.HitObject).Column);
+        var keyIndex = 0;
+
+        var keyGroups = Enumerable.Range(0, totalColumns)
+            .Select(column => new KeyHitScatterStatistics(labelFor(column, variant, ref keyIndex), CreateData(hitsByColumn[column].ToArray())))
+            .ToArray();
+
+        return new HitScatterStatistics(CreateData(scatterHits), keyGroups);
+    }
+
+    private static string labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
+    {
+        if (BmsLayout.IsScratchColumn(column, variant))
+            return "Scratch";
+
+        return $"Key {++keyIndex}";
+    }
+
+    private void rebuild()
+    {
+        content.Clear();
+
+        content.Add(createLegend(statistics.Overall));
+        content.Add(createRow("Overall", statistics.Overall, graph_height));
+
+        if (expanded)
+        {
+            foreach (var key in statistics.Keys)
+                content.Add(createRow(key.Label, key.Data, key_graph_height));
+        }
+    }
+
+    protected override bool OnClick(ClickEvent e)
+    {
+        expanded = !expanded;
+        rebuild();
+
+        return true;
     }
 
     internal static ScatterData CreateData(IReadOnlyList<HitEvent> hitEvents)
@@ -101,7 +139,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         };
     }
 
-    private Drawable createLegend()
+    private static Drawable createLegend(ScatterData data)
     {
         var children = new List<Drawable>
         {
@@ -153,15 +191,92 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         };
     }
 
-    private Drawable createYAxis() => new Container
+    private static Drawable createRow(string label, ScatterData data, float height) => new GridContainer
     {
-        RelativeSizeAxes = Axes.Both,
-        Children = data.OffsetTicks.SelectMany(tick => new[] { createYAxisTick(tick), createYAxisMark(tick) }).ToArray(),
+        RelativeSizeAxes = Axes.X,
+        Height = height + x_axis_height,
+        ColumnDimensions =
+        [
+            new Dimension(GridSizeMode.Absolute, label_width),
+            new Dimension(),
+        ],
+        Content = new[]
+        {
+            new[]
+            {
+                createLabel(label, data),
+                createGraph(data, height),
+            },
+        },
     };
 
-    private Drawable createYAxisTick(double tick)
+    private static Drawable createLabel(string label, ScatterData data) => new FillFlowContainer
     {
-        var y = yFor(tick);
+        RelativeSizeAxes = Axes.X,
+        AutoSizeAxes = Axes.Y,
+        Anchor = Anchor.CentreLeft,
+        Origin = Anchor.CentreLeft,
+        Direction = FillDirection.Vertical,
+        Spacing = new Vector2(0, 2),
+        Children =
+        [
+            new OsuSpriteText
+            {
+                Text = label,
+                Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
+            },
+            new OsuSpriteText
+            {
+                Text = $"{data.Points.Count} hits",
+                Colour = Color4.White,
+                Alpha = 0.55f,
+                Font = OsuFont.GetFont(size: 10),
+            },
+        ],
+    };
+
+    private static Drawable createGraph(ScatterData data, float height) => new Container
+    {
+        RelativeSizeAxes = Axes.X,
+        Height = height + x_axis_height,
+        Children =
+        [
+            new GridContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = height + x_axis_height,
+                RowDimensions =
+                [
+                    new Dimension(GridSizeMode.Absolute, height),
+                    new Dimension(GridSizeMode.Absolute, x_axis_height),
+                ],
+                Content = new[]
+                {
+                    new[] { createPlot(data) },
+                    new[] { createXAxis(data) },
+                },
+            },
+            new Container
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopRight,
+                Width = axis_width,
+                Height = height,
+                Child = createYAxis(data),
+            },
+        ],
+    };
+
+    private static Drawable createYAxis(ScatterData data) => new Container
+    {
+        RelativeSizeAxes = Axes.Y,
+        Width = axis_width,
+        Children = data.OffsetTicks.SelectMany(tick => new[] { createYAxisTick(data, tick), createYAxisMark(data, tick) }).ToArray(),
+    };
+
+    private static Drawable createYAxisTick(ScatterData data, double tick)
+    {
+        var y = yFor(data, tick);
 
         return new OsuSpriteText
         {
@@ -169,7 +284,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             Origin = Anchor.CentreRight,
             RelativePositionAxes = Axes.Y,
             Y = y,
-            X = -6,
+            X = -10,
             Text = $"{tick:+0;-0;0} ms",
             Colour = tick < 0 ? early_colour : tick > 0 ? late_colour : Color4.White,
             Alpha = tick == 0 ? 0.75f : 0.55f,
@@ -177,44 +292,50 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         };
     }
 
-    private Drawable createYAxisMark(double tick) => new Box
+    private static Drawable createYAxisMark(ScatterData data, double tick) => new Box
     {
         Anchor = Anchor.TopRight,
         Origin = Anchor.CentreRight,
         RelativePositionAxes = Axes.Y,
-        Y = yFor(tick),
-        Width = tick == 0 ? 12 : 8,
+        Y = yFor(data, tick),
+        X = 0,
+        Width = tick == 0 ? 8 : 5,
         Height = tick == 0 ? 2 : 1,
         Colour = Color4.White,
         Alpha = tick == 0 ? 0.45f : 0.25f,
     };
 
-    private Drawable createPlot()
+    private static Drawable createPlot(ScatterData data)
     {
-        var children = new List<Drawable>
-        {
-            new Box { RelativeSizeAxes = Axes.Both, Colour = Color4.Black, Alpha = 0.18f },
-        };
+        var dataAreaChildren = new List<Drawable>();
 
         foreach (var tick in data.OffsetTicks)
-            children.Add(createGridLine(tick));
+            dataAreaChildren.Add(createGridLine(data, tick));
 
-        children.Add(createTimingDirectionLabel("early", early_colour, Anchor.BottomRight));
-        children.Add(createTimingDirectionLabel("late", late_colour, Anchor.TopRight));
+        dataAreaChildren.AddRange(data.Points.Select(point => createPoint(data, point)));
 
-        children.AddRange(data.Points.Select(createPoint));
+        dataAreaChildren.Add(createTimingDirectionLabel("fast", early_colour, Anchor.TopRight));
+        dataAreaChildren.Add(createTimingDirectionLabel("late", late_colour, Anchor.BottomRight));
 
         return new Container
         {
             RelativeSizeAxes = Axes.Both,
             Masking = true,
-            Children = children,
+            Children =
+            [
+                new Box { RelativeSizeAxes = Axes.Both, Colour = Color4.Black, Alpha = 0.18f },
+                new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Children = dataAreaChildren,
+                },
+            ],
         };
     }
 
-    private Drawable createGridLine(double tick)
+    private static Drawable createGridLine(ScatterData data, double tick)
     {
-        var y = yFor(tick);
+        var y = yFor(data, tick);
 
         return new Box
         {
@@ -229,31 +350,30 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         };
     }
 
-    private Drawable createTimingDirectionLabel(string text, Color4 colour, Anchor origin) => new OsuSpriteText
+    private static Drawable createTimingDirectionLabel(string text, Color4 colour, Anchor anchor) => new OsuSpriteText
     {
-        Anchor = Anchor.TopRight,
-        Origin = origin,
-        RelativePositionAxes = Axes.Y,
+        Anchor = anchor,
+        Origin = anchor,
         X = -6,
-        Y = yFor(0),
+        Y = anchor == Anchor.TopRight ? 6 : -6,
         Text = text,
         Colour = colour,
         Alpha = 0.72f,
         Font = OsuFont.GetFont(size: 11, weight: FontWeight.Bold),
     };
 
-    private Drawable createPoint(ScatterPoint point) => new Circle
+    private static Drawable createPoint(ScatterData data, ScatterPoint point) => new Circle
     {
         Origin = Anchor.Centre,
         RelativePositionAxes = Axes.Both,
         X = (float)Math.Clamp(point.Time / data.Duration, 0, 1),
-        Y = yFor(point.Offset),
+        Y = yFor(data, point.Offset),
         Size = new Vector2(point.Result == HitResult.Miss ? 5.2f : 4.4f),
         Colour = BmsHitResultColours.ForHitResult(point.Result),
         Alpha = point.Result == HitResult.Miss ? 0.95f : 0.82f,
     };
 
-    private Drawable createXAxis() => new Container
+    private static Drawable createXAxis(ScatterData data) => new Container
     {
         RelativeSizeAxes = Axes.Both,
         Children =
@@ -288,7 +408,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         ],
     };
 
-    private float yFor(double offset) => (float)Math.Clamp((offset + data.OffsetRange) / (data.OffsetRange * 2), 0, 1);
+    private static float yFor(ScatterData data, double offset) => (float)Math.Clamp((offset + data.OffsetRange) / (data.OffsetRange * 2), 0, 1);
 
     private static string formatTime(double milliseconds)
     {
@@ -296,6 +416,10 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
 
         return seconds < 60 ? $"{seconds:0}s" : $"{Math.Floor(seconds / 60):0}:{seconds % 60:00}";
     }
+
+    internal sealed record HitScatterStatistics(ScatterData Overall, IReadOnlyList<KeyHitScatterStatistics> Keys);
+
+    internal sealed record KeyHitScatterStatistics(string Label, ScatterData Data);
 
     internal sealed record ScatterData(IReadOnlyList<ScatterPoint> Points, double Duration, double OffsetRange, IReadOnlyList<double> OffsetTicks);
 

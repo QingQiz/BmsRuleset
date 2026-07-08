@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -20,6 +21,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Result;
 
 public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
 {
+    private const float graph_height = 200;
+    private const float key_graph_height = 100;
     private const double offset_range = 150;
     private const int bin_count = 200;
     private const float label_width = 96;
@@ -27,6 +30,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
     private readonly HitOffsetStatistics statistics;
 
     private FillFlowContainer content = null!;
+    private bool expanded;
 
     public BmsHitOffsetStatistic(IReadOnlyList<HitEvent> hitEvents, IBeatmap playableBeatmap)
     {
@@ -35,6 +39,8 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
 
         statistics = CreateStatistics(playableBeatmap, hitEvents);
     }
+
+    public override bool HandlePositionalInput => true;
 
     [BackgroundDependencyLoader]
     private void load()
@@ -81,10 +87,21 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
     {
         content.Clear();
 
-        content.Add(createRow("Overall", statistics.Overall, 126));
+        content.Add(createRow("Overall", statistics.Overall, graph_height));
 
-        foreach (var key in statistics.Keys)
-            content.Add(createRow(key.Label, key.Summary, 84));
+        if (expanded)
+        {
+            foreach (var key in statistics.Keys)
+                content.Add(createRow(key.Label, key.Summary, key_graph_height));
+        }
+    }
+
+    protected override bool OnClick(ClickEvent e)
+    {
+        expanded = !expanded;
+        rebuild();
+
+        return true;
     }
 
     private static Drawable createRow(string label, HitOffsetSummary summary, float height) => new GridContainer
