@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using osu.Framework.Logging;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
@@ -72,11 +73,7 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
     protected override Track GetBeatmapTrack()
     {
-        // Access inner.Beatmap directly instead of this.Beatmap to avoid
-        // triggering WorkingBeatmap.loadBeatmapAsync() side effects on the
-        // BmsWorkingBeatmap wrapper.  The inner BeatmapManagerWorkingBeatmap
-        // already caches its decoded beatmap; no need to duplicate the work.
-        var beatmap = inner.Beatmap;
+        var beatmap = Beatmap;
 
         if (beatmap is IBmsBeatmap bmsBeatmap)
         {
@@ -126,7 +123,7 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         return null!; // fall back to TrackVirtual by WorkingBeatmap.LoadTrack
     }
 
-    protected override IBeatmap GetBeatmap() => inner.Beatmap;
+    protected override IBeatmap GetBeatmap() => tryDecodeExternalBeatmap(BeatmapInfo) ?? inner.Beatmap;
 
     protected override ISkin GetSkin() => inner.Skin;
 
@@ -136,14 +133,21 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
     private static BeatmapInfo createWrapperBeatmapInfo(WorkingBeatmap inner)
     {
-        var beatmapInfo = inner.BeatmapInfo.Clone();
-        beatmapInfo.Metadata = inner.BeatmapInfo.Metadata.DeepClone();
-        beatmapInfo.BeatmapSet = cloneBeatmapSetInfo(beatmapInfo.BeatmapSet, beatmapInfo);
-        var backgroundPaths = resolveExternalBackgroundPaths(inner, false);
-        var panelBackgroundPaths = resolveExternalBackgroundPaths(inner, true);
+        var beatmapInfo = cloneBeatmapInfo(inner.BeatmapInfo);
+        var bmsBeatmap = tryDecodeExternalBeatmap(beatmapInfo) as IBmsBeatmap ?? inner.Beatmap as IBmsBeatmap;
+        var backgroundPaths = resolveExternalBackgroundPaths(beatmapInfo.Metadata.Source, bmsBeatmap, false);
+        var panelBackgroundPaths = resolveExternalBackgroundPaths(beatmapInfo.Metadata.Source, bmsBeatmap, true);
         applyExternalBackgroundMarker(beatmapInfo, backgroundPaths.FirstOrDefault(), panelBackgroundPaths.FirstOrDefault());
 
         return beatmapInfo;
+    }
+
+    private static BeatmapInfo cloneBeatmapInfo(BeatmapInfo source)
+    {
+        var clone = source.Clone();
+        clone.Metadata = source.Metadata.DeepClone();
+        clone.BeatmapSet = cloneBeatmapSetInfo(clone.BeatmapSet, clone);
+        return clone;
     }
 
     private static BeatmapSetInfo? cloneBeatmapSetInfo(BeatmapSetInfo? source, BeatmapInfo owner)
@@ -187,19 +191,55 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
             beatmapInfo.BeatmapSet?.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = $"{backgroundPath}|{panelBackgroundPath}" }, markerPath));
     }
 
-    private static List<string> resolveExternalBackgroundPaths(WorkingBeatmap inner, bool preferBanner)
+    private static IBeatmap? tryDecodeExternalBeatmap(BeatmapInfo beatmapInfo)
+    {
+        var chartPath = tryResolveExternalChartPath(beatmapInfo);
+
+        if (chartPath == null)
+            return null;
+
+        try
+        {
+            return BmsBeatmapDecoder.DecodeBytes(File.ReadAllBytes(chartPath), cloneBeatmapInfo(beatmapInfo));
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, $"BMS external beatmap decode failed for {chartPath}");
+            return null;
+        }
+    }
+
+    private static string? tryResolveExternalChartPath(BeatmapInfo beatmapInfo)
+    {
+        if (string.IsNullOrWhiteSpace(beatmapInfo.Metadata.Source) || !Directory.Exists(beatmapInfo.Metadata.Source) || string.IsNullOrWhiteSpace(beatmapInfo.Path))
+            return null;
+
+        var baseFullPath = Path.GetFullPath(beatmapInfo.Metadata.Source);
+
+        try
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(baseFullPath, beatmapInfo.Path));
+            return BmsFileResourceStore.IsPathInsideDirectory(fullPath, baseFullPath) && File.Exists(fullPath) ? fullPath : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static List<string> resolveExternalBackgroundPaths(string? sourceDirectory, IBmsBeatmap? bmsBeatmap, bool preferBanner)
     {
         var paths = new List<string>();
 
         // Source is only a directory for external-audio charts; bail before touching
         // inner.Beatmap so normal imports don't pay for a decode just to resolve backgrounds.
-        if (string.IsNullOrWhiteSpace(inner.Metadata.Source) || !Directory.Exists(inner.Metadata.Source))
+        if (string.IsNullOrWhiteSpace(sourceDirectory) || !Directory.Exists(sourceDirectory))
             return paths;
 
-        if (inner.Beatmap is not IBmsBeatmap bmsBeatmap)
+        if (bmsBeatmap == null)
             return paths;
 
-        var baseFullPath = Path.GetFullPath(inner.Metadata.Source);
+        var baseFullPath = Path.GetFullPath(sourceDirectory);
 
         foreach (var candidate in getBackgroundCandidates(bmsBeatmap, preferBanner))
         {
@@ -268,8 +308,10 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
         externalBackgroundResolved = true;
 
-        resolvedBackgroundPaths = resolveExternalBackgroundPaths(inner, false);
-        resolvedPanelBackgroundPaths = resolveExternalBackgroundPaths(inner, true);
+        var bmsBeatmap = tryDecodeExternalBeatmap(BeatmapInfo) as IBmsBeatmap ?? inner.Beatmap as IBmsBeatmap;
+
+        resolvedBackgroundPaths = resolveExternalBackgroundPaths(Metadata.Source, bmsBeatmap, false);
+        resolvedPanelBackgroundPaths = resolveExternalBackgroundPaths(Metadata.Source, bmsBeatmap, true);
 
         var backgroundPath = resolvedBackgroundPaths.FirstOrDefault();
         var panelBackgroundPath = resolvedPanelBackgroundPaths.FirstOrDefault();

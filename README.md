@@ -1012,7 +1012,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Gauge**     | Hard gauge HP reaches 0 at edge cases but score statistics report it as cleared          | 0        |
 | **Gauge**     | Normal gauge fail mark position is incorrect — too far to the right                      | 0        |
 | **Import**    | Duplicate MD5 charts within the same song set are allowed to be imported                 | 0        |
-| **Import**    | UTF-8 decoded filenames fail to find files — encoding mismatch (see `D:\BMS\LargePack\BMS\Amnehilesie`) | 0        |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |
 | **Input**     | Judgement offset adjustment capability                                                   |
 | **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |          |

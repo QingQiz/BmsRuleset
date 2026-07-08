@@ -94,10 +94,27 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
 
     protected override Beatmap CreateTemplateObject() => new BmsDecodedBeatmap();
 
+    internal static Beatmap DecodeBytes(byte[] content, BeatmapInfo? beatmapInfo = null, Func<int, int>? randomValueSelector = null, BmsReferenceBpmMode? referenceBpmMode = null)
+    {
+        var decoder = new BmsBeatmapDecoder(randomValueSelector, referenceBpmMode);
+        var output = decoder.CreateTemplateObject();
+
+        if (beatmapInfo != null)
+            output.BeatmapInfo = beatmapInfo;
+
+        decoder.parseLinesInto(output, BmsChartParser.ReadAllLines(content), output.BeatmapInfo.Path);
+        return output;
+    }
+
     protected override void ParseStreamInto(LineBufferedReader stream, bool _, Beatmap output)
     {
         var lines = readLines(stream, output.BeatmapInfo.Path);
-        var parseResult = BmsChartParser.Parse(lines, output.BeatmapInfo.Path, decodeBranchSelector, effectiveReferenceBpmMode);
+        parseLinesInto(output, lines, output.BeatmapInfo.Path);
+    }
+
+    private void parseLinesInto(Beatmap output, string[] lines, string? path)
+    {
+        var parseResult = BmsChartParser.Parse(lines, path, decodeBranchSelector, effectiveReferenceBpmMode);
 
         applyMetadata(output, parseResult);
         PopulateTiming(output, parseResult.TimingMap.BpmEvents);

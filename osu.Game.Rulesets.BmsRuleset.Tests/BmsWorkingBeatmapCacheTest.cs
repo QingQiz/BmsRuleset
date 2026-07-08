@@ -1,7 +1,10 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Text;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
@@ -11,6 +14,7 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
@@ -244,6 +248,54 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     }
 
     [Test]
+    public void TestBmsWorkingBeatmapDecodesExternalShiftJisChartFromOriginalBytes()
+    {
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-shiftjis-{Guid.NewGuid()}");
+        const string chart_name = "shiftjis.bms";
+        BmsWorkingBeatmap working = null!;
+        Track previewTrack = null!;
+
+        AddStep("create shift-jis chart", () =>
+        {
+            Directory.CreateDirectory(directory);
+            createdDirectories.Add(directory);
+
+            const string chart = """
+                                 #PLAYER 1
+                                 #TITLE Shift JIS
+                                 #ARTIST Test
+                                 #WAV01 b_accordion (切る)_v100l8o5c.wav
+                                 #00111:01
+                                 """;
+
+            var shiftJis = CodePagesEncodingProvider.Instance.GetEncoding(932)!;
+            File.WriteAllBytes(Path.Combine(directory, chart_name), shiftJis.GetBytes(chart));
+        });
+
+        AddStep("create wrapped working beatmap", () =>
+        {
+            var beatmapSet = new BeatmapSetInfo();
+            var beatmapInfo = createBeatmapInfo(beatmapSet, directory, chart_name);
+
+            var innerBeatmap = new BmsBeatmap
+            {
+                SampleDefinitions = new Dictionary<ushort, string>
+                {
+                    [1] = "b_accordion (�؂�)_v100l8o5c.wav",
+                },
+            };
+
+            working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, innerBeatmap, beatmapInfo), audio);
+        });
+
+        AddAssert("sample path decoded from original bytes", () =>
+            ((IBmsBeatmap)working.Beatmap).SampleDefinitions[1] == "b_accordion (切る)_v100l8o5c.wav");
+
+        AddStep("load preview track", () => previewTrack = working.LoadTrack());
+        AddAssert("preview uses decoded sample path", () => getFirstPreviewEventSamplePath(previewTrack) == "b_accordion (切る)_v100l8o5c.wav");
+    }
+
+    [Test]
     public void TestBmsWorkingBeatmapBackgroundComparisonChangesBetweenExternalBackgrounds()
     {
         var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-background-compare-{Guid.NewGuid()}");
@@ -328,6 +380,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         };
 
         beatmapSet.Beatmaps.Add(beatmap);
+        beatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = beatmap.Hash }, filename));
 
         return beatmap;
     }
@@ -339,6 +392,16 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             .Invoke(cache, [directory]);
 
         return new WeakReference(store);
+    }
+
+    private static string getFirstPreviewEventSamplePath(Track track)
+    {
+        var events = (IEnumerable)typeof(BmsPreviewTrack)
+            .GetField("sortedEvents", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(track)!;
+
+        var first = events.Cast<object>().FirstOrDefault();
+        return first?.GetType().GetProperty("SamplePath")?.GetValue(first) as string ?? string.Empty;
     }
 
     [BackgroundDependencyLoader]
