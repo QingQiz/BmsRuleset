@@ -52,25 +52,14 @@ internal static partial class BmsChartParser
         BmsReferenceBpmMode referenceBpmMode = BmsReferenceBpmMode.StartBpm)
     {
         var state = new ParseState();
-        var commentStripper = new BmsCommentStripper();
 
-        // Merged pipeline: comment stripping → OfType filter → control-flow resolution → parseLine.
-        // A single foreach loop replaces four iterator layers (Select, OfType, MaterializeControlFlow,
-        // and the consuming foreach), eliminating per-element state-machine dispatch overhead.
+        // A single foreach loop replaces iterator layers for control-flow resolution and parsing,
+        // eliminating per-element state-machine dispatch overhead.
         randomValueSelector ??= selectRandomValue;
         var frames = new List<ControlFrame>();
 
-        foreach (var rawLine in lines)
+        foreach (var line in lines)
         {
-            // Comment stripping + OfType filter (inline).
-            string? line;
-            if (rawLine.Length > 0 && rawLine[0] == '%')
-                line = rawLine;
-            else
-                line = commentStripper.ProcessLine(rawLine);
-
-            if (line == null) continue;
-
             // Control-flow resolution (inline MaterializeControlFlow).
             if (tryReadControlCommand(line, out var command, out var value))
             {

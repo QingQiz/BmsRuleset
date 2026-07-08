@@ -277,11 +277,9 @@ public class BmsSetTitleTest
     [Test]
     public void TestTruncatedSuffixInOneChartMustNotKeepOpener()
     {
-        // A title whose #TITLE was truncated mid-suffix — the comment stripper
-        // cuts at the ';' inside "[(^_^;)]", leaving "Aleph-0[(^_^" with a
-        // dangling '[' and no closing ']'. That one truncated chart must not
-        // keep the opener attached to the set title when the rest of the set
-        // closes the suffix.
+        // A title imported from an externally normalized source can be truncated
+        // mid-suffix. That one truncated chart must not keep the opener attached
+        // to the set title when the rest of the set closes the suffix.
         Assert.That(
             BmsChartParser.InferCommonSetTitle([
                 "Aleph-0[14ANOTHER]",
@@ -329,11 +327,10 @@ public class BmsSetTitleTest
     [Test]
     public void TestTruncatedSuffixMajorityMustNotKeepOpener()
     {
-        // A // line-comment can truncate a bracketed suffix mid-content — e.g.
-        // "[7key//Assault]" → "[7key" (dangling opener, no closer). When this hits
-        // a MAJORITY of charts, the closer-quorum would fail on the intact titles
-        // alone; the truncated opener-plus-content must still count as suffix
-        // evidence so the set title collapses to the base rather than "Title [".
+        // When a majority of charts have externally truncated suffixes, the
+        // closer-quorum would fail on the intact titles alone; the truncated
+        // opener-plus-content must still count as suffix evidence so the set title
+        // collapses to the base rather than "Title [".
         Assert.That(
             BmsChartParser.InferCommonSetTitle([
                 "Title [7key",

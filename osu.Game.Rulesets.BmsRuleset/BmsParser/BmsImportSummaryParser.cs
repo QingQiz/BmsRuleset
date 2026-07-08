@@ -14,21 +14,11 @@ internal static partial class BmsChartParser
         Func<int, int>? randomValueSelector = null)
     {
         var state = new ParseState();
-        var commentStripper = new BmsCommentStripper();
         randomValueSelector ??= selectRandomValue;
         var frames = new List<ControlFrame>();
 
-        foreach (var rawLine in lines)
+        foreach (var line in lines)
         {
-            string? line;
-            if (rawLine.Length > 0 && rawLine[0] == '%')
-                line = rawLine;
-            else
-                line = commentStripper.ProcessLine(rawLine);
-
-            if (line == null)
-                continue;
-
             if (tryReadControlCommand(line, out var command, out var value))
             {
                 applyControlCommand(command, value, frames, randomValueSelector, state.BranchDecisions);

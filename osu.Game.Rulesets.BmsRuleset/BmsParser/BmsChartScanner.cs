@@ -82,13 +82,11 @@ internal static partial class BmsChartParser
             if (symmetric && i != 0 && lcp[i - 1] != ' ')
                 continue;
 
-            // A title can lack the closer when its #TITLE was truncated mid-suffix —
-            // most commonly the // line-comment cutting "[7key//Assault]" down to
-            // "[7key". For bracket pairs, such a truncated opener-plus-content still
-            // counts as evidence of a suffix; only a bare dangling opener with empty
-            // content (e.g. a literal "Song [") does not. Symmetric delimiters have no
-            // separate closer to truncate, so they're excluded. Require a quorum so a
-            // single outlier can't manufacture a suffix boundary on its own.
+            // Imported or externally normalized titles can lack the closer when a
+            // suffix was truncated mid-content. Such opener-plus-content still counts
+            // as suffix evidence; only a bare dangling opener with empty content does
+            // not. Require a quorum so a single outlier can't manufacture a suffix
+            // boundary on its own.
             var withCloser = 0;
             var suffixesDiffer = false;
             string? firstSuffix = null;

@@ -121,6 +121,12 @@ dynamic option channel (`A6`).
 | `#DIFFICULTY` | Difficulty classification index (1–5)                 | Star Rating can reference difficulty instead  |
 | `#VOLWAV`     | Global volume scalar (0–100) for WAV playback         | Too dependent on implementation or hardware   |
 
+**Syntax ignored:**
+
+| Syntax                          | Description               | Why                                       |
+|---------------------------------|---------------------------|-------------------------------------------|
+| `//`, `;`, `/* */`, `\` escapes | IIDXv-style comment forms | beatoraja does not implement BMS comments |
+
 **Channels parsed:**
 
 | Channel   | Meaning                                         |
