@@ -422,8 +422,8 @@ lightingN-2.png
 
 你也可以使用标准 osu!mania 皮肤的 `[Mania]` 段。规则集会匹配：
 
-- `[Mania]` 带有 `SpecialStyle: 1` 和 `Keys: 6` → 5K 布局
-- `[Mania]` 带有 `SpecialStyle: 1` 和 `Keys: 8` → 7K 布局
+- `[Mania]` 带有 `SpecialStyle: 1` 和包含 scratch 的按键数（`6`、`8`、`12`、`16`）
+- `[Mania]` 带有包含 scratch 的按键数（`6`、`8`、`12`、`16`），优先于精确 key-only 回退
 - `[Mania]` 带有精确的按键数
 
 在 `[Mania]` 段中，使用 mania 标准判定名称：`Hit300g`（PGREAT）、`Hit300`（GREAT）、`Hit200`（GOOD）、

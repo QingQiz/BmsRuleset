@@ -554,8 +554,8 @@ This works for any image key: `NoteImage`, `KeyImage`/`KeyImageD`, `StageLight`,
 
 You can also use `[Mania]` sections from a standard osu!mania skin. The ruleset will match on:
 
-- `[Mania]` with `SpecialStyle: 1` and `Keys: 6` → 5K layout
-- `[Mania]` with `SpecialStyle: 1` and `Keys: 8` → 7K layout
+- `[Mania]` with `SpecialStyle: 1` and scratch-inclusive keys (`6`, `8`, `12`, `16`)
+- `[Mania]` with scratch-inclusive keys (`6`, `8`, `12`, `16`), before exact key-only fallback
 - `[Mania]` with the exact key count
 
 In `[Mania]` sections, use mania standard judgement names: `Hit300g` (PGREAT), `Hit300` (GREAT), `Hit200` (GOOD),

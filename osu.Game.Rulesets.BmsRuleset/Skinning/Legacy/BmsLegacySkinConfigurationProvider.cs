@@ -80,26 +80,28 @@ internal sealed class BmsLegacySkinConfigurationProvider
                 yield return configuration;
         }
 
+        foreach (var keys in getScratchInclusiveManiaFallbackKeys())
+        {
+            foreach (var configuration in configurations.Where(c => c.Keys == keys && c.SpecialStyle != 1))
+                yield return configuration;
+        }
+
         foreach (var configuration in configurations.Where(c => c.Keys == maniaKeyCount))
             yield return configuration;
     }
 
     private IEnumerable<int> getSpecialStyleManiaFallbackKeys()
     {
-        switch (layoutVariant)
-        {
-            case BmsLayoutVariant.Bms5K:
-            case BmsLayoutVariant.Bms5K2P:
-                yield return 6;
+        foreach (var keys in getScratchInclusiveManiaFallbackKeys())
+            yield return keys;
+    }
 
-                break;
+    private IEnumerable<int> getScratchInclusiveManiaFallbackKeys()
+    {
+        var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
 
-            case BmsLayoutVariant.Bme7K:
-            case BmsLayoutVariant.Bme7K2P:
-                yield return 8;
-
-                break;
-        }
+        if (totalColumns != maniaKeyCount)
+            yield return totalColumns;
     }
 
     private int? getConfigurationColumn(BmsSkinConfiguration configuration, BmsSkinConfigurationLookup lookup)

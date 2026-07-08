@@ -301,6 +301,24 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestBms5KFallsBackToPlainSixKeyBeforeFiveKey()
+    {
+        var skin = createConfiguredSkin("""
+                                        [Mania]
+                                        Keys: 5
+                                        NoteImage0: plain-5k
+
+                                        [Mania]
+                                        Keys: 6
+                                        NoteImage1: plain-6k
+                                        """, layoutVariant: BmsLayoutVariant.Bms5K, totalColumns: 6);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bms5K, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("plain-6k"));
+    }
+
+    [Test]
     public void TestBms7KFallsBackToEightKeySpecialStyleBeforeSevenKey()
     {
         var skin = createConfiguredSkin("""
@@ -317,6 +335,60 @@ public class BmsLegacySkinTransformerTest
 
         Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
             Is.EqualTo("special-8k"));
+    }
+
+    [Test]
+    public void TestBms7KFallsBackToPlainEightKeyBeforeSevenKey()
+    {
+        var skin = createConfiguredSkin("""
+                                        [Mania]
+                                        Keys: 7
+                                        NoteImage0: plain-7k
+
+                                        [Mania]
+                                        Keys: 8
+                                        NoteImage1: plain-8k
+                                        """);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("plain-8k"));
+    }
+
+    [Test]
+    public void TestBms5KDoubleFallsBackToPlainTwelveKeyBeforeTenKey()
+    {
+        var skin = createConfiguredSkin("""
+                                        [Mania]
+                                        Keys: 10
+                                        NoteImage0: plain-10k
+
+                                        [Mania]
+                                        Keys: 12
+                                        NoteImage1: plain-12k
+                                        """, layoutVariant: BmsLayoutVariant.Bms5KDouble, totalColumns: 12);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bms5KDouble, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("plain-12k"));
+    }
+
+    [Test]
+    public void TestBms7KDoubleFallsBackToPlainSixteenKeyBeforeFourteenKey()
+    {
+        var skin = createConfiguredSkin("""
+                                        [Mania]
+                                        Keys: 14
+                                        NoteImage7: plain-14k
+
+                                        [Mania]
+                                        Keys: 16
+                                        NoteImage8: plain-16k
+                                        """, layoutVariant: BmsLayoutVariant.Bme7KDouble, totalColumns: 16);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7KDouble, 8);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("plain-16k"));
     }
 
     [Test]
