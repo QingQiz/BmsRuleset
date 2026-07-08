@@ -1,5 +1,7 @@
 using System;
+using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
@@ -41,8 +43,10 @@ public class BmsHealthProcessorTest
     public void TestAutoGaugeCascadeSwitchAvoidsFrameworkFailure()
     {
         var processor = new BmsHealthProcessor();
-        processor.SetGaugeTypes([BmsGaugeType.Hazard, BmsGaugeType.ExHard, BmsGaugeType.Hard,
-            BmsGaugeType.Normal, BmsGaugeType.Easy, BmsGaugeType.AssistEasy]);
+        processor.SetGaugeTypes([
+            BmsGaugeType.Hazard, BmsGaugeType.ExHard, BmsGaugeType.Hard,
+            BmsGaugeType.Normal, BmsGaugeType.Easy, BmsGaugeType.AssistEasy
+        ]);
 
         var beatmap = new BmsBeatmap
         {
@@ -66,6 +70,53 @@ public class BmsHealthProcessorTest
         Assert.That(processor.HasEverFailed, Is.False);
         Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExHard));
         Assert.That(processor.Health.Value, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void TestGaugeHistoryRecordsLayerFailureAndActiveGaugeSwitch()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeTypes([BmsGaugeType.Hard, BmsGaugeType.Normal]);
+
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        processor.Health.Value = 0.01;
+        processor.ApplyHellChargeTick(false, eventTime: 1000);
+
+        var history = processor.GaugeHistory;
+        Assert.That(history, Has.Count.EqualTo(1));
+        Assert.That(history[0].ActiveGaugeType, Is.EqualTo(BmsGaugeType.Normal));
+        Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Hard).Failed, Is.True);
+        Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Hard).Health, Is.Zero);
+        Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Normal).Failed, Is.False);
+    }
+
+    [Test]
+    public void TestEmptyPoorGaugeHistoryDefaultsToCurrentTime()
+    {
+        const double current_time = 1234;
+        var processor = createProcessorWithClock(current_time);
+
+        processor.RegisterEmptyPoor();
+
+        Assert.That(processor.GaugeHistory.Single().Time, Is.EqualTo(current_time));
+    }
+
+    [Test]
+    public void TestHellChargeGaugeHistoryDefaultsToCurrentTime()
+    {
+        const double current_time = 1234;
+        var processor = createProcessorWithClock(current_time);
+
+        processor.ApplyHellChargeTick(false);
+
+        Assert.That(processor.GaugeHistory.Single().Time, Is.EqualTo(current_time));
     }
 
     [Test]
@@ -219,6 +270,23 @@ public class BmsHealthProcessorTest
 
         var expectedHealth = Math.Max(0.0, initialHealth - 0.03);
         Assert.That(processor.Health.Value, Is.EqualTo(expectedHealth).Within(0.001));
+    }
+
+    private static BmsHealthProcessor createProcessorWithClock(double currentTime)
+    {
+        var processor = new BmsHealthProcessor
+        {
+            Clock = new FramedClock(new ManualClock { CurrentTime = currentTime }),
+        };
+
+        processor.ApplyBeatmap(new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        });
+
+        return processor;
     }
 
     [Test]

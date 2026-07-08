@@ -10,6 +10,7 @@ using osu.Game.IO.Archives;
 using osu.Game.IO.Serialization;
 using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -37,7 +38,7 @@ public static class BmsReplayArchive
 
     private static byte[] createReplayData(Score score)
     {
-        byte[] json = serializePayload(score);
+        var json = serializePayload(score);
 
         using var ms = new MemoryStream();
         using (var gz = new GZipStream(ms, CompressionLevel.Optimal, leaveOpen: true))
@@ -48,6 +49,8 @@ public static class BmsReplayArchive
 
     private static byte[] serializePayload(Score score)
     {
+        BmsScoreGaugeHistoryStore.TryGet(score.ScoreInfo, out var gaugeHistory);
+
         var payload = new Payload
         {
             HasReceivedAllFrames = score.Replay.HasReceivedAllFrames,
@@ -55,6 +58,7 @@ public static class BmsReplayArchive
             // Empty POORs carry a base HitObject (no BmsHitObject), so they must round-trip too —
             // dropping them would silently under-count gauge damage in restored statistics.
             HitEvents = score.ScoreInfo.HitEvents.Select(HitEventData.From).ToList(),
+            GaugeHistory = gaugeHistory.Select(GaugeHistoryEventData.From).ToList(),
         };
 
         return Encoding.UTF8.GetBytes(payload.Serialize());
@@ -79,7 +83,7 @@ public static class BmsReplayArchive
 
         using var ms = new MemoryStream();
         stream.CopyTo(ms);
-        byte[] bytes = ms.ToArray();
+        var bytes = ms.ToArray();
 
         if (bytes.Length == 0)
             return score;
@@ -110,19 +114,28 @@ public static class BmsReplayArchive
         // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
         score.ScoreInfo.HitEvents = (payload.HitEvents ?? []).Select(e => e.ToHitEvent()).ToList();
 
+        // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
+        var gaugeHistory = (payload.GaugeHistory ?? []).Select(e => e.ToGaugeHistoryEvent()).ToArray();
+        if (gaugeHistory.Length > 0)
+            BmsScoreGaugeHistoryStore.Set(score.ScoreInfo, gaugeHistory);
+        else
+            BmsScoreGaugeHistoryStore.Clear(score.ScoreInfo);
+
         return score;
     }
 
     private class Payload
     {
         // ReSharper disable once UnusedMember.Local
-        public int Version { get; set; } = 1;
+        public int Version { get; set; } = 2;
 
         public bool HasReceivedAllFrames { get; init; } = true;
 
         public List<BmsReplayFrame> Frames { get; init; } = [];
 
         public List<HitEventData> HitEvents { get; init; } = [];
+
+        public List<GaugeHistoryEventData> GaugeHistory { get; init; } = [];
     }
 
     private class HitEventData
@@ -144,6 +157,45 @@ public static class BmsReplayArchive
         };
 
         public HitEvent ToHitEvent() => new(TimeOffset, GameplayRate, Result, HitObject.ToHitObject(), null, null);
+    }
+
+    private class GaugeHistoryEventData
+    {
+        public double Time { get; init; }
+
+        public BmsGaugeType ActiveGaugeType { get; init; }
+
+        public List<GaugeStateData> States { get; init; } = [];
+
+        public static GaugeHistoryEventData From(BmsGaugeHistoryEvent gaugeEvent) => new()
+        {
+            Time = gaugeEvent.Time,
+            ActiveGaugeType = gaugeEvent.ActiveGaugeType,
+            States = gaugeEvent.States.Select(GaugeStateData.From).ToList(),
+        };
+
+        public BmsGaugeHistoryEvent ToGaugeHistoryEvent() => new(
+            Time,
+            ActiveGaugeType,
+            States.Select(state => state.ToGaugeStateSnapshot()).ToArray());
+    }
+
+    private class GaugeStateData
+    {
+        public BmsGaugeType GaugeType { get; init; }
+
+        public double Health { get; init; }
+
+        public bool Failed { get; init; }
+
+        public static GaugeStateData From(BmsGaugeStateSnapshot state) => new()
+        {
+            GaugeType = state.GaugeType,
+            Health = state.Health,
+            Failed = state.Failed,
+        };
+
+        public BmsGaugeStateSnapshot ToGaugeStateSnapshot() => new(GaugeType, Health, Failed);
     }
 
     private class HitObjectData

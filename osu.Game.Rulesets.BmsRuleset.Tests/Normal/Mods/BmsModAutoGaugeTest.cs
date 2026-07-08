@@ -49,6 +49,19 @@ public class BmsModAutoGaugeTest
     }
 
     [Test]
+    public void TestAutoGaugeAttachesGaugeHistoryOnApplyToScore()
+    {
+        var (autoGauge, _) = createAutoGaugeResolvedToExHard();
+        var score = new ScoreInfo { Mods = [autoGauge] };
+
+        autoGauge.ApplyToScore(score);
+
+        Assert.That(BmsScoreGaugeHistoryStore.TryGet(score, out var history), Is.True);
+        Assert.That(history, Is.Not.Empty);
+        Assert.That(history.Last().ActiveGaugeType, Is.EqualTo(BmsGaugeType.ExHard));
+    }
+
+    [Test]
     public void TestAutoGaugeAttributionIsIdempotent()
     {
         var (autoGauge, _) = createAutoGaugeResolvedToExHard();

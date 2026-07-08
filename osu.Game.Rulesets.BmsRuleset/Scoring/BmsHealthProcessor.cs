@@ -31,11 +31,14 @@ public partial class BmsHealthProcessor : HealthProcessor
     /// </summary>
     public bool HasEverFailed { get; private set; }
 
+    public IReadOnlyList<BmsGaugeHistoryEvent> GaugeHistory => gaugeHistory;
+
     public BmsGaugeType GaugeType { get; private set; } = BmsGaugeType.Normal;
 
     public BmsGaugeProfile GaugeProfile { get; private set; } = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
 
     private readonly List<GaugeState> gaugeStates = [];
+    private readonly List<BmsGaugeHistoryEvent> gaugeHistory = [];
 
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
     private int activeGaugeIndex;
@@ -53,7 +56,7 @@ public partial class BmsHealthProcessor : HealthProcessor
     /// <summary>
     ///     Applies an Empty POOR gauge penalty directly — no note is consumed.
     /// </summary>
-    public void RegisterEmptyPoor()
+    public void RegisterEmptyPoor(double? eventTime = null)
     {
         ensureInitialized();
         syncActiveStateFromHealth();
@@ -72,6 +75,7 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         resolveActiveState();
         markEverFailedIfEmpty();
+        recordGaugeHistory(eventTime ?? currentTime);
     }
 
     /// <summary>
@@ -93,7 +97,7 @@ public partial class BmsHealthProcessor : HealthProcessor
     ///     The default scale applies half-GREAT gauge recovery or half-BAD gauge damage.
     ///     Does not add judgement count, combo, or score.
     /// </summary>
-    public void ApplyHellChargeTick(bool holding, double scale = 0.5)
+    public void ApplyHellChargeTick(bool holding, double scale = 0.5, double? eventTime = null)
     {
         ensureInitialized();
         syncActiveStateFromHealth();
@@ -114,6 +118,7 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         resolveActiveState();
         markEverFailedIfEmpty();
+        recordGaugeHistory(eventTime ?? currentTime);
     }
 
     public void SetGaugeType(BmsGaugeType gaugeType)
@@ -203,6 +208,7 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.MaxValue = GaugeProfile.MaxHealth;
         Health.Value = GaugeProfile.InitialHealth;
         HasEverFailed = false;
+        gaugeHistory.Clear();
 
         // Reset all gauge states to their initial values for a fresh play.
         foreach (var state in gaugeStates)
@@ -221,6 +227,8 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         if (!HasEverFailed && Health.Value <= 0)
             HasEverFailed = true;
+
+        recordGaugeHistory(result.HitObject.StartTime);
     }
 
     protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement.MaxResult == HitResult.Meh
@@ -361,6 +369,26 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.MaxValue = active.Profile.MaxHealth;
         Health.Value = active.CurrentHp;
     }
+
+    private void recordGaugeHistory(double eventTime)
+    {
+        if (gaugeStates.Count == 0)
+            return;
+
+        var activeGaugeType = activeGaugeIndex < gaugeStates.Count
+            ? gaugeStates[activeGaugeIndex].GaugeType
+            : gaugeStates[^1].GaugeType;
+
+        gaugeHistory.Add(new BmsGaugeHistoryEvent(
+            eventTime,
+            activeGaugeType,
+            gaugeStates.Select(state => new BmsGaugeStateSnapshot(
+                state.GaugeType,
+                state.CurrentHp,
+                state.IsHpFailed)).ToArray()));
+    }
+
+    private double currentTime => Clock == null ? 0 : Time.Current;
 
     private sealed class GaugeState
     {

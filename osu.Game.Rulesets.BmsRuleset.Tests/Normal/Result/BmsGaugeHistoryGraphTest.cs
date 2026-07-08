@@ -6,6 +6,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Result;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osuTK;
@@ -42,6 +43,36 @@ public class BmsGaugeHistoryGraphTest
 
         Assert.That(finalGauge.IsFinalUsedGauge, Is.True);
         Assert.That(finalGauge.LineRadius, Is.GreaterThan(series.Where(s => !s.IsFinalUsedGauge).Max(s => s.LineRadius)));
+    }
+
+    [Test]
+    public void TestAutoGaugeUsesPersistedGaugeHistoryWhenHitEventsUnderReportDamage()
+    {
+        var score = new ScoreInfo
+        {
+            Mods = [new BmsModAutoGauge()],
+            HitEvents = [new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 3000 }, null, null)],
+        };
+
+        BmsScoreGaugeHistoryStore.Set(score,
+        [
+            new BmsGaugeHistoryEvent(1000, BmsGaugeType.Hard,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
+                new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.2, false),
+            ]),
+            new BmsGaugeHistoryEvent(3000, BmsGaugeType.Normal,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
+                new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.82, false),
+            ]),
+        ]);
+
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap()).ToArray();
+
+        Assert.That(series.Single(s => s.Name == "Hard").FailurePoint, Is.Not.Null);
+        Assert.That(series.Single(s => s.Name == "Hard").Points.Last().Health, Is.Zero);
+        Assert.That(series.Single(s => s.Name == "Normal").IsFinalUsedGauge, Is.True);
     }
 
     [Test]

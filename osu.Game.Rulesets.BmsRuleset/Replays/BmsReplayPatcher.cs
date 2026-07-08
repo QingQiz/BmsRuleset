@@ -9,6 +9,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Database;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking.Statistics;
@@ -181,7 +182,11 @@ public static class BmsReplayPatcher
     {
         var scoreInfo = score.NewValue;
 
-        if (scoreInfo == null || scoreInfo.HitEvents.Count > 0 || !isBmsScore(scoreInfo))
+        if (scoreInfo == null || !isBmsScore(scoreInfo))
+            return;
+
+        var hasGaugeHistory = BmsScoreGaugeHistoryStore.TryGet(scoreInfo, out var gaugeHistory) && gaugeHistory.Count > 0;
+        if (scoreInfo.HitEvents.Count > 0 && hasGaugeHistory)
             return;
 
         // CompositeDrawable.Dependencies is populated during InjectDependencies, which the framework
@@ -200,6 +205,13 @@ public static class BmsReplayPatcher
 
             if (scoreWithReplay?.ScoreInfo.HitEvents.Count > 0)
                 scoreInfo.HitEvents = scoreWithReplay.ScoreInfo.HitEvents;
+
+            if (scoreWithReplay != null
+                && BmsScoreGaugeHistoryStore.TryGet(scoreWithReplay.ScoreInfo, out var restoredGaugeHistory)
+                && restoredGaugeHistory.Count > 0)
+            {
+                BmsScoreGaugeHistoryStore.Set(scoreInfo, restoredGaugeHistory);
+            }
         }
         catch (Exception e)
         {

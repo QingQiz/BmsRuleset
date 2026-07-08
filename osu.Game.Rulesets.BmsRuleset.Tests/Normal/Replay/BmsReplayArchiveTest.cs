@@ -8,6 +8,7 @@ using osu.Game.Extensions;
 using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -91,6 +92,35 @@ public class BmsReplayArchiveTest
     }
 
     [Test]
+    public void TestGaugeHistoryRoundTripsThroughArchive()
+    {
+        var original = createScore();
+        BmsScoreGaugeHistoryStore.Set(original.ScoreInfo,
+        [
+            new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
+                new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.42, false),
+            ]),
+        ]);
+
+        using var archive = BmsReplayArchive.Create(original);
+        var replayFile = new RealmFile { Hash = "abcdef" };
+        var readTarget = new ScoreInfo();
+        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
+
+        var restored = BmsReplayArchive.ReadScore(
+            readTarget,
+            new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
+
+        Assert.That(BmsScoreGaugeHistoryStore.TryGet(restored.ScoreInfo, out var history), Is.True);
+        Assert.That(history, Has.Count.EqualTo(1));
+        Assert.That(history[0].ActiveGaugeType, Is.EqualTo(BmsGaugeType.Normal));
+        Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Hard).Failed, Is.True);
+        Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health, Is.EqualTo(0.42));
+    }
+
+    [Test]
     public void TestArchiveIsGzipCompressed()
     {
         using var archive = BmsReplayArchive.Create(createScore());
@@ -161,6 +191,28 @@ public class BmsReplayArchiveTest
 
         Assert.That(restored.Replay.Frames, Is.Empty);
         Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
+    }
+
+    [Test]
+    public void TestReadScoreClearsStaleGaugeHistoryWhenArchiveHasNone()
+    {
+        using var archive = BmsReplayArchive.Create(createScore());
+        var replayFile = new RealmFile { Hash = "abcdef" };
+        var readTarget = new ScoreInfo();
+        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
+        BmsScoreGaugeHistoryStore.Set(readTarget,
+        [
+            new BmsGaugeHistoryEvent(1000, BmsGaugeType.Hard,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
+            ]),
+        ]);
+
+        var restored = BmsReplayArchive.ReadScore(
+            readTarget,
+            new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
+
+        Assert.That(BmsScoreGaugeHistoryStore.TryGet(restored.ScoreInfo, out var history) && history.Count > 0, Is.False);
     }
 
     [Test]

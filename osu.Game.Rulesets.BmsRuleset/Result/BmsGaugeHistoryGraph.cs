@@ -70,6 +70,9 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
 
     internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap)
     {
+        if (BmsScoreGaugeHistoryStore.TryGet(score, out var gaugeHistory) && gaugeHistory.Count > 0)
+            return createSeries(gaugeHistory);
+
         var hitEvents = score.HitEvents
             .OrderBy(e => e.HitObject.StartTime)
             .ToArray();
@@ -88,6 +91,65 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes);
 
         return gaugeTypes.Select(type => createSeries(type, hitEvents, total, noteCount, duration, type == finalGaugeType)).ToArray();
+    }
+
+    private static IReadOnlyList<GaugeSeries> createSeries(IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory)
+    {
+        var ordered = gaugeHistory
+            .OrderBy(e => e.Time)
+            .ToArray();
+
+        var duration = Math.Max(1, ordered.Max(e => e.Time));
+        var gaugeTypes = ordered
+            .SelectMany(e => e.States.Select(s => s.GaugeType))
+            .Distinct()
+            .OrderByDescending(type => (int)type)
+            .ToArray();
+
+        var finalGaugeType = ordered[^1].ActiveGaugeType;
+        return gaugeTypes.Select(type => createSeries(type, ordered, duration, type == finalGaugeType)).ToArray();
+    }
+
+    private static GaugeSeries createSeries(BmsGaugeType type, IReadOnlyList<BmsGaugeHistoryEvent> history, double duration, bool isFinalUsedGauge)
+    {
+        var profile = BmsGaugeProfileFactory.Create(type);
+        var health = profile.InitialHealth;
+        GaugePoint? failurePoint = null;
+        var points = new List<GaugePoint>
+        {
+            new(0, normaliseHealth(profile, health)),
+        };
+
+        foreach (var gaugeEvent in history)
+        {
+            var time = (float)Math.Clamp(gaugeEvent.Time / duration, 0, 1);
+            var state = gaugeEvent.States.FirstOrDefault(s => s.GaugeType == type);
+
+            if (state != null)
+            {
+                health = state.Health;
+
+                if (failurePoint == null && (state.Failed || health <= 0))
+                    failurePoint = new GaugePoint(time, normaliseHealth(profile, health));
+            }
+
+            points.Add(new GaugePoint(time, normaliseHealth(profile, health)));
+        }
+
+        if (points[^1].Time < 1)
+            points.Add(new GaugePoint(1, points[^1].Health));
+
+        if (failurePoint == null && profile.ClearThreshold > 0 && health < profile.ClearThreshold)
+            failurePoint = points[^1];
+
+        return new GaugeSeries(
+            formatGaugeName(type),
+            colourFor(type),
+            points,
+            failurePoint,
+            isFinalUsedGauge,
+            isFinalUsedGauge ? final_line_radius : secondary_line_radius,
+            isFinalUsedGauge ? 1 : secondary_line_alpha);
     }
 
     private Drawable createGraph()

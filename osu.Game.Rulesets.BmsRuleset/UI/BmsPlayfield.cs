@@ -333,7 +333,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     private void registerEmptyPoor()
     {
         scoreProcessor?.RegisterEmptyPoor(Time.Current);
-        healthProcessor?.RegisterEmptyPoor();
+        healthProcessor?.RegisterEmptyPoor(Time.Current);
         requestJudgementDisplay(HitResult.Miss);
     }
 
@@ -387,7 +387,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// <summary>
     ///     Applies a HellChargeNote body gauge tick for the currently pressed column.
     /// </summary>
-    public void ApplyHellChargeTick(bool holding, double scale = 0.5) => healthProcessor?.ApplyHellChargeTick(holding, scale);
+    public void ApplyHellChargeTick(bool holding, double scale = 0.5) => healthProcessor?.ApplyHellChargeTick(holding, scale, Time.Current);
 
     #endregion
 
