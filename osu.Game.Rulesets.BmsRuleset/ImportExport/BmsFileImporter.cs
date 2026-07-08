@@ -194,8 +194,9 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         return File.Exists(path) && Constant.IsChartFile(path) ? [path] : [];
     }
 
-    /// <summary>Compute a deterministic set hash from sorted beatmap MD5 hashes.</summary>
+    /// <summary>Compute a deterministic set hash from sorted unique beatmap MD5 hashes.</summary>
     private static string calculateSetHash(IEnumerable<string> md5Hashes) => string.Concat(md5Hashes
+        .Distinct(StringComparer.OrdinalIgnoreCase)
         .OrderBy(h => h, StringComparer.OrdinalIgnoreCase)).ToLowerInvariant();
 
     private static string calculateSetHash(BeatmapSetInfo beatmapSetInfo) =>
@@ -209,9 +210,24 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         RealmAccess realmAccess,
         RealmFileStore fileStore)
     {
-        var bytes = group.ChartPaths.AsParallel().Select(File.ReadAllBytes).ToArray();
-        var allMd5 = bytes.AsParallel().Select(b => Convert.ToHexString(MD5.HashData(b)).ToLowerInvariant()).ToArray();
-        var setHash = calculateSetHash(allMd5);
+        var chartPaths = group.ChartPaths
+            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var bytes = chartPaths.AsParallel().AsOrdered().Select(File.ReadAllBytes).ToArray();
+        var allMd5 = bytes.AsParallel().AsOrdered().Select(b => Convert.ToHexString(MD5.HashData(b)).ToLowerInvariant()).ToArray();
+
+        var uniqueChartIndexes = new List<int>(allMd5.Length);
+        var seenMd5 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < allMd5.Length; i++)
+        {
+            if (seenMd5.Add(allMd5[i]))
+                uniqueChartIndexes.Add(i);
+        }
+
+        var setHash = calculateSetHash(seenMd5);
 
         var existing = realmAccess.Run(r =>
         {
@@ -226,8 +242,9 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             return null;
 
         // Step 1 — Parallel: parse chart, compute all statistics (pure data, no Realm).
-        var parsedCharts = group.ChartPaths.AsParallel().Select((path, i) =>
+        var parsedCharts = uniqueChartIndexes.AsParallel().AsOrdered().Select(i =>
         {
+            var path = chartPaths[i];
             var content = bytes[i];
             var md5 = allMd5[i];
             var lines = BmsChartParser.ReadAllLines(content);
@@ -249,7 +266,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         // Step 2 — Sequential: write to disk (Realm-thread-bound), build ChartImport.
         var charts = realmAccess.Run(r => parsedCharts.Select(parsed =>
         {
-            var path = group.ChartPaths[parsed.Index];
+            var path = chartPaths[parsed.Index];
             using var stream = new MemoryBackedFileStream(path, parsed.Content);
             var fileHash =
                 fileStore.Add(stream, r, addToRealm: false, preferHardLinks: true).Hash;

@@ -251,6 +251,40 @@ public partial class BmsFileImporterTest
     }
 
     [Test]
+    public void TestImportDirectorySkipsDuplicateMd5ChartsInSameSet()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+
+            var directory = Path.Combine(storage.GetFullPath(string.Empty), "duplicate-md5-import");
+            Directory.CreateDirectory(directory);
+
+            var sourceChart = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Aleph-0 (by LeaF)", "_7NORMAL.bms");
+            File.Copy(sourceChart, Path.Combine(directory, "first.bms"));
+            File.Copy(sourceChart, Path.Combine(directory, "second.bms"));
+
+            var importer = new BmsFileImporter(realm, storage);
+
+            await importer.Import(directory).ConfigureAwait(false);
+
+            var result = realm.Run(r =>
+            {
+                var set = r.All<BeatmapSetInfo>().Single();
+
+                return (
+                    BeatmapCount: set.Beatmaps.Count,
+                    FileCount: set.Files.Count,
+                    DistinctMd5Count: set.Beatmaps.Select(b => b.MD5Hash).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            });
+
+            Assert.That(result.BeatmapCount, Is.EqualTo(1));
+            Assert.That(result.FileCount, Is.EqualTo(1));
+            Assert.That(result.DistinctMd5Count, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void TestImportedBeatmapsShareCleanSetTitleAndSetRelativeDifficultyName()
     {
         runImportTest(async (realm, storage) =>
