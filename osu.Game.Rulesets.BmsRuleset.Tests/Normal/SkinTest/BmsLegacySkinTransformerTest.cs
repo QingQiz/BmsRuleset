@@ -242,6 +242,12 @@ public class BmsLegacySkinTransformerTest
         }
     }
 
+    private class TestLegacySkinIniSkin(string skinIni)
+        : LegacySkin(new SkinInfo("Test", "Test"), null, new TestByteResourceStore(new Dictionary<string, byte[]>
+        {
+            ["skin.ini"] = Encoding.UTF8.GetBytes(skinIni),
+        }));
+
     private class TestByteResourceStore(Dictionary<string, byte[]> resources) : IResourceStore<byte[]>
     {
 
@@ -329,6 +335,83 @@ public class BmsLegacySkinTransformerTest
                                         [Mania]
                                         Keys: 8
                                         SpecialStyle: 1
+                                        NoteImage1: special-8k
+                                        """);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("special-8k"));
+    }
+
+    [Test]
+    public void TestBms7KPrefersEightKeySpecialStyleOverPlainEightKey()
+    {
+        var skin = createConfiguredSkin("""
+                                        [Mania]
+                                        Keys: 8
+                                        NoteImage1: plain-8k
+
+                                        [Mania]
+                                        Keys: 8
+                                        SpecialStyle: 1
+                                        NoteImage1: special-8k
+                                        """);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("special-8k"));
+    }
+
+    [Test]
+    public void TestBms7KPrefersEightKeySpecialStyleOverPlainEightKeyFromLegacySkin()
+    {
+        var skin = new BmsLegacySkinTransformer(new TestLegacySkinIniSkin("""
+                                                                          [Mania]
+                                                                          Keys: 8
+                                                                          NoteImage1: plain-8k
+
+                                                                          [Mania]
+                                                                          Keys: 8
+                                                                          SpecialStyle: 1
+                                                                          NoteImage1: special-8k
+                                                                          """), createBeatmap());
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value,
+            Is.EqualTo("special-8k"));
+    }
+
+    [Test]
+    public void TestBms7KCreatesDrawableFromEightKeySpecialStyleWhenPlainEightKeyAlsoExists()
+    {
+        var skin = createConfiguredSkin("""
+                                        [Mania]
+                                        Keys: 8
+                                        NoteImage1: plain-8k
+
+                                        [Mania]
+                                        Keys: 8
+                                        SpecialStyle: 1
+                                        NoteImage1: special-8k
+                                        """, ["special-8k"]);
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
+
+        Assert.That(skin.GetDrawableComponent(lookup), Is.Not.Null);
+    }
+
+    [Test]
+    public void TestBms7KTreatsEightKeySectionAsSpecialStyleWhenDefaultSpecialStyleRepeatsLater()
+    {
+        var skin = createConfiguredSkin("""
+                                        [Mania]
+                                        Keys: 8
+                                        NoteImage1: plain-8k
+
+                                        [Mania]
+                                        Keys: 8
+                                        SpecialStyle: 0
+                                        SpecialStyle: 1
+                                        HitPosition: 400
                                         NoteImage1: special-8k
                                         """);
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);

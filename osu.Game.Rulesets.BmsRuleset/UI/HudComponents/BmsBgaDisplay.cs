@@ -335,10 +335,10 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
         if (rehostedDisplay == null || rehostedDisplayHost == null || drawableRuleset?.Playfield is not BmsPlayfield playfield || Parent == null)
             return;
 
-        var parentQuad = Parent.ScreenSpaceDrawQuad;
-        var topLeft = playfield.ToLocalSpace(parentQuad.TopLeft);
-        var topRight = playfield.ToLocalSpace(parentQuad.TopRight);
-        var bottomLeft = playfield.ToLocalSpace(parentQuad.BottomLeft);
+        var sourceQuad = ScreenSpaceDrawQuad;
+        var topLeft = playfield.ToLocalSpace(sourceQuad.TopLeft);
+        var topRight = playfield.ToLocalSpace(sourceQuad.TopRight);
+        var bottomLeft = playfield.ToLocalSpace(sourceQuad.BottomLeft);
         var xAxis = topRight - topLeft;
         var yAxis = bottomLeft - topLeft;
 
@@ -346,17 +346,18 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
         rehostedDisplayHost.Size = new Vector2(xAxis.Length, yAxis.Length);
         rehostedDisplayHost.Rotation = MathHelper.RadiansToDegrees(MathF.Atan2(xAxis.Y, xAxis.X));
 
-        syncRehostedDisplayState(this, rehostedDisplay);
+        configureRehostedDisplayToFillHost(rehostedDisplay);
     }
 
-    private static void syncRehostedDisplayState(BmsBgaDisplay source, BmsBgaDisplay target)
+    private static void configureRehostedDisplayToFillHost(BmsBgaDisplay target)
     {
-        target.Anchor = source.Anchor;
-        target.Origin = source.Origin;
-        target.Position = source.Position;
-        target.Scale = source.Scale;
-        target.Rotation = source.Rotation;
-        target.Size = source.Size;
+        target.Anchor = Anchor.TopLeft;
+        target.Origin = Anchor.TopLeft;
+        target.Position = Vector2.Zero;
+        target.Scale = Vector2.One;
+        target.Rotation = 0;
+        target.RelativeSizeAxes = Axes.Both;
+        target.Size = Vector2.One;
     }
 
     private Container createLayerHost(BmsBgaLayer layer)

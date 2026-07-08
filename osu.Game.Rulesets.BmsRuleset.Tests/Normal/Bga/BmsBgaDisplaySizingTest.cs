@@ -4,6 +4,7 @@ using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering.Dummy;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
@@ -13,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
+using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;
 
@@ -79,25 +81,52 @@ public class BmsBgaDisplaySizingTest
     [Test]
     public void TestRehostedCloneSyncDoesNotChangeDepthAfterParenting()
     {
-        var source = new BmsBgaDisplay
-        {
-            Anchor = Anchor.TopRight,
-            Origin = Anchor.BottomLeft,
-            Position = new osuTK.Vector2(12, 34),
-            Scale = new osuTK.Vector2(2),
-            Rotation = 45,
-            Size = new osuTK.Vector2(320, 240),
-            Depth = 12,
-        };
-
         var clone = new BmsBgaDisplay { Depth = float.MaxValue };
         using var parent = new Container { Child = clone };
 
-        var method = typeof(BmsBgaDisplay).GetMethod("syncRehostedDisplayState", BindingFlags.NonPublic | BindingFlags.Static);
+        var method = typeof(BmsBgaDisplay).GetMethod("configureRehostedDisplayToFillHost", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.That(method, Is.Not.Null);
 
-        Assert.DoesNotThrow(() => method!.Invoke(null, [source, clone]));
+        Assert.DoesNotThrow(() => method!.Invoke(null, [clone]));
         Assert.That(clone.Depth, Is.EqualTo(float.MaxValue));
+    }
+
+    [TestCase(Anchor.TopLeft, Anchor.TopLeft)]
+    [TestCase(Anchor.TopRight, Anchor.BottomLeft)]
+    [TestCase(Anchor.BottomCentre, Anchor.CentreRight)]
+    public void TestRehostedDisplayMatchesShellQuadAfterAnchorOriginChange(Anchor anchor, Anchor origin)
+    {
+        var root = new Container { Size = new Vector2(1280, 720) };
+        var hudParent = new Container
+        {
+            Position = new Vector2(30, 45),
+            Size = new Vector2(900, 620),
+            Padding = new MarginPadding { Left = 20, Top = 10, Right = 30, Bottom = 40 },
+        };
+        var drawableRuleset = new BmsDrawableRuleset(new BmsRuleset(), new BmsBeatmap());
+        var playfield = (BmsPlayfield)drawableRuleset.Playfield;
+        var source = new BmsBgaDisplay
+        {
+            Anchor = anchor,
+            Origin = origin,
+            Position = new Vector2(23, 37),
+            Size = new Vector2(320, 240),
+            Rotation = 17,
+        };
+        var clone = new BmsBgaDisplay();
+        var host = createRehostedDisplayHost();
+
+        setDrawableParent(hudParent, root);
+        setDrawableParent(source, hudParent);
+        setDrawableParent(playfield, root);
+        setDrawableParent(host, playfield);
+        setDrawableParent(clone, host);
+        setDrawableRuleset(source, drawableRuleset);
+        setRehostedDisplay(source, clone);
+        setRehostedDisplayHost(source, host);
+        syncRehostedDisplay(source);
+
+        assertQuadsNearlyEqual(source.ScreenSpaceDrawQuad, clone.ScreenSpaceDrawQuad);
     }
 
     [Test]
@@ -298,6 +327,14 @@ public class BmsBgaDisplaySizingTest
         method!.Invoke(display, []);
     }
 
+    private static void syncRehostedDisplay(BmsBgaDisplay display)
+    {
+        var method = typeof(BmsBgaDisplay).GetMethod("syncRehostedDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.That(method, Is.Not.Null);
+
+        method!.Invoke(display, []);
+    }
+
     private static void setRehostedDisplay(BmsBgaDisplay source, BmsBgaDisplay clone)
     {
         var field = typeof(BmsBgaDisplay).GetField("rehostedDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -379,5 +416,28 @@ public class BmsBgaDisplaySizingTest
         Assert.That(method, Is.Not.Null);
 
         return (Sprite)method!.Invoke(null, [texture])!;
+    }
+
+    private static void setDrawableParent(Drawable child, CompositeDrawable parent)
+    {
+        var property = typeof(Drawable).GetProperty(nameof(Drawable.Parent), BindingFlags.Instance | BindingFlags.Public);
+        Assert.That(property, Is.Not.Null);
+
+        property!.SetValue(child, parent);
+    }
+
+    private static void assertQuadsNearlyEqual(Quad expected, Quad actual)
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual.TopLeft.X, Is.EqualTo(expected.TopLeft.X).Within(0.001f));
+            Assert.That(actual.TopLeft.Y, Is.EqualTo(expected.TopLeft.Y).Within(0.001f));
+            Assert.That(actual.TopRight.X, Is.EqualTo(expected.TopRight.X).Within(0.001f));
+            Assert.That(actual.TopRight.Y, Is.EqualTo(expected.TopRight.Y).Within(0.001f));
+            Assert.That(actual.BottomLeft.X, Is.EqualTo(expected.BottomLeft.X).Within(0.001f));
+            Assert.That(actual.BottomLeft.Y, Is.EqualTo(expected.BottomLeft.Y).Within(0.001f));
+            Assert.That(actual.BottomRight.X, Is.EqualTo(expected.BottomRight.X).Within(0.001f));
+            Assert.That(actual.BottomRight.Y, Is.EqualTo(expected.BottomRight.Y).Within(0.001f));
+        });
     }
 }
