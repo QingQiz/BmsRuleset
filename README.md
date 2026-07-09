@@ -90,6 +90,7 @@ for deletion.
 | Poor BGA mode           | `#POORBGA 0/1/2`                                                           | 0=Replace (hide other layers on miss), 1=Add (overlay), 2=Off                                     |
 | Long-note type          | `#LNTYPE 1` / `#LNTYPE 2`                                                  | LN notation: 1=RDM (default), 2=MGQ                                                               |
 | Long-note marker        | `#LNOBJ`                                                                   | LN end-point marker value (accumulated in HashSet)                                                |
+| global audio volumn     | `#VOLWAV`                                                                  | Global volume scalar (0–100) for WAV playback                                                     |
 | Long-note lock mode     | `#LNMODE 1` / `#LNMODE 2` / `#LNMODE 3`                                    | Locks LN type: 1=LN, 2=CN (Charge Note), 3=HCN (Hell Charge Note)                                 |
 | Text events             | `#TEXTxx`, `#SONGxx`                                                       | Displayed during gameplay on channel `99`                                                         |
 | Base 62 extension       | `#BASE 62`                                                                 | Case-sensitive base-62 encoding for commands and channels                                         |
@@ -119,7 +120,6 @@ dynamic option channel (`A6`).
 |---------------|-------------------------------------------------------|-----------------------------------------------|
 | `#PLAYER`     | Player layout: 1=Single, 2=Couple, 3=Double, 4=Battle | Layout is inferred from channel usage instead |
 | `#DIFFICULTY` | Difficulty classification index (1–5)                 | Star Rating can reference difficulty instead  |
-| `#VOLWAV`     | Global volume scalar (0–100) for WAV playback         | Too dependent on implementation or hardware   |
 
 **Syntax ignored:**
 
@@ -691,7 +691,7 @@ Commands are grouped by origin and listed with their status in this ruleset.
 | `#MIDIFILE`     | ✓      | Background audio file, played from the start of the chart                     |
 | `#PLAYLEVEL`    | ✓      | Difficulty level displayed as difficulty name                                 |
 | `#RANK [0-3]`   | ✓      | Judgment: 0=Very Hard, 1=Hard, 2=Normal, 3=Easy; also accepts 4 (Very Easy)   |
-| `#VOLWAV`       | -      | Global volume scalar (0–100) for WAV playback                                 |
+| `#VOLWAV`       | ✓      | Global volume scalar (0–100) for WAV playback                                 |
 | `#WAVxx`        | ✓      | Audio file definitions (xx = 00–ZZ base-62)                                   |
 | `#BMPxx`        | ✓      | Bitmap image/video definitions (xx = 00–FF hex, later extended to base-62)    |
 | `#BMP00`        | ✓      | Special: shown on POOR judgment                                               |
@@ -1017,7 +1017,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Audio**     | Same-`#WAV` retrigger caps at 2 voices (BASS `DEFAULT_CONCURRENCY`)                                               |
 | **Audio**     | Per-`Play()` allocation churn (SampleChannel/BmsSampleInfo/ActiveChannel/closure)                                 |
 | **Audio**     | `SampleChannelBass` one-shot — no restart after natural finish; channel pooling only helps overlapping retriggers |
-| **Audio**     | `#VOLWAV` / per-note `#VOL` not applied — keysound volume constant 1.0                                            |
 | **Converter** | Mania 7K → BMS chart conversion                                                                                   | 3        |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                                             |
 | **Input**     | Judgement offset adjustment capability                                                                            |

@@ -60,12 +60,14 @@ public class BmsPreviewTrack : Track
     private readonly List<BgmEvent> sortedEvents = [];
     private readonly ISampleStore? sampleStore;
     private readonly ISample? previewSample;
+    private readonly AudioManager audioManager;
     private readonly Dictionary<string, ISample?> resolvedSamples = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ActiveBgm> activeChannels = [];
 
-    private readonly record struct BgmEvent(double Time, string SamplePath);
+    private readonly record struct BgmEvent(double Time, string SamplePath, int Volume = 100);
 
     private SampleChannel? previewChannel;
+    private readonly BindableDouble requestedVolume = new(1);
 
     private int nextEventIndex;
     private double seekOffset;
@@ -86,6 +88,8 @@ public class BmsPreviewTrack : Track
         string? previewFile = null)
         : base("bms-preview")
     {
+        this.audioManager = audioManager;
+
         // Propagate the track's aggregate rate (populated by AdjustmentsFromMods in gameplay,
         // or by MusicController mod-track-adjustments elsewhere) into the inner StopwatchClock.
         // BmsPreviewTrack.CurrentTime is driven by this StopwatchClock, not by Track.Rate, so
@@ -119,7 +123,7 @@ public class BmsPreviewTrack : Track
             foreach (var evt in bgmEvents)
             {
                 if (sampleDefinitions.TryGetValue(evt.SampleKey, out var samplePath))
-                    sortedEvents.Add(new BgmEvent(evt.Time, samplePath));
+                    sortedEvents.Add(new BgmEvent(evt.Time, samplePath, evt.Volume));
             }
 
             sortedEvents.Sort((a, b) => a.Time.CompareTo(b.Time));
@@ -313,10 +317,12 @@ public class BmsPreviewTrack : Track
 
         var channel = sample.GetChannel();
         channel.ManualFree = true;
+        requestedVolume.Value = Math.Max(0, evt.Volume) / 100.0;
         channel.Play();
 
         // channel.Play() may bind the decoded sample's aggregate chain after this call. BGM preview
-        // must follow only this Track's aggregate chain, so strip sample/effect routing again once.
+        // must follow only the requested chart volume and AudioManager aggregate, so strip
+        // sample/effect routing again once.
         bindPreviewVolumeAdjustments(channel);
 
         Action<ValueChangedEvent<double>>? isolateOnBind = null;
@@ -352,7 +358,8 @@ public class BmsPreviewTrack : Track
     private void bindPreviewVolumeAdjustments(IAdjustableAudioComponent component)
     {
         component.RemoveAllAdjustments(AdjustableProperty.Volume);
-        component.AddAdjustment(AdjustableProperty.Volume, AggregateVolume);
+        component.AddAdjustment(AdjustableProperty.Volume, requestedVolume);
+        component.AddAdjustment(AdjustableProperty.Volume, audioManager.AggregateVolume);
     }
 
     private void startPreviewChannel()
@@ -362,6 +369,7 @@ public class BmsPreviewTrack : Track
 
         previewChannel = previewSample.GetChannel();
         previewChannel.ManualFree = true;
+        requestedVolume.Value = 1;
         previewChannel.Play();
         bindPreviewVolumeAdjustments(previewChannel);
     }
@@ -382,8 +390,8 @@ public class BmsPreviewTrack : Track
 
     private void stopAllChannels()
     {
-        foreach (var active in activeChannels.ToArray())
-            active.StopAndDispose();
+        for (var i = 0; i < activeChannels.Count; i++)
+            activeChannels[i].StopAndDispose();
 
         activeChannels.Clear();
     }

@@ -38,7 +38,7 @@ public partial class BmsBackgroundAudioPlayer(
     double rate = 1.0)
     : Component
 {
-    public readonly record struct BgmEvent(double Time, string SamplePath);
+    public readonly record struct BgmEvent(double Time, string SamplePath, int Volume = 100);
 
     /// <summary>Maximum age of a BGM event that will still be played on a normal (non-seek) frame.</summary>
     private const double allowable_late_start = 100;
@@ -222,12 +222,13 @@ public partial class BmsBackgroundAudioPlayer(
 
         var channel = sample.GetChannel();
         channel.ManualFree = true;
+        requestedVolume.Value = Math.Max(0, evt.Volume) / 100.0;
         channel.Play();
 
         // channel.Play() enqueues BindAdjustments on the audio thread that bind the channel to the
         // resolved sample's aggregates (which may carry the global effect volume). BGM must be
-        // governed only by the master Volume × music VolumeTrack chain, so we re-isolate once after
-        // that bind lands to strip anything else back out.
+        // governed only by the requested chart volume and AudioManager aggregate, so we re-isolate
+        // once after that bind lands to strip anything else back out.
         bindBgmVolumeAdjustments(channel);
 
         Action<ValueChangedEvent<double>>? isolateOnBind = null;
@@ -256,7 +257,8 @@ public partial class BmsBackgroundAudioPlayer(
         }
 
         // Tracks are not routed through the effect-volume sample chain, so a direct bind of the BGM
-        // volume chain (master Volume × music VolumeTrack) is sufficient.
+        // volume chain (requested chart volume × AudioManager aggregate) is sufficient.
+        requestedVolume.Value = Math.Max(0, evt.Volume) / 100.0;
         bindBgmVolumeAdjustments(track);
 
         if (Math.Abs(rate - 1.0) > 0.001)
@@ -355,10 +357,7 @@ public partial class BmsBackgroundAudioPlayer(
         component.AddAdjustment(AdjustableProperty.Volume, requestedVolume);
 
         if (audioManager != null)
-        {
-            component.AddAdjustment(AdjustableProperty.Volume, audioManager.Volume);
-            component.AddAdjustment(AdjustableProperty.Volume, audioManager.VolumeTrack);
-        }
+            component.AddAdjustment(AdjustableProperty.Volume, audioManager.AggregateVolume);
     }
 
     private void stopAll()

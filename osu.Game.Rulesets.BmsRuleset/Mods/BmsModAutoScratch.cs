@@ -65,7 +65,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                         var headResult = headTable.ResultForOffset(now - drawable.HitObject.StartTime);
                         if (headResult != HitResult.None && drawable.TryHit(headResult))
                         {
-                            playfield.Stage.Columns[note.Column].PlaySample(note.SamplePath);
+                            playfield.Stage.Columns[note.Column].PlaySample(note.SamplePath, note.SampleVolume);
                             autoScratchLnHeads.Add(drawable);
                         }
                     }
@@ -73,8 +73,8 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                 else if (now >= ((BmsLongNote)note).EndTime)
                 {
                     var tailTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, note.Column, note.EffectiveJudgementRate, tail: true);
-                    if (longNote.TryRelease(now - ((BmsLongNote)note).EndTime, tailTable))
-                        playfield.Stage.Columns[note.Column].PlaySample(note is BmsLongNote ln ? ln.TailSamplePath : string.Empty);
+                    if (longNote.TryRelease(now - ((BmsLongNote)note).EndTime, tailTable) && note is BmsLongNote ln)
+                        playfield.Stage.Columns[note.Column].PlaySample(ln.TailSamplePath, ln.TailSampleVolume);
                 }
             }
             else
@@ -85,7 +85,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                     var result = table.ResultForOffset(now - drawable.HitObject.StartTime);
                     if (result != HitResult.None)
                     {
-                        playfield.Stage.Columns[note.Column].PlaySample(note.SamplePath);
+                        playfield.Stage.Columns[note.Column].PlaySample(note.SamplePath, note.SampleVolume);
                         drawable.TryHit(result);
                     }
                 }

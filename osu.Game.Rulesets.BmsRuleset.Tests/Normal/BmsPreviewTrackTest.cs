@@ -34,7 +34,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
 
             track = new BmsPreviewTrack(
-                [new BmsSampleEvent(0, 0, 1)],
+                [new BmsSampleEvent(0, 0, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "test.wav" },
                 directory,
                 audio);
@@ -43,7 +43,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             invokeUpdateState(track);
         });
 
-        AddAssert("sample playing from time zero", () => getActivePlaybackCount(track!) > 0);
+        AddAssert("sample playing from time zero", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -60,7 +60,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
 
             track = new BmsPreviewTrack(
-                [new BmsSampleEvent(2000, 0, 1)],
+                [new BmsSampleEvent(2000, 0, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "test.wav" },
                 directory,
                 audio);
@@ -69,7 +69,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             invokeUpdateState(track);
         });
 
-        AddAssert("first audible event plays immediately", () => getActivePlaybackCount(track!) > 0);
+        AddAssert("first audible event plays immediately", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -86,7 +86,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             Assert.That(File.Exists(Path.Combine(directory, "Track_01_001.wav")), Is.False);
 
             track = new BmsPreviewTrack(
-                [new BmsSampleEvent(0, 0, 1)],
+                [new BmsSampleEvent(0, 0, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "Track_01_001.wav" },
                 directory,
                 audio);
@@ -162,7 +162,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
 
             track = new BmsPreviewTrack(
-                [new BmsSampleEvent(0, 0, 1)],
+                [new BmsSampleEvent(0, 0, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "event.wav" },
                 directory,
                 audio,
@@ -172,7 +172,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             invokeUpdateState(track);
         });
 
-        AddAssert("event preview still plays", () => getActivePlaybackCount(track!) > 0);
+        AddAssert("event preview still plays", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -190,8 +190,8 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             track = new BmsPreviewTrack(
                 [
-                    new BmsSampleEvent(1000, 0, 1),
-                    new BmsSampleEvent(3000, 0, 1),
+                    new BmsSampleEvent(1000, 0, 1, 100),
+                    new BmsSampleEvent(3000, 0, 1, 100),
                 ],
                 new Dictionary<ushort, string> { [1] = "event.wav" },
                 directory,
@@ -204,7 +204,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             invokeUpdateState(track);
         });
 
-        AddAssert("past event was skipped", () => getActivePlaybackCount(track!) == 0);
+        AddAssert("past event was skipped", () => getActivePlaybackCount(track) == 0);
         AddStep("dispose track", () => track.Dispose());
     }
 

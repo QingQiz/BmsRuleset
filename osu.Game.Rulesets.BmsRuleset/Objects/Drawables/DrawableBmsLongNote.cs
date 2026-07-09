@@ -193,7 +193,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
                                        && Time.Current >= HitObject.StartTime && Time.Current <= ln.EndTime
                                        && Time.Current - lastHoldExplosionTime >= hold_explosion_interval)
         {
-            ParentColumn?.TriggerHitExplosion(true, isHold: true);
+            ParentColumn?.TriggerHitExplosion(true);
             lastHoldExplosionTime = Time.Current;
         }
 

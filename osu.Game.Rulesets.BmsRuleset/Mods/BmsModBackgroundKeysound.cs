@@ -25,12 +25,12 @@ public class BmsModBackgroundKeysound : Mod, IApplicableAfterBeatmapConversion
         var notes = b.HitObjects.Where(x => x is not BmsLandmine).ToArray();
 
         var starts = notes
-            .Select(x => new BmsSampleEvent(x.StartTime, x.TickInfo.Tick, x.SampleKey));
+            .Select(x => new BmsSampleEvent(x.StartTime, x.TickInfo.Tick, x.SampleKey, x.SampleVolume));
 
         var tails = notes
             .OfType<BmsLongNote>()
             .Where(x => x.TailSampleKey != 0)
-            .Select(x => new BmsSampleEvent(x.EndTime, x.TickInfo.EndTick, x.TailSampleKey));
+            .Select(x => new BmsSampleEvent(x.EndTime, x.TickInfo.EndTick, x.TailSampleKey, x.TailSampleVolume));
 
         b.BackgroundSampleEvents = b.BackgroundSampleEvents.Concat(starts).Concat(tails).ToArray();
 

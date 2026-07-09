@@ -44,12 +44,12 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
             .Where(x => BmsLayout.IsScratchColumn(x.Column, b.LayoutVariant)).ToArray();
 
         var scratchStartSamples = scratchNotes
-            .Select(x => new BmsSampleEvent(x.StartTime, x.TickInfo.Tick, x.SampleKey));
+            .Select(x => new BmsSampleEvent(x.StartTime, x.TickInfo.Tick, x.SampleKey, x.SampleVolume));
 
         var scratchEndSamples = scratchNotes
             .OfType<BmsLongNote>()
             .Where(x => x.TailSampleKey != 0) // have a tail sample
-            .Select(x => new BmsSampleEvent(x.EndTime, x.TickInfo.EndTick, x.TailSampleKey));
+            .Select(x => new BmsSampleEvent(x.EndTime, x.TickInfo.EndTick, x.TailSampleKey, x.TailSampleVolume));
 
         b.BackgroundSampleEvents = b.BackgroundSampleEvents.Concat(scratchStartSamples).Concat(scratchEndSamples).ToArray();
         b.HitObjects = b.HitObjects.Where(x => !BmsLayout.IsScratchColumn(x.Column, b.LayoutVariant)).ToList();

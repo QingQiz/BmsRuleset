@@ -232,7 +232,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
     /// own NewResult), LN head/tail endpoints, and the repeating hit light fired throughout an
     /// LN hold. Moved here from BmsPlayfield so the column owns its lane's hit-light visuals.
     /// </summary>
-    public void TriggerHitExplosion(bool isLongNote, bool isHold = false)
+    public void TriggerHitExplosion(bool isLongNote)
     {
         HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
             BmsSkinComponents.HitExplosion,
@@ -245,7 +245,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
     /// Plays a note-hit / LN-tail sample in this column's key channel. Routed to the column's own
     /// keysound player so mods (e.g. AutoScratch) hit the same channel a real press would.
     /// </summary>
-    public void PlaySample(string samplePath) => keySound?.PlaySample(samplePath);
+    public void PlaySample(string samplePath, int volume) => keySound?.PlaySample(samplePath, volume);
 
     /// <summary>
     /// Plays the landmine explosion sample (#WAV00) when a landmine in this column detonates.
@@ -256,7 +256,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         if (string.IsNullOrEmpty(explosionPath))
             return;
 
-        keySound?.PlayLandmineSound(explosionPath);
+        keySound?.PlayLandmineSound(explosionPath, hitObject.SampleVolume);
     }
 
     private void onColumnNewResult(DrawableHitObject drawable, JudgementResult result)
@@ -308,7 +308,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             var target = candidates.First(c => c.Candidate.Equals(selectedCandidate)).Drawable;
             if (target.TryHit(selection.Result))
             {
-                keySound?.PlaySample(target.HitObject.SamplePath);
+                keySound?.PlaySample(target.HitObject.SamplePath, target.HitObject.SampleVolume);
                 return PressOutcome.Hit;
             }
         }
@@ -347,7 +347,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             var releaseOffset = time - heldNote.HitObject.GetEndTime();
 
             if (ln2.TryRelease(releaseOffset, tailTable) && heldNote.HitObject is BmsLongNote ln)
-                keySound?.PlaySample(ln.TailSamplePath);
+                keySound?.PlaySample(ln.TailSamplePath, ln.TailSampleVolume);
         }
     }
 

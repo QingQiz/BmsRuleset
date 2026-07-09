@@ -50,9 +50,11 @@ public readonly record struct BmsParsedHitObject(
     double LandmineDamagePercent,
     ushort TailSampleKey,
     string TailSamplePath,
+    int SampleVolume = 100,
+    int TailSampleVolume = 100,
     double JudgementRate = 0.75);
 
-public sealed record BmsSampleEvent(double Time, long Tick, ushort SampleKey);
+public sealed record BmsSampleEvent(double Time, long Tick, ushort SampleKey, int Volume);
 
 // ReSharper disable once NotAccessedPositionalProperty.Global
 public sealed record BmsTextEvent(double Time, long Tick, string Text);

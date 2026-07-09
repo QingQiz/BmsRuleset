@@ -19,6 +19,8 @@ public class BmsHitObject : HitObject
 
     public string SamplePath { get; set; } = string.Empty;
 
+    public int SampleVolume { get; set; } = 100;
+
     public double JudgementRate { get; set; } = double.NaN;
 
     public double EffectiveJudgementRate => double.IsNaN(JudgementRate)
@@ -69,6 +71,7 @@ public class BmsHitObject : HitObject
         target.SourceChannel = SourceChannel;
         target.SampleKey = SampleKey;
         target.SamplePath = SamplePath;
+        target.SampleVolume = SampleVolume;
         target.JudgementRate = JudgementRate;
         target.ScrollPositionAtStartTime = ScrollPositionAtStartTime;
         target.Beatmap = Beatmap;
@@ -94,6 +97,8 @@ public class BmsLongNote : BmsHitObject, IHasDuration
 
     public string TailSamplePath { get; set; } = string.Empty;
 
+    public int TailSampleVolume { get; set; } = 100;
+
     /// <summary>
     ///     Creates a synthetic short-note endpoint for CN/HCN tail judgement
     ///     as a separate scoring event from the head judgement.
@@ -117,6 +122,7 @@ public class BmsLongNote : BmsHitObject, IHasDuration
             ln.ScrollPositionAtEndTime = ScrollPositionAtEndTime;
             ln.TailSampleKey = TailSampleKey;
             ln.TailSamplePath = TailSamplePath;
+            ln.TailSampleVolume = TailSampleVolume;
         }
     }
 }

@@ -24,9 +24,9 @@ public interface IBmsColumn
 
     bool Hidden { get; set; }
 
-    void TriggerHitExplosion(bool isLongNote, bool isHold = false);
+    void TriggerHitExplosion(bool isLongNote);
 
-    void PlaySample(string samplePath);
+    void PlaySample(string samplePath, int volume);
 
     PressOutcome HandlePress(double time);
 

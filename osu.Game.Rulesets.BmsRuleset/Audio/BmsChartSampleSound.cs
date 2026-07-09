@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
@@ -146,9 +145,11 @@ public sealed partial class BmsChartSampleSound : SkinReloadableDrawable
             return;
         }
 
-        foreach (var activeChannel in activeChannels
-                     .Where(activeChannel => !activeChannel.Channel.IsDisposed && activeChannel.Paused))
+        foreach (var activeChannel in activeChannels)
         {
+            if (activeChannel.Channel.IsDisposed || !activeChannel.Paused)
+                continue;
+
             activeChannel.Channel.Play();
             bindChartAudioAdjustments(activeChannel.Channel);
             activeChannel.Paused = false;
@@ -159,9 +160,11 @@ public sealed partial class BmsChartSampleSound : SkinReloadableDrawable
     {
         requestedPlaying = false;
 
-        foreach (var activeChannel in activeChannels
-                     .Where(activeChannel => !activeChannel.Channel.IsDisposed))
+        foreach (var activeChannel in activeChannels)
         {
+            if (activeChannel.Channel.IsDisposed)
+                continue;
+
             activeChannel.Channel.Stop();
             activeChannel.Channel.Dispose();
         }

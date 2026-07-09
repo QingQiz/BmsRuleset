@@ -428,6 +428,13 @@ internal static partial class BmsChartParser
         if (mode != CommandParseMode.Full)
             return;
 
+        if (cmdSpan.Equals("VOLWAV", StringComparison.OrdinalIgnoreCase))
+        {
+            if (tryParseDouble(valueSpan, out var volume) && double.IsFinite(volume))
+                state.WavVolume = Math.Max(0, (int)volume);
+            return;
+        }
+
         if (cmdSpan.Equals("PREVIEW", StringComparison.OrdinalIgnoreCase))
         {
             state.PreviewFile = valueSpan.Trim('"').ToString();
@@ -547,7 +554,7 @@ internal static partial class BmsChartParser
                 if (value == 0) continue; // 0 = "00"
 
                 var tick = mStart + mLength * i / pairCount;
-                output.Add(new BmsSampleEvent(timingMap.ProjectTickToTime(tick), tick, value));
+                output.Add(new BmsSampleEvent(timingMap.ProjectTickToTime(tick), tick, value, state.WavVolume));
             }
         }
     }
@@ -559,7 +566,7 @@ internal static partial class BmsChartParser
             return;
 
         sampleDefinitions[midi_file_sample_key] = state.MidiFile;
-        output.Add(new BmsSampleEvent(0, 0, midi_file_sample_key));
+        output.Add(new BmsSampleEvent(0, 0, midi_file_sample_key, 100));
     }
 
     private static BmsBgaTimeline collectBga(ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
@@ -647,7 +654,7 @@ internal static partial class BmsChartParser
             if (hitObject.TailSampleKey == 0 || string.IsNullOrWhiteSpace(hitObject.TailSamplePath))
                 continue;
 
-            output.Add(new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, hitObject.TailSampleKey));
+            output.Add(new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, hitObject.TailSampleKey, hitObject.TailSampleVolume));
         }
     }
 
@@ -960,14 +967,14 @@ internal static partial class BmsChartParser
         var (notes, lnCells, mines) = collectPlayableCells(state, totalColumns, measureStarts);
 
         if (state.LnType == 2)
-            collectLnType2Objects(lnCells, timingMap, state.SampleDefinitions, output);
+            collectLnType2Objects(lnCells, timingMap, state.SampleDefinitions, state.WavVolume, output);
         else
-            collectLnType1Objects(lnCells, timingMap, state.SampleDefinitions, output);
+            collectLnType1Objects(lnCells, timingMap, state.SampleDefinitions, state.WavVolume, output);
 
         collectVisibleObjects(notes, state, timingMap, output);
 
         foreach (var mine in mines.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-            output.Add(createMineHitObject(mine, timingMap));
+            output.Add(createMineHitObject(mine, timingMap, state.WavVolume));
     }
 
     private static List<BmsJudgementRateEvent> collectJudgementRateEvents(
@@ -1058,7 +1065,7 @@ internal static partial class BmsChartParser
         if (state.LnObjValues.Count == 0)
         {
             foreach (var note in notes.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-                output.Add(createHitObject(note, note.Tick, false, timingMap, state.SampleDefinitions));
+                output.Add(createHitObject(note, note.Tick, false, timingMap, state.SampleDefinitions, state.WavVolume));
 
             return;
         }
@@ -1070,23 +1077,23 @@ internal static partial class BmsChartParser
             if (state.LnObjValues.Contains(note.Value))
             {
                 if (pendingByColumn.Remove(note.Column, out var start) && note.Tick > start.Tick)
-                    output.Add(createHitObject(start, note.Tick, true, timingMap, state.SampleDefinitions, note.Value));
+                    output.Add(createHitObject(start, note.Tick, true, timingMap, state.SampleDefinitions, state.WavVolume, note.Value));
 
                 continue;
             }
 
             if (pendingByColumn.TryGetValue(note.Column, out var previous))
-                output.Add(createHitObject(previous, previous.Tick, false, timingMap, state.SampleDefinitions));
+                output.Add(createHitObject(previous, previous.Tick, false, timingMap, state.SampleDefinitions, state.WavVolume));
 
             pendingByColumn[note.Column] = note;
         }
 
         foreach (var pending in pendingByColumn.Values.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
-            output.Add(createHitObject(pending, pending.Tick, false, timingMap, state.SampleDefinitions));
+            output.Add(createHitObject(pending, pending.Tick, false, timingMap, state.SampleDefinitions, state.WavVolume));
     }
 
     private static void collectLnType1Objects(
-        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions, int wavVolume,
         List<BmsParsedHitObject> output)
     {
         var openByColumn = new Dictionary<int, RawCell>();
@@ -1096,7 +1103,7 @@ internal static partial class BmsChartParser
             if (openByColumn.Remove(cell.Column, out var start))
             {
                 if (cell.Tick > start.Tick)
-                    output.Add(createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions, cell.Value));
+                    output.Add(createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions, wavVolume, cell.Value));
             }
             else
             {
@@ -1106,7 +1113,7 @@ internal static partial class BmsChartParser
     }
 
     private static void collectLnType2Objects(
-        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions, int wavVolume,
         List<BmsParsedHitObject> output)
     {
         foreach (var channelGroup in lnCells.GroupBy(c => c.Channel))
@@ -1123,7 +1130,7 @@ internal static partial class BmsChartParser
 
                 if (openRun is { } start && cell.Tick > start.Tick)
                 {
-                    output.Add(createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions, cell.Value));
+                    output.Add(createHitObject(start, cell.Tick, true, timingMap, sampleDefinitions, wavVolume, cell.Value));
 
                     openRun = null;
                 }
@@ -1134,6 +1141,7 @@ internal static partial class BmsChartParser
     private static BmsParsedHitObject createHitObject(
         RawCell start, long endTick, bool isLongNote, BmsTimingMap timingMap,
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        int wavVolume,
         ushort tailCellValue = 0)
     {
         var startTime = timingMap.ProjectTickToTime(start.Tick);
@@ -1167,10 +1175,12 @@ internal static partial class BmsChartParser
             false,
             0,
             tailSampleKey,
-            tailSamplePath);
+            tailSamplePath,
+            wavVolume,
+            tailSamplePath.Length > 0 ? wavVolume : 100);
     }
 
-    private static BmsParsedHitObject createMineHitObject(RawCell mine, BmsTimingMap timingMap)
+    private static BmsParsedHitObject createMineHitObject(RawCell mine, BmsTimingMap timingMap, int wavVolume)
     {
         var startTime = timingMap.ProjectTickToTime(mine.Tick);
 
@@ -1187,7 +1197,8 @@ internal static partial class BmsChartParser
             true,
             parseBase36Value(mine.Value) / 2d, // 0 = "00"
             0,
-            string.Empty);
+            string.Empty,
+            wavVolume);
     }
 
     private static IEnumerable<RawCell> expandCells(
@@ -1482,6 +1493,8 @@ internal static partial class BmsChartParser
         public int Rank { get; set; } = 2;
 
         public double? DefaultExRank { get; set; }
+
+        public int WavVolume { get; set; } = 100;
 
         /// <summary>BMS #TOTAL value: gauge recovery coefficient. Zero means use the default formula.</summary>
         public double Total { get; set; }

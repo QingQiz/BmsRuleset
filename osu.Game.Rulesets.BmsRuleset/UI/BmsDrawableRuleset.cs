@@ -186,7 +186,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         var events = beatmap.BackgroundSampleEvents
             .OrderBy(e => e.Time)
             .Where(e => beatmap.SampleDefinitions.ContainsKey(e.SampleKey))
-            .Select(e => new BmsBackgroundAudioPlayer.BgmEvent(e.Time, beatmap.SampleDefinitions[e.SampleKey]))
+            .Select(e => new BmsBackgroundAudioPlayer.BgmEvent(e.Time, beatmap.SampleDefinitions[e.SampleKey], e.Volume))
             .ToList();
 
         if (events.Count > 0)

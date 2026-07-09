@@ -30,12 +30,12 @@ public sealed partial class BmsColumnKeySound : CompositeDrawable
     }
 
     /// <summary>Plays a note-hit / LN-tail sample in this column's key channel.</summary>
-    public void PlaySample(string samplePath)
+    public void PlaySample(string samplePath, int volume = 100)
     {
         if (string.IsNullOrEmpty(samplePath))
             return;
 
-        keySound.SampleInfo = new BmsSampleInfo(samplePath);
+        keySound.SampleInfo = new BmsSampleInfo(samplePath, volume);
         keySound.Play();
     }
 
@@ -51,16 +51,16 @@ public sealed partial class BmsColumnKeySound : CompositeDrawable
         if (cursor.Next(Time.Current, hasNoteFinished) is not { } hitObject || string.IsNullOrEmpty(hitObject.SamplePath))
             return;
 
-        PlaySample(hitObject.SamplePath);
+        PlaySample(hitObject.SamplePath, hitObject.SampleVolume);
     }
 
     /// <summary>Plays the landmine explosion sample (#WAV00) in this column's landmine channel.</summary>
-    public void PlayLandmineSound(string samplePath)
+    public void PlayLandmineSound(string samplePath, int volume = 100)
     {
         if (string.IsNullOrEmpty(samplePath))
             return;
 
-        landmineSound.SampleInfo = new BmsSampleInfo(samplePath);
+        landmineSound.SampleInfo = new BmsSampleInfo(samplePath, volume);
         landmineSound.Play();
     }
 

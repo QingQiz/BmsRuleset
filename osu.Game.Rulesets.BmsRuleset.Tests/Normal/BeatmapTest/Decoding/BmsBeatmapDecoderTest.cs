@@ -113,6 +113,54 @@ public class BmsBeatmapDecoderTest
         Assert.That(summary.Metadata, Is.EqualTo(extractImportMetadata(parsed, path)));
     }
 
+    [Test]
+    public void TestVolwavAppliesToChartSamples()
+    {
+        var parsed = BmsChartParser.Parse("""
+                                          #VOLWAV 25
+                                          #WAV01 hit.wav
+                                          #WAV02 tail.wav
+                                          #00001:01
+                                          #00011:01
+                                          #00151:0102
+                                          """.Split('\n'));
+
+        var note = parsed.HitObjects.Single(h => !h.IsLongNote);
+        var longNote = parsed.HitObjects.Single(h => h.IsLongNote);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(note.SampleVolume, Is.EqualTo(25));
+            Assert.That(longNote.SampleVolume, Is.EqualTo(25));
+            Assert.That(longNote.TailSampleVolume, Is.EqualTo(25));
+            Assert.That(parsed.BackgroundSampleEvents.Single().Volume, Is.EqualTo(25));
+            Assert.That(parsed.LongNoteTailSampleEvents.Single().Volume, Is.EqualTo(25));
+        });
+    }
+
+    [Test]
+    public void TestVolwavDefaultsToFullVolume()
+    {
+        var parsed = BmsChartParser.Parse("""
+                                          #WAV01 hit.wav
+                                          #00111:01
+                                          """.Split('\n'));
+
+        Assert.That(parsed.HitObjects.Single().SampleVolume, Is.EqualTo(100));
+    }
+
+    [Test]
+    public void TestVolwavAllowsAmplification()
+    {
+        var parsed = BmsChartParser.Parse("""
+                                          #VOLWAV 150
+                                          #WAV01 hit.wav
+                                          #00111:01
+                                          """.Split('\n'));
+
+        Assert.That(parsed.HitObjects.Single().SampleVolume, Is.EqualTo(150));
+    }
+
     private static BmsChartMetadata extractImportMetadata(BmsParseResult parsed, string path)
     {
         var title = parsed.Title ?? Path.GetFileNameWithoutExtension(path);

@@ -92,9 +92,9 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
                     continue;
 
                 if (hit.SampleKey != 0)
-                    allEvents.Add(new BmsSampleEvent(hit.StartTime, 0, hit.SampleKey));
+                    allEvents.Add(new BmsSampleEvent(hit.StartTime, 0, hit.SampleKey, hit.SampleVolume));
                 if (hit is BmsLongNote ln && ln.TailSampleKey != 0)
-                    allEvents.Add(new BmsSampleEvent(hit.StartTime + ln.Duration, 0, ln.TailSampleKey));
+                    allEvents.Add(new BmsSampleEvent(hit.StartTime + ln.Duration, 0, ln.TailSampleKey, ln.TailSampleVolume));
             }
 
             allEvents.Sort(static (a, b) => a.Time.CompareTo(b.Time));
