@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using HarmonyLib;
 using osu.Framework.Allocation;
+using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
@@ -13,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking.Statistics;
+using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Replays;
 
@@ -26,6 +28,8 @@ public static class BmsReplayPatcher
     private static PropertyInfo? playerScoreManagerProperty;
     private static PropertyInfo? modelManagerRealmProperty;
     private static FieldInfo? scoreImporterFilesField;
+    private static FieldInfo? replayFailIndicatorTrackField;
+    private static FieldInfo? replayFailIndicatorFailSampleField;
     private static MethodInfo? drawableScheduleMethod;
 
     public static bool IsInstalled { get; private set; }
@@ -43,10 +47,14 @@ public static class BmsReplayPatcher
             var getScorePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(getScorePrefix));
             var statisticsPanelPopulateTarget = AccessTools.Method(typeof(StatisticsPanel), "populateStatistics", [typeof(ValueChangedEvent<ScoreInfo?>)]);
             var statisticsPanelPopulatePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(statisticsPanelPopulatePrefix));
+            var replayFailIndicatorDisposeTarget = AccessTools.Method(typeof(ReplayFailIndicator), "Dispose", [typeof(bool)]);
+            var replayFailIndicatorDisposePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(replayFailIndicatorDisposePrefix));
 
             playerScoreManagerProperty = AccessTools.Property(typeof(Player), "scoreManager");
             modelManagerRealmProperty = AccessTools.Property(typeof(ModelManager<ScoreInfo>), "Realm");
             scoreImporterFilesField = AccessTools.Field(typeof(RealmArchiveModelImporter<ScoreInfo>), "Files");
+            replayFailIndicatorTrackField = AccessTools.Field(typeof(ReplayFailIndicator), "track");
+            replayFailIndicatorFailSampleField = AccessTools.Field(typeof(ReplayFailIndicator), "failSample");
             drawableScheduleMethod = AccessTools.Method(typeof(Drawable), "Schedule", [typeof(Action)]);
 
             var missingMembers = new (string name, MemberInfo? member)[]
@@ -57,9 +65,13 @@ public static class BmsReplayPatcher
                 (name: "BmsReplayPatcher.getScorePrefix", member: getScorePrefixMethod),
                 (name: "StatisticsPanel.populateStatistics", member: statisticsPanelPopulateTarget),
                 (name: "BmsReplayPatcher.statisticsPanelPopulatePrefix", member: statisticsPanelPopulatePrefixMethod),
+                (name: "ReplayFailIndicator.Dispose", member: replayFailIndicatorDisposeTarget),
+                (name: "BmsReplayPatcher.replayFailIndicatorDisposePrefix", member: replayFailIndicatorDisposePrefixMethod),
                 (name: "Player.scoreManager", member: playerScoreManagerProperty),
                 (name: "ModelManager<ScoreInfo>.Realm", member: modelManagerRealmProperty),
                 (name: "RealmArchiveModelImporter<ScoreInfo>.Files", member: scoreImporterFilesField),
+                (name: "ReplayFailIndicator.track", member: replayFailIndicatorTrackField),
+                (name: "ReplayFailIndicator.failSample", member: replayFailIndicatorFailSampleField),
                 (name: "Drawable.Schedule", member: drawableScheduleMethod),
             }.Where(m => m.member == null).Select(m => m.name).ToArray();
 
@@ -73,6 +85,7 @@ public static class BmsReplayPatcher
             harmony.Patch(importScoreTarget, postfix: new HarmonyMethod(importScorePostfixMethod));
             harmony.Patch(getScoreTarget, prefix: new HarmonyMethod(getScorePrefixMethod));
             harmony.Patch(statisticsPanelPopulateTarget, prefix: new HarmonyMethod(statisticsPanelPopulatePrefixMethod));
+            harmony.Patch(replayFailIndicatorDisposeTarget, prefix: new HarmonyMethod(replayFailIndicatorDisposePrefixMethod));
             IsInstalled = true;
         }
         catch (Exception e)
@@ -217,6 +230,15 @@ public static class BmsReplayPatcher
         {
             Logger.Error(e, "BMS replay patch failed to restore hit events for the statistics panel.");
         }
+    }
+
+    private static void replayFailIndicatorDisposePrefix(ReplayFailIndicator __instance)
+    {
+        if (__instance.LoadState != LoadState.NotLoaded)
+            return;
+
+        replayFailIndicatorFailSampleField?.SetValue(__instance, new SkinnableSound());
+        replayFailIndicatorTrackField?.SetValue(__instance, new TrackVirtual(0));
     }
     // ReSharper restore InconsistentNaming
 
