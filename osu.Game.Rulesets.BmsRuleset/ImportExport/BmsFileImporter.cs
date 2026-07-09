@@ -202,13 +202,32 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     private static string calculateSetHash(BeatmapSetInfo beatmapSetInfo) =>
         calculateSetHash(beatmapSetInfo.Beatmaps.Select(b => b.MD5Hash));
 
+    private ConcurrentDictionary<string, byte> createImportedBeatmapMd5Lookup()
+    {
+        var hashes = realm.Run(r =>
+        {
+            var result = new Dictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var beatmap in r.All<BeatmapInfo>().Filter("Ruleset.ShortName == $0 && BeatmapSet.DeletePending == false", "bms"))
+            {
+                if (!string.IsNullOrWhiteSpace(beatmap.MD5Hash))
+                    result.TryAdd(beatmap.MD5Hash, 0);
+            }
+
+            return result;
+        });
+
+        return new ConcurrentDictionary<string, byte>(hashes, StringComparer.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// Reads, parses and hashes every chart in a directory
     /// </summary>
     private static PreparedDirectory? readPreparedDirectory(
         ImportGroup group,
         RealmAccess realmAccess,
-        RealmFileStore fileStore)
+        RealmFileStore fileStore,
+        ConcurrentDictionary<string, byte> importedBeatmapMd5Hashes)
     {
         var chartPaths = group.ChartPaths
             .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
@@ -223,11 +242,14 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
         for (var i = 0; i < allMd5.Length; i++)
         {
-            if (seenMd5.Add(allMd5[i]))
+            if (seenMd5.Add(allMd5[i]) && importedBeatmapMd5Hashes.TryAdd(allMd5[i], 0))
                 uniqueChartIndexes.Add(i);
         }
 
-        var setHash = calculateSetHash(seenMd5);
+        if (uniqueChartIndexes.Count == 0)
+            return null;
+
+        var setHash = calculateSetHash(uniqueChartIndexes.Select(i => allMd5[i]));
 
         var existing = realmAccess.Run(r =>
         {
@@ -373,8 +395,9 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             // we only import .bms files, so the size will be very small
             var pool = new BlockingCollection<PreparedDirectory?>(1024);
+            var importedBeatmapMd5Hashes = createImportedBeatmapMd5Lookup();
 
-            var producer = launchProducer(notification, groups, fileStore, pool);
+            var producer = launchProducer(notification, groups, fileStore, pool, importedBeatmapMd5Hashes);
             var (imported, processed, cancelled) = drainConsumer(notification, groups, pool, producer);
 
             if (cancelled) return; // drainConsumer already set the notification state
@@ -405,7 +428,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         ProgressNotification notification,
         ImportGroup[] groups,
         RealmFileStore fileStore,
-        BlockingCollection<PreparedDirectory?> pool)
+        BlockingCollection<PreparedDirectory?> pool,
+        ConcurrentDictionary<string, byte> importedBeatmapMd5Hashes)
     {
         return Task.Run(() =>
         {
@@ -416,7 +440,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     CancellationToken = notification.CancellationToken,
                 }, group =>
                 {
-                    var prepared = readPreparedDirectory(group, realm, fileStore);
+                    var prepared = readPreparedDirectory(group, realm, fileStore, importedBeatmapMd5Hashes);
                     pool.Add(prepared, notification.CancellationToken);
                 });
             }
@@ -462,7 +486,6 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     // ── Fast path: skip if the set hash already exists (prepared == null) ──
                     if (prepared == null)
                     {
-                        imported++;
                         processed++;
                         reportProgress(notification, imported, groups.Length, processed);
                         return;

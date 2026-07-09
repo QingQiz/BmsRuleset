@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -12,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.IO;
 
@@ -281,6 +283,59 @@ public partial class BmsFileImporterTest
             Assert.That(result.BeatmapCount, Is.EqualTo(1));
             Assert.That(result.FileCount, Is.EqualTo(1));
             Assert.That(result.DistinctMd5Count, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void TestImportDirectorySkipsChartsAlreadyImportedByMd5()
+    {
+        runImportTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+
+            var sourceDirectory = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Aleph-0 (by LeaF)");
+            var importDirectory = Path.Combine(storage.GetFullPath(string.Empty), "partially-imported-md5-import");
+            Directory.CreateDirectory(importDirectory);
+
+            var alreadyImportedChart = Path.Combine(sourceDirectory, "_7NORMAL.bms");
+            var newChart = Path.Combine(sourceDirectory, "_14ANOTHER.bms");
+
+            File.Copy(alreadyImportedChart, Path.Combine(importDirectory, "_7NORMAL.bms"));
+            File.Copy(newChart, Path.Combine(importDirectory, "_14ANOTHER.bms"));
+
+            var importer = new BmsFileImporter(realm, storage);
+
+            await importer.Import(alreadyImportedChart).ConfigureAwait(false);
+            await importer.Import(importDirectory).ConfigureAwait(false);
+
+            var result = realm.Run(r =>
+            {
+                var beatmapCounts = new List<int>();
+                var md5Hashes = new List<string>();
+                var difficultyNames = new List<string>();
+
+                foreach (var set in r.All<BeatmapSetInfo>().Filter("DeletePending == false"))
+                {
+                    beatmapCounts.Add(set.Beatmaps.Count);
+
+                    foreach (var beatmap in set.Beatmaps)
+                    {
+                        md5Hashes.Add(beatmap.MD5Hash);
+                        difficultyNames.Add(beatmap.DifficultyName);
+                    }
+                }
+
+                return (
+                    SetCount: beatmapCounts.Count,
+                    BeatmapCounts: beatmapCounts.OrderBy(c => c).ToArray(),
+                    Md5Hashes: md5Hashes.ToArray(),
+                    DifficultyNames: difficultyNames.OrderBy(n => n, StringComparer.Ordinal).ToArray());
+            });
+
+            Assert.That(result.SetCount, Is.EqualTo(2));
+            Assert.That(result.BeatmapCounts, Is.EqualTo(new[] { 1, 1 }));
+            Assert.That(result.Md5Hashes.Distinct(StringComparer.OrdinalIgnoreCase).Count(), Is.EqualTo(2));
+            Assert.That(result.DifficultyNames, Is.EqualTo(new[] { "14ANOTHER", "NORMAL" }));
         });
     }
 
