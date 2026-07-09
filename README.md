@@ -30,6 +30,7 @@ Native osu! ruleset plugin for BMS-family charts (`.bms`, `.bme`, `.bml`, `.pms`
    dotnet build "osu.Game.Rulesets.BmsRuleset"
    ```
    Output: `osu.Game.Rulesets.BmsRuleset/bin/Debug/net8.0/osu.Game.Rulesets.BmsRuleset.dll`
+   The built DLL embeds compressed native backends for Windows, Linux, and macOS.
 
 3. Copy the DLL to your osu! `rulesets/` folder.
 

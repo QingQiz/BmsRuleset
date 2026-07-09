@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -199,8 +200,9 @@ internal sealed unsafe class BmsSupplementalFFmpegFuncs
             if (current_platform.artifact.Length == 0)
                 return false;
 
-            using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(current_platform.resource);
-            return stream != null;
+            var assembly = Assembly.GetExecutingAssembly();
+            return assembly.GetManifestResourceInfo(current_platform.resource) != null
+                   || assembly.GetManifestResourceInfo($"{current_platform.resource}.br") != null;
         }
     }
 
@@ -235,13 +237,38 @@ internal sealed unsafe class BmsSupplementalFFmpegFuncs
     {
         error = null;
 
-        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(name);
-        if (stream == null)
+        var assembly = Assembly.GetExecutingAssembly();
+        using var rawStream = assembly.GetManifestResourceStream(name);
+
+        if (rawStream != null)
+            return readFully(rawStream, current_platform.artifact, out error);
+
+        using var compressedStream = assembly.GetManifestResourceStream($"{name}.br");
+
+        if (compressedStream == null)
         {
             error = $"Supplemental FFmpeg native backend '{current_platform.artifact}' is not embedded in this ruleset build.";
             return null;
         }
 
+        try
+        {
+            using var brotli = new BrotliStream(compressedStream, CompressionMode.Decompress);
+            using var decompressed = new MemoryStream();
+            brotli.CopyTo(decompressed);
+
+            return decompressed.ToArray();
+        }
+        catch (InvalidDataException ex)
+        {
+            error = $"Supplemental FFmpeg native backend '{current_platform.artifact}' compressed resource could not be decompressed: {ex.Message}";
+            return null;
+        }
+    }
+
+    private static byte[]? readFully(Stream stream, string artifactName, out string? error)
+    {
+        error = null;
         var bytes = new byte[stream.Length];
         var totalRead = 0;
 
@@ -256,7 +283,7 @@ internal sealed unsafe class BmsSupplementalFFmpegFuncs
 
         if (totalRead != bytes.Length)
         {
-            error = $"Supplemental FFmpeg native backend '{current_platform.artifact}' resource was truncated.";
+            error = $"Supplemental FFmpeg native backend '{artifactName}' resource was truncated.";
             return null;
         }
 

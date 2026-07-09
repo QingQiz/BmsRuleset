@@ -20,29 +20,26 @@
         <PackageReference Include="Lib.Harmony" Version="2.4.2"/>
         <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0"/>
     </ItemGroup>
-    <!-- Detect the build host's OS via the same RuntimeInformation API the runtime loader
-         uses (BmsSupplementalFFmpegFuncs.current_platform), so a build embeds only the one
-         native backend that platform will select. Without this gate a Windows build would
-         also carry the committed Linux .so (~4 MB of dead bytes the loader never touches). -->
+    <!-- Keep the ruleset DLL portable by embedding every native backend as a Brotli-compressed
+         resource. The runtime loader only decompresses the backend that matches the current OS. -->
     <PropertyGroup>
-        <BmsNativeHostIsWindows>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))</BmsNativeHostIsWindows>
-        <BmsNativeHostIsLinux>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))</BmsNativeHostIsLinux>
-        <BmsNativeHostIsMacOS>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</BmsNativeHostIsMacOS>
+        <BmsNativeBrotliToolConfiguration Condition="'$(BmsNativeBrotliToolConfiguration)' == ''">Release</BmsNativeBrotliToolConfiguration>
+        <BmsNativeBrotliToolProject>$(MSBuildThisFileDirectory)..\osu.Game.Rulesets.BmsRuleset.Native\osu.Game.Rulesets.BmsRuleset.Native.csproj</BmsNativeBrotliToolProject>
+        <BmsNativeBrotliToolPath>$(MSBuildThisFileDirectory)..\osu.Game.Rulesets.BmsRuleset.Native\bin\$(BmsNativeBrotliToolConfiguration)\net8.0\osu.Game.Rulesets.BmsRuleset.Native.dll</BmsNativeBrotliToolPath>
     </PropertyGroup>
-    <ItemGroup Condition="'$(BmsNativeHostIsWindows)' == 'True' And Exists('..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\windows-x64\bms-ffmpeg.dll')">
-        <EmbeddedResource Include="..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\windows-x64\bms-ffmpeg.dll">
-            <LogicalName>bms-ffmpeg.win-x64.dll</LogicalName>
-        </EmbeddedResource>
-    </ItemGroup>
-    <ItemGroup Condition="'$(BmsNativeHostIsLinux)' == 'True' And Exists('..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\linux-x64\bms-ffmpeg.so')">
-        <EmbeddedResource Include="..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\linux-x64\bms-ffmpeg.so">
-            <LogicalName>bms-ffmpeg.linux-x64.so</LogicalName>
-        </EmbeddedResource>
-    </ItemGroup>
-    <ItemGroup Condition="'$(BmsNativeHostIsMacOS)' == 'True' And Exists('..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\osx\bms-ffmpeg.dylib')">
-        <EmbeddedResource Include="..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\osx\bms-ffmpeg.dylib">
-            <LogicalName>bms-ffmpeg.osx.dylib</LogicalName>
-        </EmbeddedResource>
+    <ItemGroup>
+        <BmsNativeBackendToCompress Include="..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\windows-x64\bms-ffmpeg.dll" Condition="Exists('..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\windows-x64\bms-ffmpeg.dll')">
+            <LogicalName>bms-ffmpeg.win-x64.dll.br</LogicalName>
+            <CompressedPath>$(IntermediateOutputPath)bms-native\bms-ffmpeg.win-x64.dll.br</CompressedPath>
+        </BmsNativeBackendToCompress>
+        <BmsNativeBackendToCompress Include="..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\linux-x64\bms-ffmpeg.so" Condition="Exists('..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\linux-x64\bms-ffmpeg.so')">
+            <LogicalName>bms-ffmpeg.linux-x64.so.br</LogicalName>
+            <CompressedPath>$(IntermediateOutputPath)bms-native\bms-ffmpeg.linux-x64.so.br</CompressedPath>
+        </BmsNativeBackendToCompress>
+        <BmsNativeBackendToCompress Include="..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\osx\bms-ffmpeg.dylib" Condition="Exists('..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\osx\bms-ffmpeg.dylib')">
+            <LogicalName>bms-ffmpeg.osx.dylib.br</LogicalName>
+            <CompressedPath>$(IntermediateOutputPath)bms-native\bms-ffmpeg.osx.dylib.br</CompressedPath>
+        </BmsNativeBackendToCompress>
     </ItemGroup>
     <ItemGroup Condition="'$(UseLocalOsu)' != 'true'">
         <PackageReference Include="ppy.osu.Game" Version="$(OsuVersion)"/>
@@ -81,5 +78,18 @@
             TargetKind="Dll"
             OutputFile="$(TargetPath)" />
         <Message Importance="high" Text="Repacked BMS ruleset: $(TargetPath)" />
+    </Target>
+    <Target Name="CompressBmsNativeBackends" BeforeTargets="AssignTargetPaths" Condition="'@(BmsNativeBackendToCompress)' != ''">
+        <Error Condition="'@(BmsNativeBackendToCompress->Count())' != '3'" Text="Expected all three BMS native backends before embedding compressed resources, but found @(BmsNativeBackendToCompress->Count())." />
+        <MSBuild
+            Projects="$(BmsNativeBrotliToolProject)"
+            Targets="Restore;Build"
+            Properties="Configuration=$(BmsNativeBrotliToolConfiguration)" />
+        <Exec Command="dotnet &quot;$(BmsNativeBrotliToolPath)&quot; &quot;%(BmsNativeBackendToCompress.FullPath)&quot; &quot;%(BmsNativeBackendToCompress.CompressedPath)&quot;" />
+        <ItemGroup>
+            <EmbeddedResource Include="%(BmsNativeBackendToCompress.CompressedPath)" WithCulture="false">
+                <LogicalName>%(BmsNativeBackendToCompress.LogicalName)</LogicalName>
+            </EmbeddedResource>
+        </ItemGroup>
     </Target>
 </Project>

@@ -29,6 +29,7 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
    dotnet build "osu.Game.Rulesets.BmsRuleset"
    ```
    输出：`osu.Game.Rulesets.BmsRuleset/bin/Debug/net8.0/osu.Game.Rulesets.BmsRuleset.dll`
+   构建出的 DLL 会内嵌 Windows、Linux 和 macOS 的压缩 native backend。
 
 2. 将 DLL 复制到 osu! 的 `rulesets/` 文件夹。
 
