@@ -24,12 +24,16 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
         {
             d.Anchor = Anchor.BottomCentre;
             d.Origin = Anchor.BottomCentre;
+            d.RelativeSizeAxes = Axes.X;
+            d.Width = 1;
         });
 
         downSprite = transformer.GetLegacyAnimation(transformer.GetKeyImageName(lookup, true))?.With(d =>
         {
             d.Anchor = Anchor.BottomCentre;
             d.Origin = Anchor.BottomCentre;
+            d.RelativeSizeAxes = Axes.X;
+            d.Width = 1;
             d.Alpha = 0;
         });
 
@@ -46,34 +50,10 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
         };
     }
 
-    protected override void Update()
-    {
-        base.Update();
-
-        fitToColumnWidth(upSprite);
-        fitToColumnWidth(downSprite);
-    }
-
     /// <summary>
     /// Calculates how much of an image extends past the hit position line.
     /// </summary>
     internal static float CalculateBottomOverflow(float imageHeight, float hitPosition) => System.Math.Max(0, imageHeight - hitPosition);
-
-    /// <summary>
-    /// Stretches the sprite width to fill the column while keeping its native height,
-    /// matching osu! mania's LegacyKeyArea behaviour (RelativeSizeAxes.X, Width=1).
-    ///
-    /// No Y offset is applied — like osu! mania, the key image sits at the bottom
-    /// of the column, without positionForJudgeLine alignment.
-    /// </summary>
-    private void fitToColumnWidth(Drawable? sprite)
-    {
-        if (sprite == null)
-            return;
-
-        sprite.RelativeSizeAxes = Axes.X;
-        sprite.Width = 1;
-    }
 
     /// <summary>
     /// Calculates the scale factor to fit an image width to a target column width.

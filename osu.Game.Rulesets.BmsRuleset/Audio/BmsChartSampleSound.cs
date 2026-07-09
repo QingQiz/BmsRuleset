@@ -35,7 +35,6 @@ public sealed partial class BmsChartSampleSound : SkinReloadableDrawable
     private readonly List<ActiveChannel> activeChannels = [];
     private readonly IBindable<bool> samplePlaybackDisabled = new BindableBool();
     private readonly BindableDouble pauseFrequency = new(1);
-    private readonly BindableDouble requestedVolume = new(1);
 
     private readonly record struct ResolvedSample(ISampleInfo Info, ISample Sample);
 
@@ -86,7 +85,6 @@ public sealed partial class BmsChartSampleSound : SkinReloadableDrawable
 
         var channel = resolved.Sample.GetChannel();
         channel.ManualFree = true;
-        requestedVolume.Value = Math.Max(0, resolved.Info.Volume) / 100.0;
         channel.Play();
 
         // channel.Play() enqueues two BindAdjustments calls on the audio thread via
@@ -105,18 +103,18 @@ public sealed partial class BmsChartSampleSound : SkinReloadableDrawable
         //
         // The event add/remove uses Interlocked (compiler-generated), so game-thread add
         // and audio-thread invoke/remove are both safe.
-        bindChartAudioAdjustments(channel);
+        bindChartAudioAdjustments(channel, resolved.Info.Volume);
 
         Action<ValueChangedEvent<double>>? isolateOnBind = null;
         isolateOnBind = _ =>
         {
             channel.AggregateVolume.ValueChanged -= isolateOnBind!;
-            bindChartAudioAdjustments(channel);
+            bindChartAudioAdjustments(channel, resolved.Info.Volume);
         };
         channel.AggregateVolume.ValueChanged += isolateOnBind;
 
         channel.AddAdjustment(AdjustableProperty.Frequency, pauseFrequency);
-        activeChannels.Add(new ActiveChannel(channel));
+        activeChannels.Add(new ActiveChannel(channel, resolved.Info.Volume));
     }
 
     public void Pause()
@@ -151,7 +149,7 @@ public sealed partial class BmsChartSampleSound : SkinReloadableDrawable
                 continue;
 
             activeChannel.Channel.Play();
-            bindChartAudioAdjustments(activeChannel.Channel);
+            bindChartAudioAdjustments(activeChannel.Channel, activeChannel.Volume);
             activeChannel.Paused = false;
         }
     }
@@ -246,18 +244,20 @@ public sealed partial class BmsChartSampleSound : SkinReloadableDrawable
             requestedPlaying = false;
     }
 
-    private void bindChartAudioAdjustments(IAdjustableAudioComponent component)
+    private void bindChartAudioAdjustments(IAdjustableAudioComponent component, int volume = 100)
     {
         component.RemoveAllAdjustments(AdjustableProperty.Volume);
-        component.AddAdjustment(AdjustableProperty.Volume, requestedVolume);
+        component.AddAdjustment(AdjustableProperty.Volume, new BindableDouble(Math.Max(0, volume) / 100.0));
 
         if (audioManager != null)
             component.AddAdjustment(AdjustableProperty.Volume, audioManager.AggregateVolume);
     }
 
-    private sealed class ActiveChannel(SampleChannel channel)
+    private sealed class ActiveChannel(SampleChannel channel, int volume)
     {
         public SampleChannel Channel { get; } = channel;
+
+        public int Volume { get; } = volume;
 
         public bool Paused { get; set; }
     }

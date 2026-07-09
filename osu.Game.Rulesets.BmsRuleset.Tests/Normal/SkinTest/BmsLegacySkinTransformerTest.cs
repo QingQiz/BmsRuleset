@@ -546,7 +546,8 @@ public class BmsLegacySkinTransformerTest
             Assert.That(container.Y, Is.Zero);
             Assert.That(sprite.Anchor, Is.EqualTo(Anchor.BottomCentre));
             Assert.That(sprite.Origin, Is.EqualTo(Anchor.BottomCentre));
-            Assert.That(sprite.RelativeSizeAxes, Is.EqualTo(Axes.None));
+            Assert.That(sprite.RelativeSizeAxes, Is.EqualTo(Axes.X));
+            Assert.That(sprite.Width, Is.EqualTo(1));
         });
     }
 

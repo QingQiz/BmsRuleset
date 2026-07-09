@@ -45,7 +45,6 @@ public partial class BmsBackgroundAudioPlayer(
 
     private readonly BindableBool sourceIsPaused = new();
     private readonly IBindable<bool> samplePlaybackDisabled = new BindableBool();
-    private readonly BindableDouble requestedVolume = new(1);
     private readonly BindableDouble pauseFrequency = new(1);
 
     private readonly List<ActiveBgm> activeChannels = [];
@@ -222,20 +221,19 @@ public partial class BmsBackgroundAudioPlayer(
 
         var channel = sample.GetChannel();
         channel.ManualFree = true;
-        requestedVolume.Value = Math.Max(0, evt.Volume) / 100.0;
         channel.Play();
 
         // channel.Play() enqueues BindAdjustments on the audio thread that bind the channel to the
         // resolved sample's aggregates (which may carry the global effect volume). BGM must be
         // governed only by the requested chart volume and AudioManager aggregate, so we re-isolate
         // once after that bind lands to strip anything else back out.
-        bindBgmVolumeAdjustments(channel);
+        bindBgmVolumeAdjustments(channel, evt.Volume);
 
         Action<ValueChangedEvent<double>>? isolateOnBind = null;
         isolateOnBind = _ =>
         {
             channel.AggregateVolume.ValueChanged -= isolateOnBind!;
-            bindBgmVolumeAdjustments(channel);
+            bindBgmVolumeAdjustments(channel, evt.Volume);
         };
         channel.AggregateVolume.ValueChanged += isolateOnBind;
 
@@ -258,8 +256,7 @@ public partial class BmsBackgroundAudioPlayer(
 
         // Tracks are not routed through the effect-volume sample chain, so a direct bind of the BGM
         // volume chain (requested chart volume × AudioManager aggregate) is sufficient.
-        requestedVolume.Value = Math.Max(0, evt.Volume) / 100.0;
-        bindBgmVolumeAdjustments(track);
+        bindBgmVolumeAdjustments(track, evt.Volume);
 
         if (Math.Abs(rate - 1.0) > 0.001)
             track.AddAdjustment(AdjustableProperty.Tempo, new BindableDouble(rate));
@@ -351,10 +348,10 @@ public partial class BmsBackgroundAudioPlayer(
         resumeAll();
     }
 
-    private void bindBgmVolumeAdjustments(IAdjustableAudioComponent component)
+    private void bindBgmVolumeAdjustments(IAdjustableAudioComponent component, int volume = 100)
     {
         component.RemoveAllAdjustments(AdjustableProperty.Volume);
-        component.AddAdjustment(AdjustableProperty.Volume, requestedVolume);
+        component.AddAdjustment(AdjustableProperty.Volume, new BindableDouble(Math.Max(0, volume) / 100.0));
 
         if (audioManager != null)
             component.AddAdjustment(AdjustableProperty.Volume, audioManager.AggregateVolume);
