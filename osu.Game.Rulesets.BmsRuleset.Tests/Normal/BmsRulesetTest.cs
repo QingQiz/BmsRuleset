@@ -22,6 +22,7 @@ using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Settings;
+using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -159,6 +160,12 @@ public class BmsRulesetTest
     public void TestInitialisationInstallsRankingHitResultColourPatch()
     {
         Assert.That(BmsRankingHitResultColourPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
+    public void TestInitialisationInstallsLocalLeaderboardPatch()
+    {
+        Assert.That(BmsLocalLeaderboardPatcher.IsInstalled, Is.True);
     }
 
     [Test]
