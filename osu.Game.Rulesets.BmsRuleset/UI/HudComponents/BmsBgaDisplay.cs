@@ -33,11 +33,11 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
     private static readonly string[] video_resource_extensions =
     [
         ".mp4",
+        ".avi",
         ".webm",
         ".mov",
         ".mpeg",
         ".mpg",
-        ".avi",
         ".wmv",
     ];
 
