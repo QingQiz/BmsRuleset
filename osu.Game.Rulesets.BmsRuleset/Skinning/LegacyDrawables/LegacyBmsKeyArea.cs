@@ -1,23 +1,13 @@
-﻿using osu.Framework.Graphics;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
-using osu.Game.Rulesets.BmsRuleset.UI.Components;
-using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 
-/// <summary>
-/// Legacy key overlay shown around the judgement line for one BMS column.
-/// </summary>
-/// <remarks>
-/// The up/down key images are positioned relative to <c>HitPosition</c>. The drawable also handles
-/// input state so BMS scratch/keys can swap from the normal image to the pressed image without the
-/// playfield needing to know about legacy skin texture names.
-/// </remarks>
 internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingHandler<BmsAction>
 {
     private readonly BmsSkinComponentLookup lookup;
@@ -32,30 +22,22 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
 
         upSprite = transformer.GetLegacyAnimation(transformer.GetKeyImageName(lookup, false))?.With(d =>
         {
-            d.Anchor = Anchor.TopCentre;
-            d.Origin = Anchor.TopCentre;
-            d.RelativeSizeAxes = Axes.X;
-            d.Width = 1;
+            d.Anchor = Anchor.BottomCentre;
+            d.Origin = Anchor.BottomCentre;
         });
 
         downSprite = transformer.GetLegacyAnimation(transformer.GetKeyImageName(lookup, true))?.With(d =>
         {
-            d.Anchor = Anchor.TopCentre;
-            d.Origin = Anchor.TopCentre;
-            d.RelativeSizeAxes = Axes.X;
-            d.Width = 1;
+            d.Anchor = Anchor.BottomCentre;
+            d.Origin = Anchor.BottomCentre;
             d.Alpha = 0;
         });
 
         InternalChild = new Container
         {
             Anchor = Anchor.BottomCentre,
-            Origin = Anchor.TopCentre,
-            // Fall back to the stage's default hit position when the skin has no skin.ini HitPosition
-            // (e.g. the built-in Classic skin) — otherwise 0 would park the key area off the bottom edge.
-            Y = -(transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? BmsStage.HIT_TARGET_POSITION),
-            RelativeSizeAxes = Axes.X,
-            AutoSizeAxes = Axes.Y,
+            Origin = Anchor.BottomCentre,
+            RelativeSizeAxes = Axes.Both,
             Children =
             [
                 upSprite ?? Empty(),
@@ -63,6 +45,40 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
             ],
         };
     }
+
+    protected override void Update()
+    {
+        base.Update();
+
+        fitToColumnWidth(upSprite);
+        fitToColumnWidth(downSprite);
+    }
+
+    /// <summary>
+    /// Calculates how much of an image extends past the hit position line.
+    /// </summary>
+    internal static float CalculateBottomOverflow(float imageHeight, float hitPosition) => System.Math.Max(0, imageHeight - hitPosition);
+
+    /// <summary>
+    /// Stretches the sprite width to fill the column while keeping its native height,
+    /// matching osu! mania's LegacyKeyArea behaviour (RelativeSizeAxes.X, Width=1).
+    ///
+    /// No Y offset is applied — like osu! mania, the key image sits at the bottom
+    /// of the column, without positionForJudgeLine alignment.
+    /// </summary>
+    private void fitToColumnWidth(Drawable? sprite)
+    {
+        if (sprite == null)
+            return;
+
+        sprite.RelativeSizeAxes = Axes.X;
+        sprite.Width = 1;
+    }
+
+    /// <summary>
+    /// Calculates the scale factor to fit an image width to a target column width.
+    /// </summary>
+    internal static float CalculateColumnWidthScale(float imageWidth, float columnWidth) => imageWidth > 0 && columnWidth > 0 ? columnWidth / imageWidth : 1;
 
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
     {

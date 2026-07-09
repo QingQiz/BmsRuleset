@@ -39,6 +39,14 @@ public sealed partial class BmsStage : CompositeDrawable
     private readonly Drawable rightBorder;
     private readonly SkinnableDrawable hitTarget;
 
+    private readonly FillFlowContainer keyAreaOverNotesLayer = new()
+    {
+        RelativeSizeAxes = Axes.Y,
+        AutoSizeAxes = Axes.X,
+        Direction = FillDirection.Horizontal,
+        Spacing = new Vector2(COLUMN_SPACING, 0),
+    };
+
     // Stage-level flow mirroring columnFlow; holds each column's HitExplosionArea so hit explosions
     // render in front of (not behind) the stage hitTarget. Width/margin are synced to the columns
     // each frame so the flow lays the areas out exactly over their columns (no manual positioning).
@@ -108,6 +116,7 @@ public sealed partial class BmsStage : CompositeDrawable
                     rightBorder = new Box { Anchor = Anchor.TopRight, Origin = Anchor.TopRight },
                 ],
             },
+            keyAreaOverNotesLayer,
             // Drawn last so hit explosions sit above the judgement line, bar lines and stage foreground.
             hitExplosionLayer,
         ];
@@ -117,32 +126,13 @@ public sealed partial class BmsStage : CompositeDrawable
             Columns[i] = BmsColumn.Create(i, playfield);
         }
 
-        if (BmsLayout.Is2P(layoutVariant))
-        {
-            for (var i = 1; i < playfield.TotalColumns; i++)
-                columnFlow.Add((Drawable)Columns[i]);
-            columnFlow.Add((Drawable)Columns[0]);
-        }
-        else
-        {
-            for (var i = 0; i < playfield.TotalColumns; i++)
-                columnFlow.Add((Drawable)Columns[i]);
-        }
+        addColumnsInVisualOrder(columnFlow, column => (Drawable)column);
+        addColumnsInVisualOrder(keyAreaOverNotesLayer, column => column.KeyArea);
 
         // Reparent each column's explosion container into the stage-level flow (in the same visual
         // order as the columns above) so it renders above the judgement line. The flow mirrors
         // columnFlow; width/margin are synced in Update() so each area overlays its column.
-        if (BmsLayout.Is2P(layoutVariant))
-        {
-            for (var i = 1; i < playfield.TotalColumns; i++)
-                hitExplosionLayer.Add(Columns[i].HitExplosionArea);
-            hitExplosionLayer.Add(Columns[0].HitExplosionArea);
-        }
-        else
-        {
-            for (var i = 0; i < playfield.TotalColumns; i++)
-                hitExplosionLayer.Add(Columns[i].HitExplosionArea);
-        }
+        addColumnsInVisualOrder(hitExplosionLayer, column => column.HitExplosionArea);
     }
 
     #region Disposal
@@ -167,7 +157,20 @@ public sealed partial class BmsStage : CompositeDrawable
         // Hide Scratch mod, where computing this once during skin load left the columns
         // off-centre by half a column width).
         updateStageCentre();
+        positionKeyAreas();
         positionHitExplosionAreas();
+    }
+
+    private void positionKeyAreas()
+    {
+        for (var i = 0; i < Columns.Length; i++)
+        {
+            var col = (Drawable)Columns[i];
+            var area = Columns[i].KeyArea;
+            area.Width = col.DrawWidth;
+            area.Margin = area.Parent == Columns[i].KeyAreaUnderNotesLayer ? new MarginPadding() : col.Margin;
+            area.Alpha = col.Alpha;
+        }
     }
 
     private void positionHitExplosionAreas()
@@ -204,6 +207,8 @@ public sealed partial class BmsStage : CompositeDrawable
         var lineColour = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnLineColour))?.Value
                          ?? Color4.White.Opacity(0.25f);
 
+        updateKeyAreaLayer(skin.GetConfig<BmsSkinConfigurationLookup, bool>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.KeysUnderNotes))?.Value ?? false);
+
         var leftLineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(
             new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftLineWidth,
                 new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, 0)))?.Value ?? 1;
@@ -231,6 +236,38 @@ public sealed partial class BmsStage : CompositeDrawable
         leftBorder.Height = rightBorder.Height = DrawHeight;
 
         updateStageCentre();
+    }
+
+    private void updateKeyAreaLayer(bool keysUnderNotes)
+    {
+        keyAreaOverNotesLayer.Clear(false);
+
+        foreach (var column in Columns)
+            column.KeyAreaUnderNotesLayer.Clear(false);
+
+        if (keysUnderNotes)
+        {
+            foreach (var column in Columns)
+                column.KeyAreaUnderNotesLayer.Add(column.KeyArea);
+        }
+        else
+            addColumnsInVisualOrder(keyAreaOverNotesLayer, column => column.KeyArea);
+    }
+
+    private void addColumnsInVisualOrder(FillFlowContainer target, Func<IBmsColumn, Drawable> selector)
+    {
+        if (BmsLayout.Is2P(layoutVariant))
+        {
+            for (var i = 1; i < Columns.Length; i++)
+                target.Add(selector(Columns[i]));
+
+            target.Add(selector(Columns[0]));
+        }
+        else
+        {
+            for (var i = 0; i < Columns.Length; i++)
+                target.Add(selector(Columns[i]));
+        }
     }
 
     private void updateStageCentre()

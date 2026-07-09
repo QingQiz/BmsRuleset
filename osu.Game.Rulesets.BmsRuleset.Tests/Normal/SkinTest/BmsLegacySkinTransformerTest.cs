@@ -11,6 +11,7 @@ using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Rendering.Dummy;
 using osu.Framework.Graphics.Textures;
@@ -26,6 +27,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
@@ -513,6 +515,62 @@ public class BmsLegacySkinTransformerTest
                                         """, ["custom-note"]);
 
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
+    }
+
+    [Test]
+    public void TestBmsKeyAreaDoesNotClipAtJudgeLine()
+    {
+        var skin = createConfiguredSkin("""
+                                        [Mania]
+                                        Keys: 8
+                                        SpecialStyle: 1
+                                        HitPosition: 347
+                                        KeyImage1: custom-key
+                                        """, ["custom-key"]);
+
+        var keyArea = skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1));
+
+        Assert.That(keyArea, Is.Not.Null);
+        var sprite = keyArea!.ChildrenOfType<Sprite>().Single();
+        var container = keyArea!.ChildrenOfType<Container>().Single(c => c.Children.Contains(sprite));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(keyArea.ChildrenOfType<Container>().Where(c => c.RelativeSizeAxes == Axes.Both && c.Padding.Bottom > 0), Is.Empty);
+            Assert.That(container.Anchor, Is.EqualTo(Anchor.BottomCentre));
+            Assert.That(container.Origin, Is.EqualTo(Anchor.BottomCentre));
+            Assert.That(container.RelativeSizeAxes, Is.EqualTo(Axes.Both));
+            Assert.That(container.Masking, Is.False);
+            Assert.That(container.Height, Is.EqualTo(1));
+            Assert.That(container.AutoSizeAxes, Is.EqualTo(Axes.None));
+            Assert.That(container.Y, Is.Zero);
+            Assert.That(sprite.Anchor, Is.EqualTo(Anchor.BottomCentre));
+            Assert.That(sprite.Origin, Is.EqualTo(Anchor.BottomCentre));
+            Assert.That(sprite.RelativeSizeAxes, Is.EqualTo(Axes.None));
+        });
+    }
+
+    [Test]
+    public void TestBmsKeyAreaOverflowPlacesTallImageTopAtJudgeLine()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(LegacyBmsKeyArea.CalculateBottomOverflow(40, 80), Is.Zero);
+            Assert.That(LegacyBmsKeyArea.CalculateBottomOverflow(80, 80), Is.Zero);
+            Assert.That(LegacyBmsKeyArea.CalculateBottomOverflow(120, 80), Is.EqualTo(40));
+        });
+    }
+
+    [Test]
+    public void TestBmsKeyAreaScalesImageToColumnWidth()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(LegacyBmsKeyArea.CalculateColumnWidthScale(200, 50), Is.EqualTo(0.25f));
+            Assert.That(LegacyBmsKeyArea.CalculateColumnWidthScale(25, 50), Is.EqualTo(2));
+            Assert.That(LegacyBmsKeyArea.CalculateColumnWidthScale(0, 50), Is.EqualTo(1));
+            Assert.That(LegacyBmsKeyArea.CalculateColumnWidthScale(200, 0), Is.EqualTo(1));
+        });
     }
 
     [Test]

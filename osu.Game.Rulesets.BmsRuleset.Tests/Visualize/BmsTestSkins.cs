@@ -26,16 +26,20 @@ public static partial class BmsTestSkins
     public static ISkinSource CreateSkinSource(SkinKind kind, IStorageResourceProvider resources)
         => kind == SkinKind.Legacy
             ? BmsTestLegacySkin.CreateSkinSource(resources)
-            : new SkinProvidingContainer(kind == SkinKind.Classic
-                ? new DefaultLegacySkin(resources)
-                : new ArgonSkin(resources));
+            : kind == SkinKind.LegacyKeysUnderNotes
+                ? BmsTestLegacySkin.CreateSkinSource(resources, keysUnderNotes: true)
+                : new SkinProvidingContainer(kind == SkinKind.Classic
+                    ? new DefaultLegacySkin(resources)
+                    : new ArgonSkin(resources));
 
     public enum SkinKind
     {
         Argon,
         Classic,
+
         // A synthetic legacy skin with a comprehensive skin.ini; see BmsTestLegacySkin.
         Legacy,
+        LegacyKeysUnderNotes,
     }
 
     /// <inheritdoc />

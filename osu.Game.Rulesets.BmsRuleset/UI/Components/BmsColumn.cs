@@ -35,6 +35,10 @@ public partial class BmsColumn : Playfield, IBmsColumn
     // so hit explosions render on top of the stage hitTarget instead of behind it.
     public Container HitExplosionArea { get; } = new() { RelativeSizeAxes = Axes.Y, Masking = true };
 
+    public Drawable KeyArea { get; }
+
+    public Container KeyAreaUnderNotesLayer { get; } = new() { RelativeSizeAxes = Axes.Both };
+
     /// <summary>
     ///     When <c>true</c>, this column is hidden from layout — zero width, zero
     ///     alpha, and <see cref="updateFromSkin"/> will not restore visual properties.
@@ -71,7 +75,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
     private const float key_area_under_notes_depth = 1;
     private const float key_area_over_notes_depth = -1;
 
-    private readonly SkinnableDrawable keyArea;
     private readonly SkinnableDrawable hitTarget;
 
     private BmsColumnKeySound? keySound;
@@ -98,11 +101,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             {
                 RelativeSizeAxes = Axes.Both,
             },
-            keyArea = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, LayoutVariant, index))
-            {
-                RelativeSizeAxes = Axes.Both,
-                CentreComponent = false,
-            },
+            KeyAreaUnderNotesLayer,
             hitTarget = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, LayoutVariant, index))
             {
                 RelativeSizeAxes = Axes.X,
@@ -112,6 +111,12 @@ public partial class BmsColumn : Playfield, IBmsColumn
                 CentreComponent = false,
             },
         ];
+
+        KeyArea = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, LayoutVariant, index))
+        {
+            RelativeSizeAxes = Axes.Y,
+            CentreComponent = false,
+        };
     }
 
     #region Disposal
@@ -218,8 +223,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
         hitTarget.Y = -(skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
                         ?? BmsStage.HIT_TARGET_POSITION);
 
-        var keysUnderNotes = skin.GetConfig<BmsSkinConfigurationLookup, bool>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.KeysUnderNotes))?.Value ?? false;
-        ChangeInternalChildDepth(keyArea, DepthForKeyArea(keysUnderNotes));
     }
 
     #region Hit explosions / landmine

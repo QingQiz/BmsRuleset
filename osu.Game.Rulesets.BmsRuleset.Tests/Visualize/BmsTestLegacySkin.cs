@@ -94,7 +94,7 @@ public static class BmsTestLegacySkin
 
     public static bool ExpectedShowJudgementLine => true;
 
-    public static bool ExpectedKeysUnderNotes => false;
+    public static bool ExpectedKeysUnderNotes(bool keysUnderNotes = false) => keysUnderNotes;
 
     // Each position is deliberately distinct so the test can tell them apart. HitPosition/LightPosition
     // are distance-from-bottom (480 - value, scaled); ScorePosition/ComboPosition are plain scaled values.
@@ -164,9 +164,9 @@ public static class BmsTestLegacySkin
 
     public static string KeyImageDown(int column) => $"key{column}D";
 
-    public static ISkinSource CreateSkinSource(IStorageResourceProvider resources)
+    public static ISkinSource CreateSkinSource(IStorageResourceProvider resources, bool keysUnderNotes = false)
     {
-        var skin = new TestLegacyBmsSkin(resources, buildResources());
+        var skin = new TestLegacyBmsSkin(resources, buildResources(keysUnderNotes));
         return new SkinProvidingContainer(new BmsLegacySkinTransformer(skin, new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K }));
     }
 
@@ -189,7 +189,7 @@ public static class BmsTestLegacySkin
 
     public static float ExpectedRightLineWidth(int column) => column_line_width[column + 1];
 
-    private static string buildSkinIni()
+    private static string buildSkinIni(bool keysUnderNotes)
     {
         var s = new StringBuilder();
         s.AppendLine("[General]");
@@ -211,7 +211,7 @@ public static class BmsTestLegacySkin
         s.AppendLine($"ColumnLineWidth: {string.Join(',', column_line_width.Select(ini))}");
         s.AppendLine($"WidthForNoteHeightScale: {ini(width_for_note_height_scale)}");
         s.AppendLine($"BarlineHeight: {ini(barline_height)}");
-        s.AppendLine("KeysUnderNotes: 0");
+        s.AppendLine($"KeysUnderNotes: {(keysUnderNotes ? 1 : 0)}");
         s.AppendLine();
         s.AppendLine($"ColourBarline: {toIniColour(barline_colour)}");
         s.AppendLine($"ColourColumnLine: {toIniColour(column_line_colour)}");
@@ -259,10 +259,10 @@ public static class BmsTestLegacySkin
         return s.ToString();
     }
 
-    private static Dictionary<string, byte[]> buildResources()
+    private static Dictionary<string, byte[]> buildResources(bool keysUnderNotes)
     {
         var dict = buildTextures();
-        dict["skin.ini"] = Encoding.UTF8.GetBytes(buildSkinIni());
+        dict["skin.ini"] = Encoding.UTF8.GetBytes(buildSkinIni(keysUnderNotes));
         return dict;
     }
 

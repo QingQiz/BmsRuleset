@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
@@ -83,7 +85,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         });
         this.AddSetupAssert("held LN body uses normal tint", () =>
             longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column)) is { } body
-            && (Color4)body.Colour == Color4.White
+            && body.Colour == Color4.White
             && body.ChildrenOfType<Sprite>().Any(s => s.Alpha > 0 && s.Texture != null));
         this.AddSetupUntilStep("animated LN body advances frames while held", () =>
             bodyAnimationFrameCount(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 2
@@ -233,7 +235,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             () => Is.EqualTo(BmsTestLegacySkin.ExpectedMinimumColumnWidth));
         AddAssert("keys under notes resolves",
             () => getConfig<bool>(LegacyManiaSkinConfigurationLookups.KeysUnderNotes, BmsSkinComponents.ColumnBackground, null, skin()),
-            () => Is.EqualTo(BmsTestLegacySkin.ExpectedKeysUnderNotes));
+            () => Is.EqualTo(BmsTestLegacySkin.ExpectedKeysUnderNotes()));
         AddAssert("light frame per second resolves",
             () => getConfig<int>(LegacyManiaSkinConfigurationLookups.LightFramePerSecond, BmsSkinComponents.StageBackground, null, skin()),
             () => Is.EqualTo(BmsTestLegacySkin.ExpectedLightFramePerSecond));
@@ -387,6 +389,19 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         return (int)body.GetType().GetField("currentFrameIndex", flags)!.GetValue(body)!;
     }
 
+    private static IReadOnlyList<Drawable> aliveInternalChildren(CompositeDrawable drawable)
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        return (IReadOnlyList<Drawable>)typeof(CompositeDrawable).GetProperty("AliveInternalChildren", flags)!.GetValue(drawable)!;
+    }
+
+    private static int childIndexContaining<T>(CompositeDrawable drawable)
+        where T : Drawable
+    {
+        var match = aliveInternalChildren(drawable).Select((child, index) => (child, index)).SingleOrDefault(pair => pair.child.ChildrenOfType<T>().Any());
+        return match.child == null ? -1 : match.index;
+    }
+
     [Test]
     public void TestArgonSkin() => createSkinScene(BmsTestSkins.SkinKind.Argon);
 
@@ -421,4 +436,27 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         assertLegacySkinConfigResolves();
         assertLegacySkinRenders();
     }
+
+    [Test]
+    public void TestLegacySkinKeysUnderNotes()
+    {
+        createSkinScene(BmsTestSkins.SkinKind.LegacyKeysUnderNotes);
+
+        AddAssert("keys under notes config resolves",
+            () => getConfig<bool>(LegacyManiaSkinConfigurationLookups.KeysUnderNotes, BmsSkinComponents.ColumnBackground, null, ((BmsTestSkins.SkinnedTestPlayer)Player).SkinSource),
+            () => Is.EqualTo(BmsTestLegacySkin.ExpectedKeysUnderNotes(keysUnderNotes: true)));
+
+        AddAssert("key areas render below notes but above backgrounds", () =>
+            Playfield.Stage.Columns.All(column =>
+            {
+                var drawable = (CompositeDrawable)column;
+                var children = aliveInternalChildren(drawable);
+                var backgroundIndex = childIndexContaining<LegacyBmsColumnBackground>(drawable);
+                var keyAreaIndex = childIndexContaining<LegacyBmsKeyArea>(drawable);
+                var hitObjectIndex = children.Select((child, index) => (child, index)).Single(pair => pair.child == column.HitObjectContainer).index;
+
+                return backgroundIndex < keyAreaIndex && keyAreaIndex < hitObjectIndex;
+            }));
+    }
+
 }

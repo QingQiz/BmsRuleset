@@ -1,3 +1,4 @@
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.UI;
 
@@ -14,6 +15,10 @@ public interface IBmsColumn
     bool IsScratch { get; }
 
     HitObjectContainer HitObjectContainer { get; }
+
+    Drawable KeyArea { get; }
+
+    Container KeyAreaUnderNotesLayer { get; }
 
     Container HitExplosionArea { get; }
 
