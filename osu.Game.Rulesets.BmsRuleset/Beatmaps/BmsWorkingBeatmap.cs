@@ -33,7 +33,13 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
     private List<string> resolvedBackgroundPaths = null!;
     private List<string> resolvedPanelBackgroundPaths = null!;
 
-    public override bool TryTransferTrack(WorkingBeatmap target) => false;
+    public override bool TryTransferTrack(WorkingBeatmap target)
+    {
+        if (!TrackLoaded || target is not BmsWorkingBeatmap || BeatmapInfo.ID != target.BeatmapInfo.ID)
+            return false;
+
+        return base.TryTransferTrack(target);
+    }
 
     public override Texture GetBackground() => getExternalBackground(false) ?? inner.GetBackground();
 
@@ -42,21 +48,15 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
     public override Stream GetStream(string storagePath) => inner.GetStream(storagePath);
 
     /// <summary>
-    ///     Stops the currently-active preview track (if any) — silences BGM event
-    ///     processing, mutes output, and pauses playback.  Called when gameplay
-    ///     begins so the preview does not compete with the real
+    ///     Switches the currently-active preview track (if any) to clock-only mode.  Gameplay
+    ///     seeks and starts this track as a clock source, but audible BMS playback should come from the
     ///     <see cref="BmsBackgroundAudioPlayer" />.
     /// </summary>
-    internal static void StopActivePreview()
+    internal static void SwitchActivePreviewToGameplayClockOnly()
     {
         var track = ActivePreviewTrack;
 
-        if (track == null)
-            return;
-
-        track.SuppressEventProcessing = true;
-        track.Volume.Value = 0;
-        track.Stop();
+        track?.PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly;
     }
 
     internal static void RestoreActivePreview()
@@ -66,7 +66,7 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         if (track == null || track.IsDisposed)
             return;
 
-        track.SuppressEventProcessing = false;
+        track.PlaybackMode = BmsPreviewTrackPlaybackMode.Preview;
         track.Volume.Value = 1;
         track.Start();
     }

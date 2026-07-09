@@ -9,6 +9,7 @@ using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Platform;
@@ -17,7 +18,10 @@ using osu.Game.Beatmaps;
 using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
+using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
 using SixLabors.ImageSharp;
@@ -85,6 +89,34 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     }
 
     [Test]
+    public void TestBmsWorkingBeatmapTransfersTrackForSameBeatmapRefetch()
+    {
+        var beatmapId = Guid.NewGuid();
+        BmsWorkingBeatmap source = null!;
+        BmsWorkingBeatmap target = null!;
+        Track previewTrack = null!;
+
+        AddStep("create refetched working beatmaps", () =>
+        {
+            var sourceInfo = createBeatmapInfoWithAudio(beatmapId, "same-source.bms");
+            var targetInfo = createBeatmapInfoWithAudio(beatmapId, "same-target.bms");
+
+            source = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), sourceInfo), audio);
+            target = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), targetInfo), audio);
+        });
+
+        AddStep("load source preview", () =>
+        {
+            previewTrack = source.LoadTrack();
+            previewTrack.Start();
+        });
+
+        AddAssert("same beatmap transfer accepted", () => source.TryTransferTrack(target));
+        AddAssert("target uses active preview", () => ReferenceEquals(target.Track, previewTrack));
+        AddAssert("preview still running", () => previewTrack.IsRunning);
+    }
+
+    [Test]
     public void TestBmsWorkingBeatmapDisposesPreviousPreviewTrackWhenReplaced()
     {
         var firstDirectory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-preview-first-{Guid.NewGuid()}");
@@ -113,6 +145,149 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         });
 
         AddUntilStep("first preview disposed", () => firstPreview.IsDisposed);
+    }
+
+    [Test]
+    public void TestDrawableRulesetStopsPreviewWhenGameplayLoads()
+    {
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-preview-gameplay-start-{Guid.NewGuid()}");
+        BmsPreviewTrack previewTrack = null!;
+        GameplayClockContainer gameplayClock = null!;
+        BmsDrawableRuleset drawableRuleset = null!;
+
+        AddStep("load active preview track", () =>
+        {
+            Directory.CreateDirectory(directory);
+            createdDirectories.Add(directory);
+
+            var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), directory), audio);
+            previewTrack = (BmsPreviewTrack)working.LoadTrack();
+            previewTrack.Start();
+        });
+
+        AddStep("load drawable ruleset under paused gameplay clock", () =>
+        {
+            gameplayClock = new GameplayClockContainer(previewTrack, false, false)
+            {
+                RelativeSizeAxes = Axes.Both,
+            };
+
+            Child = gameplayClock;
+            gameplayClock.Add(drawableRuleset = new BmsDrawableRuleset(new BmsRuleset(), new BmsBeatmap()));
+        });
+
+        AddUntilStep("preview event playback stopped during loading", () =>
+            previewTrack.IsRunning
+            && previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly
+            && previewTrack.Volume.Value == 1);
+        AddAssert("background audio remains paused during loading", () => getBackgroundAudioPaused(drawableRuleset));
+
+        AddStep("start gameplay clock", () => gameplayClock.Start());
+        AddUntilStep("preview remains stopped for gameplay", () =>
+            previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly
+            && previewTrack.Volume.Value == 1
+            && getActivePreviewPlaybackCount(previewTrack) == 0);
+        AddAssert("gameplay clock track is still running", () => previewTrack.IsRunning);
+
+        AddStep("dispose drawable ruleset while gameplay is running", () => drawableRuleset.RemoveAndDisposeImmediately());
+        AddAssert("preview remains suppressed after gameplay disposal", () =>
+            previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly
+            && previewTrack.Volume.Value == 1);
+    }
+
+    [Test]
+    public void TestDrawableRulesetStopsSingleFilePreviewWhenGameplayStarts()
+    {
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-single-file-preview-gameplay-start-{Guid.NewGuid()}");
+        BmsPreviewTrack previewTrack = null!;
+        GameplayClockContainer gameplayClock = null!;
+        BmsDrawableRuleset drawableRuleset = null!;
+
+        AddStep("load active single-file preview track", () =>
+        {
+            Directory.CreateDirectory(directory);
+            createdDirectories.Add(directory);
+            writePcmWave(Path.Combine(directory, "preview.wav"), TimeSpan.FromSeconds(1));
+
+            var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), directory), audio);
+            previewTrack = (BmsPreviewTrack)working.LoadTrack();
+            previewTrack.Start();
+        });
+
+        AddAssert("single-file preview is playing during loading", () =>
+            previewTrack.IsRunning
+            && previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
+            && previewTrack.Volume.Value == 1
+            && getActivePreviewPlaybackCount(previewTrack) == 1
+            && getPreviewChannelAggregateVolume(previewTrack) > 0
+            && getSingleFilePreviewTrack(previewTrack)?.IsRunning == true);
+
+        AddStep("load drawable ruleset under paused gameplay clock", () =>
+        {
+            gameplayClock = new GameplayClockContainer(previewTrack, false, false)
+            {
+                RelativeSizeAxes = Axes.Both,
+            };
+
+            Child = gameplayClock;
+            gameplayClock.Add(drawableRuleset = new BmsDrawableRuleset(new BmsRuleset(), new BmsBeatmap()));
+        });
+
+        AddUntilStep("single-file preview stopped during loading", () =>
+            previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly
+            && getActivePreviewPlaybackCount(previewTrack) == 0
+            && getSingleFilePreviewTrack(previewTrack)?.IsRunning != true);
+
+        AddStep("start gameplay clock", () => gameplayClock.Start());
+        AddUntilStep("single-file preview stopped for gameplay", () =>
+            previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly
+            && previewTrack.Volume.Value == 1
+            && getActivePreviewPlaybackCount(previewTrack) == 0);
+        AddAssert("gameplay clock track is still running", () => previewTrack.IsRunning);
+    }
+
+    [Test]
+    public void TestSwitchActivePreviewToGameplayClockOnly()
+    {
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-clock-only-preview-{Guid.NewGuid()}");
+        BmsPreviewTrack previewTrack = null!;
+
+        AddStep("load active event preview track", () =>
+        {
+            Directory.CreateDirectory(directory);
+            createdDirectories.Add(directory);
+            writePcmWave(Path.Combine(directory, "bgm.wav"), TimeSpan.FromSeconds(1));
+
+            var beatmap = new BmsBeatmap
+            {
+                SampleDefinitions = new Dictionary<ushort, string>
+                {
+                    [1] = "bgm.wav",
+                },
+                BackgroundSampleEvents =
+                [
+                    new BmsSampleEvent(0, 0, 1, 100),
+                ],
+            };
+
+            var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, beatmap, directory), audio);
+            previewTrack = (BmsPreviewTrack)working.LoadTrack();
+            previewTrack.Start();
+        });
+
+        AddUntilStep("event preview is audible", () => getActivePreviewPlaybackCount(previewTrack) > 0);
+        AddStep("switch to gameplay clock only", () => BmsWorkingBeatmap.SwitchActivePreviewToGameplayClockOnly());
+        AddAssert("preview track exposes clock-only mode", () => previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly);
+
+        AddStep("simulate gameplay reset and start", () =>
+        {
+            previewTrack.Seek(0);
+            previewTrack.Start();
+        });
+
+        AddAssert("clock remains running without preview output", () =>
+            previewTrack.IsRunning
+            && getActivePreviewPlaybackCount(previewTrack) == 0);
     }
 
     [Test]
@@ -385,6 +560,16 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         return beatmap;
     }
 
+    private static BeatmapInfo createBeatmapInfoWithAudio(Guid id, string filename)
+    {
+        var beatmapSet = new BeatmapSetInfo();
+        var beatmap = createBeatmapInfo(beatmapSet, string.Empty, filename);
+        beatmap.ID = id;
+        beatmap.Metadata.AudioFile = "audio.mp3";
+        beatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = "audio-hash" }, "audio.mp3"));
+        return beatmap;
+    }
+
     private static WeakReference createExternalTextureStoreReference(BmsWorkingBeatmapCache cache, string directory)
     {
         var store = typeof(BmsWorkingBeatmapCache)
@@ -402,6 +587,75 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
         var first = events.Cast<object>().FirstOrDefault();
         return first?.GetType().GetProperty("SamplePath")?.GetValue(first) as string ?? string.Empty;
+    }
+
+    private static int getActivePreviewPlaybackCount(BmsPreviewTrack track)
+    {
+        var activeChannels = typeof(BmsPreviewTrack)
+            .GetField("activeChannels", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(track);
+
+        var previewChannel = typeof(BmsPreviewTrack)
+            .GetField("previewChannel", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(track);
+
+        var previewTrack = getSingleFilePreviewTrack(track);
+
+        return ((ICollection)activeChannels!).Count
+               + (previewChannel == null ? 0 : 1)
+               + (previewTrack?.IsRunning == true ? 1 : 0);
+    }
+
+    private static double getPreviewChannelAggregateVolume(BmsPreviewTrack track)
+    {
+        var previewChannel = typeof(BmsPreviewTrack)
+            .GetField("previewChannel", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(track);
+
+        return (previewChannel as IAdjustableAudioComponent ?? getSingleFilePreviewTrack(track))?.AggregateVolume.Value ?? 0;
+    }
+
+    private static Track getSingleFilePreviewTrack(BmsPreviewTrack track) =>
+        typeof(BmsPreviewTrack)
+            .GetField("previewTrack", BindingFlags.Instance | BindingFlags.NonPublic)?
+            .GetValue(track) as Track;
+
+    private static bool getBackgroundAudioPaused(BmsDrawableRuleset drawableRuleset) =>
+        ((BindableBool)typeof(BmsDrawableRuleset)
+            .GetField("backgroundAudioPaused", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(drawableRuleset)!).Value;
+
+    private static void writePcmWave(string path, TimeSpan duration)
+    {
+        const int sample_rate = 44100;
+        const short channels = 1;
+        const short bits_per_sample = 16;
+
+        var sampleCount = (int)(sample_rate * duration.TotalSeconds);
+        var dataSize = sampleCount * channels * bits_per_sample / 8;
+
+        using var stream = File.Create(path);
+        using var writer = new BinaryWriter(stream);
+
+        writer.Write("RIFF"u8);
+        writer.Write(36 + dataSize);
+        writer.Write("WAVE"u8);
+        writer.Write("fmt "u8);
+        writer.Write(16);
+        writer.Write((short)1);
+        writer.Write(channels);
+        writer.Write(sample_rate);
+        writer.Write(sample_rate * channels * bits_per_sample / 8);
+        writer.Write((short)(channels * bits_per_sample / 8));
+        writer.Write(bits_per_sample);
+        writer.Write("data"u8);
+        writer.Write(dataSize);
+
+        for (var i = 0; i < sampleCount; i++)
+        {
+            var value = (short)(Math.Sin(i * Math.Tau * 440 / sample_rate) * short.MaxValue * 0.2);
+            writer.Write(value);
+        }
     }
 
     [BackgroundDependencyLoader]

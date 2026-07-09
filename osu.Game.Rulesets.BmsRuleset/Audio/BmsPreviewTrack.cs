@@ -13,6 +13,12 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
 
+public enum BmsPreviewTrackPlaybackMode
+{
+    Preview,
+    GameplayClockOnly,
+}
+
 public class BmsPreviewTrack : Track
 {
     public override bool IsRunning
@@ -34,12 +40,11 @@ public class BmsPreviewTrack : Track
     }
 
     /// <summary>
-    ///     When set, <see cref="UpdateState" /> skips BGM event processing so that
-    ///     gameplay audio (driven by <see cref="BmsBackgroundAudioPlayer" />) is
-    ///     the only source.  The track still provides clock timing for the
-    ///     <see cref="osu.Game.Screens.Play.MasterGameplayClockContainer" />.
+    ///     Gameplay seeks and starts the beatmap track as a clock source, but BMS gameplay audio is
+    ///     driven by chart events elsewhere; clock-only mode prevents those framework clock calls
+    ///     from replaying song-select preview audio.
     /// </summary>
-    public bool SuppressEventProcessing
+    public BmsPreviewTrackPlaybackMode PlaybackMode
     {
         get;
         set
@@ -49,25 +54,26 @@ public class BmsPreviewTrack : Track
 
             field = value;
 
-            if (!field)
+            if (field == BmsPreviewTrackPlaybackMode.Preview)
                 // Gameplay advances this clock while BGM/key sample events are muted, so restoring
                 // preview must resume from the current position rather than replaying the muted gap.
                 nextEventIndex = findFirstEventAfter(CurrentTime);
+            else
+                stopPreviewPlayback();
         }
     }
 
     private readonly StopwatchClock clock = new();
     private readonly List<BgmEvent> sortedEvents = [];
     private readonly ISampleStore? sampleStore;
-    private readonly ISample? previewSample;
-    private readonly AudioManager audioManager;
+    private readonly ITrackStore? previewTrackStore;
+    private readonly Track? previewTrack;
     private readonly Dictionary<string, ISample?> resolvedSamples = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ActiveBgm> activeChannels = [];
 
     private readonly record struct BgmEvent(double Time, string SamplePath, int Volume = 100);
 
     private SampleChannel? previewChannel;
-    private readonly BindableDouble requestedVolume = new(1);
 
     private int nextEventIndex;
     private double seekOffset;
@@ -88,8 +94,6 @@ public class BmsPreviewTrack : Track
         string? previewFile = null)
         : base("bms-preview")
     {
-        this.audioManager = audioManager;
-
         // Propagate the track's aggregate rate (populated by AdjustmentsFromMods in gameplay,
         // or by MusicController mod-track-adjustments elsewhere) into the inner StopwatchClock.
         // BmsPreviewTrack.CurrentTime is driven by this StopwatchClock, not by Track.Rate, so
@@ -106,20 +110,21 @@ public class BmsPreviewTrack : Track
         fileResources.AddExtension("mp3");
         fileResources.AddExtension("ogg");
 
-        sampleStore = audioManager.GetSampleStore(fileResources);
-
         foreach (var candidate in getPreviewCandidates(basePath, previewFile))
         {
-            previewSample = resolveSample(candidate);
+            previewTrackStore ??= audioManager.GetTrackStore(fileResources);
+            previewTrack = resolvePreviewTrack(candidate);
 
-            if (previewSample == null)
+            if (previewTrack == null)
                 continue;
 
             break;
         }
 
-        if (previewSample == null)
+        if (previewTrack == null)
         {
+            sampleStore = audioManager.GetSampleStore(fileResources);
+
             foreach (var evt in bgmEvents)
             {
                 if (sampleDefinitions.TryGetValue(evt.SampleKey, out var samplePath))
@@ -154,7 +159,12 @@ public class BmsPreviewTrack : Track
     {
         if (!IsDisposed)
         {
-            Stop();
+            lock (clock) clock.Stop();
+            stopAllChannels();
+            if (previewTrack == null)
+                stopPreviewChannel();
+            previewTrack?.Dispose();
+            previewTrackStore?.Dispose();
             sampleStore?.Dispose();
         }
 
@@ -168,7 +178,7 @@ public class BmsPreviewTrack : Track
         if (Length == 0 || CurrentTime >= Length)
             return;
 
-        if (!SuppressEventProcessing)
+        if (PlaybackMode == BmsPreviewTrackPlaybackMode.Preview)
             startPreviewChannel();
         lock (clock) clock.Start();
     }
@@ -195,11 +205,13 @@ public class BmsPreviewTrack : Track
                 clock.Reset();
         }
 
-        nextEventIndex = seekOffset == 0 ? 0 : findFirstEventAfter(seekOffset);
         stopAllChannels();
         stopPreviewChannel();
 
-        if (previewSample != null && wasRunning && !SuppressEventProcessing)
+        if (PlaybackMode == BmsPreviewTrackPlaybackMode.Preview)
+            nextEventIndex = seekOffset == 0 ? 0 : findFirstEventAfter(seekOffset);
+
+        if (previewTrack != null && wasRunning && PlaybackMode == BmsPreviewTrackPlaybackMode.Preview)
             startPreviewChannel();
 
         return success;
@@ -234,6 +246,9 @@ public class BmsPreviewTrack : Track
     {
         base.UpdateState();
 
+        if (previewTrack is { Length: > 0 } && Length != previewTrack.Length)
+            Length = previewTrack.Length;
+
         lock (clock)
         {
             if (clock.IsRunning && CurrentTime >= Length)
@@ -248,10 +263,10 @@ public class BmsPreviewTrack : Track
             }
         }
 
-        if (!IsRunning || SuppressEventProcessing)
+        if (!IsRunning || PlaybackMode != BmsPreviewTrackPlaybackMode.Preview)
             return;
 
-        if (previewSample != null)
+        if (previewTrack != null)
             return;
 
         var currentTime = CurrentTime;
@@ -317,19 +332,18 @@ public class BmsPreviewTrack : Track
 
         var channel = sample.GetChannel();
         channel.ManualFree = true;
-        requestedVolume.Value = Math.Max(0, evt.Volume) / 100.0;
         channel.Play();
 
         // channel.Play() may bind the decoded sample's aggregate chain after this call. BGM preview
-        // must follow only the requested chart volume and AudioManager aggregate, so strip
+        // must follow only the requested chart volume and this track's aggregate chain, so strip
         // sample/effect routing again once.
-        bindPreviewVolumeAdjustments(channel);
+        bindPreviewVolumeAdjustments(channel, evt.Volume);
 
         Action<ValueChangedEvent<double>>? isolateOnBind = null;
         isolateOnBind = _ =>
         {
             channel.AggregateVolume.ValueChanged -= isolateOnBind!;
-            bindPreviewVolumeAdjustments(channel);
+            bindPreviewVolumeAdjustments(channel, evt.Volume);
         };
         channel.AggregateVolume.ValueChanged += isolateOnBind;
 
@@ -355,27 +369,64 @@ public class BmsPreviewTrack : Track
         return resolvedSamples[samplePath] = null;
     }
 
-    private void bindPreviewVolumeAdjustments(IAdjustableAudioComponent component)
+    private Track? resolvePreviewTrack(string samplePath)
+    {
+        if (previewTrackStore == null)
+            return null;
+
+        foreach (var lookup in new BmsSampleInfo(samplePath).LookupNames)
+        {
+            var track = previewTrackStore.Get(lookup);
+
+            if (track != null)
+                return track;
+        }
+
+        return null;
+    }
+
+    private void bindPreviewVolumeAdjustments(IAdjustableAudioComponent component, int volume = 100)
     {
         component.RemoveAllAdjustments(AdjustableProperty.Volume);
-        component.AddAdjustment(AdjustableProperty.Volume, requestedVolume);
-        component.AddAdjustment(AdjustableProperty.Volume, audioManager.AggregateVolume);
+        component.AddAdjustment(AdjustableProperty.Volume, new BindableDouble(Math.Max(0, volume) / 100.0));
+        component.AddAdjustment(AdjustableProperty.Volume, AggregateVolume);
     }
 
     private void startPreviewChannel()
     {
-        if (previewSample == null || previewChannel != null)
+        if (previewTrack != null)
+        {
+            if (previewTrack.IsRunning)
+                return;
+
+            bindPreviewVolumeAdjustments(previewTrack);
+            previewTrack.Seek(CurrentTime);
+            previewTrack.Start();
+            return;
+        }
+
+        if (previewChannel != null)
+            return;
+
+        var previewSample = resolveSample(string.Empty);
+
+        if (previewSample == null)
             return;
 
         previewChannel = previewSample.GetChannel();
         previewChannel.ManualFree = true;
-        requestedVolume.Value = 1;
         previewChannel.Play();
         bindPreviewVolumeAdjustments(previewChannel);
     }
 
     private void stopPreviewChannel()
     {
+        if (previewTrack != null)
+        {
+            previewTrack.Stop();
+            return;
+        }
+
         if (previewChannel == null)
             return;
 
@@ -386,6 +437,12 @@ public class BmsPreviewTrack : Track
         }
 
         previewChannel = null;
+    }
+
+    private void stopPreviewPlayback()
+    {
+        stopAllChannels();
+        stopPreviewChannel();
     }
 
     private void stopAllChannels()

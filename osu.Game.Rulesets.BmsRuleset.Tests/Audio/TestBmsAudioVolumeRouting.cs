@@ -98,21 +98,48 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     }
 
     [Test]
-    public void PreviewSamplesUseAggregateVolumeOnly()
+    public void PreviewSamplesUseTrackAggregateVolume()
     {
-        AddAssert("preview volume adjustments use aggregate volume", () =>
+        AddAssert("preview volume adjustments use track aggregate volume", () =>
         {
             var track = new BmsPreviewTrack([], new Dictionary<ushort, string>(), null, audioManager);
             var audio = new RecordingAudioComponent();
 
             typeof(BmsPreviewTrack)
                 .GetMethod("bindPreviewVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(track, [audio]);
+                .Invoke(track, [audio, 100]);
 
             Assert.That(audio.RemovedProperties, Does.Contain(AdjustableProperty.Volume));
-            Assert.That(audio.VolumeAdjustments, Has.Some.SameAs(audioManager.AggregateVolume));
+            Assert.That(audio.VolumeAdjustments, Has.Some.SameAs(track.AggregateVolume));
+            Assert.That(audio.VolumeAdjustments, Has.None.SameAs(audioManager.AggregateVolume));
             Assert.That(audio.VolumeAdjustments, Has.None.SameAs(audioManager.VolumeTrack));
             Assert.That(audio.VolumeAdjustments, Has.None.SameAs(audioManager.VolumeSample));
+
+            return true;
+        });
+    }
+
+    [Test]
+    public void PreviewSampleVolumeAdjustmentIsPerPlayback()
+    {
+        AddAssert("preview sample playback volume uses separate bindables", () =>
+        {
+            var track = new BmsPreviewTrack([], new Dictionary<ushort, string>(), null, audioManager);
+
+            var bindMethod = typeof(BmsPreviewTrack)
+                .GetMethod("bindPreviewVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+            Assert.That(bindMethod.GetParameters(), Has.Length.EqualTo(2));
+
+            var first = new RecordingAudioComponent();
+            var second = new RecordingAudioComponent();
+
+            bindMethod.Invoke(track, [first, 40]);
+            bindMethod.Invoke(track, [second, 80]);
+
+            Assert.That(first.VolumeAdjustments[0], Is.Not.SameAs(second.VolumeAdjustments[0]));
+            Assert.That(first.VolumeAdjustments[0].Value, Is.EqualTo(0.4));
+            Assert.That(second.VolumeAdjustments[0].Value, Is.EqualTo(0.8));
 
             return true;
         });

@@ -80,9 +80,12 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
         AddStep("create track with wav declaration and ogg file", () =>
         {
-            var directory = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "103_outlaw_ogg");
+            var sourceDirectory = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "103_outlaw_ogg");
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-ogg-fallback-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
 
-            Assert.That(File.Exists(Path.Combine(directory, "Track_01_001.ogg")), Is.True);
+            File.Copy(Path.Combine(sourceDirectory, "Track_01_001.ogg"), Path.Combine(directory, "Track_01_001.ogg"));
+
             Assert.That(File.Exists(Path.Combine(directory, "Track_01_001.wav")), Is.False);
 
             track = new BmsPreviewTrack(
@@ -177,11 +180,11 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
-    public void TestRestoreAfterSuppressedPlaybackDoesNotCatchUpPastEvents()
+    public void TestRestoreAfterClockOnlyPlaybackDoesNotCatchUpPastEvents()
     {
         BmsPreviewTrack track = null!;
 
-        AddStep("create suppressed track advanced past first event", () =>
+        AddStep("create clock-only track advanced past first event", () =>
         {
             var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-suppressed-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
@@ -197,9 +200,9 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 directory,
                 audio);
 
-            track.SuppressEventProcessing = true;
+            track.PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly;
             setSeekOffset(track, 2000);
-            track.SuppressEventProcessing = false;
+            track.PlaybackMode = BmsPreviewTrackPlaybackMode.Preview;
             track.Start();
             invokeUpdateState(track);
         });

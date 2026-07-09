@@ -53,6 +53,8 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     [Cached(typeof(IBmsGameplayEvents))]
     private readonly BmsGameplayEvents gameplayEvents = new();
 
+    private readonly BindableBool backgroundAudioPaused = new(true);
+
     private BmsPreviewTrack? previewTrackBeforePlay;
 
     [Cached]
@@ -72,18 +74,31 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     [Resolved(CanBeNull = true)]
     private GameplayState? gameplayState { get; set; }
 
+    [Resolved(CanBeNull = true)]
+    private GameplayClockContainer? gameplayClockContainer { get; set; }
+
+    private bool stoppedPreviewForGameplay;
+
     #region Disposal
 
     protected override void Dispose(bool isDisposing)
     {
         base.Dispose(isDisposing);
 
-        if (!isDisposing || previewTrackBeforePlay == null)
+        if (!isDisposing)
+            return;
+
+        if (gameplayClockContainer != null)
+            gameplayClockContainer.IsPaused.ValueChanged -= onGameplayPausedChanged;
+
+        backgroundAudioPaused.UnbindAll();
+
+        if (previewTrackBeforePlay == null || !stoppedPreviewForGameplay)
             return;
 
         // Only restore if the preview track hasn't been replaced for a
         // different beatmap since play started.
-        if (BmsWorkingBeatmap.ActivePreviewTrack == previewTrackBeforePlay)
+        if (gameplayClockContainer?.IsPaused.Value != false && BmsWorkingBeatmap.ActivePreviewTrack == previewTrackBeforePlay)
             BmsWorkingBeatmap.RestoreActivePreview();
 
         previewTrackBeforePlay = null;
@@ -111,6 +126,13 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
         if (scoreProcessor != null && healthProcessor != null && gameplayState != null)
             scoreProcessor.HasCompleted.BindValueChanged(_ => onPlayCompleted());
+
+        gameplayClockContainer?.IsPaused.BindValueChanged(onGameplayPausedChanged);
+
+        if (gameplayClockContainer != null)
+            ((IBindable<bool>)backgroundAudioPaused).BindTo(gameplayClockContainer.IsPaused);
+        else
+            backgroundAudioPaused.BindTo(IsPaused);
     }
 
     protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);
@@ -190,7 +212,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             .ToList();
 
         if (events.Count > 0)
-            FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events, IsPaused, getRate(Mods)));
+            FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events, backgroundAudioPaused, getRate(Mods)));
 
         if (Config is BmsRulesetConfigManager config)
         {
@@ -198,7 +220,28 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             ((BmsPlayfield)Playfield).ScrollController.SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
         }
 
+        stopPreviewForGameplay();
+    }
+
+    private void onGameplayPausedChanged(ValueChangedEvent<bool> paused)
+    {
+        if (paused.NewValue || stoppedPreviewForGameplay)
+            return;
+
+        stopPreviewForGameplay();
+    }
+
+    private void stopPreviewForGameplay()
+    {
+        if (stoppedPreviewForGameplay)
+            return;
+
         previewTrackBeforePlay = BmsWorkingBeatmap.ActivePreviewTrack;
-        BmsWorkingBeatmap.StopActivePreview();
+
+        if (previewTrackBeforePlay == null)
+            return;
+
+        BmsWorkingBeatmap.SwitchActivePreviewToGameplayClockOnly();
+        stoppedPreviewForGameplay = true;
     }
 }
