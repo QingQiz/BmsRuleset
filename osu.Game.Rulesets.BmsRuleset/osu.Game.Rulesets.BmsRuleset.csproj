@@ -25,6 +25,7 @@
     <PropertyGroup>
         <BmsNativeBrotliToolConfiguration Condition="'$(BmsNativeBrotliToolConfiguration)' == ''">Release</BmsNativeBrotliToolConfiguration>
         <BmsNativeBrotliToolProject>$(MSBuildThisFileDirectory)..\osu.Game.Rulesets.BmsRuleset.Native\osu.Game.Rulesets.BmsRuleset.Native.csproj</BmsNativeBrotliToolProject>
+        <BmsNativeBrotliToolProgram>$(MSBuildThisFileDirectory)..\osu.Game.Rulesets.BmsRuleset.Native\Program.cs</BmsNativeBrotliToolProgram>
         <BmsNativeBrotliToolPath>$(MSBuildThisFileDirectory)..\osu.Game.Rulesets.BmsRuleset.Native\bin\$(BmsNativeBrotliToolConfiguration)\net8.0\osu.Game.Rulesets.BmsRuleset.Native.dll</BmsNativeBrotliToolPath>
     </PropertyGroup>
     <ItemGroup>
@@ -79,13 +80,22 @@
             OutputFile="$(TargetPath)" />
         <Message Importance="high" Text="Repacked BMS ruleset: $(TargetPath)" />
     </Target>
-    <Target Name="CompressBmsNativeBackends" BeforeTargets="AssignTargetPaths" Condition="'@(BmsNativeBackendToCompress)' != ''">
+    <Target Name="ValidateBmsNativeBackends" Condition="'@(BmsNativeBackendToCompress)' != ''">
         <Error Condition="'@(BmsNativeBackendToCompress->Count())' != '3'" Text="Expected all three BMS native backends before embedding compressed resources, but found @(BmsNativeBackendToCompress->Count())." />
+    </Target>
+    <Target
+        Name="CompressBmsNativeBackends"
+        DependsOnTargets="ValidateBmsNativeBackends"
+        Inputs="$(BmsNativeBrotliToolProject);$(BmsNativeBrotliToolProgram);@(BmsNativeBackendToCompress)"
+        Outputs="@(BmsNativeBackendToCompress->'%(CompressedPath)')"
+        Condition="'@(BmsNativeBackendToCompress)' != ''">
         <MSBuild
             Projects="$(BmsNativeBrotliToolProject)"
             Targets="Restore;Build"
             Properties="Configuration=$(BmsNativeBrotliToolConfiguration)" />
         <Exec Command="dotnet &quot;$(BmsNativeBrotliToolPath)&quot; &quot;%(BmsNativeBackendToCompress.FullPath)&quot; &quot;%(BmsNativeBackendToCompress.CompressedPath)&quot;" />
+    </Target>
+    <Target Name="AddBmsNativeBackendResources" BeforeTargets="AssignTargetPaths" DependsOnTargets="CompressBmsNativeBackends" Condition="'@(BmsNativeBackendToCompress)' != ''">
         <ItemGroup>
             <EmbeddedResource Include="%(BmsNativeBackendToCompress.CompressedPath)" WithCulture="false">
                 <LogicalName>%(BmsNativeBackendToCompress.LogicalName)</LogicalName>
