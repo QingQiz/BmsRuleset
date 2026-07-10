@@ -23,21 +23,21 @@ public class BmsLampScoreSelectorTest
     }
 
     [Test]
-    public void TestSelectedHideScratchOnlyShowsHideScratchScores()
+    public void TestSelectedHideScratchKeepsNoModScore()
     {
         var noModScore = score(1_000);
         var hideScratchScore = score(900, new BmsModHideScratch());
 
-        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, hideScratchScore], [new BmsModHideScratch()]), Is.SameAs(hideScratchScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, hideScratchScore], [new BmsModHideScratch()]), Is.SameAs(noModScore));
     }
 
     [Test]
-    public void TestSelectedAutoScratchOnlyShowsAutoScratchScores()
+    public void TestSelectedAutoScratchKeepsNoModScore()
     {
         var noModScore = score(1_000);
         var autoScratchScore = score(900, new BmsModAutoScratch());
 
-        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, autoScratchScore], [new BmsModAutoScratch()]), Is.SameAs(autoScratchScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, autoScratchScore], [new BmsModAutoScratch()]), Is.SameAs(noModScore));
     }
 
     [TestCase(typeof(BmsModHalfTime), typeof(BmsModDoubleTime))]
@@ -61,12 +61,21 @@ public class BmsLampScoreSelectorTest
     }
 
     [Test]
-    public void TestSelectedConstantOnlyShowsConstantScores()
+    public void TestSelectedHalfTimeKeepsNoModScore()
+    {
+        var noModScore = score(1_000);
+        var halfTimeScore = score(900, new BmsModHalfTime());
+
+        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, halfTimeScore], [new BmsModHalfTime()]), Is.SameAs(noModScore));
+    }
+
+    [Test]
+    public void TestSelectedConstantKeepsNoModScore()
     {
         var noModScore = score(1_000);
         var constantScore = score(900, new BmsModConstant());
 
-        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, constantScore], [new BmsModConstant()]), Is.SameAs(constantScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, constantScore], [new BmsModConstant()]), Is.SameAs(noModScore));
     }
 
     [Test]
@@ -80,9 +89,50 @@ public class BmsLampScoreSelectorTest
     }
 
     [Test]
-    public void TestReturnsNullWhenNoScoreMatchesSelectedSignificantMods()
+    public void TestSelectedDoubleTimeHidesScoreWithoutMod()
     {
-        Assert.That(BmsLampScoreSelector.SelectBest([score(1_000)], [new BmsModHideScratch()]), Is.Null);
+        Assert.That(BmsLampScoreSelector.SelectBest([score(1_000)], [new BmsModDoubleTime()]), Is.Null);
+    }
+
+    [TestCase(typeof(BmsModHardGauge))]
+    [TestCase(typeof(BmsModExHardGauge))]
+    [TestCase(typeof(BmsModHazardGauge))]
+    public void TestSelectedNonDoubleTimeModKeepsScore(Type modType)
+    {
+        var existingScore = score(1_000);
+
+        Assert.That(BmsLampScoreSelector.SelectBest([existingScore], [create(modType)]), Is.SameAs(existingScore));
+    }
+
+    [Test]
+    public void TestOnlyAdditionalDoubleTimeHidesExistingLamp()
+    {
+        var autoScratchScore = score(1_000, new BmsModAutoScratch());
+
+        Assert.That(BmsLampScoreSelector.SelectBest([autoScratchScore], [new BmsModAutoScratch(), new BmsModHideScratch()]), Is.SameAs(autoScratchScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([autoScratchScore], [new BmsModAutoScratch(), new BmsModHardGauge()]), Is.SameAs(autoScratchScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([autoScratchScore], [new BmsModAutoScratch(), new BmsModDoubleTime()]), Is.Null);
+    }
+
+    [Test]
+    public void TestDifficultyReductionModsUseSubsetMatching()
+    {
+        var hideScratchScore = score(1_000, new BmsModHideScratch());
+        var hideScratchConstantScore = score(1_000, new BmsModHideScratch(), new BmsModConstant());
+
+        Assert.That(BmsLampScoreSelector.SelectBest([hideScratchScore], [new BmsModHideScratch(), new BmsModConstant()]), Is.SameAs(hideScratchScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([hideScratchConstantScore], [new BmsModHideScratch()]), Is.Null);
+        Assert.That(BmsLampScoreSelector.SelectBest([hideScratchConstantScore], [new BmsModHideScratch(), new BmsModConstant(), new BmsModHalfTime()]), Is.SameAs(hideScratchConstantScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([hideScratchConstantScore], [new BmsModHideScratch(), new BmsModHalfTime()]), Is.Null);
+    }
+
+    [Test]
+    public void TestBetterLampFromEasierScoreIsSelected()
+    {
+        var harderClear = score(1_000, ScoreRank.D, stats((HitResult.Perfect, 1), (HitResult.Ok, 1)));
+        var easierFullCombo = score(900, ScoreRank.A, stats((HitResult.Perfect, 1), (HitResult.Good, 1)), new BmsModHideScratch());
+
+        Assert.That(BmsLampScoreSelector.SelectBest([harderClear, easierFullCombo], [new BmsModHideScratch()]), Is.SameAs(easierFullCombo));
     }
 
     [Test]

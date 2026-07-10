@@ -61,8 +61,8 @@ BMS 谱面并将其标记为删除。
 BMS 谱面面板会根据最匹配的本地最好成绩显示 clear lamp。Lamp 覆盖常见 BMS 结果状态：
 No Play、Failed、Assist Clear、Easy Clear、Clear、Hard Clear、EX Hard Clear、Full Combo、Perfect 和 Max。
 
-Lamp 会尽可能跟随当前选择的、会影响游玩的 mod。例如，带有 Hide Scratch、Auto Scratch、Constant、Half Time
-或 Double Time 的成绩，只会在选歌界面选择了对应 mod 组合时用于 lamp 显示。
+Lamp 会跟随当前选择的 mod：降低难度时仍显示高难度条件下取得的 lamp；提高难度时不显示低难度条件下取得的
+lamp。Lamp 筛选中只有 Double Time 算提高难度。
 
 ### 歌曲预览
 

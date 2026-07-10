@@ -29,13 +29,25 @@ public static class BmsLampScoreSelector
     };
 
     private static bool matchesSelectedMods(ScoreInfo score, IReadOnlyList<Mod> selectedMods) =>
-        has<BmsModHideScratch>(score.Mods) == has<BmsModHideScratch>(selectedMods) &&
-        has<BmsModAutoScratch>(score.Mods) == has<BmsModAutoScratch>(selectedMods) &&
-        has<BmsModConstant>(score.Mods) == has<BmsModConstant>(selectedMods) &&
-        rateMod(score.Mods) == rateMod(selectedMods);
+        reductionModMatches<BmsModHideScratch>(score.Mods, selectedMods) &&
+        reductionModMatches<BmsModAutoScratch>(score.Mods, selectedMods) &&
+        reductionModMatches<BmsModConstant>(score.Mods, selectedMods) &&
+        rateModsMatch(score.Mods, selectedMods);
+
+    private static bool reductionModMatches<TMod>(IEnumerable<Mod> scoreMods, IEnumerable<Mod> selectedMods)
+        where TMod : Mod => !has<TMod>(scoreMods) || has<TMod>(selectedMods);
 
     private static bool has<TMod>(IEnumerable<Mod> mods)
         where TMod : Mod => mods.Any(mod => mod is TMod);
+
+    private static bool rateModsMatch(IEnumerable<Mod> scoreMods, IEnumerable<Mod> selectedMods)
+    {
+        var scoreRateMod = rateMod(scoreMods);
+        var selectedRateMod = rateMod(selectedMods);
+
+        return scoreRateMod == selectedRateMod ||
+               scoreRateMod == null && selectedRateMod?.type == typeof(BmsModHalfTime);
+    }
 
     private static (Type type, double speedChange)? rateMod(IEnumerable<Mod> mods)
     {

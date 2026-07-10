@@ -192,9 +192,8 @@ select.
 BMS beatmap panels show a clear lamp based on your best matching local score. Lamps cover the usual BMS result states:
 No Play, Failed, Assist Clear, Easy Clear, Clear, Hard Clear, EX Hard Clear, Full Combo, Perfect, and Max.
 
-The lamp follows the currently selected gameplay-affecting mods when possible. For example, a score set with
-Hide Scratch, Auto Scratch, Constant, Half Time, or Double Time is only used for the lamp when the matching mod setup is
-selected in song select.
+The lamp follows the selected mods: lowering the difficulty keeps lamps earned under harder conditions visible, while
+raising the difficulty hides lamps earned under easier conditions. Only Double Time is treated as a difficulty increase.
 
 ---
 
