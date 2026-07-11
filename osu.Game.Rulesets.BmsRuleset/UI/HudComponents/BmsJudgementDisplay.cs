@@ -14,10 +14,8 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
-public sealed partial class BmsJudgementDisplay : CompositeDrawable, ISerialisableDrawable
+public sealed partial class BmsJudgementDisplay : BmsHudComponent
 {
-    public bool UsesFixedAnchor { get; set; }
-
     private readonly Dictionary<HitResult, SkinnableDrawable> drawableCache = new();
     private readonly Container drawablePool;
     private readonly Container displayArea;

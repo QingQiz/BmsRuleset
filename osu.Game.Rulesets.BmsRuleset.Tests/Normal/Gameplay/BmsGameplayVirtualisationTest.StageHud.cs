@@ -412,6 +412,63 @@ public partial class BmsGameplayVirtualisationTest
         });
     }
 
+    [TestCase(-10, -5, -10, -5)]
+    [TestCase(90, 95, 90, 90)]
+    [TestCase(-30, -25, -10, -10)]
+    [TestCase(110, 120, 90, 90)]
+    [TestCase(30, 40, 30, 40)]
+    public void TestHudEditorBoundsClamp(float x, float y, float expectedX, float expectedY)
+    {
+        var bounds = new TestSerialisableDrawableContainer { Size = new Vector2(100) };
+        var hud = new TestHudComponent
+        {
+            Position = new Vector2(x, y),
+            Size = new Vector2(20),
+        };
+        setDrawableParent(hud, bounds);
+
+        hud.ClampToEditorBounds();
+
+        Assert.That(hud.Position, Is.EqualTo(new Vector2(expectedX, expectedY)));
+    }
+
+    [Test]
+    public void TestOversizedHudEditorBoundsClampKeepsVisibleComponentPosition()
+    {
+        var bounds = new TestSerialisableDrawableContainer { Size = new Vector2(100) };
+        var hud = new TestHudComponent
+        {
+            Position = new Vector2(10),
+            Size = new Vector2(120),
+        };
+        setDrawableParent(hud, bounds);
+
+        hud.ClampToEditorBounds();
+
+        Assert.That(hud.Position, Is.EqualTo(new Vector2(10)));
+    }
+
+    [Test]
+    public void TestHudEditorBoundsClampPreservesRelativePositionAxes()
+    {
+        var bounds = new TestSerialisableDrawableContainer { Size = new Vector2(100) };
+        var hud = new TestHudComponent
+        {
+            RelativePositionAxes = Axes.Both,
+            Position = new Vector2(0.95f),
+            Size = new Vector2(20),
+        };
+        setDrawableParent(hud, bounds);
+
+        hud.ClampToEditorBounds();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hud.RelativePositionAxes, Is.EqualTo(Axes.Both));
+            Assert.That(hud.Position, Is.EqualTo(new Vector2(0.9f)));
+        });
+    }
+
     private static BmsStageHudController createController() => new(new BmsPlayfield(attachBeatmap(new BmsBeatmap
     {
         TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
@@ -447,5 +504,14 @@ public partial class BmsGameplayVirtualisationTest
         public void Add(ISerialisableDrawable drawable) => components.Add(drawable);
 
         public void Remove(ISerialisableDrawable component, bool disposeImmediately) => components.Remove(component);
+    }
+
+    private sealed partial class TestHudComponent : BmsHudComponent
+    {
+        public TestHudComponent()
+        {
+            Anchor = Anchor.TopLeft;
+            Origin = Anchor.TopLeft;
+        }
     }
 }

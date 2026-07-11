@@ -18,10 +18,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 /// <summary>
 ///     BMS-style groove gauge display that replaces osu!'s native health bar UI.
 /// </summary>
-public sealed partial class BmsHealthDisplay : CompositeDrawable, ISerialisableDrawable
+public sealed partial class BmsHealthDisplay : BmsHudComponent
 {
-    public bool UsesFixedAnchor { get; set; }
-
     [SettingSource("Groove low health colour", "Colour of the groove gauge in the red zone (below red zone threshold).")]
     public BindableColour4 GrooveColourLow { get; } = new(new Color4(255, 45, 40, 255));
 

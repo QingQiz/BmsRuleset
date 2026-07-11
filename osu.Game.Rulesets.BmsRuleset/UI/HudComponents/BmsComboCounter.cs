@@ -13,7 +13,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
-public sealed partial class BmsComboCounter : CompositeDrawable, ISerialisableDrawable
+public sealed partial class BmsComboCounter : BmsHudComponent
 {
 
     [SettingSource("Auto-hide delay", "Seconds before combo counter hides when combo hasn't grown. Set to -1 to never auto-hide.")]
@@ -32,8 +32,6 @@ public sealed partial class BmsComboCounter : CompositeDrawable, ISerialisableDr
     };
 
     public Bindable<int> Current { get; } = new BindableInt { MinValue = 0 };
-
-    public bool UsesFixedAnchor { get; set; }
 
     public int DisplayedCount
     {

@@ -4,17 +4,14 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Graphics;
-using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
-public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawable
+public sealed partial class BmsTextHud : BmsHudComponent
 {
-    public bool UsesFixedAnchor { get; set; }
-
     private readonly SpriteText mainText;
     private readonly SpriteText arrowText;
 
@@ -25,9 +22,6 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
 
     // Null in tests / non-OsuGame hosts. When the skin editor is open the HUD is forced visible so the
     // (otherwise alpha=0) text box can be positioned and sized.
-    [Resolved(CanBeNull = true)]
-    private SkinEditorOverlay? skinEditorOverlay { get; set; }
-
     public BmsTextHud()
     {
         Anchor = Anchor.TopCentre;
@@ -91,13 +85,13 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
             gameplayEvents.ScrollSpeedChanged += showScrollSpeed;
         }
 
-        if (skinEditorOverlay != null)
-            skinEditorOverlay.State.BindValueChanged(_ => updateEditModeVisibility(), true);
+        if (SkinEditor != null)
+            SkinEditor.State.BindValueChanged(_ => updateEditModeVisibility(), true);
         else
             applyEditModeVisibility(false);
     }
 
-    private void updateEditModeVisibility() => applyEditModeVisibility(skinEditorOverlay?.State.Value == Visibility.Visible);
+    private void updateEditModeVisibility() => applyEditModeVisibility(SkinEditor?.State.Value == Visibility.Visible);
 
     private void applyEditModeVisibility(bool isEditing)
     {
@@ -146,7 +140,7 @@ public sealed partial class BmsTextHud : CompositeDrawable, ISerialisableDrawabl
     private void animateShow(double displayDurationMs)
     {
         // Keep the edit-mode placeholder stable; don't fade out from gameplay text events while editing.
-        if (skinEditorOverlay?.State.Value == Visibility.Visible)
+        if (SkinEditor?.State.Value == Visibility.Visible)
             return;
 
         ClearTransforms();

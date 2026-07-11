@@ -4,7 +4,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
-using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK;
@@ -12,10 +11,8 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
-internal sealed partial class BmsStageHud : CompositeDrawable, ISerialisableDrawable
+internal sealed partial class BmsStageHud : BmsHudComponent
 {
-    public bool UsesFixedAnchor { get; set; }
-
     [SettingSource("Judgement line offset", "Moves the judgement line relative to the skin position. Positive values move it upward.")]
     public BindableFloat JudgementLineOffset { get; } = new()
     {
@@ -29,9 +26,6 @@ internal sealed partial class BmsStageHud : CompositeDrawable, ISerialisableDraw
 
     [Resolved]
     private DrawableRuleset drawableRuleset { get; set; } = null!;
-
-    [Resolved(CanBeNull = true)]
-    private SkinEditorOverlay? skinEditorOverlay { get; set; }
 
     public BmsStageHud()
     {
@@ -89,8 +83,8 @@ internal sealed partial class BmsStageHud : CompositeDrawable, ISerialisableDraw
             controller.SetHitTargetPositionOffset(JudgementLineOffset.Value);
         }
 
-        if (skinEditorOverlay != null)
-            skinEditorOverlay.State.BindValueChanged(_ => updateEditModeVisibility(), true);
+        if (SkinEditor != null)
+            SkinEditor.State.BindValueChanged(_ => updateEditModeVisibility(), true);
         else
             applyEditModeVisibility(false);
     }
@@ -112,7 +106,7 @@ internal sealed partial class BmsStageHud : CompositeDrawable, ISerialisableDraw
         JudgementLineOffset.MaxValue = maximum;
     }
 
-    private void updateEditModeVisibility() => applyEditModeVisibility(skinEditorOverlay?.State.Value == Visibility.Visible);
+    private void updateEditModeVisibility() => applyEditModeVisibility(SkinEditor?.State.Value == Visibility.Visible);
 
     private void applyEditModeVisibility(bool isEditing)
     {

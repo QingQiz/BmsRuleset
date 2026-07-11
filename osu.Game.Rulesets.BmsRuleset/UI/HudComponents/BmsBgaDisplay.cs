@@ -28,7 +28,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
-public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDrawable
+public sealed partial class BmsBgaDisplay : BmsHudComponent
 {
     private static readonly string[] video_resource_extensions =
     [
@@ -52,8 +52,6 @@ public sealed partial class BmsBgaDisplay : CompositeDrawable, ISerialisableDraw
 
     private static readonly HashSet<string> video_extensions = new(video_resource_extensions, StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> image_extensions = new(image_resource_extensions, StringComparer.OrdinalIgnoreCase);
-
-    public bool UsesFixedAnchor { get; set; }
 
     public bool AutoSizeToParent { get; init; }
 
