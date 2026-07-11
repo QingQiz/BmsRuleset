@@ -7,7 +7,9 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
+using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -37,7 +39,7 @@ public partial class BmsGameplayVirtualisationTest
             Anchor = Anchor.TopLeft,
             Origin = Anchor.TopLeft,
             Position = new Vector2(600, 250),
-            Size = new Vector2(200, 300),
+            Size = new Vector2(0.2f, 0.5f),
         };
         var controller = new BmsStageHudController(playfield);
 
@@ -55,7 +57,9 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(playfield.Stage.HasHudTransform, Is.True);
             Assert.That(playfield.Stage.X, Is.EqualTo(200).Within(0.001f));
             Assert.That(playfield.Stage.Y, Is.EqualTo(100).Within(0.001f));
-            Assert.That(playfield.Stage.Masking, Is.True);
+            Assert.That(playfield.Stage.Masking, Is.False);
+            Assert.That(playfield.Stage.Columns.All(column => ((BmsColumn)column).Masking), Is.True);
+            Assert.That(playfield.Stage.MeasureLineArea.Masking, Is.True);
         });
     }
 
@@ -80,7 +84,8 @@ public partial class BmsGameplayVirtualisationTest
         {
             Anchor = Anchor.TopLeft,
             Origin = Anchor.TopLeft,
-            Size = new Vector2(200, 1200),
+            Size = new Vector2(0.1f, 1),
+            Scale = new Vector2(2),
         };
         var controller = new BmsStageHudController(playfield);
 
@@ -94,6 +99,93 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(playfield.Stage.HudViewportHeight, Is.EqualTo(600).Within(0.001f));
             Assert.That(playfield.Stage.Masking, Is.False);
         });
+    }
+
+    [Test]
+    public void TestHorizontalResizeAfterDiagonalResizePreservesNoteHeightScale()
+    {
+        var root = new Container { Size = new Vector2(1000, 600) };
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+        }))
+        {
+            RelativeSizeAxes = Axes.None,
+            Size = new Vector2(1000, 600),
+        };
+        playfield.Stage.RelativeSizeAxes = Axes.None;
+        setAutoSizeAxes(playfield.Stage, Axes.None);
+        playfield.Stage.Size = new Vector2(100, 600);
+
+        var stageHud = new BmsStageHud
+        {
+            Anchor = Anchor.TopLeft,
+            Origin = Anchor.TopLeft,
+            Size = new Vector2(0.1f, 1),
+            Scale = new Vector2(2),
+        };
+        var controller = new BmsStageHudController(playfield);
+
+        setDrawableParent(playfield, root);
+        setDrawableParent(stageHud, root);
+        controller.Register(stageHud);
+
+        Assert.That(playfield.Stage.Scale, Is.EqualTo(new Vector2(2)));
+
+        stageHud.Width = 0.15f;
+        controller.ApplyStageTransform(new Vector2(300, 1200), new Vector2(500, 600));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(playfield.Stage.Scale.X, Is.EqualTo(3).Within(0.001f));
+            Assert.That(playfield.Stage.Scale.Y, Is.EqualTo(2).Within(0.001f));
+            Assert.That(playfield.Stage.HudViewportHeight, Is.EqualTo(600).Within(0.001f));
+            Assert.That(playfield.Stage.Masking, Is.False);
+        });
+    }
+
+    [Test]
+    public void TestRepeatedMixedResizesKeepStageInsideHudBounds()
+    {
+        var root = new Container { Size = new Vector2(1000, 600) };
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+        }))
+        {
+            RelativeSizeAxes = Axes.None,
+            Size = new Vector2(1000, 600),
+        };
+        playfield.Stage.RelativeSizeAxes = Axes.None;
+        setAutoSizeAxes(playfield.Stage, Axes.None);
+        playfield.Stage.Size = new Vector2(100, 600);
+
+        var stageHud = new BmsStageHud { Size = new Vector2(0.1f, 1) };
+        var controller = new BmsStageHudController(playfield);
+
+        setDrawableParent(playfield, root);
+        setDrawableParent(stageHud, root);
+        controller.Register(stageHud);
+
+        apply(new Vector2(170, 1020), 1.7f);
+        apply(new Vector2(300, 1020), 1.7f);
+        apply(new Vector2(500, 1380), 2.3f);
+        apply(new Vector2(500, 920), 2.3f);
+        apply(new Vector2(700, 920), 2.3f);
+
+        void apply(Vector2 hudSize, float contentScale)
+        {
+            stageHud.Scale = new Vector2(contentScale);
+            controller.ApplyStageTransform(hudSize, Vector2.Zero);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(playfield.Stage.DrawWidth * playfield.Stage.Scale.X, Is.EqualTo(hudSize.X).Within(0.001f));
+                Assert.That(playfield.Stage.HudViewportHeight * playfield.Stage.Scale.Y, Is.EqualTo(hudSize.Y).Within(0.001f));
+            });
+        }
     }
 
     [Test]
@@ -143,40 +235,6 @@ public partial class BmsGameplayVirtualisationTest
     }
 
     [Test]
-    public void TestStageHudMigratesAbsoluteSizeToRelativeSize()
-    {
-        var root = new Container { Size = new Vector2(1000, 600) };
-        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
-        {
-            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-        }))
-        {
-            RelativeSizeAxes = Axes.None,
-            Size = new Vector2(1000, 600),
-        };
-        playfield.Stage.RelativeSizeAxes = Axes.None;
-        setAutoSizeAxes(playfield.Stage, Axes.None);
-        playfield.Stage.Size = new Vector2(100, 600);
-
-        var stageHud = new BmsStageHud { Size = new Vector2(750, 300) };
-        var controller = new BmsStageHudController(playfield);
-
-        setDrawableParent(playfield, root);
-        setDrawableParent(stageHud, root);
-        controller.Register(stageHud);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(stageHud.Size.X, Is.EqualTo(0.75f).Within(0.001f));
-            Assert.That(stageHud.Size.Y, Is.EqualTo(0.5f).Within(0.001f));
-            Assert.That(playfield.Stage.Scale.X, Is.EqualTo(7.5f).Within(0.001f));
-            Assert.That(playfield.Stage.Scale.Y, Is.EqualTo(1).Within(0.001f));
-            Assert.That(playfield.Stage.HudViewportHeight, Is.EqualTo(300).Within(0.001f));
-        });
-    }
-
-    [Test]
     public void TestVerticalOnlyStageHudResizeCropsViewport()
     {
         var root = new Container { Size = new Vector2(1000, 600) };
@@ -198,7 +256,7 @@ public partial class BmsGameplayVirtualisationTest
             Anchor = Anchor.TopLeft,
             Origin = Anchor.TopLeft,
             Position = new Vector2(450, 150),
-            Size = new Vector2(100, 300),
+            Size = new Vector2(0.1f, 0.5f),
         };
         var controller = new BmsStageHudController(playfield);
 
@@ -211,8 +269,21 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(playfield.Stage.Scale, Is.EqualTo(Vector2.One));
             Assert.That(playfield.Stage.Height, Is.EqualTo(300).Within(0.001f));
             Assert.That(playfield.Stage.HudViewportHeight, Is.EqualTo(300).Within(0.001f));
-            Assert.That(playfield.Stage.Masking, Is.True);
+            Assert.That(playfield.Stage.Masking, Is.False);
+            Assert.That(playfield.Stage.Columns.All(column => ((BmsColumn)column).Masking), Is.True);
+            Assert.That(playfield.Stage.MeasureLineArea.Masking, Is.True);
+            Assert.That(stageHud.JudgementLineOffset.MinValue, Is.EqualTo(-80));
+            Assert.That(stageHud.JudgementLineOffset.MaxValue, Is.EqualTo(220));
         });
+    }
+
+    [Test]
+    public void TestLegacyStageSideImagesKeepSkinWidthWhenStageShrinks()
+    {
+        const float stage_scale = 0.25f;
+        var imageScale = LegacyBmsStageBackground.HorizontalScaleFor(stage_scale);
+
+        Assert.That(stage_scale * imageScale, Is.EqualTo(1).Within(0.001f));
     }
 
     [Test]
@@ -232,7 +303,7 @@ public partial class BmsGameplayVirtualisationTest
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = Vector2.Zero;
 
-        var stageHud = new BmsStageHud { Size = new Vector2(200, 300) };
+        var stageHud = new BmsStageHud { Size = new Vector2(0.2f, 0.5f) };
         var controller = new BmsStageHudController(playfield);
 
         setDrawableParent(playfield, root);
@@ -318,16 +389,26 @@ public partial class BmsGameplayVirtualisationTest
     {
         var controller = createController();
         var container = new TestSerialisableDrawableContainer();
-        var hud = new BmsStageHud();
+        var hud = new BmsStageHud
+        {
+            Position = new Vector2(120, -80),
+            Size = new Vector2(0.75f, 0.5f),
+            Scale = new Vector2(1.5f),
+        };
 
         container.Add(hud);
         controller.RegisterContainer(container);
         container.Remove(hud, true);
 
+        var replacement = container.Components.OfType<BmsStageHud>().Single();
+
         Assert.Multiple(() =>
         {
             Assert.That(container.Components.OfType<BmsStageHud>().Count(), Is.EqualTo(1));
-            Assert.That(container.Components.OfType<BmsStageHud>().Single(), Is.Not.SameAs(hud));
+            Assert.That(replacement, Is.Not.SameAs(hud));
+            Assert.That(replacement.Position, Is.EqualTo(Vector2.Zero));
+            Assert.That(replacement.Size, Is.EqualTo(Vector2.Zero));
+            Assert.That(replacement.Scale, Is.EqualTo(Vector2.One));
         });
     }
 

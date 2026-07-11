@@ -1,8 +1,11 @@
-﻿using osu.Framework.Graphics;
+﻿using System;
+using osu.Framework.Allocation;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.UI;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
@@ -18,6 +21,9 @@ internal sealed partial class LegacyBmsStageBackground : CompositeDrawable
 {
     private readonly Drawable? leftSprite;
     private readonly Drawable? rightSprite;
+
+    [Resolved(CanBeNull = true)]
+    private BmsPlayfield? playfield { get; set; }
 
     public LegacyBmsStageBackground(BmsLegacySkinTransformer transformer)
     {
@@ -62,6 +68,11 @@ internal sealed partial class LegacyBmsStageBackground : CompositeDrawable
         };
 
         if (height > 0)
-            sprite.Scale = new Vector2(1, DrawHeight / height);
+        {
+            var stageScaleX = playfield?.Stage.Scale.X ?? 1;
+            sprite.Scale = new Vector2(HorizontalScaleFor(stageScaleX), DrawHeight / height);
+        }
     }
+
+    internal static float HorizontalScaleFor(float stageScaleX) => 1 / Math.Max(0.001f, Math.Abs(stageScaleX));
 }

@@ -36,6 +36,8 @@ public sealed partial class BmsStage : CompositeDrawable
 
     internal float HudViewportHeight { get; private set; }
 
+    internal float HudBaseDrawHeight => HasHudTransform ? drawHeightBeforeHudTransform : DrawHeight;
+
     internal float SkinHitTargetPosition { get; private set; } = HIT_TARGET_POSITION;
 
     internal float HitTargetPositionOffset { get; private set; }
@@ -47,7 +49,6 @@ public sealed partial class BmsStage : CompositeDrawable
     private readonly BmsPlayfield playfield;
     private float heightBeforeHudTransform;
     private float drawHeightBeforeHudTransform;
-    private bool maskingBeforeHudTransform;
 
     internal void SetHudTransform(Vector2 offset, Vector2 scale, float viewportHeight)
     {
@@ -55,7 +56,6 @@ public sealed partial class BmsStage : CompositeDrawable
         {
             heightBeforeHudTransform = Height;
             drawHeightBeforeHudTransform = DrawHeight;
-            maskingBeforeHudTransform = Masking;
         }
 
         PositionOffset = offset;
@@ -67,7 +67,6 @@ public sealed partial class BmsStage : CompositeDrawable
         else
             Height = viewportHeight;
 
-        Masking = maskingBeforeHudTransform || Math.Abs(viewportHeight - drawHeightBeforeHudTransform) >= 0.001f;
         HasHudTransform = true;
         updateStageCentre();
     }
@@ -77,10 +76,7 @@ public sealed partial class BmsStage : CompositeDrawable
         PositionOffset = Vector2.Zero;
 
         if (HasHudTransform)
-        {
             Height = heightBeforeHudTransform;
-            Masking = maskingBeforeHudTransform;
-        }
 
         HudViewportHeight = 0;
         HasHudTransform = false;

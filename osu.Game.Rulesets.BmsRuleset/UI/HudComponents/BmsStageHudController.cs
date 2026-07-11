@@ -13,8 +13,6 @@ internal sealed partial class BmsStageHudController : Component
 
     private BmsStageHud? stageHud;
     private ISerialisableDrawableContainer? stageHudContainer;
-    private SerialisedDrawableInfo? lastStageHudInfo;
-    private bool stageHudSizeNormalised;
     private bool ensuringStageHud;
 
     public BmsStageHudController(BmsPlayfield playfield)
@@ -37,7 +35,6 @@ internal sealed partial class BmsStageHudController : Component
             RegisterContainer(container);
 
         stageHud = hud;
-        stageHudSizeNormalised = false;
         ensureStageHudSingleton();
         tryInitialiseHudSize();
         updateStageTransform();
@@ -51,9 +48,7 @@ internal sealed partial class BmsStageHudController : Component
         if (stageHud != hud)
             return;
 
-        lastStageHudInfo = hud.CreateSerialisedInfo();
         stageHud = null;
-        stageHudSizeNormalised = false;
         playfield.Stage.SetHitTargetPositionOffset(0);
         playfield.Stage.ClearHudTransform();
     }
@@ -108,7 +103,6 @@ internal sealed partial class BmsStageHudController : Component
                 stageHudContainer.Remove(duplicate, true);
 
             stageHud = keeper;
-            stageHudSizeNormalised = false;
             tryInitialiseHudSize();
             updateStageTransform();
             updateJudgementLineOffsetRange();
@@ -121,13 +115,16 @@ internal sealed partial class BmsStageHudController : Component
 
     private bool stageHudContainerLoaded => stageHudContainer is not SkinnableContainer skinnableContainer || skinnableContainer.ComponentsLoaded;
 
-    private BmsStageHud createReplacement() =>
-        lastStageHudInfo?.CreateInstance() as BmsStageHud ?? new BmsStageHud();
+    private static BmsStageHud createReplacement() => new();
 
     private void onComponentsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.OldItems?.OfType<BmsStageHud>().FirstOrDefault(hud => hud == stageHud) is BmsStageHud removedHud)
-            lastStageHudInfo = removedHud.CreateSerialisedInfo();
+        if (e.OldItems?.OfType<BmsStageHud>().Any(hud => hud == stageHud) == true)
+        {
+            stageHud = null;
+            playfield.Stage.SetHitTargetPositionOffset(0);
+            playfield.Stage.ClearHudTransform();
+        }
 
         // SkinnableContainer clears its component list before marking a reload as incomplete.
         // The loaded callback is the stable point at which to repair the freshly loaded layout.
@@ -168,17 +165,6 @@ internal sealed partial class BmsStageHudController : Component
         if (!isFiniteAndPositive(parentSize.X) || !isFiniteAndPositive(parentSize.Y))
             return;
 
-        if (!stageHudSizeNormalised)
-        {
-            // Stage frames pre-dating relative sizing stored pixel dimensions. Converting them once
-            // keeps existing layouts visually equivalent while making subsequent editor viewport
-            // changes proportional to the gameplay viewport.
-            stageHud.Size = new Vector2(
-                isLegacyPixelDimension(stageHud.Size.X) ? stageHud.Size.X / parentSize.X : stageHud.Size.X,
-                isLegacyPixelDimension(stageHud.Size.Y) ? stageHud.Size.Y / parentSize.Y : stageHud.Size.Y);
-            stageHudSizeNormalised = true;
-        }
-
         if (stageHud.Size.X > 0 && stageHud.Size.Y > 0)
             return;
 
@@ -213,27 +199,26 @@ internal sealed partial class BmsStageHudController : Component
         var localSize = new Vector2(
             Vector2.Distance(topLeft, topRight),
             Vector2.Distance(topLeft, bottomLeft));
-        var stageSize = playfield.Stage.DrawSize;
-        var scale = new Vector2(localSize.X / stageSize.X, localSize.Y / stageSize.Y);
+        var localCentre = playfield.ToLocalSpace(hudQuad.Centre);
 
-        if (!isFiniteAndPositive(scale.X) || !isFiniteAndPositive(scale.Y))
+        ApplyStageTransform(localSize, localCentre);
+    }
+
+    internal void ApplyStageTransform(Vector2 localSize, Vector2 localCentre)
+    {
+        var stageSize = new Vector2(playfield.Stage.DrawWidth, playfield.Stage.HudBaseDrawHeight);
+        var contentScale = Math.Abs(stageHud?.Scale.Y ?? 0);
+        var scale = new Vector2(localSize.X / stageSize.X, contentScale);
+        var viewportHeight = localSize.Y / contentScale;
+
+        if (!isFiniteAndPositive(scale.X) || !isFiniteAndPositive(scale.Y) || !isFiniteAndPositive(viewportHeight))
         {
             playfield.Stage.ClearHudTransform();
             return;
         }
 
-        var localCentre = playfield.ToLocalSpace(hudQuad.Centre);
-        var viewportHeight = stageSize.Y;
-
-        // Corner resizing preserves the native aspect ratio, while edge resizing may change the
-        // axes independently. Treat only matching axis ratios as uniform scaling so a vertical
-        // crop still works after the stage has already been stretched horizontally.
-        if (Math.Abs(scale.X - scale.Y) >= 0.001f)
-        {
-            viewportHeight = localSize.Y;
-            scale.Y = 1;
-        }
-
+        // Corner resizing changes Drawable.Scale, while edge resizing changes Width or Height.
+        // Keeping those independent avoids transform drift across arbitrary resize sequences.
         playfield.Stage.SetHudTransform(localCentre - playfield.DrawSize * 0.5f, scale, viewportHeight);
     }
 
@@ -252,8 +237,6 @@ internal sealed partial class BmsStageHudController : Component
 
         stageHud.SetJudgementLineOffsetRange(-skinPosition, stageHeight - skinPosition);
     }
-
-    private static bool isLegacyPixelDimension(float value) => value > 4;
 
     private static bool isFiniteAndPositive(float value) => float.IsFinite(value) && value > 0;
 }
