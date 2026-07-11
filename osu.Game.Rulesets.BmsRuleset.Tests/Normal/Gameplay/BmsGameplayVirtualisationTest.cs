@@ -11,7 +11,7 @@ using osu.Game.Rulesets.BmsRuleset.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
 
-public class BmsGameplayVirtualisationTest
+public partial class BmsGameplayVirtualisationTest
 {
     [Test]
     public void TestPlayfieldRoutesHitObjectsToPerColumnContainers()
@@ -322,4 +322,5 @@ public class BmsGameplayVirtualisationTest
 
         return firstVisible;
     }
+
 }

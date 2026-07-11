@@ -582,6 +582,7 @@ Additionally, select a component in the skin editor to configure its properties 
 | Judgement      | *(none)*                                                                                                                                                                                                       |
 | Health Bar     | **Groove gauge colours** — low (red zone), mid (yellow zone), high (green zone). **Fixed gauge colours** — Hard, ExHard, Hazard, each independently editable. All colours have a colour picker in the sidebar. |
 | BGA            | *(none)* — renders behind the playfield; aspect-fit (letterbox) is fixed. BGA dim is a global setting, not per-component.                                                                                      |
+| Stage          | *(none)* — required rectangular frame: drag to move the rendered stage, or resize its width and height independently. It is not offered in the component toolbox; missing/deleted layouts regenerate it, and persisted duplicates retain the first instance. |
 | Text           | *(none)* — shows a "Sample Text Event" placeholder while editing so the (otherwise alpha=0) box can be positioned. Driven by channel `99` / `#TEXTxx` at runtime.                                              |
 
 ### Example skin.ini (7K)

@@ -58,6 +58,7 @@ public static class BmsDefaultHud
         {
             Children =
             [
+                new BmsStageHud(),
                 new BmsBgaDisplay
                 {
                     AutoSizeToParent = true,

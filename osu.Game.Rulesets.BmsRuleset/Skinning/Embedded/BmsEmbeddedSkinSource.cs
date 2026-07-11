@@ -1,9 +1,12 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
@@ -16,32 +19,8 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 
-/// <inheritdoc cref="ISkinSource" />
-/// <summary>
-/// The root ISkinSource used during BMS gameplay.
-/// </summary>
-/// <remarks>
-/// Implements a three-tier fallback chain:
-/// <list type="number">
-///   <item><description>
-///     <b>parent</b> — the full osu! skin source (user skin + beatmap skin + defaults),
-///     supplied by the framework's skin manager.
-///   </description></item>
-///   <item><description>
-///     <b>primary</b> — a BmsLegacySkinTransformer wrapping a
-///     BmsEmbeddedSkin whose asset set matches the user's active skin style
-///     (e.g. BmsEmbeddedSkinKind.LegacyModern when Argon is selected).
-///   </description></item>
-///   <item><description>
-///     <b>fallback</b> — a BmsLegacySkinTransformer wrapping the
-///     BmsEmbeddedSkinKind.LegacyOld embedded skin, used as the
-///     last-resort when both the parent chain and the primary embedded skin fail.
-///   </description></item>
-/// </list>
-/// </remarks>
 public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGameplaySkinDrawableSource
 {
-    /// <inheritdoc/>
     public IEnumerable<ISkin> AllSources
     {
         get
@@ -106,6 +85,9 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
     /// </summary>
     public Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
     {
+        if (tryGetMainHudWithStage(lookup, out var mainHud))
+            return mainHud;
+
         var drawable = lookup is
             BmsSkinComponentLookup or
             SkinComponentLookup<HitResult> or
@@ -117,6 +99,62 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
         return lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents }
             ? BmsDefaultHud.GetDrawableComponent(lookup)
             : drawable;
+    }
+
+    private bool tryGetMainHudWithStage(ISkinComponentLookup lookup, out Drawable? mainHud)
+    {
+        if (lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null } directLookup)
+        {
+            mainHud = ensureSingleStageHud(BmsDefaultHud.GetDrawableComponent(directLookup));
+            return true;
+        }
+
+        if (tryGetBmsMainHudLookupFromUserLookup(lookup, out var userLookup))
+        {
+            mainHud = ensureSingleStageHud(
+                parent?.GetDrawableComponent(lookup)
+                ?? embeddedFallbacks?.GetDrawableComponent(lookup)
+                ?? BmsDefaultHud.GetDrawableComponent(userLookup));
+            return true;
+        }
+
+        mainHud = null;
+        return false;
+    }
+
+    private static bool tryGetBmsMainHudLookupFromUserLookup(ISkinComponentLookup lookup, out GlobalSkinnableContainerLookup mainHudLookup)
+    {
+        mainHudLookup = null!;
+
+        if (lookup.GetType().FullName != "osu.Game.Skinning.UserSkinComponentLookup")
+            return false;
+
+        var component = lookup.GetType().GetField("Component", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(lookup);
+
+        if (component is not GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null } globalLookup)
+            return false;
+
+        mainHudLookup = globalLookup;
+        return true;
+    }
+
+    private static Drawable? ensureSingleStageHud(Drawable? drawable)
+    {
+        if (drawable is not Container container)
+            return drawable;
+
+        var stageHuds = container.OfType<BmsStageHud>().ToArray();
+
+        if (stageHuds.Length == 0)
+        {
+            container.Add(new BmsStageHud());
+            return drawable;
+        }
+
+        foreach (var duplicate in stageHuds.Skip(1))
+            container.Remove(duplicate, true);
+
+        return drawable;
     }
 
     /// <summary>Looks up a texture, falling through parent → primary → fallback.</summary>

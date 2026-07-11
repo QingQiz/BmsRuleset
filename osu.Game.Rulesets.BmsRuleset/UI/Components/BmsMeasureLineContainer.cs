@@ -23,6 +23,11 @@ public sealed partial class BmsMeasureLineContainer : Container
     private BmsScrollController? scrollController;
     private BmsStage? stage;
 
+    public BmsMeasureLineContainer()
+    {
+        Masking = true;
+    }
+
     internal void SetTimingMap(BmsTimingMap? timingMap, BmsScrollController owner, BmsStage ownerStage)
     {
         Clear(false);

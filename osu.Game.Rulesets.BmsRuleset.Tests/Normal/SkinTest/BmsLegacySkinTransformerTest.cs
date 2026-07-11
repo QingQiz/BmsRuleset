@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -289,6 +290,18 @@ public class BmsLegacySkinTransformerTest
             TotalColumns = totalColumns,
         };
 
+    private static ISkinComponentLookup createUserMainHudLookup()
+    {
+        var type = typeof(Skin).Assembly.GetType("osu.Game.Skinning.UserSkinComponentLookup");
+        Assert.That(type, Is.Not.Null);
+
+        var lookup = new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo);
+        var instance = Activator.CreateInstance(type!, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, [lookup], null);
+
+        Assert.That(instance, Is.InstanceOf<ISkinComponentLookup>());
+        return (ISkinComponentLookup)instance!;
+    }
+
     [Test]
     public void TestBms5KFallsBackToSixKeySpecialStyleBeforeFiveKey()
     {
@@ -483,9 +496,26 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestStageHudIsExistingLayoutOnlyComponent()
+    {
+        var stageHud = new BmsStageHud();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(stageHud, Is.InstanceOf<ISerialisableDrawable>());
+            Assert.That(((ISerialisableDrawable)stageHud).IsEditable, Is.True);
+            Assert.That(SerialisedDrawableInfo.GetAllAvailableDrawables(new BmsRuleset().RulesetInfo), Does.Not.Contain(typeof(BmsStageHud)));
+            Assert.That(stageHud.AutoSizeAxes, Is.EqualTo(Axes.None));
+            Assert.That(stageHud.Width, Is.Zero);
+            Assert.That(stageHud.Height, Is.Zero);
+        });
+    }
+
+    [Test]
     public void TestBgaDisplayIsPlacedBehindNativePlayfield()
     {
         Assert.That(new BmsBgaDisplay(), Is.InstanceOf<ISerialisableDrawable>());
+        Assert.That(new BmsStageHud(), Is.InstanceOf<ISerialisableDrawable>());
 
         var rulesetHud = BmsDefaultHud.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo));
         var playfieldHud = BmsDefaultHud.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.Playfield, new BmsRuleset().RulesetInfo));
@@ -502,7 +532,49 @@ public class BmsLegacySkinTransformerTest
         Assert.That(bga.RenderOutsideHudVisibility, Is.True);
         Assert.That(bga.Depth, Is.EqualTo(float.MaxValue));
 
+        Assert.That(rulesetHud!.ChildrenOfType<BmsStageHud>().SingleOrDefault(), Is.Not.Null);
+
         Assert.That(playfieldHud!.ChildrenOfType<BmsBgaDisplay>(), Is.Empty);
+        Assert.That(playfieldHud.ChildrenOfType<BmsStageHud>(), Is.Empty);
+    }
+
+    [Test]
+    public void TestSavedBmsHudLayoutRegeneratesMissingStageHud()
+    {
+        using var source = new BmsEmbeddedSkinSource();
+        var savedLayout = new Container();
+
+        source.SetSources(new TestSkinSource(new TestDrawableSkin { Drawable = savedLayout }), null);
+
+        var hud = source.GetDrawableComponent(createUserMainHudLookup());
+
+        Assert.That(hud!.ChildrenOfType<BmsStageHud>().Count(), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestSavedBmsHudLayoutRemovesDuplicateStageHuds()
+    {
+        using var source = new BmsEmbeddedSkinSource();
+        var first = new BmsStageHud();
+        var second = new BmsStageHud();
+        var savedLayout = new Container
+        {
+            Children =
+            [
+                first,
+                second,
+            ],
+        };
+
+        source.SetSources(new TestSkinSource(new TestDrawableSkin { Drawable = savedLayout }), null);
+
+        var hud = source.GetDrawableComponent(createUserMainHudLookup());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hud!.ChildrenOfType<BmsStageHud>().Count(), Is.EqualTo(1));
+            Assert.That(hud.ChildrenOfType<BmsStageHud>().Single(), Is.SameAs(first));
+        });
     }
 
     [Test]

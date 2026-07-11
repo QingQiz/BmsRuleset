@@ -50,4 +50,18 @@ public class BmsScrollControllerTest
         Assert.That(controller.CurrentScrollPosition, Is.EqualTo(1234));
         Assert.That(controller.ChartSpeedFactor, Is.EqualTo(1));
     }
+
+    [Test]
+    public void TestCroppedViewportPreservesVisibleTime()
+    {
+        var controller = new BmsScrollController(null);
+        controller.SetHitTargetPosition(80);
+        var visibleProgress = controller.ScrollRange / controller.ScrollSpeedMultiplier;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(controller.YForScrollProgress(visibleProgress, 600, 80), Is.EqualTo(0).Within(0.001f));
+            Assert.That(controller.YForScrollProgress(visibleProgress, 300, 80), Is.EqualTo(0).Within(0.001f));
+        });
+    }
 }

@@ -12,6 +12,7 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -32,6 +33,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 /// </remarks>
 public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) : DrawableRuleset<BmsHitObject>(ruleset, beatmap, mods)
 {
+    internal BmsStageHudController StageHudController => field ??= new BmsStageHudController((BmsPlayfield)Playfield);
+
     public new PassThroughInputManager KeyBindingInputManager => base.KeyBindingInputManager;
 
     public override int Variant => (int)((BmsBeatmap)Beatmap).LayoutVariant;
@@ -200,6 +203,8 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     private void load()
     {
         var beatmap = (BmsBeatmap)Beatmap;
+
+        Overlays.Add(StageHudController);
 
         // Add the shared sample cache to the tree so it async-loads (and pre-decodes every chart
         // sample) during the gameplay loading phase.

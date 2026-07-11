@@ -30,6 +30,55 @@ public sealed partial class BmsStage : CompositeDrawable
 
     public Color4 BarLineColour => barLineColour.Value;
 
+    internal Vector2 PositionOffset { get; private set; }
+
+    internal bool HasHudTransform { get; private set; }
+
+    internal float HudViewportHeight { get; private set; }
+
+    private readonly BmsPlayfield playfield;
+    private float heightBeforeHudTransform;
+    private float drawHeightBeforeHudTransform;
+    private bool maskingBeforeHudTransform;
+
+    internal void SetHudTransform(Vector2 offset, Vector2 scale, float viewportHeight)
+    {
+        if (!HasHudTransform)
+        {
+            heightBeforeHudTransform = Height;
+            drawHeightBeforeHudTransform = DrawHeight;
+            maskingBeforeHudTransform = Masking;
+        }
+
+        PositionOffset = offset;
+        Scale = scale;
+        HudViewportHeight = viewportHeight;
+
+        if ((RelativeSizeAxes & Axes.Y) != 0)
+            Height = viewportHeight / Math.Max(1, playfield.DrawHeight);
+        else
+            Height = viewportHeight;
+
+        Masking = maskingBeforeHudTransform || Math.Abs(viewportHeight - drawHeightBeforeHudTransform) >= 0.001f;
+        HasHudTransform = true;
+        updateStageCentre();
+    }
+
+    internal void ClearHudTransform()
+    {
+        PositionOffset = Vector2.Zero;
+
+        if (HasHudTransform)
+        {
+            Height = heightBeforeHudTransform;
+            Masking = maskingBeforeHudTransform;
+        }
+
+        HudViewportHeight = 0;
+        HasHudTransform = false;
+        updateStageCentre();
+    }
+
     private readonly BindableFloat hitTargetPosition = new(HIT_TARGET_POSITION);
     private readonly BindableFloat barLineHeight = new(1);
     private readonly Bindable<Color4> barLineColour = new(Color4.White.Opacity(0.35f));
@@ -65,6 +114,7 @@ public sealed partial class BmsStage : CompositeDrawable
 
     public BmsStage(BmsPlayfield playfield)
     {
+        this.playfield = playfield;
         layoutVariant = playfield.LayoutVariant;
 
         RelativeSizeAxes = Axes.Y;
@@ -272,8 +322,15 @@ public sealed partial class BmsStage : CompositeDrawable
 
     private void updateStageCentre()
     {
+        if (HasHudTransform)
+        {
+            Position = PositionOffset;
+            return;
+        }
+
         var nonScratchCentre = getNonScratchCentreX();
         X = (DrawWidth / 2 - nonScratchCentre) * Scale.X;
+        Y = 0;
     }
 
     private float getNonScratchCentreX()

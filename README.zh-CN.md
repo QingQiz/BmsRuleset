@@ -445,6 +445,7 @@ HUD 组件实现了 `ISerialisableDrawable`，可在游戏内通过**皮肤编�
 | Judgement | （无）                                                                                                    |
 | 血条        | **Groove 三段颜色**——低血量区（红）、中血量区（黄）、高血量区（绿）。**固定颜色模式各自独立**——Hard、ExHard、Hazard 颜色均可分别编辑。所有颜色均使用侧边栏的颜色选择器。 |
 | BGA       | （无）— 在 playfield 后方渲染；aspect-fit（letterbox）固定；BGA dim 是全局设置，非组件属性。 |
+| Stage     | （无）— 必备的矩形框：拖动可移动渲染出的 stage，宽度和高度可分别缩放。组件工具箱不会提供该组件；布局缺失或删除它时会自动重新生成，持久化布局中的重复项会保留第一个。 |
 | Text      | （无）— 编辑时显示 "Sample Text Event" 占位，便于拖拽（正常运行时 alpha=0）。由通道 `99` / `#TEXTxx` 驱动。 |
 
 ### 示例 skin.ini (7K)

@@ -301,6 +301,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private void updateStageScale()
     {
+        if (Stage.HasHudTransform)
+            return;
+
         if (!Stage.IsLoaded || Stage.DrawWidth <= 0 || DrawWidth <= 0)
             return;
 
