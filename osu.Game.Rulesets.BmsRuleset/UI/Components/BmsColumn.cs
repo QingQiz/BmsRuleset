@@ -220,10 +220,11 @@ public partial class BmsColumn : Playfield, IBmsColumn
                 : 0,
         };
 
-        hitTarget.Y = -(skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                        ?? BmsStage.HIT_TARGET_POSITION);
+        SetHitTargetPosition(ParentPlayfield.Stage.HitTargetPosition);
 
     }
+
+    internal void SetHitTargetPosition(float position) => hitTarget.Y = -position;
 
     #region Hit explosions / landmine
 
@@ -238,7 +239,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             BmsSkinComponents.HitExplosion,
             LayoutVariant,
             Index,
-            isLongNote)));
+            isLongNote), ParentPlayfield.Stage.HitTargetPositionOffset));
     }
 
     /// <summary>

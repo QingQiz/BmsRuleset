@@ -1,7 +1,9 @@
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Configuration;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
@@ -13,6 +15,14 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 internal sealed partial class BmsStageHud : CompositeDrawable, ISerialisableDrawable
 {
     public bool UsesFixedAnchor { get; set; }
+
+    [SettingSource("Judgement line offset", "Moves the judgement line relative to the skin position. Positive values move it upward.")]
+    public BindableFloat JudgementLineOffset { get; } = new()
+    {
+        MinValue = -768,
+        MaxValue = 768,
+        Precision = 1,
+    };
 
     private readonly Container editHandle;
     private BmsStageHudController? controller;
@@ -75,6 +85,8 @@ internal sealed partial class BmsStageHud : CompositeDrawable, ISerialisableDraw
         {
             controller = bmsDrawableRuleset.StageHudController;
             controller.Register(this, this.FindClosestParent<ISerialisableDrawableContainer>());
+            JudgementLineOffset.ValueChanged += onJudgementLineOffsetChanged;
+            controller.SetHitTargetPositionOffset(JudgementLineOffset.Value);
         }
 
         if (skinEditorOverlay != null)
@@ -85,10 +97,19 @@ internal sealed partial class BmsStageHud : CompositeDrawable, ISerialisableDraw
 
     protected override void Dispose(bool isDisposing)
     {
+        JudgementLineOffset.ValueChanged -= onJudgementLineOffsetChanged;
         controller?.Unregister(this);
         controller = null;
 
         base.Dispose(isDisposing);
+    }
+
+    private void onJudgementLineOffsetChanged(ValueChangedEvent<float> offset) => controller?.SetHitTargetPositionOffset(offset.NewValue);
+
+    internal void SetJudgementLineOffsetRange(float minimum, float maximum)
+    {
+        JudgementLineOffset.MinValue = minimum;
+        JudgementLineOffset.MaxValue = maximum;
     }
 
     private void updateEditModeVisibility() => applyEditModeVisibility(skinEditorOverlay?.State.Value == Visibility.Visible);

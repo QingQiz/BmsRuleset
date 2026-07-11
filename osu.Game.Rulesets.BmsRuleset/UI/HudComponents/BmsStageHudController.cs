@@ -28,6 +28,7 @@ internal sealed partial class BmsStageHudController : Component
         base.Update();
         tryInitialiseHudSize();
         updateStageTransform();
+        updateJudgementLineOffsetRange();
     }
 
     internal void Register(BmsStageHud hud, ISerialisableDrawableContainer? container = null)
@@ -40,7 +41,10 @@ internal sealed partial class BmsStageHudController : Component
         ensureStageHudSingleton();
         tryInitialiseHudSize();
         updateStageTransform();
+        updateJudgementLineOffsetRange();
     }
+
+    internal void SetHitTargetPositionOffset(float offset) => playfield.Stage.SetHitTargetPositionOffset(offset);
 
     internal void Unregister(BmsStageHud hud)
     {
@@ -50,6 +54,7 @@ internal sealed partial class BmsStageHudController : Component
         lastStageHudInfo = hud.CreateSerialisedInfo();
         stageHud = null;
         stageHudSizeNormalised = false;
+        playfield.Stage.SetHitTargetPositionOffset(0);
         playfield.Stage.ClearHudTransform();
     }
 
@@ -106,6 +111,7 @@ internal sealed partial class BmsStageHudController : Component
             stageHudSizeNormalised = false;
             tryInitialiseHudSize();
             updateStageTransform();
+            updateJudgementLineOffsetRange();
         }
         finally
         {
@@ -229,6 +235,22 @@ internal sealed partial class BmsStageHudController : Component
         }
 
         playfield.Stage.SetHudTransform(localCentre - playfield.DrawSize * 0.5f, scale, viewportHeight);
+    }
+
+    private void updateJudgementLineOffsetRange()
+    {
+        if (stageHud == null)
+            return;
+
+        var skinPosition = playfield.Stage.SkinHitTargetPosition;
+        var stageHeight = playfield.Stage.HasHudTransform
+            ? playfield.Stage.HudViewportHeight
+            : playfield.Stage.DrawHeight;
+
+        if (!float.IsFinite(skinPosition) || !isFiniteAndPositive(stageHeight))
+            return;
+
+        stageHud.SetJudgementLineOffsetRange(-skinPosition, stageHeight - skinPosition);
     }
 
     private static bool isLegacyPixelDimension(float value) => value > 4;

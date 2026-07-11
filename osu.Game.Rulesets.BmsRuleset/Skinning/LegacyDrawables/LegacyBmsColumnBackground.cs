@@ -1,4 +1,5 @@
-﻿using osu.Framework.Graphics;
+﻿using osu.Framework.Allocation;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
@@ -9,6 +10,7 @@ using osu.Game.Skinning;
 using osuTK;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.UI;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
@@ -25,6 +27,10 @@ internal sealed partial class LegacyBmsColumnBackground : CompositeDrawable, IKe
 {
     private readonly BmsSkinComponentLookup lookup;
     private readonly Drawable? light;
+    private readonly float lightPosition;
+
+    [Resolved(CanBeNull = true)]
+    private BmsPlayfield? playfield { get; set; }
 
     public LegacyBmsColumnBackground(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup)
     {
@@ -35,7 +41,7 @@ internal sealed partial class LegacyBmsColumnBackground : CompositeDrawable, IKe
         var backgroundColour = transformer.GetManiaConfig<Color4>(LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour, lookup)?.Value ?? Color4.Black;
         var lightColour = transformer.GetManiaConfig<Color4>(LegacyManiaSkinConfigurationLookups.ColumnLightColour, lookup)?.Value ?? Color4.White;
         var lightImage = transformer.GetManiaConfig<string>(LegacyManiaSkinConfigurationLookups.LightImage, lookup)?.Value ?? "mania-stage-light";
-        var lightPosition = transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.LightPosition, lookup)?.Value ?? 0;
+        lightPosition = transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.LightPosition, lookup)?.Value ?? 0;
         var lightFramePerSecond = transformer.GetManiaConfig<int>(LegacyManiaSkinConfigurationLookups.LightFramePerSecond, lookup)?.Value ?? 60;
 
         var totalColumns = BmsLayout.GetTotalColumns(lookup.LayoutVariant);
@@ -88,6 +94,30 @@ internal sealed partial class LegacyBmsColumnBackground : CompositeDrawable, IKe
                 Origin = Anchor.TopRight,
             },
         ];
+    }
+
+    protected override void LoadComplete()
+    {
+        base.LoadComplete();
+
+        if (playfield == null)
+            return;
+
+        playfield.Stage.HitTargetPositionOffsetChanged += updateLightPosition;
+        updateLightPosition(playfield.Stage.HitTargetPositionOffset);
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        if (playfield != null)
+            playfield.Stage.HitTargetPositionOffsetChanged -= updateLightPosition;
+
+        base.Dispose(isDisposing);
+    }
+
+    private void updateLightPosition(float offset)
+    {
+        light?.Y = -(lightPosition + offset);
     }
 
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)

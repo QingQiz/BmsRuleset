@@ -61,6 +61,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         RelativeSizeAxes = Axes.Both;
 
         Stage = new BmsStage(this);
+        Stage.SkinHitTargetPositionChanged += onSkinHitTargetPositionChanged;
 
         InternalChildren =
         [
@@ -75,6 +76,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     protected override void Dispose(bool isDisposing)
     {
         ScrollController.ScrollSpeedChanged -= onScrollSpeedChanged;
+        Stage.SkinHitTargetPositionChanged -= onSkinHitTargetPositionChanged;
         NewResult -= onNewResult;
         parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
         skinCache.Dispose();
@@ -231,6 +233,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         RefreshAllLifetimes();
     }
 
+    private void onSkinHitTargetPositionChanged(float position)
+    {
+        ScrollController.SetHitTargetPosition(position);
+
+        if (IsLoaded)
+            RefreshAllLifetimes();
+    }
+
     internal void RefreshAllLifetimes()
     {
         var currentTime = IsLoaded ? Time.Current : (double?)null;
@@ -249,7 +259,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [BackgroundDependencyLoader(true)]
     private void load()
     {
-        ScrollController.SetHitTargetPosition(Stage.HitTargetPosition);
+        ScrollController.SetHitTargetPosition(Stage.SkinHitTargetPosition);
 
         parentSkin.SourceChanged += updateEmbeddedSkinFallback;
         updateEmbeddedSkinFallback();

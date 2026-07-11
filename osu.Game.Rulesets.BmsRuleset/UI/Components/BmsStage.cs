@@ -36,6 +36,14 @@ public sealed partial class BmsStage : CompositeDrawable
 
     internal float HudViewportHeight { get; private set; }
 
+    internal float SkinHitTargetPosition { get; private set; } = HIT_TARGET_POSITION;
+
+    internal float HitTargetPositionOffset { get; private set; }
+
+    internal event Action<float>? SkinHitTargetPositionChanged;
+
+    internal event Action<float>? HitTargetPositionOffsetChanged;
+
     private readonly BmsPlayfield playfield;
     private float heightBeforeHudTransform;
     private float drawHeightBeforeHudTransform;
@@ -246,9 +254,9 @@ public sealed partial class BmsStage : CompositeDrawable
 
     private void updateFromSkin()
     {
-        hitTargetPosition.Value = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                                  ?? HIT_TARGET_POSITION;
-        hitTarget.Y = -hitTargetPosition.Value;
+        SkinHitTargetPosition = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
+                                ?? HIT_TARGET_POSITION;
+        applyHitTargetPosition(true);
         barLineHeight.Value = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineHeight))?.Value
                               ?? 1;
         barLineColour.Value = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineColour))?.Value
@@ -286,6 +294,31 @@ public sealed partial class BmsStage : CompositeDrawable
         leftBorder.Height = rightBorder.Height = DrawHeight;
 
         updateStageCentre();
+    }
+
+    internal void SetHitTargetPositionOffset(float offset)
+    {
+        if (HitTargetPositionOffset == offset)
+            return;
+
+        HitTargetPositionOffset = offset;
+        applyHitTargetPosition();
+        HitTargetPositionOffsetChanged?.Invoke(offset);
+    }
+
+    private void applyHitTargetPosition(bool notifySkinPositionChanged = false)
+    {
+        var position = Math.Max(0, SkinHitTargetPosition + HitTargetPositionOffset);
+        var changed = hitTargetPosition.Value != position;
+
+        hitTargetPosition.Value = position;
+        hitTarget.Y = -position;
+
+        foreach (var column in Columns)
+            ((BmsColumn)column).SetHitTargetPosition(position);
+
+        if (changed && notifySkinPositionChanged)
+            SkinHitTargetPositionChanged?.Invoke(SkinHitTargetPosition);
     }
 
     private void updateKeyAreaLayer(bool keysUnderNotes)

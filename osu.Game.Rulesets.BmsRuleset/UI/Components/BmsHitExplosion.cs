@@ -9,9 +9,10 @@ public sealed partial class BmsHitExplosion : CompositeDrawable
 {
     private readonly BmsCachedSkinnableDrawable skinnableExplosion;
 
-    public BmsHitExplosion(BmsSkinComponentLookup lookup)
+    public BmsHitExplosion(BmsSkinComponentLookup lookup, float positionOffset = 0)
     {
         RelativeSizeAxes = Axes.Both;
+        Y = -positionOffset;
 
         InternalChild = skinnableExplosion = new BmsCachedSkinnableDrawable(lookup)
         {
