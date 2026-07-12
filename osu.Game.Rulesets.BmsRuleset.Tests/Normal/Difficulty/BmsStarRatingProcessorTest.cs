@@ -10,8 +10,10 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Tests.Beatmaps;
@@ -41,9 +43,27 @@ public class BmsStarRatingProcessorTest
         var method = typeof(BmsDifficultyCalculator).GetMethod("CreateDifficultyAttributes", BindingFlags.NonPublic | BindingFlags.Instance);
 
         Assert.That(method, Is.Not.Null);
-        method!.Invoke(calculator, [beatmap, Array.Empty<Mod>(), Array.Empty<Skill>(), 1.0]);
+        method!.Invoke(calculator, [beatmap, Array.Empty<Mod>(), Array.Empty<Skill>()]);
 
         Assert.That(calculator.StarRatingProcessor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(90)).Within(1e-12));
+    }
+
+    [Test]
+    public void TestDifficultyCalculatorUsesModRate()
+    {
+        var beatmap = new Beatmap();
+        new BmsDifficultyInfo { Rank = 2, KeyCount = 8 }.WriteToOsuDifficulty(beatmap);
+        beatmap.HitObjects.AddRange(createSimpleHitObjects());
+
+        var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
+        var method = typeof(BmsDifficultyCalculator).GetMethod("CreateDifficultyAttributes", BindingFlags.NonPublic | BindingFlags.Instance);
+        var doubleTime = new BmsModDoubleTime();
+        doubleTime.SpeedChange.Value = 1.75;
+
+        var attributes = (DifficultyAttributes)method!.Invoke(calculator, [beatmap, new Mod[] { doubleTime }, Array.Empty<Skill>()])!;
+        var expected = new BmsStarRatingProcessorV3().ComputeStarRating(createSimpleNoteTimings(8), 8, 2, 1.75);
+
+        Assert.That(attributes.StarRating, Is.EqualTo(expected).Within(1e-12));
     }
 
     [Test]

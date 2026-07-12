@@ -10,6 +10,7 @@ using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Utils;
 
 namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
 
@@ -17,8 +18,9 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 {
     public BmsStarRatingProcessorV3 StarRatingProcessor { get; } = new();
 
-    protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate)
+    protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills)
     {
+        var clockRate = ModUtils.CalculateRateWithMods(mods);
         var bmsBeatmap = beatmap as BmsBeatmap;
         var storedDifficulty = bmsBeatmap == null ? BmsDifficultyInfo.FromOsuDifficulty(beatmap.Difficulty) : default;
 
@@ -60,8 +62,9 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
         };
     }
 
-    protected override IEnumerable<DifficultyHitObject> CreateDifficultyHitObjects(IBeatmap beatmap, double clockRate)
+    protected override IEnumerable<DifficultyHitObject> CreateDifficultyHitObjects(IBeatmap beatmap, Mod[] mods)
     {
+        var clockRate = ModUtils.CalculateRateWithMods(mods);
         var objects = beatmap.HitObjects.OrderBy(h => h.StartTime).ToList();
         var difficultyObjects = new List<DifficultyHitObject>();
 
@@ -71,5 +74,5 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
         return difficultyObjects;
     }
 
-    protected override Skill[] CreateSkills(IBeatmap beatmap, Mod[] mods, double clockRate) => [];
+    protected override Skill[] CreateSkills(IBeatmap beatmap, Mod[] mods) => [];
 }
