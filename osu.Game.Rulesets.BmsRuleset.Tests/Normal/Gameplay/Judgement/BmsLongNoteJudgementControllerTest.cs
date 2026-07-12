@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -41,6 +42,10 @@ public class BmsLongNoteJudgementControllerTest
     {
         public List<HitResult> AppliedResults { get; } = [];
 
+        public List<(double endpointTime, double eventTime, HitResult result)> AppliedEndpoints { get; } = [];
+
+        public List<(double endpointTime, double eventTime, HitResult result)> StatisticsEvents { get; } = [];
+
         public List<HitResult> ClearedTails { get; } = [];
 
         public List<(double endpointTime, double eventTime, HitResult result)> SyntheticEndpoints { get; } = [];
@@ -53,11 +58,22 @@ public class BmsLongNoteJudgementControllerTest
 
         public int RetireCount;
 
+        public int RemovedStatisticsEventCount;
+
         public void OnUserHeadJudged() => UserHeadJudgedCount++;
 
         public void OnHellChargeHeadPoor(double eventTime, double lifetimeEnd) => HellChargeHeadPoor.Add((eventTime, lifetimeEnd));
 
-        public void ApplyJudgementResult(HitResult result) => AppliedResults.Add(result);
+        public void ApplyJudgementResult(double endpointTime, double eventTime, HitResult result)
+        {
+            AppliedResults.Add(result);
+            AppliedEndpoints.Add((endpointTime, eventTime, result));
+        }
+
+        public void RegisterStatisticsEvent(double endpointTime, double eventTime, HitResult result)
+            => StatisticsEvents.Add((endpointTime, eventTime, result));
+
+        public void RemoveStatisticsEvent() => RemovedStatisticsEventCount++;
 
         public void ClearVisualIfTailWasNotPoor(HitResult result)
         {
@@ -169,16 +185,35 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
-    public void TestPassiveHeadMissChargeAppliesMehAndSyntheticTail()
+    public void TestPassiveHeadMissChargeWaitsForTailPoorWindow()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.ChargeNote, start: 1000, duration: 500);
 
         controller.CheckPassiveResult(currentTime: 1000 + 600);
 
         Assert.That(hooks.AppliedResults, Is.EqualTo([HitResult.Meh]));
-        Assert.That(hooks.SyntheticEndpoints, Has.Count.EqualTo(1));
-        Assert.That(hooks.SyntheticEndpoints[0].result, Is.EqualTo(HitResult.Meh));
+        Assert.That(hooks.SyntheticEndpoints, Is.Empty);
+        Assert.That(controller.TailJudged, Is.False);
+
+        controller.UpdatePostResult(currentTime: 1500 + 600, elapsed: 16, holding: false);
+
+        Assert.That(hooks.SyntheticEndpoints, Is.EqualTo([(1500d, 2100d, HitResult.Meh)]));
         Assert.That(controller.TailJudged, Is.True);
+    }
+
+    [Test]
+    public void TestLongChargeHeadMissDoesNotCreateExtremeEarlyTailOffset()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.ChargeNote, start: 1000, duration: 10_000);
+
+        controller.CheckPassiveResult(currentTime: 1281);
+
+        Assert.That(hooks.AppliedEndpoints, Is.EqualTo([(1000d, 1281d, HitResult.Meh)]));
+        Assert.That(hooks.SyntheticEndpoints, Is.Empty);
+
+        controller.UpdatePostResult(currentTime: 11_281, elapsed: 16, holding: false);
+
+        Assert.That(hooks.SyntheticEndpoints, Is.EqualTo([(11_000d, 11_281d, HitResult.Meh)]));
     }
 
     [Test]
@@ -203,6 +238,19 @@ public class BmsLongNoteJudgementControllerTest
 
         Assert.That(hooks.AppliedResults, Is.EqualTo([HitResult.Meh]));
         Assert.That(controller.TailJudged, Is.True);
+    }
+
+    [Test]
+    public void TestAutomaticNormalTailUsesHeadJudgementOffset()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, start: 1000, duration: 500);
+        controller.TryHit(987, HitResult.Great);
+
+        controller.CheckPassiveResult(1500);
+
+        Assert.That(hooks.AppliedEndpoints.Single().endpointTime, Is.EqualTo(1500));
+        Assert.That(hooks.AppliedEndpoints.Single().eventTime, Is.EqualTo(1487));
+        Assert.That(hooks.AppliedEndpoints.Single().eventTime - hooks.AppliedEndpoints.Single().endpointTime, Is.EqualTo(-13));
     }
 
     [Test]
@@ -268,6 +316,89 @@ public class BmsLongNoteJudgementControllerTest
         // Normal LN defers the head result to tail release; only pin+seed happened.
         Assert.That(hooks.AppliedResults, Is.Empty);
         Assert.That(hooks.UserHeadJudgedCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestNormalHeadRegistersRealStatisticsEventOnly()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
+
+        controller.TryHit(1013, HitResult.Great);
+
+        Assert.That(hooks.StatisticsEvents, Is.EqualTo([(1000d, 1013d, HitResult.Great)]));
+        Assert.That(hooks.AppliedEndpoints, Is.Empty);
+    }
+
+    [Test]
+    public void TestRewindBeforeHeadRemovesStatisticsEvent()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
+        controller.TryHit(1013, HitResult.Great);
+
+        controller.UpdatePostResult(1005, 1, holding: false);
+
+        Assert.That(hooks.RemovedStatisticsEventCount, Is.EqualTo(1));
+        Assert.That(controller.LongNoteStarted, Is.False);
+    }
+
+    [Test]
+    public void TestEarlyHeadBeforeStartIsNotTreatedAsRewind()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
+        controller.TryHit(987, HitResult.Great);
+
+        controller.UpdatePostResult(990, 1, holding: true);
+
+        Assert.That(hooks.RemovedStatisticsEventCount, Is.Zero);
+        Assert.That(controller.LongNoteStarted, Is.True);
+    }
+
+    [Test]
+    public void TestRewindBeforeEarlyHeadRemovesStatisticsEvent()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
+        controller.TryHit(987, HitResult.Great);
+
+        controller.UpdatePostResult(986, 1, holding: false);
+
+        Assert.That(hooks.RemovedStatisticsEventCount, Is.EqualTo(1));
+        Assert.That(controller.LongNoteStarted, Is.False);
+    }
+
+    [Test]
+    public void TestChargeHeadAppliesHeadEndpoint()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.ChargeNote, 1000, 500);
+
+        controller.TryHit(987, HitResult.Great);
+
+        Assert.That(hooks.AppliedEndpoints, Is.EqualTo([(1000d, 987d, HitResult.Great)]));
+        Assert.That(hooks.StatisticsEvents, Is.Empty);
+    }
+
+    [Test]
+    public void TestNormalTailAppliesTailEndpoint()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
+        controller.TryHit(1004, HitResult.Perfect);
+        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, tail: true);
+
+        controller.TryRelease(1518, 18, tailTable);
+
+        Assert.That(hooks.AppliedEndpoints.Single().endpointTime, Is.EqualTo(1500));
+        Assert.That(hooks.AppliedEndpoints.Single().eventTime, Is.EqualTo(1518));
+    }
+
+    [Test]
+    public void TestPassiveNormalHeadPoorDoesNotInventTailEvent()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
+
+        controller.CheckPassiveResult(1600);
+
+        Assert.That(hooks.AppliedEndpoints, Is.EqualTo([(1000d, 1600d, HitResult.Meh)]));
+        Assert.That(hooks.StatisticsEvents, Is.Empty);
+        Assert.That(hooks.SyntheticEndpoints, Is.Empty);
     }
 
     [Test]

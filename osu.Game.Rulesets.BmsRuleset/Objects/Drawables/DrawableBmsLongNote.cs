@@ -10,6 +10,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Play;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
@@ -39,6 +40,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     [Resolved(CanBeNull = true)]
     private IBmsLnScoring? scoring { get; set; }
+
+    private double gameplayRate => (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
 
     public override bool TryHit(HitResult result)
     {
@@ -91,7 +94,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         var releasedEarly =
             controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !isHoldingBody();
         longNoteBody.UpdateBody(bodyHeight, tailAtTop, controller.LongNoteStarted);
-        longNoteBody.Alpha = bodyHeight > 0 ? (releasedEarly ? released_alpha : 1f) : 0;
+        longNoteBody.Alpha = bodyHeight > 0 ? releasedEarly ? released_alpha : 1f : 0;
 
         if (Math.Abs(longNoteTailContainer.Y - tailOffset) > 0.5f)
             longNoteTailContainer.Y = tailOffset;
@@ -227,11 +230,21 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         visualState.PinHead(-HitTargetPosition);
         Alpha = 1;
         LifetimeEnd = lifetimeEnd;
-        scoring?.ApplyLongNoteHead(this, eventTime, HitResult.Meh);
+        scoring?.ApplyLongNoteHead(this, eventTime, HitResult.Meh, gameplayRate);
     }
 
-    void IBmsLongNoteHooks.ApplyJudgementResult(HitResult result)
-        => ApplyResult(result);
+    void IBmsLongNoteHooks.ApplyJudgementResult(double endpointTime, double eventTime, HitResult result)
+    {
+        scoring?.PrepareLongNoteEndpoint(this, endpointTime, eventTime);
+        ApplyResult(result);
+    }
+
+    void IBmsLongNoteHooks.RegisterStatisticsEvent(double endpointTime, double eventTime, HitResult result)
+    {
+        scoring?.RegisterLongNoteEndpoint(this, endpointTime, eventTime, gameplayRate, result);
+    }
+
+    void IBmsLongNoteHooks.RemoveStatisticsEvent() => scoring?.RemoveLongNoteEndpoint(this);
 
     void IBmsLongNoteHooks.ClearVisualIfTailWasNotPoor(HitResult tailResult)
     {
@@ -246,7 +259,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     }
 
     void IBmsLongNoteHooks.ApplySyntheticTailEndpoint(double endpointTime, double eventTime, HitResult result)
-        => scoring?.ApplySyntheticLongNoteEndpoint(this, endpointTime, eventTime, result);
+        => scoring?.ApplySyntheticLongNoteEndpoint(this, endpointTime, eventTime, result, gameplayRate);
 
     void IBmsLongNoteHooks.ApplyHellChargeTick(bool holding, double scale)
         => scoring?.ApplyHellChargeTick(holding, scale);

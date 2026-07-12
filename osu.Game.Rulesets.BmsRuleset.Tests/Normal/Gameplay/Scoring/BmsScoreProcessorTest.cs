@@ -183,6 +183,106 @@ public class BmsScoreProcessorTest
         Assert.That(rank, Is.EqualTo(ScoreRank.X));
     }
 
+    [Test]
+    public void TestRegisterLongNoteEndpointRecordsOnlyStatistics()
+    {
+        var (processor, source) = createLongNoteProcessor();
+        var score = processor.TotalScore.Value;
+        var combo = processor.Combo.Value;
+        var statistics = processor.Statistics.ToDictionary(pair => pair.Key, pair => pair.Value);
+
+        processor.RegisterLongNoteEndpoint(source, source.StartTime, 1012, 1.5, HitResult.Great);
+
+        var populatedScore = new ScoreInfo();
+        processor.PopulateScore(populatedScore);
+        var hitEvent = populatedScore.HitEvents.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(hitEvent.TimeOffset, Is.EqualTo(12));
+            Assert.That(hitEvent.HitObject, Is.InstanceOf<BmsNote>());
+            Assert.That(hitEvent.HitObject.StartTime, Is.EqualTo(source.StartTime));
+            Assert.That(hitEvent.GameplayRate, Is.EqualTo(1.5));
+            Assert.That(processor.HitEvents, Is.Empty);
+            Assert.That(processor.TotalScore.Value, Is.EqualTo(score));
+            Assert.That(processor.Combo.Value, Is.EqualTo(combo));
+            Assert.That(processor.Statistics, Is.EquivalentTo(statistics));
+        });
+    }
+
+    [Test]
+    public void TestLongNoteStatisticsEventDoesNotCorruptRewindStackOrDuplicateOnReplay()
+    {
+        var (processor, source) = createLongNoteProcessor();
+        var first = new BmsNote { StartTime = 900, Column = 1, Beatmap = source.Beatmap };
+        var last = new BmsNote { StartTime = 1100, Column = 1, Beatmap = source.Beatmap };
+        var firstResult = new JudgementResult(first, first.CreateJudgement()) { Type = HitResult.Great };
+        var lastResult = new JudgementResult(last, last.CreateJudgement()) { Type = HitResult.Great };
+
+        processor.ApplyResult(firstResult);
+        processor.RegisterLongNoteEndpoint(source, source.StartTime, 1012, 1, HitResult.Great);
+        processor.ApplyResult(lastResult);
+
+        Assert.That(processor.HitEvents, Has.Count.EqualTo(2));
+
+        processor.RevertResult(lastResult);
+        processor.RevertResult(firstResult);
+        processor.RemoveLongNoteEndpoint(source);
+
+        Assert.That(processor.HitEvents, Is.Empty);
+
+        var rewoundScore = new ScoreInfo();
+        processor.PopulateScore(rewoundScore);
+        Assert.That(rewoundScore.HitEvents, Is.Empty);
+
+        processor.ApplyResult(new JudgementResult(first, first.CreateJudgement()) { Type = HitResult.Great });
+        processor.RegisterLongNoteEndpoint(source, source.StartTime, 1015, 1, HitResult.Great);
+        processor.ApplyResult(new JudgementResult(last, last.CreateJudgement()) { Type = HitResult.Great });
+
+        var populatedScore = new ScoreInfo();
+        processor.PopulateScore(populatedScore);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(populatedScore.HitEvents, Has.Count.EqualTo(3));
+            Assert.That(populatedScore.HitEvents.Count(e => e.HitObject.StartTime == source.StartTime), Is.EqualTo(1));
+            Assert.That(populatedScore.HitEvents.Single(e => e.HitObject.StartTime == source.StartTime).TimeOffset, Is.EqualTo(15));
+        });
+    }
+
+    [Test]
+    public void TestPreparedLongNoteEndpointReplacesAmbiguousFrameworkEvent()
+    {
+        var (processor, source) = createLongNoteProcessor(BmsLongNoteMode.ChargeNote);
+        processor.PrepareLongNoteEndpoint(source, source.StartTime, 988);
+
+        processor.ApplyResult(new JudgementResult(source, source.CreateJudgement()) { Type = HitResult.Great });
+
+        var hitEvent = processor.HitEvents.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(hitEvent.TimeOffset, Is.EqualTo(-12));
+            Assert.That(hitEvent.HitObject, Is.InstanceOf<BmsNote>());
+            Assert.That(hitEvent.HitObject.StartTime, Is.EqualTo(source.StartTime));
+            Assert.That(processor.HitEvents.Select(e => e.TimeOffset), Does.Not.Contain(0));
+        });
+    }
+
+    private static (BmsScoreProcessor processor, BmsLongNote source) createLongNoteProcessor(BmsLongNoteMode mode = BmsLongNoteMode.LongNote)
+    {
+        var source = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            LockedLongNoteMode = mode,
+            HitObjects = { source },
+        };
+        source.Beatmap = beatmap;
+        var processor = new BmsScoreProcessor();
+        processor.ApplyBeatmap(beatmap);
+        return (processor, source);
+    }
+
     private static BmsBeatmap createThreeNoteBeatmap() => new()
     {
         LayoutVariant = BmsLayoutVariant.Bme7K,

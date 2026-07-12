@@ -358,15 +358,33 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         gameplayEvents.RaiseJudgementDisplayed(result);
     }
 
+    public void PrepareLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime)
+    {
+        if (drawable.HitObject is BmsLongNote ln)
+            scoreProcessor?.PrepareLongNoteEndpoint(ln, endpointTime, eventTime);
+    }
+
+    public void RegisterLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime, double gameplayRate, HitResult result)
+    {
+        if (drawable.HitObject is BmsLongNote ln)
+            scoreProcessor?.RegisterLongNoteEndpoint(ln, endpointTime, eventTime, gameplayRate, result);
+    }
+
+    public void RemoveLongNoteEndpoint(DrawableBmsHitObject drawable)
+    {
+        if (drawable.HitObject is BmsLongNote ln)
+            scoreProcessor?.RemoveLongNoteEndpoint(ln);
+    }
+
     /// <summary>
     ///     Registers an HCN head judgement that should not end the drawable yet.
     /// </summary>
-    public void ApplyLongNoteHead(DrawableBmsHitObject drawable, double eventTime, HitResult result)
+    public void ApplyLongNoteHead(DrawableBmsHitObject drawable, double eventTime, HitResult result, double gameplayRate)
     {
-        if (drawable.HitObject == null)
+        if (drawable.HitObject is not BmsLongNote ln)
             return;
 
-        var scoreResult = scoreProcessor?.ApplyLongNoteHead(drawable.HitObject, eventTime, result);
+        var scoreResult = scoreProcessor?.ApplyLongNoteHead(ln, eventTime, result, gameplayRate);
 
         if (scoreResult != null)
             healthProcessor?.ApplyLongNoteHead(scoreResult);
@@ -378,12 +396,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     ///     Registers a synthetic long-note endpoint (CN/HCN tail) through
     ///     the score and health processors, and triggers a visual hit explosion.
     /// </summary>
-    public void ApplySyntheticLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime, HitResult result)
+    public void ApplySyntheticLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime, HitResult result, double gameplayRate)
     {
         if (drawable.HitObject is not BmsLongNote ln)
             return;
 
-        var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(ln, endpointTime, eventTime, result);
+        var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(ln, endpointTime, eventTime, result, gameplayRate);
 
         if (scoreResult != null)
             healthProcessor?.ApplySyntheticLongNoteEndpoint(scoreResult);

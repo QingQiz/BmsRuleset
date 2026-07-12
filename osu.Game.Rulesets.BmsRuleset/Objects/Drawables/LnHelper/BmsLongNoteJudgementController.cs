@@ -61,7 +61,9 @@ internal sealed class BmsLongNoteJudgementController
 
         // CN/HCN score the head and tail as separate beatoraja-style events.
         if (IsChargeMode)
-            hooks.ApplyJudgementResult(result);
+            hooks.ApplyJudgementResult(ln.StartTime, currentTime, result);
+        else
+            hooks.RegisterStatisticsEvent(ln.StartTime, currentTime, result);
 
         return true;
     }
@@ -73,7 +75,7 @@ internal sealed class BmsLongNoteJudgementController
 
         if (!IsChargeMode)
         {
-            applyLongNoteReleaseResult(tailTable, releaseOffset);
+            applyLongNoteReleaseResult(tailTable, releaseOffset, currentTime, automatic: false);
             return true;
         }
 
@@ -99,16 +101,16 @@ internal sealed class BmsLongNoteJudgementController
                 return;
             }
 
+            headJudged = true;
+            headJudgeOffset = currentTime - ln.StartTime;
+
             if (IsChargeMode)
             {
-                // CN: missed head -> POOR for head, then another POOR for tail.
-                hooks.ApplyJudgementResult(HitResult.Meh);
-                hooks.ApplySyntheticTailEndpoint(ln.EndTime, currentTime, HitResult.Meh);
-                TailJudged = true;
+                hooks.ApplyJudgementResult(ln.StartTime, currentTime, HitResult.Meh);
                 return;
             }
 
-            hooks.ApplyJudgementResult(HitResult.Meh);
+            hooks.ApplyJudgementResult(ln.StartTime, currentTime, HitResult.Meh);
             TailJudged = true;
             return;
         }
@@ -125,7 +127,7 @@ internal sealed class BmsLongNoteJudgementController
         }
 
         if (tailOffset >= 0)
-            applyLongNoteReleaseResult(tailTable, tailOffset);
+            applyLongNoteReleaseResult(tailTable, tailOffset, currentTime, automatic: true);
     }
 
     public double ChargeTailLifetimeEnd()
@@ -141,7 +143,14 @@ internal sealed class BmsLongNoteJudgementController
     /// </summary>
     public void UpdatePostResult(double currentTime, double elapsed, bool holding)
     {
-        if (IsChargeMode && LongNoteStarted && !TailJudged)
+        if (headJudged && currentTime < ln.StartTime + headJudgeOffset)
+        {
+            hooks.RemoveStatisticsEvent();
+            Reset();
+            return;
+        }
+
+        if (IsChargeMode && headJudged && !TailJudged)
         {
             var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.EffectiveJudgementRate, tail: true);
             var tailOffset = currentTime - ln.EndTime;
@@ -191,13 +200,15 @@ internal sealed class BmsLongNoteJudgementController
         hooks.OnHellChargeHeadPoor(currentTime, ChargeTailLifetimeEnd());
     }
 
-    private void applyLongNoteReleaseResult(BmsJudgementWindowTable tailTable, double tailOffset)
+    private void applyLongNoteReleaseResult(BmsJudgementWindowTable tailTable, double tailOffset, double eventTime, bool automatic)
     {
-        var heldOffset = Math.Abs(headJudgeOffset) > Math.Abs(tailOffset) ? headJudgeOffset : tailOffset;
+        var useHeadOffset = automatic && !tailTable.IsPastPassivePoorOffset(tailOffset)
+                            || Math.Abs(headJudgeOffset) > Math.Abs(tailOffset);
+        var heldOffset = useHeadOffset ? headJudgeOffset : tailOffset;
         var result = tailTable.ResultForOffset(heldOffset);
         var endpointResult = result == HitResult.None ? HitResult.Meh : result;
 
-        hooks.ApplyJudgementResult(endpointResult);
+        hooks.ApplyJudgementResult(ln.EndTime, automatic ? ln.EndTime + heldOffset : eventTime, endpointResult);
         TailJudged = true;
         // A non-POOR tail stops the hold immediately (the drawable fades now); a POOR tail keeps the
         // body alive until retire. This mirrors the original clearVisualIfTailWasNotPoor's state write.

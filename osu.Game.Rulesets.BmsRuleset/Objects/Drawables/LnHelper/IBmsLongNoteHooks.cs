@@ -10,8 +10,14 @@ internal interface IBmsLongNoteHooks
     /// <summary>HCN head-POOR: pin head, keep drawable alive until <paramref name="lifetimeEnd"/>, and register the head scoring event.</summary>
     void OnHellChargeHeadPoor(double eventTime, double lifetimeEnd);
 
-    /// <summary>Apply the framework <c>ApplyResult</c> for the head or tail (armed state + score/health processors).</summary>
-    void ApplyJudgementResult(HitResult result);
+    /// <summary>Apply the framework result while keeping its statistics event anchored to the judged endpoint.</summary>
+    void ApplyJudgementResult(double endpointTime, double eventTime, HitResult result);
+
+    /// <summary>Record a real endpoint timing event which does not otherwise produce a framework result.</summary>
+    void RegisterStatisticsEvent(double endpointTime, double eventTime, HitResult result);
+
+    /// <summary>Remove this LN's statistics-only event after rewinding before its head.</summary>
+    void RemoveStatisticsEvent();
 
     /// <summary>Clear the body/tail visuals when the tail result is not POOR (was <c>clearVisualIfTailWasNotPoor</c>).</summary>
     void ClearVisualIfTailWasNotPoor(HitResult result);

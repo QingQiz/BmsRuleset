@@ -4,8 +4,11 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Result;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result;
 
@@ -54,6 +57,46 @@ public class BmsHitOffsetStatisticTest
         Assert.That(statistics.Keys[0].Summary.Count, Is.EqualTo(1));
         Assert.That(statistics.Keys[8].Summary.Count, Is.EqualTo(1));
         Assert.That(statistics.Keys.Any(k => k.Label == "Scratch"), Is.False);
+    }
+
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void TestLongNoteEndpointsKeepRealOffsets(BmsLongNoteMode mode)
+    {
+        var longNote = new BmsLongNote { Column = 1, StartTime = 1000, Duration = 500 };
+        var beatmap = createBeatmap(BmsLayoutVariant.Bms5K);
+        beatmap.LockedLongNoteMode = mode;
+        beatmap.HitObjects.Add(longNote);
+        longNote.Beatmap = beatmap;
+
+        var processor = new BmsScoreProcessor();
+        processor.ApplyBeatmap(beatmap);
+
+        if (mode == BmsLongNoteMode.LongNote)
+        {
+            processor.RegisterLongNoteEndpoint(longNote, longNote.StartTime, 987, 1, HitResult.Great);
+            processor.PrepareLongNoteEndpoint(longNote, longNote.EndTime, 1519);
+            processor.ApplyResult(new JudgementResult(longNote, longNote.CreateJudgement()) { Type = HitResult.Great });
+        }
+        else
+        {
+            processor.ApplyLongNoteHead(longNote, 987, HitResult.Great);
+            processor.ApplySyntheticLongNoteEndpoint(longNote, longNote.EndTime, 1519, HitResult.Great);
+        }
+
+        var score = new ScoreInfo();
+        processor.PopulateScore(score);
+        var statistics = BmsHitOffsetStatistic.CreateStatistics(beatmap, score.HitEvents);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(score.HitEvents.Select(e => e.TimeOffset), Is.EqualTo(new[] { -13, 19 }));
+            Assert.That(score.HitEvents.Select(e => e.HitObject.StartTime), Is.EqualTo(new[] { 1000, 1500 }));
+            Assert.That(score.HitEvents.Select(e => e.TimeOffset), Does.Not.Contain(0));
+            Assert.That(statistics.Overall.Count, Is.EqualTo(2));
+            Assert.That(statistics.Overall.BinsByResult.Values.SelectMany(b => b).Sum(), Is.EqualTo(2));
+        });
     }
 
     private static BmsBeatmap createBeatmap(BmsLayoutVariant variant) => new()

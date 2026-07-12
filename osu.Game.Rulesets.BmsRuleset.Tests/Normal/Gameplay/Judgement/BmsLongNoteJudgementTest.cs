@@ -19,6 +19,36 @@ public class BmsLongNoteJudgementTest
 {
 
     [Test]
+    public void TestApplyLongNoteHeadUsesHeadOffset()
+    {
+        var (processor, source) = createLongNoteProcessor(BmsLongNoteMode.HellChargeNote);
+
+        processor.ApplyLongNoteHead(source, 1017, HitResult.Great, gameplayRate: 1.5);
+
+        var hitEvent = processor.HitEvents.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(hitEvent.TimeOffset, Is.EqualTo(17));
+            Assert.That(hitEvent.HitObject.StartTime, Is.EqualTo(1000));
+            Assert.That(hitEvent.GameplayRate, Is.EqualTo(1.5));
+        });
+    }
+
+    [TestCase(1481, -19)]
+    [TestCase(1519, 19)]
+    public void TestApplySyntheticLongNoteEndpointUsesTailOffset(double eventTime, double expectedOffset)
+    {
+        var (processor, source) = createLongNoteProcessor(BmsLongNoteMode.ChargeNote);
+
+        processor.ApplySyntheticLongNoteEndpoint(source, 1500, eventTime, HitResult.Great, gameplayRate: 0.75);
+
+        var hitEvent = processor.HitEvents.Single();
+        Assert.That(hitEvent.TimeOffset, Is.EqualTo(expectedOffset));
+        Assert.That(hitEvent.HitObject.StartTime, Is.EqualTo(1500));
+        Assert.That(hitEvent.GameplayRate, Is.EqualTo(0.75));
+    }
+
+    [Test]
     public void TestApplyLongNoteHeadCreatesUrSafeHitEvent()
     {
         var processor = new BmsScoreProcessor();
@@ -576,5 +606,21 @@ public class BmsLongNoteJudgementTest
         Assert.That(tail.ResultForOffset(280), Is.EqualTo(HitResult.Ok));
         Assert.That(tail.ResultForOffset(281), Is.EqualTo(HitResult.None));
         Assert.That(tail.IsPastPassivePoorOffset(281), Is.True);
+    }
+
+    private static (BmsScoreProcessor processor, BmsLongNote source) createLongNoteProcessor(BmsLongNoteMode mode)
+    {
+        var source = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            LockedLongNoteMode = mode,
+            HitObjects = { source },
+        };
+        source.Beatmap = beatmap;
+        var processor = new BmsScoreProcessor();
+        processor.ApplyBeatmap(beatmap);
+        return (processor, source);
     }
 }

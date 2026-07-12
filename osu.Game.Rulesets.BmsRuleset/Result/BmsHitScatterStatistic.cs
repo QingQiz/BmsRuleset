@@ -28,6 +28,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     private const float x_axis_height = 28;
     private const float label_width = 96;
     private const double minimum_offset_range = 150;
+    private const double maximum_offset_range = 300;
     private const double empty_poor_scatter_offset = -280;
 
     private static readonly Color4 early_colour = new(90, 175, 255, 255);
@@ -120,7 +121,10 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             .ToArray();
 
         var duration = Math.Max(1, points.Select(p => p.Time).DefaultIfEmpty(0).Max());
-        var maxMagnitude = Math.Max(minimum_offset_range, points.Select(p => Math.Abs(p.Offset)).DefaultIfEmpty(0).Max());
+        var maxMagnitude = Math.Clamp(
+            points.Select(p => Math.Abs(p.Offset)).DefaultIfEmpty(0).Max(),
+            minimum_offset_range,
+            maximum_offset_range);
         var offsetRange = Math.Ceiling(maxMagnitude / 50) * 50;
         var ticks = new[] { -offsetRange, -offsetRange / 2, 0, offsetRange / 2, offsetRange };
 
