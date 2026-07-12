@@ -58,6 +58,76 @@ for deletion.
 
 ---
 
+## Highlights
+
+### Song Preview
+
+Song select preview audio is generated from the original BMS folder rather than from a stored osu! audio file. The
+ruleset first tries a declared `#PREVIEW` file, then a `preview.*` file in the chart folder, and finally falls back to
+the chart's BGM/keysound event timeline. This makes charts without a dedicated preview file still audible in song
+select.
+
+---
+
+### Clear Lamps
+
+BMS beatmap panels show a clear lamp based on your best matching local score. Lamps cover the usual BMS result states:
+No Play, Failed, Assist Clear, Easy Clear, Clear, Hard Clear, EX Hard Clear, Full Combo, Perfect, and Max.
+
+The lamp follows the selected mods: lowering the difficulty keeps lamps earned under harder conditions visible, while
+raising the difficulty hides lamps earned under easier conditions. Only Double Time is treated as a difficulty increase.
+
+<details>
+<summary>Example</summary>
+
+https://github.com/user-attachments/assets/a89deadb-bde8-4e50-9d04-0aaaf65a65b9
+
+</details>
+
+---
+
+### Result Screen
+
+The result screen adds BMS-focused analysis panels for gauge history, judgement timeline, hit scatter, and hit offset.
+The scatter and offset views also provide per-key breakdowns, making timing bias and problem columns easier to identify.
+Statistics for saved scores can be viewed directly without playing the replay first.
+
+<details>
+<summary>Example</summary>
+
+https://github.com/user-attachments/assets/df369f72-a4a6-4017-9f9c-80501f0037a6
+
+</details>
+
+---
+
+### Stage Editor
+
+The playfield stage is integrated with osu!'s in-game skin editor. Its position and judgement line can be adjusted
+directly on screen. The resize handles have different effects:
+
+- **Horizontal resize** (left/right handles) changes the stage width, stretching lanes, notes, and stage graphics
+  horizontally without changing the visible lane length.
+- **Vertical resize** (top/bottom handles) changes the visible lane length without vertically scaling notes or other
+  stage content.
+- **Diagonal resize** (corner handles) scales the entire stage uniformly, including lane width, note size, and stage
+  graphics, while preserving its proportions and the amount of lane content shown.
+
+Saving in osu!'s skin editor stores these changes in the active skin's BMS-specific gameplay layout. They are applied
+again when playing BMS with that same skin; the chart files and `skin.ini` are not modified.
+
+The Stage HUD component cannot be permanently removed. Deleting it in the skin editor automatically creates a new
+default Stage component, resetting its position, size, and settings (including the judgement line offset).
+
+<details>
+<summary>Example</summary>
+
+https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
+
+</details>
+
+---
+
 ## Features
 
 <details>
@@ -175,25 +245,6 @@ dynamic option channel (`A6`).
 | `98`    | Dynamic KEY volume change channel | Rare use |
 
 </details>
-
----
-
-### Song Preview
-
-Song select preview audio is generated from the original BMS folder rather than from a stored osu! audio file. The
-ruleset first tries a declared `#PREVIEW` file, then a `preview.*` file in the chart folder, and finally falls back to
-the chart's BGM/keysound event timeline. This makes charts without a dedicated preview file still audible in song
-select.
-
----
-
-### Clear Lamps
-
-BMS beatmap panels show a clear lamp based on your best matching local score. Lamps cover the usual BMS result states:
-No Play, Failed, Assist Clear, Easy Clear, Clear, Hard Clear, EX Hard Clear, Full Combo, Perfect, and Max.
-
-The lamp follows the selected mods: lowering the difficulty keeps lamps earned under harder conditions visible, while
-raising the difficulty hides lamps earned under easier conditions. Only Double Time is treated as a difficulty increase.
 
 ---
 
@@ -582,7 +633,7 @@ Additionally, select a component in the skin editor to configure its properties 
 | Judgement      | *(none)*                                                                                                                                                                                                       |
 | Health Bar     | **Groove gauge colours** — low (red zone), mid (yellow zone), high (green zone). **Fixed gauge colours** — Hard, ExHard, Hazard, each independently editable. All colours have a colour picker in the sidebar. |
 | BGA            | *(none)* — renders behind the playfield; aspect-fit (letterbox) is fixed. BGA dim is a global setting, not per-component.                                                                                      |
-| Stage          | *(none)* — required rectangular frame: drag to move the rendered stage, or resize its width and height independently. It is not offered in the component toolbox; missing/deleted layouts regenerate it, and persisted duplicates retain the first instance. |
+| Stage          | Judgement line offset. Required rectangular frame: drag to move the rendered stage, or resize it using the behaviours described above. It is not offered in the component toolbox; deleting it regenerates a default instance and resets its position, size, and settings. Persisted duplicates retain the first instance. |
 | Text           | *(none)* — shows a "Sample Text Event" placeholder while editing so the (otherwise alpha=0) box can be positioned. Driven by channel `99` / `#TEXTxx` at runtime.                                              |
 
 ### Example skin.ini (7K)
@@ -1057,6 +1108,7 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Skin**      | E-POOR judgement image                                                                                            | 3        |
 | **UI**        | Lane cover / skin / movement                                                                                      | 2        |
 | **Perf**      | fps is not stable when a large amount of mine disposed                                                            | 4        |
+| **Maintain**  | ln system is too complex, need a refactor                                                                         | 0        |
 
 ### FIXME
 

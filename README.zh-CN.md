@@ -54,7 +54,15 @@ BMS 谱面并将其标记为删除。
 
 ---
 
-## 选歌功能
+## 亮点
+
+### 歌曲预览
+
+选歌界面的预览音频从原始 BMS 文件夹生成，而不是从已存入 osu! 的音频文件读取。规则集会先尝试声明的
+`#PREVIEW` 文件，然后尝试谱面文件夹中的 `preview.*` 文件，最后回退到谱面的 BGM/keysound 事件时间线。
+因此，即使谱面没有专用预览文件，在选歌界面也仍然可以听到预览。
+
+---
 
 ### Clear Lamps
 
@@ -64,12 +72,51 @@ No Play、Failed、Assist Clear、Easy Clear、Clear、Hard Clear、EX Hard Clea
 Lamp 会跟随当前选择的 mod：降低难度时仍显示高难度条件下取得的 lamp；提高难度时不显示低难度条件下取得的
 lamp。Lamp 筛选中只有 Double Time 算提高难度。
 
-### 歌曲预览
+<details>
+<summary>示例</summary>
 
-选歌界面的预览音频从原始 BMS 文件夹生成，而不是从已存入 osu! 的音频文件读取。规则集会先尝试声明的
-`#PREVIEW` 文件，然后尝试谱面文件夹中的 `preview.*` 文件，最后回退到谱面的 BGM/keysound 事件时间线。
-因此，即使谱面没有专用预览文件，在选歌界面也仍然可以听到预览。
+https://github.com/user-attachments/assets/a89deadb-bde8-4e50-9d04-0aaaf65a65b9
 
+</details>
+
+---
+
+### 结算界面
+
+结算界面提供针对 BMS 的分析面板，包括血量历史、判定时间线、击打散点和击打偏移。散点与偏移视图还可按键位
+分别查看，便于发现整体时机偏差和容易失误的列。已保存成绩的统计可直接查看，无需先播放 replay。
+
+<details>
+<summary>示例</summary>
+
+https://github.com/user-attachments/assets/df369f72-a4a6-4017-9f9c-80501f0037a6
+
+</details>
+
+---
+
+### Stage 编辑器
+
+游玩区域的 Stage 已集成 osu! 的游戏内皮肤编辑器，可直接在画面中调整位置和判定线。不同方向的缩放控制柄具有
+不同作用：
+
+- **横向拉伸**（左、右控制柄）：改变 Stage 宽度，横向拉伸轨道、音符和 Stage 图像，但不改变可见轨道长度。
+- **纵向拉伸**（上、下控制柄）：改变可见轨道长度，但不会纵向缩放音符或其他 Stage 内容。
+- **斜向拉伸**（四角控制柄）：等比缩放整个 Stage，包括轨道宽度、音符大小和 Stage 图像，同时保持其比例和
+  显示的轨道内容范围不变。
+
+在 osu! 皮肤编辑器中保存后，这些改动会写入当前皮肤的 BMS 专用游玩界面布局。之后使用同一皮肤游玩 BMS 时会
+再次应用该布局；谱面文件和 `skin.ini` 均不会被修改。
+
+Stage HUD 组件无法被永久删除。在皮肤编辑器中将其删除后，规则集会自动创建新的默认 Stage 组件，并将其位置、
+大小和设置（包括判定线偏移）全部重置为默认值。
+
+<details>
+<summary>示例</summary>
+
+https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
+
+</details>
 ---
 
 ## 输入与键位
@@ -445,7 +492,7 @@ HUD 组件实现了 `ISerialisableDrawable`，可在游戏内通过**皮肤编�
 | Judgement | （无）                                                                                                    |
 | 血条        | **Groove 三段颜色**——低血量区（红）、中血量区（黄）、高血量区（绿）。**固定颜色模式各自独立**——Hard、ExHard、Hazard 颜色均可分别编辑。所有颜色均使用侧边栏的颜色选择器。 |
 | BGA       | （无）— 在 playfield 后方渲染；aspect-fit（letterbox）固定；BGA dim 是全局设置，非组件属性。 |
-| Stage     | （无）— 必备的矩形框：拖动可移动渲染出的 stage，宽度和高度可分别缩放。组件工具箱不会提供该组件；布局缺失或删除它时会自动重新生成，持久化布局中的重复项会保留第一个。 |
+| Stage     | 判定线偏移。必备的矩形框：拖动可移动渲染出的 Stage，也可按上文所述方式缩放。组件工具箱不会提供该组件；删除后会重新生成默认实例，并重置位置、大小和设置。持久化布局中的重复项会保留第一个。 |
 | Text      | （无）— 编辑时显示 "Sample Text Event" 占位，便于拖拽（正常运行时 alpha=0）。由通道 `99` / `#TEXTxx` 驱动。 |
 
 ### 示例 skin.ini (7K)
