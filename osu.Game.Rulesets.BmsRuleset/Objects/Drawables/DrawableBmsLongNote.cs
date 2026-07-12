@@ -92,7 +92,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             longNoteBody.Height = Math.Max(1, bodyHeight);
 
         var releasedEarly =
-            controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !isHoldingBody();
+            controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime
+            && (controller.TailJudged || !isHoldingBody());
         longNoteBody.UpdateBody(bodyHeight, tailAtTop, controller.LongNoteStarted);
         longNoteBody.Alpha = bodyHeight > 0 ? releasedEarly ? released_alpha : 1f : 0;
 

@@ -22,6 +22,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     private const double second_start_time = 5500;
     private const double duration = 900;
     private const double early_release_offset = -500;
+    private const double repress_offset = -300;
     private const long tick = 192;
     private const long second_tick = 384;
 
@@ -69,6 +70,8 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
             new BmsReplayFrame(0),
             new BmsReplayFrame(start_time, action),
             new BmsReplayFrame(start_time + duration + early_release_offset),
+            new BmsReplayFrame(start_time + duration + repress_offset, action),
+            new BmsReplayFrame(start_time + duration + 100),
             new BmsReplayFrame(second_start_time, action),
             new BmsReplayFrame(second_start_time + duration),
         ];
@@ -106,6 +109,14 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         // Released-early fades body+tail together (matches DrawableBmsLongNote.released_alpha) instead
         // of greying only the body, so a coloured tail no longer clashes with a grey body.
         AddAssert("released body and tail are faded", () =>
+        {
+            var longNote = Playfield.GetAliveObjectAtTick(tick);
+            return longNote != null
+                   && longNoteBodyOf(longNote).Alpha == 0.4f
+                   && longNoteTailContainerOf(longNote).Alpha == 0.4f;
+        });
+        AddUntilStep("pressed again after failed release", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + repress_offset + 120);
+        AddAssert("failed body and tail remain faded", () =>
         {
             var longNote = Playfield.GetAliveObjectAtTick(tick);
             return longNote != null
