@@ -260,6 +260,21 @@ public class BmsLongNoteJudgementControllerTest
         Assert.That(controller.LongNoteStarted, Is.True); // body stays visible until retire
     }
 
+    [TestCase(BmsLongNoteMode.LongNote, false)]
+    [TestCase(BmsLongNoteMode.ChargeNote, false)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, true)]
+    public void TestFailedTailHeldVisualDependsOnMode(BmsLongNoteMode mode, bool expected)
+    {
+        var (controller, _) = makeController(mode, start: 1000, duration: 500);
+        controller.TryHit(1000, HitResult.Perfect);
+        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, tail: true);
+
+        controller.TryRelease(1100, -400, tailTable);
+
+        Assert.That(controller.TailJudged, Is.True);
+        Assert.That(controller.ShouldShowHeldVisual(keyPressed: true), Is.EqualTo(expected));
+    }
+
     [Test]
     public void TestResetClearsStateAndExposesMode()
     {

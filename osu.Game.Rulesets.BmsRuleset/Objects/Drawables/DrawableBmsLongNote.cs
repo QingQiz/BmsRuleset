@@ -93,8 +93,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             longNoteBody.Height = Math.Max(1, bodyHeight);
 
         var releasedEarly =
-            controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime
-            && (controller.TailJudged || !isHoldingBody());
+            controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !holdingBody;
         longNoteBody.UpdateBody(bodyHeight, tailAtTop, controller.LongNoteStarted);
         longNoteBody.Alpha = bodyHeight > 0 ? releasedEarly ? released_alpha : 1f : 0;
 
@@ -206,9 +205,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     }
 
     private bool isHoldingBody()
-        => controller.LongNoteStarted
-           && HitObject != null
-           && ParentColumn?.IsPressed == true;
+        => HitObject != null && controller.ShouldShowHeldVisual(ParentColumn?.IsPressed == true);
 
     private int bodyDirectionBeforeTailPasses(float realHeadY, float realTailY) => HitObject == null
         ? Math.Sign(realTailY - realHeadY)

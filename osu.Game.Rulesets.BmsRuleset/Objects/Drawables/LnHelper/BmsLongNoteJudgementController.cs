@@ -13,6 +13,11 @@ internal sealed class BmsLongNoteJudgementController
 
     public bool IsChargeMode { get; private set; }
 
+    public bool ShouldShowHeldVisual(bool keyPressed)
+        => LongNoteStarted
+           && keyPressed
+           && (!TailJudged || mode == BmsLongNoteMode.HellChargeNote);
+
     private const double passive_poor_lifetime_margin = 100;
     private const double tail_visibility_grace = 50;
     private readonly BmsHellChargeBodyTracker hellChargeTracker = new();

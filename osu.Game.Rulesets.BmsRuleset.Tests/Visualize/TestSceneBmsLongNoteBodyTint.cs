@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
@@ -26,6 +27,8 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     private const long tick = 192;
     private const long second_tick = 384;
 
+    private BmsLongNoteMode mode = BmsLongNoteMode.ChargeNote;
+
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
         => CreateBmsPlayer(createReplayFrames);
 
@@ -37,7 +40,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
             TotalColumns = 8,
             Rank = 2,
             Total = 160,
-            LockedLongNoteMode = BmsLongNoteMode.ChargeNote,
+            LockedLongNoteMode = mode,
             HitObjects =
             {
                 new BmsLongNote
@@ -89,9 +92,17 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         return (Drawable)longNote.GetType().GetField("longNoteTailContainer", flags)!.GetValue(longNote)!;
     }
 
-    [Test]
-    public void TestBodyAlphaTracksHeldState()
+    private static Drawable noteHeadOf(DrawableBmsHitObject longNote)
     {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        return (Drawable)typeof(DrawableBmsHitObject).GetField("NoteContainer", flags)!.GetValue(longNote)!;
+    }
+
+    [TestCase(BmsLongNoteMode.ChargeNote, 0.4f, false)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, 1f, true)]
+    public void TestFailedBodyRepressVisual(BmsLongNoteMode mode, float expectedAlpha, bool expectedPinned)
+    {
+        AddStep("set long note mode", () => this.mode = mode);
         AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
@@ -116,12 +127,20 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
                    && longNoteTailContainerOf(longNote).Alpha == 0.4f;
         });
         AddUntilStep("pressed again after failed release", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + repress_offset + 120);
-        AddAssert("failed body and tail remain faded", () =>
+        AddAssert("failed repress has mode-specific visual", () =>
         {
             var longNote = Playfield.GetAliveObjectAtTick(tick);
-            return longNote != null
-                   && longNoteBodyOf(longNote).Alpha == 0.4f
-                   && longNoteTailContainerOf(longNote).Alpha == 0.4f;
+
+            if (longNote == null
+                || longNoteBodyOf(longNote).Alpha != expectedAlpha
+                || longNoteTailContainerOf(longNote).Alpha != expectedAlpha)
+                return false;
+
+            var headY = BmsPlayfieldAssertions.TopOf(noteHeadOf(longNote));
+            var judgementLineY = Playfield.JudgementLineY();
+            return expectedPinned
+                ? Math.Abs(headY - judgementLineY) <= 1
+                : headY > judgementLineY + 1;
         });
     }
 
