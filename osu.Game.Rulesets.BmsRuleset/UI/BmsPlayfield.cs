@@ -11,6 +11,7 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
@@ -358,61 +359,26 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         gameplayEvents.RaiseJudgementDisplayed(result);
     }
 
-    public void PrepareLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime)
-    {
-        if (drawable.HitObject is BmsLongNote ln)
-            scoreProcessor?.PrepareLongNoteEndpoint(ln, endpointTime, eventTime);
-    }
-
-    public void RegisterLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime, double gameplayRate, HitResult result)
-    {
-        if (drawable.HitObject is BmsLongNote ln)
-            scoreProcessor?.RegisterLongNoteEndpoint(ln, endpointTime, eventTime, gameplayRate, result);
-    }
-
-    public void RemoveLongNoteEndpoint(DrawableBmsHitObject drawable)
-    {
-        if (drawable.HitObject is BmsLongNote ln)
-            scoreProcessor?.RemoveLongNoteEndpoint(ln);
-    }
-
     /// <summary>
-    ///     Registers an HCN head judgement that should not end the drawable yet.
+    ///     Registers a separate CN/HCN endpoint through the score and health processors.
     /// </summary>
-    public void ApplyLongNoteHead(DrawableBmsHitObject drawable, double eventTime, HitResult result, double gameplayRate)
+    public void ApplySyntheticLongNoteEndpoint(DrawableBmsHitObject drawable, BmsLongNoteEndpointResult endpoint)
     {
-        if (drawable.HitObject is not BmsLongNote ln)
+        if (drawable.HitObject is not BmsLongNote)
             return;
 
-        var scoreResult = scoreProcessor?.ApplyLongNoteHead(ln, eventTime, result, gameplayRate);
-
-        if (scoreResult != null)
-            healthProcessor?.ApplyLongNoteHead(scoreResult);
-
-        requestJudgementDisplay(result);
-    }
-
-    /// <summary>
-    ///     Registers a synthetic long-note endpoint (CN/HCN tail) through
-    ///     the score and health processors, and triggers a visual hit explosion.
-    /// </summary>
-    public void ApplySyntheticLongNoteEndpoint(DrawableBmsHitObject drawable, double endpointTime, double eventTime, HitResult result, double gameplayRate)
-    {
-        if (drawable.HitObject is not BmsLongNote ln)
-            return;
-
-        var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(ln, endpointTime, eventTime, result, gameplayRate);
+        var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(endpoint);
 
         if (scoreResult != null)
             healthProcessor?.ApplySyntheticLongNoteEndpoint(scoreResult);
 
-        if (result.IsHit())
+        if (endpoint.Kind == BmsLongNoteEndpointKind.Tail && endpoint.Result.IsHit())
         {
             var column = Math.Clamp(drawable.HitObject.Column, 0, Stage.Columns.Length - 1);
             Stage.Columns[column].TriggerHitExplosion(drawable.HitObject is BmsLongNote);
         }
 
-        requestJudgementDisplay(result);
+        requestJudgementDisplay(endpoint.Result);
     }
 
     /// <summary>

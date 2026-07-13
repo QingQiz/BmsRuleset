@@ -5,6 +5,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Result;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -75,14 +76,19 @@ public class BmsHitOffsetStatisticTest
 
         if (mode == BmsLongNoteMode.LongNote)
         {
-            processor.RegisterLongNoteEndpoint(longNote, longNote.StartTime, 987, 1, HitResult.Great);
-            processor.PrepareLongNoteEndpoint(longNote, longNote.EndTime, 1519);
-            processor.ApplyResult(new JudgementResult(longNote, longNote.CreateJudgement()) { Type = HitResult.Great });
+            var endpoints = new[]
+            {
+                new BmsLongNoteEndpointResult(longNote, BmsLongNoteEndpointKind.Head, 987, 1, HitResult.Great),
+                new BmsLongNoteEndpointResult(longNote, BmsLongNoteEndpointKind.Tail, 1519, 1, HitResult.Great),
+            };
+            processor.ApplyResult(new BmsLongNoteJudgementResult(longNote, longNote.CreateJudgement(), endpoints) { Type = HitResult.Great });
         }
         else
         {
-            processor.ApplyLongNoteHead(longNote, 987, HitResult.Great);
-            processor.ApplySyntheticLongNoteEndpoint(longNote, longNote.EndTime, 1519, HitResult.Great);
+            processor.ApplySyntheticLongNoteEndpoint(
+                new BmsLongNoteEndpointResult(longNote, BmsLongNoteEndpointKind.Head, 987, 1, HitResult.Great));
+            processor.ApplySyntheticLongNoteEndpoint(
+                new BmsLongNoteEndpointResult(longNote, BmsLongNoteEndpointKind.Tail, 1519, 1, HitResult.Great));
         }
 
         var score = new ScoreInfo();

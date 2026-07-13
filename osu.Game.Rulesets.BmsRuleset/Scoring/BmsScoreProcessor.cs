@@ -7,6 +7,7 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -25,13 +26,10 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     private static readonly Action<JudgementResult, int> set_combo_after = createComboAfterSetter();
 
-    private static readonly Action<JudgementResult, double> set_raw_time = createRawTimeSetter();
-    private static readonly Action<JudgementResult, double> set_gameplay_rate = createGameplayRateSetter();
     private static readonly Action<BmsScoreProcessor, HitEvent> add_hit_event = createHitEventAdder();
 
     private double latestEndTime = double.MaxValue;
-    private LongNoteEndpointEvent? pendingLongNoteEndpoint;
-    private readonly Dictionary<BmsLongNote, HitEvent> supplementalLongNoteEvents = new();
+    private readonly Dictionary<BmsLongNoteJudgementResult, IReadOnlyList<HitEvent>> additionalLongNoteEvents = new();
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
@@ -111,45 +109,16 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         add_hit_event(this, new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = eventTime }, null, null));
     }
 
-    public void PrepareLongNoteEndpoint(BmsLongNote source, double endpointTime, double eventTime)
-        => pendingLongNoteEndpoint = new LongNoteEndpointEvent(source, source, endpointTime, eventTime);
-
-    public void RegisterLongNoteEndpoint(BmsLongNote source, double endpointTime, double eventTime, double gameplayRate, HitResult result)
-    {
-        // Statistics-only LN heads cannot enter the framework list because its rewind logic assumes
-        // exactly one HitEvent per JudgementResult. Keying by source also makes replay idempotent.
-        supplementalLongNoteEvents[source] = createLongNoteEndpointEvent(source, endpointTime, eventTime, gameplayRate, result, null);
-    }
-
-    public void RemoveLongNoteEndpoint(BmsLongNote source) => supplementalLongNoteEvents.Remove(source);
-
     /// <summary>
-    ///     Applies a judgement result for a synthetic long-note endpoint
-    ///     (CN/HCN tail). Creates its own <see cref="JudgementResult"/> and
-    ///     runs it through the full score/accuracy/combo pipeline.
+    ///     Applies a separate CN/HCN endpoint without requiring the source drawable to complete.
     /// </summary>
-    public JudgementResult ApplySyntheticLongNoteEndpoint(BmsLongNote source, double endpointTime, double eventTime, HitResult type, double gameplayRate = 1)
+    public BmsLongNoteJudgementResult ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpointResult)
     {
-        var endpoint = source.CreateSyntheticEndpoint(endpointTime);
-        var result = new JudgementResult(endpoint, endpoint.CreateJudgement());
-
-        pendingLongNoteEndpoint = new LongNoteEndpointEvent(source, endpoint, endpointTime, eventTime);
-        populateSyntheticResult(result, eventTime, gameplayRate, type);
-        ApplyResult(result);
-        return result;
-    }
-
-    /// <summary>
-    ///     Applies a long-note head judgement without requiring the drawable to enter
-    ///     its terminal judged state. HCN head POOR still has an active body afterwards.
-    /// </summary>
-    public JudgementResult ApplyLongNoteHead(BmsLongNote source, double eventTime, HitResult type, double gameplayRate = 1)
-    {
-        var endpoint = source.CreateSyntheticEndpoint(source.StartTime);
-        var result = new JudgementResult(endpoint, endpoint.CreateJudgement());
-
-        pendingLongNoteEndpoint = new LongNoteEndpointEvent(source, endpoint, source.StartTime, eventTime);
-        populateSyntheticResult(result, eventTime, gameplayRate, type);
+        var endpoint = endpointResult.Source.CreateSyntheticEndpoint(endpointResult.ExpectedTime);
+        var result = new BmsLongNoteJudgementResult(endpoint, endpoint.CreateJudgement(), [endpointResult])
+        {
+            Type = endpointResult.Result,
+        };
         ApplyResult(result);
         return result;
     }
@@ -159,7 +128,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         base.PopulateScore(score);
 
         score.HitEvents = score.HitEvents
-            .Concat(supplementalLongNoteEvents.Values)
+            .Concat(additionalLongNoteEvents.Values.SelectMany(events => events))
             .OrderBy(e => e.HitObject.GetEndTime() + e.TimeOffset)
             .ToList();
 
@@ -184,8 +153,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     protected override void Reset(bool storeResults)
     {
         base.Reset(storeResults);
-        pendingLongNoteEndpoint = null;
-        supplementalLongNoteEvents.Clear();
+        additionalLongNoteEvents.Clear();
     }
 
     /// <summary>
@@ -214,22 +182,29 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         }
     }
 
+    protected override void RemoveScoreChange(JudgementResult result)
+    {
+        base.RemoveScoreChange(result);
+
+        if (result is BmsLongNoteJudgementResult longNoteResult)
+            additionalLongNoteEvents.Remove(longNoteResult);
+    }
+
     protected override HitEvent CreateHitEvent(JudgementResult result)
     {
         var frameworkEvent = base.CreateHitEvent(result);
-        var endpoint = pendingLongNoteEndpoint;
-        pendingLongNoteEndpoint = null;
 
-        if (endpoint is not { } preparedEndpoint || !ReferenceEquals(preparedEndpoint.ResultHitObject, result.HitObject))
+        if (result is not BmsLongNoteJudgementResult longNoteResult || longNoteResult.EndpointResults.Count == 0)
             return frameworkEvent;
 
-        return createLongNoteEndpointEvent(
-            preparedEndpoint.Source,
-            preparedEndpoint.EndpointTime,
-            preparedEndpoint.EventTime,
-            frameworkEvent.GameplayRate ?? 1,
-            result.Type,
-            frameworkEvent.LastHitObject);
+        var events = longNoteResult.EndpointResults
+            .Select(endpoint => createLongNoteEndpointEvent(endpoint, frameworkEvent.LastHitObject))
+            .ToArray();
+
+        if (events.Length > 1)
+            additionalLongNoteEvents[longNoteResult] = events[..^1];
+
+        return events[^1];
     }
 
     protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
@@ -273,32 +248,6 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         }
     }
 
-    private static Action<JudgementResult, double> createRawTimeSetter()
-    {
-        var property = typeof(JudgementResult).GetProperty("RawTime", BindingFlags.Instance | BindingFlags.NonPublic);
-
-        if (property == null)
-        {
-            Logger.Log("BMS ScoreProcessor: Could not bind JudgementResult.RawTime; synthetic LN endpoint offsets will be zero.", level: LogLevel.Error);
-            return (_, _) => { };
-        }
-
-        return (result, rawTime) => property.SetValue(result, rawTime);
-    }
-
-    private static Action<JudgementResult, double> createGameplayRateSetter()
-    {
-        var property = typeof(JudgementResult).GetProperty("GameplayRate", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-        if (property == null)
-        {
-            Logger.Log("BMS ScoreProcessor: Could not bind JudgementResult.GameplayRate; synthetic LN endpoint hit events may not support UR calculation.", level: LogLevel.Error);
-            return (_, _) => { };
-        }
-
-        return (result, gameplayRate) => property.SetValue(result, gameplayRate);
-    }
-
     private static Action<BmsScoreProcessor, HitEvent> createHitEventAdder()
     {
         var field = typeof(ScoreProcessor).GetField("hitEvents", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -314,26 +263,13 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         return (processor, hitEvent) => ((List<HitEvent>)field.GetValue(processor)!).Add(hitEvent);
     }
 
-    private static void populateSyntheticResult(JudgementResult result, double eventTime, double gameplayRate, HitResult type)
-    {
-        result.Type = type;
-        set_raw_time(result, eventTime);
-        set_gameplay_rate(result, gameplayRate);
-    }
-
     private static HitEvent createLongNoteEndpointEvent(
-        BmsLongNote source,
-        double endpointTime,
-        double eventTime,
-        double gameplayRate,
-        HitResult result,
+        BmsLongNoteEndpointResult endpointResult,
         HitObject? lastHitObject)
     {
-        var endpoint = source.CreateSyntheticEndpoint(endpointTime);
-        return new HitEvent(eventTime - endpointTime, gameplayRate, result, endpoint, lastHitObject, null);
+        var endpoint = endpointResult.Source.CreateSyntheticEndpoint(endpointResult.ExpectedTime);
+        return new HitEvent(endpointResult.TimeOffset, endpointResult.GameplayRate, endpointResult.Result, endpoint, lastHitObject, null);
     }
-
-    private readonly record struct LongNoteEndpointEvent(BmsLongNote Source, HitObject ResultHitObject, double EndpointTime, double EventTime);
 
     private class JudgementOrderComparer : IComparer<HitObject>
     {

@@ -8,6 +8,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
@@ -48,11 +49,11 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (Judged || HitObject == null)
             return false;
 
-        return controller.TryHit(Time.Current, result);
+        return controller.TryHit(Time.Current, result, gameplayRate);
     }
 
     public bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable)
-        => HitObject != null && controller.TryRelease(Time.Current, releaseOffset, tailTable);
+        => HitObject != null && controller.TryRelease(Time.Current, releaseOffset, tailTable, gameplayRate);
 
     /// <summary>
     /// Called by BmsColumnHitObjectContainer every frame with pre-computed
@@ -160,7 +161,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (userTriggered || HitObject == null)
             return;
 
-        controller.CheckPassiveResult(Time.Current);
+        controller.CheckPassiveResult(Time.Current, gameplayRate);
     }
 
     // Keep CN/HCN visuals alive after head judgement
@@ -201,7 +202,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             lastHoldExplosionTime = Time.Current;
         }
 
-        controller.UpdatePostResult(Time.Current, Time.Elapsed, ParentColumn?.IsPressed == true);
+        controller.UpdatePostResult(Time.Current, Time.Elapsed, ParentColumn?.IsPressed == true, gameplayRate);
     }
 
     private bool isHoldingBody()
@@ -231,21 +232,16 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         visualState.PinHead(-HitTargetPosition);
         Alpha = 1;
         LifetimeEnd = lifetimeEnd;
-        scoring?.ApplyLongNoteHead(this, eventTime, HitResult.Meh, gameplayRate);
     }
 
-    void IBmsLongNoteHooks.ApplyJudgementResult(double endpointTime, double eventTime, HitResult result)
+    void IBmsLongNoteHooks.ApplyJudgementResult(HitResult result, System.Collections.Generic.IReadOnlyList<BmsLongNoteEndpointResult> endpoints)
     {
-        scoring?.PrepareLongNoteEndpoint(this, endpointTime, eventTime);
+        ((BmsLongNoteJudgementResult)Result).SetEndpointResults(endpoints);
         ApplyResult(result);
     }
 
-    void IBmsLongNoteHooks.RegisterStatisticsEvent(double endpointTime, double eventTime, HitResult result)
-    {
-        scoring?.RegisterLongNoteEndpoint(this, endpointTime, eventTime, gameplayRate, result);
-    }
-
-    void IBmsLongNoteHooks.RemoveStatisticsEvent() => scoring?.RemoveLongNoteEndpoint(this);
+    void IBmsLongNoteHooks.ApplySyntheticEndpoint(HitResult result, BmsLongNoteEndpointResult endpoint)
+        => scoring?.ApplySyntheticLongNoteEndpoint(this, endpoint);
 
     void IBmsLongNoteHooks.ClearVisualIfTailWasNotPoor(HitResult tailResult)
     {
@@ -259,9 +255,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         LifetimeEnd = Time.Current;
     }
 
-    void IBmsLongNoteHooks.ApplySyntheticTailEndpoint(double endpointTime, double eventTime, HitResult result)
-        => scoring?.ApplySyntheticLongNoteEndpoint(this, endpointTime, eventTime, result, gameplayRate);
-
     void IBmsLongNoteHooks.ApplyHellChargeTick(bool holding, double scale)
         => scoring?.ApplyHellChargeTick(holding, scale);
 
@@ -270,4 +263,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         this.FadeOut();
         LifetimeEnd = Time.Current;
     }
+
+    protected override JudgementResult CreateResult(Judgement judgement)
+        => new BmsLongNoteJudgementResult(HitObject, judgement);
 }

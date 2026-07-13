@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables.LnHelper;
@@ -10,20 +12,14 @@ internal interface IBmsLongNoteHooks
     /// <summary>HCN head-POOR: pin head, keep drawable alive until <paramref name="lifetimeEnd"/>, and register the head scoring event.</summary>
     void OnHellChargeHeadPoor(double eventTime, double lifetimeEnd);
 
-    /// <summary>Apply the framework result while keeping its statistics event anchored to the judged endpoint.</summary>
-    void ApplyJudgementResult(double endpointTime, double eventTime, HitResult result);
+    /// <summary>Apply the drawable's framework result with every timing endpoint represented by it.</summary>
+    void ApplyJudgementResult(HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints);
 
-    /// <summary>Record a real endpoint timing event which does not otherwise produce a framework result.</summary>
-    void RegisterStatisticsEvent(double endpointTime, double eventTime, HitResult result);
-
-    /// <summary>Remove this LN's statistics-only event after rewinding before its head.</summary>
-    void RemoveStatisticsEvent();
+    /// <summary>Apply a separate CN/HCN scoring result without completing the drawable.</summary>
+    void ApplySyntheticEndpoint(HitResult result, BmsLongNoteEndpointResult endpoint);
 
     /// <summary>Clear the body/tail visuals when the tail result is not POOR (was <c>clearVisualIfTailWasNotPoor</c>).</summary>
     void ClearVisualIfTailWasNotPoor(HitResult result);
-
-    /// <summary>Register a synthetic CN/HCN tail endpoint through the score/health processors.</summary>
-    void ApplySyntheticTailEndpoint(double endpointTime, double eventTime, HitResult result);
 
     /// <summary>Apply one HCN body gauge tick.</summary>
     void ApplyHellChargeTick(bool holding, double scale);

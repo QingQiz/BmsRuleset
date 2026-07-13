@@ -40,15 +40,19 @@ public class BmsLongNoteJudgementControllerTest
 
     private sealed class FakeLongNoteHooks : IBmsLongNoteHooks
     {
-        public List<HitResult> AppliedResults { get; } = [];
+        public List<(HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints)> AppliedJudgements { get; } = [];
 
-        public List<(double endpointTime, double eventTime, HitResult result)> AppliedEndpoints { get; } = [];
+        public IReadOnlyList<HitResult> AppliedResults => AppliedJudgements.Select(j => j.result).ToList();
 
-        public List<(double endpointTime, double eventTime, HitResult result)> StatisticsEvents { get; } = [];
+        public IReadOnlyList<(double endpointTime, double eventTime, HitResult result)> AppliedEndpoints =>
+            AppliedJudgements.SelectMany(j => j.endpoints.Select(e => (e.ExpectedTime, e.EventTime, e.Result))).ToList();
 
         public List<HitResult> ClearedTails { get; } = [];
 
-        public List<(double endpointTime, double eventTime, HitResult result)> SyntheticEndpoints { get; } = [];
+        public List<(HitResult result, BmsLongNoteEndpointResult endpoint)> SyntheticJudgements { get; } = [];
+
+        public IReadOnlyList<(double endpointTime, double eventTime, HitResult result)> SyntheticEndpoints =>
+            SyntheticJudgements.Select(j => (j.endpoint.ExpectedTime, j.endpoint.EventTime, j.endpoint.Result)).ToList();
 
         public List<(double eventTime, double lifetimeEnd)> HellChargeHeadPoor { get; } = [];
 
@@ -58,22 +62,12 @@ public class BmsLongNoteJudgementControllerTest
 
         public int RetireCount;
 
-        public int RemovedStatisticsEventCount;
-
         public void OnUserHeadJudged() => UserHeadJudgedCount++;
 
         public void OnHellChargeHeadPoor(double eventTime, double lifetimeEnd) => HellChargeHeadPoor.Add((eventTime, lifetimeEnd));
 
-        public void ApplyJudgementResult(double endpointTime, double eventTime, HitResult result)
-        {
-            AppliedResults.Add(result);
-            AppliedEndpoints.Add((endpointTime, eventTime, result));
-        }
-
-        public void RegisterStatisticsEvent(double endpointTime, double eventTime, HitResult result)
-            => StatisticsEvents.Add((endpointTime, eventTime, result));
-
-        public void RemoveStatisticsEvent() => RemovedStatisticsEventCount++;
+        public void ApplyJudgementResult(HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints)
+            => AppliedJudgements.Add((result, endpoints));
 
         public void ClearVisualIfTailWasNotPoor(HitResult result)
         {
@@ -84,7 +78,8 @@ public class BmsLongNoteJudgementControllerTest
             ClearedTails.Add(result);
         }
 
-        public void ApplySyntheticTailEndpoint(double endpointTime, double eventTime, HitResult result) => SyntheticEndpoints.Add((endpointTime, eventTime, result));
+        public void ApplySyntheticEndpoint(HitResult result, BmsLongNoteEndpointResult endpoint)
+            => SyntheticJudgements.Add((result, endpoint));
 
         public void ApplyHellChargeTick(bool holding, double scale) => HellChargeTicks.Add((holding, scale));
 
@@ -248,9 +243,9 @@ public class BmsLongNoteJudgementControllerTest
 
         controller.CheckPassiveResult(1500);
 
-        Assert.That(hooks.AppliedEndpoints.Single().endpointTime, Is.EqualTo(1500));
-        Assert.That(hooks.AppliedEndpoints.Single().eventTime, Is.EqualTo(1487));
-        Assert.That(hooks.AppliedEndpoints.Single().eventTime - hooks.AppliedEndpoints.Single().endpointTime, Is.EqualTo(-13));
+        Assert.That(hooks.AppliedEndpoints.Last().endpointTime, Is.EqualTo(1500));
+        Assert.That(hooks.AppliedEndpoints.Last().eventTime, Is.EqualTo(1487));
+        Assert.That(hooks.AppliedEndpoints.Last().eventTime - hooks.AppliedEndpoints.Last().endpointTime, Is.EqualTo(-13));
     }
 
     [Test]
@@ -319,26 +314,40 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
-    public void TestNormalHeadRegistersRealStatisticsEventOnly()
+    public void TestNormalHeadDefersEndpointUntilCompletion()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
 
         controller.TryHit(1013, HitResult.Great);
 
-        Assert.That(hooks.StatisticsEvents, Is.EqualTo([(1000d, 1013d, HitResult.Great)]));
-        Assert.That(hooks.AppliedEndpoints, Is.Empty);
+        Assert.That(hooks.AppliedJudgements, Is.Empty);
     }
 
     [Test]
-    public void TestRewindBeforeHeadRemovesStatisticsEvent()
+    public void TestRewindBeforeHeadDiscardsPendingEndpoint()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
         controller.TryHit(1013, HitResult.Great);
 
         controller.UpdatePostResult(1005, 1, holding: false);
 
-        Assert.That(hooks.RemovedStatisticsEventCount, Is.EqualTo(1));
+        Assert.That(hooks.AppliedJudgements, Is.Empty);
         Assert.That(controller.LongNoteStarted, Is.False);
+    }
+
+    [Test]
+    public void TestReplayAfterRewindCommitsOnlyReplayedHeadEndpoint()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
+        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, tail: true);
+        controller.TryHit(1013, HitResult.Great);
+        controller.UpdatePostResult(1005, 1, holding: false);
+
+        controller.TryHit(1017, HitResult.Great);
+        controller.TryRelease(1510, 10, tailTable);
+
+        Assert.That(hooks.AppliedJudgements.Single().endpoints.Select(e => e.TimeOffset),
+            Is.EqualTo(new[] { 17, 10 }));
     }
 
     [Test]
@@ -349,19 +358,19 @@ public class BmsLongNoteJudgementControllerTest
 
         controller.UpdatePostResult(990, 1, holding: true);
 
-        Assert.That(hooks.RemovedStatisticsEventCount, Is.Zero);
+        Assert.That(hooks.AppliedJudgements, Is.Empty);
         Assert.That(controller.LongNoteStarted, Is.True);
     }
 
     [Test]
-    public void TestRewindBeforeEarlyHeadRemovesStatisticsEvent()
+    public void TestRewindBeforeEarlyHeadDiscardsPendingEndpoint()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
         controller.TryHit(987, HitResult.Great);
 
         controller.UpdatePostResult(986, 1, holding: false);
 
-        Assert.That(hooks.RemovedStatisticsEventCount, Is.EqualTo(1));
+        Assert.That(hooks.AppliedJudgements, Is.Empty);
         Assert.That(controller.LongNoteStarted, Is.False);
     }
 
@@ -373,7 +382,16 @@ public class BmsLongNoteJudgementControllerTest
         controller.TryHit(987, HitResult.Great);
 
         Assert.That(hooks.AppliedEndpoints, Is.EqualTo([(1000d, 987d, HitResult.Great)]));
-        Assert.That(hooks.StatisticsEvents, Is.Empty);
+    }
+
+    [Test]
+    public void TestEndpointCapturesGameplayRateWhenJudged()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.ChargeNote, 1000, 500);
+
+        controller.TryHit(987, HitResult.Great, gameplayRate: 1.5);
+
+        Assert.That(hooks.AppliedJudgements.Single().endpoints.Single().GameplayRate, Is.EqualTo(1.5));
     }
 
     [Test]
@@ -385,8 +403,13 @@ public class BmsLongNoteJudgementControllerTest
 
         controller.TryRelease(1518, 18, tailTable);
 
-        Assert.That(hooks.AppliedEndpoints.Single().endpointTime, Is.EqualTo(1500));
-        Assert.That(hooks.AppliedEndpoints.Single().eventTime, Is.EqualTo(1518));
+        Assert.Multiple(() =>
+        {
+            Assert.That(hooks.AppliedJudgements.Single().endpoints.Select(e => e.Kind),
+                Is.EqualTo(new[] { BmsLongNoteEndpointKind.Head, BmsLongNoteEndpointKind.Tail }));
+            Assert.That(hooks.AppliedEndpoints.Last().endpointTime, Is.EqualTo(1500));
+            Assert.That(hooks.AppliedEndpoints.Last().eventTime, Is.EqualTo(1518));
+        });
     }
 
     [Test]
@@ -397,7 +420,6 @@ public class BmsLongNoteJudgementControllerTest
         controller.CheckPassiveResult(1600);
 
         Assert.That(hooks.AppliedEndpoints, Is.EqualTo([(1000d, 1600d, HitResult.Meh)]));
-        Assert.That(hooks.StatisticsEvents, Is.Empty);
         Assert.That(hooks.SyntheticEndpoints, Is.Empty);
     }
 

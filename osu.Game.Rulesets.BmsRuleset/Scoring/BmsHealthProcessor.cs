@@ -87,11 +87,6 @@ public partial class BmsHealthProcessor : HealthProcessor
         ApplyResult(result);
     }
 
-    public void ApplyLongNoteHead(JudgementResult result)
-    {
-        ApplyResult(result);
-    }
-
     /// <summary>
     ///     Applies a HellChargeNote body tick at ~200 ms cadence.
     ///     The default scale applies half-GREAT gauge recovery or half-BAD gauge damage.
