@@ -29,8 +29,8 @@ internal sealed partial class BmsStageHud : BmsHudComponent
 
     public BmsStageHud()
     {
-        Anchor = Anchor.Centre;
-        Origin = Anchor.Centre;
+        Anchor = Anchor.BottomCentre;
+        Origin = Anchor.BottomCentre;
         RelativeSizeAxes = Axes.Both;
         Size = Vector2.Zero;
         AlwaysPresent = true;
