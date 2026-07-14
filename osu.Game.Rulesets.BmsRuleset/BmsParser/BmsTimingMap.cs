@@ -64,6 +64,7 @@ public sealed class BmsTimingMap
 
     private readonly double[] cumulativeStopDurations;
     private int cursor;
+    private readonly double timeOffset;
 
     // ── Construction ──────────────────────────────────────────────────────────
 
@@ -71,10 +72,23 @@ public sealed class BmsTimingMap
                         IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
                         IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents,
                         double baseBpm = 0)
+        : this(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, speedEvents, baseBpm, 0)
+    {
+    }
+
+    private BmsTimingMap(int tickResolution, IEnumerable<BmsMeasureInfo> measures,
+                         IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
+                         IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents,
+                         double baseBpm, double timeOffset)
     {
         TickResolution = tickResolution;
+        this.timeOffset = timeOffset;
         this.measures = measures.OrderBy(m => m.Index).ToArray();
-        this.bpmEvents = bpmEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
+        this.bpmEvents = bpmEvents
+            .Select(e => e with { Time = e.Time + timeOffset })
+            .OrderBy(e => e.Tick)
+            .ThenBy(e => e.Sequence)
+            .ToArray();
         this.stopEvents = stopEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
         this.scrollEvents = scrollEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
         this.speedEvents = speedEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
@@ -89,6 +103,26 @@ public sealed class BmsTimingMap
                         double baseBpm = 0)
         : this(tickResolution, measures, bpmEvents, stopEvents, [], [], baseBpm)
     {
+    }
+
+    internal BmsTimingMap ShiftedBy(double offset)
+    {
+        if (offset == 0)
+            return this;
+
+        // Lead-in is applied once to a freshly parsed map; shifting an already-offset map would make its absolute times ambiguous.
+        if (timeOffset != 0)
+            throw new InvalidOperationException("A BMS timing map cannot be shifted more than once.");
+
+        return new BmsTimingMap(
+            TickResolution,
+            measures,
+            bpmEvents,
+            stopEvents,
+            scrollEvents,
+            speedEvents,
+            ScrollReferenceBpm,
+            offset);
     }
 
     // ── Time-based queries ────────────────────────────────────────────────────
@@ -242,7 +276,7 @@ public sealed class BmsTimingMap
 
         var currentTick = 0L;
         var scrollTick = 0.0;
-        var currentTime = 0d;
+        var currentTime = timeOffset;
         var firstBpm = bpmEvents.FirstOrDefault(e => e.Tick == 0 && e.Bpm != 0).Bpm;
         var currentBpm = Math.Abs(firstBpm);
         var currentDir = firstBpm < 0 ? -1 : 1;

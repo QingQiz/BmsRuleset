@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -32,7 +33,31 @@ public sealed record BmsParseResult(
     string? StageFile = null,
     string? BackBmp = null,
     string? Banner = null,
-    double? DefaultExRank = null);
+    double? DefaultExRank = null)
+{
+    internal BmsParseResult ShiftedBy(double offset)
+    {
+        if (offset == 0)
+            return this;
+
+        return this with
+        {
+            TimingMap = TimingMap.ShiftedBy(offset),
+            BackgroundSampleEvents = BackgroundSampleEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),
+            LongNoteTailSampleEvents = LongNoteTailSampleEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),
+            HitObjects = HitObjects.Select(h => h with { StartTime = h.StartTime + offset }).ToArray(),
+            TextEvents = TextEvents with
+            {
+                TextEvents = TextEvents.TextEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),
+            },
+            Bga = Bga with
+            {
+                Events = Bga.Events.Select(e => e with { Time = e.Time + offset }).ToArray(),
+                OpacityEvents = Bga.OpacityEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),
+            },
+        };
+    }
+}
 
 public readonly record struct BmsBranchDecision(int MaxValue, int SelectedValue);
 

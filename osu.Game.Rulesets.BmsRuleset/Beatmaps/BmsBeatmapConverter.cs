@@ -236,7 +236,8 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         if (!string.IsNullOrWhiteSpace(BranchReplayDecisions))
             selector = BmsChartParser.CreateReplayDecisionSelector(BmsChartParser.DeserialiseBranchDecisions(BranchReplayDecisions));
 
-        var parseResult = BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector, ReferenceBpmMode ?? BmsRulesetRuntime.CurrentReferenceBpmMode);
+        var parseResult = BmsTimelineLeadIn.Apply(
+            BmsChartParser.Parse(decoded.RawLines, decoded.BeatmapInfo.Path, selector, ReferenceBpmMode ?? BmsRulesetRuntime.CurrentReferenceBpmMode));
         var beatmap = new BmsDecodedBeatmap
         {
             BeatmapInfo = decoded.BeatmapInfo,

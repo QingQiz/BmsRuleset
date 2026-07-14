@@ -63,6 +63,80 @@ public class BmsBeatmapDecoderTest
             ReferenceBpmMode = referenceBpmMode,
         }.Convert();
 
+    [Test]
+    public void TestMinimumLeadInShiftsChartTimelineAndIsPreservedDuringConversion()
+    {
+        var decoded = decode("""
+                             #BPM 120
+                             #WAV01 kick.wav
+                             #WAV02 tail.wav
+                             #BMP01 background.png
+                             #TEXT01 ready
+                             #00001:01
+                             #00004:01
+                             #0000B:FF
+                             #00099:01
+                             #00051:0102
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        var decodedBms = (IBmsBeatmap)decoded;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(decoded.HitObjects.Single().StartTime, Is.Zero);
+            Assert.That(decodedBms.BackgroundSampleEvents.Single().Time, Is.Zero);
+            Assert.That(converted.HitObjects.Single().StartTime, Is.EqualTo(1000));
+            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(1000));
+            Assert.That(converted.TimingMap.BpmEvents[0].Time, Is.EqualTo(1000));
+            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(1000));
+            Assert.That(converted.LongNoteTailSampleEvents.Single().Time, Is.EqualTo(2000));
+            Assert.That(converted.TextEvents.TextEvents.Single().Time, Is.EqualTo(1000));
+            Assert.That(converted.Bga.Events.Single().Time, Is.EqualTo(1000));
+            Assert.That(converted.Bga.OpacityEvents.Single().Time, Is.EqualTo(1000));
+        });
+    }
+
+    [Test]
+    public void TestPartialLeadIn()
+    {
+        var lines = """
+                    #BPM 120
+                    #WAV01 kick.wav
+                    #00001:01
+                    #00011:00010100
+                    """.Split('\n');
+        var decoded = decode(string.Join('\n', lines));
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(decoded.HitObjects.Select(h => h.StartTime), Is.EqualTo([500, 1000]));
+            Assert.That(converted.HitObjects.Select(h => h.StartTime), Is.EqualTo([1000, 1500]));
+            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(500));
+            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(500));
+        });
+    }
+
+    [Test]
+    public void TestExistingLeadInIsNotExtended()
+    {
+        var decoded = decode("""
+                             #BPM 120
+                             #WAV01 kick.wav
+                             #00001:01
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(decoded.HitObjects.Single().StartTime, Is.EqualTo(2000));
+            Assert.That(((IBmsBeatmap)decoded).BackgroundSampleEvents.Single().Time, Is.Zero);
+            Assert.That(converted.HitObjects.Single().StartTime, Is.EqualTo(2000));
+            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.Zero);
+        });
+    }
+
     [TestCase("Aleph-0 (by LeaF)", "_7NORMAL.bms")]
     [TestCase("Aleph-0 (by LeaF)", "_14ANOTHER.bms")]
     [TestCase("Destr0yer (by 削除 feat. Nikki Simmons)", "destr0yer_starnother.bms")]
@@ -1596,6 +1670,7 @@ public class BmsBeatmapDecoderTest
         Assert.That(first.StartTime, Is.EqualTo(0).Within(0.001));
         Assert.That(second.TickInfo.Tick, Is.EqualTo(192));
         Assert.That(second.StartTime, Is.EqualTo(2000).Within(0.001));
+        Assert.That(second.StartTime - first.StartTime, Is.EqualTo(2000).Within(0.001));
     }
 
     [Test]
