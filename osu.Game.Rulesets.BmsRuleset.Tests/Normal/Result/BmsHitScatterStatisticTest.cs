@@ -26,7 +26,7 @@ public class BmsHitScatterStatisticTest
                 new HitEvent(5, 1, HitResult.Great, new HitObject { StartTime = 3500 }, null, null),
             ]);
 
-        Assert.That(statistics.Overall.Points.Select(p => p.Offset), Is.EqualTo(new[] { -12, 8, 30, -20, -280 }));
+        Assert.That(statistics.Overall.Points.Select(p => p.Offset), Is.EqualTo(new[] { -12, 8, 30, -20, -150 }));
         Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(new[] { "Scratch", "Key 1", "Key 2", "Key 3", "Key 4", "Key 5" }));
         Assert.That(statistics.Keys[0].Data.Points.Select(p => p.Offset), Is.EqualTo(new[] { -12, 8 }));
         Assert.That(statistics.Keys[1].Data.Points.Select(p => p.Offset), Is.EqualTo(new[] { 30, -20 }));
@@ -54,18 +54,19 @@ public class BmsHitScatterStatisticTest
         }));
 
         Assert.That(data.Points.Select(p => p.Time), Is.EqualTo(new[] { 1000, 2000, 3000, 3500 }));
-        Assert.That(data.Points.Select(p => p.Offset), Is.EqualTo(new[] { -12, 28, -280, -280 }));
+        Assert.That(data.Points.Select(p => p.Offset), Is.EqualTo(new[] { -12, 28, -150, -150 }));
         Assert.That(data.Duration, Is.EqualTo(3500));
     }
 
     [Test]
-    public void TestEmptyPoorIsPinnedToEarlyPoorOffset()
+    public void TestEmptyPoorIsPinnedToUpperBoundary()
     {
         var data = BmsHitScatterStatistic.CreateData([
             new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = 1000 }, null, null),
         ]);
 
-        Assert.That(data.Points.Single().Offset, Is.EqualTo(-280));
+        Assert.That(data.OffsetRange, Is.EqualTo(150));
+        Assert.That(data.Points.Single().Offset, Is.EqualTo(-150));
     }
 
     [Test]
@@ -81,14 +82,39 @@ public class BmsHitScatterStatisticTest
     }
 
     [Test]
-    public void TestExtremeLongNotePoorDoesNotFlattenScatter()
+    public void TestPoorAndEmptyPoorDoNotExpandOffsetRange()
     {
         var data = BmsHitScatterStatistic.CreateData([
             new HitEvent(-5000, 1, HitResult.Meh, new BmsNote { StartTime = 1000 }, null, null),
-            new HitEvent(12, 1, HitResult.Perfect, new BmsNote { StartTime = 2000 }, null, null),
+            new HitEvent(5000, 1, HitResult.Meh, new BmsNote { StartTime = 2000 }, null, null),
+            new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = 3000 }, null, null),
+            new HitEvent(12, 1, HitResult.Perfect, new BmsNote { StartTime = 4000 }, null, null),
         ]);
 
-        Assert.That(data.Points[0].Offset, Is.EqualTo(-5000));
+        Assert.That(data.OffsetRange, Is.EqualTo(150));
+        Assert.That(data.Points.Select(p => p.Offset), Is.EqualTo(new[] { -150, 150, -150, 12 }));
+        Assert.That(data.OffsetTicks, Is.EqualTo(new[] { -150, -75, 0, 75, 150 }));
+    }
+
+    [Test]
+    public void TestPoorWithinRangeKeepsOffset()
+    {
+        var data = BmsHitScatterStatistic.CreateData([
+            new HitEvent(-187, 1, HitResult.Good, new BmsNote { StartTime = 1000 }, null, null),
+            new HitEvent(175, 1, HitResult.Meh, new BmsNote { StartTime = 2000 }, null, null),
+        ]);
+
+        Assert.That(data.OffsetRange, Is.EqualTo(200));
+        Assert.That(data.Points[1].Offset, Is.EqualTo(175));
+    }
+
+    [Test]
+    public void TestTimedOffsetRangeIsCapped()
+    {
+        var data = BmsHitScatterStatistic.CreateData([
+            new HitEvent(-5000, 1, HitResult.Good, new BmsNote { StartTime = 1000 }, null, null),
+        ]);
+
         Assert.That(data.OffsetRange, Is.EqualTo(300));
         Assert.That(data.OffsetTicks, Is.EqualTo(new[] { -300, -150, 0, 150, 300 }));
     }

@@ -27,9 +27,9 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     private const float axis_width = 52;
     private const float x_axis_height = 28;
     private const float label_width = 96;
+    private const float point_padding = 3;
     private const double minimum_offset_range = 150;
     private const double maximum_offset_range = 300;
-    private const double empty_poor_scatter_offset = -280;
 
     private static readonly Color4 early_colour = new(90, 175, 255, 255);
     private static readonly Color4 late_colour = new(255, 130, 92, 255);
@@ -116,22 +116,28 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     {
         var points = hitEvents
             .Where(isScatterHit)
-            .Select(e => new ScatterPoint(e.HitObject.StartTime, offsetFor(e), e.Result))
+            .Select(e => new ScatterPoint(e.HitObject.StartTime, e.TimeOffset, e.Result))
             .OrderBy(p => p.Time)
             .ToArray();
 
         var duration = Math.Max(1, points.Select(p => p.Time).DefaultIfEmpty(0).Max());
         var maxMagnitude = Math.Clamp(
-            points.Select(p => Math.Abs(p.Offset)).DefaultIfEmpty(0).Max(),
+            points.Where(p => p.Result is not (HitResult.Meh or HitResult.Miss)).Select(p => Math.Abs(p.Offset)).DefaultIfEmpty(0).Max(),
             minimum_offset_range,
             maximum_offset_range);
         var offsetRange = Math.Ceiling(maxMagnitude / 50) * 50;
         var ticks = new[] { -offsetRange, -offsetRange / 2, 0, offsetRange / 2, offsetRange };
+        points = points.Select(p => p with { Offset = displayedOffsetFor(p, offsetRange) }).ToArray();
 
         return new ScatterData(points, duration, offsetRange, ticks);
     }
 
-    private static double offsetFor(HitEvent e) => e.Result == HitResult.Miss ? empty_poor_scatter_offset : e.TimeOffset;
+    private static double displayedOffsetFor(ScatterPoint point, double offsetRange) => point.Result switch
+    {
+        HitResult.Miss => -offsetRange,
+        HitResult.Meh => Math.Clamp(point.Offset, -offsetRange, offsetRange),
+        _ => point.Offset,
+    };
 
     private static bool isScatterHit(HitEvent e)
     {
@@ -319,7 +325,12 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         foreach (var tick in data.OffsetTicks)
             dataAreaChildren.Add(createGridLine(data, tick));
 
-        dataAreaChildren.AddRange(data.Points.Select(point => createPoint(data, point)));
+        dataAreaChildren.Add(new Container
+        {
+            RelativeSizeAxes = Axes.Both,
+            Padding = new MarginPadding(point_padding),
+            Children = data.Points.Select(point => createPoint(data, point)).ToArray(),
+        });
 
         dataAreaChildren.Add(createTimingDirectionLabel("fast", early_colour, Anchor.TopRight));
         dataAreaChildren.Add(createTimingDirectionLabel("late", late_colour, Anchor.BottomRight));

@@ -368,8 +368,23 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             var plot = plotBackgroundFor(hitScatterStatistic).ScreenSpaceDrawQuad.AABBFloat;
 
             return hitScatterStatistic.ChildrenOfType<SpriteText>()
-                                      .Where(t => t.Text.ToString() is "-200 ms" or "-100 ms" or "0 ms" or "+100 ms" or "+200 ms")
+                                      .Where(t => t.Text.ToString() is "-150 ms" or "-75 ms" or "0 ms" or "+75 ms" or "+150 ms")
                                       .All(t => t.ScreenSpaceDrawQuad.AABBFloat.Right < plot.Left);
+        });
+
+        AddUntilStep("scatter points stay inside plot", () =>
+        {
+            var plot = plotBackgroundFor(hitScatterStatistic).ScreenSpaceDrawQuad.AABBFloat;
+            var points = hitScatterStatistic.ChildrenOfType<Circle>()
+                                            .Where(c => Math.Abs(c.DrawWidth - 4.4f) < 0.01f || Math.Abs(c.DrawWidth - 5.2f) < 0.01f)
+                                            .Select(c => c.ScreenSpaceDrawQuad.AABBFloat)
+                                            .ToArray();
+
+            return points.Length > 0
+                   && points.All(point => point.Left >= plot.Left
+                                          && point.Right <= plot.Right
+                                          && point.Top >= plot.Top
+                                          && point.Bottom <= plot.Bottom);
         });
 
         AddUntilStep("direction labels stay at plot edges", () =>
