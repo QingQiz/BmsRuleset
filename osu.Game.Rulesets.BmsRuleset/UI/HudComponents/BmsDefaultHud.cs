@@ -81,7 +81,7 @@ public static class BmsDefaultHud
                 {
                     Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,
-                    Margin = new MarginPadding { Top = 60 },
+                    Y = 60,
                 },
             ],
         };
