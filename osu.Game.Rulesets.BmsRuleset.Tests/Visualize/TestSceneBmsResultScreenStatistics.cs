@@ -75,12 +75,12 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         assertText("Hit Offset");
         assertNoHitOffsetText("Scratch");
         assertNoHitOffsetText("Key 1");
-        assertHitOffsetText("-150 ms");
-        assertHitOffsetText("0 ms");
-        assertHitOffsetText("+150 ms");
+        assertHitOffsetText("-150");
+        assertHitOffsetText("0");
+        assertHitOffsetText("+150");
         assertText("Hit Scatter");
         assertText("E-POOR");
-        assertText("+200 ms");
+        assertText("+300 ms");
     }
 
     [Test]
@@ -311,12 +311,11 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
     }
 
     [Test]
-    public void TestHitScatterPlotAlignsWithHitOffsetPlot()
+    public void TestHitOffsetStatisticUsesManiaTimingDistributionStyle()
     {
         BmsHitOffsetStatistic hitOffsetStatistic = null!;
-        BmsHitScatterStatistic hitScatterStatistic = null!;
 
-        AddStep("load hit statistics", () =>
+        AddStep("load hit offset statistic", () =>
         {
             var beatmap = new BmsBeatmap
             {
@@ -324,31 +323,22 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
             };
 
-            Child = new FillFlowContainer
+            Child = new Container
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Width = 720,
                 AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Spacing = new osuTK.Vector2(0, 24),
-                Children =
-                [
-                    hitScatterStatistic = new BmsHitScatterStatistic(createGaugeHitEvents(), beatmap),
-                    hitOffsetStatistic = new BmsHitOffsetStatistic(createGaugeHitEvents(), beatmap),
-                ],
+                Child = hitOffsetStatistic = new BmsHitOffsetStatistic(createGaugeHitEvents(), beatmap),
             };
         });
 
-        AddUntilStep("hit statistics loaded", () => hitOffsetStatistic.IsLoaded && hitScatterStatistic.IsLoaded);
-        AddUntilStep("plot backgrounds align", () =>
-        {
-            var scatterPlot = plotBackgroundFor(hitScatterStatistic);
-            var offsetPlot = plotBackgroundFor(hitOffsetStatistic);
-
-            return Math.Abs(scatterPlot.ScreenSpaceDrawQuad.TopLeft.X - offsetPlot.ScreenSpaceDrawQuad.TopLeft.X) < 0.5f
-                   && Math.Abs(scatterPlot.DrawWidth - offsetPlot.DrawWidth) < 0.5f;
-        });
+        AddUntilStep("hit offset statistic loaded", () => hitOffsetStatistic.IsLoaded);
+        AddUntilStep("rounded timing bars shown", () => hitOffsetStatistic.ChildrenOfType<Circle>().Count() >= 101);
+        AddUntilStep("old plot background removed", () => !hitOffsetStatistic.ChildrenOfType<Box>().Any(b => Math.Abs(b.Alpha - 0.18f) < 0.001f));
+        assertHitOffsetText("-150");
+        assertHitOffsetText("0");
+        assertHitOffsetText("+150");
     }
 
     [Test]

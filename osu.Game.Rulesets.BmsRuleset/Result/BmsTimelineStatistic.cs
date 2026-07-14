@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Result;
 
 public sealed partial class BmsTimelineStatistic : CompositeDrawable
 {
-    private const int bucket_count = 200;
+    private const int bucket_count = 500;
     private const float subplot_height = 96;
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 

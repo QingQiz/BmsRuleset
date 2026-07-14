@@ -23,8 +23,11 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
 {
     private const float graph_height = 200;
     private const float key_graph_height = 100;
-    private const double offset_range = 150;
-    private const int bin_count = 200;
+    private const int bins_per_side = 50;
+    private const int bin_count = bins_per_side * 2 + 1;
+    private const int centre_bin_index = bins_per_side;
+    private const int axis_points = 5;
+    private const float minimum_bar_height = 0.02f;
     private const float label_width = 96;
 
     private readonly HitOffsetStatistics statistics;
@@ -58,7 +61,11 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
 
     internal static HitOffsetStatistics CreateStatistics(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents)
     {
-        var bmsHitEvents = hitEvents.Where(e => e.HitObject is BmsHitObject and not BmsLandmine && e.Result.IsBasic() && e.Result.IsHit()).ToArray();
+        var displayedHitEvents = hitEvents.Where(e =>
+            e.HitObject is not BmsLandmine
+            && e.Result.IsBasic()
+            && (e.HitObject is BmsHitObject || e.Result == HitResult.Miss)).ToArray();
+        var bmsHitEvents = displayedHitEvents.Where(e => e.HitObject is BmsHitObject).ToArray();
 
         var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
         var totalColumns = playableBeatmap is BmsBeatmap { TotalColumns: > 0 } bmsWithColumns
@@ -72,7 +79,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
             .Select(column => new KeyHitOffsetStatistics(labelFor(column, variant, ref keyIndex), createSummary(hitsByColumn[column].Select(e => (e.TimeOffset, e.Result)))))
             .ToArray();
 
-        return new HitOffsetStatistics(createSummary(bmsHitEvents.Select(e => (e.TimeOffset, e.Result))), keyGroups);
+        return new HitOffsetStatistics(createSummary(displayedHitEvents.Select(e => (e.TimeOffset, e.Result))), keyGroups);
     }
 
     private static string labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
@@ -157,28 +164,45 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
     private static HitOffsetSummary createSummary(IEnumerable<(double offset, HitResult result)> hits)
     {
         var hitList = hits.ToList();
-        var values = hitList.Select(h => h.offset).ToArray();
+        var timedValues = hitList.Where(h => h.result is not (HitResult.Meh or HitResult.Miss)).Select(h => h.offset).ToArray();
         var binsByResult = new Dictionary<HitResult, int[]>();
+        var binSize = Math.Max(1, Math.Ceiling(timedValues.Select(Math.Abs).DefaultIfEmpty(0).Max() / bins_per_side));
+        var roundUp = true;
 
         foreach (var (offset, result) in hitList)
         {
-            var clamped = Math.Clamp(offset, -offset_range, offset_range);
-            var index = (int)Math.Floor((clamped + offset_range) / (offset_range * 2) * bin_count);
-            var bin = Math.Clamp(index, 0, bin_count - 1);
+            if (result is HitResult.Meh or HitResult.Miss)
+            {
+                if (!binsByResult.TryGetValue(result, out var untimedBins))
+                    binsByResult[result] = untimedBins = new int[bin_count];
+                untimedBins[result == HitResult.Miss ? 0 : bin_count - 1]++;
+                continue;
+            }
+
+            var binOffset = offset / binSize;
+
+            // Alternating exact midpoints avoids visually biasing the distribution toward either side.
+            if (Math.Abs(binOffset - (int)binOffset) == 0.5)
+            {
+                binOffset = (int)binOffset + Math.Sign(binOffset) * (roundUp ? 1 : 0);
+                roundUp = !roundUp;
+            }
+
+            var bin = Math.Clamp(centre_bin_index + (int)Math.Round(binOffset, MidpointRounding.AwayFromZero), 0, bin_count - 1);
 
             if (!binsByResult.TryGetValue(result, out var bins))
                 binsByResult[result] = bins = new int[bin_count];
             bins[bin]++;
         }
 
-        // Descending order (best → worst) so the best result stacks at the bottom and the worst on top.
-        var results = binsByResult.Keys.OrderByDescending(r => r).ToArray();
+        var results = binsByResult.Keys.OrderBy(r => r.GetIndexForOrderedDisplay()).ToArray();
 
         return new HitOffsetSummary(
-            values.Length,
-            values.Length == 0 ? 0 : values.Average(),
-            values.Count(v => v < 0),
-            values.Count(v => v > 0),
+            hitList.Count,
+            timedValues.Length == 0 ? 0 : timedValues.Average(),
+            timedValues.Count(v => v < 0),
+            timedValues.Count(v => v > 0),
+            binSize,
             results,
             binsByResult);
     }
@@ -195,6 +219,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
         double AverageOffset,
         int EarlyCount,
         int LateCount,
+        double BinSize,
         IReadOnlyList<HitResult> Results,
         IReadOnlyDictionary<HitResult, int[]> BinsByResult);
 
@@ -217,13 +242,15 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
                 .DefaultIfEmpty(0)
                 .Max());
 
+            Padding = new MarginPadding { Horizontal = 5 };
+
             InternalChild = new GridContainer
             {
                 RelativeSizeAxes = Axes.Both,
                 RowDimensions =
                 [
                     new Dimension(),
-                    new Dimension(GridSizeMode.Absolute, 24),
+                    new Dimension(GridSizeMode.Absolute, 13),
                 ],
                 Content = new[]
                 {
@@ -236,123 +263,106 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
         private Drawable createPlot(int maxTotal) => new Container
         {
             RelativeSizeAxes = Axes.Both,
-            Children =
-            [
-                new Box
+            Child = new GridContainer
+            {
+                RelativeSizeAxes = Axes.Both,
+                ColumnDimensions = Enumerable.Range(0, bin_count).Select(_ => new Dimension()).ToArray(),
+                Content = new[]
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Color4.Black,
-                    Alpha = 0.18f,
+                    Enumerable.Range(0, bin_count).Select(b => createBar(b, maxTotal)).ToArray(),
                 },
-                new GridContainer
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    ColumnDimensions = Enumerable.Range(0, bin_count).Select(_ => new Dimension()).ToArray(),
-                    Content = new[]
-                    {
-                        Enumerable.Range(0, bin_count).Select(b => createBar(b, maxTotal)).ToArray(),
-                    },
-                },
-                new Box
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Y,
-                    Width = 2,
-                    Colour = Color4.White,
-                    Alpha = 0.32f,
-                },
-            ],
+            },
         };
 
-        private Drawable createAxis() => new Container
+        private Drawable createAxis()
         {
-            RelativeSizeAxes = Axes.Both,
-            Children =
-            [
-                new OsuSpriteText
-                {
-                    Anchor = Anchor.BottomLeft,
-                    Origin = Anchor.BottomLeft,
-                    Text = $"early {summary.EarlyCount}",
-                    Colour = early_colour,
-                    Alpha = 0.75f,
-                    Font = OsuFont.GetFont(size: 10, weight: FontWeight.SemiBold),
-                },
-                createTickLabel(-150, 0, Anchor.TopLeft),
-                createTickLabel(-75, 0.25f, Anchor.TopCentre),
-                createTickLabel(0, 0.5f, Anchor.TopCentre),
-                createTickLabel(75, 0.75f, Anchor.TopCentre),
-                createTickLabel(150, 1, Anchor.TopRight),
-                new OsuSpriteText
-                {
-                    Anchor = Anchor.BottomRight,
-                    Origin = Anchor.BottomRight,
-                    Text = $"late {summary.LateCount}",
-                    Colour = late_colour,
-                    Alpha = 0.75f,
-                    Font = OsuFont.GetFont(size: 10, weight: FontWeight.SemiBold),
-                },
-            ],
-        };
-
-        private static OsuSpriteText createTickLabel(int offset, float x, Anchor origin) => new()
-        {
-            Anchor = Anchor.TopLeft,
-            Origin = origin,
-            RelativePositionAxes = Axes.X,
-            X = x,
-            Text = $"{offset:+0;-0;0} ms",
-            Colour = Color4.White,
-            Alpha = 0.55f,
-            Font = OsuFont.GetFont(size: 9),
-        };
-
-        private Drawable createBar(int binIndex, int maxTotal)
-        {
-            // No horizontal padding: bars sit edge-to-edge so the histogram reads as one continuous shape.
-            var bar = new Container
+            var axis = new Container
             {
                 RelativeSizeAxes = Axes.Both,
             };
 
-            var total = summary.Results.Sum(r => summary.BinsByResult[r][binIndex]);
-
-            if (total == 0)
+            axis.Add(new OsuSpriteText
             {
-                bar.Add(new Box
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Text = "0",
+                Font = OsuFont.GetFont(size: 13, weight: FontWeight.SemiBold),
+            });
+
+            var maxValue = bins_per_side * summary.BinSize;
+            var axisValueStep = maxValue / axis_points;
+
+            for (var i = 1; i <= axis_points; i++)
+            {
+                var axisValue = i * axisValueStep;
+                var position = (float)(axisValue / maxValue);
+                var alpha = 1f - position * 0.8f;
+
+                axis.AddRange([
+                    createTickLabel(-axisValue, -position / 2, alpha),
+                    createTickLabel(axisValue, position / 2, alpha),
+                ]);
+            }
+
+            return axis;
+        }
+
+        private static OsuSpriteText createTickLabel(double offset, float x, float alpha) => new()
+        {
+            Anchor = Anchor.Centre,
+            Origin = Anchor.Centre,
+            RelativePositionAxes = Axes.X,
+            X = x,
+            Text = offset.ToString("+0;-0;0"),
+            Alpha = alpha,
+            Font = OsuFont.GetFont(size: 13, weight: FontWeight.SemiBold),
+        };
+
+        private Drawable createBar(int binIndex, int maxTotal)
+        {
+            var bar = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Masking = true,
+            };
+
+            var values = summary.Results
+                                .Select(result => (result, count: summary.BinsByResult[result][binIndex]))
+                                .Where(value => value.count > 0)
+                                .ToArray();
+
+            if (values.Length == 0)
+            {
+                bar.Add(new Circle
                 {
                     RelativeSizeAxes = Axes.Both,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
-                    Height = 0.03f,
-                    Colour = Color4.White,
-                    Alpha = 0.12f,
+                    Height = minimum_bar_height,
+                    Colour = binIndex == centre_bin_index ? Color4.White : Color4.Gray,
                 });
                 return bar;
             }
 
             float cumulativeBelow = 0;
 
-            foreach (var result in summary.Results)
+            for (var i = 0; i < values.Length; i++)
             {
-                var count = summary.BinsByResult[result][binIndex];
-                if (count == 0)
-                    continue;
-
-                var height = (float)count / maxTotal;
-                bar.Add(new Box
+                var (result, count) = values[i];
+                var height = minimum_bar_height + (1 - minimum_bar_height) * count / maxTotal;
+                bar.Add(new Circle
                 {
                     RelativeSizeAxes = Axes.Both,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
                     RelativePositionAxes = Axes.Y,
-                    Y = -cumulativeBelow,
+                    Y = -(1 - minimum_bar_height) * cumulativeBelow / maxTotal,
                     Height = height,
-                    Colour = BmsHitResultColours.ForHitResult(result),
-                    Alpha = 0.86f,
+                    Colour = binIndex == centre_bin_index && i == 0 && result is not (HitResult.Meh or HitResult.Miss)
+                        ? Color4.White
+                        : BmsHitResultColours.ForHitResult(result),
                 });
-                cumulativeBelow += height;
+                cumulativeBelow += count;
             }
 
             return bar;

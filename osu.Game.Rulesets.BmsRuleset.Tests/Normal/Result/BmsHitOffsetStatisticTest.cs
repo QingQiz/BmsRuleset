@@ -6,7 +6,6 @@ using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Result;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -26,18 +25,24 @@ public class BmsHitOffsetStatisticTest
                 new HitEvent(8, 1, HitResult.Perfect, new BmsNote { Column = 0, StartTime = 1500 }, null, null),
                 new HitEvent(30, 1, HitResult.Good, new BmsNote { Column = 1, StartTime = 2000 }, null, null),
                 new HitEvent(-20, 1, HitResult.Ok, new BmsNote { Column = 1, StartTime = 2500 }, null, null),
+                new HitEvent(500, 1, HitResult.Meh, new BmsNote { Column = 0, StartTime = 2750 }, null, null),
                 new HitEvent(100, 1, HitResult.Miss, new BmsNote { Column = 0, StartTime = 3000 }, null, null),
+                new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = 3250 }, null, null),
                 new HitEvent(5, 1, HitResult.Great, new HitObject { StartTime = 3500 }, null, null),
             ]);
 
-        Assert.That(statistics.Overall.Count, Is.EqualTo(4));
+        Assert.That(statistics.Overall.Count, Is.EqualTo(7));
         Assert.That(statistics.Overall.AverageOffset, Is.EqualTo(1.5).Within(0.001));
         Assert.That(statistics.Overall.EarlyCount, Is.EqualTo(2));
         Assert.That(statistics.Overall.LateCount, Is.EqualTo(2));
-        Assert.That(statistics.Overall.BinsByResult.Values.SelectMany(b => b).Sum(), Is.EqualTo(4));
+        Assert.That(statistics.Overall.BinSize, Is.EqualTo(1));
+        Assert.That(statistics.Overall.BinsByResult.Values, Has.All.Length.EqualTo(101));
+        Assert.That(statistics.Overall.BinsByResult.Values.SelectMany(b => b).Sum(), Is.EqualTo(7));
+        Assert.That(statistics.Overall.BinsByResult[HitResult.Meh][^1], Is.EqualTo(1));
+        Assert.That(statistics.Overall.BinsByResult[HitResult.Miss][0], Is.EqualTo(2));
 
-        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(new[] { "Scratch", "Key 1", "Key 2", "Key 3", "Key 4", "Key 5" }));
-        Assert.That(statistics.Keys[0].Summary.Count, Is.EqualTo(2));
+        Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(["Scratch", "Key 1", "Key 2", "Key 3", "Key 4", "Key 5"]));
+        Assert.That(statistics.Keys[0].Summary.Count, Is.EqualTo(4));
         Assert.That(statistics.Keys[0].Summary.AverageOffset, Is.EqualTo(-2).Within(0.001));
         Assert.That(statistics.Keys[1].Summary.Count, Is.EqualTo(2));
         Assert.That(statistics.Keys[1].Summary.AverageOffset, Is.EqualTo(5).Within(0.001));
