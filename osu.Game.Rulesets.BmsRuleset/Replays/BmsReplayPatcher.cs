@@ -21,8 +21,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Replays;
 public static class BmsReplayPatcher
 {
     private const string harmony_id = "osu.Game.Rulesets.BmsRuleset.Replay";
-    private const string ruleset_short_name = "bms";
-
     private static bool disabled;
 
     private static PropertyInfo? playerScoreManagerProperty;
@@ -242,7 +240,7 @@ public static class BmsReplayPatcher
     }
     // ReSharper restore InconsistentNaming
 
-    private static bool isBmsScore(ScoreInfo score) => score.Ruleset.ShortName == ruleset_short_name;
+    private static bool isBmsScore(ScoreInfo score) => score.Ruleset.ShortName == Constant.SHORT_NAME;
 
     private static void disable(string message, Exception? exception = null)
     {

@@ -72,7 +72,7 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
         if (keyRestrictedVariants != null && !keyRestrictedVariants.Contains(variant))
             return false;
 
-        var store = BmsRuleset.DifficultyTableStore;
+        var store = BmsRulesetRuntime.DifficultyTableStore;
         if (store != null && (!string.IsNullOrEmpty(selectedTableName) || !string.IsNullOrEmpty(selectedLevel)))
         {
             var markers = store.GetMarkers(beatmapInfo.MD5Hash);

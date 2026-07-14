@@ -102,7 +102,7 @@ public partial class BmsFileImporterTest
             {
                 var sets = r.All<BeatmapSetInfo>().AsEnumerable()
                     .Where(s => !s.DeletePending && !s.Protected)
-                    .Where(s => s.Beatmaps.Any(b => b.Ruleset.ShortName == "bms"))
+                    .Where(s => s.Beatmaps.Any(b => b.Ruleset.ShortName == Constant.SHORT_NAME))
                     .ToArray();
                 foreach (var set in sets)
                     set.DeletePending = true;

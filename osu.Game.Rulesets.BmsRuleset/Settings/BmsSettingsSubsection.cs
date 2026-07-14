@@ -193,12 +193,12 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         useDedicatedPreviewAudio.BindValueChanged(_ => reloadCurrentPreview());
 
         // Initialize difficulty table services
-        if (BmsRuleset.DifficultyTableStore == null && host != null)
+        if (BmsRulesetRuntime.DifficultyTableStore == null && host != null)
         {
             var cacheDir = Path.Combine(host.Storage.GetFullPath(string.Empty), "difficulty-tables");
             collectionSyncManager = new CollectionSyncManager();
             var store = new DifficultyTableStore(manager, cacheDir, collectionSyncManager, realm);
-            BmsRuleset.DifficultyTableStore = store;
+            BmsRulesetRuntime.DifficultyTableStore = store;
 
             difficultyTableStore = store;
             difficultyNameUpdater = new DifficultyNameUpdater(realm!, store);
@@ -211,7 +211,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         }
         else
         {
-            difficultyTableStore = BmsRuleset.DifficultyTableStore;
+            difficultyTableStore = BmsRulesetRuntime.DifficultyTableStore;
         }
 
         Children =

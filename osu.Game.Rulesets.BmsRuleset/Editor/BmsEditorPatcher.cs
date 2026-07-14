@@ -57,7 +57,7 @@ public static class BmsEditorPatcher
     // ReSharper disable once InconsistentNaming
     private static bool prefix(EditorLoader __instance)
     {
-        if (__instance.Beatmap.Value.BeatmapInfo.Ruleset.ShortName != "bms")
+        if (__instance.Beatmap.Value.BeatmapInfo.Ruleset.ShortName != Constant.SHORT_NAME)
             return true;
 
         PostEditorUnavailableNotification(__instance.Dependencies);

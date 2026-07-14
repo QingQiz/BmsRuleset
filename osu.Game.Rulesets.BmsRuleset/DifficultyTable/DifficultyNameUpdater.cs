@@ -21,12 +21,12 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
     {
         markerStr = string.Empty;
 
-        if (BmsRuleset.DifficultyTableStore == null)
+        if (BmsRulesetRuntime.DifficultyTableStore == null)
         {
             return;
         }
 
-        var markers = BmsRuleset.DifficultyTableStore.GetMarkers(beatmap.MD5Hash);
+        var markers = BmsRulesetRuntime.DifficultyTableStore.GetMarkers(beatmap.MD5Hash);
 
         markerStr = FormatMarkers(markers);
     }

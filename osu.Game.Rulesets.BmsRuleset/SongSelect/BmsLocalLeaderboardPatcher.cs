@@ -143,7 +143,7 @@ public static class BmsLocalLeaderboardPatcher
     private static bool isBmsLocalCriteria(LeaderboardCriteria? criteria) =>
         criteria?.Scope == BeatmapLeaderboardScope.Local
         && criteria.Beatmap != null
-        && criteria.Ruleset?.ShortName == "bms";
+        && criteria.Ruleset?.ShortName == Constant.SHORT_NAME;
 
     private static void setCurrentCriteria(LeaderboardManager manager, LeaderboardCriteria criteria)
         => currentCriteriaSetter!.Invoke(manager, [criteria]);

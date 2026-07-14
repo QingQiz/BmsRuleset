@@ -17,8 +17,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Result;
 public static class BmsRankingHitResultColourPatcher
 {
     private const string harmony_id = "osu.Game.Rulesets.BmsRuleset.RankingHitResultColours";
-    private const string ruleset_short_name = "bms";
-
     private static readonly object install_lock = new();
 
     private static FieldInfo? scoreField;
@@ -73,7 +71,7 @@ public static class BmsRankingHitResultColourPatcher
     // ReSharper disable once InconsistentNaming
     private static void postfix(ExpandedPanelMiddleContent __instance)
     {
-        if (scoreField?.GetValue(__instance) is not ScoreInfo score || score.Ruleset.ShortName != ruleset_short_name)
+        if (scoreField?.GetValue(__instance) is not ScoreInfo score || score.Ruleset.ShortName != Constant.SHORT_NAME)
             return;
 
         scheduleMethod?.Invoke(__instance, [new Action(() => apply(__instance, score))]);

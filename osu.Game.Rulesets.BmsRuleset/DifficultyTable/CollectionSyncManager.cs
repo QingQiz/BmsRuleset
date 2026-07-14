@@ -36,7 +36,7 @@ public class CollectionSyncManager
             subdividedTables.Add(key);
 
         // rebuild first. so we can update the divided status
-        BmsRuleset.DifficultyTableStore?.NotifyToRebuildTableList(null);
+        BmsRulesetRuntime.DifficultyTableStore?.NotifyToRebuildTableList(null);
 
         SyncInTransaction(realm, null);
     }
@@ -76,7 +76,7 @@ public class CollectionSyncManager
             });
         }
 
-        foreach (var table in BmsRuleset.DifficultyTableStore?.Tables ?? [])
+        foreach (var table in BmsRulesetRuntime.DifficultyTableStore?.Tables ?? [])
         {
             realm.Write(r => syncDivideStatus(r, table));
         }

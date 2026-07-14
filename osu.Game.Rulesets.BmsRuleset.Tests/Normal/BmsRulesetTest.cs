@@ -85,7 +85,7 @@ public class BmsRulesetTest
         try
         {
             config.SetValue(BmsRulesetSetting.UseDedicatedPreviewAudio, false);
-            Assert.That(BmsRuleset.UseDedicatedPreviewAudio, Is.False);
+            Assert.That(BmsRulesetRuntime.UseDedicatedPreviewAudio, Is.False);
         }
         finally
         {
@@ -238,7 +238,7 @@ public class BmsRulesetTest
     {
         var colours = new OsuColour();
 
-        Assert.That(BmsHitResultColours.ForScore(new ScoreInfo { Ruleset = new RulesetInfo { ShortName = "bms" } }, HitResult.Meh), Is.EqualTo(colours.Red));
+        Assert.That(BmsHitResultColours.ForScore(new ScoreInfo { Ruleset = new RulesetInfo { ShortName = Constant.SHORT_NAME } }, HitResult.Meh), Is.EqualTo(colours.Red));
         Assert.That(BmsHitResultColours.ForScore(new ScoreInfo { Ruleset = new RulesetInfo { ShortName = "mania" } }, HitResult.Meh), Is.EqualTo(colours.Yellow));
     }
 
@@ -317,7 +317,7 @@ public class BmsRulesetTest
     [Test]
     public void TestMetadata()
     {
-        Assert.That(ruleset.ShortName, Is.EqualTo("bms"));
+        Assert.That(ruleset.ShortName, Is.EqualTo(Constant.SHORT_NAME));
         Assert.That(ruleset.Description, Is.EqualTo("BMS"));
         Assert.That(ruleset.RulesetAPIVersionSupported, Is.Not.Null.And.Not.Empty);
     }

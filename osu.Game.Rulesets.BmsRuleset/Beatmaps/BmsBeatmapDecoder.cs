@@ -29,7 +29,7 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
     // The decoded beatmap is cached before play starts; only playable conversion should roll runtime branches.
     private Func<int, int> decodeBranchSelector => randomValueSelector ?? (_ => 1);
 
-    private BmsReferenceBpmMode effectiveReferenceBpmMode => referenceBpmMode ?? BmsRuleset.CurrentReferenceBpmMode;
+    private BmsReferenceBpmMode effectiveReferenceBpmMode => referenceBpmMode ?? BmsRulesetRuntime.CurrentReferenceBpmMode;
 
     private static bool registered;
 

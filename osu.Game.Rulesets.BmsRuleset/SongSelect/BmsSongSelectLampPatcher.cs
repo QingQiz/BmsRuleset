@@ -180,7 +180,7 @@ public static partial class BmsSongSelectLampPatcher
         if (rulesetProperty?.GetValue(display) is not IBindable<RulesetInfo> ruleset)
             return false;
 
-        return ruleset.Value.ShortName == "bms";
+        return ruleset.Value.ShortName == Constant.SHORT_NAME;
     }
 
     private static Drawable? getIconContainer(Panel panel)

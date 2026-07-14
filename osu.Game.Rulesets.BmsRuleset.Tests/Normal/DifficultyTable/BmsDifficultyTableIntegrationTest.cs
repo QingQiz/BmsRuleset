@@ -99,7 +99,7 @@ public partial class BmsDifficultyTableIntegrationTest
             realm.Run(r =>
             {
                 var bmsBeatmaps = r.All<BeatmapInfo>().AsEnumerable()
-                    .Where(b => b.Ruleset.ShortName == "bms")
+                    .Where(b => b.Ruleset.ShortName == Constant.SHORT_NAME)
                     .ToList();
 
                 Assert.That(bmsBeatmaps, Has.Count.EqualTo(3),
@@ -147,7 +147,7 @@ public partial class BmsDifficultyTableIntegrationTest
             realm.Run(r =>
             {
                 var bmsBeatmaps = r.All<BeatmapInfo>().AsEnumerable()
-                    .Where(b => b.Ruleset.ShortName == "bms")
+                    .Where(b => b.Ruleset.ShortName == Constant.SHORT_NAME)
                     .ToList();
 
                 // Determine expected level for each chart based on the table JSON above.
@@ -213,7 +213,7 @@ public partial class BmsDifficultyTableIntegrationTest
             realm.Run(r =>
             {
                 var beatmap = r.All<BeatmapInfo>().AsEnumerable()
-                    .FirstOrDefault(b => b.Ruleset.ShortName == "bms");
+                    .FirstOrDefault(b => b.Ruleset.ShortName == Constant.SHORT_NAME);
                 Assert.That(beatmap, Is.Not.Null);
                 Assert.That(beatmap!.DifficultyName, Does.Contain("[RT★1]"));
             });
@@ -225,7 +225,7 @@ public partial class BmsDifficultyTableIntegrationTest
             realm.Run(r =>
             {
                 var beatmap = r.All<BeatmapInfo>().AsEnumerable()
-                    .FirstOrDefault(b => b.Ruleset.ShortName == "bms");
+                    .FirstOrDefault(b => b.Ruleset.ShortName == Constant.SHORT_NAME);
                 Assert.That(beatmap, Is.Not.Null);
                 Assert.That(beatmap!.DifficultyName, Does.Not.Contain("[RT"),
                     "Marker should be removed after table removal");
@@ -313,8 +313,8 @@ public partial class BmsDifficultyTableIntegrationTest
                 ],
             };
 
-            var previousStore = BmsRuleset.DifficultyTableStore;
-            BmsRuleset.DifficultyTableStore = store;
+            var previousStore = BmsRulesetRuntime.DifficultyTableStore;
+            BmsRulesetRuntime.DifficultyTableStore = store;
 
             try
             {
@@ -341,7 +341,7 @@ public partial class BmsDifficultyTableIntegrationTest
             }
             finally
             {
-                BmsRuleset.DifficultyTableStore = previousStore;
+                BmsRulesetRuntime.DifficultyTableStore = previousStore;
             }
 
             return Task.CompletedTask;
@@ -366,8 +366,8 @@ public partial class BmsDifficultyTableIntegrationTest
 
             var syncManager = new CollectionSyncManager();
             var store = new DifficultyTableStore(null, Path.Combine(storage.GetFullPath(string.Empty), "dt-cache"), syncManager, realm);
-            var previousStore = BmsRuleset.DifficultyTableStore;
-            BmsRuleset.DifficultyTableStore = store;
+            var previousStore = BmsRulesetRuntime.DifficultyTableStore;
+            BmsRulesetRuntime.DifficultyTableStore = store;
 
             try
             {
@@ -385,7 +385,7 @@ public partial class BmsDifficultyTableIntegrationTest
             }
             finally
             {
-                BmsRuleset.DifficultyTableStore = previousStore;
+                BmsRulesetRuntime.DifficultyTableStore = previousStore;
             }
 
             return Task.CompletedTask;

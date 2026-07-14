@@ -897,7 +897,7 @@ public class BmsLegacySkinTransformerTest
             TotalColumns = 8,
         };
         var skin = new BmsLegacySkinTransformer(new TestLegacySkin(["mania-key1"]), beatmap);
-        var hud = skin.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new RulesetInfo("bms", "BMS", string.Empty, -1)));
+        var hud = skin.GetDrawableComponent(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new RulesetInfo(Constant.SHORT_NAME, "BMS", string.Empty, -1)));
 
         Assert.That(hud, Is.Not.Null);
         Assert.That(hud!.ChildrenOfType<HealthDisplay>(), Is.Empty);

@@ -17,12 +17,12 @@ public class BmsLocalLeaderboardScoreSelectorTest
     public void TestSelectsScoreByBeatmapHashWhenBeatmapInfoPointsToOldBeatmap()
     {
         var oldBeatmap = new BeatmapInfo { Hash = "target-hash" };
-        var scoreWithOldBeatmapLink = score("target-hash", "bms", 900_000, oldBeatmap);
+        var scoreWithOldBeatmapLink = score("target-hash", Constant.SHORT_NAME, 900_000, oldBeatmap);
 
         var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
             [scoreWithOldBeatmapLink],
             "target-hash",
-            "bms",
+            Constant.SHORT_NAME,
             null,
             LeaderboardSortMode.Score);
 
@@ -32,16 +32,16 @@ public class BmsLocalLeaderboardScoreSelectorTest
     [Test]
     public void TestExcludesOtherHashesRulesetsAndDeletedScores()
     {
-        var matching = score("target-hash", "bms", 900_000);
-        var otherHash = score("other-hash", "bms", 1_000_000);
+        var matching = score("target-hash", Constant.SHORT_NAME, 900_000);
+        var otherHash = score("other-hash", Constant.SHORT_NAME, 1_000_000);
         var otherRuleset = score("target-hash", "mania", 1_000_000);
-        var deleted = score("target-hash", "bms", 1_000_000);
+        var deleted = score("target-hash", Constant.SHORT_NAME, 1_000_000);
         deleted.DeletePending = true;
 
         var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
             [otherHash, otherRuleset, deleted, matching],
             "target-hash",
-            "bms",
+            Constant.SHORT_NAME,
             null,
             LeaderboardSortMode.Score);
 
@@ -52,13 +52,13 @@ public class BmsLocalLeaderboardScoreSelectorTest
     public void TestAttachesFallbackBeatmapForScoresWithoutBeatmapInfo()
     {
         var currentBeatmap = new BeatmapInfo { Hash = "target-hash" };
-        var scoreWithoutBeatmapInfo = score("target-hash", "bms", 900_000);
+        var scoreWithoutBeatmapInfo = score("target-hash", Constant.SHORT_NAME, 900_000);
         scoreWithoutBeatmapInfo.BeatmapInfo = null;
 
         var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
             [scoreWithoutBeatmapInfo],
             "target-hash",
-            "bms",
+            Constant.SHORT_NAME,
             null,
             LeaderboardSortMode.Score,
             currentBeatmap);
@@ -69,21 +69,21 @@ public class BmsLocalLeaderboardScoreSelectorTest
     [Test]
     public void TestExactModsFilterUsesNativeLocalLeaderboardSemantics()
     {
-        var noModScore = score("target-hash", "bms", 900_000);
-        var noFailScore = score("target-hash", "bms", 800_000, mods: new BmsModNoFail());
-        var noFailMirrorScore = score("target-hash", "bms", 1_000_000, mods: [new BmsModNoFail(), new BmsModMirror()]);
+        var noModScore = score("target-hash", Constant.SHORT_NAME, 900_000);
+        var noFailScore = score("target-hash", Constant.SHORT_NAME, 800_000, mods: new BmsModNoFail());
+        var noFailMirrorScore = score("target-hash", Constant.SHORT_NAME, 1_000_000, mods: [new BmsModNoFail(), new BmsModMirror()]);
 
         var noModSelected = BmsLocalLeaderboardScoreSelector.SelectScores(
             [noFailScore, noModScore],
             "target-hash",
-            "bms",
+            Constant.SHORT_NAME,
             [],
             LeaderboardSortMode.Score);
 
         var noFailSelected = BmsLocalLeaderboardScoreSelector.SelectScores(
             [noFailMirrorScore, noModScore, noFailScore],
             "target-hash",
-            "bms",
+            Constant.SHORT_NAME,
             [new BmsModNoFail()],
             LeaderboardSortMode.Score);
 
@@ -94,16 +94,16 @@ public class BmsLocalLeaderboardScoreSelectorTest
     [Test]
     public void TestSortsByRequestedLeaderboardMode()
     {
-        var lowerAccuracy = score("target-hash", "bms", 1_000_000);
+        var lowerAccuracy = score("target-hash", Constant.SHORT_NAME, 1_000_000);
         lowerAccuracy.Accuracy = 0.95;
 
-        var higherAccuracy = score("target-hash", "bms", 900_000);
+        var higherAccuracy = score("target-hash", Constant.SHORT_NAME, 900_000);
         higherAccuracy.Accuracy = 0.99;
 
         var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
             [lowerAccuracy, higherAccuracy],
             "target-hash",
-            "bms",
+            Constant.SHORT_NAME,
             null,
             LeaderboardSortMode.Accuracy);
 

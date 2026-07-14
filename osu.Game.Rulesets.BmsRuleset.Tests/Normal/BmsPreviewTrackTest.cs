@@ -12,6 +12,7 @@ using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
@@ -20,6 +21,21 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 public partial class BmsPreviewTrackTest : OsuTestScene
 {
     private AudioManager audio = null!;
+    private BmsRulesetConfigManager? previousConfigManager;
+    private BmsRulesetConfigManager? testConfigManager;
+
+    [TearDown]
+    public void TearDown()
+    {
+        var configManager = testConfigManager;
+        testConfigManager = null;
+        configManager?.Dispose();
+
+        if (configManager != null)
+            BmsRulesetRuntime.ConfigManager = previousConfigManager;
+
+        previousConfigManager = null;
+    }
 
     [Test]
     public void TestEventAtTimeZeroPlaysOnStart()
@@ -144,6 +160,11 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
         AddStep("create sample-only preview", () =>
         {
+            previousConfigManager = BmsRulesetRuntime.ConfigManager;
+            testConfigManager = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
+            testConfigManager.SetValue(BmsRulesetSetting.UseDedicatedPreviewAudio, false);
+            BmsRulesetRuntime.ConfigManager = testConfigManager;
+
             var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-disabled-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
 
@@ -159,8 +180,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 new Dictionary<ushort, string> { [1] = "event.wav" },
                 directory,
                 audio,
-                "declared.wav",
-                false);
+                "declared.wav");
 
             track.Start();
             invokeUpdateState(track);

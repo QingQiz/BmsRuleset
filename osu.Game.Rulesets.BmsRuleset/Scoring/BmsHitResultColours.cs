@@ -19,5 +19,5 @@ internal static class BmsHitResultColours
     };
 
     public static Color4 ForScore(ScoreInfo score, HitResult result) =>
-        score.Ruleset.ShortName == "bms" ? ForHitResult(result) : colours.ForHitResult(result);
+        score.Ruleset.ShortName == Constant.SHORT_NAME ? ForHitResult(result) : colours.ForHitResult(result);
 }

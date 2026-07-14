@@ -107,7 +107,7 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         {
             BmsSongSelectLampPatcher.InstallOnce();
 
-            Ruleset.Value = rulesets.AvailableRulesets.Single(r => r.ShortName == "bms");
+            Ruleset.Value = rulesets.AvailableRulesets.Single(r => r.ShortName == Constant.SHORT_NAME);
             Beatmap.SetDefault();
             SelectedMods.SetDefault();
 
@@ -130,7 +130,7 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         loadSongSelect();
 
         AddAssert("patch installed", () => BmsSongSelectLampPatcher.IsInstalled);
-        AddUntilStep("BMS ruleset active", () => Ruleset.Value.ShortName == "bms");
+        AddUntilStep("BMS ruleset active", () => Ruleset.Value.ShortName == Constant.SHORT_NAME);
         AddUntilStep("all lamp panels are realised", () => lampRankDisplays().Count(), () => Is.EqualTo(all_lamps.Length));
         AddUntilStep("all real panels have BMS lamps", () => visibleLampDisplays().Count(), () => Is.EqualTo(all_lamps.Length));
         AddAssert("all lamp states are represented", () => visibleLampDisplays().Select(lampFromDisplay).OrderBy(l => l).SequenceEqual(all_lamps.OrderBy(l => l)));
@@ -158,7 +158,7 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
     {
         AddStep("import one BMS set with all lamp difficulties", () =>
         {
-            var bmsRuleset = rulesets.AvailableRulesets.Single(r => r.ShortName == "bms");
+            var bmsRuleset = rulesets.AvailableRulesets.Single(r => r.ShortName == Constant.SHORT_NAME);
             var imported = beatmaps.Import(createBeatmapSet(bmsRuleset));
 
             Assert.That(imported, Is.Not.Null);

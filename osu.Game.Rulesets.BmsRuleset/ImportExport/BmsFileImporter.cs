@@ -74,7 +74,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 var orphans = r.All<BeatmapSetInfo>()
                     .AsEnumerable()
                     .Where(s => !s.DeletePending)
-                    .Where(s => s.Beatmaps.Any(b => b.Ruleset.ShortName == "bms"))
+                    .Where(s => s.Beatmaps.Any(b => b.Ruleset.ShortName == Constant.SHORT_NAME))
                     .Where(s => s.Beatmaps.Any(b =>
                     {
                         var src = b.Metadata.Source;
@@ -138,7 +138,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                     {
                         notification.CancellationToken.ThrowIfCancellationRequested();
 
-                        if (set.Beatmaps.Any(x => x.Ruleset.ShortName == "bms"))
+                        if (set.Beatmaps.Any(x => x.Ruleset.ShortName == Constant.SHORT_NAME))
                         {
                             r.Write(() => beatmaps.Delete(set));
                             cnt += 1;
@@ -208,7 +208,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         {
             var result = new Dictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var beatmap in r.All<BeatmapInfo>().Filter("Ruleset.ShortName == $0 && BeatmapSet.DeletePending == false", "bms"))
+            foreach (var beatmap in r.All<BeatmapInfo>().Filter("Ruleset.ShortName == $0 && BeatmapSet.DeletePending == false", Constant.SHORT_NAME))
             {
                 if (!string.IsNullOrWhiteSpace(beatmap.MD5Hash))
                     result.TryAdd(beatmap.MD5Hash, 0);
@@ -363,7 +363,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     /// <summary>Validate that the BMS ruleset is available; set notification state if not.</summary>
     private bool checkRulesetAvailable(ProgressNotification notification) => realm.Run(r =>
     {
-        if (r.Find<RulesetInfo>("bms")?.Available == true) return true;
+        if (r.Find<RulesetInfo>(Constant.SHORT_NAME)?.Available == true) return true;
 
         notification.CompletionText = "Bms ruleset is not available";
         notification.State = ProgressNotificationState.Cancelled;
@@ -480,7 +480,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             {
                 realm.Run(r =>
                 {
-                    var rulesetInfo = r.Find<RulesetInfo>("bms")!;
+                    var rulesetInfo = r.Find<RulesetInfo>(Constant.SHORT_NAME)!;
                     notification.CancellationToken.ThrowIfCancellationRequested();
 
                     // ── Fast path: skip if the set hash already exists (prepared == null) ──

@@ -13,7 +13,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Editor;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
@@ -44,7 +43,7 @@ public partial class BmsRuleset : Ruleset
 {
     public override string Description => "BMS";
 
-    public override string ShortName => "bms";
+    public override string ShortName => Constant.SHORT_NAME;
 
     public override string RulesetAPIVersionSupported => CURRENT_RULESET_API_VERSION;
 
@@ -71,13 +70,6 @@ public partial class BmsRuleset : Ruleset
         HitResult.Meh,
         HitResult.Miss, // Empty POOR counter (keypress with no note to consume)
     ];
-
-    /// <summary>
-    /// Shared difficulty table store, set by <see cref="Settings.BmsSettingsSubsection"/> on creation.
-    /// </summary>
-    internal static DifficultyTableStore? DifficultyTableStore { get; set; }
-
-    private static BmsRulesetConfigManager? sharedConfigManager;
 
     static BmsRuleset()
     {
@@ -248,20 +240,14 @@ public partial class BmsRuleset : Ruleset
 
     public override IRulesetConfigManager CreateConfig(SettingsStore? settings)
     {
-        return sharedConfigManager = new BmsRulesetConfigManager(settings, RulesetInfo);
+        return BmsRulesetRuntime.ConfigManager = new BmsRulesetConfigManager(settings, RulesetInfo);
     }
-
-    internal static BmsReferenceBpmMode CurrentReferenceBpmMode =>
-        sharedConfigManager?.Get<BmsReferenceBpmMode>(BmsRulesetSetting.ReferenceBpmMode) ?? BmsReferenceBpmMode.MainBpm;
-
-    internal static bool UseDedicatedPreviewAudio =>
-        sharedConfigManager?.Get<bool>(BmsRulesetSetting.UseDedicatedPreviewAudio) ?? true;
 
     public override RulesetSettingsSubsection CreateSettings() =>
         new BmsSettingsSubsection(this);
 
     public override IRulesetFilterCriteria CreateRulesetFilterCriteria() =>
-        new BmsFilterCriteria(sharedConfigManager);
+        new BmsFilterCriteria(BmsRulesetRuntime.ConfigManager);
 
     public override Drawable CreateIcon() => new SpriteIcon
     {

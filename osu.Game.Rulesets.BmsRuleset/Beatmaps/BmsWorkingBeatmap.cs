@@ -82,8 +82,7 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
                 bmsBeatmap.SampleDefinitions,
                 Metadata.Source,
                 audioManager,
-                bmsBeatmap.PreviewFile,
-                BmsRuleset.UseDedicatedPreviewAudio);
+                bmsBeatmap.PreviewFile);
 
             // Stop and remove the previous preview track before registering the new one.
             // Disposing via the audio update loop also releases the per-chart SampleStore.

@@ -91,18 +91,13 @@ public class BmsPreviewTrack : Track
     /// </param>
     /// <param name="audioManager">Framework audio manager, used to create filesystem-backed audio stores.</param>
     /// <param name="previewFile"></param>
-    /// <param name="useDedicatedPreviewAudio">
-    ///     Set to <c>false</c> to avoid opening dedicated preview tracks and synthesize the preview
-    ///     from chart sample events instead.
-    /// </param>
     public BmsPreviewTrack(
         IReadOnlyList<BmsSampleEvent> sampleEvents,
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
         string? basePath,
         AudioManager audioManager,
-        string? previewFile = null,
-        bool useDedicatedPreviewAudio = true)
-        : this(() => sampleEvents, sampleDefinitions, basePath, audioManager, previewFile, useDedicatedPreviewAudio)
+        string? previewFile = null)
+        : this(() => sampleEvents, sampleDefinitions, basePath, audioManager, previewFile)
     {
     }
 
@@ -111,8 +106,7 @@ public class BmsPreviewTrack : Track
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
         string? basePath,
         AudioManager audioManager,
-        string? previewFile = null,
-        bool useDedicatedPreviewAudio = true)
+        string? previewFile = null)
         : base("bms-preview")
     {
         // Propagate the track's aggregate rate (populated by AdjustmentsFromMods in gameplay,
@@ -131,7 +125,7 @@ public class BmsPreviewTrack : Track
         fileResources.AddExtension("mp3");
         fileResources.AddExtension("ogg");
 
-        if (useDedicatedPreviewAudio)
+        if (BmsRulesetRuntime.UseDedicatedPreviewAudio)
         {
             foreach (var candidate in getPreviewCandidates(basePath, previewFile))
             {

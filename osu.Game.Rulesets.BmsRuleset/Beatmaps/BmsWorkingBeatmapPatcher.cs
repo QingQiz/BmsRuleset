@@ -65,7 +65,7 @@ public static class BmsWorkingBeatmapPatcher
         if (__result is BmsWorkingBeatmap)
             return;
 
-        if (__result.BeatmapInfo.Ruleset.ShortName != "bms")
+        if (__result.BeatmapInfo.Ruleset.ShortName != Constant.SHORT_NAME)
             return;
 
         try
