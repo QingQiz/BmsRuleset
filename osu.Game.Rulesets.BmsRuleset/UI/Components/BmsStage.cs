@@ -73,6 +73,10 @@ public sealed partial class BmsStage : CompositeDrawable
 
     internal void ClearHudTransform()
     {
+        // The HUD controller is a sibling and can outlive the stage during recursive disposal.
+        if (IsDisposed)
+            return;
+
         PositionOffset = Vector2.Zero;
 
         if (HasHudTransform)

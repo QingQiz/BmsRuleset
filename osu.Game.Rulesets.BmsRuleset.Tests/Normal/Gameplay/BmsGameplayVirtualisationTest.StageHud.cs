@@ -18,6 +18,23 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
 public partial class BmsGameplayVirtualisationTest
 {
     [Test]
+    public void TestStageHudControllerDisposalAfterStageDisposal()
+    {
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+        }));
+        var controller = new BmsStageHudController(playfield);
+
+        playfield.Stage.SetHudTransform(Vector2.Zero, Vector2.One, 500);
+        playfield.Stage.Dispose();
+
+        Assert.DoesNotThrow(controller.Dispose);
+        Assert.That(playfield.Stage.HasHudTransform, Is.True);
+    }
+
+    [Test]
     public void TestStageHudBoundsControlStageTransform()
     {
         var root = new Container { Size = new Vector2(1000, 600) };
