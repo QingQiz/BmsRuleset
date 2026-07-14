@@ -70,6 +70,30 @@ public class BmsRulesetTest
     }
 
     [Test]
+    public void TestDedicatedPreviewAudioIsEnabledByDefault()
+    {
+        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
+
+        Assert.That(config.Get<bool>(BmsRulesetSetting.UseDedicatedPreviewAudio), Is.True);
+    }
+
+    [Test]
+    public void TestDedicatedPreviewAudioSettingUpdatesCurrentValue()
+    {
+        using var config = (BmsRulesetConfigManager)ruleset.CreateConfig(null);
+
+        try
+        {
+            config.SetValue(BmsRulesetSetting.UseDedicatedPreviewAudio, false);
+            Assert.That(BmsRuleset.UseDedicatedPreviewAudio, Is.False);
+        }
+        finally
+        {
+            config.SetValue(BmsRulesetSetting.UseDedicatedPreviewAudio, true);
+        }
+    }
+
+    [Test]
     public void TestCreateDifficultyCalculatorUsesNativeBmsImplementation()
     {
         var working = new TestWorkingBeatmap(new BmsBeatmap());

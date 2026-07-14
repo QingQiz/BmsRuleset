@@ -31,6 +31,11 @@ public class BmsPreviewTrack : Track
 
     public override bool IsDummyDevice => false;
 
+    /// <summary>
+    /// Exposes the resolved source so callers can verify that the dedicated-track loading path was skipped.
+    /// </summary>
+    public bool UsesDedicatedPreviewAudio => previewTrack != null;
+
     public override double CurrentTime
     {
         get
@@ -78,7 +83,7 @@ public class BmsPreviewTrack : Track
     private int nextEventIndex;
     private double seekOffset;
 
-    /// <param name="bgmEvents">BGM events (channel #01) from the parsed BMS chart.</param>
+    /// <param name="sampleEvents">BGM and keysound events from the parsed BMS chart.</param>
     /// <param name="sampleDefinitions">Maps sample keys to filenames from the BMS chart.</param>
     /// <param name="basePath">
     ///     The chart directory on disk (from <c>BeatmapInfo.Metadata.Source</c>).
@@ -86,12 +91,28 @@ public class BmsPreviewTrack : Track
     /// </param>
     /// <param name="audioManager">Framework audio manager, used to create filesystem-backed audio stores.</param>
     /// <param name="previewFile"></param>
+    /// <param name="useDedicatedPreviewAudio">
+    ///     Set to <c>false</c> to avoid opening dedicated preview tracks and synthesize the preview
+    ///     from chart sample events instead.
+    /// </param>
     public BmsPreviewTrack(
-        IReadOnlyList<BmsSampleEvent> bgmEvents,
+        IReadOnlyList<BmsSampleEvent> sampleEvents,
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
         string? basePath,
         AudioManager audioManager,
-        string? previewFile = null)
+        string? previewFile = null,
+        bool useDedicatedPreviewAudio = true)
+        : this(() => sampleEvents, sampleDefinitions, basePath, audioManager, previewFile, useDedicatedPreviewAudio)
+    {
+    }
+
+    internal BmsPreviewTrack(
+        Func<IReadOnlyList<BmsSampleEvent>> sampleEventFactory,
+        IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        string? basePath,
+        AudioManager audioManager,
+        string? previewFile = null,
+        bool useDedicatedPreviewAudio = true)
         : base("bms-preview")
     {
         // Propagate the track's aggregate rate (populated by AdjustmentsFromMods in gameplay,
@@ -110,22 +131,25 @@ public class BmsPreviewTrack : Track
         fileResources.AddExtension("mp3");
         fileResources.AddExtension("ogg");
 
-        foreach (var candidate in getPreviewCandidates(basePath, previewFile))
+        if (useDedicatedPreviewAudio)
         {
-            previewTrackStore ??= audioManager.GetTrackStore(fileResources);
-            previewTrack = resolvePreviewTrack(candidate);
+            foreach (var candidate in getPreviewCandidates(basePath, previewFile))
+            {
+                previewTrackStore ??= audioManager.GetTrackStore(fileResources);
+                previewTrack = resolvePreviewTrack(candidate);
 
-            if (previewTrack == null)
-                continue;
+                if (previewTrack == null)
+                    continue;
 
-            break;
+                break;
+            }
         }
 
         if (previewTrack == null)
         {
             sampleStore = audioManager.GetSampleStore(fileResources);
 
-            foreach (var evt in bgmEvents)
+            foreach (var evt in sampleEventFactory())
             {
                 if (sampleDefinitions.TryGetValue(evt.SampleKey, out var samplePath))
                     sortedEvents.Add(new BgmEvent(evt.Time, samplePath, evt.Volume));

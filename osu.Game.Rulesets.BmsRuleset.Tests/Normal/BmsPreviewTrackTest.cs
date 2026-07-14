@@ -109,6 +109,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     public void TestDeclaredPreviewHasPriorityOverFolderPreview()
     {
         BmsPreviewTrack track = null!;
+        var eventFactoryInvoked = false;
 
         AddStep("create track with declared and folder preview", () =>
         {
@@ -119,13 +120,55 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "preview.wav"), TimeSpan.FromSeconds(1));
 
             track = new BmsPreviewTrack(
-                [],
+                () =>
+                {
+                    eventFactoryInvoked = true;
+                    return [];
+                },
                 new Dictionary<ushort, string>(),
                 directory,
                 audio,
                 "declared.wav");
         });
 
+        AddAssert("dedicated preview is used", () => track.UsesDedicatedPreviewAudio);
+        AddAssert("event factory is not invoked", () => !eventFactoryInvoked);
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
+    public void TestDedicatedPreviewCanBeDisabled()
+    {
+        BmsPreviewTrack track = null!;
+        var eventFactoryInvoked = false;
+
+        AddStep("create sample-only preview", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-disabled-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "declared.wav"), TimeSpan.FromSeconds(1));
+            writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsPreviewTrack(
+                () =>
+                {
+                    eventFactoryInvoked = true;
+                    return [new BmsSampleEvent(0, 0, 1, 100)];
+                },
+                new Dictionary<ushort, string> { [1] = "event.wav" },
+                directory,
+                audio,
+                "declared.wav",
+                false);
+
+            track.Start();
+            invokeUpdateState(track);
+        });
+
+        AddAssert("dedicated preview is skipped", () => !track.UsesDedicatedPreviewAudio);
+        AddAssert("event factory is invoked", () => eventFactoryInvoked);
+        AddAssert("chart sample preview plays", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
     }
 

@@ -65,7 +65,8 @@ for deletion.
 Song select preview audio is generated from the original BMS folder rather than from a stored osu! audio file. The
 ruleset first tries a declared `#PREVIEW` file, then a `preview.*` file in the chart folder, and finally falls back to
 the chart's BGM/keysound event timeline. This makes charts without a dedicated preview file still audible in song
-select.
+select. Disable **Use dedicated preview audio** in the BMS settings to always synthesize previews from BGM/keysound
+samples and skip loading dedicated preview files.
 
 ---
 
@@ -181,9 +182,8 @@ dynamic option channel (`A6`).
 > [!NOTE]
 > The resolved preview source is exposed so callers can tell whether a declared single-file (`#PREVIEW` / `preview.*`)
 > or BGM/keysound playback is active. BGM/keysound playback often gives a more representative preview; declared files
-> may
-> not reflect the chart's full audio content.
-> Whether a user-facing "prefer BGM/keysound preview" option is needed depends on player feedback.
+> may not reflect the chart's full audio content. The **Use dedicated preview audio** setting can disable single-file
+> previews and avoid their loading cost.
 
 **Header ignored:**
 

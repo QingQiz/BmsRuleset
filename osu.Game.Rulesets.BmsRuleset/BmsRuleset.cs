@@ -254,6 +254,9 @@ public partial class BmsRuleset : Ruleset
     internal static BmsReferenceBpmMode CurrentReferenceBpmMode =>
         sharedConfigManager?.Get<BmsReferenceBpmMode>(BmsRulesetSetting.ReferenceBpmMode) ?? BmsReferenceBpmMode.MainBpm;
 
+    internal static bool UseDedicatedPreviewAudio =>
+        sharedConfigManager?.Get<bool>(BmsRulesetSetting.UseDedicatedPreviewAudio) ?? true;
+
     public override RulesetSettingsSubsection CreateSettings() =>
         new BmsSettingsSubsection(this);
 

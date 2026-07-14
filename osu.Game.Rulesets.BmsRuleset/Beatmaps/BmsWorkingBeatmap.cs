@@ -77,34 +77,13 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
         if (beatmap is IBmsBeatmap bmsBeatmap)
         {
-            // Merge BGM events (#01 channel) with key sounds from every
-            // playable hit-object column so the preview plays all audible
-            // chart content, not just the BGM layer.
-            var allEvents = new List<BmsSampleEvent>(
-                bmsBeatmap.BackgroundSampleEvents.Count
-                + beatmap.HitObjects.Count);
-
-            allEvents.AddRange(bmsBeatmap.BackgroundSampleEvents);
-
-            foreach (var obj in beatmap.HitObjects)
-            {
-                if (obj is not BmsHitObject hit || hit is BmsLandmine)
-                    continue;
-
-                if (hit.SampleKey != 0)
-                    allEvents.Add(new BmsSampleEvent(hit.StartTime, 0, hit.SampleKey, hit.SampleVolume));
-                if (hit is BmsLongNote ln && ln.TailSampleKey != 0)
-                    allEvents.Add(new BmsSampleEvent(hit.StartTime + ln.Duration, 0, ln.TailSampleKey, ln.TailSampleVolume));
-            }
-
-            allEvents.Sort(static (a, b) => a.Time.CompareTo(b.Time));
-
             var track = new BmsPreviewTrack(
-                allEvents,
+                () => createPreviewEvents(beatmap, bmsBeatmap),
                 bmsBeatmap.SampleDefinitions,
                 Metadata.Source,
                 audioManager,
-                bmsBeatmap.PreviewFile);
+                bmsBeatmap.PreviewFile,
+                BmsRuleset.UseDedicatedPreviewAudio);
 
             // Stop and remove the previous preview track before registering the new one.
             // Disposing via the audio update loop also releases the per-chart SampleStore.
@@ -121,6 +100,31 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         }
 
         return null!; // fall back to TrackVirtual by WorkingBeatmap.LoadTrack
+    }
+
+    private static IReadOnlyList<BmsSampleEvent> createPreviewEvents(IBeatmap beatmap, IBmsBeatmap bmsBeatmap)
+    {
+        var allEvents = new List<BmsSampleEvent>(
+            bmsBeatmap.BackgroundSampleEvents.Count
+            + beatmap.HitObjects.Count);
+
+        allEvents.AddRange(bmsBeatmap.BackgroundSampleEvents);
+
+        // Song preview needs playable keysounds alongside #01 BGM because gameplay normally
+        // routes those two sources through separate players.
+        foreach (var obj in beatmap.HitObjects)
+        {
+            if (obj is not BmsHitObject hit || hit is BmsLandmine)
+                continue;
+
+            if (hit.SampleKey != 0)
+                allEvents.Add(new BmsSampleEvent(hit.StartTime, 0, hit.SampleKey, hit.SampleVolume));
+            if (hit is BmsLongNote ln && ln.TailSampleKey != 0)
+                allEvents.Add(new BmsSampleEvent(hit.StartTime + ln.Duration, 0, ln.TailSampleKey, ln.TailSampleVolume));
+        }
+
+        allEvents.Sort(static (a, b) => a.Time.CompareTo(b.Time));
+        return allEvents;
     }
 
     protected override IBeatmap GetBeatmap() => tryDecodeExternalBeatmap(BeatmapInfo) ?? inner.Beatmap;

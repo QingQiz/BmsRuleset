@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
@@ -24,6 +25,8 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.Settings.Sections.Maintenance;
+using osu.Game.Rulesets.BmsRuleset.Audio;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
@@ -90,6 +93,12 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
     [Resolved(CanBeNull = true)]
     private BeatmapManager? beatmapManager { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private MusicController? musicController { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private IBindable<WorkingBeatmap>? workingBeatmap { get; set; }
 
     [Resolved]
     private OsuColour colours { get; set; } = null!;
@@ -173,6 +182,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         var bindable5KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowBms5KDouble);
         var bindable7KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowBme7KDouble);
         var bindable9KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowPms9KDouble);
+        var useDedicatedPreviewAudio = manager.GetBindable<bool>(BmsRulesetSetting.UseDedicatedPreviewAudio);
 
         bindable5K.BindValueChanged(_ => onLayoutSettingChanged());
         bindable7K.BindValueChanged(_ => onLayoutSettingChanged());
@@ -180,6 +190,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         bindable5KDp.BindValueChanged(_ => onLayoutSettingChanged());
         bindable7KDp.BindValueChanged(_ => onLayoutSettingChanged());
         bindable9KDp.BindValueChanged(_ => onLayoutSettingChanged());
+        useDedicatedPreviewAudio.BindValueChanged(_ => reloadCurrentPreview());
 
         // Initialize difficulty table services
         if (BmsRuleset.DifficultyTableStore == null && host != null)
@@ -222,6 +233,12 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Caption = "BGA dim",
                 Current = manager.GetBindable<double>(BmsRulesetSetting.BgaDim),
                 DisplayAsPercentage = true,
+            }),
+            new SettingsItemV2(new FormCheckBox
+            {
+                Caption = "Use dedicated preview audio",
+                HintText = "Use #PREVIEW or preview.* files when available. Disable this to synthesize song-select previews only from BGM and keysound samples.",
+                Current = useDedicatedPreviewAudio,
             }),
             new SettingsItemV2(new FormCheckBox
             {
@@ -318,6 +335,23 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         };
         autocomplete.SetItems(buildPresetItems(), buildHistoryItems());
         Add(autocomplete);
+    }
+
+    private void reloadCurrentPreview()
+    {
+        Scheduler.AddOnce(() =>
+        {
+            if (musicController == null
+                || workingBeatmap?.Value is not BmsWorkingBeatmap
+                || BmsWorkingBeatmap.ActivePreviewTrack?.PlaybackMode != BmsPreviewTrackPlaybackMode.Preview)
+                return;
+
+            var wasPlaying = musicController.IsPlaying;
+            musicController.ReloadCurrentTrack();
+
+            if (wasPlaying)
+                musicController.Play();
+        });
     }
 
     /// <summary>
