@@ -143,7 +143,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         keysUnderNotes ? key_area_under_notes_depth : key_area_over_notes_depth;
 
     protected override HitObjectContainer CreateHitObjectContainer()
-        => new BmsColumnHitObjectContainer(ParentPlayfield.ScrollController, () => HitTargetPosition);
+        => new BmsColumnHitObjectContainer(ParentPlayfield.ScrollController, () => HitTargetPosition, () => ParentPlayfield.IsResumeRewinding);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
         => new BmsHitObjectLifetimeEntry(hitObject, ParentPlayfield.ScrollController);
@@ -165,6 +165,13 @@ public partial class BmsColumn : Playfield, IBmsColumn
         AddInternal(keySound);
 
         NewResult += onColumnNewResult;
+    }
+
+    protected override void Update()
+    {
+        // Each column owns its result stack, so it must suppress the framework's rewind reversion too.
+        if (!ParentPlayfield.IsResumeRewinding)
+            base.Update();
     }
 
     private static float defaultColumnWidth(int index, BmsLayoutVariant layoutVariant) =>

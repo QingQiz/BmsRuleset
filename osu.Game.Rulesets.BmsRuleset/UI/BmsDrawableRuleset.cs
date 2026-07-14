@@ -1,14 +1,18 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using HarmonyLib;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Input;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Input.Handlers;
 using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
@@ -33,6 +37,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 /// </remarks>
 public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) : DrawableRuleset<BmsHitObject>(ruleset, beatmap, mods)
 {
+    private static readonly MethodInfo? frame_stable_playback_setter = AccessTools.PropertySetter(typeof(DrawableRuleset<BmsHitObject>), "FrameStablePlayback");
+
     internal BmsStageHudController StageHudController => field ??= new BmsStageHudController((BmsPlayfield)Playfield);
 
     public new PassThroughInputManager KeyBindingInputManager => base.KeyBindingInputManager;
@@ -81,6 +87,8 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     private GameplayClockContainer? gameplayClockContainer { get; set; }
 
     private bool stoppedPreviewForGameplay;
+
+    private double? pendingResumeRewindFrom;
 
     #region Disposal
 
@@ -230,10 +238,69 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     private void onGameplayPausedChanged(ValueChangedEvent<bool> paused)
     {
-        if (paused.NewValue || stoppedPreviewForGameplay)
+        if (gameplayClockContainer == null)
             return;
 
-        stopPreviewForGameplay();
+        if (paused.NewValue)
+        {
+            pendingResumeRewindFrom = gameplayClockContainer.CurrentTime;
+            return;
+        }
+
+        if (!stoppedPreviewForGameplay)
+            stopPreviewForGameplay();
+
+        if (pendingResumeRewindFrom == null || gameplayState == null)
+            return;
+
+        var recordedPauseTime = (int)System.Math.Round(pendingResumeRewindFrom.Value);
+
+        if (gameplayState.Score.ScoreInfo.Pauses.Contains(recordedPauseTime))
+        {
+            BmsModPaused.ApplyToScore(gameplayState.Score.ScoreInfo);
+
+            var rewindTarget = ((BmsPlayfield)Playfield).BeginResumeRewind(
+                pendingResumeRewindFrom.Value,
+                gameplayClockContainer.StartTime);
+
+            seekImmediatelyForResume(rewindTarget);
+        }
+
+        pendingResumeRewindFrom = null;
+    }
+
+    private void seekImmediatelyForResume(double rewindTarget)
+    {
+        if (gameplayClockContainer == null)
+            return;
+
+        if (!trySetFrameStablePlayback(false))
+        {
+            gameplayClockContainer.Seek(rewindTarget);
+            return;
+        }
+
+        // Frame stability normally replays every intermediate rewind frame, which turns a five-second
+        // resume lead-in into a multi-second stall instead of an immediate seek.
+        gameplayClockContainer.Seek(rewindTarget);
+        SchedulerAfterChildren.Add(() => trySetFrameStablePlayback(true));
+    }
+
+    private bool trySetFrameStablePlayback(bool enabled)
+    {
+        if (frame_stable_playback_setter == null)
+            return false;
+
+        try
+        {
+            frame_stable_playback_setter.Invoke(this, [enabled]);
+            return true;
+        }
+        catch (System.Exception exception)
+        {
+            Logger.Error(exception, $"Failed to {(enabled ? "restore" : "disable")} frame-stable BMS playback for a resume rewind.");
+            return false;
+        }
     }
 
     private void stopPreviewForGameplay()

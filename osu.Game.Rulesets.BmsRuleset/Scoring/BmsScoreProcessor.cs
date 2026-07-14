@@ -136,6 +136,8 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         // that introduce the behaviour, so the score processor stays free of gauge-specific logic.
         foreach (var mod in Mods.Value.OfType<IApplicableToScorePopulation>())
             mod.ApplyToScore(score);
+
+        BmsModPaused.ApplyToScore(score);
     }
 
     protected override void Update()

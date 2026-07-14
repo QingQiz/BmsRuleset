@@ -18,14 +18,16 @@ public static class BmsLocalLeaderboardScoreSelector
 
         if (exactMods != null)
         {
-            if (!exactMods.Any())
+            var filterableExactMods = exactMods.Where(isFilterableMod).ToArray();
+
+            if (filterableExactMods.Length == 0)
             {
-                newScores = newScores.Where(s => !s.Mods.Any());
+                newScores = newScores.Where(s => !s.Mods.Any(isFilterableMod));
             }
             else
             {
-                var selectedMods = exactMods.Select(m => m.Acronym).ToHashSet();
-                newScores = newScores.Where(s => selectedMods.SetEquals(s.Mods.Select(m => m.Acronym)));
+                var selectedMods = filterableExactMods.Select(m => m.Acronym).ToHashSet();
+                newScores = newScores.Where(s => selectedMods.SetEquals(s.Mods.Where(isFilterableMod).Select(m => m.Acronym)));
             }
         }
 
@@ -39,4 +41,6 @@ public static class BmsLocalLeaderboardScoreSelector
 
         return selectedScores;
     }
+
+    private static bool isFilterableMod(Mod mod) => mod.Type != ModType.System;
 }

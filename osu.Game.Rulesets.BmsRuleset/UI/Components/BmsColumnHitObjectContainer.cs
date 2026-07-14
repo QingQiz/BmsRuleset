@@ -11,11 +11,13 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
     private readonly BmsScrollController scrollController;
     private readonly Func<float> getHitTargetPosition;
+    private readonly Func<bool> isResumeRewinding;
 
-    internal BmsColumnHitObjectContainer(BmsScrollController scrollController, Func<float> getHitTargetPosition)
+    internal BmsColumnHitObjectContainer(BmsScrollController scrollController, Func<float> getHitTargetPosition, Func<bool> isResumeRewinding)
     {
         this.scrollController = scrollController;
         this.getHitTargetPosition = getHitTargetPosition;
+        this.isResumeRewinding = isResumeRewinding;
         RelativeSizeAxes = Axes.Both;
     }
 
@@ -58,7 +60,9 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
                 ln.UpdateBodyGeometry(y, -(hitTarget + endOffset));
             }
 
-            note.UpdateColumnFrame();
+            // Keeping judgement controllers frozen avoids replaying misses or resetting an active long note.
+            if (!isResumeRewinding())
+                note.UpdateColumnFrame();
         }
     }
 }

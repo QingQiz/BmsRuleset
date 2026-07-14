@@ -39,6 +39,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private const float minimum_side_padding = 20;
 
+    internal const double RESUME_REWIND_DURATION = 5000;
+
+    internal const double RESUME_REWIND_ANIMATION_DURATION = 400;
+
     #endregion
 
     #region Construction
@@ -190,6 +194,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                 return true;
         }
 
+        if (IsResumeRewinding)
+            return false;
+
         var column = BmsKeyBindingConfiguration.ActionToColumn(e.Action, LayoutVariant);
 
         if (column == null || column.Value >= TotalColumns)
@@ -211,6 +218,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             case BmsAction.DecreaseScrollSpeed:
                 return;
         }
+
+        if (IsResumeRewinding)
+            return;
 
         var column = BmsKeyBindingConfiguration.ActionToColumn(e.Action, LayoutVariant);
 
@@ -257,6 +267,37 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region Lifecycle
 
+    private double resumeRewindInitialVisualOffset;
+
+    private double resumeRewindAnimationElapsed = RESUME_REWIND_ANIMATION_DURATION;
+
+    internal double ResumeRewindEndTime { get; private set; } = double.MinValue;
+
+    internal bool IsResumeRewinding => Time.Current < ResumeRewindEndTime;
+
+    internal bool IsResumeRewindAnimating => resumeRewindAnimationElapsed < RESUME_REWIND_ANIMATION_DURATION;
+
+    internal double DisplayTime { get; private set; }
+
+    internal double BeginResumeRewind(double pauseTime, double minimumTime)
+    {
+        var rewindTarget = ComputeResumeRewindTarget(pauseTime, minimumTime);
+
+        ResumeRewindEndTime = Math.Max(ResumeRewindEndTime, pauseTime);
+        resumeRewindInitialVisualOffset = pauseTime - rewindTarget;
+        resumeRewindAnimationElapsed = 0;
+        return rewindTarget;
+    }
+
+    internal static double ComputeResumeRewindTarget(double pauseTime, double minimumTime) =>
+        Math.Max(minimumTime, pauseTime - RESUME_REWIND_DURATION);
+
+    internal static double ComputeResumeRewindVisualOffset(double initialOffset, double elapsed)
+    {
+        var progress = Math.Clamp(elapsed / RESUME_REWIND_ANIMATION_DURATION, 0, 1);
+        return initialOffset * Math.Pow(1 - progress, 3);
+    }
+
     [BackgroundDependencyLoader(true)]
     private void load()
     {
@@ -290,9 +331,17 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     protected override void Update()
     {
-        ScrollController.Update(Time.Current);
+        if (IsResumeRewindAnimating && Time.Elapsed > 0)
+            resumeRewindAnimationElapsed += Time.Elapsed / Math.Max(Math.Abs(Clock.Rate), 0.01);
 
-        base.Update();
+        var visualOffset = ComputeResumeRewindVisualOffset(resumeRewindInitialVisualOffset, resumeRewindAnimationElapsed);
+        DisplayTime = Time.Current + visualOffset;
+        ScrollController.Update(DisplayTime);
+
+        // Playfield.Update normally reverts results newer than the clock. During the resume lead-in,
+        // those results belong to the completed attempt and must remain authoritative.
+        if (!IsResumeRewinding)
+            base.Update();
 
         triggerEvents();
         updateStageScale();
