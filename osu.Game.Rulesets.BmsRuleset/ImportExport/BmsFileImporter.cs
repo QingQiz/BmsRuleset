@@ -617,7 +617,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 DifficultyNameUpdater.GetDifficultyName(beatmapInfo, out var markerStr);
                 if (!string.IsNullOrWhiteSpace(markerStr))
                 {
-                    beatmapInfo.DifficultyName += $" [{markerStr}]";
+                    beatmapInfo.DifficultyName = DifficultyNameUpdater.AddMarkerSuffix(beatmapInfo.DifficultyName, markerStr);
                 }
 
                 beatmapSetInfo.Beatmaps.Add(beatmapInfo);

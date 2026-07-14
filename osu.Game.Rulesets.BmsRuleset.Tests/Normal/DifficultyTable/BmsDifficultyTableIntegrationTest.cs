@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Collections;
 using osu.Game.Database;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
@@ -229,6 +230,165 @@ public partial class BmsDifficultyTableIntegrationTest
                 Assert.That(beatmap!.DifficultyName, Does.Not.Contain("[RT"),
                     "Marker should be removed after table removal");
             });
+        });
+    }
+
+    [Test]
+    public void TestRefreshWithoutMarkersPreservesDifficultyName()
+    {
+        runIntegrationTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+
+            var chartPath = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Aleph-0 (by LeaF)", "_7NORMAL.bms");
+            var importer = new BmsFileImporter(realm, storage);
+            await importer.Import(chartPath).ConfigureAwait(false);
+
+            string originalName = null!;
+            realm.Run(r => originalName = r.All<BeatmapInfo>().Single().DifficultyName);
+
+            var store = new DifficultyTableStore(null, Path.Combine(storage.GetFullPath(string.Empty), "dt-cache"));
+            new DifficultyNameUpdater(realm, store).RefreshAllMarkers();
+
+            realm.Run(r => Assert.That(r.All<BeatmapInfo>().Single().DifficultyName, Is.EqualTo(originalName)));
+        });
+    }
+
+    [Test]
+    public void TestMarkerRefreshPreservesBracketedDifficultyName()
+    {
+        runIntegrationTest(async (realm, storage) =>
+        {
+            addBmsRuleset(realm);
+
+            var chartPath = Path.Combine(BmsEmbeddedSongDecoderTest.TestSongsRoot, "Aleph-0 (by LeaF)", "_7NORMAL.bms");
+            var md5 = computeMd5(chartPath);
+            var importer = new BmsFileImporter(realm, storage);
+            await importer.Import(chartPath).ConfigureAwait(false);
+
+            const string original_name = "Another [7K]";
+            realm.Write(r => r.All<BeatmapInfo>().Single().DifficultyName = original_name);
+
+            var store = new DifficultyTableStore(null, Path.Combine(storage.GetFullPath(string.Empty), "dt-cache"));
+            var table = new global::osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+            {
+                Name = "Bracket Preservation Test",
+                Symbol = "RT",
+                SourcePath = "bracket-preservation-test",
+                LevelOrder = ["★1"],
+                Entries = [new TableEntry { Level = "★1", Md5Hash = md5 }],
+            };
+            store.AddTable(table);
+
+            var updater = new DifficultyNameUpdater(realm, store);
+            updater.RefreshAllMarkers();
+
+            realm.Run(r => Assert.That(r.All<BeatmapInfo>().Single().DifficultyName,
+                Is.EqualTo($"{original_name}\u200B [RT★1]")));
+
+            store.RemoveTable(table);
+            updater.RefreshAllMarkers();
+
+            realm.Run(r => Assert.That(r.All<BeatmapInfo>().Single().DifficultyName, Is.EqualTo(original_name)));
+        });
+    }
+
+    [Test]
+    public void TestMergingSubdividedCollectionKeepsSurvivingRealmObjectAttached()
+    {
+        runIntegrationTest((realm, storage) =>
+        {
+            var syncManager = new CollectionSyncManager();
+            var store = new DifficultyTableStore(null, Path.Combine(storage.GetFullPath(string.Empty), "dt-cache"), syncManager, realm);
+            var table = new global::osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+            {
+                Name = "Collection Identity Test",
+                Symbol = "IT",
+                SourcePath = "collection-identity-test",
+                LevelOrder = ["1", "2"],
+                Entries =
+                [
+                    new TableEntry { Level = "1", Md5Hash = "11111111111111111111111111111111" },
+                    new TableEntry { Level = "2", Md5Hash = "22222222222222222222222222222222" },
+                ],
+            };
+
+            var previousStore = BmsRuleset.DifficultyTableStore;
+            BmsRuleset.DifficultyTableStore = store;
+
+            try
+            {
+                store.AddTable(table);
+                syncManager.ToggleSubdivide(realm, table);
+
+                BeatmapCollection survivingCollection = null!;
+                Guid survivingId = Guid.Empty;
+
+                realm.Run(r =>
+                {
+                    survivingCollection = r.All<BeatmapCollection>()
+                        .OrderBy(c => c.Name)
+                        .First();
+                    survivingId = survivingCollection.ID;
+                });
+
+                syncManager.ToggleSubdivide(realm, table);
+
+                Assert.DoesNotThrow(() => _ = survivingCollection.ID,
+                    "Collection UI may still access the old Realm object while processing the change notification");
+
+                realm.Run(r => Assert.That(r.All<BeatmapCollection>().Single().ID, Is.EqualTo(survivingId)));
+            }
+            finally
+            {
+                BmsRuleset.DifficultyTableStore = previousStore;
+            }
+
+            return Task.CompletedTask;
+        });
+    }
+
+    [Test]
+    public void TestSubdivideMatchesInferredLevelsIgnoringCase()
+    {
+        runIntegrationTest((realm, storage) =>
+        {
+            var table = BmsTableJsonParser.Merge("case-insensitive-levels", TableSource.LocalFile,
+                new RawTableData { Name = "Case-insensitive Levels" },
+                [
+                    new RawChartItem { Level = "st2", Md5 = "11111111111111111111111111111111" },
+                    new RawChartItem { Level = "ST2", Md5 = "22222222222222222222222222222222" },
+                ]);
+
+            Assert.That(table, Is.Not.Null);
+            string[] expectedLevelOrder = ["st2"];
+            Assert.That(table!.LevelOrder, Is.EqualTo(expectedLevelOrder));
+
+            var syncManager = new CollectionSyncManager();
+            var store = new DifficultyTableStore(null, Path.Combine(storage.GetFullPath(string.Empty), "dt-cache"), syncManager, realm);
+            var previousStore = BmsRuleset.DifficultyTableStore;
+            BmsRuleset.DifficultyTableStore = store;
+
+            try
+            {
+                store.AddTable(table);
+                syncManager.ToggleSubdivide(realm, table);
+
+                string[] expectedHashes =
+                [
+                    "11111111111111111111111111111111",
+                    "22222222222222222222222222222222",
+                ];
+
+                realm.Run(r => Assert.That(r.All<BeatmapCollection>().Single().BeatmapMD5Hashes,
+                    Is.EquivalentTo(expectedHashes)));
+            }
+            finally
+            {
+                BmsRuleset.DifficultyTableStore = previousStore;
+            }
+
+            return Task.CompletedTask;
         });
     }
 }

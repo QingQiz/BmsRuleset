@@ -87,108 +87,95 @@ public class CollectionSyncManager
         var prefix = $"{COLLECTION_PREFIX}{table.Name} ";
         var baseName = prefix.TrimEnd(' ');
 
-        var subdivided = IsSubdivided(table);
-
         // Find all existing collections that belong to this table
         var existing = r.All<BeatmapCollection>()
             .Where(c => c.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
                         || c.Name.Equals(baseName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (subdivided)
+        var desired = new List<(string name, List<string> hashes)>();
+
+        if (IsSubdivided(table))
         {
-            // Determine which levels in LevelOrder actually have entries
             var levelsWithEntries = table.LevelOrder
-                .Where(l => table.Entries.Any(e => e.Level == l))
+                .Where(l => table.Entries.Any(e => e.Level.Equals(l, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
-            // Dynamic index width based on number of levels with entries
             var indexWidth = levelsWithEntries.Count > 0
                 ? (int)Math.Floor(Math.Log10(levelsWithEntries.Count)) + 1
                 : 1;
 
-            var expectedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var index = 0;
-
-            foreach (var level in levelsWithEntries)
+            for (var index = 0; index < levelsWithEntries.Count; index++)
             {
+                var level = levelsWithEntries[index];
                 var indexStr = index.ToString($"D{indexWidth}");
-
                 var entries = table.Entries
-                    .Where(e => e.Level == level)
+                    .Where(e => e.Level.Equals(level, StringComparison.OrdinalIgnoreCase))
                     .Select(e => e.Md5Hash)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-                if (entries.Count == 0)
-                {
-                    index++;
-                    continue;
-                }
-
-                var collectionName = $"{prefix}[{indexStr}] {table.Symbol}{level}";
-                expectedNames.Add(collectionName);
-
-                var existingCol = r.All<BeatmapCollection>()
-                    .FirstOrDefault(c => c.Name == collectionName);
-
-                if (existingCol != null)
-                {
-                    // Diff-based update
-                    var currentSet = new HashSet<string>(existingCol.BeatmapMD5Hashes, StringComparer.OrdinalIgnoreCase);
-                    var newSet = new HashSet<string>(entries, StringComparer.OrdinalIgnoreCase);
-
-                    foreach (var toRemove in currentSet.Except(newSet).ToList())
-                        existingCol.BeatmapMD5Hashes.Remove(toRemove);
-                    foreach (var toAdd in newSet.Except(currentSet))
-                        existingCol.BeatmapMD5Hashes.Add(toAdd);
-                }
-                else
-                {
-                    r.Add(new BeatmapCollection(collectionName, entries));
-                }
-
-                index++;
-            }
-
-            // Remove any existing collections that aren't in the expected set
-            // (handles renamed collections from index-width changes or removed levels)
-            foreach (var col in existing)
-            {
-                if (!expectedNames.Contains(col.Name))
-                    r.Remove(col);
+                desired.Add(($"{prefix}[{indexStr}] {table.Symbol}{level}", entries));
             }
         }
         else
         {
-            // Not subdivided: merge into a single collection
             var allMd5 = table.Entries.Select(e => e.Md5Hash)
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-            // Remove per-level collections
-            foreach (var col in existing)
-            {
-                if (col.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    r.Remove(col);
-            }
-
-            var baseCol = r.All<BeatmapCollection>()
-                .FirstOrDefault(c => c.Name == baseName);
-
-            if (baseCol != null)
-            {
-                var currentSet = new HashSet<string>(baseCol.BeatmapMD5Hashes, StringComparer.OrdinalIgnoreCase);
-                var newSet = new HashSet<string>(allMd5, StringComparer.OrdinalIgnoreCase);
-
-                foreach (var toRemove in currentSet.Except(newSet).ToList())
-                    baseCol.BeatmapMD5Hashes.Remove(toRemove);
-                foreach (var toAdd in newSet.Except(currentSet))
-                    baseCol.BeatmapMD5Hashes.Add(toAdd);
-            }
-            else if (allMd5.Count > 0)
-            {
-                r.Add(new BeatmapCollection(baseName, allMd5));
-            }
+            if (allMd5.Count > 0)
+                desired.Add((baseName, allMd5));
         }
+
+        reconcileCollections(r, existing, desired);
+    }
+
+    private static void reconcileCollections(Realm r, List<BeatmapCollection> existing,
+                                             List<(string name, List<string> hashes)> desired)
+    {
+        var unmatchedExisting = existing.ToList();
+        var unmatchedDesired = new List<(string name, List<string> hashes)>();
+
+        foreach (var desiredCollection in desired)
+        {
+            var exactMatch = unmatchedExisting.FirstOrDefault(c =>
+                c.Name.Equals(desiredCollection.name, StringComparison.OrdinalIgnoreCase));
+
+            if (exactMatch == null)
+            {
+                unmatchedDesired.Add(desiredCollection);
+                continue;
+            }
+
+            unmatchedExisting.Remove(exactMatch);
+            updateCollection(exactMatch, desiredCollection.name, desiredCollection.hashes);
+        }
+
+        var reusableCount = Math.Min(unmatchedExisting.Count, unmatchedDesired.Count);
+
+        // Realm-backed drawables can outlive a change notification, so retaining identity prevents them from reading detached rows.
+        for (var i = 0; i < reusableCount; i++)
+            updateCollection(unmatchedExisting[i], unmatchedDesired[i].name, unmatchedDesired[i].hashes);
+
+        for (var i = reusableCount; i < unmatchedExisting.Count; i++)
+            r.Remove(unmatchedExisting[i]);
+
+        for (var i = reusableCount; i < unmatchedDesired.Count; i++)
+            r.Add(new BeatmapCollection(unmatchedDesired[i].name, unmatchedDesired[i].hashes));
+    }
+
+    private static void updateCollection(BeatmapCollection collection, string name, List<string> hashes)
+    {
+        if (!collection.Name.Equals(name, StringComparison.Ordinal))
+            collection.Name = name;
+
+        var currentSet = new HashSet<string>(collection.BeatmapMD5Hashes, StringComparer.OrdinalIgnoreCase);
+        var newSet = new HashSet<string>(hashes, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var toRemove in currentSet.Except(newSet).ToList())
+            collection.BeatmapMD5Hashes.Remove(toRemove);
+
+        foreach (var toAdd in newSet.Except(currentSet))
+            collection.BeatmapMD5Hashes.Add(toAdd);
     }
 }

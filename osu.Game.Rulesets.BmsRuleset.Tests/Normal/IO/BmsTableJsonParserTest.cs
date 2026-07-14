@@ -65,6 +65,33 @@ public class BmsTableJsonParserTest
         Assert.That(table!.Name, Is.EqualTo("Combined"));
         Assert.That(table.Entries, Has.Count.EqualTo(1));
         Assert.That(table.Entries[0].Md5Hash, Is.EqualTo("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+        string[] expectedOrder = ["★1"];
+        Assert.That(table.LevelOrder, Is.EqualTo(expectedOrder));
+    }
+
+    [Test]
+    public void TestMergeInfersMissingLevelOrder()
+    {
+        var table = BmsTableJsonParser.Merge("fallback", TableSource.LocalFile,
+            new RawTableData { Name = "Fallback" },
+            [
+                new RawChartItem { Level = "beta", Md5 = "00000000000000000000000000000001" },
+                new RawChartItem { Level = "st10", Md5 = "00000000000000000000000000000002" },
+                new RawChartItem { Level = "2", Md5 = "00000000000000000000000000000003" },
+                new RawChartItem { Level = "st2", Md5 = "00000000000000000000000000000004" },
+                new RawChartItem { Level = "alpha", Md5 = "00000000000000000000000000000005" },
+                new RawChartItem { Level = "1", Md5 = "00000000000000000000000000000006" },
+                new RawChartItem { Level = "ST2", Md5 = "00000000000000000000000000000007" },
+                new RawChartItem { Level = "1.5", Md5 = "00000000000000000000000000000008" },
+                new RawChartItem { Level = "st1.25", Md5 = "00000000000000000000000000000009" },
+                new RawChartItem { Level = "st-2", Md5 = "0000000000000000000000000000000a" },
+                new RawChartItem { Level = "st.5", Md5 = "0000000000000000000000000000000b" },
+                new RawChartItem { Level = "ignored", Md5 = "invalid" },
+            ]);
+
+        Assert.That(table, Is.Not.Null);
+        string[] expectedOrder = ["st-2", "st.5", "1", "st1.25", "1.5", "2", "st2", "st10", "alpha", "beta"];
+        Assert.That(table!.LevelOrder, Is.EqualTo(expectedOrder));
     }
 
     [Test]

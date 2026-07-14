@@ -15,6 +15,8 @@ namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 /// </summary>
 public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableStore store)
 {
+    private const char marker_ownership_sentinel = '\u200B';
+
     public static void GetDifficultyName(BeatmapInfo beatmap, out string markerStr)
     {
         markerStr = string.Empty;
@@ -26,10 +28,11 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
 
         var markers = BmsRuleset.DifficultyTableStore.GetMarkers(beatmap.MD5Hash);
 
-        markerStr = markers.Count == 0
-            ? string.Empty
-            : string.Join(" ", markers.Select(m => $"{m.table.Symbol}{m.entry.Level}"));
+        markerStr = FormatMarkers(markers);
     }
+
+    internal static string AddMarkerSuffix(string difficultyName, string markerStr) =>
+        $"{difficultyName}{marker_ownership_sentinel} [{markerStr}]";
 
     /// <summary>
     /// Full rebuild — applies markers from every loaded table to the matching
@@ -48,19 +51,13 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
             var allBmsBeatmaps = r.All<BeatmapInfo>().Filter("Ruleset.ShortName == 'bms'");
             foreach (var beatmap in allBmsBeatmaps)
             {
-                var clean = markerSuffixRegex().Replace(beatmap.DifficultyName, string.Empty);
                 var markers = store.GetMarkers(beatmap.MD5Hash);
-                var res = string.Empty;
+                var markerStr = FormatMarkers(markers);
+                var clean = ownedMarkerSuffixRegex().Replace(beatmap.DifficultyName, string.Empty);
 
-                if (markers.Count == 0)
-                {
-                    if (beatmap.DifficultyName != clean) res = clean;
-                }
-                else
-                {
-                    var markerStr = string.Join(" ", markers.Select(m => $"{m.table.Symbol}{m.entry.Level}"));
-                    res = $"{clean} [{markerStr}]";
-                }
+                var res = markers.Count == 0
+                    ? clean
+                    : AddMarkerSuffix(clean, markerStr);
 
                 if (res != beatmap.DifficultyName) collect.Add((beatmap.ID, res));
             }
@@ -83,6 +80,11 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
         });
     }
 
-    [GeneratedRegex(@"\s\[[^\]]*\]$", RegexOptions.Compiled)]
-    private static partial Regex markerSuffixRegex();
+    internal static string FormatMarkers(IReadOnlyList<(DifficultyTable table, TableEntry entry)> markers) =>
+        markers.Count == 0
+            ? string.Empty
+            : string.Join(" ", markers.Select(m => $"{m.table.Symbol}{m.entry.Level}"));
+
+    [GeneratedRegex(@"\u200B\s\[[^\]]*\]$", RegexOptions.Compiled)]
+    private static partial Regex ownedMarkerSuffixRegex();
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -67,21 +68,33 @@ public static class BmsTableJsonParser
         if (string.IsNullOrEmpty(name) || charts == null || charts.Count == 0)
             return null;
 
-        var levelOrder = header?.LevelOrder;
-        var levelIndexMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        if (levelOrder != null)
+        var validCharts = new List<(RawChartItem chart, string hash, string level)>();
+
+        foreach (var chart in charts)
         {
-            for (var i = 0; i < levelOrder.Length; i++)
-                levelIndexMap[levelOrder[i]] = i;
+            var hash = PickHash(chart.Md5, chart.Sha256);
+            if (hash != null)
+                validCharts.Add((chart, hash, chart.Level ?? string.Empty));
         }
 
-        var entries = new List<TableEntry>();
-        foreach (var c in charts)
-        {
-            var hash = PickHash(c.Md5, c.Sha256);
-            if (hash == null) continue;
+        var levelOrder = header?.LevelOrder;
 
-            var level = c.Level ?? string.Empty;
+        if (levelOrder == null || levelOrder.Length == 0)
+        {
+            levelOrder = validCharts
+                .Select(c => c.level)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(level => level, LevelOrderComparer.INSTANCE)
+                .ToArray();
+        }
+
+        var levelIndexMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < levelOrder.Length; i++)
+            levelIndexMap[levelOrder[i]] = i;
+
+        var entries = new List<TableEntry>();
+        foreach (var (chart, hash, level) in validCharts)
+        {
             var levelIndex = levelIndexMap.GetValueOrDefault(level, int.MaxValue);
 
             entries.Add(new TableEntry
@@ -89,8 +102,8 @@ public static class BmsTableJsonParser
                 Level = level,
                 LevelIndex = levelIndex,
                 Md5Hash = hash,
-                Title = c.Title,
-                Artist = c.Artist,
+                Title = chart.Title,
+                Artist = chart.Artist,
             });
         }
 
@@ -98,7 +111,7 @@ public static class BmsTableJsonParser
         {
             Name = name,
             Symbol = symbol,
-            LevelOrder = levelOrder ?? [],
+            LevelOrder = levelOrder,
             Source = source,
             SourcePath = sourcePath,
             Entries = entries,
@@ -107,6 +120,51 @@ public static class BmsTableJsonParser
 
     private static bool isHexOfLength(string? s, int len) =>
         s != null && s.Length == len && s.All(static c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
+
+    private sealed class LevelOrderComparer : IComparer<string>
+    {
+        public static readonly LevelOrderComparer INSTANCE = new();
+
+        public int Compare(string? x, string? y)
+        {
+            var xHasNumber = tryParseLevelNumber(x, out var xNumber);
+            var yHasNumber = tryParseLevelNumber(y, out var yNumber);
+
+            if (xHasNumber != yHasNumber)
+                return xHasNumber ? -1 : 1;
+
+            if (xHasNumber)
+            {
+                var numberComparison = xNumber.CompareTo(yNumber);
+                if (numberComparison != 0)
+                    return numberComparison;
+            }
+
+            var lexicalComparison = StringComparer.OrdinalIgnoreCase.Compare(x, y);
+            return lexicalComparison != 0 ? lexicalComparison : StringComparer.Ordinal.Compare(x, y);
+        }
+
+        private static bool tryParseLevelNumber(string? level, out decimal number)
+        {
+            if (decimal.TryParse(level, NumberStyles.Number, CultureInfo.InvariantCulture, out number))
+                return true;
+
+            if (level != null)
+            {
+                for (var numericStart = 1; numericStart < level.Length; numericStart++)
+                {
+                    if (char.IsAsciiDigit(level[numericStart - 1]))
+                        break;
+
+                    if (decimal.TryParse(level.AsSpan(numericStart), NumberStyles.Number, CultureInfo.InvariantCulture, out number))
+                        return true;
+                }
+            }
+
+            number = 0;
+            return false;
+        }
+    }
 
     private static RawTableData parseHeader(JsonElement root)
     {
