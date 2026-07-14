@@ -14,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
+using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;
@@ -75,6 +76,22 @@ public class BmsBgaDisplaySizingTest
         {
             Assert.That(display.RelativeSizeAxes, Is.EqualTo(Axes.None));
             Assert.That(display.Size, Is.EqualTo(new osuTK.Vector2(640, 480)));
+        });
+    }
+
+    [Test]
+    public void TestUntouchedAutoSizeSurvivesSkinLayoutRoundTrip()
+    {
+        var display = new BmsBgaDisplay { AutoSizeToParent = true };
+        applyAutoSizeToParent(display);
+
+        var restored = (BmsBgaDisplay)display.CreateSerialisedInfo().CreateInstance();
+        applyAutoSizeToParent(restored);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.RelativeSizeAxes, Is.EqualTo(Axes.Both));
+            Assert.That(restored.Size, Is.EqualTo(Vector2.One));
         });
     }
 

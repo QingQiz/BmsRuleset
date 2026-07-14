@@ -266,8 +266,10 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
     {
         // The HUD default (AutoSizeToParent) fills the parent so the rehost host — sized to the
         // parent quad — defines the BGA window; content letterboxes transparently via FillMode.Fit.
-        // The non-auto path keeps an explicit skin-edited size.
-        if (AutoSizeToParent)
+        // RelativeSizeAxes is not part of osu!'s serialised skin layout, so an untouched default
+        // reloads as an absolute 1×1 component. Treat that exact shape as the persisted auto-size
+        // sentinel while leaving explicit skin-edited sizes untouched.
+        if (AutoSizeToParent || RelativeSizeAxes == Axes.None && Size == Vector2.One)
         {
             RelativeSizeAxes = Axes.Both;
             Size = Vector2.One;
