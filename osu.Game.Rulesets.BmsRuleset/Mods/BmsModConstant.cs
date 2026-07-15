@@ -1,5 +1,6 @@
 using System;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Mods;
@@ -13,7 +14,7 @@ public class BmsModConstant : Mod, IApplicableToDrawableRuleset<BmsHitObject>
 
     public override string Acronym => "CN";
 
-    public override LocalisableString Description => "Disables BPM-based scroll speed changes.";
+    public override LocalisableString Description => BmsStrings.ModConstant;
 
     public override ModType Type => ModType.DifficultyReduction;
 

@@ -30,6 +30,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Screens;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Screens;
@@ -225,54 +226,54 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             }),
             new SettingsItemV2(new FormEnumDropdown<BmsReferenceBpmMode>
             {
-                Caption = "Reference BPM",
+                Caption = BmsStrings.ReferenceBpm,
                 Current = manager.GetBindable<BmsReferenceBpmMode>(BmsRulesetSetting.ReferenceBpmMode),
             }),
             new SettingsItemV2(new FormSliderBar<double>
             {
-                Caption = "BGA dim",
+                Caption = BmsStrings.BgaDim,
                 Current = manager.GetBindable<double>(BmsRulesetSetting.BgaDim),
                 DisplayAsPercentage = true,
             }),
             new SettingsItemV2(new FormCheckBox
             {
-                Caption = "Use dedicated preview audio",
-                HintText = "Use #PREVIEW or preview.* files when available. Disable this to synthesize song-select previews only from BGM and keysound samples.",
+                Caption = BmsStrings.UseDedicatedPreviewAudio,
+                HintText = BmsStrings.DedicatedPreviewAudioHint,
                 Current = useDedicatedPreviewAudio,
             }),
             new SettingsItemV2(new FormCheckBox
             {
-                Caption = "Show BMS 5K",
+                Caption = BmsStrings.ShowBms5K,
                 Current = bindable5K,
             }),
             new SettingsItemV2(new FormCheckBox
             {
-                Caption = "Show BME 7K",
+                Caption = BmsStrings.ShowBme7K,
                 Current = bindable7K,
             }),
             new SettingsItemV2(new FormCheckBox
             {
-                Caption = "Show PMS 9K",
+                Caption = BmsStrings.ShowPms9K,
                 Current = bindable9K,
             }),
             new SettingsItemV2(new FormCheckBox
             {
-                Caption = "Show BMS 5K DP",
+                Caption = BmsStrings.ShowBms5KDp,
                 Current = bindable5KDp,
             }),
             new SettingsItemV2(new FormCheckBox
             {
-                Caption = "Show BME 7K DP",
+                Caption = BmsStrings.ShowBme7KDp,
                 Current = bindable7KDp,
             }),
             new SettingsItemV2(new FormCheckBox
             {
-                Caption = "Show PMS 9K DP",
+                Caption = BmsStrings.ShowPms9KDp,
                 Current = bindable9KDp,
             }),
             new RoundedButton
             {
-                Text = "Import BMS files",
+                Text = BmsStrings.ImportBmsFiles,
                 RelativeSizeAxes = Axes.X,
                 Height = 36,
                 Action = () => { performer?.PerformFromScreen(menu => menu.Push(new BmsFileImportScreen(manager))); },
@@ -280,8 +281,8 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             },
             new RoundedButton
             {
-                Text = "Clean up orphaned BMS sets",
-                TooltipText = "Removes BMS beatmaps whose source files (audio, images) can no longer be found on disk",
+                Text = BmsStrings.CleanupOrphanedSets,
+                TooltipText = BmsStrings.CleanupOrphanedSetsTooltip,
                 BackgroundColour = colours.YellowDarker,
                 RelativeSizeAxes = Axes.X,
                 Height = 36,
@@ -290,7 +291,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             },
             new DangerousRoundedButton
             {
-                Text = "Delete all imported BMS files",
+                Text = BmsStrings.DeleteAllImportedFiles,
                 RelativeSizeAxes = Axes.X,
                 Height = 36,
                 Action = confirmDeleteAllBmsFiles,
@@ -299,7 +300,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             // ── Difficulty Table Section ──
             new OsuSpriteText
             {
-                Text = "Difficulty Tables",
+                Text = BmsStrings.DifficultyTables,
                 Font = OsuFont.Default.With(size: 16, weight: FontWeight.Bold),
                 Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS, Top = 15 },
             },
@@ -320,7 +321,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                     Current =
                     {
                         Value = new SettingsNote.Data(
-                            "Adding or removing difficulty tables while on the song select screen may freeze the UI. Switch to the main menu first.",
+                            BmsStrings.DifficultyTableWarning,
                             SettingsNote.Type.Warning)
                     },
                 },
@@ -434,7 +435,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         // irreversibly removing every imported BMS beatmap.
         var dialog = new MassDeleteConfirmationDialog(
             () => bmsImporter.DeleteAllBmsFilesAsync(),
-            "All imported BMS beatmaps will be permanently deleted. This cannot be undone!");
+            BmsStrings.DeleteAllConfirmation);
 
         if (dialogOverlay != null)
             dialogOverlay.Push(dialog);
@@ -450,7 +451,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
         var dialog = new MassDeleteConfirmationDialog(
             () => Task.Run(() => bmsImporter.CleanupOrphanedSets()),
-            "BMS beatmaps whose source directory no longer exists will be removed. This cannot be undone.\n\nAfter deletion, you will need to re-import them. Cancel now and move the files back to their original location if you want to keep them.");
+            BmsStrings.CleanupOrphansConfirmation);
 
         if (dialogOverlay != null)
             dialogOverlay.Push(dialog);
@@ -474,7 +475,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
             notification = new ProgressNotification
             {
-                Text = "Importing difficulty table…",
+                Text = BmsStrings.ImportingDifficultyTable,
                 Progress = 0,
                 State = ProgressNotificationState.Active,
             };
@@ -485,7 +486,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             {
                 Schedule(() =>
                 {
-                    notification.CompletionText = $"Difficulty table already imported: {pathOrUrl}";
+                    notification.CompletionText = BmsStrings.DifficultyTableAlreadyImported(pathOrUrl);
                     notification.State = ProgressNotificationState.Completed;
                 });
                 return;
@@ -514,7 +515,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 {
                     addToHistory(pathOrUrl, importResult.Table.Name, importResult.Table.Symbol);
                     autocomplete?.SetItems(buildPresetItems(), buildHistoryItems());
-                    notification.CompletionText = $"Loaded table: {importResult.Table.Name} ({importResult.Table.Entries.Count} charts)";
+                    notification.CompletionText = BmsStrings.LoadedTable(importResult.Table.Name, importResult.Table.Entries.Count);
                     notification.Progress = 1;
                     notification.State = ProgressNotificationState.Completed;
                 });
@@ -523,7 +524,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             {
                 Schedule(() =>
                 {
-                    notification.CompletionText = $"Failed to load difficulty table from: {pathOrUrl}";
+                    notification.CompletionText = BmsStrings.FailedToLoadTable(pathOrUrl);
                     notification.State = ProgressNotificationState.Cancelled;
                 });
             }
@@ -548,7 +549,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             {
                 notification = new ProgressNotification
                 {
-                    Text = $"Removing difficulty table \"{table.Name}\"...",
+                    Text = BmsStrings.RemovingTable(table.Name),
                     Progress = 0,
                     State = ProgressNotificationState.Active,
                 };
@@ -563,7 +564,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             {
                 if (notification == null) return;
 
-                notification.CompletionText = $"Removed difficulty table \"{table.Name}\"";
+                notification.CompletionText = BmsStrings.RemovedTable(table.Name);
                 notification.Progress = 1;
                 notification.State = ProgressNotificationState.Completed;
             });
@@ -586,7 +587,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
 
             var notification = new ProgressNotification
             {
-                Text = $"Updating difficulty table \"{table.Name}\"...",
+                Text = BmsStrings.UpdatingTable(table.Name),
                 Progress = 0,
                 State = ProgressNotificationState.Active,
             };
@@ -599,7 +600,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 difficultyTableStore.ReplaceTable(table, importResult.Table);
                 Schedule(() =>
                 {
-                    notification.CompletionText = $"Updated table: {importResult.Table.Name} ({importResult.Table.Entries.Count} charts)";
+                    notification.CompletionText = BmsStrings.UpdatedTable(importResult.Table.Name, importResult.Table.Entries.Count);
                     notification.Progress = 1;
                     notification.State = ProgressNotificationState.Completed;
                 });
@@ -608,7 +609,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             {
                 Schedule(() =>
                 {
-                    notification.CompletionText = $"Failed to update difficulty table: {table.SourcePath}";
+                    notification.CompletionText = BmsStrings.FailedToUpdateTable(table.SourcePath);
                     notification.State = ProgressNotificationState.Cancelled;
                 });
             }
@@ -724,10 +725,10 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 {
                     new RoundedButton
                     {
-                        Text = isSubdivided ? "Unsubdivide" : "Subdivide",
+                        Text = isSubdivided ? BmsStrings.Unsubdivide : BmsStrings.Subdivide,
                         TooltipText = isSubdivided
-                            ? "Merge per-level collections back into one"
-                            : "Split into per-level collections",
+                            ? BmsStrings.UnsubdivideTooltip
+                            : BmsStrings.SubdivideTooltip,
                         Height = 25,
                         Width = 100,
                         Action = confirmSubdivide,
@@ -738,8 +739,8 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 {
                     buttons.Add(new RoundedButton
                     {
-                        Text = "Upd",
-                        TooltipText = "Re-fetch table from source",
+                        Text = BmsStrings.Update,
+                        TooltipText = BmsStrings.UpdateTableTooltip,
                         Height = 25,
                         Width = 40,
                         Action = confirmUpdate,
@@ -749,7 +750,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 buttons.Add(new DangerousRoundedButton
                 {
                     Text = "X",
-                    TooltipText = "Delete table",
+                    TooltipText = BmsStrings.DeleteTableTooltip,
                     Height = 25,
                     Width = 35,
                     Action = confirmDelete,
@@ -763,7 +764,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 if (dialogOverlay != null)
                     dialogOverlay.Push(new MassDeleteConfirmationDialog(
                         () => Task.Run(() => onDelete?.Invoke(table)),
-                        $"Delete difficulty table \"{table.Name}\" ({table.Entries.Count} charts)?\n\n⚠ This may freeze the UI if done from song select. Switch to the main menu first."));
+                        BmsStrings.DeleteTableConfirmation(table.Name, table.Entries.Count)));
                 else
                     onDelete?.Invoke(table);
             }
@@ -773,7 +774,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 if (dialogOverlay != null)
                     dialogOverlay.Push(new MassDeleteConfirmationDialog(
                         () => onUpdate?.Invoke(table),
-                        $"Re-fetch difficulty table \"{table.Name}\" from source?\n\n⚠ This may freeze the UI if done from song select. Switch to the main menu first."));
+                        BmsStrings.UpdateTableConfirmation(table.Name)));
                 else
                     onUpdate?.Invoke(table);
             }
@@ -785,8 +786,8 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                     dialogOverlay.Push(new MassDeleteConfirmationDialog(
                         () => syncManager?.ToggleSubdivide(realm, table),
                         isSubdivided
-                            ? $"Merge difficulty table \"{table.Name}\" back into a single collection?"
-                            : $"Split difficulty table \"{table.Name}\" into per-level collections?"));
+                            ? BmsStrings.MergeTableConfirmation(table.Name)
+                            : BmsStrings.SplitTableConfirmation(table.Name)));
                 else
                     syncManager?.ToggleSubdivide(realm, table);
             }

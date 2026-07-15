@@ -16,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using Realms;
 
@@ -33,7 +34,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
         var notification = new ProgressNotification
         {
-            Text = "BMS import is initialising...",
+            Text = BmsStrings.ImportInitialising,
             State = ProgressNotificationState.Active,
             CancelRequested = () => true,
         };
@@ -62,7 +63,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     {
         var notification = new ProgressNotification
         {
-            Text = "Scanning for orphaned BMS beatmaps...",
+            Text = BmsStrings.ScanningOrphans,
             State = ProgressNotificationState.Active,
         };
         notifications?.Post(notification);
@@ -94,8 +95,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             });
 
             notification.CompletionText = deleted > 0
-                ? $"Cleaned up {deleted} orphaned BMS beatmap set{(deleted != 1 ? "s" : "")}."
-                : "No orphaned BMS beatmaps found.";
+                ? BmsStrings.CleanupComplete(deleted)
+                : BmsStrings.NoOrphansFound;
             notification.State = ProgressNotificationState.Completed;
 
             return deleted;
@@ -104,7 +105,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         {
             Logger.Error(e, $"BMS cleanup failed: {e.Message}");
 
-            notification.CompletionText = "BMS cleanup failed. Check logs for more information.";
+            notification.CompletionText = BmsStrings.CleanupFailed;
             notification.State = ProgressNotificationState.Cancelled;
             return 0;
         }
@@ -120,7 +121,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
         var notification = new ProgressNotification
         {
-            Text = "Deleting Bms beatmaps...",
+            Text = BmsStrings.DeletingBeatmaps,
             State = ProgressNotificationState.Active,
         };
         notification.CancelRequested = () => true;
@@ -142,27 +143,27 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                         {
                             r.Write(() => beatmaps.Delete(set));
                             cnt += 1;
-                            notification.Text = $"Deleted {cnt} BMS beatmap sets";
+                            notification.Text = BmsStrings.DeletedSets(cnt);
                         }
                     }
                 });
 
-                notification.CompletionText = $"Deleted {cnt} BMS beatmap sets";
+                notification.CompletionText = BmsStrings.DeletedSets(cnt);
                 notification.State = ProgressNotificationState.Completed;
             }
             catch (OperationCanceledException)
             {
                 Logger.Log($"BMS delete: cancelled after {cnt} sets");
                 notification.CompletionText = cnt > 0
-                    ? $"Delete cancelled. {cnt} BMS beatmap sets were deleted."
-                    : "BMS delete was cancelled.";
+                    ? BmsStrings.DeleteCancelled(cnt)
+                    : BmsStrings.DeleteWasCancelled;
                 notification.State = ProgressNotificationState.Cancelled;
             }
             catch (Exception e)
             {
                 Logger.Error(e, $"BMS delete failed: {e.Message}");
 
-                notification.CompletionText = "An error occurred while deleting BMS beatmaps. Check logs for more information.";
+                notification.CompletionText = BmsStrings.DeleteFailed;
                 notification.State = ProgressNotificationState.Cancelled;
             }
         });
@@ -333,7 +334,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     {
         if (!result.RulesetAvailable)
         {
-            notification.CompletionText = "BMS import failed! Check logs for more information.";
+            notification.CompletionText = BmsStrings.ImportFailed;
             notification.State = ProgressNotificationState.Cancelled;
             return;
         }
@@ -341,22 +342,22 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         if (result.Imported == 0 && result.Processed > 0)
         {
             notification.CompletionText = result.Processed == 1
-                ? "BMS set is already imported."
-                : $"All {result.Processed} BMS sets are already imported.";
+                ? BmsStrings.SetAlreadyImported
+                : BmsStrings.AllSetsAlreadyImported(result.Processed);
             notification.State = ProgressNotificationState.Completed;
             return;
         }
 
         if (result.Imported == 0)
         {
-            notification.CompletionText = "BMS import failed! Check logs for more information.";
+            notification.CompletionText = BmsStrings.ImportFailed;
             notification.State = ProgressNotificationState.Cancelled;
             return;
         }
 
         notification.CompletionText = result.Imported == result.TotalSets
-            ? $"Imported {result.Imported} BMS sets!"
-            : $"Imported {result.Imported} of {result.TotalSets} BMS sets.";
+            ? BmsStrings.ImportedSets(result.Imported)
+            : BmsStrings.ImportedSetsProgress(result.Imported, result.TotalSets);
         notification.State = ProgressNotificationState.Completed;
     }
 
@@ -365,7 +366,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     {
         if (r.Find<RulesetInfo>(Constant.SHORT_NAME)?.Available == true) return true;
 
-        notification.CompletionText = "Bms ruleset is not available";
+        notification.CompletionText = BmsStrings.RulesetUnavailable;
         notification.State = ProgressNotificationState.Cancelled;
         return false;
     });
@@ -381,17 +382,17 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         {
             var fileStore = new RealmFileStore(realm, storage);
 
-            notification.Text = "BMS import: scanning files...";
+            notification.Text = BmsStrings.ScanningFiles;
             var groups = discoverChartGroups(paths);
 
             if (groups.Length == 0)
             {
-                notification.CompletionText = "No BMS charts found to import.";
+                notification.CompletionText = BmsStrings.NoChartsFound;
                 notification.State = ProgressNotificationState.Cancelled;
                 return;
             }
 
-            notification.Text = "BMS import: preparing...";
+            notification.Text = BmsStrings.PreparingImport;
 
             // we only import .bms files, so the size will be very small
             var pool = new BlockingCollection<PreparedDirectory?>(1024);
@@ -408,14 +409,14 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         catch (OperationCanceledException)
         {
             Logger.Log("BMS import: cancelled");
-            notification.CompletionText = "BMS import was cancelled.";
+            notification.CompletionText = BmsStrings.ImportWasCancelled;
             notification.State = ProgressNotificationState.Cancelled;
         }
         catch (Exception e)
         {
             Logger.Log($"BMS import: scan failed: {e.Message}");
             Logger.Log(e.ToString());
-            notification.CompletionText = "BMS import failed! Check logs for more information.";
+            notification.CompletionText = BmsStrings.ImportFailed;
             notification.State = ProgressNotificationState.Cancelled;
         }
     }
@@ -508,8 +509,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         {
             Logger.Log($"BMS import: cancelled after {imported} of {groups.Length} sets");
             notification.CompletionText = imported > 0
-                ? $"Import cancelled. {imported} of {groups.Length} BMS sets were imported."
-                : "BMS import was cancelled.";
+                ? BmsStrings.ImportCancelledProgress(imported, groups.Length)
+                : BmsStrings.ImportWasCancelled;
             notification.State = ProgressNotificationState.Cancelled;
             return (imported, processed, true);
         }
@@ -518,7 +519,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
         static void reportProgress(ProgressNotification n, int imp, int total, int proc)
         {
-            n.Text = $"Imported {imp} of {total} BMS sets";
+            n.Text = BmsStrings.ImportedSetsProgress(imp, total);
             n.Progress = (float)proc / total;
         }
     }

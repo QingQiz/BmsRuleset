@@ -6,6 +6,7 @@ using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Screens.Edit;
 
 namespace osu.Game.Rulesets.BmsRuleset.Editor;
@@ -73,7 +74,7 @@ public static class BmsEditorPatcher
 
         notifications.Post(new SimpleNotification
         {
-            Text = "The BMS editor is not supported yet.",
+            Text = BmsStrings.EditorUnsupported,
         });
     }
 }

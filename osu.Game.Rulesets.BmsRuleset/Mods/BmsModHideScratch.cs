@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -17,7 +18,7 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
 
     public override string Acronym => "HS";
 
-    public override LocalisableString Description => "Remove scratch notes and scratch columns.";
+    public override LocalisableString Description => BmsStrings.ModHideScratch;
 
     public override ModType Type => ModType.DifficultyReduction;
 

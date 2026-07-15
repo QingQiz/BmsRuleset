@@ -6,11 +6,13 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.Scoring;
@@ -94,12 +96,12 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
     {
         content.Clear();
 
-        content.Add(createRow("Overall", statistics.Overall, graph_height));
+        content.Add(createRow(BmsStrings.Overall, statistics.Overall, graph_height));
 
         if (expanded)
         {
             foreach (var key in statistics.Keys)
-                content.Add(createRow(key.Label, key.Summary, key_graph_height));
+                content.Add(createRow(localiseLabel(key.Label), key.Summary, key_graph_height));
         }
     }
 
@@ -111,7 +113,15 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
         return true;
     }
 
-    private static Drawable createRow(string label, HitOffsetSummary summary, float height) => new GridContainer
+    private static LocalisableString localiseLabel(string label)
+    {
+        if (label == "Scratch")
+            return BmsStrings.Scratch;
+
+        return int.TryParse(label.AsSpan("Key ".Length), out var key) ? BmsStrings.Key(key) : label;
+    }
+
+    private static Drawable createRow(LocalisableString label, HitOffsetSummary summary, float height) => new GridContainer
     {
         RelativeSizeAxes = Axes.X,
         Height = height,
@@ -130,7 +140,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
         },
     };
 
-    private static Drawable createLabel(string label, HitOffsetSummary summary) => new FillFlowContainer
+    private static Drawable createLabel(LocalisableString label, HitOffsetSummary summary) => new FillFlowContainer
     {
         RelativeSizeAxes = Axes.X,
         AutoSizeAxes = Axes.Y,
@@ -153,7 +163,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
             },
             new OsuSpriteText
             {
-                Text = $"{summary.Count} hits",
+                Text = BmsStrings.HitCount(summary.Count),
                 Colour = Color4.White,
                 Alpha = 0.55f,
                 Font = OsuFont.GetFont(size: 10),
@@ -327,9 +337,9 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
             };
 
             var values = summary.Results
-                                .Select(result => (result, count: summary.BinsByResult[result][binIndex]))
-                                .Where(value => value.count > 0)
-                                .ToArray();
+                .Select(result => (result, count: summary.BinsByResult[result][binIndex]))
+                .Where(value => value.count > 0)
+                .ToArray();
 
             if (values.Length == 0)
             {

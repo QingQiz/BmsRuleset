@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -14,7 +15,7 @@ public class BmsModBackgroundKeysound : Mod, IApplicableAfterBeatmapConversion
 
     public override string Acronym => "BK";
 
-    public override LocalisableString Description => "Play all keysounds as background audio instead of on key press.";
+    public override LocalisableString Description => BmsStrings.ModBackgroundKeysound;
 
     public override ModType Type => ModType.Fun;
 

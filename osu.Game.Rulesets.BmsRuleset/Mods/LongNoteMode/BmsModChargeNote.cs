@@ -1,4 +1,5 @@
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
@@ -15,7 +16,7 @@ public class BmsModChargeNote : BmsModLongNoteModeBase
 
     public override string Acronym => "L2";
 
-    public override LocalisableString Description => "Two-endpoint note: head and tail judged separately with independent combo.";
+    public override LocalisableString Description => BmsStrings.ModChargeNote;
 
     protected override BmsLongNoteMode TargetMode => BmsLongNoteMode.ChargeNote;
 }

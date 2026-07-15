@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Mods;
@@ -31,8 +32,7 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
 
     public override string Acronym => "AG";
 
-    public override LocalisableString Description =>
-        "Start with the hardest gauge. When you fail, drop to the next tier.";
+    public override LocalisableString Description => BmsStrings.ModAutoGauge;
 
     public override ModType Type => ModType.Automation;
 

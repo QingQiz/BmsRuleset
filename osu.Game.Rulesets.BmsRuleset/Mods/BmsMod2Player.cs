@@ -1,4 +1,5 @@
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -12,7 +13,7 @@ public class BmsModSecondPlayer : Mod, IApplicableAfterBeatmapConversion
 
     public override string Acronym => "2P";
 
-    public override LocalisableString Description => "Switches to second-player cabinet layout (scratch on right).";
+    public override LocalisableString Description => BmsStrings.ModSecondPlayer;
 
     public override ModType Type => ModType.Conversion;
 

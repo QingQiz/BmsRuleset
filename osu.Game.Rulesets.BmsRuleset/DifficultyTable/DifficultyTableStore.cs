@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using osu.Framework.Logging;
 using osu.Game.Database;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 
 namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
@@ -121,7 +122,7 @@ public partial class DifficultyTableStore
                 var jsonUrl = resolveUrlFromHtml(body, source);
                 if (jsonUrl == null)
                 {
-                    notification.CompletionText = $"Page at {source} does not contain a bmstable meta tag";
+                    notification.CompletionText = BmsStrings.MissingBmstableMeta(source);
                     notification.State = ProgressNotificationState.Cancelled;
                     return null;
                 }
@@ -137,7 +138,7 @@ public partial class DifficultyTableStore
         {
             if (!File.Exists(source))
             {
-                notification.CompletionText = "File not exists.";
+                notification.CompletionText = BmsStrings.FileDoesNotExist;
                 notification.State = ProgressNotificationState.Cancelled;
                 return null;
             }
@@ -151,7 +152,7 @@ public partial class DifficultyTableStore
         var parsed = BmsTableJsonParser.Parse(json);
         if (parsed == null)
         {
-            notification.CompletionText = $"Failed to parse difficulty table from {source}";
+            notification.CompletionText = BmsStrings.FailedToParseTable(source);
             notification.State = ProgressNotificationState.Cancelled;
             return null;
         }
@@ -182,7 +183,7 @@ public partial class DifficultyTableStore
 
         if (table == null)
         {
-            notification.CompletionText = $"No valid entries found in difficulty table from {source}";
+            notification.CompletionText = BmsStrings.NoValidTableEntries(source);
             notification.State = ProgressNotificationState.Cancelled;
             return null;
         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Mods;
@@ -44,5 +45,5 @@ public abstract class BmsModGauge : Mod, IApplicableToHealthProcessor
     }
 
     protected static LocalisableString GaugeDescription(string label)
-        => $"Use the {label} BMS gauge.";
+        => BmsStrings.GaugeDescription(label);
 }

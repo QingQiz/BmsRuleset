@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="layout" xml:space="preserve"><value>布局</value></data>
+  <data name="gauge_history" xml:space="preserve"><value>血量历史</value></data>
+  <data name="timeline" xml:space="preserve"><value>时间线</value></data>
+  <data name="hit_scatter" xml:space="preserve"><value>击打散点图</value></data>
+  <data name="hit_offset" xml:space="preserve"><value>击打偏差</value></data>
+  <data name="reference_bpm" xml:space="preserve"><value>基准 BPM</value></data>
+  <data name="bga_dim" xml:space="preserve"><value>BGA 暗化</value></data>
+  <data name="use_dedicated_preview_audio" xml:space="preserve"><value>使用专用预览音频</value></data>
+  <data name="dedicated_preview_audio_hint" xml:space="preserve"><value>存在 #PREVIEW 或 preview.* 文件时优先使用。关闭后，选歌预览将仅由 BGM 和按键音样本合成。</value></data>
+  <data name="show_bms_5k" xml:space="preserve"><value>显示 BMS 5K</value></data>
+  <data name="show_bme_7k" xml:space="preserve"><value>显示 BME 7K</value></data>
+  <data name="show_pms_9k" xml:space="preserve"><value>显示 PMS 9K</value></data>
+  <data name="show_bms_5k_dp" xml:space="preserve"><value>显示 BMS 5K DP</value></data>
+  <data name="show_bme_7k_dp" xml:space="preserve"><value>显示 BME 7K DP</value></data>
+  <data name="show_pms_9k_dp" xml:space="preserve"><value>显示 PMS 9K DP</value></data>
+  <data name="import_bms_files" xml:space="preserve"><value>导入 BMS 文件</value></data>
+  <data name="cleanup_orphaned_sets" xml:space="preserve"><value>清理失去源文件的 BMS 谱面集</value></data>
+  <data name="cleanup_orphaned_sets_tooltip" xml:space="preserve"><value>移除源文件（音频、图片）已无法在磁盘上找到的 BMS 谱面</value></data>
+  <data name="delete_all_imported_files" xml:space="preserve"><value>删除所有已导入的 BMS 文件</value></data>
+  <data name="difficulty_tables" xml:space="preserve"><value>难度表</value></data>
+  <data name="difficulty_table_warning" xml:space="preserve"><value>在选歌界面添加或移除难度表可能导致界面卡顿，请先返回主菜单。</value></data>
+  <data name="delete_all_confirmation" xml:space="preserve"><value>所有已导入的 BMS 谱面都将被永久删除，此操作无法撤销！</value></data>
+  <data name="cleanup_orphans_confirmation" xml:space="preserve"><value>源目录已不存在的 BMS 谱面将被移除，此操作无法撤销。&#10;&#10;删除后需要重新导入。若要保留这些谱面，请立即取消并将文件移回原位置。</value></data>
+  <data name="import_selected_file" xml:space="preserve"><value>导入所选文件</value></data>
+  <data name="import_current_folder" xml:space="preserve"><value>导入当前文件夹中的全部文件</value></data>
+  <data name="import_directory_recursive" xml:space="preserve"><value>导入目录中的全部文件（含子目录）</value></data>
+  <data name="import_directory_recursive_tooltip" xml:space="preserve"><value>导入所选目录及其子目录中的所有 BMS 文件</value></data>
+  <data name="select_file_or_folder" xml:space="preserve"><value>请选择文件或文件夹</value></data>
+  <data name="difficulty_table_placeholder" xml:space="preserve"><value>难度表 URL 或文件路径...</value></data>
+  <data name="import" xml:space="preserve"><value>导入</value></data>
+  <data name="presets" xml:space="preserve"><value>预设</value></data>
+  <data name="history" xml:space="preserve"><value>历史记录</value></data>
+  <data name="subdivide" xml:space="preserve"><value>拆分</value></data>
+  <data name="unsubdivide" xml:space="preserve"><value>合并</value></data>
+  <data name="subdivide_tooltip" xml:space="preserve"><value>按等级拆分为多个收藏夹</value></data>
+  <data name="unsubdivide_tooltip" xml:space="preserve"><value>将各等级收藏夹重新合并为一个</value></data>
+  <data name="update" xml:space="preserve"><value>更新</value></data>
+  <data name="update_table_tooltip" xml:space="preserve"><value>从来源重新获取难度表</value></data>
+  <data name="delete_table_tooltip" xml:space="preserve"><value>删除难度表</value></data>
+  <data name="importing_difficulty_table" xml:space="preserve"><value>正在导入难度表…</value></data>
+  <data name="editor_unsupported" xml:space="preserve"><value>目前尚不支持 BMS 编辑器。</value></data>
+  <data name="collecting" xml:space="preserve"><value>正在收集...</value></data>
+  <data name="refreshing" xml:space="preserve"><value>正在刷新...</value></data>
+  <data name="start" xml:space="preserve"><value>开始</value></data>
+  <data name="time" xml:space="preserve"><value>时间</value></data>
+  <data name="overall" xml:space="preserve"><value>总体</value></data>
+  <data name="scratch" xml:space="preserve"><value>皿</value></data>
+  <data name="fast" xml:space="preserve"><value>偏快</value></data>
+  <data name="late" xml:space="preserve"><value>偏慢</value></data>
+  <data name="key" xml:space="preserve"><value>按键 {0}</value></data>
+  <data name="notes" xml:space="preserve"><value>音符</value></data>
+  <data name="judgement" xml:space="preserve"><value>判定</value></data>
+  <data name="fast_late" xml:space="preserve"><value>快/慢</value></data>
+  <data name="note" xml:space="preserve"><value>单键</value></data>
+  <data name="long_note" xml:space="preserve"><value>长按</value></data>
+  <data name="mine" xml:space="preserve"><value>地雷</value></data>
+  <data name="poor" xml:space="preserve"><value>POOR</value></data>
+  <data name="bad" xml:space="preserve"><value>BAD</value></data>
+  <data name="good" xml:space="preserve"><value>GOOD</value></data>
+  <data name="great" xml:space="preserve"><value>GREAT</value></data>
+  <data name="perfect" xml:space="preserve"><value>PGREAT</value></data>
+  <data name="difficulty_table_already_imported" xml:space="preserve"><value>难度表已导入：{0}</value></data>
+  <data name="loaded_table" xml:space="preserve"><value>已载入难度表：{0}（{1} 张谱面）</value></data>
+  <data name="failed_to_load_table" xml:space="preserve"><value>无法从以下位置载入难度表：{0}</value></data>
+  <data name="removing_table" xml:space="preserve"><value>正在移除难度表“{0}”...</value></data>
+  <data name="removed_table" xml:space="preserve"><value>已移除难度表“{0}”</value></data>
+  <data name="updating_table" xml:space="preserve"><value>正在更新难度表“{0}”...</value></data>
+  <data name="updated_table" xml:space="preserve"><value>已更新难度表：{0}（{1} 张谱面）</value></data>
+  <data name="failed_to_update_table" xml:space="preserve"><value>难度表更新失败：{0}</value></data>
+  <data name="delete_table_confirmation" xml:space="preserve"><value>要删除难度表“{0}”（{1} 张谱面）吗？&#10;&#10;⚠ 若在选歌界面操作，界面可能卡顿。请先返回主菜单。</value></data>
+  <data name="update_table_confirmation" xml:space="preserve"><value>要从来源重新获取难度表“{0}”吗？&#10;&#10;⚠ 若在选歌界面操作，界面可能卡顿。请先返回主菜单。</value></data>
+  <data name="merge_table_confirmation" xml:space="preserve"><value>要将难度表“{0}”重新合并为单个收藏夹吗？</value></data>
+  <data name="split_table_confirmation" xml:space="preserve"><value>要将难度表“{0}”按等级拆分为多个收藏夹吗？</value></data>
+  <data name="hit_count" xml:space="preserve"><value>{0} 次击打</value></data>
+  <data name="import_initialising" xml:space="preserve"><value>正在初始化 BMS 导入...</value></data>
+  <data name="scanning_orphans" xml:space="preserve"><value>正在扫描失去源文件的 BMS 谱面...</value></data>
+  <data name="cleanup_complete" xml:space="preserve"><value>已清理 {0} 个失去源文件的 BMS 谱面组。</value></data>
+  <data name="no_orphans_found" xml:space="preserve"><value>未发现失去源文件的 BMS 谱面。</value></data>
+  <data name="cleanup_failed" xml:space="preserve"><value>BMS 清理失败，请查看日志了解详情。</value></data>
+  <data name="deleting_beatmaps" xml:space="preserve"><value>正在删除 BMS 谱面...</value></data>
+  <data name="deleted_sets" xml:space="preserve"><value>已删除 {0} 个 BMS 谱面组</value></data>
+  <data name="delete_cancelled" xml:space="preserve"><value>删除已取消，已删除 {0} 个 BMS 谱面组。</value></data>
+  <data name="delete_was_cancelled" xml:space="preserve"><value>BMS 删除已取消。</value></data>
+  <data name="delete_failed" xml:space="preserve"><value>删除 BMS 谱面时发生错误，请查看日志了解详情。</value></data>
+  <data name="import_failed" xml:space="preserve"><value>BMS 导入失败！请查看日志了解详情。</value></data>
+  <data name="set_already_imported" xml:space="preserve"><value>该 BMS 谱面组已导入。</value></data>
+  <data name="all_sets_already_imported" xml:space="preserve"><value>全部 {0} 个 BMS 谱面组均已导入。</value></data>
+  <data name="imported_sets" xml:space="preserve"><value>已导入 {0} 个 BMS 谱面组！</value></data>
+  <data name="imported_sets_progress" xml:space="preserve"><value>已导入 {0}/{1} 个 BMS 谱面组</value></data>
+  <data name="ruleset_unavailable" xml:space="preserve"><value>BMS 规则集不可用</value></data>
+  <data name="scanning_files" xml:space="preserve"><value>BMS 导入：正在扫描文件...</value></data>
+  <data name="no_charts_found" xml:space="preserve"><value>未找到可导入的 BMS 谱面。</value></data>
+  <data name="preparing_import" xml:space="preserve"><value>BMS 导入：正在准备...</value></data>
+  <data name="import_was_cancelled" xml:space="preserve"><value>BMS 导入已取消。</value></data>
+  <data name="import_cancelled_progress" xml:space="preserve"><value>导入已取消，已导入 {0}/{1} 个 BMS 谱面组。</value></data>
+  <data name="missing_bmstable_meta" xml:space="preserve"><value>页面 {0} 不含 bmstable 元数据标签</value></data>
+  <data name="file_does_not_exist" xml:space="preserve"><value>文件不存在。</value></data>
+  <data name="failed_to_parse_table" xml:space="preserve"><value>无法解析来自 {0} 的难度表</value></data>
+  <data name="no_valid_table_entries" xml:space="preserve"><value>来自 {0} 的难度表中没有有效条目</value></data>
+  <data name="refreshing_progress" xml:space="preserve"><value>正在刷新 {0}/{1}...</value></data>
+  <data name="exrank_description" xml:space="preserve"><value>EXRANK {0:0.##}% 判定区间。</value></data>
+  <data name="rank_description" xml:space="preserve"><value>RANK {0} 判定区间。</value></data>
+  <data name="locked_long_note_mode" xml:space="preserve"><value>锁定的长按模式：{0}</value></data>
+  <data name="locked_mode" xml:space="preserve"><value>锁定模式</value></data>
+  <data name="gauge_summary" xml:space="preserve"><value>{0} 血条&#10;{1} 个物件，{2}</value></data>
+  <data name="gauge_summary_with_guts" xml:space="preserve"><value>{0} 血条&#10;{1} 个物件，{2}&#10;伤害按初始血量显示；低血量 GUTS 机制可能减轻惩罚。</value></data>
+  <data name="action_scratch" xml:space="preserve"><value>皿</value></data>
+  <data name="action_key_1" xml:space="preserve"><value>按键 1</value></data>
+  <data name="action_key_2" xml:space="preserve"><value>按键 2</value></data>
+  <data name="action_key_3" xml:space="preserve"><value>按键 3</value></data>
+  <data name="action_key_4" xml:space="preserve"><value>按键 4</value></data>
+  <data name="action_key_5" xml:space="preserve"><value>按键 5</value></data>
+  <data name="action_key_6" xml:space="preserve"><value>按键 6</value></data>
+  <data name="action_key_7" xml:space="preserve"><value>按键 7</value></data>
+  <data name="action_p2_scratch" xml:space="preserve"><value>P2 皿</value></data>
+  <data name="action_p2_key_1" xml:space="preserve"><value>P2 按键 1</value></data>
+  <data name="action_p2_key_2" xml:space="preserve"><value>P2 按键 2</value></data>
+  <data name="action_p2_key_3" xml:space="preserve"><value>P2 按键 3</value></data>
+  <data name="action_p2_key_4" xml:space="preserve"><value>P2 按键 4</value></data>
+  <data name="action_p2_key_5" xml:space="preserve"><value>P2 按键 5</value></data>
+  <data name="action_p2_key_6" xml:space="preserve"><value>P2 按键 6</value></data>
+  <data name="action_p2_key_7" xml:space="preserve"><value>P2 按键 7</value></data>
+  <data name="action_pms_key_1" xml:space="preserve"><value>PMS 按键 1</value></data>
+  <data name="action_pms_key_2" xml:space="preserve"><value>PMS 按键 2</value></data>
+  <data name="action_pms_key_3" xml:space="preserve"><value>PMS 按键 3</value></data>
+  <data name="action_pms_key_4" xml:space="preserve"><value>PMS 按键 4</value></data>
+  <data name="action_pms_key_5" xml:space="preserve"><value>PMS 按键 5</value></data>
+  <data name="action_pms_key_6" xml:space="preserve"><value>PMS 按键 6</value></data>
+  <data name="action_pms_key_7" xml:space="preserve"><value>PMS 按键 7</value></data>
+  <data name="action_pms_key_8" xml:space="preserve"><value>PMS 按键 8</value></data>
+  <data name="action_pms_key_9" xml:space="preserve"><value>PMS 按键 9</value></data>
+  <data name="action_p2_pms_key_1" xml:space="preserve"><value>P2 PMS 按键 1</value></data>
+  <data name="action_p2_pms_key_2" xml:space="preserve"><value>P2 PMS 按键 2</value></data>
+  <data name="action_p2_pms_key_3" xml:space="preserve"><value>P2 PMS 按键 3</value></data>
+  <data name="action_p2_pms_key_4" xml:space="preserve"><value>P2 PMS 按键 4</value></data>
+  <data name="action_p2_pms_key_5" xml:space="preserve"><value>P2 PMS 按键 5</value></data>
+  <data name="action_p2_pms_key_6" xml:space="preserve"><value>P2 PMS 按键 6</value></data>
+  <data name="action_p2_pms_key_7" xml:space="preserve"><value>P2 PMS 按键 7</value></data>
+  <data name="action_p2_pms_key_8" xml:space="preserve"><value>P2 PMS 按键 8</value></data>
+  <data name="action_p2_pms_key_9" xml:space="preserve"><value>P2 PMS 按键 9</value></data>
+  <data name="action_increase_scroll_speed" xml:space="preserve"><value>提高滚动速度</value></data>
+  <data name="action_decrease_scroll_speed" xml:space="preserve"><value>降低滚动速度</value></data>
+  <data name="start_bpm" xml:space="preserve"><value>起始 BPM</value></data>
+  <data name="max_bpm" xml:space="preserve"><value>最高 BPM</value></data>
+  <data name="main_bpm" xml:space="preserve"><value>主要 BPM</value></data>
+  <data name="min_bpm" xml:space="preserve"><value>最低 BPM</value></data>
+  <data name="mod_second_player" xml:space="preserve"><value>切换为街机二号玩家布局（皿在右侧）。</value></data>
+  <data name="mod_auto_scratch" xml:space="preserve"><value>自动击打皿。</value></data>
+  <data name="mod_background_keysound" xml:space="preserve"><value>将所有按键音作为背景音频播放，而非按键时播放。</value></data>
+  <data name="mod_branch_replay" xml:space="preserve"><value>保存 BMS 随机与分支选择，以供回放时重现。</value></data>
+  <data name="mod_constant" xml:space="preserve"><value>禁用由 BPM 引起的滚动速度变化。</value></data>
+  <data name="mod_hide_scratch" xml:space="preserve"><value>移除皿和对应轨道。</value></data>
+  <data name="mod_lane_random" xml:space="preserve"><value>重新排列轨道。可指定轨道顺序，或随机生成一种排列。</value></data>
+  <data name="mod_mirror" xml:space="preserve"><value>镜像翻转按键布局。</value></data>
+  <data name="mod_note_random" xml:space="preserve"><value>逐音符随机排列。&#10;S-RANDOM 使用 40ms 防纵连窗口打乱每个音符。&#10;H-RANDOM 将窗口扩大至 100ms，以更混乱的排列为代价强力拆分纵连。</value></data>
+  <data name="mod_paused" xml:space="preserve"><value>本次游玩曾暂停并继续。</value></data>
+  <data name="mod_rotation_random" xml:space="preserve"><value>R-RANDOM：随机旋转轨道，并有 50% 概率同时镜像。</value></data>
+  <data name="mod_long_note" xml:space="preserve"><value>标准长按音符：在尾端以首尾两次偏差中较差的一次进行单次判定。</value></data>
+  <data name="mod_charge_note" xml:space="preserve"><value>双端点音符：首端和尾端分别判定，并独立计算连击。</value></data>
+  <data name="mod_hell_charge_note" xml:space="preserve"><value>带持续血量变化的充能音符：按住恢复，松开扣血。</value></data>
+  <data name="mod_auto_gauge" xml:space="preserve"><value>从最难的血条开始；失败后自动降至下一档。</value></data>
+  <data name="gauge_description" xml:space="preserve"><value>使用 BMS {0} 血条。</value></data>
+</root>

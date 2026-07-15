@@ -4,6 +4,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
@@ -22,7 +23,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
     public override string Acronym => "AS";
 
-    public override LocalisableString Description => "Automatically hits scratch notes.";
+    public override LocalisableString Description => BmsStrings.ModAutoScratch;
 
     public override ModType Type => ModType.Automation;
 

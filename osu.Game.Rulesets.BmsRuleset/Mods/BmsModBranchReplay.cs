@@ -1,5 +1,6 @@
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.Mods;
@@ -12,7 +13,7 @@ public class BmsModBranchReplay : Mod, IApplicableToBeatmapConverter
 
     public override string Acronym => "BR";
 
-    public override LocalisableString Description => "Stores BMS random/switch branch decisions for replay playback.";
+    public override LocalisableString Description => BmsStrings.ModBranchReplay;
 
     public override ModType Type => ModType.System;
 

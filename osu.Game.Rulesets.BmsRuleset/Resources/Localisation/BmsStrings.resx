@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="layout" xml:space="preserve"><value>Layout</value></data>
+  <data name="gauge_history" xml:space="preserve"><value>Gauge History</value></data>
+  <data name="timeline" xml:space="preserve"><value>Timeline</value></data>
+  <data name="hit_scatter" xml:space="preserve"><value>Hit Scatter</value></data>
+  <data name="hit_offset" xml:space="preserve"><value>Hit Offset</value></data>
+  <data name="reference_bpm" xml:space="preserve"><value>Reference BPM</value></data>
+  <data name="bga_dim" xml:space="preserve"><value>BGA dim</value></data>
+  <data name="use_dedicated_preview_audio" xml:space="preserve"><value>Use dedicated preview audio</value></data>
+  <data name="dedicated_preview_audio_hint" xml:space="preserve"><value>Use #PREVIEW or preview.* files when available. Disable this to synthesize song-select previews only from BGM and keysound samples.</value></data>
+  <data name="show_bms_5k" xml:space="preserve"><value>Show BMS 5K</value></data>
+  <data name="show_bme_7k" xml:space="preserve"><value>Show BME 7K</value></data>
+  <data name="show_pms_9k" xml:space="preserve"><value>Show PMS 9K</value></data>
+  <data name="show_bms_5k_dp" xml:space="preserve"><value>Show BMS 5K DP</value></data>
+  <data name="show_bme_7k_dp" xml:space="preserve"><value>Show BME 7K DP</value></data>
+  <data name="show_pms_9k_dp" xml:space="preserve"><value>Show PMS 9K DP</value></data>
+  <data name="import_bms_files" xml:space="preserve"><value>Import BMS files</value></data>
+  <data name="cleanup_orphaned_sets" xml:space="preserve"><value>Clean up orphaned BMS sets</value></data>
+  <data name="cleanup_orphaned_sets_tooltip" xml:space="preserve"><value>Removes BMS beatmaps whose source files (audio, images) can no longer be found on disk</value></data>
+  <data name="delete_all_imported_files" xml:space="preserve"><value>Delete all imported BMS files</value></data>
+  <data name="difficulty_tables" xml:space="preserve"><value>Difficulty Tables</value></data>
+  <data name="difficulty_table_warning" xml:space="preserve"><value>Adding or removing difficulty tables while on the song select screen may freeze the UI. Switch to the main menu first.</value></data>
+  <data name="delete_all_confirmation" xml:space="preserve"><value>All imported BMS beatmaps will be permanently deleted. This cannot be undone!</value></data>
+  <data name="cleanup_orphans_confirmation" xml:space="preserve"><value>BMS beatmaps whose source directory no longer exists will be removed. This cannot be undone.&#10;&#10;After deletion, you will need to re-import them. Cancel now and move the files back to their original location if you want to keep them.</value></data>
+  <data name="import_selected_file" xml:space="preserve"><value>Import selected file</value></data>
+  <data name="import_current_folder" xml:space="preserve"><value>Import all in current folder</value></data>
+  <data name="import_directory_recursive" xml:space="preserve"><value>Import all from directory (recursive)</value></data>
+  <data name="import_directory_recursive_tooltip" xml:space="preserve"><value>Imports all BMS files from the selected directory and subdirectories</value></data>
+  <data name="select_file_or_folder" xml:space="preserve"><value>Select a file/folder</value></data>
+  <data name="difficulty_table_placeholder" xml:space="preserve"><value>Difficulty table URL or file path...</value></data>
+  <data name="import" xml:space="preserve"><value>Import</value></data>
+  <data name="presets" xml:space="preserve"><value>PRESETS</value></data>
+  <data name="history" xml:space="preserve"><value>HISTORY</value></data>
+  <data name="subdivide" xml:space="preserve"><value>Subdivide</value></data>
+  <data name="unsubdivide" xml:space="preserve"><value>Unsubdivide</value></data>
+  <data name="subdivide_tooltip" xml:space="preserve"><value>Split into per-level collections</value></data>
+  <data name="unsubdivide_tooltip" xml:space="preserve"><value>Merge per-level collections back into one</value></data>
+  <data name="update" xml:space="preserve"><value>Upd</value></data>
+  <data name="update_table_tooltip" xml:space="preserve"><value>Re-fetch table from source</value></data>
+  <data name="delete_table_tooltip" xml:space="preserve"><value>Delete table</value></data>
+  <data name="importing_difficulty_table" xml:space="preserve"><value>Importing difficulty table…</value></data>
+  <data name="editor_unsupported" xml:space="preserve"><value>The BMS editor is not supported yet.</value></data>
+  <data name="collecting" xml:space="preserve"><value>Collecting ...</value></data>
+  <data name="refreshing" xml:space="preserve"><value>Refreshing ...</value></data>
+  <data name="start" xml:space="preserve"><value>start</value></data>
+  <data name="time" xml:space="preserve"><value>time</value></data>
+  <data name="overall" xml:space="preserve"><value>Overall</value></data>
+  <data name="scratch" xml:space="preserve"><value>Scratch</value></data>
+  <data name="fast" xml:space="preserve"><value>fast</value></data>
+  <data name="late" xml:space="preserve"><value>late</value></data>
+  <data name="key" xml:space="preserve"><value>Key {0}</value></data>
+  <data name="notes" xml:space="preserve"><value>Notes</value></data>
+  <data name="judgement" xml:space="preserve"><value>Judgement</value></data>
+  <data name="fast_late" xml:space="preserve"><value>Fast/Late</value></data>
+  <data name="note" xml:space="preserve"><value>note</value></data>
+  <data name="long_note" xml:space="preserve"><value>ln</value></data>
+  <data name="mine" xml:space="preserve"><value>mine</value></data>
+  <data name="poor" xml:space="preserve"><value>Poor</value></data>
+  <data name="bad" xml:space="preserve"><value>Bad</value></data>
+  <data name="good" xml:space="preserve"><value>Good</value></data>
+  <data name="great" xml:space="preserve"><value>Great</value></data>
+  <data name="perfect" xml:space="preserve"><value>Perfect</value></data>
+  <data name="difficulty_table_already_imported" xml:space="preserve"><value>Difficulty table already imported: {0}</value></data>
+  <data name="loaded_table" xml:space="preserve"><value>Loaded table: {0} ({1} charts)</value></data>
+  <data name="failed_to_load_table" xml:space="preserve"><value>Failed to load difficulty table from: {0}</value></data>
+  <data name="removing_table" xml:space="preserve"><value>Removing difficulty table "{0}"...</value></data>
+  <data name="removed_table" xml:space="preserve"><value>Removed difficulty table "{0}"</value></data>
+  <data name="updating_table" xml:space="preserve"><value>Updating difficulty table "{0}"...</value></data>
+  <data name="updated_table" xml:space="preserve"><value>Updated table: {0} ({1} charts)</value></data>
+  <data name="failed_to_update_table" xml:space="preserve"><value>Failed to update difficulty table: {0}</value></data>
+  <data name="delete_table_confirmation" xml:space="preserve"><value>Delete difficulty table "{0}" ({1} charts)?&#10;&#10;⚠ This may freeze the UI if done from song select. Switch to the main menu first.</value></data>
+  <data name="update_table_confirmation" xml:space="preserve"><value>Re-fetch difficulty table "{0}" from source?&#10;&#10;⚠ This may freeze the UI if done from song select. Switch to the main menu first.</value></data>
+  <data name="merge_table_confirmation" xml:space="preserve"><value>Merge difficulty table "{0}" back into a single collection?</value></data>
+  <data name="split_table_confirmation" xml:space="preserve"><value>Split difficulty table "{0}" into per-level collections?</value></data>
+  <data name="hit_count" xml:space="preserve"><value>{0} hits</value></data>
+  <data name="import_initialising" xml:space="preserve"><value>BMS import is initialising...</value></data>
+  <data name="scanning_orphans" xml:space="preserve"><value>Scanning for orphaned BMS beatmaps...</value></data>
+  <data name="cleanup_complete" xml:space="preserve"><value>Cleaned up {0} orphaned BMS beatmap sets.</value></data>
+  <data name="no_orphans_found" xml:space="preserve"><value>No orphaned BMS beatmaps found.</value></data>
+  <data name="cleanup_failed" xml:space="preserve"><value>BMS cleanup failed. Check logs for more information.</value></data>
+  <data name="deleting_beatmaps" xml:space="preserve"><value>Deleting BMS beatmaps...</value></data>
+  <data name="deleted_sets" xml:space="preserve"><value>Deleted {0} BMS beatmap sets</value></data>
+  <data name="delete_cancelled" xml:space="preserve"><value>Delete cancelled. {0} BMS beatmap sets were deleted.</value></data>
+  <data name="delete_was_cancelled" xml:space="preserve"><value>BMS delete was cancelled.</value></data>
+  <data name="delete_failed" xml:space="preserve"><value>An error occurred while deleting BMS beatmaps. Check logs for more information.</value></data>
+  <data name="import_failed" xml:space="preserve"><value>BMS import failed! Check logs for more information.</value></data>
+  <data name="set_already_imported" xml:space="preserve"><value>BMS set is already imported.</value></data>
+  <data name="all_sets_already_imported" xml:space="preserve"><value>All {0} BMS sets are already imported.</value></data>
+  <data name="imported_sets" xml:space="preserve"><value>Imported {0} BMS sets!</value></data>
+  <data name="imported_sets_progress" xml:space="preserve"><value>Imported {0} of {1} BMS sets</value></data>
+  <data name="ruleset_unavailable" xml:space="preserve"><value>BMS ruleset is not available</value></data>
+  <data name="scanning_files" xml:space="preserve"><value>BMS import: scanning files...</value></data>
+  <data name="no_charts_found" xml:space="preserve"><value>No BMS charts found to import.</value></data>
+  <data name="preparing_import" xml:space="preserve"><value>BMS import: preparing...</value></data>
+  <data name="import_was_cancelled" xml:space="preserve"><value>BMS import was cancelled.</value></data>
+  <data name="import_cancelled_progress" xml:space="preserve"><value>Import cancelled. {0} of {1} BMS sets were imported.</value></data>
+  <data name="missing_bmstable_meta" xml:space="preserve"><value>Page at {0} does not contain a bmstable meta tag</value></data>
+  <data name="file_does_not_exist" xml:space="preserve"><value>File does not exist.</value></data>
+  <data name="failed_to_parse_table" xml:space="preserve"><value>Failed to parse difficulty table from {0}</value></data>
+  <data name="no_valid_table_entries" xml:space="preserve"><value>No valid entries found in difficulty table from {0}</value></data>
+  <data name="refreshing_progress" xml:space="preserve"><value>Refreshing {0}/{1}...</value></data>
+  <data name="exrank_description" xml:space="preserve"><value>EXRANK {0:0.##}% timing windows.</value></data>
+  <data name="rank_description" xml:space="preserve"><value>RANK {0} timing windows.</value></data>
+  <data name="locked_long_note_mode" xml:space="preserve"><value>Locked long-note mode: {0}</value></data>
+  <data name="locked_mode" xml:space="preserve"><value>Locked mode</value></data>
+  <data name="gauge_summary" xml:space="preserve"><value>{0} gauge&#10;{1} objects, {2}</value></data>
+  <data name="gauge_summary_with_guts" xml:space="preserve"><value>{0} gauge&#10;{1} objects, {2}&#10;Damage shown at initial HP; low-HP guts may reduce penalties.</value></data>
+  <data name="action_scratch" xml:space="preserve"><value>Scratch</value></data>
+  <data name="action_key_1" xml:space="preserve"><value>Key 1</value></data>
+  <data name="action_key_2" xml:space="preserve"><value>Key 2</value></data>
+  <data name="action_key_3" xml:space="preserve"><value>Key 3</value></data>
+  <data name="action_key_4" xml:space="preserve"><value>Key 4</value></data>
+  <data name="action_key_5" xml:space="preserve"><value>Key 5</value></data>
+  <data name="action_key_6" xml:space="preserve"><value>Key 6</value></data>
+  <data name="action_key_7" xml:space="preserve"><value>Key 7</value></data>
+  <data name="action_p2_scratch" xml:space="preserve"><value>P2 Scratch</value></data>
+  <data name="action_p2_key_1" xml:space="preserve"><value>P2 Key 1</value></data>
+  <data name="action_p2_key_2" xml:space="preserve"><value>P2 Key 2</value></data>
+  <data name="action_p2_key_3" xml:space="preserve"><value>P2 Key 3</value></data>
+  <data name="action_p2_key_4" xml:space="preserve"><value>P2 Key 4</value></data>
+  <data name="action_p2_key_5" xml:space="preserve"><value>P2 Key 5</value></data>
+  <data name="action_p2_key_6" xml:space="preserve"><value>P2 Key 6</value></data>
+  <data name="action_p2_key_7" xml:space="preserve"><value>P2 Key 7</value></data>
+  <data name="action_pms_key_1" xml:space="preserve"><value>PMS Key 1</value></data>
+  <data name="action_pms_key_2" xml:space="preserve"><value>PMS Key 2</value></data>
+  <data name="action_pms_key_3" xml:space="preserve"><value>PMS Key 3</value></data>
+  <data name="action_pms_key_4" xml:space="preserve"><value>PMS Key 4</value></data>
+  <data name="action_pms_key_5" xml:space="preserve"><value>PMS Key 5</value></data>
+  <data name="action_pms_key_6" xml:space="preserve"><value>PMS Key 6</value></data>
+  <data name="action_pms_key_7" xml:space="preserve"><value>PMS Key 7</value></data>
+  <data name="action_pms_key_8" xml:space="preserve"><value>PMS Key 8</value></data>
+  <data name="action_pms_key_9" xml:space="preserve"><value>PMS Key 9</value></data>
+  <data name="action_p2_pms_key_1" xml:space="preserve"><value>P2 PMS Key 1</value></data>
+  <data name="action_p2_pms_key_2" xml:space="preserve"><value>P2 PMS Key 2</value></data>
+  <data name="action_p2_pms_key_3" xml:space="preserve"><value>P2 PMS Key 3</value></data>
+  <data name="action_p2_pms_key_4" xml:space="preserve"><value>P2 PMS Key 4</value></data>
+  <data name="action_p2_pms_key_5" xml:space="preserve"><value>P2 PMS Key 5</value></data>
+  <data name="action_p2_pms_key_6" xml:space="preserve"><value>P2 PMS Key 6</value></data>
+  <data name="action_p2_pms_key_7" xml:space="preserve"><value>P2 PMS Key 7</value></data>
+  <data name="action_p2_pms_key_8" xml:space="preserve"><value>P2 PMS Key 8</value></data>
+  <data name="action_p2_pms_key_9" xml:space="preserve"><value>P2 PMS Key 9</value></data>
+  <data name="action_increase_scroll_speed" xml:space="preserve"><value>Increase Scroll Speed</value></data>
+  <data name="action_decrease_scroll_speed" xml:space="preserve"><value>Decrease Scroll Speed</value></data>
+  <data name="start_bpm" xml:space="preserve"><value>Start BPM</value></data>
+  <data name="max_bpm" xml:space="preserve"><value>Max BPM</value></data>
+  <data name="main_bpm" xml:space="preserve"><value>Main BPM</value></data>
+  <data name="min_bpm" xml:space="preserve"><value>Min BPM</value></data>
+  <data name="mod_second_player" xml:space="preserve"><value>Switches to second-player cabinet layout (scratch on right).</value></data>
+  <data name="mod_auto_scratch" xml:space="preserve"><value>Automatically hits scratch notes.</value></data>
+  <data name="mod_background_keysound" xml:space="preserve"><value>Play all keysounds as background audio instead of on key press.</value></data>
+  <data name="mod_branch_replay" xml:space="preserve"><value>Stores BMS random/switch branch decisions for replay playback.</value></data>
+  <data name="mod_constant" xml:space="preserve"><value>Disables BPM-based scroll speed changes.</value></data>
+  <data name="mod_hide_scratch" xml:space="preserve"><value>Remove scratch notes and scratch columns.</value></data>
+  <data name="mod_lane_random" xml:space="preserve"><value>Permutes lane columns. Set a custom lane order or let it generate a random permutation.</value></data>
+  <data name="mod_mirror" xml:space="preserve"><value>Mirrors the key layout.</value></data>
+  <data name="mod_note_random" xml:space="preserve"><value>Per-note randomisation.&#x20;&#10;S-RANDOM shuffles every note with a 40ms anti-jack window.&#x20;&#10;H-RANDOM widens it to 100ms, aggressively breaking jacks at the cost of more chaotic patterns.</value></data>
+  <data name="mod_paused" xml:space="preserve"><value>The play was paused and resumed.</value></data>
+  <data name="mod_rotation_random" xml:space="preserve"><value>R-RANDOM: randomly rotates columns, with 50% chance of also mirroring.</value></data>
+  <data name="mod_long_note" xml:space="preserve"><value>Standard hold-note: single endpoint judged at the tail using worst offset.</value></data>
+  <data name="mod_charge_note" xml:space="preserve"><value>Two-endpoint note: head and tail judged separately with independent combo.</value></data>
+  <data name="mod_hell_charge_note" xml:space="preserve"><value>Charge-note with continuous body gauge drain: hold to recover, release to damage.</value></data>
+  <data name="mod_auto_gauge" xml:space="preserve"><value>Start with the hardest gauge. When you fail, drop to the next tier.</value></data>
+  <data name="gauge_description" xml:space="preserve"><value>Use the {0} BMS gauge.</value></data>
+</root>

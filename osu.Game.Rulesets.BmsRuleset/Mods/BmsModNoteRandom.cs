@@ -4,6 +4,7 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -29,7 +30,7 @@ public class BmsModNoteRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
 
     public override string Acronym => "NR";
 
-    public override LocalisableString Description => "Per-note randomisation. \nS-RANDOM shuffles every note with a 40ms anti-jack window. \nH-RANDOM widens it to 100ms, aggressively breaking jacks at the cost of more chaotic patterns.";
+    public override LocalisableString Description => BmsStrings.ModNoteRandom;
 
     public override ModType Type => ModType.Conversion;
 

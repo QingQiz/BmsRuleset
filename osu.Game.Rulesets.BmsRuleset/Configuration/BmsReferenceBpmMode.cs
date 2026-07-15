@@ -1,18 +1,19 @@
-using System.ComponentModel;
+using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 
 namespace osu.Game.Rulesets.BmsRuleset.Configuration;
 
 public enum BmsReferenceBpmMode
 {
-    [Description("Start BPM")]
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.StartBpm))]
     StartBpm = 1,
 
-    [Description("Max BPM")]
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.MaxBpm))]
     MaxBpm = 2,
 
-    [Description("Main BPM")]
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.MainBpm))]
     MainBpm = 3,
 
-    [Description("Min BPM")]
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.MinBpm))]
     MinBpm = 4,
 }

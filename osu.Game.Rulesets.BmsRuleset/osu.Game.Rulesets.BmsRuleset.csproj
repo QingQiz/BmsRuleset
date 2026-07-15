@@ -12,7 +12,9 @@
         <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     </PropertyGroup>
     <ItemGroup>
-        <EmbeddedResource Include="Resources\**" WithCulture="false"/>
+        <EmbeddedResource Include="Resources\**" Exclude="Resources\**\*.resx" WithCulture="false"/>
+        <EmbeddedResource Update="Resources\Localisation\BmsStrings.resx" WithCulture="false" />
+        <EmbeddedResource Update="Resources\Localisation\BmsStrings.zh.resx" WithCulture="false" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="FFmpeg.AutoGen" Version="4.3.0.1" />

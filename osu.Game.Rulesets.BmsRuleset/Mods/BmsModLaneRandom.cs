@@ -3,6 +3,7 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -20,7 +21,7 @@ public class BmsModLaneRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
 
     public override string Acronym => "LR";
 
-    public override LocalisableString Description => "Permutes lane columns. Set a custom lane order or let it generate a random permutation.";
+    public override LocalisableString Description => BmsStrings.ModLaneRandom;
 
     public override ModType Type => ModType.Conversion;
 

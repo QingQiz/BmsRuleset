@@ -12,6 +12,11 @@
 - use `var` for local variables when possible
 - use collection expressions when possible (e.g. `string[] vowels = ["a", "e", "i", "o", "u"]`)
 
+## Localisation
+
+- All user-facing text must use the `BmsStrings` localisation system; do not hard-code labels, abbreviations, formatted values, or units in UI code.
+- Keep the English base resource and all supported `.resx` translations in sync when adding or changing user-facing text.
+
 ## Test Rules
 
 - Do NOT run benchmark tests without asking. Benchmarks can take minutes and consume significant resources.

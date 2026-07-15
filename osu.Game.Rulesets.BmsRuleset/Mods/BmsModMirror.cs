@@ -1,4 +1,5 @@
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -12,7 +13,7 @@ public class BmsModMirror : Mod, IApplicableAfterBeatmapConversion
 
     public override string Acronym => "MR";
 
-    public override LocalisableString Description => "Mirrors the key layout.";
+    public override LocalisableString Description => BmsStrings.ModMirror;
 
     public override ModType Type => ModType.Conversion;
 

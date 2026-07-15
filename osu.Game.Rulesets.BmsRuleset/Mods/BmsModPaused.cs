@@ -1,5 +1,6 @@
 using System.Linq;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 
@@ -11,7 +12,7 @@ public class BmsModPaused : Mod, IApplicableMod
 
     public override string Acronym => "PA";
 
-    public override LocalisableString Description => "The play was paused and resumed.";
+    public override LocalisableString Description => BmsStrings.ModPaused;
 
     public override ModType Type => ModType.System;
 

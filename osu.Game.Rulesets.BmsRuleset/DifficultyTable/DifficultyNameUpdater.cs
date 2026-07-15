@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
@@ -42,7 +43,7 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
     /// </summary>
     public void RefreshAllMarkers(ProgressNotification? notification = null)
     {
-        notification?.Text = "Collecting ...";
+        notification?.Text = BmsStrings.Collecting;
 
         List<(Guid, string)> collect = [];
 
@@ -65,7 +66,7 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
 
         var total = collect.Count;
         var processed = 0;
-        notification?.Text = "Refreshing ...";
+        notification?.Text = BmsStrings.Refreshing;
         notification?.Progress = 0;
 
         realm.Write(r =>
@@ -74,7 +75,7 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
             {
                 r.Find<BeatmapInfo>(collectItem.Item1)?.DifficultyName = collectItem.Item2;
                 processed++;
-                notification?.Text = $"Refreshing {processed}/{total}...";
+                notification?.Text = BmsStrings.RefreshingProgress(processed, total);
                 notification?.Progress = (float)processed / total;
             }
         });

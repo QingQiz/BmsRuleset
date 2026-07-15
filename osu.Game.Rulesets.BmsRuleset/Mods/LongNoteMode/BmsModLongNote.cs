@@ -1,4 +1,5 @@
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
@@ -16,7 +17,7 @@ public class BmsModLongNote : BmsModLongNoteModeBase
 
     public override string Acronym => "L1";
 
-    public override LocalisableString Description => "Standard hold-note: single endpoint judged at the tail using worst offset.";
+    public override LocalisableString Description => BmsStrings.ModLongNote;
 
     protected override BmsLongNoteMode TargetMode => BmsLongNoteMode.LongNote;
 }

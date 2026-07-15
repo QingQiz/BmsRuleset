@@ -5,11 +5,13 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
@@ -58,9 +60,9 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
             Spacing = new Vector2(0, 8),
             Children =
             [
-                createSubplot("Notes", data.Notes, null),
-                createSubplot("Judgement", data.Judgements, data.FailureFraction),
-                createSubplot("Fast/Late", data.FastLate, data.FailureFraction),
+                createSubplot(BmsStrings.Notes, data.Notes, null),
+                createSubplot(BmsStrings.Judgement, data.Judgements, data.FailureFraction),
+                createSubplot(BmsStrings.FastLate, data.FastLate, data.FailureFraction),
             ],
         };
     }
@@ -219,7 +221,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         return NoteKind.Note;
     }
 
-    private static Drawable createSubplot(string title, SubplotData subplot, double? failureFraction) => new FillFlowContainer
+    private static Drawable createSubplot(LocalisableString title, SubplotData subplot, double? failureFraction) => new FillFlowContainer
     {
         RelativeSizeAxes = Axes.X,
         AutoSizeAxes = Axes.Y,
@@ -232,7 +234,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         ],
     };
 
-    private static Drawable createLegend(string title, SubplotData subplot)
+    private static Drawable createLegend(LocalisableString title, SubplotData subplot)
     {
         var items = new List<Drawable>
         {
@@ -265,7 +267,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
                     },
                     new OsuSpriteText
                     {
-                        Text = c.Label,
+                        Text = localiseCategory(c.Label),
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
                         Font = OsuFont.GetFont(size: 11),
@@ -283,6 +285,22 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
             Children = items,
         };
     }
+
+    private static LocalisableString localiseCategory(string category) => category switch
+    {
+        "note" => BmsStrings.Note,
+        "ln" => BmsStrings.LongNote,
+        "Scratch" => BmsStrings.Scratch,
+        "mine" => BmsStrings.Mine,
+        "Poor" => BmsStrings.Poor,
+        "Bad" => BmsStrings.Bad,
+        "Good" => BmsStrings.Good,
+        "Great" => BmsStrings.Great,
+        "Perfect" => BmsStrings.Perfect,
+        "fast" => BmsStrings.Fast,
+        "late" => BmsStrings.Late,
+        _ => category,
+    };
 
     private static Drawable createPlot(SubplotData subplot, double? failureFraction)
     {

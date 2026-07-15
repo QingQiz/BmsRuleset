@@ -1,4 +1,5 @@
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
@@ -16,7 +17,7 @@ public class BmsModHellChargeNote : BmsModLongNoteModeBase
 
     public override string Acronym => "L3";
 
-    public override LocalisableString Description => "Charge-note with continuous body gauge drain: hold to recover, release to damage.";
+    public override LocalisableString Description => BmsStrings.ModHellChargeNote;
 
     protected override BmsLongNoteMode TargetMode => BmsLongNoteMode.HellChargeNote;
 }

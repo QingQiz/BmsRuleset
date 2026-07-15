@@ -14,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Editor;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
@@ -49,7 +50,7 @@ public partial class BmsRuleset : Ruleset
 
     public override IEnumerable<int> AvailableVariants => BmsKeyBindingConfiguration.AvailableVariants;
 
-    public override LocalisableString VariantDescription => "Layout";
+    public override LocalisableString VariantDescription => BmsStrings.Layout;
 
     public static readonly IReadOnlyDictionary<HitResult, string> HIT_RESULT_LABELS = new Dictionary<HitResult, string>
     {
@@ -121,10 +122,10 @@ public partial class BmsRuleset : Ruleset
 
     public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) =>
     [
-        new("Gauge History", () => new BmsGaugeHistoryGraph(score, playableBeatmap), requiresHitEvents: true),
-        new("Timeline", () => new BmsTimelineStatistic(score, playableBeatmap), requiresHitEvents: true),
-        new("Hit Scatter", () => new BmsHitScatterStatistic(score.HitEvents, playableBeatmap), requiresHitEvents: true),
-        new("Hit Offset", () => new BmsHitOffsetStatistic(score.HitEvents, playableBeatmap), requiresHitEvents: true),
+        new(BmsStrings.GaugeHistory, () => new BmsGaugeHistoryGraph(score, playableBeatmap), requiresHitEvents: true),
+        new(BmsStrings.Timeline, () => new BmsTimelineStatistic(score, playableBeatmap), requiresHitEvents: true),
+        new(BmsStrings.HitScatter, () => new BmsHitScatterStatistic(score.HitEvents, playableBeatmap), requiresHitEvents: true),
+        new(BmsStrings.HitOffset, () => new BmsHitOffsetStatistic(score.HitEvents, playableBeatmap), requiresHitEvents: true),
     ];
 
     public override IEnumerable<Mod> GetModsFor(ModType type) => type switch
@@ -193,7 +194,7 @@ public partial class BmsRuleset : Ruleset
             var rate = BmsJudgementProfileProvider.RateForExRank(layout, exRank);
             yield return new RulesetBeatmapAttribute("EXRANK", "EX", (float)original.ExRank.GetValueOrDefault(exRank), (float)exRank, exrank_display_max)
             {
-                Description = $"EXRANK {exRank:0.##}% timing windows.",
+                Description = BmsStrings.ExRankDescription(exRank),
                 AdditionalMetrics = createRankMetrics(rate, adjusted.KeyCount),
             };
         }
@@ -202,7 +203,7 @@ public partial class BmsRuleset : Ruleset
             var rate = BmsJudgementProfileProvider.RateForRank(layout, adjusted.Rank);
             yield return new RulesetBeatmapAttribute("RANK", "RK", original.Rank, adjusted.Rank, 4)
             {
-                Description = $"RANK {adjusted.Rank} timing windows.",
+                Description = BmsStrings.RankDescription(adjusted.Rank),
                 AdditionalMetrics = createRankMetrics(rate, adjusted.KeyCount),
             };
         }
@@ -211,10 +212,10 @@ public partial class BmsRuleset : Ruleset
         {
             yield return new RulesetBeatmapAttribute("LNMODE", "LM", (float)original.LockedLongNoteMode, (float)original.LockedLongNoteMode, 3)
             {
-                Description = $"Locked long-note mode: {formatLongNoteMode(original.LockedLongNoteMode)}",
+                Description = BmsStrings.LockedLongNoteMode(formatLongNoteMode(original.LockedLongNoteMode)),
                 AdditionalMetrics =
                 [
-                    new("Locked mode", formatLongNoteMode(original.LockedLongNoteMode), colours.Gray4),
+                    new(BmsStrings.LockedMode, formatLongNoteMode(original.LockedLongNoteMode), colours.Gray4),
                 ],
             };
         }
@@ -262,11 +263,12 @@ public partial class BmsRuleset : Ruleset
         var noteCount = Math.Max(1, beatmapInfo.TotalObjectCount);
         var calculator = new BmsGaugeCalculator(profile, difficulty.Total, noteCount);
 
-        var gutsText = profile.GutsRules.Count > 0
-            ? "\nDamage shown at initial HP; low-HP guts may reduce penalties."
-            : string.Empty;
+        var gaugeName = formatGaugeName(gaugeType);
+        var total = formatTotal(difficulty, calculator);
 
-        return $"{formatGaugeName(gaugeType)} gauge\n{noteCount} objects, {formatTotal(difficulty, calculator)}{gutsText}";
+        return profile.GutsRules.Count > 0
+            ? BmsStrings.GaugeSummaryWithGuts(gaugeName, noteCount, total)
+            : BmsStrings.GaugeSummary(gaugeName, noteCount, total);
 
         static string formatGaugeName(BmsGaugeType gaugeType) => gaugeType switch
         {

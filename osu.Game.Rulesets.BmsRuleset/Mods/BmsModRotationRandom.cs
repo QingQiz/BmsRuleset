@@ -3,6 +3,7 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -20,7 +21,7 @@ public class BmsModRotationRandom : Mod, IApplicableAfterBeatmapConversion, IHas
 
     public override string Acronym => "RR";
 
-    public override LocalisableString Description => "R-RANDOM: randomly rotates columns, with 50% chance of also mirroring.";
+    public override LocalisableString Description => BmsStrings.ModRotationRandom;
 
     public override ModType Type => ModType.Conversion;
 

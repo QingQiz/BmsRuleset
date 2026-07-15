@@ -6,10 +6,12 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
+using osu.Framework.Localisation;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osuTK;
 using osuTK.Graphics;
 
@@ -47,7 +49,7 @@ public sealed partial class DifficultyTableAutocomplete : CompositeDrawable
         {
             RelativeSizeAxes = Axes.X,
             Height = 35,
-            PlaceholderText = "Difficulty table URL or file path...",
+            PlaceholderText = BmsStrings.DifficultyTablePlaceholder,
         };
 
         dropdown = new DropdownContainer();
@@ -60,7 +62,7 @@ public sealed partial class DifficultyTableAutocomplete : CompositeDrawable
 
         var importButton = new RoundedButton
         {
-            Text = "Import",
+            Text = BmsStrings.Import,
             RelativeSizeAxes = Axes.X,
             Height = 36,
             Action = () => OnImport?.Invoke(textBox.Current.Value),
@@ -179,14 +181,14 @@ public sealed partial class DifficultyTableAutocomplete : CompositeDrawable
 
             if (presets.Count > 0)
             {
-                list.Add(new SectionHeader("PRESETS"));
+                list.Add(new SectionHeader(BmsStrings.Presets));
                 foreach (var item in presets)
                     list.Add(new DropdownItemRow(item, () => ItemSelected?.Invoke(item)));
             }
 
             if (history.Count > 0)
             {
-                list.Add(new SectionHeader("HISTORY"));
+                list.Add(new SectionHeader(BmsStrings.History));
                 foreach (var item in history)
                 {
                     var captured = item;
@@ -207,7 +209,7 @@ public sealed partial class DifficultyTableAutocomplete : CompositeDrawable
 
     private sealed partial class SectionHeader : OsuSpriteText
     {
-        public SectionHeader(string text)
+        public SectionHeader(LocalisableString text)
         {
             Text = text;
             Font = OsuFont.Default.With(size: 10, weight: FontWeight.Bold);

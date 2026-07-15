@@ -18,6 +18,7 @@ using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Screens;
 using osuTK;
 
@@ -99,22 +100,22 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
             [
                 buttons[0] = new RoundedButton
                 {
-                    Text = "Import selected file",
+                    Text = BmsStrings.ImportSelectedFile,
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
                     Action = () => startImport(fileSelector.CurrentFile.Value?.FullName),
                 },
                 buttons[1] = new RoundedButton
                 {
-                    Text = "Import all in current folder",
+                    Text = BmsStrings.ImportCurrentFolder,
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
                     Action = () => Task.Run(() => startDirectoryImport(false)),
                 },
                 buttons[2] = new RoundedButton
                 {
-                    Text = "Import all from directory (recursive)",
-                    TooltipText = "Imports all BMS files from the selected directory and subdirectories",
+                    Text = BmsStrings.ImportDirectoryRecursive,
+                    TooltipText = BmsStrings.ImportDirectoryRecursiveTooltip,
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
                     Action = () => Task.Run(() => startDirectoryImport(true)),
@@ -210,7 +211,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     private void fileChanged(ValueChangedEvent<FileInfo> selectedFile)
     {
         buttons[0].Enabled.Value = selectedFile.NewValue != null;
-        currentFileText.Text = selectedFile.NewValue?.Name ?? "Select a file/folder";
+        currentFileText.Text = selectedFile.NewValue?.Name ?? BmsStrings.SelectFileOrFolder;
     }
 
     private void startImport(params string[] paths)
