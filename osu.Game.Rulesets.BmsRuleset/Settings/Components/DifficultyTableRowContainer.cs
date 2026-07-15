@@ -69,7 +69,7 @@ internal sealed partial class DifficultyTableRowContainer : Container
                 Direction = FillDirection.Vertical,
                 Children =
                 [
-                    new TableRowHeader(table, expanded),
+                    new TableRowHeader(table, isSubdivided, expanded),
                     new TableRowActions(buttons, expanded),
                 ],
             },
@@ -153,7 +153,7 @@ internal sealed partial class DifficultyTableRowContainer : Container
 
     private sealed partial class TableRowHeader : OsuClickableContainer
     {
-        public TableRowHeader(DT table, BindableBool expanded)
+        public TableRowHeader(DT table, bool isSubdivided, BindableBool expanded)
         {
             var chevron = new SpriteIcon
             {
@@ -163,6 +163,25 @@ internal sealed partial class DifficultyTableRowContainer : Container
                 Size = new Vector2(12),
                 Icon = FontAwesome.Solid.ChevronRight,
             };
+            var title = new TextFlowContainer(text =>
+                text.Font = OsuFont.Default.With(size: 16, weight: FontWeight.Bold))
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Padding = new MarginPadding { Left = 12, Right = 40, Vertical = 11 },
+            };
+            title.AddText(BmsStrings.DifficultyTableName(table.Name, table.Symbol));
+            title.AddText(" ", text => text.Width = 5);
+            title.AddText(
+                isSubdivided
+                    ? BmsStrings.DifficultyTableSubdividedStatus
+                    : BmsStrings.DifficultyTableNotSubdividedStatus,
+                text =>
+                {
+                    text.Name = $"Difficulty table subdivision status ({table.Name})";
+                    text.Font = OsuFont.Default.With(size: 12);
+                    text.Alpha = 0.45f;
+                });
 
             Name = $"Difficulty table header ({table.Name})";
             TooltipText = buildTooltip(table);
@@ -171,13 +190,7 @@ internal sealed partial class DifficultyTableRowContainer : Container
             Action = expanded.Toggle;
             Children =
             [
-                new TextFlowContainer(text => text.Font = OsuFont.Default.With(size: 16, weight: FontWeight.Bold))
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Padding = new MarginPadding { Left = 12, Right = 40, Vertical = 11 },
-                    Text = BmsStrings.DifficultyTableName(table.Name, table.Symbol),
-                },
+                title,
                 chevron,
             ];
 

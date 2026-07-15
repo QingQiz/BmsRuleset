@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 using osu.Game.Graphics.Containers;
 using osu.Game.Overlays;
@@ -32,10 +33,13 @@ public partial class TestSceneBmsSettings : OsuTestScene
         storage = new TemporaryNativeStorage($"{nameof(TestSceneBmsSettings)}-{Guid.NewGuid()}");
         previousStore = BmsRulesetRuntime.DifficultyTableStore;
 
-        var store = new DifficultyTableStore(null, storage.GetFullPath("difficulty-tables"));
-        store.RestoreTable(createRemoteTable());
+        var syncManager = new CollectionSyncManager();
+        var store = new DifficultyTableStore(null, storage.GetFullPath("difficulty-tables"), syncManager);
+        var remoteTable = createRemoteTable();
+        store.RestoreTable(remoteTable);
         store.RestoreTable(createLocalTable());
         BmsRulesetRuntime.DifficultyTableStore = store;
+        syncManager.ToggleSubdivide(null, remoteTable);
 
         var ruleset = new BmsRuleset();
         settings = ruleset.CreateSettings();
@@ -75,8 +79,12 @@ public partial class TestSceneBmsSettings : OsuTestScene
     public void TestDifficultyTables()
     {
         AddAssert("table rows have drawable size", () => settings.ChildrenOfType<OsuClickableContainer>()
-            .Where(header => header.Name.StartsWith("Difficulty table header"))
+            .Where(header => header.Name.StartsWith("Difficulty table header", StringComparison.Ordinal))
             .All(header => header.DrawWidth > 0 && header.DrawHeight > 0));
+        AddAssert("table rows show subdivision status", () => settings.ChildrenOfType<OsuClickableContainer>()
+            .Where(header => header.Name.StartsWith("Difficulty table header", StringComparison.Ordinal))
+            .All(header => header.ChildrenOfType<SpriteText>()
+                .Any(text => text.Name.StartsWith("Difficulty table subdivision status", StringComparison.Ordinal))));
         AddStep("expand table actions", () =>
         {
             getTableHeader("Satellite Difficulty Table").TriggerClickWithSound();

@@ -45,6 +45,8 @@
   <data name="update_table_tooltip" xml:space="preserve"><value>Re-fetch table from source</value></data>
   <data name="delete_table_tooltip" xml:space="preserve"><value>Delete table</value></data>
   <data name="difficulty_table_name" xml:space="preserve"><value>{0} ({1})</value></data>
+  <data name="difficulty_table_subdivided_status" xml:space="preserve"><value>Subdivided</value></data>
+  <data name="difficulty_table_not_subdivided_status" xml:space="preserve"><value>Not subdivided</value></data>
   <data name="difficulty_table_tooltip" xml:space="preserve"><value>{0} charts&#10;{1}</value></data>
   <data name="importing_difficulty_table" xml:space="preserve"><value>Importing difficulty table…</value></data>
   <data name="editor_unsupported" xml:space="preserve"><value>The BMS editor is not supported yet.</value></data>
