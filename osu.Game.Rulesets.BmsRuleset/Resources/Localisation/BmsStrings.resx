@@ -41,9 +41,11 @@
   <data name="unsubdivide" xml:space="preserve"><value>Unsubdivide</value></data>
   <data name="subdivide_tooltip" xml:space="preserve"><value>Split into per-level collections</value></data>
   <data name="unsubdivide_tooltip" xml:space="preserve"><value>Merge per-level collections back into one</value></data>
-  <data name="update" xml:space="preserve"><value>Upd</value></data>
+  <data name="update" xml:space="preserve"><value>Update</value></data>
   <data name="update_table_tooltip" xml:space="preserve"><value>Re-fetch table from source</value></data>
   <data name="delete_table_tooltip" xml:space="preserve"><value>Delete table</value></data>
+  <data name="difficulty_table_name" xml:space="preserve"><value>{0} ({1})</value></data>
+  <data name="difficulty_table_tooltip" xml:space="preserve"><value>{0} charts&#10;{1}</value></data>
   <data name="importing_difficulty_table" xml:space="preserve"><value>Importing difficulty table…</value></data>
   <data name="editor_unsupported" xml:space="preserve"><value>The BMS editor is not supported yet.</value></data>
   <data name="collecting" xml:space="preserve"><value>Collecting ...</value></data>

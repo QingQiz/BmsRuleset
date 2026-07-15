@@ -44,6 +44,8 @@
   <data name="update" xml:space="preserve"><value>更新</value></data>
   <data name="update_table_tooltip" xml:space="preserve"><value>从来源重新获取难度表</value></data>
   <data name="delete_table_tooltip" xml:space="preserve"><value>删除难度表</value></data>
+  <data name="difficulty_table_name" xml:space="preserve"><value>{0}（{1}）</value></data>
+  <data name="difficulty_table_tooltip" xml:space="preserve"><value>{0} 张谱面&#10;{1}</value></data>
   <data name="importing_difficulty_table" xml:space="preserve"><value>正在导入难度表…</value></data>
   <data name="editor_unsupported" xml:space="preserve"><value>目前尚不支持 BMS 编辑器。</value></data>
   <data name="collecting" xml:space="preserve"><value>正在收集...</value></data>

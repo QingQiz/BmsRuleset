@@ -419,18 +419,26 @@ own collections.)
 
 ### Table Row Display
 
-Each imported table shows its name and symbol in the settings list. Long names wrap to fit. Hover a row
-to see a tooltip with the chart count per level.
+Each imported table appears as an expandable item in the settings list. Hover it to see a tooltip with the chart count
+per level.
+
+Click a table to show its available actions. Remote tables provide **Subdivide/Unsubdivide**, **Update**, and
+**Delete table**; local tables omit **Update**. The actions stay visible after an operation, including when the table
+list is rebuilt.
 
 ### Subdivide
 
-Click **Subdivide** to split a table's collection into per-level collections with ordering indices
+Expand the table row and click **Subdivide** to split its collection into per-level collections with ordering indices
 (e.g., `[BMS] Table [00] ★1`, `[BMS] Table [01] ★2`). The index width adapts to the number of levels
 (1 digit for &lt;10, 2 for &lt;100, etc.). Click **Unsubdivide** to merge them back into one.
 
 ### Update
 
-Click **Upd** to re-import the table from its original source URL or file path.
+Remote tables provide an **Update** action that re-imports the table from its original source URL.
+
+### Delete
+
+Click **Delete table** and confirm the dialog to remove a table, its markers, and its generated collections.
 
 ---
 

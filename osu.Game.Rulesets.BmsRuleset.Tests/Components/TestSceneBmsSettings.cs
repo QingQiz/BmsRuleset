@@ -1,11 +1,17 @@
+using System;
+using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
+using osu.Framework.Testing;
+using osu.Game.Graphics.Containers;
 using osu.Game.Overlays;
+using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Screens;
 using osu.Game.Tests.Visual;
+using DT = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Components;
 
@@ -15,23 +21,48 @@ public partial class TestSceneBmsSettings : OsuTestScene
     [Cached]
     private OverlayColourProvider colourProvider = new(OverlayColourScheme.Purple);
 
+    private TemporaryNativeStorage storage = null!;
+    private DifficultyTableStore previousStore = null!;
+    private OsuScrollContainer scroll = null!;
+    private Drawable settings = null!;
+
     [BackgroundDependencyLoader]
     private void load()
     {
+        storage = new TemporaryNativeStorage($"{nameof(TestSceneBmsSettings)}-{Guid.NewGuid()}");
+        previousStore = BmsRulesetRuntime.DifficultyTableStore;
+
+        var store = new DifficultyTableStore(null, storage.GetFullPath("difficulty-tables"));
+        store.RestoreTable(createRemoteTable());
+        store.RestoreTable(createLocalTable());
+        BmsRulesetRuntime.DifficultyTableStore = store;
+
         var ruleset = new BmsRuleset();
-        var section = ruleset.CreateSettings();
+        settings = ruleset.CreateSettings();
 
         Add(new PopoverContainer
         {
             RelativeSizeAxes = Axes.Both,
-            Child = new FillFlowContainer
+            Child = scroll = new OsuScrollContainer
             {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Children = [section],
+                RelativeSizeAxes = Axes.Both,
+                Child = new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Vertical,
+                    Children = [settings],
+                },
             },
         });
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        base.Dispose(isDisposing);
+
+        BmsRulesetRuntime.DifficultyTableStore = previousStore;
+        storage.Dispose();
     }
 
     [Test]
@@ -39,6 +70,55 @@ public partial class TestSceneBmsSettings : OsuTestScene
     {
         AddStep("visible", () => { });
     }
+
+    [Test]
+    public void TestDifficultyTables()
+    {
+        AddAssert("table rows have drawable size", () => settings.ChildrenOfType<OsuClickableContainer>()
+            .Where(header => header.Name.StartsWith("Difficulty table header"))
+            .All(header => header.DrawWidth > 0 && header.DrawHeight > 0));
+        AddStep("expand table actions", () =>
+        {
+            getTableHeader("Satellite Difficulty Table").TriggerClickWithSound();
+            getTableHeader("Local Practice Table with a long name that wraps across multiple lines").TriggerClickWithSound();
+        });
+        AddStep("scroll to difficulty tables", () => scroll.ScrollTo(getTableHeader("Satellite Difficulty Table"), false));
+    }
+
+    private OsuClickableContainer getTableHeader(string tableName) => settings.ChildrenOfType<OsuClickableContainer>()
+        .Single(header => header.Name == $"Difficulty table header ({tableName})");
+
+    private static DT createRemoteTable() => new()
+    {
+        Name = "Satellite Difficulty Table",
+        Symbol = "sl",
+        Source = TableSource.RemoteUrl,
+        SourcePath = "https://example.com/satellite/header.json",
+        LevelOrder = ["0", "1", "2"],
+        Entries =
+        [
+            new TableEntry { Level = "0", Md5Hash = "00000000000000000000000000000001" },
+            new TableEntry { Level = "0", Md5Hash = "00000000000000000000000000000002" },
+            new TableEntry { Level = "1", Md5Hash = "00000000000000000000000000000003" },
+            new TableEntry { Level = "1", Md5Hash = "00000000000000000000000000000004" },
+            new TableEntry { Level = "1", Md5Hash = "00000000000000000000000000000005" },
+            new TableEntry { Level = "2", Md5Hash = "00000000000000000000000000000006" },
+        ],
+    };
+
+    private static DT createLocalTable() => new()
+    {
+        Name = "Local Practice Table with a long name that wraps across multiple lines",
+        Symbol = "LP",
+        Source = TableSource.LocalFile,
+        SourcePath = "local-practice-table.json",
+        LevelOrder = ["Beginner", "Advanced"],
+        Entries =
+        [
+            new TableEntry { Level = "Beginner", Md5Hash = "00000000000000000000000000000007" },
+            new TableEntry { Level = "Advanced", Md5Hash = "00000000000000000000000000000008" },
+        ],
+    };
 }
 
 [TestFixture]

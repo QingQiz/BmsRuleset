@@ -93,6 +93,10 @@ public static class BmsStrings
 
     public static LocalisableString DeleteTableTooltip => get("delete_table_tooltip");
 
+    public static LocalisableString DifficultyTableName(string name, string symbol) => get("difficulty_table_name", name, symbol);
+
+    public static LocalisableString DifficultyTableTooltip(int count, string levels) => get("difficulty_table_tooltip", count, levels);
+
     public static LocalisableString ImportingDifficultyTable => get("importing_difficulty_table");
 
     public static LocalisableString EditorUnsupported => get("editor_unsupported");
