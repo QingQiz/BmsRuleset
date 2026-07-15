@@ -34,7 +34,7 @@ Native osu! ruleset plugin for BMS-family charts (`.bms`, `.bme`, `.bml`, `.pms`
 
 3. Copy the DLL to your osu! `rulesets/` folder.
 
-4. Restart osu!. The ruleset will appear in the ruleset selector (currently uses the osu!mania icon as a placeholder).
+4. Restart osu!. The ruleset will appear in the ruleset selector.
 
 ---
 
@@ -1110,13 +1110,11 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 | **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                                            | 3        |
 | **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT                                       | 4        |
 | **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                                                   | 4        |
-| **Skin**      | Column start position — value or enum (leftN, rightN, center)                                                     | 3        |
 | **Skin**      | Non-legacy BMS skin — fully configurable via skin editor                                                          |
 | **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                                                        |
 | **Skin**      | E-POOR judgement image                                                                                            | 3        |
 | **UI**        | Lane cover / skin / movement                                                                                      | 2        |
 | **Perf**      | fps is not stable when a large amount of mine disposed                                                            | 4        |
-| **Maintain**  | ln system is too complex, need a refactor                                                                         | 0        |
 
 ### FIXME
 

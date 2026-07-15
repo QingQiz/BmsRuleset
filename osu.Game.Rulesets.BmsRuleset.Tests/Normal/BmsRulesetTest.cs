@@ -140,7 +140,7 @@ public class BmsRulesetTest
     {
         var icon = ruleset.CreateIcon();
 
-        Assert.That(icon, Is.Not.Null);
+        Assert.That(icon, Is.TypeOf<BmsRulesetIcon>());
     }
 
     [Test]

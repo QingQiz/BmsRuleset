@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
@@ -250,11 +249,7 @@ public partial class BmsRuleset : Ruleset
     public override IRulesetFilterCriteria CreateRulesetFilterCriteria() =>
         new BmsFilterCriteria(BmsRulesetRuntime.ConfigManager);
 
-    public override Drawable CreateIcon() => new SpriteIcon
-    {
-        Icon = OsuIcon.RulesetMania,
-        Colour = Colour4.White,
-    };
+    public override Drawable CreateIcon() => new BmsRulesetIcon();
 
     private static LocalisableString createTotalDescription(IBeatmapInfo beatmapInfo, BmsDifficultyInfo difficulty, IReadOnlyCollection<Mod> mods)
     {
