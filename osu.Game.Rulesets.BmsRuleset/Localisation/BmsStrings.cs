@@ -23,6 +23,8 @@ public static class BmsStrings
 
     public static LocalisableString HitOffset => get("hit_offset");
 
+    public static LocalisableString StandardDeviation(double value) => get("standard_deviation", value);
+
     public static LocalisableString ReferenceBpm => get("reference_bpm");
 
     public static LocalisableString BgaDim => get("bga_dim");

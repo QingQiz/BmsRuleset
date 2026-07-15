@@ -63,6 +63,17 @@ public class BmsLocalisationTest
     }
 
     [Test]
+    public void TestStandardDeviationUpdatesWhenLanguageChanges()
+    {
+        var text = localisation.GetLocalisedBindableString(BmsStrings.StandardDeviation(12.34));
+
+        Assert.That(text.Value, Is.EqualTo("SD 12.3 ms"));
+
+        config.SetValue(FrameworkSetting.Locale, "zh");
+        Assert.That(text.Value, Is.EqualTo("标准差 12.3 ms"));
+    }
+
+    [Test]
     public void TestResourceKeysAndFormatArgumentsMatch()
     {
         var english = getResourceValues(resource_prefix);

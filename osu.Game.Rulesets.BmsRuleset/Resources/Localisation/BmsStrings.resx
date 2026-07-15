@@ -9,6 +9,7 @@
   <data name="timeline" xml:space="preserve"><value>Timeline</value></data>
   <data name="hit_scatter" xml:space="preserve"><value>Hit Scatter</value></data>
   <data name="hit_offset" xml:space="preserve"><value>Hit Offset</value></data>
+  <data name="standard_deviation" xml:space="preserve"><value>SD {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>Reference BPM</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA dim</value></data>
   <data name="use_dedicated_preview_audio" xml:space="preserve"><value>Use dedicated preview audio</value></data>

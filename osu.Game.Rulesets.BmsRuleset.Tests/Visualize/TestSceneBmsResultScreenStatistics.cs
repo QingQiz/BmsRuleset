@@ -336,6 +336,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddUntilStep("hit offset statistic loaded", () => hitOffsetStatistic.IsLoaded);
         AddUntilStep("rounded timing bars shown", () => hitOffsetStatistic.ChildrenOfType<Circle>().Count() >= 101);
         AddUntilStep("old plot background removed", () => !hitOffsetStatistic.ChildrenOfType<Box>().Any(b => Math.Abs(b.Alpha - 0.18f) < 0.001f));
+        AddUntilStep("standard deviation shown", () => hitOffsetStatistic.ChildrenOfType<SpriteText>().Any(t => t.Text.ToString().StartsWith("SD ")));
         assertHitOffsetText("-150");
         assertHitOffsetText("0");
         assertHitOffsetText("+150");

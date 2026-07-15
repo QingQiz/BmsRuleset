@@ -163,6 +163,13 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
             },
             new OsuSpriteText
             {
+                Text = BmsStrings.StandardDeviation(summary.StandardDeviation),
+                Colour = Color4.White,
+                Alpha = 0.75f,
+                Font = OsuFont.GetFont(size: 10),
+            },
+            new OsuSpriteText
+            {
                 Text = BmsStrings.HitCount(summary.Count),
                 Colour = Color4.White,
                 Alpha = 0.55f,
@@ -175,6 +182,10 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
     {
         var hitList = hits.ToList();
         var timedValues = hitList.Where(h => h.result is not (HitResult.Meh or HitResult.Miss)).Select(h => h.offset).ToArray();
+        var averageOffset = timedValues.Length == 0 ? 0 : timedValues.Average();
+        var standardDeviation = timedValues.Length == 0
+            ? 0
+            : Math.Sqrt(timedValues.Sum(value => Math.Pow(value - averageOffset, 2)) / timedValues.Length);
         var binsByResult = new Dictionary<HitResult, int[]>();
         var binSize = Math.Max(1, Math.Ceiling(timedValues.Select(Math.Abs).DefaultIfEmpty(0).Max() / bins_per_side));
         var roundUp = true;
@@ -209,7 +220,8 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
 
         return new HitOffsetSummary(
             hitList.Count,
-            timedValues.Length == 0 ? 0 : timedValues.Average(),
+            averageOffset,
+            standardDeviation,
             timedValues.Count(v => v < 0),
             timedValues.Count(v => v > 0),
             binSize,
@@ -227,6 +239,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
     internal sealed record HitOffsetSummary(
         int Count,
         double AverageOffset,
+        double StandardDeviation,
         int EarlyCount,
         int LateCount,
         double BinSize,

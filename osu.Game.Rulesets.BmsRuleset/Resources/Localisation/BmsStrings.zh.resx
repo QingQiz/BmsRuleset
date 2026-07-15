@@ -9,6 +9,7 @@
   <data name="timeline" xml:space="preserve"><value>时间线</value></data>
   <data name="hit_scatter" xml:space="preserve"><value>击打散点图</value></data>
   <data name="hit_offset" xml:space="preserve"><value>击打偏差</value></data>
+  <data name="standard_deviation" xml:space="preserve"><value>标准差 {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>基准 BPM</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA 暗化</value></data>
   <data name="use_dedicated_preview_audio" xml:space="preserve"><value>使用专用预览音频</value></data>

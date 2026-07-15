@@ -33,6 +33,7 @@ public class BmsHitOffsetStatisticTest
 
         Assert.That(statistics.Overall.Count, Is.EqualTo(7));
         Assert.That(statistics.Overall.AverageOffset, Is.EqualTo(1.5).Within(0.001));
+        Assert.That(statistics.Overall.StandardDeviation, Is.EqualTo(19.358).Within(0.001));
         Assert.That(statistics.Overall.EarlyCount, Is.EqualTo(2));
         Assert.That(statistics.Overall.LateCount, Is.EqualTo(2));
         Assert.That(statistics.Overall.BinSize, Is.EqualTo(1));
@@ -44,9 +45,12 @@ public class BmsHitOffsetStatisticTest
         Assert.That(statistics.Keys.Select(k => k.Label), Is.EqualTo(["Scratch", "Key 1", "Key 2", "Key 3", "Key 4", "Key 5"]));
         Assert.That(statistics.Keys[0].Summary.Count, Is.EqualTo(4));
         Assert.That(statistics.Keys[0].Summary.AverageOffset, Is.EqualTo(-2).Within(0.001));
+        Assert.That(statistics.Keys[0].Summary.StandardDeviation, Is.EqualTo(10).Within(0.001));
         Assert.That(statistics.Keys[1].Summary.Count, Is.EqualTo(2));
         Assert.That(statistics.Keys[1].Summary.AverageOffset, Is.EqualTo(5).Within(0.001));
+        Assert.That(statistics.Keys[1].Summary.StandardDeviation, Is.EqualTo(25).Within(0.001));
         Assert.That(statistics.Keys[2].Summary.Count, Is.Zero);
+        Assert.That(statistics.Keys[2].Summary.StandardDeviation, Is.Zero);
     }
 
     [Test]
