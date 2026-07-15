@@ -6,6 +6,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
@@ -159,6 +161,58 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(playfield.Stage.Scale.Y, Is.EqualTo(2).Within(0.001f));
             Assert.That(playfield.Stage.HudViewportHeight, Is.EqualTo(600).Within(0.001f));
             Assert.That(playfield.Stage.Masking, Is.False);
+        });
+    }
+
+    [Test]
+    public void TestStageHudNoteHeightScalePreservesBounds()
+    {
+        var root = new Container { Size = new Vector2(1000, 600) };
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+        }))
+        {
+            RelativeSizeAxes = Axes.None,
+            Size = new Vector2(1000, 600),
+        };
+        playfield.Stage.RelativeSizeAxes = Axes.None;
+        setAutoSizeAxes(playfield.Stage, Axes.None);
+        playfield.Stage.Size = new Vector2(100, 600);
+
+        var stageHud = new BmsStageHud
+        {
+            Anchor = Anchor.TopLeft,
+            Origin = Anchor.TopLeft,
+            Size = new Vector2(0.1f, 1),
+        };
+        stageHud.NoteHeightScale.Value = 1.5f;
+        var controller = new BmsStageHudController(playfield);
+
+        setDrawableParent(playfield, root);
+        setDrawableParent(stageHud, root);
+        controller.Register(stageHud);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(playfield.Stage.Scale, Is.EqualTo(Vector2.One));
+            Assert.That(playfield.Stage.HudViewportHeight, Is.EqualTo(600).Within(0.001f));
+            Assert.That(playfield.Stage.NoteHeightScale, Is.EqualTo(1.5f));
+        });
+    }
+
+    [Test]
+    public void TestNoteHeightScaleOnlyScalesNoteVisual()
+    {
+        var drawable = new TestDrawableBmsHitObject();
+
+        drawable.ApplyNoteHeightScale(1.5f);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(drawable.Scale, Is.EqualTo(Vector2.One));
+            Assert.That(drawable.TestNoteContainer.Scale, Is.EqualTo(new Vector2(1, 1.5f)));
         });
     }
 
@@ -529,6 +583,22 @@ public partial class BmsGameplayVirtualisationTest
         {
             Anchor = Anchor.TopLeft;
             Origin = Anchor.TopLeft;
+        }
+    }
+
+    private sealed partial class TestDrawableBmsHitObject : DrawableBmsHitObject
+    {
+        protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Note;
+
+        public Container TestNoteContainer => NoteContainer;
+
+        public TestDrawableBmsHitObject()
+        {
+            NoteContainer = new Container();
+        }
+
+        protected override void CheckForResult(bool userTriggered, double timeOffset)
+        {
         }
     }
 }

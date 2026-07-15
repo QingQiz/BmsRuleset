@@ -70,6 +70,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal double ScrollSpeedMultiplier => ParentPlayfield.ScrollController.ScrollSpeedMultiplier;
 
+    internal float NoteHeightScale => ParentPlayfield.Stage.NoteHeightScale;
+
     protected BmsPlayfield ParentPlayfield { get; }
 
     private const float key_area_under_notes_depth = 1;

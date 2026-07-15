@@ -21,6 +21,14 @@ internal sealed partial class BmsStageHud : BmsHudComponent
         Precision = 1,
     };
 
+    [SettingSource("Note height scale", "Scales note heads and tails without changing their positions or other Stage elements.")]
+    public BindableFloat NoteHeightScale { get; } = new(1)
+    {
+        MinValue = 0.01f,
+        MaxValue = 5,
+        Precision = 0.01f,
+    };
+
     private readonly Container editHandle;
     private BmsStageHudController? controller;
 
@@ -80,7 +88,9 @@ internal sealed partial class BmsStageHud : BmsHudComponent
             controller = bmsDrawableRuleset.StageHudController;
             controller.Register(this, this.FindClosestParent<ISerialisableDrawableContainer>());
             JudgementLineOffset.ValueChanged += onJudgementLineOffsetChanged;
+            NoteHeightScale.ValueChanged += onNoteHeightScaleChanged;
             controller.SetHitTargetPositionOffset(JudgementLineOffset.Value);
+            controller.SetNoteHeightScale(NoteHeightScale.Value);
         }
 
         if (SkinEditor != null)
@@ -92,6 +102,7 @@ internal sealed partial class BmsStageHud : BmsHudComponent
     protected override void Dispose(bool isDisposing)
     {
         JudgementLineOffset.ValueChanged -= onJudgementLineOffsetChanged;
+        NoteHeightScale.ValueChanged -= onNoteHeightScaleChanged;
         controller?.Unregister(this);
         controller = null;
 
@@ -99,6 +110,8 @@ internal sealed partial class BmsStageHud : BmsHudComponent
     }
 
     private void onJudgementLineOffsetChanged(ValueChangedEvent<float> offset) => controller?.SetHitTargetPositionOffset(offset.NewValue);
+
+    private void onNoteHeightScaleChanged(ValueChangedEvent<float> scale) => controller?.SetNoteHeightScale(scale.NewValue);
 
     internal void SetJudgementLineOffsetRange(float minimum, float maximum)
     {

@@ -56,4 +56,15 @@ public partial class BmsGameplayVirtualisationTest
 
         Assert.That(restored.JudgementLineOffset.Value, Is.EqualTo(40));
     }
+
+    [Test]
+    public void TestNoteHeightScaleIsSerialisedWithStageHud()
+    {
+        var hud = new BmsStageHud();
+        hud.NoteHeightScale.Value = 1.5f;
+
+        var restored = (BmsStageHud)hud.CreateSerialisedInfo().CreateInstance();
+
+        Assert.That(restored.NoteHeightScale.Value, Is.EqualTo(1.5f));
+    }
 }

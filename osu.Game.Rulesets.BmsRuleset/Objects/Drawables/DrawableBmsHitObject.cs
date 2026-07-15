@@ -8,6 +8,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
@@ -62,6 +63,23 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         }
 
         UpdateKindPostResultState();
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+
+        ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
+    }
+
+    internal void ApplyNoteHeightScale(float scale)
+    {
+        NoteContainer.Scale = new Vector2(1, scale);
+        ApplyNoteHeightScaleToKind(scale);
+    }
+
+    protected virtual void ApplyNoteHeightScaleToKind(float scale)
+    {
     }
 
     protected virtual void ResetKindState()

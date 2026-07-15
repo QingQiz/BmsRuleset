@@ -42,6 +42,8 @@ public sealed partial class BmsStage : CompositeDrawable
 
     internal float HitTargetPositionOffset { get; private set; }
 
+    internal float NoteHeightScale { get; private set; } = 1;
+
     internal event Action<float>? SkinHitTargetPositionChanged;
 
     internal event Action<float>? HitTargetPositionOffsetChanged;
@@ -304,6 +306,12 @@ public sealed partial class BmsStage : CompositeDrawable
         HitTargetPositionOffset = offset;
         applyHitTargetPosition();
         HitTargetPositionOffsetChanged?.Invoke(offset);
+    }
+
+    internal void SetNoteHeightScale(float scale)
+    {
+        if (float.IsFinite(scale) && scale > 0)
+            NoteHeightScale = scale;
     }
 
     private void applyHitTargetPosition(bool notifySkinPositionChanged = false)

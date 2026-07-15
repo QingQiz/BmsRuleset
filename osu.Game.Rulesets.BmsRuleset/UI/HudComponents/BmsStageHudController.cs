@@ -36,12 +36,15 @@ internal sealed partial class BmsStageHudController : Component
 
         stageHud = hud;
         ensureStageHudSingleton();
+        SetNoteHeightScale(stageHud?.NoteHeightScale.Value ?? 1);
         tryInitialiseHudSize();
         updateStageTransform();
         updateJudgementLineOffsetRange();
     }
 
     internal void SetHitTargetPositionOffset(float offset) => playfield.Stage.SetHitTargetPositionOffset(offset);
+
+    internal void SetNoteHeightScale(float scale) => playfield.Stage.SetNoteHeightScale(scale);
 
     internal void Unregister(BmsStageHud hud)
     {
@@ -50,6 +53,7 @@ internal sealed partial class BmsStageHudController : Component
 
         stageHud = null;
         playfield.Stage.SetHitTargetPositionOffset(0);
+        playfield.Stage.SetNoteHeightScale(1);
         playfield.Stage.ClearHudTransform();
     }
 
@@ -75,6 +79,7 @@ internal sealed partial class BmsStageHudController : Component
     protected override void Dispose(bool isDisposing)
     {
         unregisterContainer();
+        playfield.Stage.SetNoteHeightScale(1);
         playfield.Stage.ClearHudTransform();
 
         base.Dispose(isDisposing);
@@ -103,6 +108,7 @@ internal sealed partial class BmsStageHudController : Component
                 stageHudContainer.Remove(duplicate, true);
 
             stageHud = keeper;
+            SetNoteHeightScale(keeper.NoteHeightScale.Value);
             tryInitialiseHudSize();
             updateStageTransform();
             updateJudgementLineOffsetRange();
@@ -123,6 +129,7 @@ internal sealed partial class BmsStageHudController : Component
         {
             stageHud = null;
             playfield.Stage.SetHitTargetPositionOffset(0);
+            playfield.Stage.SetNoteHeightScale(1);
             playfield.Stage.ClearHudTransform();
         }
 

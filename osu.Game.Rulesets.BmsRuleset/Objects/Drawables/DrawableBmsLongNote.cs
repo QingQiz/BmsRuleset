@@ -12,6 +12,7 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
@@ -38,6 +39,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private double lastHoldExplosionTime;
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private Container longNoteTailContainer = null!;
+    private BmsCachedSkinnableDrawable longNoteTail = null!;
 
     [Resolved(CanBeNull = true)]
     private IBmsLnScoring? scoring { get; set; }
@@ -114,6 +116,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         longNoteTailContainer.Alpha = 0;
     }
 
+    protected override void ApplyNoteHeightScaleToKind(float scale) => longNoteTail.Scale = new Vector2(1, scale);
+
     protected override void OnApply()
     {
         base.OnApply();
@@ -144,7 +148,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
                 Alpha = 0,
                 Children =
                 [
-                    new BmsCachedSkinnableDrawable(
+                    longNoteTail = new BmsCachedSkinnableDrawable(
                         new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail,
                             LayoutVariant, Column))
                     {
