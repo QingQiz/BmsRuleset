@@ -23,6 +23,8 @@ public partial class DifficultyTableStore
 {
     public IReadOnlyList<DifficultyTable> Tables => tables;
 
+    internal CollectionSyncManager? CollectionSyncManager { get; }
+
     /// <summary>
     /// Optional; set after construction to enable automatic marker refresh when tables change.
     /// </summary>
@@ -45,13 +47,14 @@ public partial class DifficultyTableStore
     {
         this.config = config;
         this.cacheDirectory = cacheDirectory;
+        CollectionSyncManager = syncManager;
         Directory.CreateDirectory(cacheDirectory);
         RefreshDiffNameEvent += notification => Task.Factory.StartNew(() =>
         {
             DifficultyNameUpdater?.RefreshAllMarkers(notification);
         }, TaskCreationOptions.LongRunning);
 
-        TableListRebuildEvent += tb => syncManager?.SyncInTransaction(realm, tb);
+        TableListRebuildEvent += tb => CollectionSyncManager?.SyncInTransaction(realm, tb);
     }
 
     /// <summary>

@@ -123,7 +123,7 @@ internal partial class DifficultyTableSettings : FillFlowContainer
         if (BmsRulesetRuntime.DifficultyTableStore == null && host != null)
         {
             var cacheDir = Path.Combine(host.Storage.GetFullPath(string.Empty), "difficulty-tables");
-            collectionSyncManager = new CollectionSyncManager();
+            collectionSyncManager = new CollectionSyncManager(configManager);
             var store = new DifficultyTableStore(configManager, cacheDir, collectionSyncManager, realm);
             BmsRulesetRuntime.DifficultyTableStore = store;
 
@@ -134,6 +134,7 @@ internal partial class DifficultyTableSettings : FillFlowContainer
         }
 
         difficultyTableStore = BmsRulesetRuntime.DifficultyTableStore;
+        collectionSyncManager = difficultyTableStore?.CollectionSyncManager;
     }
 
     private static string friendlyName(string url)

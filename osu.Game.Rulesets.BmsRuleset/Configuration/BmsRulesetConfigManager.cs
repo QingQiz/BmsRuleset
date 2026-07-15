@@ -29,6 +29,7 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
         SetDefault(BmsRulesetSetting.ShowPms9KDouble, true);
         SetDefault(BmsRulesetSetting.DifficultyTableSources, string.Empty);
         SetDefault(BmsRulesetSetting.DifficultyTableHistory, string.Empty);
+        SetDefault(BmsRulesetSetting.DifficultyTableSubdividedTables, string.Empty);
     }
 }
 
@@ -46,5 +47,6 @@ public enum BmsRulesetSetting
     ShowPms9KDouble,
     DifficultyTableSources,
     DifficultyTableHistory,
+    DifficultyTableSubdividedTables,
     UseDedicatedPreviewAudio,
 }

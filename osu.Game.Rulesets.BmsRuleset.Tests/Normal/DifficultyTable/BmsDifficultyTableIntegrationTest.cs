@@ -7,8 +7,10 @@ using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
+using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.ImportExport;
 
@@ -386,6 +388,58 @@ public partial class BmsDifficultyTableIntegrationTest
             finally
             {
                 BmsRulesetRuntime.DifficultyTableStore = previousStore;
+            }
+
+            return Task.CompletedTask;
+        });
+    }
+
+    [Test]
+    public void TestSubdivisionStatePersistsAcrossConfigReloads()
+    {
+        runIntegrationTest((realm, _) =>
+        {
+            var ruleset = new BmsRuleset();
+            var settingsStore = new SettingsStore(realm);
+            var table = new global::osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+            {
+                Name = "Subdivision Persistence Test",
+                SourcePath = "subdivision-persistence-test",
+            };
+
+            using (var config = new BmsRulesetConfigManager(settingsStore, ruleset.RulesetInfo))
+            {
+                var syncManager = new CollectionSyncManager(config);
+                syncManager.ToggleSubdivide(null, table);
+                Assert.That(syncManager.IsSubdivided(table), Is.True);
+                Assert.That(config.Save(), Is.True);
+            }
+
+            using (var config = new BmsRulesetConfigManager(settingsStore, ruleset.RulesetInfo))
+            {
+                var syncManager = new CollectionSyncManager(config);
+                Assert.That(syncManager.IsSubdivided(table), Is.True);
+
+                syncManager.ToggleSubdivide(null, table);
+                Assert.That(syncManager.IsSubdivided(table), Is.False);
+                Assert.That(config.Save(), Is.True);
+            }
+
+            using (var config = new BmsRulesetConfigManager(settingsStore, ruleset.RulesetInfo))
+            {
+                var syncManager = new CollectionSyncManager(config);
+                Assert.That(syncManager.IsSubdivided(table), Is.False);
+
+                syncManager.ToggleSubdivide(null, table);
+                syncManager.SyncInTransaction(null, table);
+                Assert.That(syncManager.IsSubdivided(table), Is.False);
+                Assert.That(config.Save(), Is.True);
+            }
+
+            using (var config = new BmsRulesetConfigManager(settingsStore, ruleset.RulesetInfo))
+            {
+                var syncManager = new CollectionSyncManager(config);
+                Assert.That(syncManager.IsSubdivided(table), Is.False);
             }
 
             return Task.CompletedTask;

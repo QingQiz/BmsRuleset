@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using osu.Game.Collections;
 using osu.Game.Database;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
@@ -22,18 +24,37 @@ public class CollectionSyncManager
     /// Tracks which tables are currently subdivided.
     /// Key: table identifier (SourcePath ?? Name).
     /// </summary>
-    private readonly HashSet<string> subdividedTables = [];
+    private readonly HashSet<string> subdividedTables = new(StringComparer.Ordinal);
+
+    private readonly BmsRulesetConfigManager? config;
+
+    public CollectionSyncManager(BmsRulesetConfigManager? config = null)
+    {
+        this.config = config;
+
+        var savedTables = config?.Get<string>(BmsRulesetSetting.DifficultyTableSubdividedTables);
+        if (string.IsNullOrEmpty(savedTables))
+            return;
+
+        try
+        {
+            subdividedTables.UnionWith(JsonSerializer.Deserialize<string[]>(savedTables) ?? []);
+        }
+        catch (JsonException)
+        {
+        }
+    }
 
     /// <summary>
     /// Toggle subdivide state for a table.
     /// </summary>
     public void ToggleSubdivide(RealmAccess? realm, DifficultyTable table)
     {
-        if (realm == null) return;
-
         var key = table.SourcePath ?? table.Name;
         if (!subdividedTables.Remove(key))
             subdividedTables.Add(key);
+
+        persistSubdividedTables();
 
         // rebuild first. so we can update the divided status
         BmsRulesetRuntime.DifficultyTableStore?.NotifyToRebuildTableList(null);
@@ -54,6 +75,9 @@ public class CollectionSyncManager
     /// </summary>
     public void SyncInTransaction(RealmAccess? realm, DifficultyTable? tableRemoved)
     {
+        if (tableRemoved != null && subdividedTables.Remove(tableRemoved.SourcePath ?? tableRemoved.Name))
+            persistSubdividedTables();
+
         if (realm == null) return;
 
         // remove collections for removed table first
@@ -80,6 +104,12 @@ public class CollectionSyncManager
         {
             realm.Write(r => syncDivideStatus(r, table));
         }
+    }
+
+    private void persistSubdividedTables()
+    {
+        config?.SetValue(BmsRulesetSetting.DifficultyTableSubdividedTables,
+            JsonSerializer.Serialize(subdividedTables.Order(StringComparer.Ordinal)));
     }
 
     private void syncDivideStatus(Realm r, DifficultyTable table)
