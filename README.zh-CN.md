@@ -8,32 +8,51 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
 
 ## 安装
 
-1. 克隆
+### 从 Release 安装
 
-   克隆仓库时可以跳过 `bms_test_songs` 文件夹以节省时间和磁盘空间，它包含仅运行测试所需的大型音频文件：
+1. 从 [Releases](https://github.com/QingQiz/BmsRuleset/releases) 的附件中下载
+   `osu.Game.Rulesets.BmsRuleset.dll`。Release 标题通常为 `xxxx.yyy.z` 格式，请选择 `xxxx.yyy` 与你安装的
+   osu!lazer 版本相同的 Release；也可以通过 Release 中的 **Compatibility** 说明确认目标版本。
+2. 在 osu! 中点击**设置 → 常规 → 打开 osu! 文件夹**，将 DLL 放入其中的 `rulesets` 子文件夹；如果该文件夹
+   不存在，请手动创建。
+3. 重启 osu!，规则集会出现在规则集选择器中。
 
-   ```bash
-   git clone --filter=blob:none --sparse https://github.com/QINGQIZ/BmsRuleset.git
-   cd BmsRuleset
-   git sparse-checkout set --no-cone '/*' '!bms_test_songs'
-   ```
+### 手动编译
 
-   如果需要恢复该文件夹（例如运行测试）：
+<details>
+<summary>点击展开</summary>
 
-   ```bash
-   git sparse-checkout add bms_test_songs
-   ```
+安装 [Git](https://git-scm.com/) 和 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)，然后将本仓库
+和 osu! 克隆到任意工作目录下的两个同级文件夹。以下 sparse checkout 会跳过体积较大的测试歌曲文件夹：
 
-1. 构建规则集：
-   ```
-   dotnet build "osu.Game.Rulesets.BmsRuleset"
-   ```
-   输出：`osu.Game.Rulesets.BmsRuleset/bin/Debug/net8.0/osu.Game.Rulesets.BmsRuleset.dll`
-   构建出的 DLL 会内嵌 Windows、Linux 和 macOS 的压缩 native backend。
+```bash
+git clone --filter=blob:none --sparse https://github.com/QingQiz/BmsRuleset.git
+git -C BmsRuleset sparse-checkout set --no-cone '/*' '!bms_test_songs'
+git clone --filter=blob:none https://github.com/ppy/osu.git
+```
 
-2. 将 DLL 复制到 osu! 的 `rulesets/` 文件夹。
+查看 `BmsRuleset/Directory.Build.props` 中的 `OsuBase`，然后切换到对应的 osu! 标签。例如 `OsuBase` 为
+`2026.711` 时：
 
-3. 重启 osu!。规则集会出现在规则集选择器中。
+```bash
+git -C osu checkout 2026.711.0-lazer
+```
+
+项目默认启用 `UseLocalOsu`，会自动引用同级的 `osu` checkout。这是因为 ppy 发布 osu!lazer 时，往往不会同步更新
+`ppy.osu.Game` NuGet 包。使用匹配标签的本地 osu! 源码可以确保引用的 API 和 osu! 版本一致，而无需等待 NuGet
+包更新。
+
+使用 Release 配置编译规则集：
+
+```bash
+cd BmsRuleset
+dotnet build osu.Game.Rulesets.BmsRuleset -c Release
+```
+
+输出文件位于 `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets.BmsRuleset.dll`。按照上面的安装
+步骤放入 osu! 的 `rulesets` 文件夹即可。
+
+</details>
 
 ---
 
@@ -55,6 +74,27 @@ BMS 谱面并将其标记为删除。
 ---
 
 ## 亮点
+
+### osu!mania 皮肤支持
+
+本插件支持标准 osu!mania 皮肤。如果你是 mania 玩家，规则集通常会直接渲染你当前使用的 mania 皮肤。以 BMS 7K
+（7 键加皿）为例，皮肤配置按以下顺序选择：
+
+1. `Layout: 7K` 的 `[BMS]` 配置
+2. `Keys: 8` 且 `SpecialStyle: 1` 的 `[Mania]` 配置
+3. `Keys: 8` `[Mania]` 配置
+4. `Keys: 7` 的 `[Mania]` 配置
+5. 规则集内置的回退皮肤
+
+> [!NOTE]
+> 由于 BMS 专用 HUD 会与 mania 皮肤中的组件一同显示，初始布局可能会有些杂乱，例如出现两个偏移条。请打开
+> 皮肤编辑器，拖拽组件并调整布局。
+
+> [!TIP]
+> 本插件提供了许多用于还原 BMS 游玩体验的自定义 HUD 组件。建议首次启动时先进入皮肤编辑器，编辑布局并添加或
+> 删除你想使用的 HUD 组件。
+
+---
 
 ### 歌曲预览
 
@@ -306,26 +346,7 @@ DP ☆NOTHER [TT★1 TT★2]
 
 ## 皮肤系统
 
-### 使用方式
-
-规则集使用**三层皮肤回退机制**：
-
-```
-1. 谱面自带的嵌入式皮肤（如果存在）
-2. 当前 osu! 用户皮肤（如果提供 BMS 资源）
-3. 规则集内置回退皮肤（始终可用）
-```
-
-用户皮肤在以下情况被识别为提供 BMS 资源：
-
-- 其 `skin.ini` 包含 `[BMS]` 段，**或**
-- 其 `skin.ini` 包含按键数正确的 `[Mania]` 段，**或**
-- 拥有 `mania-key1` 或 `mania-keyS` 纹理
-
-如果以上条件均不满足，则使用规则集内置皮肤。内置皮肤有两种变体：
-
-- **LegacyModern** — 当你的活跃 osu! 皮肤为 Argon/Triangles 时使用
-- **LegacyOld** — 当你的活跃 osu! 皮肤为默认 legacy 皮肤时使用
+皮肤配置的选择顺序见上文的 [osu!mania 皮肤支持](#osumania-皮肤支持)。
 
 ### 制作皮肤
 
@@ -487,8 +508,7 @@ lightingN-2.png
 
 ### HUD 组件
 
-HUD 组件实现了 `ISerialisableDrawable`，可在游戏内通过**皮肤编辑器**自由拖拽位置和调整大小。
-在游戏中打开皮肤编辑器，拖动任意组件到合适位置。
+HUD 组件可在游戏内通过**皮肤编辑器**自由拖拽位置和调整大小。在游戏中打开皮肤编辑器，拖动任意组件到合适位置。
 
 下次游玩时自动加载保存的布局。
 

@@ -8,33 +8,53 @@ Native osu! ruleset plugin for BMS-family charts (`.bms`, `.bme`, `.bml`, `.pms`
 
 ## Installation
 
-1. Cloning
+### Install a Release
 
-   When cloning this repository, you can skip the `bms_test_songs` folder to save time and disk space — it contains
-   large test audio files only needed for running tests:
+1. Download `osu.Game.Rulesets.BmsRuleset.dll` from the assets of a
+   [release](https://github.com/QingQiz/BmsRuleset/releases). Release titles normally use the `xxxx.yyy.z` format;
+   choose one whose `xxxx.yyy` matches your installed osu!lazer version. You can also confirm the target version in
+   the release's **Compatibility** section.
+2. In osu!, use **Settings → General → Open osu! folder**, then place the DLL in its `rulesets` subfolder. Create the
+   folder if it does not exist.
+3. Restart osu!. The ruleset will appear in the ruleset selector.
 
-    ```bash
-    git clone --filter=blob:none --sparse https://github.com/QINGQIZ/BmsRuleset.git
-    cd BmsRuleset
-    git sparse-checkout set --no-cone '/*' '!bms_test_songs'
-    ```
+### Build Manually
 
-   To restore the folder later (e.g., to run tests):
+<details>
+<summary>Click to expand</summary>
 
-    ```bash
-    git sparse-checkout add bms_test_songs
-    ```
+Install [Git](https://git-scm.com/) and the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), then clone
+this repository and osu! into sibling directories under any working directory. The sparse checkout skips the large
+test-song folder:
 
-2. Build the ruleset:
-   ```
-   dotnet build "osu.Game.Rulesets.BmsRuleset"
-   ```
-   Output: `osu.Game.Rulesets.BmsRuleset/bin/Debug/net8.0/osu.Game.Rulesets.BmsRuleset.dll`
-   The built DLL embeds compressed native backends for Windows, Linux, and macOS.
+```bash
+git clone --filter=blob:none --sparse https://github.com/QingQiz/BmsRuleset.git
+git -C BmsRuleset sparse-checkout set --no-cone '/*' '!bms_test_songs'
+git clone --filter=blob:none https://github.com/ppy/osu.git
+```
 
-3. Copy the DLL to your osu! `rulesets/` folder.
+Read `OsuBase` in `BmsRuleset/Directory.Build.props`, then check out the matching osu! tag. For example,
+`OsuBase` `2026.711` requires:
 
-4. Restart osu!. The ruleset will appear in the ruleset selector.
+```bash
+git -C osu checkout 2026.711.0-lazer
+```
+
+The project enables `UseLocalOsu` by default and automatically references the sibling `osu` checkout. This is needed
+because ppy often does not update the `ppy.osu.Game` NuGet package at the same time as an osu!lazer release. Building
+against the matching local tag keeps the referenced API and osu! version in sync without waiting for a NuGet update.
+
+Build the ruleset in Release configuration:
+
+```bash
+cd BmsRuleset
+dotnet build osu.Game.Rulesets.BmsRuleset -c Release
+```
+
+The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets.BmsRuleset.dll`. Install it using the
+steps above.
+
+</details>
 
 ---
 
@@ -59,6 +79,28 @@ for deletion.
 ---
 
 ## Highlights
+
+### osu!mania Skin Support
+
+The ruleset supports standard osu!mania skins. If you are a mania player, it should render the mania skin you are
+currently using directly. For example, BMS 7K (seven keys plus scratch) selects skin configuration in this order:
+
+1. `[BMS]` with `Layout: 7K`
+2. `[Mania]` with `Keys: 8` and `SpecialStyle: 1`
+3. `[Mania]` with `Keys: 8`
+4. `[Mania]` with `Keys: 7`
+5. The ruleset's built-in fallback skin
+
+> [!NOTE]
+> The initial layout may look cluttered because the BMS-specific HUD is placed alongside components from your mania
+> skin. For example, two hit error meters may be visible. Open the skin editor and drag the components into place to
+> tidy up the layout.
+
+> [!TIP]
+> This ruleset provides many custom HUD components that recreate the BMS gameplay experience. On first launch, open
+> the skin editor to arrange the layout and add or remove the HUD components you want to use.
+
+---
 
 ### Song Preview
 
@@ -444,26 +486,7 @@ Click **Delete table** and confirm the dialog to remove a table, its markers, an
 
 ## Skin System
 
-### How It Works
-
-The ruleset uses a **three-layer skin fallback chain**:
-
-```
-1. Chart's own embedded skin (if present)
-2. Your current osu! user skin (if it provides BMS resources)
-3. Ruleset built-in fallback skin (always present)
-```
-
-A user skin is recognized as providing BMS resources if:
-
-- Its `skin.ini` contains a `[BMS]` section, **or**
-- Its `skin.ini` contains a `[Mania]` section with the correct key count, **or**
-- It has `mania-key1` or `mania-keyS` textures
-
-If none of these apply, the ruleset's built-in skin is used. Two built-in variants exist:
-
-- **LegacyModern** — used when your active osu! skin is Argon/Triangles
-- **LegacyOld** — used when your active osu! skin is the default legacy skin
+The skin configuration selection order is described in [osu!mania Skin Support](#osumania-skin-support) above.
 
 ### Creating a Skin
 
@@ -628,8 +651,8 @@ In `[Mania]` sections, use mania standard judgement names: `Hit300g` (PGREAT), `
 
 ### HUD Components
 
-HUD components implement `ISerialisableDrawable` and can be repositioned and resized freely in the
-**Skin Editor** during gameplay. Open the skin editor and drag any component to your preferred position.
+HUD components can be repositioned and resized freely in the **Skin Editor** during gameplay.
+Open the skin editor and drag any component to your preferred position.
 
 On the next play session the saved layout is automatically loaded.
 
