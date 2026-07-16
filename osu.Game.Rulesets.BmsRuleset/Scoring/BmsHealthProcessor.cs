@@ -223,7 +223,7 @@ public partial class BmsHealthProcessor : HealthProcessor
         if (!HasEverFailed && Health.Value <= 0)
             HasEverFailed = true;
 
-        recordGaugeHistory(result.HitObject.StartTime);
+        recordGaugeHistory(result.TimeAbsolute);
     }
 
     protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement.MaxResult == HitResult.Meh

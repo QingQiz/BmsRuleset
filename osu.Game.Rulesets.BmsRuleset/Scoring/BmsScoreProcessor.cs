@@ -17,19 +17,13 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 
 public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 {
-    private const double accuracy_cutoff_x = 1;
-    private const double accuracy_cutoff_s = 8.0 / 9.0;
-    private const double accuracy_cutoff_a = 7.0 / 9.0;
-    private const double accuracy_cutoff_b = 6.0 / 9.0;
-    private const double accuracy_cutoff_c = 5.0 / 9.0;
-    private const double accuracy_cutoff_d = 0;
-
     private static readonly Action<JudgementResult, int> set_combo_after = createComboAfterSetter();
 
-    private static readonly Action<BmsScoreProcessor, HitEvent> add_hit_event = createHitEventAdder();
-
     private double latestEndTime = double.MaxValue;
-    private readonly Dictionary<BmsLongNoteJudgementResult, IReadOnlyList<HitEvent>> additionalLongNoteEvents = new();
+    private readonly List<BmsJudgementEvent> judgementEvents = [];
+    private readonly Dictionary<JudgementResult, BmsJudgementEvent> eventsByResult = new();
+
+    public IReadOnlyList<BmsJudgementEvent> JudgementEvents => judgementEvents;
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
@@ -69,27 +63,14 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             // Traditional BMS DJ LEVEL thresholds expressed as EX-score ratios.
             // AAA = 8/9 of max ≈ 0.889, AA = 7/9 ≈ 0.778, A = 6/9 ≈ 0.667.
             // We expose S/A/B/C/D as approximate equivalents.
-            >= accuracy_cutoff_s => ScoreRank.S,
-            >= accuracy_cutoff_a => ScoreRank.A,
-            >= accuracy_cutoff_b => ScoreRank.B,
-            >= accuracy_cutoff_c => ScoreRank.C,
-            _ => ScoreRank.D,
+            _ => BmsExScore.RankFromAccuracy(accuracy, allowX: false),
         };
 
         // BMS pass/fail is determined solely by gauge at song end, not by score accuracy.
         // ScoreRank.F is never assigned here; failure is communicated through BmsHealthProcessor.
     }
 
-    public override double AccuracyCutoffFromRank(ScoreRank rank) => rank switch
-    {
-        ScoreRank.X or ScoreRank.XH => accuracy_cutoff_x,
-        ScoreRank.S or ScoreRank.SH => accuracy_cutoff_s,
-        ScoreRank.A => accuracy_cutoff_a,
-        ScoreRank.B => accuracy_cutoff_b,
-        ScoreRank.C => accuracy_cutoff_c,
-        ScoreRank.D => accuracy_cutoff_d,
-        _ => throw new ArgumentOutOfRangeException(nameof(rank), rank, null),
-    };
+    public override double AccuracyCutoffFromRank(ScoreRank rank) => BmsExScore.AccuracyCutoffFromRank(rank);
 
     /// <summary>
     ///     Records an Empty POOR: a keypress that found no note to consume.
@@ -100,13 +81,18 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     /// </summary>
     public void RegisterEmptyPoor()
     {
-        ScoreResultCounts[HitResult.Miss] = ScoreResultCounts.GetValueOrDefault(HitResult.Miss) + 1;
+        RegisterEmptyPoor(Clock?.CurrentTime ?? 0);
     }
 
     public void RegisterEmptyPoor(double eventTime)
     {
-        RegisterEmptyPoor();
-        add_hit_event(this, new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = eventTime }, null, null));
+        ScoreResultCounts[HitResult.Miss] = ScoreResultCounts.GetValueOrDefault(HitResult.Miss) + 1;
+
+        var source = new BmsJudgementSource(eventTime, 0, BmsJudgementSourceKind.EmptyPoor);
+        judgementEvents.Add(new BmsJudgementEvent(source, HitResult.Miss,
+        [
+            new BmsTimingObservation(BmsTimingObservationKind.Note, eventTime, eventTime, 1, HitResult.Miss),
+        ]));
     }
 
     /// <summary>
@@ -126,11 +112,8 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     public override void PopulateScore(ScoreInfo score)
     {
         base.PopulateScore(score);
-
-        score.HitEvents = score.HitEvents
-            .Concat(additionalLongNoteEvents.Values.SelectMany(events => events))
-            .OrderBy(e => e.HitObject.GetEndTime() + e.TimeOffset)
-            .ToList();
+        score.HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents(judgementEvents);
+        BmsJudgementEventStore.Set(score, judgementEvents);
 
         // Attribution (e.g. which gauge an Auto Gauge run resolved to) is owned by the mods
         // that introduce the behaviour, so the score processor stays free of gauge-specific logic.
@@ -154,7 +137,8 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     protected override void Reset(bool storeResults)
     {
         base.Reset(storeResults);
-        additionalLongNoteEvents.Clear();
+        judgementEvents.Clear();
+        eventsByResult.Clear();
     }
 
     /// <summary>
@@ -187,25 +171,20 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     {
         base.RemoveScoreChange(result);
 
-        if (result is BmsLongNoteJudgementResult longNoteResult)
-            additionalLongNoteEvents.Remove(longNoteResult);
+        if (eventsByResult.Remove(result, out var judgementEvent))
+            judgementEvents.Remove(judgementEvent);
     }
 
     protected override HitEvent CreateHitEvent(JudgementResult result)
     {
         var frameworkEvent = base.CreateHitEvent(result);
-
-        if (result is not BmsLongNoteJudgementResult longNoteResult || longNoteResult.EndpointResults.Count == 0)
-            return frameworkEvent;
-
-        var events = longNoteResult.EndpointResults
-            .Select(endpoint => createLongNoteEndpointEvent(endpoint, frameworkEvent.LastHitObject))
-            .ToArray();
-
-        if (events.Length > 1)
-            additionalLongNoteEvents[longNoteResult] = events[..^1];
-
-        return events[^1];
+        var judgementEvent = createJudgementEvent(result);
+        judgementEvents.Add(judgementEvent);
+        eventsByResult.Add(result, judgementEvent);
+        return BmsJudgementEventProjection.CreateTimingHitEvent(
+            judgementEvent.Source,
+            judgementEvent.TimingObservations[^1],
+            frameworkEvent.LastHitObject);
     }
 
     protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
@@ -249,27 +228,36 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         }
     }
 
-    private static Action<BmsScoreProcessor, HitEvent> createHitEventAdder()
+    private static BmsJudgementEvent createJudgementEvent(JudgementResult result)
     {
-        var field = typeof(ScoreProcessor).GetField("hitEvents", BindingFlags.Instance | BindingFlags.NonPublic);
-
-        if (field == null)
+        if (result is BmsLongNoteJudgementResult longNoteResult)
         {
-            Logger.Log(
-                "BMS ScoreProcessor: Could not bind ScoreProcessor hitEvents. Empty POORs will be missing from result statistics.",
-                level: LogLevel.Error);
-            return (_, _) => { };
+            var source = longNoteResult.EndpointResults[0].Source;
+            var observations = longNoteResult.EndpointResults.Select(endpoint => new BmsTimingObservation(
+                endpoint.Kind == BmsLongNoteEndpointKind.Head
+                    ? BmsTimingObservationKind.LongNoteHead
+                    : BmsTimingObservationKind.LongNoteTail,
+                endpoint.ExpectedTime,
+                endpoint.EventTime,
+                endpoint.GameplayRate,
+                endpoint.Result));
+
+            return new BmsJudgementEvent(
+                BmsJudgementSource.From(longNoteResult.EndpointResults.Count > 1 ? source : result.HitObject),
+                result.Type,
+                observations);
         }
 
-        return (processor, hitEvent) => ((List<HitEvent>)field.GetValue(processor)!).Add(hitEvent);
-    }
-
-    private static HitEvent createLongNoteEndpointEvent(
-        BmsLongNoteEndpointResult endpointResult,
-        HitObject? lastHitObject)
-    {
-        var endpoint = endpointResult.Source.CreateSyntheticEndpoint(endpointResult.ExpectedTime);
-        return new HitEvent(endpointResult.TimeOffset, endpointResult.GameplayRate, endpointResult.Result, endpoint, lastHitObject, null);
+        var expectedTime = result.HitObject.GetEndTime();
+        return new BmsJudgementEvent(BmsJudgementSource.From(result.HitObject), result.Type,
+        [
+            new BmsTimingObservation(
+                BmsTimingObservationKind.Note,
+                expectedTime,
+                expectedTime + result.TimeOffset,
+                result.GameplayRate,
+                result.Type),
+        ]);
     }
 
     private class JudgementOrderComparer : IComparer<HitObject>

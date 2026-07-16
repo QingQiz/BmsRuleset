@@ -16,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -196,6 +197,9 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
         {
             var passed = bmsHp.HasPassedAtEnd();
             scoreProcessor.PopulateScore(gameplayState.Score.ScoreInfo);
+
+            if (bmsHp.GaugeHistory.Count > 0)
+                BmsScoreGaugeHistoryStore.Set(gameplayState.Score.ScoreInfo, bmsHp.GaugeHistory);
 
             if (!passed)
                 scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);

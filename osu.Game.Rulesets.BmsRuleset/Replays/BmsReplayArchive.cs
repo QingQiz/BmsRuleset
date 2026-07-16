@@ -9,9 +9,8 @@ using osu.Game.Extensions;
 using osu.Game.IO.Archives;
 using osu.Game.IO.Serialization;
 using osu.Game.Replays;
-using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -26,6 +25,7 @@ public static class BmsReplayArchive
     // load instead of crashing — no version handshake needed.
     private const byte gzip_magic_1 = 0x1f;
     private const byte gzip_magic_2 = 0x8b;
+    private const int current_version = 3;
 
     public static ArchiveReader Create(Score score)
         => new ByteArrayArchiveReader(createReplayData(score), FILENAME);
@@ -50,14 +50,13 @@ public static class BmsReplayArchive
     private static byte[] serializePayload(Score score)
     {
         BmsScoreGaugeHistoryStore.TryGet(score.ScoreInfo, out var gaugeHistory);
+        BmsJudgementEventStore.TryGet(score.ScoreInfo, out var judgementEvents);
 
         var payload = new Payload
         {
             HasReceivedAllFrames = score.Replay.HasReceivedAllFrames,
             Frames = score.Replay.Frames.OfType<BmsReplayFrame>().ToList(),
-            // Empty POORs carry a base HitObject (no BmsHitObject), so they must round-trip too —
-            // dropping them would silently under-count gauge damage in restored statistics.
-            HitEvents = score.ScoreInfo.HitEvents.Select(HitEventData.From).ToList(),
+            JudgementEvents = judgementEvents.Select(JudgementEventData.From).ToList(),
             GaugeHistory = gaugeHistory.Select(GaugeHistoryEventData.From).ToList(),
         };
 
@@ -103,60 +102,103 @@ public static class BmsReplayArchive
         score.Replay = new Replay
         {
             HasReceivedAllFrames = payload.HasReceivedAllFrames,
-            // Frames/HitEvents default to [] on the Payload, but osu!'s serializer uses
+            // Frames default to [] on the Payload, but osu!'s serializer uses
             // DefaultValueHandling.IgnoreAndPopulate, which populates an absent field with the
-            // type's default (null for List<>) — overriding the = [] initialiser. Pre-HitEvents
-            // archives omit hit_events entirely, so guard: missing field ⇒ no frames/hit events,
-            // not a crash.
+            // type's default (null for List<>) — overriding the = [] initialiser. Older archives
+            // may omit frames entirely, so guard against the serializer replacing the
+            // collection initialiser with null.
             // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
             Frames = (payload.Frames ?? []).Cast<osu.Game.Rulesets.Replays.ReplayFrame>().ToList(),
         };
-        // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
-        score.ScoreInfo.HitEvents = (payload.HitEvents ?? []).Select(e => e.ToHitEvent()).ToList();
 
-        // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
-        var gaugeHistory = (payload.GaugeHistory ?? []).Select(e => e.ToGaugeHistoryEvent()).ToArray();
-        if (gaugeHistory.Length > 0)
-            BmsScoreGaugeHistoryStore.Set(score.ScoreInfo, gaugeHistory);
+        if (payload.Version == current_version)
+        {
+            // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
+            var judgementEvents = (payload.JudgementEvents ?? []).Select(e => e.ToJudgementEvent()).ToArray();
+            score.ScoreInfo.HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents(judgementEvents);
+            BmsJudgementEventStore.Set(score.ScoreInfo, judgementEvents);
+
+            // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
+            var gaugeHistory = (payload.GaugeHistory ?? []).Select(e => e.ToGaugeHistoryEvent()).ToArray();
+            if (gaugeHistory.Length > 0)
+                BmsScoreGaugeHistoryStore.Set(score.ScoreInfo, gaugeHistory);
+            else
+                BmsScoreGaugeHistoryStore.Clear(score.ScoreInfo);
+        }
         else
+        {
+            // Input frames remain useful across schema changes; derived statistics are rebuilt
+            // by replay playback instead of guessing at a no-longer-compatible event model.
+            score.ScoreInfo.HitEvents = [];
+            BmsJudgementEventStore.Clear(score.ScoreInfo);
             BmsScoreGaugeHistoryStore.Clear(score.ScoreInfo);
+        }
 
         return score;
     }
 
     private class Payload
     {
-        // ReSharper disable once UnusedMember.Local
-        public int Version { get; set; } = 2;
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Local
+        public int Version { get; set; } = current_version;
 
         public bool HasReceivedAllFrames { get; init; } = true;
 
         public List<BmsReplayFrame> Frames { get; init; } = [];
 
-        public List<HitEventData> HitEvents { get; init; } = [];
+        public List<JudgementEventData> JudgementEvents { get; init; } = [];
 
         public List<GaugeHistoryEventData> GaugeHistory { get; init; } = [];
     }
 
-    private class HitEventData
+    private class JudgementEventData
     {
-        public double TimeOffset { get; init; }
+        public HitResult Result { get; init; }
+
+        public JudgementSourceData Source { get; init; } = new();
+
+        public List<TimingObservationData> TimingObservations { get; init; } = [];
+
+        public static JudgementEventData From(BmsJudgementEvent judgementEvent) => new()
+        {
+            Result = judgementEvent.Result,
+            Source = JudgementSourceData.From(judgementEvent.Source),
+            TimingObservations = judgementEvent.TimingObservations.Select(TimingObservationData.From).ToList(),
+        };
+
+        public BmsJudgementEvent ToJudgementEvent() => new(
+            Source.ToJudgementSource(),
+            Result,
+            TimingObservations.Select(observation => observation.ToTimingObservation()));
+    }
+
+    private class TimingObservationData
+    {
+        public BmsTimingObservationKind Kind { get; init; }
+
+        public double ExpectedTime { get; init; }
+
+        public double ActualTime { get; init; }
 
         public double? GameplayRate { get; init; }
 
         public HitResult Result { get; init; }
 
-        public HitObjectData HitObject { get; init; } = new();
-
-        public static HitEventData From(HitEvent hitEvent) => new()
+        public static TimingObservationData From(BmsTimingObservation observation) => new()
         {
-            TimeOffset = hitEvent.TimeOffset,
-            GameplayRate = hitEvent.GameplayRate,
-            Result = hitEvent.Result,
-            HitObject = HitObjectData.From(hitEvent.HitObject),
+            Kind = observation.Kind,
+            ExpectedTime = observation.ExpectedTime,
+            ActualTime = observation.ActualTime,
+            GameplayRate = observation.GameplayRate,
+            Result = observation.Result,
         };
 
-        public HitEvent ToHitEvent() => new(TimeOffset, GameplayRate, Result, HitObject.ToHitObject(), null, null);
+        public BmsTimingObservation ToTimingObservation() => new(
+            Kind,
+            ExpectedTime,
+            ActualTime,
+            GameplayRate,
+            Result);
     }
 
     private class GaugeHistoryEventData
@@ -198,58 +240,33 @@ public static class BmsReplayArchive
         public BmsGaugeStateSnapshot ToGaugeStateSnapshot() => new(GaugeType, Health, Failed);
     }
 
-    private class HitObjectData
+    private class JudgementSourceData
     {
         public double StartTime { get; init; }
 
         public int Column { get; init; }
 
-        public HitObjectKind Kind { get; init; }
+        public BmsJudgementSourceKind Kind { get; init; }
 
         public double Duration { get; init; }
 
         public double LandmineDamagePercent { get; init; }
 
-        public static HitObjectData From(HitObject hitObject) => new()
+        public static JudgementSourceData From(BmsJudgementSource source) => new()
         {
-            StartTime = hitObject.StartTime,
-            Column = hitObject is BmsHitObject bms ? bms.Column : 0,
-            Kind = hitObject switch
-            {
-                BmsLandmine => HitObjectKind.Landmine,
-                BmsLongNote => HitObjectKind.LongNote,
-                BmsHitObject => HitObjectKind.Note,
-                _ => HitObjectKind.EmptyPoor,
-            },
-            Duration = hitObject is BmsLongNote longNote ? longNote.Duration : 0,
-            LandmineDamagePercent = hitObject is BmsLandmine landmine ? landmine.LandmineDamagePercent : 0,
+            StartTime = source.StartTime,
+            Column = source.Column,
+            Kind = source.Kind,
+            Duration = source.Duration,
+            LandmineDamagePercent = source.LandmineDamagePercent,
         };
 
-        public HitObject ToHitObject()
-        {
-            HitObject hitObject = Kind switch
-            {
-                HitObjectKind.LongNote => new BmsLongNote { Duration = Duration },
-                HitObjectKind.Landmine => new BmsLandmine { LandmineDamagePercent = LandmineDamagePercent },
-                HitObjectKind.Note => new BmsNote(),
-                // Empty POOR: a synthetic base HitObject with only a press time — no column/kind.
-                _ => new HitObject(),
-            };
-
-            hitObject.StartTime = StartTime;
-
-            if (hitObject is BmsHitObject bms)
-                bms.Column = Column;
-
-            return hitObject;
-        }
+        public BmsJudgementSource ToJudgementSource() => new(
+            StartTime,
+            Column,
+            Kind,
+            Duration,
+            LandmineDamagePercent);
     }
 
-    private enum HitObjectKind
-    {
-        Note,
-        LongNote,
-        Landmine,
-        EmptyPoor,
-    }
 }

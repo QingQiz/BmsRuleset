@@ -120,6 +120,27 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
+    public void TestLongNoteGaugeHistoryUsesJudgementTime()
+    {
+        var processor = new BmsHealthProcessor();
+        var longNote = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { longNote },
+        };
+        processor.ApplyBeatmap(beatmap);
+
+        processor.ApplyResult(new JudgementResult(longNote, longNote.CreateJudgement())
+        {
+            Type = HitResult.Great,
+        });
+
+        Assert.That(processor.GaugeHistory.Single().Time, Is.EqualTo(longNote.EndTime));
+    }
+
+    [Test]
     public void TestAutoGaugeClearCascadeAtSongEnd()
     {
         var processor = new BmsHealthProcessor();

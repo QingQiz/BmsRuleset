@@ -16,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osuTK;
@@ -72,14 +73,17 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
 
         var beatmapMax = playableBeatmap.HitObjects.Count == 0 ? 0 : playableBeatmap.HitObjects.Max(h => h.StartTime);
-        var hitEvents = score.HitEvents.ToArray();
-        var hitEventsMax = hitEvents.Length == 0 ? 0 : hitEvents.Max(e => e.HitObject.StartTime);
+        var timingHitEvents = score.HitEvents.ToArray();
+        var scoringHitEvents = BmsJudgementEventStore.TryGet(score, out var judgementEvents)
+            ? BmsJudgementEventProjection.CreateScoringHitEvents(judgementEvents).ToArray()
+            : timingHitEvents;
+        var hitEventsMax = timingHitEvents.Length == 0 ? 0 : timingHitEvents.Max(e => e.HitObject.GetEndTime());
         var duration = Math.Max(1, Math.Max(beatmapMax, hitEventsMax));
 
         var notes = createNotesSubplot(playableBeatmap, variant, duration);
-        var judgements = createJudgementSubplot(hitEvents, duration);
-        var fastLate = createFastLateSubplot(hitEvents, duration);
-        var failure = score.Passed ? null : findFailureFraction(score, playableBeatmap, duration);
+        var judgements = createJudgementSubplot(scoringHitEvents, duration);
+        var fastLate = createFastLateSubplot(timingHitEvents, duration);
+        var failure = score.Passed ? null : findFailureFraction(score, playableBeatmap, scoringHitEvents, duration);
 
         return new TimelineData(notes, judgements, fastLate, failure);
     }
@@ -125,7 +129,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
 
         foreach (var e in hitEvents.Where(isBmsHit))
         {
-            var b = bucketFor(e.HitObject.StartTime, duration);
+            var b = bucketFor(e.HitObject.GetEndTime(), duration);
 
             switch (e.Result)
             {
@@ -158,7 +162,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
 
         foreach (var e in hitEvents.Where(isBmsHit))
         {
-            var b = bucketFor(e.HitObject.StartTime, duration);
+            var b = bucketFor(e.HitObject.GetEndTime(), duration);
 
             if (e.TimeOffset < 0) fast[b]++;
             else if (e.TimeOffset > 0) late[b]++;
@@ -171,10 +175,9 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
     }
 
     // Returns the time fraction at which the player's gauge first hit 0 (game over), or null if it never did.
-    private static double? findFailureFraction(ScoreInfo score, IBeatmap playableBeatmap, double duration)
+    private static double? findFailureFraction(ScoreInfo score, IBeatmap playableBeatmap, IReadOnlyList<HitEvent> scoringHitEvents, double duration)
     {
-        var ordered = score.HitEvents.OrderBy(e => e.HitObject.StartTime).ToArray();
-        if (ordered.Length == 0) return null;
+        if (scoringHitEvents.Count == 0) return null;
 
         var gaugeType = score.Mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
         var profile = BmsGaugeProfileFactory.Create(gaugeType);
@@ -184,12 +187,12 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
 
         var health = profile.InitialHealth;
 
-        foreach (var e in ordered)
+        foreach (var e in scoringHitEvents)
         {
             health = applyGaugeDelta(e, calculator, health);
 
             if (health <= 0)
-                return Math.Clamp(e.HitObject.StartTime / duration, 0, 1);
+                return Math.Clamp(e.HitObject.GetEndTime() / duration, 0, 1);
         }
 
         return null;

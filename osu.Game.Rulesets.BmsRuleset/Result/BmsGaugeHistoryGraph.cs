@@ -13,8 +13,10 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osuTK;
@@ -71,10 +73,11 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
     internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap)
     {
         if (BmsScoreGaugeHistoryStore.TryGet(score, out var gaugeHistory) && gaugeHistory.Count > 0)
-            return createSeries(gaugeHistory);
+            return createSeries(score, gaugeHistory);
 
-        var hitEvents = score.HitEvents
-            .OrderBy(e => e.HitObject.StartTime)
+        var hitEvents = (BmsJudgementEventStore.TryGet(score, out var judgementEvents)
+                ? BmsJudgementEventProjection.CreateScoringHitEvents(judgementEvents)
+                : score.HitEvents)
             .ToArray();
 
         if (hitEvents.Length == 0)
@@ -85,7 +88,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             noteCount = 1;
 
         var total = playableBeatmap is BmsBeatmap bmsBeatmap ? bmsBeatmap.Total : 0;
-        var duration = Math.Max(1, hitEvents.Max(e => e.HitObject.StartTime));
+        var duration = Math.Max(1, hitEvents.Max(e => e.HitObject.GetEndTime()));
 
         var gaugeTypes = gaugeTypesFor(score.Mods).ToArray();
         var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes);
@@ -93,11 +96,9 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         return gaugeTypes.Select(type => createSeries(type, hitEvents, total, noteCount, duration, type == finalGaugeType)).ToArray();
     }
 
-    private static IReadOnlyList<GaugeSeries> createSeries(IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory)
+    private static IReadOnlyList<GaugeSeries> createSeries(ScoreInfo score, IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory)
     {
-        var ordered = gaugeHistory
-            .OrderBy(e => e.Time)
-            .ToArray();
+        var ordered = gaugeHistory.ToArray();
 
         var duration = Math.Max(1, ordered.Max(e => e.Time));
         var gaugeTypes = ordered
@@ -106,7 +107,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             .OrderByDescending(type => (int)type)
             .ToArray();
 
-        var finalGaugeType = ordered[^1].ActiveGaugeType;
+        var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes) ?? ordered[^1].ActiveGaugeType;
         return gaugeTypes.Select(type => createSeries(type, ordered, duration, type == finalGaugeType)).ToArray();
     }
 
@@ -312,7 +313,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
 
         foreach (var hitEvent in hitEvents)
         {
-            var time = (float)Math.Clamp(hitEvent.HitObject.StartTime / duration, 0, 1);
+            var time = (float)Math.Clamp(hitEvent.HitObject.GetEndTime() / duration, 0, 1);
 
             if (!failed)
             {

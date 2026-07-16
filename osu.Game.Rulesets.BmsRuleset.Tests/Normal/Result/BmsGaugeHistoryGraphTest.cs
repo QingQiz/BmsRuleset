@@ -76,6 +76,75 @@ public class BmsGaugeHistoryGraphTest
     }
 
     [Test]
+    public void TestPersistedHistoryUsesResolvedAutoGaugeType()
+    {
+        var score = new ScoreInfo
+        {
+            Mods = [new BmsModAutoGauge(), new BmsModEasyGauge()],
+        };
+        BmsScoreGaugeHistoryStore.Set(score,
+        [
+            new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.6, false),
+                new BmsGaugeStateSnapshot(BmsGaugeType.Easy, 0.7, false),
+            ]),
+        ]);
+
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap());
+
+        Assert.That(series.Single(s => s.Name == "Easy").IsFinalUsedGauge, Is.True);
+        Assert.That(series.Single(s => s.Name == "Normal").IsFinalUsedGauge, Is.False);
+    }
+
+    [Test]
+    public void TestPersistedHistoryPreservesCanonicalSnapshotOrder()
+    {
+        var score = new ScoreInfo { Mods = [new BmsModAutoGauge()] };
+        BmsScoreGaugeHistoryStore.Set(score,
+        [
+            new BmsGaugeHistoryEvent(2000, BmsGaugeType.Normal,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.7, false),
+                new BmsGaugeStateSnapshot(BmsGaugeType.Easy, 0.8, false),
+            ]),
+            new BmsGaugeHistoryEvent(1000, BmsGaugeType.Easy,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.6, false),
+                new BmsGaugeStateSnapshot(BmsGaugeType.Easy, 0.9, false),
+            ]),
+        ]);
+
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap());
+
+        Assert.That(series.Single(s => s.Name == "Easy").IsFinalUsedGauge, Is.True);
+        Assert.That(series.Single(s => s.Name == "Easy").Points[^1].Health, Is.EqualTo(0.9f));
+    }
+
+    [Test]
+    public void TestCanonicalGaugeEventsAreNotReorderedByExpectedTime()
+    {
+        BmsJudgementEvent[] events =
+        [
+            new BmsJudgementEvent(
+                BmsJudgementSource.From(new BmsNote { StartTime = 2000 }),
+                HitResult.Perfect,
+                [new BmsTimingObservation(BmsTimingObservationKind.Note, 2000, 2100, 1, HitResult.Perfect)]),
+            new BmsJudgementEvent(
+                BmsJudgementSource.From(new BmsNote { StartTime = 1000 }),
+                HitResult.Meh,
+                [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 2200, 1, HitResult.Meh)]),
+        ];
+        var score = new ScoreInfo { Mods = [new BmsModHardGauge()] };
+        score.HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents(events);
+        BmsJudgementEventStore.Set(score, events);
+
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap()).Single();
+
+        Assert.That(series.Points[1].Health, Is.GreaterThan(series.Points[2].Health));
+    }
+
+    [Test]
     public void TestGaugeModCreatesSingleGaugeSeries()
     {
         var series = BmsGaugeHistoryGraph.CreateSeries(

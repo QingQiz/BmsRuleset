@@ -8,6 +8,7 @@ using osu.Game.Extensions;
 using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -53,17 +54,31 @@ public class BmsReplayArchiveTest
     }
 
     [Test]
-    public void TestHitEventsRoundTripThroughArchive()
+    public void TestJudgementLedgerRoundTripsThroughArchive()
     {
         var original = createScore();
-
-        original.ScoreInfo.HitEvents =
+        BmsJudgementEventStore.Set(original.ScoreInfo,
         [
-            new HitEvent(-12, 1, HitResult.Great, new BmsNote { StartTime = 1000, Column = 2 }, null, null),
-            new HitEvent(34, 1.25, HitResult.Ok, new BmsLongNote { StartTime = 2000, Duration = 500, Column = 4 }, null, null),
-            new HitEvent(0, 1, HitResult.Meh, new BmsLandmine { StartTime = 3000, Column = 1, LandmineDamagePercent = 50 }, null, null),
-            new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = 4000 }, null, null),
-        ];
+            new BmsJudgementEvent(
+                BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 2 }),
+                HitResult.Great,
+                [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 988, 1, HitResult.Great)]),
+            new BmsJudgementEvent(
+                BmsJudgementSource.From(new BmsLongNote { StartTime = 2000, Duration = 500, Column = 4 }),
+                HitResult.Ok,
+                [
+                    new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 2000, 2034, 1.25, HitResult.Great),
+                    new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 2500, 2519, 1.25, HitResult.Ok),
+                ]),
+            new BmsJudgementEvent(
+                BmsJudgementSource.From(new BmsLandmine { StartTime = 3000, Column = 1, LandmineDamagePercent = 50 }),
+                HitResult.Meh,
+                [new BmsTimingObservation(BmsTimingObservationKind.Note, 3000, 3000, 1, HitResult.Meh)]),
+            new BmsJudgementEvent(
+                BmsJudgementSource.From(new HitObject { StartTime = 4000 }),
+                HitResult.Miss,
+                [new BmsTimingObservation(BmsTimingObservationKind.Note, 4000, 4000, 1, HitResult.Miss)]),
+        ]);
 
         using var archive = BmsReplayArchive.Create(original);
         var replayFile = new RealmFile { Hash = "abcdef" };
@@ -74,15 +89,23 @@ public class BmsReplayArchiveTest
             readTarget,
             new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
 
-        Assert.That(restored.ScoreInfo.HitEvents, Has.Count.EqualTo(4));
+        Assert.That(BmsJudgementEventStore.TryGet(restored.ScoreInfo, out var restoredEvents), Is.True);
+        Assert.That(restoredEvents, Has.Count.EqualTo(4));
+        Assert.That(restoredEvents[1].Source.Kind, Is.EqualTo(BmsJudgementSourceKind.LongNote));
+        Assert.That(restoredEvents[1].Result, Is.EqualTo(HitResult.Ok));
+        Assert.That(restoredEvents[1].TimingObservations.Select(o => o.Kind),
+            Is.EqualTo(new[] { BmsTimingObservationKind.LongNoteHead, BmsTimingObservationKind.LongNoteTail }));
+
+        Assert.That(restored.ScoreInfo.HitEvents, Has.Count.EqualTo(5));
         assertHitEvent(restored.ScoreInfo.HitEvents[0], -12, 1, HitResult.Great, typeof(BmsNote), 1000, 2);
-        assertHitEvent(restored.ScoreInfo.HitEvents[1], 34, 1.25, HitResult.Ok, typeof(BmsLongNote), 2000, 4);
-        assertHitEvent(restored.ScoreInfo.HitEvents[2], 0, 1, HitResult.Meh, typeof(BmsLandmine), 3000, 1);
-        Assert.That(((BmsLongNote)restored.ScoreInfo.HitEvents[1].HitObject).Duration, Is.EqualTo(500));
-        Assert.That(((BmsLandmine)restored.ScoreInfo.HitEvents[2].HitObject).LandmineDamagePercent, Is.EqualTo(50));
+        assertHitEvent(restored.ScoreInfo.HitEvents[1], 34, 1.25, HitResult.Great, typeof(BmsNote), 2000, 4);
+        assertHitEvent(restored.ScoreInfo.HitEvents[2], 19, 1.25, HitResult.Ok, typeof(BmsNote), 2500, 4);
+        assertHitEvent(restored.ScoreInfo.HitEvents[3], 0, 1, HitResult.Meh, typeof(BmsLandmine), 3000, 1);
+        Assert.That(restoredEvents[1].Source.Duration, Is.EqualTo(500));
+        Assert.That(restoredEvents[2].Source.LandmineDamagePercent, Is.EqualTo(50));
 
         // Empty POOR: round-trips as a base HitObject (no BmsHitObject), preserving press time + Miss.
-        var emptyPoor = restored.ScoreInfo.HitEvents[3];
+        var emptyPoor = restored.ScoreInfo.HitEvents[4];
         Assert.That(emptyPoor.TimeOffset, Is.EqualTo(0));
         Assert.That(emptyPoor.GameplayRate, Is.EqualTo(1));
         Assert.That(emptyPoor.Result, Is.EqualTo(HitResult.Miss));
@@ -121,6 +144,37 @@ public class BmsReplayArchiveTest
     }
 
     [Test]
+    public void TestSidecarDataSurvivesScoreCloneBeforeArchiveCreation()
+    {
+        var ruleset = new BmsRuleset();
+        var original = createScore();
+        original.ScoreInfo.Ruleset = ruleset.RulesetInfo;
+        var judgementEvent = new BmsJudgementEvent(
+            BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 2 }),
+            HitResult.Great,
+            [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 988, 1, HitResult.Great)]);
+        var gaugeEvent = new BmsGaugeHistoryEvent(1000, BmsGaugeType.Hard,
+        [
+            new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0.75, false),
+        ]);
+        BmsJudgementEventStore.Set(original.ScoreInfo, [judgementEvent]);
+        BmsScoreGaugeHistoryStore.Set(original.ScoreInfo, [gaugeEvent]);
+
+        var clone = original.DeepClone();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(BmsJudgementEventStore.TryGet(clone.ScoreInfo, out var judgementEvents), Is.True);
+            Assert.That(judgementEvents, Is.EqualTo([judgementEvent]));
+            Assert.That(BmsScoreGaugeHistoryStore.TryGet(clone.ScoreInfo, out var gaugeHistory), Is.True);
+            Assert.That(gaugeHistory, Has.Count.EqualTo(1));
+            Assert.That(gaugeHistory[0].Time, Is.EqualTo(gaugeEvent.Time));
+            Assert.That(gaugeHistory[0].ActiveGaugeType, Is.EqualTo(gaugeEvent.ActiveGaugeType));
+            Assert.That(gaugeHistory[0].States, Is.EqualTo(gaugeEvent.States));
+        });
+    }
+
+    [Test]
     public void TestArchiveIsGzipCompressed()
     {
         using var archive = BmsReplayArchive.Create(createScore());
@@ -138,11 +192,17 @@ public class BmsReplayArchiveTest
         // back to plain JSON, then hand that plain JSON to ReadScore. Verifies the gzip-magic
         // fallback so old scores/replays load instead of crashing.
         var original = createScore();
-        original.ScoreInfo.HitEvents =
+        BmsJudgementEventStore.Set(original.ScoreInfo,
         [
-            new HitEvent(-12, 1, HitResult.Great, new BmsNote { StartTime = 1000, Column = 2 }, null, null),
-            new HitEvent(0, 1, HitResult.Miss, new HitObject { StartTime = 2000 }, null, null),
-        ];
+            new BmsJudgementEvent(
+                BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 2 }),
+                HitResult.Great,
+                [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 988, 1, HitResult.Great)]),
+            new BmsJudgementEvent(
+                BmsJudgementSource.From(new HitObject { StartTime = 2000 }),
+                HitResult.Miss,
+                [new BmsTimingObservation(BmsTimingObservationKind.Note, 2000, 2000, 1, HitResult.Miss)]),
+        ]);
 
         using var gzipArchive = BmsReplayArchive.Create(original);
         byte[] gzipBytes = gzipArchive.Get(BmsReplayArchive.FILENAME);
@@ -191,6 +251,43 @@ public class BmsReplayArchiveTest
 
         Assert.That(restored.Replay.Frames, Is.Empty);
         Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
+    }
+
+    [Test]
+    public void TestOldJudgementSchemaRestoresFramesWithoutStatistics()
+    {
+        var original = createScore();
+        BmsJudgementEventStore.Set(original.ScoreInfo,
+        [
+            new BmsJudgementEvent(
+                BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 2 }),
+                HitResult.Great,
+                [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 988, 1, HitResult.Great)]),
+        ]);
+
+        using var archive = BmsReplayArchive.Create(original);
+        using var decompressed = new MemoryStream();
+        using (var gz = new GZipStream(new MemoryStream(archive.Get(BmsReplayArchive.FILENAME)), CompressionMode.Decompress))
+            gz.CopyTo(decompressed);
+
+        var currentJson = Encoding.UTF8.GetString(decompressed.ToArray());
+        var oldJson = currentJson.Replace("\"version\": 3", "\"version\": 2");
+        Assert.That(oldJson, Is.Not.EqualTo(currentJson));
+
+        var replayFile = new RealmFile { Hash = "abcdef" };
+        var readTarget = new ScoreInfo();
+        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
+
+        var restored = BmsReplayArchive.ReadScore(
+            readTarget,
+            new TestResourceStore(replayFile.GetStoragePath(), Encoding.UTF8.GetBytes(oldJson)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.Replay.Frames, Has.Count.EqualTo(1));
+            Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
+            Assert.That(BmsJudgementEventStore.TryGet(restored.ScoreInfo, out _), Is.False);
+        });
     }
 
     [Test]

@@ -193,9 +193,12 @@ public partial class BmsScoreProcessorTest
 
         processor.RegisterEmptyPoor(1234);
 
-        Assert.That(processor.HitEvents, Has.Count.EqualTo(1));
-        Assert.That(processor.HitEvents.Single().Result, Is.EqualTo(HitResult.Miss));
-        Assert.That(processor.HitEvents.Single().HitObject.StartTime, Is.EqualTo(1234));
+        var score = new ScoreInfo();
+        processor.PopulateScore(score);
+
+        Assert.That(processor.JudgementEvents, Has.Count.EqualTo(1));
+        Assert.That(processor.JudgementEvents.Single().Result, Is.EqualTo(HitResult.Miss));
+        Assert.That(score.HitEvents.Single().HitObject.StartTime, Is.EqualTo(1234));
     }
 
     [Test]
@@ -230,6 +233,8 @@ public partial class BmsScoreProcessorTest
         Assert.Multiple(() =>
         {
             Assert.That(processor.HitEvents, Has.Count.EqualTo(1));
+            Assert.That(processor.JudgementEvents, Has.Count.EqualTo(1));
+            Assert.That(processor.JudgementEvents.Single().TimingObservations, Has.Count.EqualTo(2));
             Assert.That(populatedScore.HitEvents.Select(e => e.TimeOffset), Is.EqualTo(new[] { 12, -10 }));
             Assert.That(populatedScore.HitEvents.Select(e => e.GameplayRate), Is.All.EqualTo(1.5));
             Assert.That(processor.Statistics.GetValueOrDefault(HitResult.Great), Is.EqualTo(1));
@@ -246,6 +251,7 @@ public partial class BmsScoreProcessorTest
         processor.RevertResult(result);
 
         Assert.That(processor.HitEvents, Is.Empty);
+        Assert.That(processor.JudgementEvents, Is.Empty);
 
         var rewoundScore = new ScoreInfo();
         processor.PopulateScore(rewoundScore);
@@ -271,13 +277,15 @@ public partial class BmsScoreProcessorTest
 
         processor.ApplyResult(new BmsLongNoteJudgementResult(source, source.CreateJudgement(), [endpoint]) { Type = HitResult.Great });
 
-        var hitEvent = processor.HitEvents.Single();
+        var score = new ScoreInfo();
+        processor.PopulateScore(score);
+        var hitEvent = score.HitEvents.Single();
         Assert.Multiple(() =>
         {
             Assert.That(hitEvent.TimeOffset, Is.EqualTo(-12));
             Assert.That(hitEvent.HitObject, Is.InstanceOf<BmsNote>());
             Assert.That(hitEvent.HitObject.StartTime, Is.EqualTo(source.StartTime));
-            Assert.That(processor.HitEvents.Select(e => e.TimeOffset), Does.Not.Contain(0));
+            Assert.That(score.HitEvents.Select(e => e.TimeOffset), Does.Not.Contain(0));
         });
     }
 
@@ -296,10 +304,42 @@ public partial class BmsScoreProcessorTest
         processor.PopulateScore(score);
         Assert.Multiple(() =>
         {
+            Assert.That(processor.JudgementEvents, Has.Count.EqualTo(1));
             Assert.That(score.HitEvents, Has.Count.EqualTo(1));
             Assert.That(score.HitEvents.Single().HitObject.StartTime, Is.EqualTo(source.StartTime));
             Assert.That(score.HitEvents.Single().TimeOffset, Is.EqualTo(12));
         });
+    }
+
+    [Test]
+    public void TestChargeEndpointsAreSeparateJudgementEvents()
+    {
+        var (processor, source) = createLongNoteProcessor(BmsLongNoteMode.ChargeNote);
+
+        processor.ApplyResult(createEndpointResult(source, BmsLongNoteEndpointKind.Head, 1012));
+        processor.ApplyResult(createEndpointResult(source, BmsLongNoteEndpointKind.Tail, 1490));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(processor.JudgementEvents, Has.Count.EqualTo(2));
+            Assert.That(processor.JudgementEvents.Select(e => e.TimingObservations.Single().Kind),
+                Is.EqualTo(new[] { BmsTimingObservationKind.LongNoteHead, BmsTimingObservationKind.LongNoteTail }));
+        });
+    }
+
+    [Test]
+    public void TestResetClearsJudgementLedger()
+    {
+        var (processor, source) = createLongNoteProcessor();
+        processor.ApplyResult(createLongNoteResult(source, headEventTime: 1012, tailEventTime: 1490));
+        processor.RegisterEmptyPoor(2000);
+
+        processor.ResetProcessor();
+
+        Assert.That(processor.JudgementEvents, Is.Empty);
+        var score = new ScoreInfo();
+        processor.PopulateScore(score);
+        Assert.That(score.HitEvents, Is.Empty);
     }
 
     [Test]
@@ -350,7 +390,7 @@ public partial class BmsScoreProcessorTest
         };
     }
 
-    private static (BmsScoreProcessor processor, BmsLongNote source) createLongNoteProcessor(BmsLongNoteMode mode = BmsLongNoteMode.LongNote)
+    private static (TestBmsScoreProcessor processor, BmsLongNote source) createLongNoteProcessor(BmsLongNoteMode mode = BmsLongNoteMode.LongNote)
     {
         var source = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
         var beatmap = new BmsBeatmap
@@ -361,7 +401,7 @@ public partial class BmsScoreProcessorTest
             HitObjects = { source },
         };
         source.Beatmap = beatmap;
-        var processor = new BmsScoreProcessor();
+        var processor = new TestBmsScoreProcessor();
         processor.ApplyBeatmap(beatmap);
         return (processor, source);
     }
@@ -381,5 +421,7 @@ public partial class BmsScoreProcessorTest
     private sealed partial class TestBmsScoreProcessor : BmsScoreProcessor
     {
         public void UpdateCompletion() => base.Update();
+
+        public void ResetProcessor() => base.Reset(false);
     }
 }

@@ -10,6 +10,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Database;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
@@ -41,6 +42,8 @@ public static class BmsReplayPatcher
         {
             var importScoreTarget = AccessTools.Method(typeof(Player), "ImportScore", [typeof(Score)]);
             var importScorePostfixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(importScorePostfix));
+            var scoreDeepCloneTarget = AccessTools.Method(typeof(Score), nameof(Score.DeepClone));
+            var scoreDeepClonePostfixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(scoreDeepClonePostfix));
             var getScoreTarget = AccessTools.Method(typeof(ScoreImporter), nameof(ScoreImporter.GetScore), [typeof(ScoreInfo)]);
             var getScorePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(getScorePrefix));
             var statisticsPanelPopulateTarget = AccessTools.Method(typeof(StatisticsPanel), "populateStatistics", [typeof(ValueChangedEvent<ScoreInfo?>)]);
@@ -59,6 +62,8 @@ public static class BmsReplayPatcher
             {
                 (name: "Player.ImportScore", member: importScoreTarget),
                 (name: "BmsReplayPatcher.importScorePostfix", member: importScorePostfixMethod),
+                (name: "Score.DeepClone", member: scoreDeepCloneTarget),
+                (name: "BmsReplayPatcher.scoreDeepClonePostfix", member: scoreDeepClonePostfixMethod),
                 (name: "ScoreImporter.GetScore", member: getScoreTarget),
                 (name: "BmsReplayPatcher.getScorePrefix", member: getScorePrefixMethod),
                 (name: "StatisticsPanel.populateStatistics", member: statisticsPanelPopulateTarget),
@@ -81,6 +86,7 @@ public static class BmsReplayPatcher
 
             var harmony = new Harmony(harmony_id);
             harmony.Patch(importScoreTarget, postfix: new HarmonyMethod(importScorePostfixMethod));
+            harmony.Patch(scoreDeepCloneTarget, postfix: new HarmonyMethod(scoreDeepClonePostfixMethod));
             harmony.Patch(getScoreTarget, prefix: new HarmonyMethod(getScorePrefixMethod));
             harmony.Patch(statisticsPanelPopulateTarget, prefix: new HarmonyMethod(statisticsPanelPopulatePrefixMethod));
             harmony.Patch(replayFailIndicatorDisposeTarget, prefix: new HarmonyMethod(replayFailIndicatorDisposePrefixMethod));
@@ -168,6 +174,20 @@ public static class BmsReplayPatcher
         __result = importScoreWithReplay(__instance, score, __result);
     }
 
+    private static void scoreDeepClonePostfix(Score __instance, Score __result)
+    {
+        if (!isBmsScore(__instance.ScoreInfo))
+            return;
+
+        // Player clones a completed score before the replay archive is created. These sidecars
+        // carry data that ScoreInfo.DeepClone cannot know about, so keep them with that clone.
+        if (BmsJudgementEventStore.TryGet(__instance.ScoreInfo, out var judgementEvents))
+            BmsJudgementEventStore.Set(__result.ScoreInfo, judgementEvents);
+
+        if (BmsScoreGaugeHistoryStore.TryGet(__instance.ScoreInfo, out var gaugeHistory))
+            BmsScoreGaugeHistoryStore.Set(__result.ScoreInfo, gaugeHistory);
+    }
+
     private static bool getScorePrefix(ScoreInfo score, ScoreImporter __instance, ref Score __result)
     {
         if (!isBmsScore(score) || score.Files.All(f => f.Filename != BmsReplayArchive.FILENAME))
@@ -216,6 +236,13 @@ public static class BmsReplayPatcher
 
             if (scoreWithReplay?.ScoreInfo.HitEvents.Count > 0)
                 scoreInfo.HitEvents = scoreWithReplay.ScoreInfo.HitEvents;
+
+            if (scoreWithReplay != null
+                && BmsJudgementEventStore.TryGet(scoreWithReplay.ScoreInfo, out var restoredJudgementEvents)
+                && restoredJudgementEvents.Count > 0)
+            {
+                BmsJudgementEventStore.Set(scoreInfo, restoredJudgementEvents);
+            }
 
             if (scoreWithReplay != null
                 && BmsScoreGaugeHistoryStore.TryGet(scoreWithReplay.ScoreInfo, out var restoredGaugeHistory)
