@@ -35,12 +35,18 @@ public static class BmsDefaultHud
         {
             Children =
             [
+                new BmsSongProgress
+                {
+                    Anchor = Anchor.BottomLeft,
+                    Origin = Anchor.BottomRight,
+                    X = -15,
+                },
                 new BmsTextHud(),
                 new BmsHealthDisplay
                 {
                     Anchor = Anchor.BottomRight,
                     Origin = Anchor.BottomLeft,
-                    Margin = new MarginPadding { Left = 5 },
+                    X = 5,
                 },
                 new BmsJudgementDisplay(),
                 new BmsComboCounter(),

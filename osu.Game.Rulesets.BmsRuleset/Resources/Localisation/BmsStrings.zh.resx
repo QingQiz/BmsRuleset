@@ -171,4 +171,6 @@
   <data name="mod_hell_charge_note" xml:space="preserve"><value>带持续血量变化的充能音符：按住恢复，松开扣血。</value></data>
   <data name="mod_auto_gauge" xml:space="preserve"><value>从最难的血条开始；失败后自动降至下一档。</value></data>
   <data name="gauge_description" xml:space="preserve"><value>使用 BMS {0} 血条。</value></data>
+  <data name="song_progress_colour" xml:space="preserve"><value>指示块颜色</value></data>
+  <data name="song_progress_colour_description" xml:space="preserve"><value>发光歌曲进度指示块的颜色。</value></data>
 </root>

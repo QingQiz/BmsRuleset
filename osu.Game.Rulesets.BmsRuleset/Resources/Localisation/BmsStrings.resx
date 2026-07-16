@@ -171,4 +171,6 @@
   <data name="mod_hell_charge_note" xml:space="preserve"><value>Charge-note with continuous body gauge drain: hold to recover, release to damage.</value></data>
   <data name="mod_auto_gauge" xml:space="preserve"><value>Start with the hardest gauge. When you fail, drop to the next tier.</value></data>
   <data name="gauge_description" xml:space="preserve"><value>Use the {0} BMS gauge.</value></data>
+  <data name="song_progress_colour" xml:space="preserve"><value>Indicator colour</value></data>
+  <data name="song_progress_colour_description" xml:space="preserve"><value>Colour of the glowing song progress indicator.</value></data>
 </root>
