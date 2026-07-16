@@ -29,10 +29,10 @@ public class BmsModRotationRandom : Mod, IApplicableAfterBeatmapConversion, IHas
 
     public override Type[] IncompatibleMods => [typeof(BmsModLaneRandom), typeof(BmsModNoteRandom), typeof(BmsModMirror)];
 
-    [SettingSource("Include Scratch", "Whether to include scratch lanes in the rotation.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.IncludeScratch), nameof(BmsStrings.IncludeScratchRotationDescription))]
     public Bindable<bool> IncludeScratch { get; } = new();
 
-    [SettingSource("Seed", "Use a custom seed for deterministic randomisation.", SettingControlType = typeof(SettingsNumberBox))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.Seed), nameof(BmsStrings.SeedDescription), SettingControlType = typeof(SettingsNumberBox))]
     public Bindable<int?> Seed { get; } = new();
 
     public void ApplyToBeatmap(IBeatmap beatmap)

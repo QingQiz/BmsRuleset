@@ -5,6 +5,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Threading;
 using osu.Game.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
@@ -16,7 +17,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 public sealed partial class BmsComboCounter : BmsHudComponent
 {
 
-    [SettingSource("Auto-hide delay", "Seconds before combo counter hides when combo hasn't grown. Set to -1 to never auto-hide.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.AutoHideDelay), nameof(BmsStrings.AutoHideDelayDescription))]
     public BindableFloat AutoHideDelay { get; } = new(3f)
     {
         MinValue = -1f,
@@ -24,7 +25,7 @@ public sealed partial class BmsComboCounter : BmsHudComponent
         Precision = 1f,
     };
 
-    [SettingSource("Min visible combo", "Minimum combo count for the counter to be visible.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.MinVisibleCombo), nameof(BmsStrings.MinVisibleComboDescription))]
     public Bindable<int> MinVisibleCombo { get; } = new BindableInt(10)
     {
         MinValue = 0,

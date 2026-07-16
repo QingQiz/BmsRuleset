@@ -38,13 +38,13 @@ public class BmsModNoteRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
 
     public override Type[] IncompatibleMods => [typeof(BmsModLaneRandom), typeof(BmsModMirror)];
 
-    [SettingSource("Include Scratch", "Whether to include scratch lanes in the shuffle.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.IncludeScratch), nameof(BmsStrings.IncludeScratchShuffleDescription))]
     public Bindable<bool> IncludeScratch { get; } = new();
 
-    [SettingSource("Mode", "S-RANDOM: 40ms anti-jack — only prevents impossibly close jacks. H-RANDOM: 100ms anti-jack — actively breaks jacks into stair/trill patterns.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.NoteRandomMode), nameof(BmsStrings.NoteRandomModeDescription))]
     public Bindable<BmsNoteRandomMode> Mode { get; } = new();
 
-    [SettingSource("Seed", "Use a custom seed for deterministic randomisation (required for replay consistency).", SettingControlType = typeof(SettingsNumberBox))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.Seed), nameof(BmsStrings.NoteRandomSeedDescription), SettingControlType = typeof(SettingsNumberBox))]
     public Bindable<int?> Seed { get; } = new();
 
     private const int s_random_threshold = 40;

@@ -5,6 +5,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Utils;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Scoring;
@@ -20,22 +21,22 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 /// </summary>
 public sealed partial class BmsHealthDisplay : BmsHudComponent
 {
-    [SettingSource("Groove low health colour", "Colour of the groove gauge in the red zone (below red zone threshold).")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.GrooveLowHealthColour), nameof(BmsStrings.GrooveLowHealthColourDescription))]
     public BindableColour4 GrooveColourLow { get; } = new(new Color4(255, 45, 40, 255));
 
-    [SettingSource("Groove mid health colour", "Colour of the groove gauge in the yellow zone (between red zone and clear threshold).")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.GrooveMidHealthColour), nameof(BmsStrings.GrooveMidHealthColourDescription))]
     public BindableColour4 GrooveColourMid { get; } = new(new Color4(255, 160, 30, 255));
 
-    [SettingSource("Groove high health colour", "Colour of the groove gauge above the clear threshold.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.GrooveHighHealthColour), nameof(BmsStrings.GrooveHighHealthColourDescription))]
     public BindableColour4 GrooveColourHigh { get; } = new(new Color4(45, 225, 80, 255));
 
-    [SettingSource("Hard gauge fill colour", "Fill colour for the Hard gauge type.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.HardGaugeFillColour), nameof(BmsStrings.HardGaugeFillColourDescription))]
     public BindableColour4 HardFillColour { get; } = new(new Color4(220, 55, 50, 255));
 
-    [SettingSource("ExHard gauge fill colour", "Fill colour for the ExHard gauge type.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ExHardGaugeFillColour), nameof(BmsStrings.ExHardGaugeFillColourDescription))]
     public BindableColour4 ExHardFillColour { get; } = new(new Color4(195, 55, 210, 255));
 
-    [SettingSource("Hazard gauge fill colour", "Fill colour for the Hazard gauge type.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.HazardGaugeFillColour), nameof(BmsStrings.HazardGaugeFillColourDescription))]
     public BindableColour4 HazardFillColour { get; } = new(new Color4(255, 215, 0, 255));
 
     private const float clear_threshold = 0.8f;

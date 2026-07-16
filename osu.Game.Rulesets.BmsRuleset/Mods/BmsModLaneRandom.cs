@@ -29,13 +29,13 @@ public class BmsModLaneRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
 
     public override Type[] IncompatibleMods => [typeof(BmsModNoteRandom), typeof(BmsModMirror)];
 
-    [SettingSource("Include Scratch", "Whether to include scratch lanes in the shuffle.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.IncludeScratch), nameof(BmsStrings.IncludeScratchShuffleDescription))]
     public Bindable<bool> IncludeScratch { get; } = new();
 
-    [SettingSource("Seed", "Use a custom seed for deterministic randomisation.", SettingControlType = typeof(SettingsNumberBox))]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.Seed), nameof(BmsStrings.SeedDescription), SettingControlType = typeof(SettingsNumberBox))]
     public Bindable<int?> Seed { get; } = new();
 
-    [SettingSource("Lane Order", "Comma-separated direct lane mapping (e.g. \"0,3,1,4,2,5\").")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.LaneOrder), nameof(BmsStrings.LaneOrderDescription))]
     public Bindable<string> LaneOrder { get; } = new(string.Empty);
 
 

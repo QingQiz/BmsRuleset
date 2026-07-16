@@ -4,6 +4,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK;
@@ -13,7 +14,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 internal sealed partial class BmsStageHud : BmsHudComponent
 {
-    [SettingSource("Judgement line offset", "Moves the judgement line relative to the skin position. Positive values move it upward.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.JudgementLineOffset), nameof(BmsStrings.JudgementLineOffsetDescription))]
     public BindableFloat JudgementLineOffset { get; } = new()
     {
         MinValue = -768,
@@ -21,7 +22,7 @@ internal sealed partial class BmsStageHud : BmsHudComponent
         Precision = 1,
     };
 
-    [SettingSource("Note height scale", "Scales note heads and tails without changing their positions or other Stage elements.")]
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.NoteHeightScale), nameof(BmsStrings.NoteHeightScaleDescription))]
     public BindableFloat NoteHeightScale { get; } = new(1)
     {
         MinValue = 0.01f,

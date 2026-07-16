@@ -33,6 +33,66 @@ public static class BmsStrings
 
     public static LocalisableString SongProgressColourDescription => get("song_progress_colour_description");
 
+    public static LocalisableString IncludeScratch => get("include_scratch");
+
+    public static LocalisableString IncludeScratchShuffleDescription => get("include_scratch_shuffle_description");
+
+    public static LocalisableString IncludeScratchRotationDescription => get("include_scratch_rotation_description");
+
+    public static LocalisableString Seed => get("seed");
+
+    public static LocalisableString SeedDescription => get("seed_description");
+
+    public static LocalisableString NoteRandomSeedDescription => get("note_random_seed_description");
+
+    public static LocalisableString LaneOrder => get("lane_order");
+
+    public static LocalisableString LaneOrderDescription => get("lane_order_description");
+
+    public static LocalisableString NoteRandomMode => get("note_random_mode");
+
+    public static LocalisableString NoteRandomModeDescription => get("note_random_mode_description");
+
+    public static LocalisableString JudgementLineOffset => get("judgement_line_offset");
+
+    public static LocalisableString JudgementLineOffsetDescription => get("judgement_line_offset_description");
+
+    public static LocalisableString NoteHeightScale => get("note_height_scale");
+
+    public static LocalisableString NoteHeightScaleDescription => get("note_height_scale_description");
+
+    public static LocalisableString GrooveLowHealthColour => get("groove_low_health_colour");
+
+    public static LocalisableString GrooveLowHealthColourDescription => get("groove_low_health_colour_description");
+
+    public static LocalisableString GrooveMidHealthColour => get("groove_mid_health_colour");
+
+    public static LocalisableString GrooveMidHealthColourDescription => get("groove_mid_health_colour_description");
+
+    public static LocalisableString GrooveHighHealthColour => get("groove_high_health_colour");
+
+    public static LocalisableString GrooveHighHealthColourDescription => get("groove_high_health_colour_description");
+
+    public static LocalisableString HardGaugeFillColour => get("hard_gauge_fill_colour");
+
+    public static LocalisableString HardGaugeFillColourDescription => get("hard_gauge_fill_colour_description");
+
+    public static LocalisableString ExHardGaugeFillColour => get("exhard_gauge_fill_colour");
+
+    public static LocalisableString ExHardGaugeFillColourDescription => get("exhard_gauge_fill_colour_description");
+
+    public static LocalisableString HazardGaugeFillColour => get("hazard_gauge_fill_colour");
+
+    public static LocalisableString HazardGaugeFillColourDescription => get("hazard_gauge_fill_colour_description");
+
+    public static LocalisableString AutoHideDelay => get("auto_hide_delay");
+
+    public static LocalisableString AutoHideDelayDescription => get("auto_hide_delay_description");
+
+    public static LocalisableString MinVisibleCombo => get("min_visible_combo");
+
+    public static LocalisableString MinVisibleComboDescription => get("min_visible_combo_description");
+
     public static LocalisableString UseDedicatedPreviewAudio => get("use_dedicated_preview_audio");
 
     public static LocalisableString DedicatedPreviewAudioHint => get("dedicated_preview_audio_hint");

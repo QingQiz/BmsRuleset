@@ -173,4 +173,34 @@
   <data name="gauge_description" xml:space="preserve"><value>Use the {0} BMS gauge.</value></data>
   <data name="song_progress_colour" xml:space="preserve"><value>Indicator colour</value></data>
   <data name="song_progress_colour_description" xml:space="preserve"><value>Colour of the glowing song progress indicator.</value></data>
+  <data name="include_scratch" xml:space="preserve"><value>Include Scratch</value></data>
+  <data name="include_scratch_shuffle_description" xml:space="preserve"><value>Whether to include scratch lanes in the shuffle.</value></data>
+  <data name="include_scratch_rotation_description" xml:space="preserve"><value>Whether to include scratch lanes in the rotation.</value></data>
+  <data name="seed" xml:space="preserve"><value>Seed</value></data>
+  <data name="seed_description" xml:space="preserve"><value>Use a custom seed for deterministic randomisation.</value></data>
+  <data name="note_random_seed_description" xml:space="preserve"><value>Use a custom seed for deterministic randomisation (required for replay consistency).</value></data>
+  <data name="lane_order" xml:space="preserve"><value>Lane Order</value></data>
+  <data name="lane_order_description" xml:space="preserve"><value>Comma-separated direct lane mapping (e.g. "0,3,1,4,2,5").</value></data>
+  <data name="note_random_mode" xml:space="preserve"><value>Mode</value></data>
+  <data name="note_random_mode_description" xml:space="preserve"><value>S-RANDOM: 40ms anti-jack - only prevents impossibly close jacks. H-RANDOM: 100ms anti-jack - actively breaks jacks into stair/trill patterns.</value></data>
+  <data name="judgement_line_offset" xml:space="preserve"><value>Judgement line offset</value></data>
+  <data name="judgement_line_offset_description" xml:space="preserve"><value>Moves the judgement line relative to the skin position. Positive values move it upward.</value></data>
+  <data name="note_height_scale" xml:space="preserve"><value>Note height scale</value></data>
+  <data name="note_height_scale_description" xml:space="preserve"><value>Scales note heads and tails without changing their positions or other Stage elements.</value></data>
+  <data name="groove_low_health_colour" xml:space="preserve"><value>Groove low health colour</value></data>
+  <data name="groove_low_health_colour_description" xml:space="preserve"><value>Colour of the groove gauge in the red zone (below red zone threshold).</value></data>
+  <data name="groove_mid_health_colour" xml:space="preserve"><value>Groove mid health colour</value></data>
+  <data name="groove_mid_health_colour_description" xml:space="preserve"><value>Colour of the groove gauge in the yellow zone (between red zone and clear threshold).</value></data>
+  <data name="groove_high_health_colour" xml:space="preserve"><value>Groove high health colour</value></data>
+  <data name="groove_high_health_colour_description" xml:space="preserve"><value>Colour of the groove gauge above the clear threshold.</value></data>
+  <data name="hard_gauge_fill_colour" xml:space="preserve"><value>Hard gauge fill colour</value></data>
+  <data name="hard_gauge_fill_colour_description" xml:space="preserve"><value>Fill colour for the Hard gauge type.</value></data>
+  <data name="exhard_gauge_fill_colour" xml:space="preserve"><value>ExHard gauge fill colour</value></data>
+  <data name="exhard_gauge_fill_colour_description" xml:space="preserve"><value>Fill colour for the ExHard gauge type.</value></data>
+  <data name="hazard_gauge_fill_colour" xml:space="preserve"><value>Hazard gauge fill colour</value></data>
+  <data name="hazard_gauge_fill_colour_description" xml:space="preserve"><value>Fill colour for the Hazard gauge type.</value></data>
+  <data name="auto_hide_delay" xml:space="preserve"><value>Auto-hide delay</value></data>
+  <data name="auto_hide_delay_description" xml:space="preserve"><value>Seconds before combo counter hides when combo hasn't grown. Set to -1 to never auto-hide.</value></data>
+  <data name="min_visible_combo" xml:space="preserve"><value>Min visible combo</value></data>
+  <data name="min_visible_combo_description" xml:space="preserve"><value>Minimum combo count for the counter to be visible.</value></data>
 </root>
