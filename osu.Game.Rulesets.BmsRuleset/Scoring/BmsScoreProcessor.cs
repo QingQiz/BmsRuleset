@@ -145,11 +145,10 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         // Don't call base — JudgementProcessor.Update() checks JudgedHits == MaxHits,
         // which never becomes true when mines expire without a result.  Replace with a
         // time-based check: play is complete when the last object's late window has passed.
-        if (!HasCompleted.Value && Time.Current >= latestEndTime)
-        {
-            if (HasCompleted is BindableBool bb)
-                bb.Value = true;
-        }
+        // This must also clear completion after a rewind because looping players wait for
+        // that transition before they stop seeking back to the start of the beatmap.
+        if (HasCompleted is BindableBool bb)
+            bb.Value = Time.Current >= latestEndTime;
     }
 
     protected override void Reset(bool storeResults)

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
@@ -13,8 +14,35 @@ using osu.Game.Scoring;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Scoring;
 
 [TestFixture]
-public class BmsScoreProcessorTest
+public partial class BmsScoreProcessorTest
 {
+    [Test]
+    public void TestCompletionClearsAfterRewind()
+    {
+        var manualClock = new ManualClock();
+        var framedClock = new FramedClock(manualClock);
+        var processor = new TestBmsScoreProcessor
+        {
+            Clock = framedClock,
+        };
+        processor.ApplyBeatmap(createThreeNoteBeatmap());
+
+        manualClock.CurrentTime = 10000;
+        framedClock.ProcessFrame();
+        processor.UpdateCompletion();
+        Assert.That(processor.HasCompleted.Value, Is.True);
+
+        manualClock.CurrentTime = 0;
+        framedClock.ProcessFrame();
+        processor.UpdateCompletion();
+        Assert.That(processor.HasCompleted.Value, Is.False);
+
+        manualClock.CurrentTime = 10000;
+        framedClock.ProcessFrame();
+        processor.UpdateCompletion();
+        Assert.That(processor.HasCompleted.Value, Is.True);
+    }
+
     [Test]
     public void TestScoreProcessorBaseScoreIsPgreatTwo()
     {
@@ -349,4 +377,9 @@ public class BmsScoreProcessorTest
             new BmsHitObject { StartTime = 3000, Column = 3 },
         },
     };
+
+    private sealed partial class TestBmsScoreProcessor : BmsScoreProcessor
+    {
+        public void UpdateCompletion() => base.Update();
+    }
 }
