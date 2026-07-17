@@ -39,6 +39,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) : DrawableRuleset<BmsHitObject>(ruleset, beatmap, mods)
 {
     private static readonly MethodInfo? frame_stable_playback_setter = AccessTools.PropertySetter(typeof(DrawableRuleset<BmsHitObject>), "FrameStablePlayback");
+    private static readonly FieldInfo? player_last_pause_action_time_field = AccessTools.Field(typeof(Player), "lastPauseActionTime");
 
     internal BmsStageHudController StageHudController => field ??= new BmsStageHudController((BmsPlayfield)Playfield);
 
@@ -86,6 +87,9 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     [Resolved(CanBeNull = true)]
     private GameplayClockContainer? gameplayClockContainer { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private Player? player { get; set; }
 
     private bool stoppedPreviewForGameplay;
 
@@ -267,10 +271,28 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
                 pendingResumeRewindFrom.Value,
                 gameplayClockContainer.StartTime);
 
+            clearPauseCooldownForResumeRewind();
             seekImmediatelyForResume(rewindTarget);
         }
 
         pendingResumeRewindFrom = null;
+    }
+
+    private void clearPauseCooldownForResumeRewind()
+    {
+        if (player == null || player_last_pause_action_time_field == null)
+            return;
+
+        try
+        {
+            // The base player measures this cooldown against gameplay time, so rewinding that clock
+            // would otherwise prevent another pause until the resume lead-in has fully caught up.
+            player_last_pause_action_time_field.SetValue(player, null);
+        }
+        catch (System.Exception exception)
+        {
+            Logger.Error(exception, "Failed to clear the pause cooldown for a BMS resume rewind.");
+        }
     }
 
     private void seekImmediatelyForResume(double rewindTarget)

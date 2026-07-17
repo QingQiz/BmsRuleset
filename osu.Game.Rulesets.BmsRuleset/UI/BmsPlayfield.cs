@@ -271,6 +271,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private double resumeRewindAnimationElapsed = RESUME_REWIND_ANIMATION_DURATION;
 
+    internal double ResumeRewindStartTime { get; private set; } = double.MinValue;
+
     internal double ResumeRewindEndTime { get; private set; } = double.MinValue;
 
     internal bool IsResumeRewinding => Time.Current < ResumeRewindEndTime;
@@ -281,7 +283,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     internal double BeginResumeRewind(double pauseTime, double minimumTime)
     {
-        var rewindTarget = ComputeResumeRewindTarget(pauseTime, minimumTime);
+        var continuesExistingRewind = pauseTime >= ResumeRewindStartTime && pauseTime < ResumeRewindEndTime;
+        var rewindTarget = continuesExistingRewind
+            ? ResumeRewindStartTime
+            : ComputeResumeRewindTarget(pauseTime, minimumTime);
+
+        if (!continuesExistingRewind)
+            ResumeRewindStartTime = rewindTarget;
 
         ResumeRewindEndTime = Math.Max(ResumeRewindEndTime, pauseTime);
         resumeRewindInitialVisualOffset = pauseTime - rewindTarget;

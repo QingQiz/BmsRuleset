@@ -88,14 +88,30 @@ public class BmsModPausedTest
     }
 
     [Test]
-    public void TestRepeatedPausePreservesJudgementsUntilFurthestResumePoint()
+    public void TestRepeatedPauseReusesExistingRewindWindow()
+    {
+        var playfield = new BmsPlayfield(new BmsBeatmap { TotalColumns = 1 });
+
+        var firstTarget = playfield.BeginResumeRewind(10000, 0);
+        var repeatedTarget = playfield.BeginResumeRewind(7000, 0);
+
+        Assert.That(firstTarget, Is.EqualTo(5000));
+        Assert.That(repeatedTarget, Is.EqualTo(firstTarget));
+        Assert.That(playfield.ResumeRewindStartTime, Is.EqualTo(5000));
+        Assert.That(playfield.ResumeRewindEndTime, Is.EqualTo(10000));
+    }
+
+    [Test]
+    public void TestPauseAfterExistingRewindStartsNewWindow()
     {
         var playfield = new BmsPlayfield(new BmsBeatmap { TotalColumns = 1 });
 
         playfield.BeginResumeRewind(10000, 0);
-        playfield.BeginResumeRewind(7000, 0);
+        var nextTarget = playfield.BeginResumeRewind(11000, 0);
 
-        Assert.That(playfield.ResumeRewindEndTime, Is.EqualTo(10000));
+        Assert.That(nextTarget, Is.EqualTo(6000));
+        Assert.That(playfield.ResumeRewindStartTime, Is.EqualTo(6000));
+        Assert.That(playfield.ResumeRewindEndTime, Is.EqualTo(11000));
     }
 
     [Test]
