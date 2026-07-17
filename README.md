@@ -92,13 +92,27 @@ currently using directly. For example, BMS 7K (seven keys plus scratch) selects 
 5. The ruleset's built-in fallback skin
 
 > [!NOTE]
-> The initial layout may look cluttered because the BMS-specific HUD is placed alongside components from your mania
-> skin. For example, two hit error meters may be visible. Open the skin editor and drag the components into place to
-> tidy up the layout.
+> The initial layout may look cluttered because the BMS-specific skin components are placed alongside components from
+> your mania skin. For example, two hit error meters may be visible. Open the skin editor and drag the components into
+> place to tidy up the layout.
 
-> [!TIP]
-> This ruleset provides many custom HUD components that recreate the BMS gameplay experience. On first launch, open
-> the skin editor to arrange the layout and add or remove the HUD components you want to use.
+---
+
+### Visually Editable Skin Components
+
+The ruleset lets you visually edit all of these parts of the gameplay screen:
+
+- the number showing your current combo;
+- the judgement shown after each hit;
+- the gauge showing how close you are to clearing or failing;
+- the marker showing your current position in the song;
+- the images and videos played behind the lanes by the chart;
+- the panel comparing your current EX score and judgement counts against your personal best and target;
+- the playfield containing the lanes, notes, and judgement line; and
+- text messages displayed by the chart during gameplay.
+
+Add, remove, arrange, resize, and configure them directly in osu!'s skin editor without editing a cumbersome
+`skin.ini` file. See [Skin Components](#skin-components) for detailed editing options.
 
 ---
 
@@ -139,33 +153,6 @@ Statistics for saved scores can be viewed directly without playing the replay fi
 <summary>Example</summary>
 
 https://github.com/user-attachments/assets/df369f72-a4a6-4017-9f9c-80501f0037a6
-
-</details>
-
----
-
-### Stage Editor
-
-The playfield stage is integrated with osu!'s in-game skin editor. Its position and judgement line can be adjusted
-directly on screen. The resize handles have different effects:
-
-- **Horizontal resize** (left/right handles) changes the stage width, stretching lanes, notes, and stage graphics
-  horizontally without changing the visible lane length.
-- **Vertical resize** (top/bottom handles) changes the visible lane length without vertically scaling notes or other
-  stage content.
-- **Diagonal resize** (corner handles) scales the entire stage uniformly, including lane width, note size, and stage
-  graphics, while preserving its proportions and the amount of lane content shown.
-
-Saving in osu!'s skin editor stores these changes in the active skin's BMS-specific gameplay layout. They are applied
-again when playing BMS with that same skin; the chart files and `skin.ini` are not modified.
-
-The Stage HUD component cannot be permanently removed. Deleting it in the skin editor automatically creates a new
-default Stage component, resetting its position, size, and settings (including the judgement line offset).
-
-<details>
-<summary>Example</summary>
-
-https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
 
 </details>
 
@@ -649,24 +636,74 @@ You can also use `[Mania]` sections from a standard osu!mania skin. The ruleset 
 In `[Mania]` sections, use mania standard judgement names: `Hit300g` (PGREAT), `Hit300` (GREAT), `Hit200` (GOOD),
 `Hit50` (BAD), `Hit0` (POOR).
 
-### HUD Components
+### Skin Components
 
-HUD components can be repositioned and resized freely in the **Skin Editor** during gameplay.
+Skin components can be repositioned and resized freely in the **Skin Editor** during gameplay.
 Open the skin editor and drag any component to your preferred position.
 
 On the next play session the saved layout is automatically loaded.
 
 Additionally, select a component in the skin editor to configure its properties in the sidebar:
 
-| HUD components | Skin editor properties                                                                                                                                                                                         |
-|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Combo          | Auto-hide delay, min visible combo.                                                                                                                                                                            |
-| Judgement      | *(none)*                                                                                                                                                                                                       |
-| Health Bar     | **Groove gauge colours** — low (red zone), mid (yellow zone), high (green zone). **Fixed gauge colours** — Hard, ExHard, Hazard, each independently editable. All colours have a colour picker in the sidebar. |
-| Song Progress  | **Indicator colour** — controls the glowing vertical marker that tracks playback position. The component is attached to the left edge of the Stage by default and can be repositioned in the skin editor.      |
-| BGA            | *(none)* — renders behind the playfield; aspect-fit (letterbox) is fixed. BGA dim is a global setting, not per-component.                                                                                      |
-| Stage          | Judgement line offset and note height scale. Required rectangular frame: drag to move the rendered stage, or resize it using the behaviours described above. It is not offered in the component toolbox; deleting it regenerates a default instance and resets its position, size, and settings. Persisted duplicates retain the first instance. |
-| Text           | *(none)* — shows a "Sample Text Event" placeholder while editing so the (otherwise alpha=0) box can be positioned. Driven by channel `99` / `#TEXTxx` at runtime.                                              |
+#### Combo
+
+Auto-hide delay and minimum visible combo.
+
+#### Judgement
+
+No component-specific properties.
+
+#### Score Graph
+
+Configures the colours used for the current, personal-best, and target EX scores. The score bars, score differences,
+and current-versus-personal-best judgement counts can each be shown or hidden independently.
+
+#### Health Bar
+
+**Groove gauge colours** configure the low (red), mid (yellow), and high (green) zones. **Fixed gauge colours**
+configure Hard, ExHard, and Hazard independently. All colours use a colour picker in the sidebar.
+
+#### Song Progress
+
+**Indicator colour** controls the glowing vertical marker that tracks playback position. The component is attached
+to the left edge of the Stage by default and can be repositioned in the skin editor.
+
+#### BGA
+
+No component-specific properties. It renders behind the playfield with a fixed aspect-fit (letterbox) mode. BGA dim
+is a global setting rather than a per-component property.
+
+#### Stage
+
+Configures the judgement line offset and note height scale. The playfield Stage is integrated with osu!'s in-game
+skin editor, so its position and judgement line can be adjusted directly on screen. The resize handles have different
+effects:
+
+- **Horizontal resize** (left/right handles) changes the Stage width, stretching lanes, notes, and Stage graphics
+  horizontally without changing the visible lane length.
+- **Vertical resize** (top/bottom handles) changes the visible lane length without vertically scaling notes or other
+  Stage content.
+- **Diagonal resize** (corner handles) scales the entire Stage uniformly, including lane width, note size, and Stage
+  graphics, while preserving its proportions and the amount of lane content shown.
+
+Saving in osu!'s skin editor stores these changes in the active skin's BMS-specific gameplay layout. They are applied
+again when playing BMS with that same skin; the chart files and `skin.ini` are not modified.
+
+The Stage skin component is required and is not offered in the component toolbox. Deleting it automatically creates
+a new default instance, resetting its position, size, and settings, including the judgement line offset. If a saved
+layout contains duplicates, only the first instance is retained.
+
+<details>
+<summary>Example</summary>
+
+https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
+
+</details>
+
+#### Text
+
+No component-specific properties. While editing, it shows a "Sample Text Event" placeholder so the otherwise
+transparent box can be positioned. At runtime, it is driven by channel `99` / `#TEXTxx`.
 
 ### Example skin.ini (7K)
 

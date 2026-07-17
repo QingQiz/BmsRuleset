@@ -2,6 +2,8 @@ using System;
 using System.Globalization;
 using System.Resources;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
 
 
 namespace osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -92,6 +94,73 @@ public static class BmsStrings
     public static LocalisableString MinVisibleCombo => get("min_visible_combo");
 
     public static LocalisableString MinVisibleComboDescription => get("min_visible_combo_description");
+
+    public static LocalisableString ScoreGraph => get("score_graph");
+
+    public static LocalisableString ScoreGraphMaximum(int score) => get("score_graph_maximum", score);
+
+    public static LocalisableString ScoreGraphCurrent => get("score_graph_current");
+
+    public static LocalisableString ScoreGraphPersonalBest => get("score_graph_personal_best");
+
+    public static LocalisableString ScoreGraphPersonalBestShort => get("score_graph_personal_best_short");
+
+    public static LocalisableString ScoreGraphTarget(ScoreRank rank) => get("score_graph_target", ScoreGraphRank(rank));
+
+    public static LocalisableString ScoreGraphRank(ScoreRank rank) => rank switch
+    {
+        ScoreRank.X or ScoreRank.XH => get("score_graph_rank_x"),
+        ScoreRank.S or ScoreRank.SH => get("score_graph_rank_s"),
+        ScoreRank.A => get("score_graph_rank_a"),
+        ScoreRank.B => get("score_graph_rank_b"),
+        ScoreRank.C => get("score_graph_rank_c"),
+        _ => get("score_graph_rank_d"),
+    };
+
+    public static LocalisableString ScoreGraphRankThreshold(ScoreRank rank, int score) =>
+        get("score_graph_rank_threshold", ScoreGraphRank(rank), score);
+
+    public static LocalisableString ScoreGraphExScore(int score) => get("score_graph_ex_score", score);
+
+    public static LocalisableString ScoreGraphDifference(int difference) => get("score_graph_difference", difference);
+
+    public static LocalisableString ScoreGraphJudgement(HitResult result) => result switch
+    {
+        HitResult.Perfect => get("score_graph_judgement_pgreat"),
+        HitResult.Great => get("score_graph_judgement_great"),
+        HitResult.Good => get("score_graph_judgement_good"),
+        HitResult.Ok => get("score_graph_judgement_bad"),
+        HitResult.Meh => get("score_graph_judgement_poor"),
+        _ => get("score_graph_judgement_empty_poor"),
+    };
+
+    public static LocalisableString ScoreGraphJudgementCount(int count) => get("score_graph_judgement_count", count);
+
+    public static LocalisableString ScoreGraphJudgementUnavailable => get("score_graph_judgement_unavailable");
+
+    public static LocalisableString ScoreGraphCurrentColour => get("score_graph_current_colour");
+
+    public static LocalisableString ScoreGraphCurrentColourDescription => get("score_graph_current_colour_description");
+
+    public static LocalisableString ScoreGraphPersonalBestColour => get("score_graph_personal_best_colour");
+
+    public static LocalisableString ScoreGraphPersonalBestColourDescription => get("score_graph_personal_best_colour_description");
+
+    public static LocalisableString ScoreGraphTargetColour => get("score_graph_target_colour");
+
+    public static LocalisableString ScoreGraphTargetColourDescription => get("score_graph_target_colour_description");
+
+    public static LocalisableString ScoreGraphShowBars => get("score_graph_show_bars");
+
+    public static LocalisableString ScoreGraphShowBarsDescription => get("score_graph_show_bars_description");
+
+    public static LocalisableString ScoreGraphShowScoreDifference => get("score_graph_show_score_difference");
+
+    public static LocalisableString ScoreGraphShowScoreDifferenceDescription => get("score_graph_show_score_difference_description");
+
+    public static LocalisableString ScoreGraphShowJudgementComparison => get("score_graph_show_judgement_comparison");
+
+    public static LocalisableString ScoreGraphShowJudgementComparisonDescription => get("score_graph_show_judgement_comparison_description");
 
     public static LocalisableString UseDedicatedPreviewAudio => get("use_dedicated_preview_audio");
 

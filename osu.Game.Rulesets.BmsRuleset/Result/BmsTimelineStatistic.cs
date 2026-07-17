@@ -112,10 +112,10 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         }
 
         return new SubplotData([
-            new CategoryData("note", note_colour, note),
-            new CategoryData("ln", ln_colour, ln),
             new CategoryData("Scratch", scratch_colour, scratch),
+            new CategoryData("ln", ln_colour, ln),
             new CategoryData("mine", mine_colour, mine),
+            new CategoryData("note", note_colour, note),
         ]);
     }
 

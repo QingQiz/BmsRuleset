@@ -65,6 +65,12 @@ public static class BmsDefaultHud
             Children =
             [
                 new BmsStageHud(),
+                new BmsScoreGraph
+                {
+                    Anchor = Anchor.BottomRight,
+                    Origin = Anchor.BottomRight,
+                    Scale = new Vector2(1.5f),
+                },
                 new BmsBgaDisplay
                 {
                     AutoSizeToParent = true,

@@ -203,4 +203,39 @@
   <data name="auto_hide_delay_description" xml:space="preserve"><value>连击数停止增长后经过多少秒隐藏计数器。设为 -1 则永不自动隐藏。</value></data>
   <data name="min_visible_combo" xml:space="preserve"><value>最低可见连击数</value></data>
   <data name="min_visible_combo_description" xml:space="preserve"><value>显示计数器所需的最低连击数。</value></data>
+  <data name="score_graph" xml:space="preserve"><value>成绩图</value></data>
+  <data name="score_graph_maximum" xml:space="preserve"><value>最高 {0:D4}</value></data>
+  <data name="score_graph_current" xml:space="preserve"><value>当前成绩</value></data>
+  <data name="score_graph_personal_best" xml:space="preserve"><value>个人最好</value></data>
+  <data name="score_graph_personal_best_short" xml:space="preserve"><value>最好</value></data>
+  <data name="score_graph_target" xml:space="preserve"><value>目标 {0}</value></data>
+  <data name="score_graph_rank_x" xml:space="preserve"><value>X</value></data>
+  <data name="score_graph_rank_s" xml:space="preserve"><value>S</value></data>
+  <data name="score_graph_rank_a" xml:space="preserve"><value>A</value></data>
+  <data name="score_graph_rank_b" xml:space="preserve"><value>B</value></data>
+  <data name="score_graph_rank_c" xml:space="preserve"><value>C</value></data>
+  <data name="score_graph_rank_d" xml:space="preserve"><value>D</value></data>
+  <data name="score_graph_rank_threshold" xml:space="preserve"><value>{0} {1:D4}</value></data>
+  <data name="score_graph_ex_score" xml:space="preserve"><value>{0:D4}</value></data>
+  <data name="score_graph_difference" xml:space="preserve"><value>{0:+0000;-0000;+0000}</value></data>
+  <data name="score_graph_judgement_pgreat" xml:space="preserve"><value>PGREAT</value></data>
+  <data name="score_graph_judgement_great" xml:space="preserve"><value>GREAT</value></data>
+  <data name="score_graph_judgement_good" xml:space="preserve"><value>GOOD</value></data>
+  <data name="score_graph_judgement_bad" xml:space="preserve"><value>BAD</value></data>
+  <data name="score_graph_judgement_poor" xml:space="preserve"><value>POOR</value></data>
+  <data name="score_graph_judgement_empty_poor" xml:space="preserve"><value>E-POOR</value></data>
+  <data name="score_graph_judgement_count" xml:space="preserve"><value>{0:D4}</value></data>
+  <data name="score_graph_judgement_unavailable" xml:space="preserve"><value>—</value></data>
+  <data name="score_graph_current_colour" xml:space="preserve"><value>当前成绩颜色</value></data>
+  <data name="score_graph_current_colour_description" xml:space="preserve"><value>当前 EX Score 柱体的颜色。</value></data>
+  <data name="score_graph_personal_best_colour" xml:space="preserve"><value>个人最好颜色</value></data>
+  <data name="score_graph_personal_best_colour_description" xml:space="preserve"><value>个人最好 EX Score 柱体及最终成绩虚影的颜色。</value></data>
+  <data name="score_graph_target_colour" xml:space="preserve"><value>目标颜色</value></data>
+  <data name="score_graph_target_colour_description" xml:space="preserve"><value>目标 EX Score 柱体及最终成绩虚影的颜色。</value></data>
+  <data name="score_graph_show_bars" xml:space="preserve"><value>显示成绩柱</value></data>
+  <data name="score_graph_show_bars_description" xml:space="preserve"><value>显示当前、个人最好和目标 EX Score 柱体。</value></data>
+  <data name="score_graph_show_score_difference" xml:space="preserve"><value>显示成绩差</value></data>
+  <data name="score_graph_show_score_difference_description" xml:space="preserve"><value>显示当前、个人最好和目标 EX Score 及其差值。</value></data>
+  <data name="score_graph_show_judgement_comparison" xml:space="preserve"><value>显示判定对比</value></data>
+  <data name="score_graph_show_judgement_comparison_description" xml:space="preserve"><value>显示当前成绩与个人最好成绩的判定数量。</value></data>
 </root>

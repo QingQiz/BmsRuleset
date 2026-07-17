@@ -10,7 +10,7 @@ namespace osu.Game.Rulesets.BmsRuleset.SongSelect;
 public static class BmsLampScoreSelector
 {
     public static ScoreInfo? SelectBest(IEnumerable<ScoreInfo> scores, IReadOnlyList<Mod> selectedMods) =>
-        scores.Where(score => matchesSelectedMods(score, selectedMods))
+        scores.Where(score => MatchesSelectedMods(score, selectedMods))
             .MaxBy(score => (lampPriority(BmsLampCalculator.Calculate(score)), score.TotalScore, -score.Date.UtcDateTime.Ticks));
 
     private static int lampPriority(BmsLamp lamp) => lamp switch
@@ -28,7 +28,7 @@ public static class BmsLampScoreSelector
         _ => throw new ArgumentOutOfRangeException(nameof(lamp), lamp, null),
     };
 
-    private static bool matchesSelectedMods(ScoreInfo score, IReadOnlyList<Mod> selectedMods) =>
+    internal static bool MatchesSelectedMods(ScoreInfo score, IReadOnlyList<Mod> selectedMods) =>
         reductionModMatches<BmsModHideScratch>(score.Mods, selectedMods) &&
         reductionModMatches<BmsModAutoScratch>(score.Mods, selectedMods) &&
         reductionModMatches<BmsModConstant>(score.Mods, selectedMods) &&
