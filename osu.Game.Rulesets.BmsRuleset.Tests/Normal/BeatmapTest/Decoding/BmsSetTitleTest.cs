@@ -363,6 +363,60 @@ public class BmsSetTitleTest
             Is.EqualTo("Title"));
     }
 
+    // ── Difficulty delimiter stripping ──
+
+    [TestCase("[NORMAL]", "NORMAL")]
+    [TestCase("(AAA)", "AAA")]
+    [TestCase("（HARD）", "HARD")]
+    [TestCase("[[SPECIAL]]", "[SPECIAL]")]
+    [TestCase("[AAA [BBB]]", "AAA [BBB]")]
+    [TestCase("[AAA] BBB [CCC]", "[AAA] BBB [CCC]")]
+    [TestCase("(AAA) BBB [CCC]", "(AAA) BBB [CCC]")]
+    [TestCase("[AAA)", "[AAA)")]
+    [TestCase("[INCOMPLETE", "[INCOMPLETE")]
+    [TestCase("-Diff-", "Diff")]
+    [TestCase("~Hard~", "Hard")]
+    [TestCase("-AAA- BBB -CCC-", "-AAA- BBB -CCC-")]
+    public void TestStripDifficultyDelimiters(string value, string expected)
+    {
+        Assert.That(BmsChartParser.StripDifficultyDelimiters(value), Is.EqualTo(expected));
+    }
+
+    // ── Mixed bracket groups across a set ──
+
+    [Test]
+    public void TestMixedBracketSuffixesInferBaseTitle()
+    {
+        Assert.That(
+            BmsChartParser.InferCommonSetTitle([
+                "Title (AAA) BBB [CCC]",
+                "Title (DDD) BBB [EEE]"
+            ]),
+            Is.EqualTo("Title"));
+    }
+
+    [Test]
+    public void TestRepeatedSquareBracketSuffixesInferBaseTitle()
+    {
+        Assert.That(
+            BmsChartParser.InferCommonSetTitle([
+                "Title [AAA] BBB [CCC]",
+                "Title [DDD] BBB [EEE]"
+            ]),
+            Is.EqualTo("Title"));
+    }
+
+    [Test]
+    public void TestSharedMixedBracketPrefixRemainsInSetTitle()
+    {
+        Assert.That(
+            BmsChartParser.InferCommonSetTitle([
+                "Title (AAA) BBB [CCC]",
+                "Title (AAA) BBB [DDD]"
+            ]),
+            Is.EqualTo("Title (AAA) BBB"));
+    }
+
     // ── InferTitle: per-chart title-vs-difficulty splitter (derives DifficultyName) ──
 
     [TestCase("Title [NORMAL]", "Title")]
@@ -389,9 +443,13 @@ public class BmsSetTitleTest
     [TestCase("congolict", "conflict", "congolict")] // outlier typo → raw name as diff name
     [TestCase("Aleph-0[NORMAL]", "Aleph-0", "NORMAL")]
     [TestCase("Aleph-0 [Dirty Pattern]", "Aleph-0", "Dirty Pattern")]
-    [TestCase("Aleph-0[(^_^", "Aleph-0", "^_^")] // truncated mid-suffix still splits
+    [TestCase("Aleph-0[(^_^", "Aleph-0", "[(^_^")] // malformed wrappers are preserved
     [TestCase("Aleph-0[NORMAL]", "Aleph-0[NORMAL]", "NORMAL")] // single chart → InferTitle fallback
     [TestCase("Destr0yer", "Destr0yer", "")] // single chart, no suffix → empty (caller falls back)
+    [TestCase("Title [AAA] BBB [CCC]", "Title", "[AAA] BBB [CCC]")]
+    [TestCase("Title [AAA] BBB [CCC]", "Title [AAA] BBB", "CCC")]
+    [TestCase("Title (AAA) BBB [CCC]", "Title", "(AAA) BBB [CCC]")]
+    [TestCase("Title (AAA) BBB [CCC]", "Title (AAA) BBB", "CCC")]
     public void TestInferDifficultyName(string rawTitle, string setTitle, string expected)
     {
         Assert.That(BmsChartParser.InferDifficultyName(rawTitle, setTitle), Is.EqualTo(expected),

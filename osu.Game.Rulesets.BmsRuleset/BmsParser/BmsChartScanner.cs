@@ -247,12 +247,46 @@ internal static partial class BmsChartParser
     }
 
     /// <summary>
-    /// Trims whitespace and wrapping difficulty-suffix delimiters — the half-width
-    /// set mirrored by <see cref="title_suffix_pairs"/> — from a fragment. Used when
-    /// extracting <c>DifficultyName</c> from a #SUBTITLE or from a title suffix.
+    /// Trims whitespace and one complete layer of wrapping difficulty-suffix
+    /// delimiters from a fragment. Composite or malformed delimiters are preserved
+    /// so a value such as "(AAA) BBB [CCC]" is not damaged by independently trimming
+    /// its first and last characters.
     /// </summary>
     public static string StripDifficultyDelimiters(string value)
-        => value.Trim().Trim('[', ']', '-', '(', ')', '~');
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length < 2)
+            return trimmed;
+
+        var closer = trimmed[0] switch
+        {
+            '[' => ']',
+            '(' => ')',
+            '（' => '）',
+            _ => '\0',
+        };
+
+        if (closer != '\0')
+        {
+            var depth = 0;
+
+            for (var i = 0; i < trimmed.Length; i++)
+            {
+                if (trimmed[i] == trimmed[0])
+                    depth++;
+                else if (trimmed[i] == closer && --depth == 0)
+                    return i == trimmed.Length - 1 ? trimmed[1..^1].Trim() : trimmed;
+            }
+
+            return trimmed;
+        }
+
+        if (trimmed[0] is '-' or '~' && trimmed[^1] == trimmed[0]
+            && trimmed.AsSpan(1, trimmed.Length - 2).IndexOf(trimmed[0]) < 0)
+            return trimmed[1..^1].Trim();
+
+        return trimmed;
+    }
 
     /// <summary>
     /// Infers a per-chart <c>DifficultyName</c> by splitting <paramref name="rawTitle"/>

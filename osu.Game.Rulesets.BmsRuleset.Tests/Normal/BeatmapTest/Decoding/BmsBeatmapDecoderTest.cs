@@ -172,7 +172,7 @@ public class BmsBeatmapDecoderTest
         var lines = """
                     #TITLE Shared Title
                     #ARTIST Shared Artist
-                    #SUBTITLE [Shared Difficulty]
+                    #SUBTITLE [AAA] BBB [CCC]
                     #PLAYLEVEL 12.5
                     #RANK 3
                     #TOTAL 240
@@ -184,7 +184,11 @@ public class BmsBeatmapDecoderTest
         var parsed = BmsChartParser.Parse(lines, path, _ => 1);
         var summary = BmsChartParser.ParseImportSummary(lines, path, _ => 1);
 
-        Assert.That(summary.Metadata, Is.EqualTo(extractImportMetadata(parsed, path)));
+        Assert.Multiple(() =>
+        {
+            Assert.That(summary.Metadata, Is.EqualTo(extractImportMetadata(parsed, path)));
+            Assert.That(summary.Metadata.DifficultyName, Is.EqualTo("[AAA] BBB [CCC]"));
+        });
     }
 
     [Test]
