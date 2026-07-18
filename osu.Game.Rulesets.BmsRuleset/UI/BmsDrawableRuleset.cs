@@ -36,8 +36,19 @@ namespace osu.Game.Rulesets.BmsRuleset.UI;
 ///     avoids any mania types and wires BMS hit objects into a native playfield. The visuals are simple
 ///     placeholders that currently use projected object time for vertical positioning.
 /// </remarks>
-public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) : DrawableRuleset<BmsHitObject>(ruleset, beatmap, mods)
+public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 {
+    public BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
+        : base(ruleset, beatmap, mods)
+    {
+        var bmsBeatmap = (BmsBeatmap)beatmap;
+        sampleStore = new BmsSampleStore(
+            bmsBeatmap.SampleDefinitions,
+            getSource(bmsBeatmap),
+            getRate(Mods)
+        );
+    }
+
     private static readonly MethodInfo? frame_stable_playback_setter = AccessTools.PropertySetter(typeof(DrawableRuleset<BmsHitObject>), "FrameStablePlayback");
     private static readonly FieldInfo? player_last_pause_action_time_field = AccessTools.Field(typeof(Player), "lastPauseActionTime");
 
@@ -69,11 +80,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
     private BmsPreviewTrack? previewTrackBeforePlay;
 
     [Cached]
-    private BmsSampleStore sampleStore = new(
-        ((BmsBeatmap)beatmap).SampleDefinitions,
-        getSource((BmsBeatmap)beatmap),
-        getRate(mods)
-    );
+    private readonly BmsSampleStore sampleStore;
 
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
     [Resolved(CanBeNull = true)]
@@ -241,6 +248,8 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             config.BindWith(BmsRulesetSetting.BgaDim, BgaDim);
             ((BmsPlayfield)Playfield).ScrollController.SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
         }
+
+        ((BmsPlayfield)Playfield).ScrollController.SetPlaybackRate(getRate(Mods));
 
         stopPreviewForGameplay();
     }

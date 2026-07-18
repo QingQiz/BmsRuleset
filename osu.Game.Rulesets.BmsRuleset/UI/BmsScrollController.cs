@@ -10,7 +10,7 @@ internal sealed class BmsScrollController(BmsTimingMap? timingMap)
 
     public BmsTimingMap? TimingMap { get; } = timingMap;
 
-    public double ScrollRange => ComputeScrollTime(default_scroll_speed) * ScrollRangeScale;
+    public double ScrollRange => ComputeScrollTime(default_scroll_speed) * ScrollRangeScale * PlaybackRate;
 
     public double ScrollSpeedMultiplier => ScrollSpeed / default_scroll_speed * ChartSpeedFactor;
 
@@ -36,6 +36,8 @@ internal sealed class BmsScrollController(BmsTimingMap? timingMap)
     public double ChartSpeedFactor { get; private set; } = 1.0;
 
     public double ScrollRangeScale { get; private set; } = 1.0;
+
+    public double PlaybackRate { get; private set; } = 1.0;
 
     private const int default_multiplier_index = 9;
 
@@ -63,6 +65,11 @@ internal sealed class BmsScrollController(BmsTimingMap? timingMap)
     {
         configuredScrollSpeed = speed;
         setScrollSpeedFromMultiplierIndex(false);
+    }
+
+    public void SetPlaybackRate(double rate)
+    {
+        PlaybackRate = double.IsFinite(rate) && Math.Abs(rate) >= 0.001 ? Math.Abs(rate) : 1.0;
     }
 
     public void AdjustScrollSpeed(double delta)

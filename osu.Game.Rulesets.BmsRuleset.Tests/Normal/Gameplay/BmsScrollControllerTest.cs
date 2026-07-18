@@ -64,4 +64,18 @@ public class BmsScrollControllerTest
             Assert.That(controller.YForScrollProgress(visibleProgress, 300, 80), Is.EqualTo(0).Within(0.001f));
         });
     }
+
+    [TestCase(0.75)]
+    [TestCase(1.5)]
+    public void TestPlaybackRatePreservesTravelDistance(double playbackRate)
+    {
+        var normal = new BmsScrollController(null);
+        var adjusted = new BmsScrollController(null);
+        adjusted.SetPlaybackRate(playbackRate);
+
+        var normalPosition = normal.YForScrollProgress(1000, 768, 124.8);
+        var adjustedPosition = adjusted.YForScrollProgress(1000 * playbackRate, 768, 124.8);
+
+        Assert.That(adjustedPosition, Is.EqualTo(normalPosition).Within(0.001f));
+    }
 }

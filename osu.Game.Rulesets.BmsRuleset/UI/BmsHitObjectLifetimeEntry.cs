@@ -4,7 +4,6 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
@@ -259,6 +258,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
 
         return BmsScrollController.ComputeScrollTime(BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED)
                * currentScrollRangeScale()
+               * scrollController.PlaybackRate
                / Math.Max(0.001, scrollController.ScrollSpeed / BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED * speedFactor);
     }
 
@@ -269,7 +269,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
     private double computeConstantScrollFutureLifetime()
     {
         var speed = Math.Max(0.001, scrollController.ScrollSpeed);
-        return BmsScrollController.ComputeScrollTime(speed) * currentScrollRangeScale() + lifetime_margin;
+        return BmsScrollController.ComputeScrollTime(speed) * currentScrollRangeScale() * scrollController.PlaybackRate + lifetime_margin;
     }
 
     #endregion
