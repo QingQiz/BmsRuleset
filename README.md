@@ -689,6 +689,13 @@ marker when the saved score does not contain the required replay judgement data.
 The component enforces a minimum width and enough height for the enabled sections. Resizing it beyond those limits gives
 the score plot more room without changing any score calculations.
 
+<details>
+<summary>Example</summary>
+
+https://github.com/user-attachments/assets/ab14a6e8-e853-42ed-ae08-61cc4427e667
+
+</details>
+
 #### Health Bar
 
 Shows the currently selected BMS gauge as a bottom-to-top fill. For Assist Easy, Easy, and Normal, a clear line marks

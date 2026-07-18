@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -238,7 +239,7 @@ public partial class BmsSampleStore : Component
     }
 
     [BackgroundDependencyLoader]
-    private async Task load(CancellationToken? cancellationToken)
+    private void load(CancellationToken? cancellationToken)
     {
         if (string.IsNullOrEmpty(basePath) || !Directory.Exists(basePath))
             return;
@@ -251,9 +252,11 @@ public partial class BmsSampleStore : Component
 
         foreach (var (sampleKey, path) in sampleDefinitions)
         {
+            cancellationToken?.ThrowIfCancellationRequested();
+
             foreach (var lookup in new BmsSampleInfo(path).LookupNames)
             {
-                var track = await trackStore.GetAsync(lookup);
+                var track = trackStore.Get(lookup);
 
                 if (track == null)
                     continue;
@@ -266,34 +269,34 @@ public partial class BmsSampleStore : Component
             }
         }
 
-        await waitForTracks(cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
+        // Dependency loaders are invoked synchronously, so returning a Task here would let the
+        // drawable become loaded before the audio thread has initialised these Tracks.
+        waitForTracks(cancellationToken ?? CancellationToken.None);
     }
 
-    private async Task waitForTracks(CancellationToken cancellationToken)
+    private void waitForTracks(CancellationToken cancellationToken)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(track_load_timeout);
+        var stopwatch = Stopwatch.StartNew();
 
-        try
+        while (tracks.Values.Any(track => !track.IsLoaded) && stopwatch.Elapsed < track_load_timeout)
         {
-            while (tracks.Values.Any(track => !track.IsLoaded))
-                await Task.Delay(10, timeout.Token).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            Thread.Sleep(10);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+
+        var failedKeys = tracks
+            .Where(pair => !pair.Value.IsLoaded)
+            .Select(pair => pair.Key)
+            .ToArray();
+
+        foreach (var key in failedKeys)
         {
-            var failedKeys = tracks
-                .Where(pair => !pair.Value.IsLoaded)
-                .Select(pair => pair.Key)
-                .ToArray();
+            tracks[key].Dispose();
+            tracks.Remove(key);
+        }
 
-            foreach (var key in failedKeys)
-            {
-                tracks[key].Dispose();
-                tracks.Remove(key);
-            }
-
+        if (failedKeys.Length > 0)
             Logger.Log($"Timed out while loading {failedKeys.Length} BMS sample tracks; those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
-        }
     }
 
     private enum TrackCommandType

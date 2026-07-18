@@ -541,6 +541,13 @@ osu!mania 对应判定图像。
 
 组件会限制最小宽度，并根据已启用的区域保留足够高度。继续放大只会为图表提供更多显示空间，不会改变成绩计算。
 
+<details>
+<summary>示例</summary>
+
+https://github.com/user-attachments/assets/ab14a6e8-e853-42ed-ae08-61cc4427e667
+
+</details>
+
 #### 血条
 
 以从下向上的填充条显示当前选择的 BMS 血条。使用 Assist Easy、Easy 和 Normal 时，通关线会标出该血条的通关
