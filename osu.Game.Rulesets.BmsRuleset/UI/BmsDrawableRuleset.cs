@@ -70,7 +70,7 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
     [Cached]
     private BmsSampleStore sampleStore = new(
-        ((BmsBeatmap)beatmap).SampleDefinitions.Values,
+        ((BmsBeatmap)beatmap).SampleDefinitions,
         getSource((BmsBeatmap)beatmap),
         getRate(mods)
     );
@@ -175,9 +175,9 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
             ?.Metadata.Source ?? b.BeatmapInfo.Metadata.Source;
 
     /// <summary>
-    ///     The active rate mod's SpeedChange (1.0 when no rate mod is selected). Used to pre-stretch
-    ///     BMS samples at load so audio follows HT/DT pitch-preserving, in sync with the rate-scaled
-    ///     chart clock.
+    ///     The active rate mod's SpeedChange (1.0 when no rate mod is selected). Applied as the
+    ///     tempo of every preloaded sample Track so audio stays pitch-preserving and follows the
+    ///     rate-scaled chart clock.
     /// </summary>
     private static double getRate(IReadOnlyList<Mod>? mods)
     {
@@ -222,18 +222,19 @@ public partial class BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IRead
 
         Overlays.Add(StageHudController);
 
-        // Add the shared sample cache to the tree so it async-loads (and pre-decodes every chart
-        // sample) during the gameplay loading phase.
+        // Add the shared store to the tree so every definition Track finishes loading before
+        // gameplay begins.
         FrameStableComponents.Add(sampleStore);
 
         var events = beatmap.BackgroundSampleEvents
             .OrderBy(e => e.Time)
             .Where(e => beatmap.SampleDefinitions.ContainsKey(e.SampleKey))
-            .Select(e => new BmsBackgroundAudioPlayer.BgmEvent(e.Time, beatmap.SampleDefinitions[e.SampleKey], e.Volume))
+            .Select(e => new BmsBackgroundAudioPlayer.BgmEvent(e.Time, e.SampleKey, e.Volume))
             .ToList();
 
-        if (events.Count > 0)
-            FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events, backgroundAudioPaused, getRate(Mods)));
+        // This component also coordinates pause/seek blocking for KeySounds in the shared Track
+        // store, so it must exist even when the chart has no background sample events.
+        FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events, backgroundAudioPaused));
 
         if (Config is BmsRulesetConfigManager config)
         {

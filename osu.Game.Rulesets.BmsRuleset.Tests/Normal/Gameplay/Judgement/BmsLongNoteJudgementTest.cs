@@ -188,13 +188,11 @@ public class BmsLongNoteJudgementTest
             StartTime = 1000,
             Duration = 500,
             TailSampleKey = 99,
-            TailSamplePath = "tail.wav",
         };
 
         var endpoint = ln.CreateSyntheticEndpoint(1500);
 
-        Assert.That((endpoint is BmsLongNote ? ((BmsLongNote)endpoint).TailSampleKey : 0), Is.Zero);
-        Assert.That((endpoint is BmsLongNote ? ((BmsLongNote)endpoint).TailSamplePath : string.Empty), Is.Empty);
+        Assert.That(endpoint, Is.Not.InstanceOf<BmsLongNote>());
     }
 
     [Test]
@@ -213,7 +211,6 @@ public class BmsLongNoteJudgementTest
             Column = 5,
             Beatmap = beatmap,
             SampleKey = 77,
-            SamplePath = "test.wav",
         };
 
         var endpoint = ln.CreateSyntheticEndpoint(1500);

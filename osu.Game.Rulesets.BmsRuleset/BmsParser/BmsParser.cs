@@ -101,7 +101,7 @@ internal static partial class BmsChartParser
         hitObjects.Sort(default(HitObjectComparer));
 
         var longNoteTailSampleEvents = new List<BmsSampleEvent>(hitObjects.Count / 4);
-        collectLongNoteTailSampleEvents(hitObjects, longNoteTailSampleEvents);
+        collectLongNoteTailSampleEvents(hitObjects, sampleDefinitions, longNoteTailSampleEvents);
         longNoteTailSampleEvents.Sort(default(SampleEventComparer));
 
         var textEvents = collectTextEvents(state, measureStarts, timingMap);
@@ -640,7 +640,10 @@ internal static partial class BmsChartParser
         return new BmsTextEvents(mistake, events.ToArray());
     }
 
-    private static void collectLongNoteTailSampleEvents(IEnumerable<BmsParsedHitObject> hitObjects, List<BmsSampleEvent> output)
+    private static void collectLongNoteTailSampleEvents(
+        IEnumerable<BmsParsedHitObject> hitObjects,
+        IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        List<BmsSampleEvent> output)
     {
         foreach (var hitObject in hitObjects)
         {
@@ -651,10 +654,14 @@ internal static partial class BmsChartParser
             // sample path resolves (i.e. the key has a #WAV definition in the chart).
             // Do NOT fallback to the head's SampleKey — if the terminating cell has
             // no sample defined, the tail simply has no sound.
-            if (hitObject.TailSampleKey == 0 || string.IsNullOrWhiteSpace(hitObject.TailSamplePath))
+            if (hitObject.TailSampleKey is not { } tailSampleKey
+                || !sampleDefinitions.TryGetValue(tailSampleKey, out var samplePath)
+                || string.IsNullOrWhiteSpace(samplePath))
+            {
                 continue;
+            }
 
-            output.Add(new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, hitObject.TailSampleKey, hitObject.TailSampleVolume));
+            output.Add(new BmsSampleEvent(hitObject.StartTime + hitObject.Duration, hitObject.EndTick, tailSampleKey, hitObject.TailSampleVolume));
         }
     }
 
@@ -1155,12 +1162,12 @@ internal static partial class BmsChartParser
         // For LNTYPE 1 the terminating cell has the same value as the head, which
         // would play the identical sample on release.  Skip the tail sample when
         // it matches the head's sample key to avoid the double-play.
-        var tailSampleKey = tailCellValue != 0 && tailCellValue != start.Value
+        ushort? tailSampleKey = tailCellValue != 0 && tailCellValue != start.Value
             ? tailCellValue
-            : (ushort)0;
-        var tailSamplePath = tailSampleKey != 0
-            ? sampleDefinitions.GetValueOrDefault(tailSampleKey, string.Empty)
-            : string.Empty;
+            : null;
+        var hasTailSample = tailSampleKey is { } key
+                            && sampleDefinitions.TryGetValue(key, out var tailSamplePath)
+                            && !string.IsNullOrWhiteSpace(tailSamplePath);
 
         return new BmsParsedHitObject(
             start.Tick,
@@ -1170,14 +1177,12 @@ internal static partial class BmsChartParser
             start.Column,
             start.Channel,
             start.Value,
-            sampleDefinitions.GetValueOrDefault(start.Value, string.Empty),
             isLongNote,
             false,
             0,
             tailSampleKey,
-            tailSamplePath,
             wavVolume,
-            tailSamplePath.Length > 0 ? wavVolume : 100);
+            hasTailSample ? wavVolume : 100);
     }
 
     private static BmsParsedHitObject createMineHitObject(RawCell mine, BmsTimingMap timingMap, int wavVolume)
@@ -1191,13 +1196,11 @@ internal static partial class BmsChartParser
             0,
             mine.Column,
             mine.Channel,
-            mine.Value,
-            string.Empty,
+            0,
             false,
             true,
             parseBase36Value(mine.Value) / 2d, // 0 = "00"
-            0,
-            string.Empty,
+            null,
             wavVolume);
     }
 

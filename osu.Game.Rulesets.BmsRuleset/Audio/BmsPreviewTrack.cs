@@ -58,13 +58,18 @@ public class BmsPreviewTrack : Track
                 return;
 
             field = value;
+            previewOutputVolume.Value = field == BmsPreviewTrackPlaybackMode.Preview ? 1 : 0;
 
             if (field == BmsPreviewTrackPlaybackMode.Preview)
                 // Gameplay advances this clock while BGM/key sample events are muted, so restoring
                 // preview must resume from the current position rather than replaying the muted gap.
                 nextEventIndex = findFirstEventAfter(CurrentTime);
             else
-                stopPreviewPlayback();
+            {
+                // A preview event may already have passed the mode check on the audio thread. Run
+                // cleanup after that frame so it also catches any channel the frame creates.
+                EnqueueAction(stopPreviewPlayback);
+            }
         }
     }
 
@@ -75,6 +80,7 @@ public class BmsPreviewTrack : Track
     private readonly Track? previewTrack;
     private readonly Dictionary<string, ISample?> resolvedSamples = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ActiveBgm> activeChannels = [];
+    private readonly BindableDouble previewOutputVolume = new(1);
 
     private readonly record struct BgmEvent(double Time, string SamplePath, int Volume = 100);
 
@@ -408,6 +414,7 @@ public class BmsPreviewTrack : Track
         component.RemoveAllAdjustments(AdjustableProperty.Volume);
         component.AddAdjustment(AdjustableProperty.Volume, new BindableDouble(Math.Max(0, volume) / 100.0));
         component.AddAdjustment(AdjustableProperty.Volume, AggregateVolume);
+        component.AddAdjustment(AdjustableProperty.Volume, previewOutputVolume);
     }
 
     private void startPreviewChannel()

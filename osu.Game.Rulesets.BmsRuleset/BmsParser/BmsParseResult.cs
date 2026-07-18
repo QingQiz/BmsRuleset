@@ -69,12 +69,10 @@ public readonly record struct BmsParsedHitObject(
     int Column,
     ushort SourceChannel,
     ushort SampleKey,
-    string SamplePath,
     bool IsLongNote,
     bool IsMine,
     double LandmineDamagePercent,
-    ushort TailSampleKey,
-    string TailSamplePath,
+    ushort? TailSampleKey,
     int SampleVolume = 100,
     int TailSampleVolume = 100,
     double JudgementRate = 0.75);

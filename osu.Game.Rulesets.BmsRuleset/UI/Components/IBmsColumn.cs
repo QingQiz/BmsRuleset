@@ -26,7 +26,7 @@ public interface IBmsColumn
 
     void TriggerHitExplosion(bool isLongNote);
 
-    void PlaySample(string samplePath, int volume);
+    void PlaySample(ushort? sampleKey, int volume);
 
     PressOutcome HandlePress(double time);
 

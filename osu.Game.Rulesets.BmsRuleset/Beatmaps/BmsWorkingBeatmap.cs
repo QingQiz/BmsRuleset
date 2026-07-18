@@ -116,10 +116,10 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
             if (obj is not BmsHitObject hit || hit is BmsLandmine)
                 continue;
 
-            if (hit.SampleKey != 0)
-                allEvents.Add(new BmsSampleEvent(hit.StartTime, 0, hit.SampleKey, hit.SampleVolume));
-            if (hit is BmsLongNote ln && ln.TailSampleKey != 0)
-                allEvents.Add(new BmsSampleEvent(hit.StartTime + ln.Duration, 0, ln.TailSampleKey, ln.TailSampleVolume));
+            if (hit.SampleKey is { } sampleKey)
+                allEvents.Add(new BmsSampleEvent(hit.StartTime, 0, sampleKey, hit.SampleVolume));
+            if (hit is BmsLongNote { TailSampleKey: { } tailSampleKey } ln)
+                allEvents.Add(new BmsSampleEvent(hit.StartTime + ln.Duration, 0, tailSampleKey, ln.TailSampleVolume));
         }
 
         allEvents.Sort(static (a, b) => a.Time.CompareTo(b.Time));

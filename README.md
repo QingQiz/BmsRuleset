@@ -638,46 +638,109 @@ In `[Mania]` sections, use mania standard judgement names: `Hit300g` (PGREAT), `
 
 ### Skin Components
 
-Skin components can be repositioned and resized freely in the **Skin Editor** during gameplay.
-Open the skin editor and drag any component to your preferred position.
-
-On the next play session the saved layout is automatically loaded.
-
-Additionally, select a component in the skin editor to configure its properties in the sidebar:
+Open the **Skin Editor** during gameplay to add, remove, reposition, and resize components. Selecting a component also
+opens its component-specific settings in the sidebar. Saving the editor layout stores both the transforms and these
+settings in the active skin's BMS-specific gameplay layout. The layout is loaded again whenever that skin is used for
+BMS; chart files and `skin.ini` are not modified.
 
 #### Combo
 
-Auto-hide delay and minimum visible combo.
+Displays the current combo using the skin's combo digit textures (`ComboPrefix`, or `score` by default). The number
+animates on each increment and flashes with `ColourBreak` when the combo is broken. If the required digit textures are
+missing, the counter has nothing to draw and remains hidden.
+
+- **Auto-hide delay** controls how many seconds the counter remains visible after the combo stops increasing. Each
+  increment restarts the timer. The allowed range is -1 to 100 seconds, the default is 3 seconds, and -1 disables
+  automatic hiding.
+- **Min visible combo** controls the first combo value at which the counter appears. Values below this threshold are
+  hidden immediately; the allowed range is 0 to 100 and the default is 10.
+
+Moving or scaling the component changes where and how large the digits are drawn; it does not change either threshold.
 
 #### Judgement
 
-No component-specific properties.
+Displays the result of the most recently judged note. A new PGREAT, GREAT, GOOD, BAD, or POOR/E-POOR immediately
+replaces the previous result and restarts that judgement image's animation. Images come from the `HitPGreat` through
+`HitPoor` entries in a `[BMS]` skin, or the corresponding mania judgement images described above.
+
+There are no component-specific sidebar settings. Use the editor controls to set the popup's position and scale, and
+use the skin image files to change its artwork or animation.
 
 #### Score Graph
 
-Configures the colours used for the current, personal-best, and target EX scores. The score bars, score differences,
-and current-versus-personal-best judgement counts can each be shown or hidden independently.
+Tracks the current EX score against two references throughout the chart:
+
+- **Personal best** is the saved play with the highest EX score among scores achieved with the currently selected mods
+  or with more difficult mods. Its live progression is reconstructed from the saved play when replay judgement data is
+  available.
+- **Target** is the minimum EX score for the rank immediately above the personal best (C, B, A, S, then X). Once the
+  personal best is X, X remains the target.
+
+The graph can show rank threshold lines, three live score bars, the current difference from the personal best and
+target, and a PGREAT-through-E-POOR judgement-count comparison. The personal-best judgement column shows an unavailable
+marker when the saved score does not contain the required replay judgement data.
+
+- **Current score colour** changes the live EX-score bar and current-score accents.
+- **Personal best colour** changes the personal-best bar, its final-score ghost, and personal-best accents.
+- **Target colour** changes the target bar, its final-score ghost, and target accents.
+- **Show score bars**, **Show score differences**, and **Show judgement comparison** independently control the three
+  sections. At least one section must remain enabled, so disabling the last visible section is rejected.
+
+The component enforces a minimum width and enough height for the enabled sections. Resizing it beyond those limits gives
+the score plot more room without changing any score calculations.
 
 #### Health Bar
 
-**Groove gauge colours** configure the low (red), mid (yellow), and high (green) zones. **Fixed gauge colours**
-configure Hard, ExHard, and Hazard independently. All colours use a colour picker in the sidebar.
+Shows the currently selected BMS gauge as a bottom-to-top fill. For Assist Easy, Easy, and Normal, a clear line marks
+the gauge's clear threshold and the fill changes colour as it passes the red-zone and clear thresholds. The thresholds
+come from the selected gauge rules: the red zone ends at 20%, Assist Easy clears at 60%, and Easy and Normal clear at
+80%.
+
+- **Groove low health colour** is used below the red-zone threshold.
+- **Groove mid health colour** is used from the red-zone threshold up to the clear threshold.
+- **Groove high health colour** is used at or above the clear threshold.
+- **Hard**, **ExHard**, and **Hazard gauge fill colour** each set the single fill colour used by that survival gauge.
+
+The Class gauge variants use their own fixed profile colours. Resizing the component changes the gauge's visible width
+and height only; it does not change health values, thresholds, or gauge behaviour.
 
 #### Song Progress
 
-**Indicator colour** controls the glowing vertical marker that tracks playback position. The component is attached
-to the left edge of the Stage by default and can be repositioned in the skin editor.
+Shows playback position along a vertical track: the glowing marker starts at the top, remains there during the intro,
+and travels towards the bottom as the playable portion of the chart advances. The marker is clamped to the track, so it
+cannot travel outside the component at either end of the song.
+
+**Indicator colour** changes both the sharp marker and its surrounding glow. Moving the component places the progress
+track elsewhere; changing its height changes the marker's travel distance. The default layout attaches it to the left
+edge of the Stage.
 
 #### BGA
 
-No component-specific properties. It renders behind the playfield with a fixed aspect-fit (letterbox) mode. BGA dim
-is a global setting rather than a per-component property.
+Displays the chart-authored BGA timeline, including the base, layer 1, layer 2, and POOR layers. Supported image formats
+are PNG, JPEG, BMP, and GIF; supported video formats are MP4, AVI, WebM, MOV, MPEG, and WMV. The component applies
+chart-defined crop and opacity events and shows the POOR layer briefly after a miss according to the chart's POOR BGA
+mode.
+
+The component's rectangle defines the BGA viewport. Content always preserves its aspect ratio with aspect-fit sizing,
+so unused space is letterboxed rather than stretching the image. The default component fills the available gameplay
+area, but it can be moved or resized to create a smaller BGA window. It is rendered behind the playfield and remains
+there when the gameplay HUD is hidden.
+
+There are no component-specific sidebar settings. **BGA dim** is a ruleset-wide gameplay setting and affects the BGA
+regardless of which saved component layout is active.
 
 #### Stage
 
-Configures the judgement line offset and note height scale. The playfield Stage is integrated with osu!'s in-game
-skin editor, so its position and judgement line can be adjusted directly on screen. The resize handles have different
-effects:
+Represents the complete playable Stage: its lanes, notes, measure lines, key area, judgement line, hit explosions, and
+Stage artwork all move together when this component is repositioned.
+
+- **Judgement line offset** moves the judgement line relative to the position supplied by the skin. Positive values
+  move it upward and negative values move it downward. The editor limits the value so the line remains within the
+  current visible Stage; changing the offset does not change judgement timing.
+- **Note height scale** scales the height of note heads and tails from 0.01x to 5x (default 1x). It does not move notes,
+  alter long-note body length, or scale other Stage elements.
+
+The Stage resize handles deliberately perform different operations:
 
 - **Horizontal resize** (left/right handles) changes the Stage width, stretching lanes, notes, and Stage graphics
   horizontally without changing the visible lane length.
@@ -685,9 +748,6 @@ effects:
   Stage content.
 - **Diagonal resize** (corner handles) scales the entire Stage uniformly, including lane width, note size, and Stage
   graphics, while preserving its proportions and the amount of lane content shown.
-
-Saving in osu!'s skin editor stores these changes in the active skin's BMS-specific gameplay layout. They are applied
-again when playing BMS with that same skin; the chart files and `skin.ini` are not modified.
 
 The Stage skin component is required and is not offered in the component toolbox. Deleting it automatically creates
 a new default instance, resetting its position, size, and settings, including the judgement line offset. If a saved
@@ -702,8 +762,14 @@ https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
 
 #### Text
 
-No component-specific properties. While editing, it shows a "Sample Text Event" placeholder so the otherwise
-transparent box can be positioned. At runtime, it is driven by channel `99` / `#TEXTxx`.
+Shows short gameplay messages in a dark-backed text banner. At chart start it briefly displays `Game Start`. During
+play, channel `99` events display the corresponding `#TEXTxx` value; if `#TEXT00` is defined, a POOR judgement displays
+it as the mistake message. An in-game scroll-speed change displays the new multiplier with `>>` or `<<` direction
+markers. Each message fades out automatically after a short delay.
+
+There are no component-specific sidebar settings. Because the component is normally transparent between messages, the
+skin editor replaces its contents with a fully visible `Sample Text Event` placeholder. Use that placeholder to place
+and scale the banner; it is never shown during normal gameplay.
 
 ### Example skin.ini (7K)
 

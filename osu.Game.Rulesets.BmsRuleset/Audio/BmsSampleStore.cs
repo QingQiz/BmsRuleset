@@ -2,221 +2,314 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
-using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.IO.Stores;
-using osu.Game.Audio;
+using osu.Framework.Logging;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
 
 /// <summary>
-///     Resolves and caches every chart-declared sample (key-sounds, landmine, BGM) up-front,
-///     during the gameplay loading phase, so the gameplay hot path never touches disk or decodes
-///     audio: callers only ask for an already-resolved <see cref="ISample" /> and obtain a
-///     lightweight channel from it via <see cref="ISample.GetChannel" />.
+///     Owns one preloaded, seekable <see cref="Track" /> for every chart sample definition.
 /// </summary>
 /// <remarks>
-///     Samples are resolved only from the original BMS chart directory on the filesystem
-///     (via <see cref="BmsFileResourceStore" />), using the path stored in
-///     <c>BeatmapInfo.Metadata.Source</c>. Charts imported in external-audio mode (BMS text
-///     in Realm, audio on disk) resolve normally; charts whose audio lives only in Realm
-///     (no filesystem <c>Source</c> path) will not resolve samples.
+///     Track identity follows the BMS definition key rather than the resolved file path. Reusing a
+///     key therefore truncates and restarts its existing playback, while distinct keys can overlap
+///     even when they reference the same file.
 /// </remarks>
 public partial class BmsSampleStore : Component
 {
+    private static readonly TimeSpan track_load_timeout = TimeSpan.FromSeconds(30);
 
-    /// <summary>
-    ///     The length (in milliseconds) of the longest resolved sample. Used to bound how far back
-    ///     a seek needs to look for samples that may still be sounding at the seek target. Returns
-    ///     <c>0</c> until samples have finished decoding.
-    /// </summary>
-    public double MaxSampleLengthMilliseconds
-    {
-        get
-        {
-            double max = 0;
+    public double MaxTrackLengthMilliseconds => tracks.Count == 0 ? 0 : tracks.Values.Max(track => track.Length);
 
-            foreach (var sample in cache.Values)
-            {
-                if (sample != null && sample.Length > max)
-                    max = sample.Length;
-            }
-
-            return max;
-        }
-    }
-
-    /// <summary>
-    ///     An <see cref="ITrackStore" /> for BGM seek-back tracks, backed by the same filesystem
-    ///     store used for sample resolution.  <c>null</c> when <c>basePath</c> is not a real
-    ///     directory.
-    /// </summary>
-    internal ITrackStore? TrackStore { get; private set; }
-
-    private readonly IReadOnlyList<string> samplePaths;
+    private readonly IReadOnlyDictionary<ushort, string> sampleDefinitions;
     private readonly string? basePath;
     private readonly double rate;
 
-    /// <summary>
-    ///     Declared sample path (the first <see cref="BmsSampleInfo.LookupNames" /> entry) →
-    ///     resolved sample. A cached <c>null</c> means "resolved, but absent" so it is never
-    ///     re-probed.
-    /// </summary>
-    private readonly Dictionary<string, ISample?> cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<ushort, Track> tracks = [];
+    private readonly HashSet<ushort> activeKeys = [];
+    private readonly HashSet<ushort> pausedKeys = [];
+    private readonly Dictionary<ushort, TrackCommandQueue> commandQueues = [];
+    private readonly object commandLock = new();
 
-    // Owned by this store (its stretched ISamples are served from cache). Disposed in Dispose.
-    private BmsSampleStretcher? stretcher;
-
-    private ISampleStore? fileSampleStore;
+    private ITrackStore? trackStore;
+    private bool playbackBlocked;
+    private bool isDisposing;
 
     [Resolved]
     private AudioManager audioManager { get; set; } = null!;
 
-    /// <param name="samplePaths">
-    ///     Every distinct chart-declared sample filename to pre-resolve (typically
-    ///     <c>BmsBeatmap.SampleDefinitions.Values</c>).
-    /// </param>
-    /// <param name="basePath">
-    ///     The chart directory on the real filesystem (from <c>BeatmapInfo.Metadata.Source</c>).
-    ///     Audio files are resolved from here via <see cref="BmsFileResourceStore" />. When
-    ///     null or non-existent, no samples resolve.
-    /// </param>
-    /// <param name="rate">
-    ///     When not <c>1.0</c>, every resolved sample is pitch-preserving time-stretched by this
-    ///     factor during <c>load()</c> (via <see cref="BmsSampleStretcher" />) and the cache entry
-    ///     replaced, so runtime playback is rate-adjusted with zero per-playback overhead.
-    /// </param>
-    public BmsSampleStore(IEnumerable<string> samplePaths, string? basePath = null, double rate = 1.0)
+    public BmsSampleStore(
+        IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        string? basePath = null,
+        double rate = 1.0)
     {
-        this.samplePaths = samplePaths
-            .Where(p => !string.IsNullOrEmpty(p))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        this.sampleDefinitions = sampleDefinitions
+            .Where(pair => !string.IsNullOrEmpty(pair.Value))
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
         this.basePath = basePath;
         this.rate = rate;
     }
 
-    #region Disposal
-
     protected override void Dispose(bool isDisposing)
     {
-        // File sample store is owned by this component.  Dispose it to free native BASS resources.
-        if (fileSampleStore is IDisposable disposable)
-            disposable.Dispose();
+        lock (commandLock)
+        {
+            this.isDisposing = true;
 
-        // Stretcher owns the stretched ISamples now served from cache; free their native BASS
-        // resources too. Must happen before cache.Clear() since the cache entries reference them.
-        stretcher?.Dispose();
-        fileSampleStore = null;
-        TrackStore = null;
-        cache.Clear();
+            foreach (var queue in commandQueues.Values)
+                queue.PendingCommand = null;
+        }
+
+        activeKeys.Clear();
+        pausedKeys.Clear();
+        commandQueues.Clear();
+        tracks.Clear();
+        trackStore?.Dispose();
+        trackStore = null;
         base.Dispose(isDisposing);
     }
 
-    #endregion
+    internal Track? GetTrack(ushort sampleKey) => tracks.GetValueOrDefault(sampleKey);
+
+    internal double GetTrackLength(ushort sampleKey) => GetTrack(sampleKey)?.Length ?? 0;
 
     /// <summary>
-    ///     Returns the resolved sample for the given chart-declared path, resolving and caching it
-    ///     on first request. Returns <c>null</c> when the sample is absent.
+    ///     Truncates any playback for <paramref name="sampleKey" /> and starts that key's Track at
+    ///     <paramref name="offset" />. Other definition keys are unaffected.
     /// </summary>
-    public ISample? Get(string? path) => string.IsNullOrEmpty(path) ? null : Get(new BmsSampleInfo(path));
-
-    /// <inheritdoc cref="Get(string)" />
-    public ISample? Get(ISampleInfo sampleInfo)
+    internal void Play(ushort sampleKey, int volume = 100, double offset = 0)
     {
-        var key = sampleInfo.LookupNames.FirstOrDefault();
+        if (playbackBlocked || !tracks.TryGetValue(sampleKey, out var track))
+            return;
 
-        if (string.IsNullOrEmpty(key))
-            return null;
+        offset = Math.Max(0, offset);
 
-        if (cache.TryGetValue(key, out var cached))
-            return cached;
+        if (track.Length <= 0 || offset >= track.Length)
+            return;
 
-        // Filesystem (external-audio import mode). byte[] allocation (if any) happens here,
-        // during preload on the async background thread.  Playback via ISample.GetChannel()
-        // reuses the already-loaded native sample handle and allocates zero managed memory.
-        if (fileSampleStore != null)
+        bindTrackVolumeAdjustments(track, volume);
+        pausedKeys.Remove(sampleKey);
+        activeKeys.Add(sampleKey);
+        queueCommand(sampleKey, new TrackCommand(TrackCommandType.Restart, offset));
+    }
+
+    internal void SetPlaybackBlocked(bool blocked)
+    {
+        if (blocked == playbackBlocked)
+            return;
+
+        playbackBlocked = blocked;
+
+        if (playbackBlocked)
+            PauseAll();
+    }
+
+    internal void PauseAll()
+    {
+        pausedKeys.Clear();
+
+        foreach (var sampleKey in activeKeys)
         {
-            foreach (var lookup in sampleInfo.LookupNames)
-            {
-                var sample = fileSampleStore.Get(lookup);
+            queueCommand(sampleKey, new TrackCommand(TrackCommandType.Stop));
+            pausedKeys.Add(sampleKey);
+        }
+    }
 
-                if (sample != null)
-                    return cache[key] = sample;
+    internal void ResumeAll()
+    {
+        if (playbackBlocked)
+            return;
+
+        foreach (var sampleKey in pausedKeys)
+            queueCommand(sampleKey, new TrackCommand(TrackCommandType.Start));
+
+        pausedKeys.Clear();
+    }
+
+    internal void StopAll()
+    {
+        foreach (var sampleKey in activeKeys)
+            queueCommand(sampleKey, new TrackCommand(TrackCommandType.Stop));
+
+        activeKeys.Clear();
+        pausedKeys.Clear();
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+        activeKeys.RemoveWhere(sampleKey => !hasPendingCommand(sampleKey) && tracks[sampleKey].HasCompleted);
+    }
+
+    private void queueCommand(ushort sampleKey, TrackCommand command)
+    {
+        TrackCommandQueue queue;
+        var startProcessing = false;
+
+        lock (commandLock)
+        {
+            if (isDisposing)
+                return;
+
+            if (!commandQueues.TryGetValue(sampleKey, out queue!))
+                commandQueues[sampleKey] = queue = new TrackCommandQueue(tracks[sampleKey]);
+
+            // Once the audio thread falls behind, replaying every stale retrigger would produce
+            // delayed duplicate sounds. BMS truncation semantics only require the latest request.
+            queue.PendingCommand = command;
+
+            if (!queue.IsProcessing)
+            {
+                queue.IsProcessing = true;
+                startProcessing = true;
             }
         }
 
-        return cache[key] = null;
+        if (startProcessing)
+            _ = processCommands(queue, sampleKey);
+    }
+
+    private async Task processCommands(TrackCommandQueue queue, ushort sampleKey)
+    {
+        while (true)
+        {
+            TrackCommand command;
+
+            lock (commandLock)
+            {
+                if (isDisposing || queue.PendingCommand is not { } pending)
+                {
+                    queue.IsProcessing = false;
+                    return;
+                }
+
+                command = pending;
+                queue.PendingCommand = null;
+            }
+
+            try
+            {
+                switch (command.Type)
+                {
+                    case TrackCommandType.Restart:
+                        // Only one restart per Track can be in flight, so RestartPoint cannot be
+                        // overwritten before the audio thread consumes this command.
+                        queue.Track.RestartPoint = command.Offset;
+                        await queue.Track.RestartAsync().ConfigureAwait(false);
+                        break;
+
+                    case TrackCommandType.Stop:
+                        await queue.Track.StopAsync().ConfigureAwait(false);
+                        break;
+
+                    case TrackCommandType.Start:
+                        await queue.Track.StartAsync().ConfigureAwait(false);
+                        break;
+
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, $"Failed to execute an audio command for BMS sample key {sampleKey:X2}.");
+            }
+        }
+    }
+
+    private bool hasPendingCommand(ushort sampleKey)
+    {
+        lock (commandLock)
+            return commandQueues.TryGetValue(sampleKey, out var queue) && queue.IsProcessing;
+    }
+
+    private void bindTrackVolumeAdjustments(IAdjustableAudioComponent component, int volume)
+    {
+        component.RemoveAllAdjustments(AdjustableProperty.Volume);
+        component.AddAdjustment(AdjustableProperty.Volume, new BindableDouble(Math.Max(0, volume) / 100.0));
+        component.AddAdjustment(AdjustableProperty.Volume, audioManager.AggregateVolume);
     }
 
     [BackgroundDependencyLoader]
-    private void load()
+    private async Task load(CancellationToken? cancellationToken)
     {
-        // Runs on the async load thread (the "click play → loading screen" phase), so the
-        // disk read + decode of every sample happens off the gameplay hot path.
-        // Only create the filesystem-backed store when basePath is a real directory.
-        if (!string.IsNullOrEmpty(basePath) && Directory.Exists(basePath))
-        {
-            var fileResources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
-            fileResources.AddExtension("wav");
-            fileResources.AddExtension("mp3");
-            fileResources.AddExtension("ogg");
-
-            fileSampleStore = audioManager.GetSampleStore(fileResources);
-            TrackStore = audioManager.GetTrackStore(fileResources);
-        }
-
-        foreach (var path in samplePaths)
-            Get(path);
-
-        // Pre-stretch pass: when rate != 1, replace each resolved cache entry with a pitch-preserving
-        // stretch. Done after (not during) resolution so the stretcher decodes the source bytes once
-        // per sample and the runtime Get() path stays untouched (callers receive stretched samples
-        // transparently). Absent samples (cached null) are skipped, preserving their "absent" state.
-        if (!(Math.Abs(rate - 1.0) > 0.001))
+        if (string.IsNullOrEmpty(basePath) || !Directory.Exists(basePath))
             return;
 
-        var sourceBytes = buildSourceByteStore();
+        var resources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
+        resources.AddExtension("wav");
+        resources.AddExtension("mp3");
+        resources.AddExtension("ogg");
+        trackStore = audioManager.GetTrackStore(resources);
 
-        if (sourceBytes != null)
+        foreach (var (sampleKey, path) in sampleDefinitions)
         {
-            stretcher = new BmsSampleStretcher(audioManager);
-
-            foreach (var path in samplePaths)
+            foreach (var lookup in new BmsSampleInfo(path).LookupNames)
             {
-                var key = new BmsSampleInfo(path).LookupNames.FirstOrDefault();
+                var track = await trackStore.GetAsync(lookup);
 
-                if (string.IsNullOrEmpty(key))
+                if (track == null)
                     continue;
 
-                if (!cache.TryGetValue(key, out var existing) || existing == null)
-                    continue;
+                if (Math.Abs(rate - 1.0) > 0.001)
+                    track.AddAdjustment(AdjustableProperty.Tempo, new BindableDouble(rate));
 
-                var stretched = stretcher.Stretch(sourceBytes, path, rate);
-
-                if (stretched != null)
-                    cache[key] = stretched;
+                tracks[sampleKey] = track;
+                break;
             }
+        }
+
+        await waitForTracks(cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private async Task waitForTracks(CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(track_load_timeout);
+
+        try
+        {
+            while (tracks.Values.Any(track => !track.IsLoaded))
+                await Task.Delay(10, timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            var failedKeys = tracks
+                .Where(pair => !pair.Value.IsLoaded)
+                .Select(pair => pair.Key)
+                .ToArray();
+
+            foreach (var key in failedKeys)
+            {
+                tracks[key].Dispose();
+                tracks.Remove(key);
+            }
+
+            Logger.Log($"Timed out while loading {failedKeys.Length} BMS sample tracks; those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
         }
     }
 
-    /// <summary>
-    ///     Builds a byte resource store over the chart directory so the stretcher can decode
-    ///     source audio. Returns null when <c>basePath</c> is not a real directory (no samples
-    ///     to pre-stretch).
-    /// </summary>
-    private IResourceStore<byte[]>? buildSourceByteStore()
+    private enum TrackCommandType
     {
-        if (string.IsNullOrEmpty(basePath) || !Directory.Exists(basePath))
-            return null;
+        Restart,
+        Stop,
+        Start,
+    }
 
-        var fileResources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
-        fileResources.AddExtension("wav");
-        fileResources.AddExtension("mp3");
-        fileResources.AddExtension("ogg");
-        return fileResources;
+    private readonly record struct TrackCommand(TrackCommandType Type, double Offset = 0);
+
+    private sealed class TrackCommandQueue(Track track)
+    {
+        public readonly Track Track = track;
+
+        public TrackCommand? PendingCommand;
+        public bool IsProcessing;
     }
 }

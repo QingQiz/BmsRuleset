@@ -15,20 +15,53 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     [Resolved]
     private AudioManager audioManager { get; set; } = null!;
 
-    [Test]
-    public void BackgroundSamplesUseAggregateVolumeOnly()
+    [TestCase(100, 0, false)]
+    [TestCase(100, 200, true)]
+    [TestCase(200, 200, false)]
+    public void SeekResumesOnlyLoadedTracksThatAreStillActive(double offset, double length, bool expected)
     {
-        AddAssert("BGM volume adjustments use aggregate volume", () =>
+        Assert.That(BmsBackgroundAudioPlayer.ShouldResumeSampleAfterSeek(offset, length), Is.EqualTo(expected));
+    }
+
+    [TestCase(0, 99.999, false)]
+    [TestCase(0, 100, true)]
+    [TestCase(100, 0, false)]
+    public void LateBackgroundEventRequiresReconstruction(double eventTime, double currentTime, bool expected)
+    {
+        Assert.That(BmsBackgroundAudioPlayer.IsEventTooLateForDirectStart(eventTime, currentTime), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void SeekKeepsOnlyLatestEventPerKey()
+    {
+        BmsBackgroundAudioPlayer.BgmEvent[] events =
+        [
+            new(0, 1),
+            new(1000, 1),
+            new(1200, 2),
+        ];
+
+        var selected = BmsBackgroundAudioPlayer.SelectEventsForSeek(events, events.Length, 1500, 2000, _ => 2000);
+
+        Assert.That(selected, Has.Count.EqualTo(2));
+        Assert.That(selected, Has.Exactly(1).Matches<BmsBackgroundAudioPlayer.SeekedBgm>(item => item.Event.SampleKey == 1 && item.Event.Time == 1000));
+        Assert.That(selected, Has.Exactly(1).Matches<BmsBackgroundAudioPlayer.SeekedBgm>(item => item.Event.SampleKey == 2));
+    }
+
+    [Test]
+    public void GameplayTracksUseAggregateVolumeOnly()
+    {
+        AddAssert("gameplay Track volume uses aggregate volume", () =>
         {
-            var player = new BmsBackgroundAudioPlayer([], new BindableBool());
-            typeof(BmsBackgroundAudioPlayer)
+            var store = new BmsSampleStore(new Dictionary<ushort, string>());
+            typeof(BmsSampleStore)
                 .GetProperty("audioManager", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .SetValue(player, audioManager);
+                .SetValue(store, audioManager);
 
             var audio = new RecordingAudioComponent();
-            typeof(BmsBackgroundAudioPlayer)
-                .GetMethod("bindBgmVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(player, [audio, 100]);
+            typeof(BmsSampleStore)
+                .GetMethod("bindTrackVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(store, [audio, 100]);
 
             Assert.That(audio.RemovedProperties, Does.Contain(AdjustableProperty.Volume));
             Assert.That(audio.VolumeAdjustments, Has.Some.SameAs(audioManager.AggregateVolume));
@@ -40,54 +73,25 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     }
 
     [Test]
-    public void BackgroundSampleVolumeAdjustmentIsPerPlayback()
+    public void GameplayTrackVolumeAdjustmentIsPerPlayback()
     {
-        AddAssert("BGM playback volume uses separate bindables", () =>
+        AddAssert("gameplay Track volume uses separate bindables", () =>
         {
-            var player = new BmsBackgroundAudioPlayer([], new BindableBool());
-            typeof(BmsBackgroundAudioPlayer)
+            var store = new BmsSampleStore(new Dictionary<ushort, string>());
+            typeof(BmsSampleStore)
                 .GetProperty("audioManager", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .SetValue(player, audioManager);
+                .SetValue(store, audioManager);
 
-            var bindMethod = typeof(BmsBackgroundAudioPlayer)
-                .GetMethod("bindBgmVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var bindMethod = typeof(BmsSampleStore)
+                .GetMethod("bindTrackVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
             Assert.That(bindMethod.GetParameters(), Has.Length.EqualTo(2));
 
             var first = new RecordingAudioComponent();
             var second = new RecordingAudioComponent();
 
-            bindMethod.Invoke(player, [first, 40]);
-            bindMethod.Invoke(player, [second, 80]);
-
-            Assert.That(first.VolumeAdjustments[0], Is.Not.SameAs(second.VolumeAdjustments[0]));
-            Assert.That(first.VolumeAdjustments[0].Value, Is.EqualTo(0.4));
-            Assert.That(second.VolumeAdjustments[0].Value, Is.EqualTo(0.8));
-
-            return true;
-        });
-    }
-
-    [Test]
-    public void ChartSampleVolumeAdjustmentIsPerPlayback()
-    {
-        AddAssert("chart sample playback volume uses separate bindables", () =>
-        {
-            var sample = new BmsChartSampleSound();
-            typeof(BmsChartSampleSound)
-                .GetProperty("audioManager", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .SetValue(sample, audioManager);
-
-            var bindMethod = typeof(BmsChartSampleSound)
-                .GetMethod("bindChartAudioAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!;
-
-            Assert.That(bindMethod.GetParameters(), Has.Length.EqualTo(2));
-
-            var first = new RecordingAudioComponent();
-            var second = new RecordingAudioComponent();
-
-            bindMethod.Invoke(sample, [first, 40]);
-            bindMethod.Invoke(sample, [second, 80]);
+            bindMethod.Invoke(store, [first, 40]);
+            bindMethod.Invoke(store, [second, 80]);
 
             Assert.That(first.VolumeAdjustments[0], Is.Not.SameAs(second.VolumeAdjustments[0]));
             Assert.That(first.VolumeAdjustments[0].Value, Is.EqualTo(0.4));
@@ -116,6 +120,25 @@ public partial class TestBmsAudioVolumeRouting : TestScene
             Assert.That(audio.VolumeAdjustments, Has.None.SameAs(audioManager.VolumeSample));
 
             return true;
+        });
+    }
+
+    [Test]
+    public void PreviewOutputIsMutedInGameplayClockOnlyMode()
+    {
+        AddAssert("clock-only preview output is muted", () =>
+        {
+            var track = new BmsPreviewTrack([], new Dictionary<ushort, string>(), null, audioManager)
+            {
+                PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly,
+            };
+            var audio = new RecordingAudioComponent();
+
+            typeof(BmsPreviewTrack)
+                .GetMethod("bindPreviewVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(track, [audio, 100]);
+
+            return audio.VolumeAdjustments.Exists(adjustment => adjustment.Value == 0);
         });
     }
 

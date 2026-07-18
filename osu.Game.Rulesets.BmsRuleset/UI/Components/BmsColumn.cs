@@ -252,21 +252,20 @@ public partial class BmsColumn : Playfield, IBmsColumn
     }
 
     /// <summary>
-    /// Plays a note-hit / LN-tail sample in this column's key channel. Routed to the column's own
-    /// keysound player so mods (e.g. AutoScratch) hit the same channel a real press would.
+    /// Triggers a note-hit / LN-tail definition key. All columns and automation route through the
+    /// shared key Track, so retriggering the definition has the same truncation behaviour.
     /// </summary>
-    public void PlaySample(string samplePath, int volume) => keySound?.PlaySample(samplePath, volume);
+    public void PlaySample(ushort? sampleKey, int volume) => keySound?.PlaySample(sampleKey, volume);
 
     /// <summary>
     /// Plays the landmine explosion sample (#WAV00) when a landmine in this column detonates.
     /// </summary>
     public void DetonateLandmine(BmsHitObject hitObject)
     {
-        var explosionPath = hitObject.Beatmap.SampleDefinitions.TryGetValue(0, out var p) ? p : string.Empty;
-        if (string.IsNullOrEmpty(explosionPath))
+        if (!hitObject.Beatmap.SampleDefinitions.ContainsKey(0))
             return;
 
-        keySound?.PlayLandmineSound(explosionPath, hitObject.SampleVolume);
+        keySound?.PlayLandmineSound(hitObject.SampleVolume);
     }
 
     private void onColumnNewResult(DrawableHitObject drawable, JudgementResult result)
@@ -318,7 +317,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             var target = candidates.First(c => c.Candidate.Equals(selectedCandidate)).Drawable;
             if (target.TryHit(selection.Result))
             {
-                keySound?.PlaySample(target.HitObject.SamplePath, target.HitObject.SampleVolume);
+                keySound?.PlaySample(target.HitObject.SampleKey, target.HitObject.SampleVolume);
                 return PressOutcome.Hit;
             }
         }
@@ -357,7 +356,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             var releaseOffset = time - heldNote.HitObject.GetEndTime();
 
             if (ln2.TryRelease(releaseOffset, tailTable) && heldNote.HitObject is BmsLongNote ln)
-                keySound?.PlaySample(ln.TailSamplePath, ln.TailSampleVolume);
+                keySound?.PlaySample(ln.TailSampleKey, ln.TailSampleVolume);
         }
     }
 

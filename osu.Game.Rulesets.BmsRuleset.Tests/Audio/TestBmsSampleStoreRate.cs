@@ -1,8 +1,6 @@
-using System;
+using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
-using osu.Framework.Allocation;
-using osu.Framework.Audio;
 using osu.Framework.Testing;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 
@@ -14,41 +12,133 @@ public partial class TestBmsSampleStoreRate : TestScene
     private string tempDir = null!;
     private BmsSampleStore store = null!;
 
-    [Resolved]
-    private AudioManager audioManager { get; set; } = null!;
-
     [Test]
-    public void PreStretch_HalvesCachedSampleLength()
+    public void PreloadWaitsForTracks()
     {
-        // The whole lifecycle runs as AddStep steps on the update thread. osu-framework pumps a
-        // TestScene's step sequence in AfterTest (RunTestBlocking), which runs AFTER NUnit's
-        // [SetUp]/[TearDown]: doing file I/O + Add() in [SetUp] either throws
-        // InvalidThreadForMutationException (Add mutates a Loaded scene from the NUnit thread) or
-        // has its temp dir deleted by [TearDown] before the steps pump. Keeping setup, assertions
-        // and cleanup all inside the step sequence sidesteps both.
-        AddStep("create temp dir + store", () =>
+        AddStep("create sample + store", () =>
         {
-            tempDir = Directory.CreateTempSubdirectory("bmsrate").FullName;
-            // 1 second of 44100 Hz mono float silence.
-            File.WriteAllBytes(Path.Combine(tempDir, "sine.wav"), BmsWavEncoder.Encode(new byte[44100 * 4], 44100, 1));
-            Add(store = new BmsSampleStore(new[] { "sine.wav" }, tempDir, rate: 2.0));
+            createWav("sine.wav", 1);
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "sine.wav" } }, tempDir));
         });
         AddUntilStep("wait for store load", () => store.IsLoaded);
-        // The stretched ISample is created during load() but its BASS sample loads async on the
-        // audio thread; wait for it before reading Length (racy-assertion lesson from Task 3).
-        AddUntilStep("wait for stretched sample load", () => store.Get("sine.wav")?.IsLoaded == true);
-        AddAssert("stretched sample is ~half length", () =>
+        AddAssert("track loaded during store load", () => store.GetTrack(1) is { IsLoaded: true, Length: > 0 });
+        addCleanupSteps();
+    }
+
+    [Test]
+    public void SameFileWithDifferentKeysCreatesIndependentTracks()
+    {
+        AddStep("create shared sample + store", () =>
         {
-            var s = store.Get("sine.wav");
-            return s != null && Math.Abs(s.Length - 500) < 80;
+            createWav("shared.wav", 6);
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string>
+            {
+                { 1, "shared.wav" },
+                { 2, "shared.wav" },
+            }, tempDir));
         });
-        // The store stays parented; the framework disposes it (and its BmsSampleStretcher) on
-        // scene teardown. Source files were read into memory during load(), so the dir is safe to
-        // delete now.
-        AddStep("cleanup temp dir", () =>
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddAssert("different keys have different tracks", () =>
+            store.GetTrack(1) is { } first
+            && store.GetTrack(2) is { } second
+            && !ReferenceEquals(first, second));
+        AddStep("play both keys", () =>
         {
-            if (Directory.Exists(tempDir))
-                Directory.Delete(tempDir, true);
+            store.Play(1);
+            store.Play(2);
+        });
+        AddUntilStep("different keys overlap", () => store.GetTrack(1)?.IsRunning == true && store.GetTrack(2)?.IsRunning == true);
+        addCleanupSteps();
+    }
+
+    [Test]
+    public void ZeroKeyIsPlayableForLandmines()
+    {
+        AddStep("create landmine sample + store", () =>
+        {
+            createWav("landmine.wav", 1);
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 0, "landmine.wav" } }, tempDir));
+        });
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddStep("play key zero", () => store.Play(0));
+        AddUntilStep("landmine sample is playing", () => store.GetTrack(0)?.IsRunning == true);
+        addCleanupSteps();
+    }
+
+    [Test]
+    public void SameKeyRetriggersExistingTrack()
+    {
+        AddStep("create sample + store", () =>
+        {
+            createWav("retrigger.wav", 6);
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "retrigger.wav" } }, tempDir));
+        });
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddStep("start from offset", () => store.Play(1, offset: 1000));
+        AddUntilStep("started near requested offset", () => store.GetTrack(1) is { CurrentTime: >= 900 });
+        AddStep("retrigger same key", () => store.Play(1));
+        AddUntilStep("same track restarted from beginning", () => store.GetTrack(1) is { IsRunning: true, CurrentTime: < 200 });
+        addCleanupSteps();
+    }
+
+    [Test]
+    public void RateUsesTrackTempo()
+    {
+        AddStep("create sample + rate store", () =>
+        {
+            createWav("rate.wav", 1);
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "rate.wav" } }, tempDir, rate: 2));
+        });
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddUntilStep("track tempo follows rate", () => store.GetTrack(1)?.AggregateTempo.Value == 2);
+        AddAssert("track keeps source length", () => store.GetTrack(1) is { Length: >= 900 and <= 1100 });
+        addCleanupSteps();
+    }
+
+    private void createWav(string filename, int seconds)
+    {
+        const int sample_rate = 44100;
+        const short channels = 1;
+        const short bits_per_sample = 16;
+
+        tempDir = Directory.CreateTempSubdirectory("bmstracks").FullName;
+        var dataSize = sample_rate * channels * bits_per_sample / 8 * seconds;
+
+        using var stream = File.Create(Path.Combine(tempDir, filename));
+        using var writer = new BinaryWriter(stream);
+
+        writer.Write("RIFF"u8);
+        writer.Write(36 + dataSize);
+        writer.Write("WAVE"u8);
+        writer.Write("fmt "u8);
+        writer.Write(16);
+        writer.Write((short)1);
+        writer.Write(channels);
+        writer.Write(sample_rate);
+        writer.Write(sample_rate * channels * bits_per_sample / 8);
+        writer.Write((short)(channels * bits_per_sample / 8));
+        writer.Write(bits_per_sample);
+        writer.Write("data"u8);
+        writer.Write(dataSize);
+        writer.Write(new byte[dataSize]);
+    }
+
+    private void addCleanupSteps()
+    {
+        AddStep("expire store", () => store.Expire());
+        AddUntilStep("cleanup temp dir", () =>
+        {
+            try
+            {
+                if (Directory.Exists(tempDir))
+                    Directory.Delete(tempDir, true);
+
+                return true;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
         });
     }
 }

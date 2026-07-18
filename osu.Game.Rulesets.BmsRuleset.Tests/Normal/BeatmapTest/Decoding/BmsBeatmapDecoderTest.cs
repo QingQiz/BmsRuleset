@@ -63,6 +63,14 @@ public class BmsBeatmapDecoderTest
             ReferenceBpmMode = referenceBpmMode,
         }.Convert();
 
+    private static string getSamplePath(BmsHitObject hitObject, ushort? sampleKey = null)
+    {
+        var key = sampleKey ?? hitObject.SampleKey;
+        return key is { } value
+            ? hitObject.Beatmap.SampleDefinitions.GetValueOrDefault(value, string.Empty)
+            : string.Empty;
+    }
+
     [Test]
     public void TestMinimumLeadInShiftsChartTimelineAndIsPreservedDuringConversion()
     {
@@ -435,7 +443,7 @@ public class BmsBeatmapDecoderTest
         var hitObject = beatmap.HitObjects.OfType<BmsHitObject>().Single();
 
         // Should still be case-insensitive.
-        Assert.That(hitObject.SamplePath, Is.EqualTo("uppercase.wav"));
+        Assert.That(getSamplePath(hitObject), Is.EqualTo("uppercase.wav"));
     }
 
     [Test]
@@ -492,7 +500,7 @@ public class BmsBeatmapDecoderTest
 
         // "aa" and "AA" should encode to the same key (case-insensitive default).
         // The second definition (#WAVAA) overwrites the first.
-        Assert.That(hitObject.SamplePath, Is.EqualTo("uppercase.wav"));
+        Assert.That(getSamplePath(hitObject), Is.EqualTo("uppercase.wav"));
     }
 
     [Test]
@@ -509,7 +517,7 @@ public class BmsBeatmapDecoderTest
         var hitObject = beatmap.HitObjects.OfType<BmsHitObject>().Single();
 
         // "aa" maps to the lowercase definition only.
-        Assert.That(hitObject.SamplePath, Is.EqualTo("lowercase.wav"));
+        Assert.That(getSamplePath(hitObject), Is.EqualTo("lowercase.wav"));
     }
 
     [Test]
@@ -526,8 +534,8 @@ public class BmsBeatmapDecoderTest
         var hitObjects = beatmap.HitObjects.OfType<BmsHitObject>().OrderBy(h => h.StartTime).ToList();
 
         Assert.That(hitObjects, Has.Count.EqualTo(2));
-        Assert.That(hitObjects[0].SamplePath, Is.EqualTo("lower.wav"));
-        Assert.That(hitObjects[1].SamplePath, Is.EqualTo("upper.wav"));
+        Assert.That(getSamplePath(hitObjects[0]), Is.EqualTo("lower.wav"));
+        Assert.That(getSamplePath(hitObjects[1]), Is.EqualTo("upper.wav"));
     }
 
     [Test]
@@ -983,7 +991,7 @@ public class BmsBeatmapDecoderTest
         var hitObject = (BmsHitObject)beatmap.HitObjects.Single();
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
-        Assert.That(hitObject.SamplePath, Is.EqualTo("kick.wav"));
+        Assert.That(getSamplePath(hitObject), Is.EqualTo("kick.wav"));
         Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("kick.wav"));
         Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("bgm.ogg"));
         Assert.That(converted.BackgroundSampleEvents, Has.Count.EqualTo(1));
@@ -1005,10 +1013,25 @@ public class BmsBeatmapDecoderTest
         Assert.That(mine is BmsLandmine, Is.True);
         Assert.That(mine.Column, Is.EqualTo(3));
         Assert.That(mine.SourceChannel, Is.EqualTo(BmsChartParser.Enc("D3")));
-        Assert.That(mine.SampleKey, Is.EqualTo(BmsChartParser.Enc("1E")));
-        Assert.That(mine.SamplePath, Is.Empty);
+        Assert.That(mine.SampleKey, Is.Zero);
+        Assert.That(getSamplePath(mine), Is.EqualTo("bomb.wav"));
         Assert.That((mine as BmsLandmine)?.LandmineDamagePercent ?? 0, Is.EqualTo(25));
         Assert.That(mine.Beatmap.SampleDefinitions.TryGetValue(0, out var p) ? p : null, Is.EqualTo("bomb.wav"));
+    }
+
+    [Test]
+    public void TestLandmineWithoutWav00KeepsReservedSampleKey()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #001D3:0000001E
+                             """);
+
+        var mine = (BmsLandmine)beatmap.HitObjects.Single();
+
+        Assert.That(mine.SampleKey, Is.Zero);
+        Assert.That(getSamplePath(mine), Is.Empty);
+        Assert.That(mine.LandmineDamagePercent, Is.EqualTo(25));
     }
 
     [Test]
@@ -1030,7 +1053,7 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestDecoderPreservesSamplePathWithSubdirectory()
+    public void TestDecoderPreservesSampleDefinitionPathWithSubdirectory()
     {
         // BMS charts may use relative paths with subdirectories in #WAV definitions
         // (e.g. #WAV01 wav/kick.wav). The parser must preserve the full path as-is.
@@ -1049,19 +1072,19 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         // Flat filename (no subdir) — baseline.
-        Assert.That(hitObjects[0].SamplePath, Is.EqualTo("kick.wav"));
+        Assert.That(getSamplePath(hitObjects[0]), Is.EqualTo("kick.wav"));
         Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("kick.wav"));
 
         // Single subdirectory level.
-        Assert.That(hitObjects[1].SamplePath, Is.EqualTo("wav/kick.wav"));
+        Assert.That(getSamplePath(hitObjects[1]), Is.EqualTo("wav/kick.wav"));
         Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("wav/kick.wav"));
 
         // Single subdirectory, different path.
-        Assert.That(hitObjects[2].SamplePath, Is.EqualTo("subdir/sample.wav"));
+        Assert.That(getSamplePath(hitObjects[2]), Is.EqualTo("subdir/sample.wav"));
         Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("03")], Is.EqualTo("subdir/sample.wav"));
 
         // Nested subdirectories.
-        Assert.That(hitObjects[3].SamplePath, Is.EqualTo("a/b/c.wav"));
+        Assert.That(getSamplePath(hitObjects[3]), Is.EqualTo("a/b/c.wav"));
         Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("04")], Is.EqualTo("a/b/c.wav"));
     }
 
@@ -1554,6 +1577,7 @@ public class BmsBeatmapDecoderTest
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
 
         // LNTYPE 2 terminates with "00" (control value, no sample) → no tail sample event.
+        Assert.That(((BmsLongNote)converted.HitObjects.Single()).TailSampleKey, Is.Null);
         Assert.That(converted.LongNoteTailSampleEvents, Is.Empty);
     }
 
@@ -1572,6 +1596,7 @@ public class BmsBeatmapDecoderTest
         // so the tail sample key should not be played.
         Assert.That(converted.HitObjects[0] is BmsLongNote, Is.True);
         Assert.That(converted.HitObjects[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("01")));
+        Assert.That(((BmsLongNote)converted.HitObjects[0]).TailSampleKey, Is.Null);
         Assert.That(converted.LongNoteTailSampleEvents, Has.Count.EqualTo(0));
     }
 
@@ -1593,7 +1618,7 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestLongNoteTailSamplePathOnHitObject()
+    public void TestLongNoteTailSamplePathInDefinitions()
     {
         var beatmap = decode("""
                              #BPM 120
@@ -1607,11 +1632,11 @@ public class BmsBeatmapDecoderTest
 
         Assert.That(note is BmsLongNote, Is.True);
         Assert.That((note as BmsLongNote)?.TailSampleKey ?? 0, Is.EqualTo(BmsChartParser.Enc("02")));
-        Assert.That((note is BmsLongNote ? ((BmsLongNote)note).TailSamplePath : string.Empty), Is.EqualTo("tail.wav"));
+        Assert.That(getSamplePath(note, ((BmsLongNote)note).TailSampleKey), Is.EqualTo("tail.wav"));
     }
 
     [Test]
-    public void TestLongNoteTailSamplePathWithNoWavForTailValue()
+    public void TestLongNoteTailKeyWithNoSampleDefinition()
     {
         var beatmap = decode("""
                              #BPM 120
@@ -1623,9 +1648,9 @@ public class BmsBeatmapDecoderTest
         var note = converted.HitObjects.Single();
 
         Assert.That(note is BmsLongNote, Is.True);
-        // Terminating value "03" has no #WAV definition → TailSamplePath should be empty
+        // Terminating value "03" has no #WAV definition.
         Assert.That((note as BmsLongNote)?.TailSampleKey ?? 0, Is.EqualTo(BmsChartParser.Enc("03")));
-        Assert.That((note is BmsLongNote ? ((BmsLongNote)note).TailSamplePath : string.Empty), Is.Empty);
+        Assert.That(getSamplePath(note, ((BmsLongNote)note).TailSampleKey), Is.Empty);
         // No tail sample event either since the sample can't be resolved
         Assert.That(converted.LongNoteTailSampleEvents, Is.Empty);
     }
@@ -1717,13 +1742,13 @@ public class BmsBeatmapDecoderTest
         Assert.That(notes[0] is BmsLongNote, Is.True);
         Assert.That(notes[0].SampleKey, Is.EqualTo(BmsChartParser.Enc("aa")));
         Assert.That(((BmsLongNote)notes[0]).TailSampleKey, Is.EqualTo(BmsChartParser.Enc("bb")));
-        Assert.That(((BmsLongNote)notes[0]).TailSamplePath, Is.EqualTo("onkeyup1.wav"));
+        Assert.That(getSamplePath(notes[0], ((BmsLongNote)notes[0]).TailSampleKey), Is.EqualTo("onkeyup1.wav"));
 
         // Second LN: head=cc, tail=dd
         Assert.That(notes[1] is BmsLongNote, Is.True);
         Assert.That(notes[1].SampleKey, Is.EqualTo(BmsChartParser.Enc("cc")));
         Assert.That(((BmsLongNote)notes[1]).TailSampleKey, Is.EqualTo(BmsChartParser.Enc("dd")));
-        Assert.That(((BmsLongNote)notes[1]).TailSamplePath, Is.EqualTo("onkeyup2.wav"));
+        Assert.That(getSamplePath(notes[1], ((BmsLongNote)notes[1]).TailSampleKey), Is.EqualTo("onkeyup2.wav"));
     }
 
     [Test]

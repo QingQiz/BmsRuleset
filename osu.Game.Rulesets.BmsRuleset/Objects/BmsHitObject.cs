@@ -15,9 +15,7 @@ public class BmsHitObject : HitObject
 
     public ushort SourceChannel { get; set; }
 
-    public ushort SampleKey { get; set; }
-
-    public string SamplePath { get; set; } = string.Empty;
+    public ushort? SampleKey { get; set; }
 
     public int SampleVolume { get; set; } = 100;
 
@@ -70,7 +68,6 @@ public class BmsHitObject : HitObject
         target.Column = Column;
         target.SourceChannel = SourceChannel;
         target.SampleKey = SampleKey;
-        target.SamplePath = SamplePath;
         target.SampleVolume = SampleVolume;
         target.JudgementRate = JudgementRate;
         target.ScrollPositionAtStartTime = ScrollPositionAtStartTime;
@@ -93,9 +90,7 @@ public class BmsLongNote : BmsHitObject, IHasDuration
     /// </summary>
     public double ScrollPositionAtEndTime { get; set; }
 
-    public ushort TailSampleKey { get; set; }
-
-    public string TailSamplePath { get; set; } = string.Empty;
+    public ushort? TailSampleKey { get; set; }
 
     public int TailSampleVolume { get; set; } = 100;
 
@@ -121,7 +116,6 @@ public class BmsLongNote : BmsHitObject, IHasDuration
             ln.Duration = Duration;
             ln.ScrollPositionAtEndTime = ScrollPositionAtEndTime;
             ln.TailSampleKey = TailSampleKey;
-            ln.TailSamplePath = TailSamplePath;
             ln.TailSampleVolume = TailSampleVolume;
         }
     }

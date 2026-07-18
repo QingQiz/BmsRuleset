@@ -14,7 +14,6 @@ public class BmsKeySoundCursorTest
     {
         StartTime = startTime,
         Column = 0,
-        SamplePath = "s",
     };
 
     private static BmsLandmine mine(double startTime) => new()

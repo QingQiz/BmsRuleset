@@ -46,9 +46,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         var converted = convertToBmsBeatmap(original, cancellationToken);
         var hasBmsData = tryCopyBmsData(converted, original);
 
-        if (!hasBmsData)
-            populateFallbackSampleDefinitions(converted);
-
         converted.TimingMap ??= createFallbackTimingMap(converted);
         converted.TickResolution = converted.TimingMap.TickResolution;
 
@@ -124,14 +121,6 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             return metadataKeyCount;
 
         return Math.Max(BmsLayout.BMS5_KEY_COLUMNS, hitObjects.Count == 0 ? 0 : hitObjects.Max(h => h.Column) + 1);
-    }
-
-    private static void populateFallbackSampleDefinitions(BmsBeatmap beatmap)
-    {
-        beatmap.SampleDefinitions = beatmap.HitObjects
-            .Where(h => h.SampleKey != 0 && h.SamplePath.Length > 0)
-            .GroupBy(h => h.SampleKey)
-            .ToDictionary(g => g.Key, g => g.First().SamplePath);
     }
 
     private static void remapColumns(BmsBeatmap beatmap)

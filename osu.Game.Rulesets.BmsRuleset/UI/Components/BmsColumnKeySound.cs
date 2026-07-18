@@ -10,33 +10,23 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 
-public sealed partial class BmsColumnKeySound : CompositeDrawable
+public sealed partial class BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, HitObjectContainer hitObjectContainer)
+    : CompositeDrawable
 {
     public override bool IsPresent => false;
 
-    private readonly BmsChartSampleSound keySound = new();
-    private readonly BmsChartSampleSound landmineSound = new();
-    private readonly BmsKeySoundCursor cursor;
-    private readonly HitObjectContainer hitObjectContainer;
+    private readonly BmsKeySoundCursor cursor = new(hitObjects);
 
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
-    public BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, HitObjectContainer hitObjectContainer)
+    [Resolved]
+    private BmsSampleStore sampleStore { get; set; } = null!;
+
+    /// <summary>Triggers a note-hit / LN-tail definition in the shared Track store.</summary>
+    public void PlaySample(ushort? sampleKey, int volume = 100)
     {
-        this.hitObjectContainer = hitObjectContainer;
-        cursor = new BmsKeySoundCursor(hitObjects);
-
-        InternalChildren = [keySound, landmineSound];
-    }
-
-    /// <summary>Plays a note-hit / LN-tail sample in this column's key channel.</summary>
-    public void PlaySample(string samplePath, int volume = 100)
-    {
-        if (string.IsNullOrEmpty(samplePath))
-            return;
-
-        keySound.SampleInfo = new BmsSampleInfo(samplePath, volume);
-        keySound.Play();
+        if (sampleKey is { } key)
+            sampleStore.Play(key, volume);
     }
 
     /// <summary>
@@ -48,21 +38,14 @@ public sealed partial class BmsColumnKeySound : CompositeDrawable
         if (samplePlaybackDisabled.Value)
             return;
 
-        if (cursor.Next(Time.Current, hasNoteFinished) is not { } hitObject || string.IsNullOrEmpty(hitObject.SamplePath))
+        if (cursor.Next(Time.Current, hasNoteFinished) is not { } hitObject)
             return;
 
-        PlaySample(hitObject.SamplePath, hitObject.SampleVolume);
+        PlaySample(hitObject.SampleKey, hitObject.SampleVolume);
     }
 
-    /// <summary>Plays the landmine explosion sample (#WAV00) in this column's landmine channel.</summary>
-    public void PlayLandmineSound(string samplePath, int volume = 100)
-    {
-        if (string.IsNullOrEmpty(samplePath))
-            return;
-
-        landmineSound.SampleInfo = new BmsSampleInfo(samplePath, volume);
-        landmineSound.Play();
-    }
+    /// <summary>Triggers the landmine explosion definition (#WAV00).</summary>
+    public void PlayLandmineSound(int volume = 100) => PlaySample(0, volume);
 
     [BackgroundDependencyLoader(true)]
     private void load(ISamplePlaybackDisabler? samplePlaybackDisabler)
