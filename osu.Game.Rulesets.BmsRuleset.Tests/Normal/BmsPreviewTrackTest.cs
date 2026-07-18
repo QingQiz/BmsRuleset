@@ -7,6 +7,8 @@ using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Audio.Track;
+using osu.Framework.Bindables;
 using osu.Framework.Testing;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Audio;
@@ -59,7 +61,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             invokeUpdateState(track);
         });
 
-        AddAssert("sample playing from time zero", () => getActivePlaybackCount(track) > 0);
+        AddUntilStep("track playing from time zero", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -85,7 +87,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             invokeUpdateState(track);
         });
 
-        AddAssert("first audible event plays immediately", () => getActivePlaybackCount(track) > 0);
+        AddUntilStep("first audible event plays immediately", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -111,12 +113,11 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 audio);
         });
 
-        AddAssert("fallback sample resolved", () =>
+        AddAssert("fallback track resolved", () =>
         {
-            var resolveSample = typeof(BmsPreviewTrack).GetMethod("resolveSample",
+            var resolveTrack = typeof(BmsPreviewTrack).GetMethod("resolvePreviewTrack",
                 BindingFlags.Instance | BindingFlags.NonPublic)!;
-            var sample = resolveSample.Invoke(track, ["Track_01_001.wav"]);
-            return sample != null;
+            return resolveTrack.Invoke(track, ["Track_01_001.wav"]) != null;
         });
         AddStep("dispose track", () => track.Dispose());
     }
@@ -175,7 +176,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 () =>
                 {
                     eventFactoryInvoked = true;
-                    return [new BmsSampleEvent(0, 0, 1, 100)];
+                    return [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), true)];
                 },
                 new Dictionary<ushort, string> { [1] = "event.wav" },
                 directory,
@@ -188,7 +189,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
         AddAssert("dedicated preview is skipped", () => !track.UsesDedicatedPreviewAudio);
         AddAssert("event factory is invoked", () => eventFactoryInvoked);
-        AddAssert("chart sample preview plays", () => getActivePlaybackCount(track) > 0);
+        AddUntilStep("chart track preview plays", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -238,7 +239,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             invokeUpdateState(track);
         });
 
-        AddAssert("event preview still plays", () => getActivePlaybackCount(track) > 0);
+        AddUntilStep("event preview still plays", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -264,13 +265,77 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 audio);
 
             track.PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly;
-            setSeekOffset(track, 2000);
+            setSeekOffset(track, 1500);
             track.PlaybackMode = BmsPreviewTrackPlaybackMode.Preview;
             track.Start();
             invokeUpdateState(track);
         });
 
         AddAssert("past event was skipped", () => getActivePlaybackCount(track) == 0);
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
+    public void TestRestoreAfterClockOnlyPlaybackResumesActiveBackgroundTrack()
+    {
+        BmsPreviewTrack track = null!;
+
+        AddStep("create clock-only track within long background event", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-resume-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "bgm.wav"), TimeSpan.FromSeconds(3));
+
+            track = new BmsPreviewTrack(
+                [new BmsSampleEvent(0, 0, 1, 100)],
+                new Dictionary<ushort, string> { [1] = "bgm.wav" },
+                directory,
+                audio)
+            {
+                PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly,
+            };
+            track.Seek(1000);
+            track.Start();
+            track.PlaybackMode = BmsPreviewTrackPlaybackMode.Preview;
+            track.Start();
+            invokeUpdateState(track);
+        });
+
+        AddUntilStep("background track resumes from gameplay position", () =>
+            getActiveTrack(track) is { IsRunning: true, CurrentTime: >= 900 });
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
+    public void TestEventTracksAreCreatedOnDemandAndFollowRateAdjustments()
+    {
+        BmsPreviewTrack track = null!;
+        var tempo = new BindableDouble(1.5);
+
+        AddStep("create event preview", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-lazy-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsPreviewTrack(
+                [new BmsSampleEvent(0, 0, 1, 100)],
+                new Dictionary<ushort, string> { [1] = "event.wav" },
+                directory,
+                audio);
+            track.AddAdjustment(AdjustableProperty.Tempo, tempo);
+        });
+
+        AddAssert("event tracks are not preloaded", () => getActivePlaybackCount(track) == 0);
+        AddStep("start event preview", () =>
+        {
+            track.Start();
+            invokeUpdateState(track);
+        });
+        AddUntilStep("event track starts", () => getActivePlaybackCount(track) > 0);
+        AddAssert("event track inherits tempo", () => getActiveTrack(track)?.AggregateTempo.Value == tempo.Value);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -329,8 +394,26 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
     private static int getActivePlaybackCount(BmsPreviewTrack track)
     {
-        var activeChannels = typeof(BmsPreviewTrack).GetField("activeChannels", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track);
-        return ((ICollection)activeChannels!).Count;
+        var activeTracks = (IList)typeof(BmsPreviewTrack).GetField("activeTracks", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track)!;
+        var count = 0;
+
+        for (var i = 0; i < activeTracks.Count; i++)
+        {
+            if (((Track)activeTracks[i]!).IsRunning)
+                count++;
+        }
+
+        return count;
+    }
+
+    private static Track? getActiveTrack(BmsPreviewTrack track)
+    {
+        var activeTracks = (IList)typeof(BmsPreviewTrack).GetField("activeTracks", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track)!;
+
+        if (activeTracks.Count == 0)
+            return null;
+
+        return (Track?)activeTracks[0];
     }
 
     private static void setSeekOffset(BmsPreviewTrack track, double seekOffset)

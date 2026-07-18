@@ -106,6 +106,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
     protected override void Dispose(bool isDisposing)
     {
+        var previewRestoreTime = isDisposing ? gameplayClockContainer?.CurrentTime : null;
+
         base.Dispose(isDisposing);
 
         if (!isDisposing)
@@ -121,8 +123,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
         // Only restore if the preview track hasn't been replaced for a
         // different beatmap since play started.
-        if (gameplayClockContainer?.IsPaused.Value != false && BmsWorkingBeatmap.ActivePreviewTrack == previewTrackBeforePlay)
-            BmsWorkingBeatmap.RestoreActivePreview();
+        if (BmsWorkingBeatmap.ActivePreviewTrack == previewTrackBeforePlay)
+            BmsWorkingBeatmap.RestoreActivePreview(previewRestoreTime);
 
         previewTrackBeforePlay = null;
     }

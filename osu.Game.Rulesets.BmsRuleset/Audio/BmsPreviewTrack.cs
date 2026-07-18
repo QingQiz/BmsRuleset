@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
-using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.IO.Stores;
@@ -19,8 +19,12 @@ public enum BmsPreviewTrackPlaybackMode
     GameplayClockOnly,
 }
 
+internal readonly record struct BmsPreviewSampleEvent(BmsSampleEvent Event, bool ResumeAfterSeek);
+
 public class BmsPreviewTrack : Track
 {
+    private const double restore_fade_duration = 20;
+
     public override bool IsRunning
     {
         get
@@ -61,13 +65,17 @@ public class BmsPreviewTrack : Track
             previewOutputVolume.Value = field == BmsPreviewTrackPlaybackMode.Preview ? 1 : 0;
 
             if (field == BmsPreviewTrackPlaybackMode.Preview)
+            {
                 // Gameplay advances this clock while BGM/key sample events are muted, so restoring
                 // preview must resume from the current position rather than replaying the muted gap.
                 nextEventIndex = findFirstEventAfter(CurrentTime);
+                eventResyncRequired = previewTrack == null;
+            }
             else
             {
+                eventResyncRequired = false;
                 // A preview event may already have passed the mode check on the audio thread. Run
-                // cleanup after that frame so it also catches any channel the frame creates.
+                // cleanup after that frame so it also catches any track the frame creates.
                 EnqueueAction(stopPreviewPlayback);
             }
         }
@@ -75,19 +83,19 @@ public class BmsPreviewTrack : Track
 
     private readonly StopwatchClock clock = new();
     private readonly List<BgmEvent> sortedEvents = [];
-    private readonly ISampleStore? sampleStore;
     private readonly ITrackStore? previewTrackStore;
     private readonly Track? previewTrack;
-    private readonly Dictionary<string, ISample?> resolvedSamples = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<ActiveBgm> activeChannels = [];
+    private readonly List<Track> activeTracks = [];
     private readonly BindableDouble previewOutputVolume = new(1);
+    private readonly BindableDouble restoreFadeVolume = new(1);
 
-    private readonly record struct BgmEvent(double Time, string SamplePath, int Volume = 100);
-
-    private SampleChannel? previewChannel;
+    private readonly record struct BgmEvent(double Time, ushort SampleKey, string SamplePath, int Volume, bool ResumeAfterSeek);
 
     private int nextEventIndex;
     private double seekOffset;
+    private bool eventResyncRequired;
+    private long restoreFadeStart;
+    private bool restoreFadeInProgress;
 
     /// <param name="sampleEvents">BGM and keysound events from the parsed BMS chart.</param>
     /// <param name="sampleDefinitions">Maps sample keys to filenames from the BMS chart.</param>
@@ -103,12 +111,12 @@ public class BmsPreviewTrack : Track
         string? basePath,
         AudioManager audioManager,
         string? previewFile = null)
-        : this(() => sampleEvents, sampleDefinitions, basePath, audioManager, previewFile)
+        : this(() => createPreviewEvents(sampleEvents), sampleDefinitions, basePath, audioManager, previewFile)
     {
     }
 
     internal BmsPreviewTrack(
-        Func<IReadOnlyList<BmsSampleEvent>> sampleEventFactory,
+        Func<IReadOnlyList<BmsPreviewSampleEvent>> sampleEventFactory,
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
         string? basePath,
         AudioManager audioManager,
@@ -147,12 +155,14 @@ public class BmsPreviewTrack : Track
 
         if (previewTrack == null)
         {
-            sampleStore = audioManager.GetSampleStore(fileResources);
+            previewTrackStore ??= audioManager.GetTrackStore(fileResources);
 
-            foreach (var evt in sampleEventFactory())
+            foreach (var previewEvent in sampleEventFactory())
             {
+                var evt = previewEvent.Event;
+
                 if (sampleDefinitions.TryGetValue(evt.SampleKey, out var samplePath))
-                    sortedEvents.Add(new BgmEvent(evt.Time, samplePath, evt.Volume));
+                    sortedEvents.Add(new BgmEvent(evt.Time, evt.SampleKey, samplePath, evt.Volume, previewEvent.ResumeAfterSeek));
             }
 
             sortedEvents.Sort((a, b) => a.Time.CompareTo(b.Time));
@@ -184,12 +194,9 @@ public class BmsPreviewTrack : Track
         if (!IsDisposed)
         {
             lock (clock) clock.Stop();
-            stopAllChannels();
-            if (previewTrack == null)
-                stopPreviewChannel();
+            stopPreviewPlayback();
             previewTrack?.Dispose();
             previewTrackStore?.Dispose();
-            sampleStore?.Dispose();
         }
 
         base.Dispose(disposing);
@@ -203,15 +210,21 @@ public class BmsPreviewTrack : Track
             return;
 
         if (PlaybackMode == BmsPreviewTrackPlaybackMode.Preview)
-            startPreviewChannel();
+        {
+            startDedicatedPreviewTrack();
+            eventResyncRequired = previewTrack == null && activeTracks.Count == 0;
+
+            if (eventResyncRequired)
+                nextEventIndex = findFirstEventAfter(CurrentTime);
+        }
+
         lock (clock) clock.Start();
     }
 
     public override void Stop()
     {
         lock (clock) clock.Stop();
-        stopAllChannels();
-        stopPreviewChannel();
+        stopPreviewPlayback();
     }
 
     public override bool Seek(double seek)
@@ -229,14 +242,16 @@ public class BmsPreviewTrack : Track
                 clock.Reset();
         }
 
-        stopAllChannels();
-        stopPreviewChannel();
+        stopPreviewPlayback();
 
         if (PlaybackMode == BmsPreviewTrackPlaybackMode.Preview)
+        {
             nextEventIndex = seekOffset == 0 ? 0 : findFirstEventAfter(seekOffset);
+            eventResyncRequired = previewTrack == null && seekOffset > 0;
+        }
 
         if (previewTrack != null && wasRunning && PlaybackMode == BmsPreviewTrackPlaybackMode.Preview)
-            startPreviewChannel();
+            startDedicatedPreviewTrack();
 
         return success;
     }
@@ -260,8 +275,9 @@ public class BmsPreviewTrack : Track
         lock (clock) clock.Reset();
         seekOffset = 0;
         nextEventIndex = 0;
-        stopAllChannels();
-        stopPreviewChannel();
+        restoreFadeInProgress = false;
+        restoreFadeVolume.Value = 1;
+        stopPreviewPlayback();
 
         base.Reset();
     }
@@ -269,6 +285,7 @@ public class BmsPreviewTrack : Track
     protected override void UpdateState()
     {
         base.UpdateState();
+        updateRestoreFade();
 
         if (previewTrack is { Length: > 0 } && Length != previewTrack.Length)
             Length = previewTrack.Length;
@@ -295,6 +312,12 @@ public class BmsPreviewTrack : Track
 
         var currentTime = CurrentTime;
 
+        if (eventResyncRequired)
+        {
+            eventResyncRequired = false;
+            resumeEventTracks(currentTime);
+        }
+
         while (nextEventIndex < sortedEvents.Count)
         {
             var evt = sortedEvents[nextEventIndex];
@@ -302,11 +325,11 @@ public class BmsPreviewTrack : Track
             if (currentTime < evt.Time)
                 break;
 
-            playSample(evt);
+            playTrack(evt);
             nextEventIndex++;
         }
 
-        cleanupChannels();
+        cleanupTracks();
     }
 
     private static IEnumerable<string> getPreviewCandidates(string basePath, string? previewFile)
@@ -341,56 +364,50 @@ public class BmsPreviewTrack : Track
     private void updateClockRate()
     {
         lock (clock)
-            clock.Rate = AggregateFrequency.Value * AggregateTempo.Value;
+            clock.Rate = Rate;
     }
 
-    private void playSample(BgmEvent evt)
+    private void playTrack(BgmEvent evt)
     {
-        if (sampleStore == null)
+        var track = resolvePreviewTrack(evt.SamplePath);
+
+        if (track == null)
             return;
 
-        var sample = resolveSample(evt.SamplePath);
-
-        if (sample == null)
-            return;
-
-        var channel = sample.GetChannel();
-        channel.ManualFree = true;
-        channel.Play();
-
-        // channel.Play() may bind the decoded sample's aggregate chain after this call. BGM preview
-        // must follow only the requested chart volume and this track's aggregate chain, so strip
-        // sample/effect routing again once.
-        bindPreviewVolumeAdjustments(channel, evt.Volume);
-
-        Action<ValueChangedEvent<double>>? isolateOnBind = null;
-        isolateOnBind = _ =>
-        {
-            channel.AggregateVolume.ValueChanged -= isolateOnBind!;
-            bindPreviewVolumeAdjustments(channel, evt.Volume);
-        };
-        channel.AggregateVolume.ValueChanged += isolateOnBind;
-
-        activeChannels.Add(new ActiveBgm(channel));
+        bindPreviewAdjustments(track, evt.Volume);
+        track.Start();
+        activeTracks.Add(track);
     }
 
-    private ISample? resolveSample(string samplePath)
+    private void resumeEventTracks(double currentTime)
     {
-        if (sampleStore == null)
-            return null;
+        HashSet<ushort> resumedKeys = [];
 
-        if (resolvedSamples.TryGetValue(samplePath, out var cached))
-            return cached;
-
-        foreach (var lookup in new BmsSampleInfo(samplePath).LookupNames)
+        for (var i = nextEventIndex - 1; i >= 0; i--)
         {
-            var sample = sampleStore.Get(lookup);
+            var evt = sortedEvents[i];
 
-            if (sample != null)
-                return resolvedSamples[samplePath] = sample;
+            if (!evt.ResumeAfterSeek || !resumedKeys.Add(evt.SampleKey))
+                continue;
+
+            var track = resolvePreviewTrack(evt.SamplePath);
+
+            if (track == null)
+                continue;
+
+            var offset = currentTime - evt.Time;
+            track.Seek(offset);
+
+            if (track.Length <= 0 || offset >= track.Length)
+            {
+                track.Dispose();
+                continue;
+            }
+
+            bindPreviewAdjustments(track, evt.Volume);
+            track.Start();
+            activeTracks.Add(track);
         }
-
-        return resolvedSamples[samplePath] = null;
     }
 
     private Track? resolvePreviewTrack(string samplePath)
@@ -409,91 +426,78 @@ public class BmsPreviewTrack : Track
         return null;
     }
 
-    private void bindPreviewVolumeAdjustments(IAdjustableAudioComponent component, int volume = 100)
+    private void bindPreviewAdjustments(IAdjustableAudioComponent component, int volume = 100)
     {
         component.RemoveAllAdjustments(AdjustableProperty.Volume);
+        component.RemoveAllAdjustments(AdjustableProperty.Balance);
+        component.RemoveAllAdjustments(AdjustableProperty.Frequency);
+        component.RemoveAllAdjustments(AdjustableProperty.Tempo);
+        component.BindAdjustments(this);
         component.AddAdjustment(AdjustableProperty.Volume, new BindableDouble(Math.Max(0, volume) / 100.0));
-        component.AddAdjustment(AdjustableProperty.Volume, AggregateVolume);
         component.AddAdjustment(AdjustableProperty.Volume, previewOutputVolume);
+        component.AddAdjustment(AdjustableProperty.Volume, restoreFadeVolume);
     }
 
-    private void startPreviewChannel()
+    internal void BeginRestoreFade()
     {
-        if (previewTrack != null)
-        {
-            if (previewTrack.IsRunning)
-                return;
-
-            bindPreviewVolumeAdjustments(previewTrack);
-            previewTrack.Seek(CurrentTime);
-            previewTrack.Start();
-            return;
-        }
-
-        if (previewChannel != null)
-            return;
-
-        var previewSample = resolveSample(string.Empty);
-
-        if (previewSample == null)
-            return;
-
-        previewChannel = previewSample.GetChannel();
-        previewChannel.ManualFree = true;
-        previewChannel.Play();
-        bindPreviewVolumeAdjustments(previewChannel);
+        restoreFadeVolume.Value = 0;
+        restoreFadeStart = Stopwatch.GetTimestamp();
+        restoreFadeInProgress = true;
     }
 
-    private void stopPreviewChannel()
+    private void updateRestoreFade()
     {
-        if (previewTrack != null)
-        {
-            previewTrack.Stop();
-            return;
-        }
-
-        if (previewChannel == null)
+        if (!restoreFadeInProgress)
             return;
 
-        if (!previewChannel.IsDisposed)
-        {
-            previewChannel.Stop();
-            previewChannel.Dispose();
-        }
+        var progress = Stopwatch.GetElapsedTime(restoreFadeStart).TotalMilliseconds / restore_fade_duration;
+        restoreFadeVolume.Value = Math.Min(1, progress);
+        restoreFadeInProgress = progress < 1;
+    }
 
-        previewChannel = null;
+    private void startDedicatedPreviewTrack()
+    {
+        if (previewTrack == null || previewTrack.IsRunning)
+            return;
+
+        bindPreviewAdjustments(previewTrack);
+        previewTrack.Seek(CurrentTime);
+        previewTrack.Start();
     }
 
     private void stopPreviewPlayback()
     {
-        stopAllChannels();
-        stopPreviewChannel();
-    }
-
-    private void stopAllChannels()
-    {
-        for (var i = 0; i < activeChannels.Count; i++)
-            activeChannels[i].StopAndDispose();
-
-        activeChannels.Clear();
-    }
-
-    private void cleanupChannels()
-    {
-        for (var i = activeChannels.Count - 1; i >= 0; i--)
+        for (var i = 0; i < activeTracks.Count; i++)
         {
-            var active = activeChannels[i];
+            var track = activeTracks[i];
 
-            if (active.IsDisposed)
+            if (!track.IsDisposed)
             {
-                activeChannels.RemoveAt(i);
+                track.Stop();
+                track.Dispose();
+            }
+        }
+
+        activeTracks.Clear();
+        previewTrack?.Stop();
+    }
+
+    private void cleanupTracks()
+    {
+        for (var i = activeTracks.Count - 1; i >= 0; i--)
+        {
+            var track = activeTracks[i];
+
+            if (track.IsDisposed)
+            {
+                activeTracks.RemoveAt(i);
                 continue;
             }
 
-            if (active.HasFinished)
+            if (track.HasCompleted)
             {
-                active.StopAndDispose();
-                activeChannels.RemoveAt(i);
+                track.Dispose();
+                activeTracks.RemoveAt(i);
             }
         }
     }
@@ -516,19 +520,13 @@ public class BmsPreviewTrack : Track
         return low;
     }
 
-    private sealed class ActiveBgm(SampleChannel channel)
+    private static IReadOnlyList<BmsPreviewSampleEvent> createPreviewEvents(IReadOnlyList<BmsSampleEvent> sampleEvents)
     {
-        public bool IsDisposed => channel.IsDisposed;
+        var previewEvents = new BmsPreviewSampleEvent[sampleEvents.Count];
 
-        public bool HasFinished => channel.Played && !channel.Playing;
+        for (var i = 0; i < sampleEvents.Count; i++)
+            previewEvents[i] = new BmsPreviewSampleEvent(sampleEvents[i], true);
 
-        public void StopAndDispose()
-        {
-            if (!channel.IsDisposed)
-            {
-                channel.Stop();
-                channel.Dispose();
-            }
-        }
+        return previewEvents;
     }
 }

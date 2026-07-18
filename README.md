@@ -18,6 +18,8 @@ Native osu! ruleset plugin for BMS-family charts (`.bms`, `.bme`, `.bml`, `.pms`
    folder if it does not exist.
 3. Restart osu!. The ruleset will appear in the ruleset selector.
 
+---
+
 ### Build Manually
 
 <details>
@@ -122,7 +124,7 @@ Song select preview audio is generated from the original BMS folder rather than 
 ruleset first tries a declared `#PREVIEW` file, then a `preview.*` file in the chart folder, and finally falls back to
 the chart's BGM/keysound event timeline. This makes charts without a dedicated preview file still audible in song
 select. Disable **Use dedicated preview audio** in the BMS settings to always synthesize previews from BGM/keysound
-samples and skip loading dedicated preview files.
+audio and skip loading dedicated preview files.
 
 ---
 
@@ -395,6 +397,8 @@ You can also filter by key count from the search box using `k=`, `key=` or `keys
 Difficulty tables (LR2/beatoraja format) provide difficulty ratings and markers for BMS charts. The ruleset supports
 importing tables from a JSON file or URL, and automatically matches charts by MD5 hash.
 
+---
+
 ### Preset Tables
 
 The following well-known tables are available as one-click presets in the autocomplete dropdown:
@@ -411,6 +415,8 @@ The following well-known tables are available as one-click presets in the autoco
 | Luminous (ln)         | ln     | `http://zris.work/bmstable/luminous/header.json`       |
 | BMS図書館 (T)            | T      | `http://zris.work/bmstable/turbow/header.json`         |
 
+---
+
 ### Importing a Table
 
 1. Open **Settings → BMS** → scroll to **Difficulty Tables**.
@@ -422,6 +428,8 @@ The importer supports three JSON formats:
 - **Separate files** — `header.json` + `data.json` linked by `data_url`
 - **Combined file** — a single JSON with both header fields (name, symbol, level_order) and `"charts": [...]`
 - **HTML page** — a web page with `<meta name="bmstable" content="URL">` pointing to the JSON
+
+---
 
 ### How Markers Work
 
@@ -439,12 +447,16 @@ The marker shows the table symbol and the entry's level. Markers update automati
 > beatmap carousel's active Realm reads and will freeze the UI. Always switch to the **main menu**
 > before importing or deleting a difficulty table.
 
+---
+
 ### Collections
 
 Each table also creates a **BeatmapCollection** named `[BMS] {table.Name}` containing all matched charts. This lets you
 browse the table's songs directly from the song select collection list.
 (The collection name uses invisible characters under the hood, so you don't need to worry about it colliding with your
 own collections.)
+
+---
 
 ### Table Row Display
 
@@ -455,15 +467,21 @@ Click a table to show its available actions. Remote tables provide **Subdivide/U
 **Delete table**; local tables omit **Update**. The actions stay visible after an operation, including when the table
 list is rebuilt.
 
+---
+
 ### Subdivide
 
 Expand the table row and click **Subdivide** to split its collection into per-level collections with ordering indices
 (e.g., `[BMS] Table [00] ★1`, `[BMS] Table [01] ★2`). The index width adapts to the number of levels
 (1 digit for &lt;10, 2 for &lt;100, etc.). Click **Unsubdivide** to merge them back into one.
 
+---
+
 ### Update
 
 Remote tables provide an **Update** action that re-imports the table from its original source URL.
+
+---
 
 ### Delete
 
@@ -475,9 +493,13 @@ Click **Delete table** and confirm the dialog to remove a table, its markers, an
 
 The skin configuration selection order is described in [osu!mania Skin Support](#osumania-skin-support) above.
 
+---
+
 ### Creating a Skin
 
 Place your images and a `skin.ini` in a folder, then import it as a normal osu! skin.
+
+---
 
 #### skin.ini — `[BMS]` Section
 
@@ -485,6 +507,8 @@ Write one `[BMS]` section per layout you want to support. The `Layout:` key is r
 
 **Layout values:** `5K`, `7K`, `9K`, `10K`, `14K`, `18K`  
 (Aliases: `BMS5K`, `BME7K`, `PMS9K`, `BMS5KDouble`, `BME7KDouble`, `PMS9KDouble`)
+
+---
 
 #### All Supported Keys
 
@@ -606,6 +630,8 @@ If the digit textures are missing, the combo counter is silently hidden.
 | `HitBad`    | BAD           |
 | `HitPoor`   | POOR / E-POOR |
 
+---
+
 #### Frame Animations (N-suffix)
 
 Most image assets can be provided as multi-frame animations. Append `-0`, `-1`, `-2`, … to the
@@ -625,6 +651,8 @@ sprite.
 This works for any image key: `NoteImage`, `KeyImage`/`KeyImageD`, `StageLight`, `LightingN`,
 `LightingL`, `StageHint`, judgement images, etc.
 
+---
+
 #### osu!mania Skin Compatibility
 
 You can also use `[Mania]` sections from a standard osu!mania skin. The ruleset will match on:
@@ -636,12 +664,16 @@ You can also use `[Mania]` sections from a standard osu!mania skin. The ruleset 
 In `[Mania]` sections, use mania standard judgement names: `Hit300g` (PGREAT), `Hit300` (GREAT), `Hit200` (GOOD),
 `Hit50` (BAD), `Hit0` (POOR).
 
+---
+
 ### Skin Components
 
 Open the **Skin Editor** during gameplay to add, remove, reposition, and resize components. Selecting a component also
 opens its component-specific settings in the sidebar. Saving the editor layout stores both the transforms and these
 settings in the active skin's BMS-specific gameplay layout. The layout is loaded again whenever that skin is used for
 BMS; chart files and `skin.ini` are not modified.
+
+---
 
 #### Combo
 
@@ -657,6 +689,8 @@ missing, the counter has nothing to draw and remains hidden.
 
 Moving or scaling the component changes where and how large the digits are drawn; it does not change either threshold.
 
+---
+
 #### Judgement
 
 Displays the result of the most recently judged note. A new PGREAT, GREAT, GOOD, BAD, or POOR/E-POOR immediately
@@ -665,6 +699,8 @@ replaces the previous result and restarts that judgement image's animation. Imag
 
 There are no component-specific sidebar settings. Use the editor controls to set the popup's position and scale, and
 use the skin image files to change its artwork or animation.
+
+---
 
 #### Score Graph
 
@@ -692,9 +728,11 @@ the score plot more room without changing any score calculations.
 <details>
 <summary>Example</summary>
 
-https://github.com/user-attachments/assets/ab14a6e8-e853-42ed-ae08-61cc4427e667
+![](https://github.com/user-attachments/assets/ab14a6e8-e853-42ed-ae08-61cc4427e667)
 
 </details>
+
+---
 
 #### Health Bar
 
@@ -711,30 +749,34 @@ come from the selected gauge rules: the red zone ends at 20%, Assist Easy clears
 The Class gauge variants use their own fixed profile colours. Resizing the component changes the gauge's visible width
 and height only; it does not change health values, thresholds, or gauge behaviour.
 
+---
+
 #### Song Progress
 
 Shows playback position along a vertical track: the glowing marker starts at the top, remains there during the intro,
-and travels towards the bottom as the playable portion of the chart advances. The marker is clamped to the track, so it
-cannot travel outside the component at either end of the song.
+and travels towards the bottom as the playable portion of the chart advances.
 
 **Indicator colour** changes both the sharp marker and its surrounding glow. Moving the component places the progress
-track elsewhere; changing its height changes the marker's travel distance. The default layout attaches it to the left
-edge of the Stage.
+track elsewhere; changing its height changes the marker's travel distance.
+
+The default layout attaches it to the left edge of the Stage.
+
+---
 
 #### BGA
 
-Displays the chart-authored BGA timeline, including the base, layer 1, layer 2, and POOR layers. Supported image formats
-are PNG, JPEG, BMP, and GIF; supported video formats are MP4, AVI, WebM, MOV, MPEG, and WMV. The component applies
+Displays the chart-authored BGA timeline, including the base, layer 1, layer 2, and POOR layers. The component applies
 chart-defined crop and opacity events and shows the POOR layer briefly after a miss according to the chart's POOR BGA
 mode.
 
-The component's rectangle defines the BGA viewport. Content always preserves its aspect ratio with aspect-fit sizing,
-so unused space is letterboxed rather than stretching the image. The default component fills the available gameplay
-area, but it can be moved or resized to create a smaller BGA window. It is rendered behind the playfield and remains
-there when the gameplay HUD is hidden.
+The component's rectangle defines the BGA viewport. Content always preserves its aspect ratio with aspect-fit sizing.
+The default component fills the available gameplay area, but it can be moved or resized to create a smaller BGA window.
+It is rendered behind the playfield and remains there when the gameplay HUD is hidden.
 
 There are no component-specific sidebar settings. **BGA dim** is a ruleset-wide gameplay setting and affects the BGA
 regardless of which saved component layout is active.
+
+---
 
 #### Stage
 
@@ -767,6 +809,8 @@ https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
 
 </details>
 
+---
+
 #### Text
 
 Shows short gameplay messages in a dark-backed text banner. At chart start it briefly displays `Game Start`. During
@@ -777,6 +821,8 @@ markers. Each message fades out automatically after a short delay.
 There are no component-specific sidebar settings. Because the component is normally transparent between messages, the
 skin editor replaces its contents with a fully visible `Sample Text Event` placeholder. Use that placeholder to place
 and scale the banner; it is never shown during normal gameplay.
+
+---
 
 ### Example skin.ini (7K)
 
@@ -1207,10 +1253,6 @@ PMS files (`.pms` extension) reinterpret the standard channel layout for 9-key /
 |---------------|-------------------------------------------------------------------------------------------------------------------|----------|
 | **Audio**     | `#WAVCMD` (MacBeat) — pitch/volume/playback-time per WAV slot                                                     |
 | **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                                           |
-| **Audio**     | `HT`, `DT` preview audio only changed the time gap between events now                                             | 4        |
-| **Audio**     | Same-`#WAV` retrigger caps at 2 voices (BASS `DEFAULT_CONCURRENCY`)                                               |
-| **Audio**     | Per-`Play()` allocation churn (SampleChannel/BmsSampleInfo/ActiveChannel/closure)                                 |
-| **Audio**     | `SampleChannelBass` one-shot — no restart after natural finish; channel pooling only helps overlapping retriggers |
 | **Converter** | Mania 7K → BMS chart conversion                                                                                   | 3        |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                                             |
 | **Input**     | Judgement offset adjustment capability                                                                            |

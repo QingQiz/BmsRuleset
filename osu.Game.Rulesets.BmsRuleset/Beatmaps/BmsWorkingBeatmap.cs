@@ -59,15 +59,23 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         track?.PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly;
     }
 
-    internal static void RestoreActivePreview()
+    internal static void RestoreActivePreview(double? gameplayTime)
     {
         var track = ActivePreviewTrack;
 
         if (track == null || track.IsDisposed)
             return;
 
+        if (gameplayTime is { } time)
+            track.Seek(time);
+
         track.PlaybackMode = BmsPreviewTrackPlaybackMode.Preview;
         track.Volume.Value = 1;
+
+        if (track.CurrentTime >= track.Length)
+            track.Seek(0);
+
+        track.BeginRestoreFade();
         track.Start();
     }
 
@@ -101,13 +109,14 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         return null!; // fall back to TrackVirtual by WorkingBeatmap.LoadTrack
     }
 
-    private static IReadOnlyList<BmsSampleEvent> createPreviewEvents(IBeatmap beatmap, IBmsBeatmap bmsBeatmap)
+    private static IReadOnlyList<BmsPreviewSampleEvent> createPreviewEvents(IBeatmap beatmap, IBmsBeatmap bmsBeatmap)
     {
-        var allEvents = new List<BmsSampleEvent>(
+        var allEvents = new List<BmsPreviewSampleEvent>(
             bmsBeatmap.BackgroundSampleEvents.Count
             + beatmap.HitObjects.Count);
 
-        allEvents.AddRange(bmsBeatmap.BackgroundSampleEvents);
+        foreach (var evt in bmsBeatmap.BackgroundSampleEvents)
+            allEvents.Add(new BmsPreviewSampleEvent(evt, true));
 
         // Song preview needs playable keysounds alongside #01 BGM because gameplay normally
         // routes those two sources through separate players.
@@ -117,12 +126,12 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
                 continue;
 
             if (hit.SampleKey is { } sampleKey)
-                allEvents.Add(new BmsSampleEvent(hit.StartTime, 0, sampleKey, hit.SampleVolume));
+                allEvents.Add(new BmsPreviewSampleEvent(new BmsSampleEvent(hit.StartTime, 0, sampleKey, hit.SampleVolume), false));
             if (hit is BmsLongNote { TailSampleKey: { } tailSampleKey } ln)
-                allEvents.Add(new BmsSampleEvent(hit.StartTime + ln.Duration, 0, tailSampleKey, ln.TailSampleVolume));
+                allEvents.Add(new BmsPreviewSampleEvent(new BmsSampleEvent(hit.StartTime + ln.Duration, 0, tailSampleKey, ln.TailSampleVolume), false));
         }
 
-        allEvents.Sort(static (a, b) => a.Time.CompareTo(b.Time));
+        allEvents.Sort(static (a, b) => a.Event.Time.CompareTo(b.Event.Time));
         return allEvents;
     }
 

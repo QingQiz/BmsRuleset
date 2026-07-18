@@ -17,6 +17,8 @@ osu! 原生 BMS 规则集插件，支持 `.bms`、`.bme`、`.bml`、`.pms` 谱�
    不存在，请手动创建。
 3. 重启 osu!，规则集会出现在规则集选择器中。
 
+---
+
 ### 手动编译
 
 <details>
@@ -115,7 +117,7 @@ BMS 谱面并将其标记为删除。
 选歌界面的预览音频从原始 BMS 文件夹生成，而不是从已存入 osu! 的音频文件读取。规则集会先尝试声明的
 `#PREVIEW` 文件，然后尝试谱面文件夹中的 `preview.*` 文件，最后回退到谱面的 BGM/keysound 事件时间线。
 因此，即使谱面没有专用预览文件，在选歌界面也仍然可以听到预览。在 BMS 设置中关闭 **Use dedicated preview audio**
-即可始终使用 BGM/keysound samples 合成预览，并完全跳过专用预览文件的加载。
+即可始终使用 BGM/keysound 音频合成预览，并完全跳过专用预览文件的加载。
 
 ---
 
@@ -263,6 +265,8 @@ https://github.com/user-attachments/assets/df369f72-a4a6-4017-9f9c-80501f0037a6
 难度表（LR2/beatoraja 格式）为 BMS 谱面提供难度评级和标记。规则集支持从 JSON 文件或 URL 导入难度表，
 并通过 MD5 哈希自动匹配谱面。
 
+---
+
 ### 预设表
 
 以下知名难度表可在自动完成下拉菜单中一键选择：
@@ -279,6 +283,8 @@ https://github.com/user-attachments/assets/df369f72-a4a6-4017-9f9c-80501f0037a6
 | Luminous (ln)         | ln | `http://zris.work/bmstable/luminous/header.json`       |
 | BMS図書館 (T)            | T  | `http://zris.work/bmstable/turbow/header.json`         |
 
+---
+
 ### 导入难度表
 
 1. 打开 **设置 → BMS** → 滚动到 **Difficulty Tables**。
@@ -290,6 +296,8 @@ https://github.com/user-attachments/assets/df369f72-a4a6-4017-9f9c-80501f0037a6
 - **分离文件** — `header.json` + `data.json`，通过 `data_url` 链接
 - **合并文件** — 单个 JSON，同时包含 header 字段（名称、符号、level_order）和 `"charts": [...]`
 - **HTML 页面** — 包含 `<meta name="bmstable" content="URL">` 指向 JSON 的网页
+
+---
 
 ### 标记
 
@@ -305,10 +313,14 @@ DP ☆NOTHER [TT★1 TT★2]
 > 不要在**选歌界面**添加或删除难度表。删除表会触发所有 BMS 谱面的完整标记重建，
 > 与谱面轮播的活跃 Realm 读取竞争，导致 UI 冻结。请在导入或删除难度表之前先切换到**主菜单**。
 
+---
+
 ### 收藏夹
 
 每个表同时创建一个名为 `[BMS] {表名}` 的 **BeatmapCollection**，包含所有匹配的谱面。可以直接在选歌界面的收藏夹列表中浏览。
 （收藏夹名底层使用了不可见字符，不必担心与你自己的收藏夹撞名。）
+
+---
 
 ### 表格行显示
 
@@ -317,15 +329,21 @@ DP ☆NOTHER [TT★1 TT★2]
 点击表项可显示可用操作。远程表提供**拆分/合并**、**更新**和**删除难度表**；本地表不提供**更新**。
 执行操作后这些操作仍保持可见，难度表列表重建时也会保留展开状态。
 
+---
+
 ### 拆分
 
 展开表项后点击**拆分**，可将表的收藏夹拆分为每级独立且带序号的收藏夹（例如 `[BMS] Table [00] ★1`、`[BMS] Table [01] ★2`）。
 序号位数根据等级数量自适应（&lt;10 级用 1 位，&lt;100 级用 2 位，依此类推）。
 点击**合并**可恢复为单个收藏夹。
 
+---
+
 ### 更新
 
 远程表提供**更新**操作，可从原始来源 URL 重新导入难度表。
+
+---
 
 ### 删除
 
@@ -337,9 +355,13 @@ DP ☆NOTHER [TT★1 TT★2]
 
 皮肤配置的选择顺序见上文的 [osu!mania 皮肤支持](#osumania-皮肤支持)。
 
+---
+
 ### 制作皮肤
 
 将图片和 `skin.ini` 放入文件夹中，然后作为普通 osu! 皮肤导入。
+
+---
 
 #### skin.ini — `[BMS]` 段
 
@@ -347,6 +369,8 @@ DP ☆NOTHER [TT★1 TT★2]
 
 **布局值：** `5K`、`7K`、`9K`、`10K`、`14K`、`18K`
 （别名：`BMS5K`、`BME7K`、`PMS9K`、`BMS5KDouble`、`BME7KDouble`、`PMS9KDouble`）
+
+---
 
 #### 所有支持的键
 
@@ -467,6 +491,8 @@ DP ☆NOTHER [TT★1 TT★2]
 | `HitBad`    | BAD           |
 | `HitPoor`   | POOR / E-POOR |
 
+---
+
 #### 帧动画（N 后缀）
 
 大多数图像资源可以作为多帧动画提供。在纹理名后追加 `-0`、`-1`、`-2`、…：
@@ -484,6 +510,8 @@ lightingN-2.png
 适用于任何图像键：`NoteImage`、`KeyImage`/`KeyImageD`、`StageLight`、`LightingN`、
 `LightingL`、`StageHint`、判定图像等。
 
+---
+
 #### osu!mania 皮肤兼容
 
 你也可以使用标准 osu!mania 皮肤的 `[Mania]` 段。规则集会匹配：
@@ -495,11 +523,15 @@ lightingN-2.png
 在 `[Mania]` 段中，使用 mania 标准判定名称：`Hit300g`（PGREAT）、`Hit300`（GREAT）、`Hit200`（GOOD）、
 `Hit50`（BAD）、`Hit0`（POOR）。
 
+---
+
 ### 皮肤组件
 
 在游玩过程中打开**皮肤编辑器**，即可添加、删除、移动和缩放组件。选中组件后，侧边栏还会显示该组件的专属设置。
 保存布局时，组件的位置、大小和专属设置都会写入当前皮肤的 BMS 专用游玩界面布局。之后使用同一皮肤游玩 BMS 时会
 自动加载该布局；谱面文件和 `skin.ini` 均不会被修改。
+
+---
 
 #### Combo
 
@@ -513,6 +545,8 @@ lightingN-2.png
 
 移动或缩放组件只会改变数字的显示位置和大小，不会改变上述两个阈值。
 
+---
+
 #### Judgement
 
 显示最近一个音符的判定结果。出现新的 PGREAT、GREAT、GOOD、BAD 或 POOR/E-POOR 时，会立即替换上一个结果，
@@ -520,6 +554,8 @@ lightingN-2.png
 osu!mania 对应判定图像。
 
 此组件没有专属侧边栏设置。判定弹窗的位置和大小应通过编辑器控制，图案和动画则通过皮肤图像文件修改。
+
+---
 
 #### 成绩图
 
@@ -544,9 +580,11 @@ osu!mania 对应判定图像。
 <details>
 <summary>示例</summary>
 
-https://github.com/user-attachments/assets/ab14a6e8-e853-42ed-ae08-61cc4427e667
+![](https://github.com/user-attachments/assets/ab14a6e8-e853-42ed-ae08-61cc4427e667)
 
 </details>
+
+---
 
 #### 血条
 
@@ -562,26 +600,31 @@ https://github.com/user-attachments/assets/ab14a6e8-e853-42ed-ae08-61cc4427e667
 Class 系列血条使用各自规则中固定的颜色。调整组件大小只会改变血条的可见宽度和高度，不会修改血量、阈值或血条
 机制。
 
+---
+
 #### 歌曲进度
 
 沿竖直轨道显示歌曲播放位置：发光指示块从顶部开始，在前奏期间保持在顶部，随后随着谱面的可游玩部分向底部移动。
-指示块的位置会被限制在轨道内，因此在歌曲开始和结束处都不会移出组件边界。
 
-**指示块颜色**会同时改变清晰的指示块和周围光晕。移动组件可以改变进度轨道的位置，改变其高度则会改变指示块的
-移动距离。默认布局将其贴在 Stage 左边缘。
+**指示块颜色**会同时改变清晰的指示块和周围光晕。
+
+移动组件可以改变进度轨道的位置，改变其高度则会改变指示块的移动距离。默认布局将其贴在 Stage 左边缘。
+
+---
 
 #### BGA
 
-显示谱面编排的完整 BGA 时间线，包括 Base、Layer 1、Layer 2 和 POOR 图层。支持 PNG、JPEG、BMP、GIF 图像，
-以及 MP4、AVI、WebM、MOV、MPEG、WMV 视频。该组件会应用谱面定义的裁剪与透明度事件，并在出现 Miss 后根据
-谱面的 POOR BGA 模式短暂显示 POOR 图层。
+显示谱面编排的完整 BGA 时间线，包括 Base、Layer 1、Layer 2 和 POOR 图层。
+该组件会应用谱面定义的裁剪与透明度事件，并在出现 Miss 后根据谱面的 POOR BGA 模式短暂显示 POOR 图层。
 
-组件矩形范围就是 BGA 的显示窗口。内容始终使用 aspect-fit 并保持原始宽高比，未填满的区域会留空形成 letterbox，
-而不会拉伸图像。默认组件会填满可用游玩区域，也可以移动或缩小为单独的 BGA 窗口。BGA 始终渲染在 playfield
-后方，并且在隐藏游玩 HUD 时仍保留显示。
+组件矩形范围就是 BGA 的显示窗口。内容始终使用 aspect-fit 并保持原始宽高比。
+默认组件会填满可用游玩区域，你可以移动或缩小为单独的 BGA 窗口。
+BGA 始终渲染在 playfield 后方，并且在隐藏游玩 HUD 时仍保留显示。
 
 此组件没有专属侧边栏设置。**BGA dim** 是规则集的全局游玩设置，无论当前使用哪个已保存组件布局，都会作用于
 BGA。
+
+---
 
 #### Stage
 
@@ -609,6 +652,8 @@ https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
 
 </details>
 
+---
+
 #### Text
 
 以带深色背景的横幅显示简短游玩消息。谱面开始时会短暂显示 `Game Start`；游玩过程中，通道 `99` 事件会显示
@@ -617,6 +662,8 @@ https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
 
 此组件没有专属侧边栏设置。由于没有消息时组件通常完全透明，皮肤编辑器会改为显示完全可见的
 `Sample Text Event` 占位内容，供用户定位和缩放横幅；正常游玩时不会显示该占位内容。
+
+---
 
 ### 示例 skin.ini (7K)
 

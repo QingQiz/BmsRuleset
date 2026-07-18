@@ -102,7 +102,7 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     }
 
     [Test]
-    public void PreviewSamplesUseTrackAggregateVolume()
+    public void PreviewTracksUseTrackAggregateVolume()
     {
         AddAssert("preview volume adjustments use track aggregate volume", () =>
         {
@@ -110,14 +110,11 @@ public partial class TestBmsAudioVolumeRouting : TestScene
             var audio = new RecordingAudioComponent();
 
             typeof(BmsPreviewTrack)
-                .GetMethod("bindPreviewVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetMethod("bindPreviewAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(track, [audio, 100]);
 
             Assert.That(audio.RemovedProperties, Does.Contain(AdjustableProperty.Volume));
-            Assert.That(audio.VolumeAdjustments, Has.Some.SameAs(track.AggregateVolume));
-            Assert.That(audio.VolumeAdjustments, Has.None.SameAs(audioManager.AggregateVolume));
-            Assert.That(audio.VolumeAdjustments, Has.None.SameAs(audioManager.VolumeTrack));
-            Assert.That(audio.VolumeAdjustments, Has.None.SameAs(audioManager.VolumeSample));
+            Assert.That(audio.BoundAdjustments, Is.SameAs(track));
 
             return true;
         });
@@ -135,7 +132,7 @@ public partial class TestBmsAudioVolumeRouting : TestScene
             var audio = new RecordingAudioComponent();
 
             typeof(BmsPreviewTrack)
-                .GetMethod("bindPreviewVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetMethod("bindPreviewAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(track, [audio, 100]);
 
             return audio.VolumeAdjustments.Exists(adjustment => adjustment.Value == 0);
@@ -143,14 +140,14 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     }
 
     [Test]
-    public void PreviewSampleVolumeAdjustmentIsPerPlayback()
+    public void PreviewTrackVolumeAdjustmentIsPerPlayback()
     {
-        AddAssert("preview sample playback volume uses separate bindables", () =>
+        AddAssert("preview track playback volume uses separate bindables", () =>
         {
             var track = new BmsPreviewTrack([], new Dictionary<ushort, string>(), null, audioManager);
 
             var bindMethod = typeof(BmsPreviewTrack)
-                .GetMethod("bindPreviewVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                .GetMethod("bindPreviewAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
             Assert.That(bindMethod.GetParameters(), Has.Length.EqualTo(2));
 
@@ -190,8 +187,11 @@ public partial class TestBmsAudioVolumeRouting : TestScene
 
         public List<IBindable<double>> VolumeAdjustments { get; } = [];
 
+        public IAggregateAudioAdjustment BoundAdjustments { get; private set; } = null!;
+
         public void BindAdjustments(IAggregateAudioAdjustment component)
         {
+            BoundAdjustments = component;
         }
 
         public void UnbindAdjustments(IAggregateAudioAdjustment component)
