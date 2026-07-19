@@ -95,6 +95,20 @@ public partial class TestBmsSampleStoreRate : TestScene
         addCleanupSteps();
     }
 
+    [Test]
+    public void InvalidAudioDoesNotWaitForTimeout()
+    {
+        AddStep("create invalid sample + store", () =>
+        {
+            tempDir = Directory.CreateTempSubdirectory("bmstracks").FullName;
+            File.WriteAllBytes(Path.Combine(tempDir, "invalid.wav"), [0, 1, 2, 3]);
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "invalid.wav" } }, tempDir));
+        });
+        AddUntilStep("store loads without timeout", () => store.IsLoaded);
+        AddAssert("invalid track is unavailable", () => store.GetTrack(1) == null);
+        addCleanupSteps();
+    }
+
     private void createWav(string filename, int seconds)
     {
         const int sample_rate = 44100;

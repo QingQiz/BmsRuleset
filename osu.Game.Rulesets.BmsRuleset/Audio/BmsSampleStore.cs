@@ -249,6 +249,7 @@ public partial class BmsSampleStore : Component
         resources.AddExtension("mp3");
         resources.AddExtension("ogg");
         trackStore = audioManager.GetTrackStore(resources);
+        Dictionary<ushort, Task<bool>> trackInitialisationTasks = [];
 
         foreach (var (sampleKey, path) in sampleDefinitions)
         {
@@ -265,38 +266,44 @@ public partial class BmsSampleStore : Component
                     track.AddAdjustment(AdjustableProperty.Tempo, new BindableDouble(rate));
 
                 tracks[sampleKey] = track;
+                trackInitialisationTasks[sampleKey] = track.SeekAsync(0);
                 break;
             }
         }
 
         // Dependency loaders are invoked synchronously, so returning a Task here would let the
         // drawable become loaded before the audio thread has initialised these Tracks.
-        waitForTracks(cancellationToken ?? CancellationToken.None);
+        waitForTracks(trackInitialisationTasks, cancellationToken ?? CancellationToken.None);
     }
 
-    private void waitForTracks(CancellationToken cancellationToken)
+    private void waitForTracks(IReadOnlyDictionary<ushort, Task<bool>> trackInitialisationTasks, CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
 
-        while (tracks.Values.Any(track => !track.IsLoaded) && stopwatch.Elapsed < track_load_timeout)
+        while (trackInitialisationTasks.Values.Any(task => !task.IsCompleted) && stopwatch.Elapsed < track_load_timeout)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Thread.Sleep(10);
         }
 
-        var failedKeys = tracks
-            .Where(pair => !pair.Value.IsLoaded)
-            .Select(pair => pair.Key)
+        var timedOutTracks = tracks
+            .Where(pair => !trackInitialisationTasks[pair.Key].IsCompleted)
+            .ToArray();
+        var failedTracks = tracks
+            .Where(pair => trackInitialisationTasks[pair.Key].IsCompleted && (!trackInitialisationTasks[pair.Key].IsCompletedSuccessfully || !pair.Value.IsLoaded))
             .ToArray();
 
-        foreach (var key in failedKeys)
+        foreach (var (key, track) in timedOutTracks.Concat(failedTracks))
         {
-            tracks[key].Dispose();
+            track.Dispose();
             tracks.Remove(key);
         }
 
-        if (failedKeys.Length > 0)
-            Logger.Log($"Timed out while loading {failedKeys.Length} BMS sample tracks; those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
+        if (timedOutTracks.Length > 0)
+            Logger.Log($"Timed out while loading {timedOutTracks.Length} BMS sample tracks ({string.Join(", ", timedOutTracks.Select(pair => pair.Value.Name).Distinct())}); those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
+
+        if (failedTracks.Length > 0)
+            Logger.Log($"Failed to load {failedTracks.Length} BMS sample tracks ({string.Join(", ", failedTracks.Select(pair => pair.Value.Name).Distinct())}); those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
     }
 
     private enum TrackCommandType
