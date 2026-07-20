@@ -106,7 +106,7 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     {
         AddAssert("preview volume adjustments use track aggregate volume", () =>
         {
-            var track = new BmsPreviewTrack([], new Dictionary<ushort, string>(), null, audioManager);
+            var track = new BmsPreviewTrack(() => [], new Dictionary<ushort, string>(), null, audioManager);
             var audio = new RecordingAudioComponent();
 
             typeof(BmsPreviewTrack)
@@ -125,7 +125,7 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     {
         AddAssert("clock-only preview output is muted", () =>
         {
-            var track = new BmsPreviewTrack([], new Dictionary<ushort, string>(), null, audioManager)
+            var track = new BmsPreviewTrack(() => [], new Dictionary<ushort, string>(), null, audioManager)
             {
                 PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly,
             };
@@ -144,7 +144,7 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     {
         AddAssert("preview track playback volume uses separate bindables", () =>
         {
-            var track = new BmsPreviewTrack([], new Dictionary<ushort, string>(), null, audioManager);
+            var track = new BmsPreviewTrack(() => [], new Dictionary<ushort, string>(), null, audioManager);
 
             var bindMethod = typeof(BmsPreviewTrack)
                 .GetMethod("bindPreviewAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!;

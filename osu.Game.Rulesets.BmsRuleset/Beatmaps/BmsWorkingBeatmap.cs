@@ -66,17 +66,7 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         if (track == null || track.IsDisposed)
             return;
 
-        if (gameplayTime is { } time)
-            track.Seek(time);
-
-        track.PlaybackMode = BmsPreviewTrackPlaybackMode.Preview;
-        track.Volume.Value = 1;
-
-        if (track.CurrentTime >= track.Length)
-            track.Seek(0);
-
-        track.BeginRestoreFade();
-        track.Start();
+        track.RestorePreview(gameplayTime);
     }
 
     protected override Track GetBeatmapTrack()

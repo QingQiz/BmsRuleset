@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.IO.Stores;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -34,11 +35,6 @@ public class BmsPreviewTrack : Track
     }
 
     public override bool IsDummyDevice => false;
-
-    /// <summary>
-    /// Exposes the resolved source so callers can verify that the dedicated-track loading path was skipped.
-    /// </summary>
-    public bool UsesDedicatedPreviewAudio => previewTrack != null;
 
     public override double CurrentTime
     {
@@ -96,24 +92,6 @@ public class BmsPreviewTrack : Track
     private bool eventResyncRequired;
     private long restoreFadeStart;
     private bool restoreFadeInProgress;
-
-    /// <param name="sampleEvents">BGM and keysound events from the parsed BMS chart.</param>
-    /// <param name="sampleDefinitions">Maps sample keys to filenames from the BMS chart.</param>
-    /// <param name="basePath">
-    ///     The chart directory on disk (from <c>BeatmapInfo.Metadata.Source</c>).
-    ///     May be <c>null</c> in fully-imported mode (no filesystem fallback available).
-    /// </param>
-    /// <param name="audioManager">Framework audio manager, used to create filesystem-backed audio stores.</param>
-    /// <param name="previewFile"></param>
-    public BmsPreviewTrack(
-        IReadOnlyList<BmsSampleEvent> sampleEvents,
-        IReadOnlyDictionary<ushort, string> sampleDefinitions,
-        string? basePath,
-        AudioManager audioManager,
-        string? previewFile = null)
-        : this(() => createPreviewEvents(sampleEvents), sampleDefinitions, basePath, audioManager, previewFile)
-    {
-    }
 
     internal BmsPreviewTrack(
         Func<IReadOnlyList<BmsPreviewSampleEvent>> sampleEventFactory,
@@ -204,7 +182,11 @@ public class BmsPreviewTrack : Track
 
     #endregion
 
-    public override void Start()
+    public override void Start() => StartAsync().WaitSafely();
+
+    public override Task StartAsync() => EnqueueAction(startInternal);
+
+    private void startInternal()
     {
         if (Length == 0 || CurrentTime >= Length)
             return;
@@ -221,17 +203,33 @@ public class BmsPreviewTrack : Track
         lock (clock) clock.Start();
     }
 
-    public override void Stop()
+    public override void Stop() => StopAsync().WaitSafely();
+
+    public override Task StopAsync() => EnqueueAction(stopInternal);
+
+    private void stopInternal()
     {
         lock (clock) clock.Stop();
         stopPreviewPlayback();
     }
 
-    public override bool Seek(double seek)
-    {
-        seekOffset = Math.Clamp(seek, 0, Length);
+    public override bool Seek(double seek) => SeekAsync(seek).GetResultSafely();
 
-        var success = seekOffset == seek;
+    public override async Task<bool> SeekAsync(double seek)
+    {
+        var clamped = Math.Clamp(seek, 0, Length);
+        var success = clamped == seek;
+
+        // Seeking an event preview may replace many inner tracks. Performing the whole operation
+        // on the audio thread avoids blocking the update thread once for every affected track.
+        await EnqueueAction(() => seekInternal(clamped, success)).ConfigureAwait(false);
+
+        return success;
+    }
+
+    private void seekInternal(double seek, bool success)
+    {
+        seekOffset = seek;
         var wasRunning = IsRunning;
 
         lock (clock)
@@ -252,25 +250,11 @@ public class BmsPreviewTrack : Track
 
         if (previewTrack != null && wasRunning && PlaybackMode == BmsPreviewTrackPlaybackMode.Preview)
             startDedicatedPreviewTrack();
-
-        return success;
     }
 
-    public override Task<bool> SeekAsync(double seek) => Task.FromResult(Seek(seek));
+    public override void Reset() => EnqueueAction(resetInternal).WaitSafely();
 
-    public override Task StartAsync()
-    {
-        Start();
-        return Task.CompletedTask;
-    }
-
-    public override Task StopAsync()
-    {
-        Stop();
-        return Task.CompletedTask;
-    }
-
-    public override void Reset()
+    private void resetInternal()
     {
         lock (clock) clock.Reset();
         seekOffset = 0;
@@ -280,6 +264,27 @@ public class BmsPreviewTrack : Track
         stopPreviewPlayback();
 
         base.Reset();
+    }
+
+    internal void RestorePreview(double? gameplayTime)
+    {
+        EnqueueAction(() =>
+        {
+            if (gameplayTime is { } time)
+            {
+                var clamped = Math.Clamp(time, 0, Length);
+                seekInternal(clamped, clamped == time);
+            }
+
+            PlaybackMode = BmsPreviewTrackPlaybackMode.Preview;
+            Volume.Value = 1;
+
+            if (CurrentTime >= Length)
+                seekInternal(0, true);
+
+            BeginRestoreFade();
+            startInternal();
+        }).WaitSafely();
     }
 
     protected override void UpdateState()
@@ -520,13 +525,4 @@ public class BmsPreviewTrack : Track
         return low;
     }
 
-    private static IReadOnlyList<BmsPreviewSampleEvent> createPreviewEvents(IReadOnlyList<BmsSampleEvent> sampleEvents)
-    {
-        var previewEvents = new BmsPreviewSampleEvent[sampleEvents.Count];
-
-        for (var i = 0; i < sampleEvents.Count; i++)
-            previewEvents[i] = new BmsPreviewSampleEvent(sampleEvents[i], true);
-
-        return previewEvents;
-    }
 }
