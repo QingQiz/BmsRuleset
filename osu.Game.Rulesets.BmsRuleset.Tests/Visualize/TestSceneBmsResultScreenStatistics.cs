@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.Drawables;
 using osu.Game.Models;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -16,6 +17,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Result;
+using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens;
@@ -29,6 +31,27 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [TestFixture]
 public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerTestScene
 {
+    [Test]
+    public void TestScoreCardUsesBmsRulesetIcon()
+    {
+        TestBmsSoloResultsScreen screen = null!;
+
+        AddStep("load results screen", () =>
+        {
+            var stack = new OsuScreenStack
+            {
+                RelativeSizeAxes = Axes.Both,
+            };
+
+            Child = stack;
+            stack.Push(screen = new TestBmsSoloResultsScreen(createScore()));
+        });
+
+        AddUntilStep("results screen loaded", () => screen.IsLoaded);
+        AddUntilStep("score card uses BMS ruleset icon", () =>
+            this.ChildrenOfType<DifficultyIcon>().Any(icon => icon.ChildrenOfType<BmsRulesetIcon>().Any()));
+    }
+
     [Test]
     public void TestAutoGaugeHistory()
     {
