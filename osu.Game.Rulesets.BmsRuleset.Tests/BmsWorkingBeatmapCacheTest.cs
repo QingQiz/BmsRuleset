@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
@@ -412,6 +414,48 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddStep("get background", () => texture = working.GetBackground());
         AddAssert("background loaded", () => texture != null);
         AddAssert("loaded back bmp dimensions", () => texture.Width > 0);
+    }
+
+    [Test]
+    public void TestBmsWorkingBeatmapConcurrentBackgroundRequestsDoNotObservePartialState()
+    {
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-background-concurrent-{Guid.NewGuid()}");
+        BmsWorkingBeatmap working = null!;
+
+        AddStep("create working beatmap", () =>
+        {
+            Directory.CreateDirectory(directory);
+            createdDirectories.Add(directory);
+
+            var beatmap = new BmsBeatmap
+            {
+                StageFile = "missing-stage.png",
+                BackBmp = "missing-background.png",
+                Banner = "missing-banner.png",
+            };
+
+            working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, beatmap, directory), audio);
+        });
+
+        AddStep("request background concurrently", () =>
+        {
+            const int request_count = 16;
+
+            using var start = new ManualResetEventSlim();
+            using var ready = new CountdownEvent(request_count);
+            var requests = Enumerable.Range(0, request_count)
+                .Select(_ => Task.Factory.StartNew(() =>
+                {
+                    ready.Signal();
+                    start.Wait();
+                    working.GetBackground();
+                }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default))
+                .ToArray();
+
+            ready.Wait();
+            start.Set();
+            Task.WaitAll(requests);
+        });
     }
 
     [Test]

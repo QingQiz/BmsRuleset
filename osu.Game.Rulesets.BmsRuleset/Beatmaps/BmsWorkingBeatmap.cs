@@ -29,9 +29,10 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
     private readonly AudioManager audioManager = audioManager;
 
-    private bool externalBackgroundResolved;
-    private List<string> resolvedBackgroundPaths = null!;
-    private List<string> resolvedPanelBackgroundPaths = null!;
+    private readonly object externalBackgroundResolutionLock = new();
+    private volatile bool externalBackgroundResolved;
+    private List<string> resolvedBackgroundPaths = [];
+    private List<string> resolvedPanelBackgroundPaths = [];
 
     public override bool TryTransferTrack(WorkingBeatmap target)
     {
@@ -308,15 +309,22 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         if (externalBackgroundResolved)
             return;
 
-        externalBackgroundResolved = true;
+        lock (externalBackgroundResolutionLock)
+        {
+            if (externalBackgroundResolved)
+                return;
 
-        var bmsBeatmap = tryDecodeExternalBeatmap(BeatmapInfo) as IBmsBeatmap ?? inner.Beatmap as IBmsBeatmap;
+            var bmsBeatmap = tryDecodeExternalBeatmap(BeatmapInfo) as IBmsBeatmap ?? inner.Beatmap as IBmsBeatmap;
 
-        resolvedBackgroundPaths = resolveExternalBackgroundPaths(Metadata.Source, bmsBeatmap, false);
-        resolvedPanelBackgroundPaths = resolveExternalBackgroundPaths(Metadata.Source, bmsBeatmap, true);
+            resolvedBackgroundPaths = resolveExternalBackgroundPaths(Metadata.Source, bmsBeatmap, false);
+            resolvedPanelBackgroundPaths = resolveExternalBackgroundPaths(Metadata.Source, bmsBeatmap, true);
 
-        var backgroundPath = resolvedBackgroundPaths.FirstOrDefault();
-        var panelBackgroundPath = resolvedPanelBackgroundPaths.FirstOrDefault();
-        applyExternalBackgroundMarker(BeatmapInfo, backgroundPath, panelBackgroundPath);
+            var backgroundPath = resolvedBackgroundPaths.FirstOrDefault();
+            var panelBackgroundPath = resolvedPanelBackgroundPaths.FirstOrDefault();
+            applyExternalBackgroundMarker(BeatmapInfo, backgroundPath, panelBackgroundPath);
+
+            // Publish completion only after both lists and their metadata marker are ready for readers.
+            externalBackgroundResolved = true;
+        }
     }
 }
