@@ -148,7 +148,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     }
 
     [Test]
-    public void TestDrawableRulesetStopsPreviewWhenGameplayLoads()
+    public void TestDrawableRulesetKeepsPreviewUntilGameplayStarts()
     {
         var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-preview-gameplay-start-{Guid.NewGuid()}");
         BmsPreviewTrack previewTrack = null!;
@@ -176,9 +176,9 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             gameplayClock.Add(drawableRuleset = new BmsDrawableRuleset(new BmsRuleset(), new BmsBeatmap()));
         });
 
-        AddUntilStep("preview event playback stopped during loading", () =>
+        AddUntilStep("preview clock remains in preview mode during loading", () =>
             previewTrack.IsRunning
-            && previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly
+            && previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
             && previewTrack.Volume.Value == 1);
         AddAssert("background audio remains paused during loading", () => getBackgroundAudioPaused(drawableRuleset));
 
@@ -207,14 +207,14 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         {
             Directory.CreateDirectory(directory);
             createdDirectories.Add(directory);
-            writePcmWave(Path.Combine(directory, "preview.wav"), TimeSpan.FromSeconds(1));
+            writePcmWave(Path.Combine(directory, "preview.wav"), TimeSpan.FromSeconds(5));
 
             var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), directory), audio);
             previewTrack = (BmsPreviewTrack)working.LoadTrack();
             previewTrack.Start();
         });
 
-        AddAssert("single-file preview is playing during loading", () =>
+        AddAssert("single-file preview is playing before loading", () =>
             previewTrack.IsRunning
             && previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
             && previewTrack.Volume.Value == 1
@@ -233,10 +233,10 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             gameplayClock.Add(drawableRuleset = new BmsDrawableRuleset(new BmsRuleset(), new BmsBeatmap()));
         });
 
-        AddUntilStep("single-file preview stopped during loading", () =>
-            previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly
-            && getActivePreviewPlaybackCount(previewTrack) == 0
-            && getSingleFilePreviewTrack(previewTrack)?.IsRunning != true);
+        AddUntilStep("single-file preview continues during loading", () =>
+            previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
+            && getActivePreviewPlaybackCount(previewTrack) == 1
+            && getSingleFilePreviewTrack(previewTrack)?.IsRunning == true);
 
         AddStep("start gameplay clock", () => gameplayClock.Start());
         AddUntilStep("single-file preview stopped for gameplay", () =>

@@ -160,6 +160,14 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             backgroundAudioPaused.BindTo(IsPaused);
     }
 
+    protected override void Update()
+    {
+        base.Update();
+
+        if (!backgroundAudioPaused.Value && !stoppedPreviewForGameplay)
+            stopPreviewForGameplay();
+    }
+
     protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);
 
     protected override ReplayInputHandler CreateReplayInputHandler(Replay replay) => new BmsFramedReplayInputHandler(replay);
@@ -252,8 +260,6 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         }
 
         ((BmsPlayfield)Playfield).ScrollController.SetPlaybackRate(getRate(Mods));
-
-        stopPreviewForGameplay();
     }
 
     private void onGameplayPausedChanged(ValueChangedEvent<bool> paused)

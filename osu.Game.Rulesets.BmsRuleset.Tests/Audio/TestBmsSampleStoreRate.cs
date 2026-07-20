@@ -27,6 +27,33 @@ public partial class TestBmsSampleStoreRate : TestScene
     }
 
     [Test]
+    public void PreloadCompletesAcrossBatches()
+    {
+        AddStep("create batched sample store", () =>
+        {
+            createWav("batched.wav", 1);
+            Dictionary<ushort, string> definitions = [];
+
+            for (ushort sampleKey = 1; sampleKey <= 17; sampleKey++)
+                definitions.Add(sampleKey, "batched.wav");
+
+            Add(store = new BmsSampleStore(definitions, tempDir));
+        });
+        AddUntilStep("wait for batched store load", () => store.IsLoaded);
+        AddAssert("all batches loaded", () =>
+        {
+            for (ushort sampleKey = 1; sampleKey <= 17; sampleKey++)
+            {
+                if (store.GetTrack(sampleKey) is not { IsLoaded: true, Length: > 0 })
+                    return false;
+            }
+
+            return true;
+        });
+        addCleanupSteps();
+    }
+
+    [Test]
     public void SameFileWithDifferentKeysCreatesIndependentTracks()
     {
         AddStep("create shared sample + store", () =>

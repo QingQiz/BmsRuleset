@@ -26,6 +26,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Audio;
 public partial class BmsSampleStore : Component
 {
     private static readonly TimeSpan track_load_timeout = TimeSpan.FromSeconds(30);
+    private const int track_load_batch_size = 16;
 
     public double MaxTrackLengthMilliseconds => tracks.Count == 0 ? 0 : tracks.Values.Max(track => track.Length);
 
@@ -256,10 +257,14 @@ public partial class BmsSampleStore : Component
         resources.AddExtension("ogg");
         trackStore = audioManager.GetTrackStore(resources);
         Dictionary<ushort, Task<bool>> trackInitialisationTasks = [];
+        var loadStopwatch = Stopwatch.StartNew();
 
         foreach (var (sampleKey, path) in sampleDefinitions)
         {
             cancellationToken?.ThrowIfCancellationRequested();
+
+            if (loadStopwatch.Elapsed >= track_load_timeout)
+                break;
 
             foreach (var lookup in new BmsSampleInfo(path).LookupNames)
             {
@@ -275,28 +280,37 @@ public partial class BmsSampleStore : Component
                 trackInitialisationTasks[sampleKey] = track.SeekAsync(0);
                 break;
             }
+
+            if (trackInitialisationTasks.Count < track_load_batch_size)
+                continue;
+
+            // Bounded batches keep the audio update queue responsive enough to continue the
+            // song-select preview while gameplay resources are prepared in the background.
+            waitForTracks(trackInitialisationTasks, cancellationToken ?? CancellationToken.None, loadStopwatch);
+            trackInitialisationTasks.Clear();
         }
 
         // Dependency loaders are invoked synchronously, so returning a Task here would let the
         // drawable become loaded before the audio thread has initialised these Tracks.
-        waitForTracks(trackInitialisationTasks, cancellationToken ?? CancellationToken.None);
+        waitForTracks(trackInitialisationTasks, cancellationToken ?? CancellationToken.None, loadStopwatch);
     }
 
-    private void waitForTracks(IReadOnlyDictionary<ushort, Task<bool>> trackInitialisationTasks, CancellationToken cancellationToken)
+    private void waitForTracks(IReadOnlyDictionary<ushort, Task<bool>> trackInitialisationTasks, CancellationToken cancellationToken, Stopwatch stopwatch)
     {
-        var stopwatch = Stopwatch.StartNew();
-
         while (trackInitialisationTasks.Values.Any(task => !task.IsCompleted) && stopwatch.Elapsed < track_load_timeout)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Thread.Sleep(10);
         }
 
-        var timedOutTracks = tracks
-            .Where(pair => !trackInitialisationTasks[pair.Key].IsCompleted)
+        var timedOutTracks = trackInitialisationTasks
+            .Where(pair => !pair.Value.IsCompleted)
+            .Select(pair => (pair.Key, Track: tracks[pair.Key]))
             .ToArray();
-        var failedTracks = tracks
-            .Where(pair => trackInitialisationTasks[pair.Key].IsCompleted && (!trackInitialisationTasks[pair.Key].IsCompletedSuccessfully || !pair.Value.IsLoaded))
+
+        var failedTracks = trackInitialisationTasks
+            .Where(pair => pair.Value.IsCompleted && (!pair.Value.IsCompletedSuccessfully || !tracks[pair.Key].IsLoaded))
+            .Select(pair => (pair.Key, Track: tracks[pair.Key]))
             .ToArray();
 
         foreach (var (key, track) in timedOutTracks.Concat(failedTracks))
@@ -306,10 +320,10 @@ public partial class BmsSampleStore : Component
         }
 
         if (timedOutTracks.Length > 0)
-            Logger.Log($"Timed out while loading {timedOutTracks.Length} BMS sample tracks ({string.Join(", ", timedOutTracks.Select(pair => pair.Value.Name).Distinct())}); those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
+            Logger.Log($"Timed out while loading {timedOutTracks.Length} BMS sample tracks ({string.Join(", ", timedOutTracks.Select(pair => pair.Track.Name).Distinct())}); those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
 
         if (failedTracks.Length > 0)
-            Logger.Log($"Failed to load {failedTracks.Length} BMS sample tracks ({string.Join(", ", failedTracks.Select(pair => pair.Value.Name).Distinct())}); those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
+            Logger.Log($"Failed to load {failedTracks.Length} BMS sample tracks ({string.Join(", ", failedTracks.Select(pair => pair.Track.Name).Distinct())}); those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
     }
 
     private enum TrackCommandType
