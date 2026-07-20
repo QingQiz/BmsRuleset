@@ -74,6 +74,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
     {
         const int animated_body_column = 1;
         const int animated_tail_column = 7;
+        Sprite[] bodySpritesBeforeReload = null;
 
         this.AddSetupUntilStep("legacy LN skin coverage held", () =>
             Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SKIN_COVERAGE_START_TIME + 95);
@@ -92,6 +93,14 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             && currentBodyAnimationFrame(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 1);
         this.AddSetupAssert("animated LN tail renders multi-frame drawable", () =>
             liveSkinCoverageLongNote(animated_tail_column)?.ChildrenOfType<TextureAnimation>().Any(a => a.FrameCount == 2) == true);
+        this.AddSetupStep("capture LN body sprites", () =>
+            bodySpritesBeforeReload = longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column)).ChildrenOfType<Sprite>().ToArray());
+        this.AddSetupStep("reload skin source", () =>
+            typeof(SkinProvidingContainer).GetMethod("TriggerSourceChanged", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(((BmsTestSkins.SkinnedTestPlayer)Player).SkinSource, null));
+        this.AddSetupUntilStep("LN body reloads after skin change", () =>
+            longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column)).ChildrenOfType<Sprite>()
+                .Any(sprite => sprite.Alpha > 0 && !bodySpritesBeforeReload.Contains(sprite)));
     }
 
     private void assertLegacySkinConfigResolves()

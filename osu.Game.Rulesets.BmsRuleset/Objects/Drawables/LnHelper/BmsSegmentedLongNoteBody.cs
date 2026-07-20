@@ -96,12 +96,12 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
 
     protected override void Dispose(bool isDisposing)
     {
-        base.Dispose(isDisposing);
-
         if (skin != null)
             skin.SourceChanged -= onSkinChanged;
 
         fallbackTextureCache?.Dispose();
+
+        base.Dispose(isDisposing);
     }
 
     #endregion
@@ -121,10 +121,10 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
 
     public void UpdateBody(float bodyHeight, bool newTailAtTop, bool isHolding)
     {
+        ensureSlicesLoaded();
+
         if (slices.Length == 0 && bodyFrames.Length == 0)
             return;
-
-        ensureSlicesLoaded();
 
         var heightChanged = Math.Abs(lastBodyHeight - bodyHeight) >= 1;
         var width = Math.Max(1, DrawWidth);
@@ -162,22 +162,15 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         ensureSlicesLoaded();
     }
 
-    private void onSkinChanged()
+    private void onSkinChanged() => Scheduler.AddOnce(invalidateSkin);
+
+    private void invalidateSkin()
     {
         // Do not synchronously resolve/decode textures for every active LN on a skin switch. A replay
         // can have many pooled LN drawables alive; forcing all of them to reload immediately causes a
         // visible hitch. Mark dirty and let the next UpdateBody() reload only drawables that are used.
         slicesDirty = true;
-        bodyFrames = [];
-        slices = [];
-        naturalHeights = [];
-        parts = [];
-        reusablePartSizes.Clear();
-        reusableParts.Clear();
-        segmentContainer.Clear(disposeChildren: true);
-        spritePool.Clear();
         fallbackTextureCache?.Clear();
-        fallback.Alpha = 1;
     }
 
     private void ensureSlicesLoaded()

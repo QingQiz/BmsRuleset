@@ -35,7 +35,7 @@ internal sealed partial class BmsStageHudController : Component
             RegisterContainer(container);
 
         stageHud = hud;
-        ensureStageHudSingleton();
+        scheduleStageHudSingleton();
         SetNoteHeightScale(stageHud?.NoteHeightScale.Value ?? 1);
         tryInitialiseHudSize();
         updateStageTransform();
@@ -61,7 +61,7 @@ internal sealed partial class BmsStageHudController : Component
     {
         if (stageHudContainer == container)
         {
-            ensureStageHudSingleton();
+            scheduleStageHudSingleton();
             return;
         }
 
@@ -73,7 +73,7 @@ internal sealed partial class BmsStageHudController : Component
         if (stageHudContainer is SkinnableContainer skinnableContainer)
             skinnableContainer.OnComponentsLoaded += onComponentsLoaded;
 
-        ensureStageHudSingleton();
+        scheduleStageHudSingleton();
     }
 
     protected override void Dispose(bool isDisposing)
@@ -121,6 +121,10 @@ internal sealed partial class BmsStageHudController : Component
 
     private bool stageHudContainerLoaded => stageHudContainer is not SkinnableContainer skinnableContainer || skinnableContainer.ComponentsLoaded;
 
+    // Registration can run during asynchronous layout loading while the previous content is being disposed.
+    // Deferring repair keeps child mutations on the update thread after SkinnableContainer has swapped content.
+    private void scheduleStageHudSingleton() => Scheduler.AddOnce(ensureStageHudSingleton);
+
     private static BmsStageHud createReplacement() => new();
 
     private void onComponentsChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -138,16 +142,10 @@ internal sealed partial class BmsStageHudController : Component
         if (e.Action == NotifyCollectionChangedAction.Reset && stageHudContainer is SkinnableContainer)
             return;
 
-        if (e.NewItems?.OfType<BmsStageHud>().Any() == true)
-        {
-            Schedule(ensureStageHudSingleton);
-            return;
-        }
-
-        ensureStageHudSingleton();
+        scheduleStageHudSingleton();
     }
 
-    private void onComponentsLoaded(Drawable drawable) => ensureStageHudSingleton();
+    private void onComponentsLoaded(Drawable drawable) => scheduleStageHudSingleton();
 
     private void unregisterContainer()
     {
