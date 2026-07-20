@@ -20,7 +20,7 @@ six gauge types, difficulty tables, clear lamps, and detailed performance analys
 <p align="center">
   <img src="https://github.com/user-attachments/assets/816fb844-e684-48d0-8c37-0217fdd2d9b2" width="900" alt="BMS gameplay running natively in osu!lazer">
   <br>
-  <sub>Native BMS gameplay in osu!lazer</sub>
+  <sub>Native BMS gameplay in osu!lazer, shown with the developer's customizable skin</sub>
 </p>
 
 ## Installation

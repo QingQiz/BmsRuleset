@@ -20,7 +20,7 @@
 <p align="center">
   <img src="https://github.com/user-attachments/assets/816fb844-e684-48d0-8c37-0217fdd2d9b2" width="900" alt="在 osu!lazer 中原生运行的 BMS 游玩画面">
   <br>
-  <sub>在 osu!lazer 中原生游玩 BMS</sub>
+  <sub>在 osu!lazer 中原生游玩 BMS，使用开发者的可自定义皮肤</sub>
 </p>
 
 ## 安装
