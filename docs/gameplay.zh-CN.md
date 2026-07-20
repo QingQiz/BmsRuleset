@@ -1,0 +1,108 @@
+# 游玩机制与设置
+
+[返回 README](../README.zh-CN.md) | [English](./gameplay.md)
+
+## 输入与键位
+
+默认键位（可在 **设置 → Key Bindings → osu!BMS** 中重新绑定）：
+
+**游戏中控制：** 上/下 箭头临时调整滚动速度
+
+每次按下按键时，无论判定结果如何，都会播放对应列中下一个音符的 key sound。
+
+## 判定与计分
+
+**判定等级（beatoraja 判定窗口，由 `#RANK` / EXRANK 决定）：**
+
+| 名称         | EX 分 | 连击      | RANK 2 (Normal) 窗口    |
+|------------|------|---------|-----------------------|
+| **PGREAT** | 2    | 保持      | ±15 ms                |
+| **GREAT**  | 1    | 保持      | ±45 ms                |
+| **GOOD**   | 0    | 保持      | ±112.5 ms             |
+| **BAD**    | 0    | 重置      | -220ms / +280ms       |
+| **POOR**   | 0    | 重置      | > +280ms              |
+| **E-POOR** | 0    | **不中断** | [-500ms,-220ms]，不消耗音符 |
+
+`#RANK` 0 = Very Hard (±5/15/37.5 ms，BAD -220/+280 ms) → 4 = Very Easy (±25/75/187.5 ms，BAD -220/+280 ms)。
+`#DEFEXRANK` 和不带编号的 `#EXRANK` 会以百分比设置初始判定窗口宽度，`100` 等同 Normal（`#RANK 2`）。
+带编号的 `#EXRANKxx` 可由 `A0` 通道在谱面中途切换；未定义的 `A0` 引用会保持当前判定窗口不变。
+
+**分数：** `总 EX 分 / 最大 EX 分 × 1,000,000`
+
+**DJ LEVEL 评级：** X（全 PGREAT）· S ≥ 8/9 · A ≥ 7/9 · B ≥ 6/9 · C ≥ 5/9 · D 其他
+
+## 血量
+
+规则集实现了 6 种可选 BMS 血量类型，涵盖 Groove 和 Survival 两种模式。
+默认使用 Normal 血量。通过 Mod 选择不同血量类型：
+
+> [!NOTE]
+> 血量数值和算法改编自 **beatoraja**（SEVENKEYS 模式），而 beatoraja 本身是对 LR2 groove gauge 的复现。
+> Survival 血量（H1/H2）的 `(2 × #TOTAL − 320) / notes` recovery 缩放系数遵循 beatoraja 的 `LIMIT_INCREMENT` 修饰器。
+> 地雷伤害使用 BMS 规范公式。
+
+| Mod         | 缩写     | 类型   | 算法              | 初始 HP | 通关    | 血条         |
+|-------------|--------|------|-----------------|-------|-------|------------|
+| Assist Easy | **E2** | 难度降低 | TOTAL (#TOTAL)  | 20%   | ≥ 60% | Groove（动态） |
+| Easy        | **E1** | 难度降低 | TOTAL (#TOTAL)  | 20%   | ≥ 80% | Groove（动态） |
+| Normal      | *(默认)* | —    | TOTAL (#TOTAL)  | 20%   | ≥ 80% | Groove（动态） |
+| Hard        | **H1** | 难度增加 | Limit Increment | 100%  | 存活    | 固定红色       |
+| EX Hard     | **H2** | 难度增加 | Limit Increment | 100%  | 存活    | 固定紫色       |
+| Hazard      | **H3** | 难度增加 | Fixed           | 100%  | 存活    | 固定金色       |
+
+- **Groove 血量**（E2/E1/Normal）：可回复，从 20% 开始，结束时需达到通关线。血条颜色按阈值动态变化：红（< 20%）→ 黄（< 通关线）→
+  绿（≥ 通关线）。
+- **Survival 血量**（H1/H2/H3）：满血开局，仅扣血（H3 无回复）。血条使用固定颜色，无 clear 线。通关条件仅为存活（HP 从未归零）。
+- Hard（H1）有 **guts 保护**：低血量时减少伤害（50% → ×0.8, 40% → ×0.7, …, 10% → ×0.4）。
+- `#TOTAL` 控制 TOTAL 算法血量的最大回复速度。默认公式：`max(7.605 × N / (0.01 × N + 6.5), 160)`（LR2 公式，N = 总可玩音符数）。
+- 地雷伤害：36进制值 ÷ 2 百分比（例如 `ZZ` = 647.5% → 直接清空）。
+- 各血量 Mod 互相排斥。
+- **Auto Gauge (AG)**：将六种血量按最难优先串联（Hazard → EX Hard → Hard → Normal → Easy → Assist Easy）。从最难档位开局；HP
+  归零时当前档位降级到下一档并继续游戏——只有所有档位都耗尽才会失败。最终成绩按所达到的最难档位归属。
+
+## Mods
+
+| Mod                      | 说明                         |     |
+|--------------------------|----------------------------|-----|
+| Autoplay                 | 自动播放                       |     |
+| Double Time / Half Time  |                            | |
+| No Fail                  |                            |     |
+| Mirror                   | 镜像键位布局                     |     |
+| 2P                       | 将玩家布局从 1P 切换为 2P           |     |
+| Auto Scratch (AS)        | 自动播放 皿                     |     |
+| Hide Scratch (HS)        | 删除 皿 列的 note，并隐藏该列         |     |
+| Background Keysound (BK) | 移除按键音，把它们当作背景音播放           |     |
+| Lane Random (LR)         | RANDOM：随机排列轨道列             |     |
+| Note Random (NR)         | S-RANDOM / H-RANDOM：逐音符随机  |     |
+| Rotation Random (RR)     | R-RANDOM：旋转 + 可选镜像         |     |
+| Assist Easy Gauge (E2)   | 使用 Assist Easy BMS 血量      |     |
+| Easy Gauge (E1)          | 使用 Easy BMS 血量             |     |
+| Hard Gauge (H1)          | 使用 Hard BMS 血量             |     |
+| EX Hard Gauge (H2)       | 使用 EX Hard BMS 血量          |     |
+| Hazard Gauge (H3)        | 使用 Hazard BMS 血量           |     |
+| Auto Gauge (AG)          | 从最难血量起；失败时降一档              |     |
+| Long Note (L1)           | LN 判定：LN 模式：尾部单一判定         |     |
+| Charge Note (L2)         | LN 判定：CN 模式：头尾各自独立判分       |     |
+| Hell Charge Note (L3)    | LN 判定：HCN 模式：CN + 持续身体血量流失 |     |
+
+## 设置
+
+| 设置                | 默认值   | 范围 / 选项                    | 说明                                                                                 |
+|-------------------|-------|----------------------------|------------------------------------------------------------------------------------|
+| 滚动速度              | 8.0   | 1.0–50.0，步长 0.1            | 控制音符下落速度。游戏中的滚速操作只会临时调整；按键可在**设置 → Key Bindings → osu!BMS**中重新绑定。              |
+| 基准 BPM            | 主要 BPM | 起始 BPM、最高 BPM、主要 BPM 或最低 BPM | 谱面未声明 `#BASEBPM` 时使用的滚速参考。主要 BPM 取包含可玩音符最多的 BPM；并列时取最早出现者。                  |
+| BGA 暗化            | 70%   | 0%–100%                    | 在不停止 BGA 的情况下调暗画面。0% 为完整亮度；100% 时 BGA 仍继续运行，但完全不可见。                            |
+| 使用专用预览音频         | 开启    | 开启 / 关闭                    | 存在 `#PREVIEW` 或 `preview.*` 时优先使用。关闭后，选歌预览仅由 BGM 和按键音样本合成。                        |
+| 显示 BMS 5K         | 开启    | 开启 / 关闭                    | 在选歌界面显示或隐藏单人 BMS 5K 谱面。                                                         |
+| 显示 BME 7K         | 开启    | 开启 / 关闭                    | 在选歌界面显示或隐藏单人 BME 7K 谱面。                                                         |
+| 显示 PMS 9K         | 开启    | 开启 / 关闭                    | 在选歌界面显示或隐藏单人 PMS 9K 谱面。                                                         |
+| 显示 BMS 5K DP      | 开启    | 开启 / 关闭                    | 在选歌界面显示或隐藏双人 BMS 5K 谱面。                                                         |
+| 显示 BME 7K DP      | 开启    | 开启 / 关闭                    | 在选歌界面显示或隐藏双人 BME 7K 谱面。                                                         |
+| 显示 PMS 9K DP      | 开启    | 开启 / 关闭                    | 在选歌界面显示或隐藏双人 PMS 9K 谱面。                                                         |
+
+布局可见性过滤在选歌界面实时生效 — 取消勾选某个布局可隐藏该类型的所有谱面。
+
+你也可以在搜索框中使用 `k=`、`key=` 或 `keys=` 按键数过滤（支持 `=`、`!=`、`<`、`<=`、`>`、`>=` 运算符和逗号分隔值，例如
+`keys=7` 或 `k>5`）。
+
+同一个 BMS 设置栏目还提供谱面导入和清理操作。难度表管理见[难度表指南](./difficulty-tables.zh-CN.md)。
