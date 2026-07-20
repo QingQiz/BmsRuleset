@@ -96,6 +96,21 @@ public class BmsBgaDisplaySizingTest
     }
 
     [Test]
+    public void TestExplicitSizeSurvivesSkinLayoutRoundTrip()
+    {
+        var display = new BmsBgaDisplay { Size = new Vector2(320, 240) };
+
+        var restored = (BmsBgaDisplay)display.CreateSerialisedInfo().CreateInstance();
+        applyAutoSizeToParent(restored);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.RelativeSizeAxes, Is.EqualTo(Axes.None));
+            Assert.That(restored.Size, Is.EqualTo(new Vector2(320, 240)));
+        });
+    }
+
+    [Test]
     public void TestRehostedCloneSyncDoesNotChangeDepthAfterParenting()
     {
         var clone = new BmsBgaDisplay { Depth = float.MaxValue };

@@ -272,15 +272,21 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
                 (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, c))?.Create() as BmsResolvedNotePiece)
                 ?.ChildrenOfType<TextureAnimation>().SingleOrDefault()?.FrameCount == 2));
         AddAssert("animated hold body textures resolve as animation frames",
-            () => BmsTestLegacySkin.ANIMATED_HOLD_BODY_COLUMNS.All(c =>
+            () =>
             {
-                var textures = BmsLongNoteBodySource.Resolve(
-                    skinSource(),
-                    new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, c),
-                    ((IStorageResourceProvider)this).Renderer);
+                using var cache = new BmsLongNoteBodySource.BmsLongNoteBodyTextureCache();
 
-                return textures?.Kind == BmsLongNoteBodyTextureKind.AnimationFrames && textures.Value.Textures.Length == 2;
-            }));
+                return BmsTestLegacySkin.ANIMATED_HOLD_BODY_COLUMNS.All(c =>
+                {
+                    var textures = BmsLongNoteBodySource.Resolve(
+                        skinSource(),
+                        new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, c),
+                        ((IStorageResourceProvider)this).Renderer,
+                        cache);
+
+                    return textures?.Kind == BmsLongNoteBodyTextureKind.AnimationFrames && textures.Value.Textures.Length == 2;
+                });
+            });
         AddAssert("1x1 hold tail factories resolve per column",
             () => BmsTestLegacySkin.ONE_PIXEL_TAIL_COLUMNS.All(c =>
             {

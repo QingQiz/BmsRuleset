@@ -48,26 +48,18 @@ public static class BmsLongNoteBodySource
     private const float max_source_slice_height = 1024;
 
     private static readonly FieldInfo? skin_store_field = typeof(Skin).GetField("store", BindingFlags.Instance | BindingFlags.NonPublic);
-    private static readonly Dictionary<RawSliceCacheKey, Texture[]> raw_slice_cache = new();
-    private static readonly object raw_slice_cache_lock = new();
-
-    public static void ClearCache()
-    {
-        // SourceChanged means a user skin or embedded fallback changed. Raw slices are renderer-owned
-        // textures, so keep the cache coarse and invalidate all entries rather than trying to track
-        // per-file lifetimes through skin-source wrappers.
-        lock (raw_slice_cache_lock)
-            raw_slice_cache.Clear();
-    }
-
-    public static BmsLongNoteBodyTextureSet? Resolve(ISkinSource skin, BmsSkinComponentLookup lookup, IRenderer renderer)
+    internal static BmsLongNoteBodyTextureSet? Resolve(
+        ISkinSource skin,
+        BmsSkinComponentLookup lookup,
+        IRenderer renderer,
+        BmsLongNoteBodyTextureCache rawSliceCache)
     {
         foreach (var candidate in BmsLegacyTextureResolver.HoldBodyImageCandidates(skin, lookup).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct())
         {
             // Try raw bytes before normal GetTextures(). This is the critical Argon/ultra-tall path:
             // normal texture stores may apply maximum-dimension scaling before the renderer sees the
             // image, which compresses rounded endpoints and makes LN bodies look flattened.
-            var rawSlices = getRawBodySlices(skin, candidate!, renderer);
+            var rawSlices = getRawBodySlices(skin, candidate!, renderer, rawSliceCache);
 
             if (rawSlices.Length > 0)
                 return new BmsLongNoteBodyTextureSet(rawSlices, BmsLongNoteBodyTextureKind.SpatialSlices);
@@ -85,7 +77,11 @@ public static class BmsLongNoteBodySource
         return null;
     }
 
-    private static Texture[] getRawBodySlices(ISkinSource skin, string candidate, IRenderer renderer)
+    private static Texture[] getRawBodySlices(
+        ISkinSource skin,
+        string candidate,
+        IRenderer renderer,
+        BmsLongNoteBodyTextureCache rawSliceCache)
     {
         var rawResource = findRawTextureResource(skin, candidate);
 
@@ -94,18 +90,7 @@ public static class BmsLongNoteBodySource
 
         var key = new RawSliceCacheKey(rawResource.Value.Provider, renderer, rawResource.Value.ResourceName);
 
-        lock (raw_slice_cache_lock)
-        {
-            if (raw_slice_cache.TryGetValue(key, out var cached))
-                return cached;
-        }
-
-        var decoded = decodeRawBodySlices(rawResource.Value.Store, rawResource.Value.ResourceName, renderer);
-
-        lock (raw_slice_cache_lock)
-            raw_slice_cache[key] = decoded;
-
-        return decoded;
+        return rawSliceCache.GetOrCreate(key, () => decodeRawBodySlices(rawResource.Value.Store, rawResource.Value.ResourceName, renderer));
     }
 
     private static Texture[] decodeRawBodySlices(IResourceStore<byte[]> store, string resourceName, IRenderer renderer)
@@ -200,7 +185,7 @@ public static class BmsLongNoteBodySource
         }
     }
 
-    private sealed class RawSliceCacheKey(ISkin provider, IRenderer renderer, string resourceName)
+    internal sealed class RawSliceCacheKey(ISkin provider, IRenderer renderer, string resourceName)
         : IEquatable<RawSliceCacheKey>
     {
         private readonly ISkin provider = provider;
@@ -215,5 +200,28 @@ public static class BmsLongNoteBodySource
         public override bool Equals(object? obj) => obj is RawSliceCacheKey other && Equals(other);
 
         public override int GetHashCode() => HashCode.Combine(RuntimeHelpers.GetHashCode(provider), RuntimeHelpers.GetHashCode(renderer), resourceName);
+    }
+
+    internal sealed class BmsLongNoteBodyTextureCache : IDisposable
+    {
+        private readonly Dictionary<RawSliceCacheKey, Texture[]> slices = new();
+
+        internal Texture[] GetOrCreate(RawSliceCacheKey key, Func<Texture[]> factory)
+        {
+            if (slices.TryGetValue(key, out var cached))
+                return cached;
+
+            return slices[key] = factory();
+        }
+
+        public void Clear()
+        {
+            foreach (var texture in slices.Values.SelectMany(textures => textures).Distinct())
+                new DisposableTexture(texture).Dispose();
+
+            slices.Clear();
+        }
+
+        public void Dispose() => Clear();
     }
 }

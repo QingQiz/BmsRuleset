@@ -15,11 +15,13 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
     private readonly ConcurrentQueue<BmsSupplementalVideoFrame> queuedFrames = new();
     private readonly AutoResetEvent wakeSignal = new(false);
     private readonly CancellationTokenSource cancellation = new();
+
     private Task? worker;
     private long targetTimeMilliseconds;
     private int decodedFrames;
     private int droppedFrames;
     private int uploadedFrames;
+    private int disposed;
     private volatile bool isFaulted;
     private string? faultMessage;
 
@@ -29,8 +31,12 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
         isFaulted,
         faultMessage);
 
+    internal bool WorkerCompleted => worker?.IsCompleted ?? true;
+
     public void Start()
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
+
         if (worker != null)
             return;
 
@@ -135,15 +141,21 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref disposed, 1) != 0)
+            return;
+
         cancellation.Cancel();
         wakeSignal.Set();
 
         try
         {
-            worker?.Wait(250);
+            // The decoder reads from memory, so cancellation is observed after the in-flight frame.
+            // Do not release its wait handle or source bytes while that frame is still being decoded.
+            worker?.GetAwaiter().GetResult();
         }
-        catch
+        catch (Exception exception)
         {
+            Logger.Error(exception, "Failed while stopping a supplemental BGA video worker.");
         }
 
         while (queuedFrames.TryDequeue(out var frame))

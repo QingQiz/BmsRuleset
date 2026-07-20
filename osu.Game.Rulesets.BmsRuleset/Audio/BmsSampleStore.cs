@@ -71,6 +71,12 @@ public partial class BmsSampleStore : Component
         activeKeys.Clear();
         pausedKeys.Clear();
         commandQueues.Clear();
+
+        // Queue each owned track for native BASS cleanup directly. Relying only on the nested
+        // TrackStore would defer this by an additional audio-collection update.
+        foreach (var track in tracks.Values.Distinct())
+            track.Dispose();
+
         tracks.Clear();
         trackStore?.Dispose();
         trackStore = null;

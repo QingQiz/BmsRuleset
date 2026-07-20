@@ -23,7 +23,6 @@ using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
-using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
@@ -213,8 +212,8 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             return;
         }
 
-        resources = new BmsBgaResourceStore(bmsDrawableRuleset.BeatmapSourceDirectory, workingBeatmap);
-        textures = new TextureStore(host.Renderer, host.CreateTextureLoaderStore(resources), false, scaleAdjust: 1);
+        resources ??= new BmsBgaResourceStore(bmsDrawableRuleset.BeatmapSourceDirectory, workingBeatmap);
+        textures ??= new TextureStore(host.Renderer, host.CreateTextureLoaderStore(resources), false, scaleAdjust: 1);
 
         // Reuse a preloader handed over from the HUD shell when this display is the rehosted renderer,
         // so the loading screen only spawns one decoder per video (the shell warms; the rehosted
@@ -269,7 +268,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         // RelativeSizeAxes is not part of osu!'s serialised skin layout, so an untouched default
         // reloads as an absolute 1×1 component. Treat that exact shape as the persisted auto-size
         // sentinel while leaving explicit skin-edited sizes untouched.
-        if (AutoSizeToParent || RelativeSizeAxes == Axes.None && Size == Vector2.One)
+        if (AutoSizeToParent || (RelativeSizeAxes == Axes.None && Size == Vector2.One))
         {
             RelativeSizeAxes = Axes.Both;
             Size = Vector2.One;
@@ -312,9 +311,19 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             Depth = float.MaxValue,
             RenderOutsideHudVisibility = false,
         };
-        // The shell warmed the videos during loading; hand the preloader to the rehosted renderer so
-        // createVideo consumes those warm sources instead of re-creating decoders on the game thread.
+
+        // The shell has already loaded every BGA resource. Transfer the complete resource set to
+        // the renderer instead of letting its dependency loader retain a second copy of all source
+        // bytes, decoded textures, and warmed video sources for the duration of gameplay.
+        rehostedDisplay.bga = bga;
+        rehostedDisplay.resources = resources;
+        rehostedDisplay.textures = textures;
         rehostedDisplay.videoPreloader = videoPreloader;
+        rehostedDisplay.events = events;
+        rehostedDisplay.opacityEvents = opacityEvents;
+        resources = null;
+        textures = null;
+        videoPreloader = null;
         if (bgaDim != null)
             rehostedDisplay.applyBgaDim(bgaDim.Value);
         rehostedDisplayHost = new RehostedDisplayHost
@@ -542,7 +551,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         applyLayerVisibility();
     }
 
-    private sealed class BmsBgaResourceStore(string? sourceDirectory, IBindable<WorkingBeatmap>? workingBeatmap) : IResourceStore<byte[]>
+    internal sealed class BmsBgaResourceStore(string? sourceDirectory, IBindable<WorkingBeatmap>? workingBeatmap) : IResourceStore<byte[]>
     {
         private readonly BmsFileResourceStore? externalStore = !string.IsNullOrWhiteSpace(sourceDirectory) && Directory.Exists(sourceDirectory)
             ? new BmsFileResourceStore(sourceDirectory)
@@ -721,6 +730,12 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
 
         public void Dispose()
         {
+            lock (cacheLock)
+            {
+                cache.Clear();
+                resolvedLookups.Clear();
+            }
+
             externalStore?.Dispose();
         }
     }

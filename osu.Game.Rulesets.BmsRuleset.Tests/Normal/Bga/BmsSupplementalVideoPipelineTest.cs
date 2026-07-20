@@ -47,6 +47,23 @@ public class BmsSupplementalVideoPipelineTest
     }
 
     [Test]
+    public void TestFrameSourceDisposalWaitsForWorker()
+    {
+        requireSupplementalNativeArtifacts();
+
+        var bytes = File.ReadAllBytes(Path.Combine(TestContext.CurrentContext.TestDirectory, "bga_fixtures", "mpeg1.mpg"));
+        var source = new BmsSupplementalVideoFrameSource(bytes);
+
+        source.Start();
+        Assert.That(waitUntil(() => source.Stats.DecodedFrames > 0, TimeSpan.FromSeconds(3)), Is.True);
+
+        source.Dispose();
+
+        Assert.That(source.WorkerCompleted, Is.True);
+        Assert.DoesNotThrow(source.Dispose);
+    }
+
+    [Test]
     public void TestFrameSourceDecodesAlephOnWorkerAndReturnsLatestFrame()
     {
         requireSupplementalNativeArtifacts();

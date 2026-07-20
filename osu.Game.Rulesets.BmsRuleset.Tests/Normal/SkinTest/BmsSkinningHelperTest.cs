@@ -34,13 +34,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SkinTest;
 [TestFixture]
 public class BmsSkinningHelperTest
 {
-
-    [SetUp]
-    public void SetUp() => BmsLongNoteBodySource.ClearCache();
-
-    [TearDown]
-    public void TearDown() => BmsLongNoteBodySource.ClearCache();
-
     private readonly DummyRenderer renderer = new();
 
     private static byte[] createPng(int width, int height)
@@ -516,8 +509,9 @@ public class BmsSkinningHelperTest
         };
         var source = new TestSkinSource(rawSkin);
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1);
+        using var cache = new BmsLongNoteBodySource.BmsLongNoteBodyTextureCache();
 
-        var resolved = BmsLongNoteBodySource.Resolve(source, lookup, renderer);
+        var resolved = BmsLongNoteBodySource.Resolve(source, lookup, renderer, cache);
 
         Assert.That(resolved, Is.Not.Null);
         Assert.That(resolved!.Value.Kind, Is.EqualTo(BmsLongNoteBodyTextureKind.SpatialSlices));
@@ -537,8 +531,9 @@ public class BmsSkinningHelperTest
         };
         var source = new TestSkinSource(skin);
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1);
+        using var cache = new BmsLongNoteBodySource.BmsLongNoteBodyTextureCache();
 
-        var resolved = BmsLongNoteBodySource.Resolve(source, lookup, renderer);
+        var resolved = BmsLongNoteBodySource.Resolve(source, lookup, renderer, cache);
 
         Assert.That(resolved, Is.Not.Null);
         Assert.That(resolved!.Value.Kind, Is.EqualTo(BmsLongNoteBodyTextureKind.AnimationFrames));

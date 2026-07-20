@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
+using osu.Framework.Audio.Track;
 using osu.Framework.Testing;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 
@@ -107,6 +108,36 @@ public partial class TestBmsSampleStoreRate : TestScene
         AddUntilStep("store loads without timeout", () => store.IsLoaded);
         AddAssert("invalid track is unavailable", () => store.GetTrack(1) == null);
         addCleanupSteps();
+    }
+
+    [Test]
+    public void DisposalReleasesOwnedTracks()
+    {
+        Track ownedTrack = null!;
+
+        AddStep("create sample + store", () =>
+        {
+            createWav("dispose.wav", 1);
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "dispose.wav" } }, tempDir));
+        });
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddStep("retain track for disposal check", () => ownedTrack = store.GetTrack(1));
+        AddStep("expire store", () => store.Expire());
+        AddUntilStep("owned track disposed", () => ownedTrack.IsDisposed);
+        AddUntilStep("cleanup temp dir", () =>
+        {
+            try
+            {
+                if (Directory.Exists(tempDir))
+                    Directory.Delete(tempDir, true);
+
+                return true;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+        });
     }
 
     private void createWav(string filename, int seconds)

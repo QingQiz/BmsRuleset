@@ -11,7 +11,6 @@ using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
@@ -67,10 +66,6 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
     /// <param name="embeddedFallbacks">The BMS embedded fallback chain to consult after <paramref name="parent"/> misses.</param>
     public void SetSources(ISkinSource parent, BmsEmbeddedSkinFallbackChain? embeddedFallbacks)
     {
-        // A source switch may replace the user skin, embedded fallback kind, renderer-backed texture
-        // stores, or all of the above. Invalidate raw LN body slices once per source switch rather
-        // than from every active drawable's SourceChanged handler.
-        BmsLongNoteBodySource.ClearCache();
         DisposeEmbeddedSkins();
 
         this.parent = parent;

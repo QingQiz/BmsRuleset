@@ -63,6 +63,7 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
     private int? column;
     private BmsLayoutVariant layoutVariant;
     private bool slicesDirty = true;
+    private BmsLongNoteBodySource.BmsLongNoteBodyTextureCache? fallbackTextureCache;
 
     [Resolved(CanBeNull = true)]
     private ISkinSource? skin { get; set; }
@@ -99,6 +100,8 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
 
         if (skin != null)
             skin.SourceChanged -= onSkinChanged;
+
+        fallbackTextureCache?.Dispose();
     }
 
     #endregion
@@ -173,6 +176,7 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         reusableParts.Clear();
         segmentContainer.Clear(disposeChildren: true);
         spritePool.Clear();
+        fallbackTextureCache?.Clear();
         fallback.Alpha = 1;
     }
 
@@ -200,8 +204,9 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
             return;
 
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, layoutVariant, column.Value);
-        var textures = gameplaySkinCache?.GetLongNoteBodyTextureSet(lookup, renderer)
-                       ?? BmsLongNoteBodySource.Resolve(skin, lookup, renderer);
+        var textures = gameplaySkinCache != null
+            ? gameplaySkinCache.GetLongNoteBodyTextureSet(lookup, renderer)
+            : BmsLongNoteBodySource.Resolve(skin, lookup, renderer, fallbackTextureCache ??= new BmsLongNoteBodySource.BmsLongNoteBodyTextureCache());
 
         if (textures == null)
             return;

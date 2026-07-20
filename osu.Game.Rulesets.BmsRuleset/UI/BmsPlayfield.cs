@@ -84,9 +84,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         Stage.SkinHitTargetPositionChanged -= onSkinHitTargetPositionChanged;
         NewResult -= onNewResult;
         parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
+        base.Dispose(isDisposing);
         skinCache.Dispose();
         activeSkin.DisposeEmbeddedSkins();
-        base.Dispose(isDisposing);
     }
 
     #endregion
