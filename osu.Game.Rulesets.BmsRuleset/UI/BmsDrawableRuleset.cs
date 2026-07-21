@@ -45,7 +45,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         sampleStore = new BmsSampleStore(
             bmsBeatmap.SampleDefinitions,
             getSource(bmsBeatmap),
-            getRate(Mods)
+            getRate(Mods),
+            getSampleUsages(bmsBeatmap)
         );
     }
 
@@ -193,13 +194,28 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
     /// <summary>
     ///     The active rate mod's SpeedChange (1.0 when no rate mod is selected). Applied as the
-    ///     tempo of every preloaded sample Track so audio stays pitch-preserving and follows the
+    ///     tempo of every loaded sample Track so audio stays pitch-preserving and follows the
     ///     rate-scaled chart clock.
     /// </summary>
     private static double getRate(IReadOnlyList<Mod>? mods)
     {
         var rateMod = mods?.OfType<ModRateAdjust>().FirstOrDefault();
         return rateMod?.SpeedChange.Value ?? 1.0;
+    }
+
+    private static IEnumerable<BmsSampleUsage> getSampleUsages(BmsBeatmap beatmap)
+    {
+        foreach (var evt in beatmap.BackgroundSampleEvents)
+            yield return new BmsSampleUsage(evt.SampleKey, evt.Time);
+
+        foreach (var hitObject in beatmap.HitObjects)
+        {
+            if (hitObject.SampleKey is { } sampleKey)
+                yield return new BmsSampleUsage(sampleKey, hitObject.StartTime);
+
+            if (hitObject is BmsLongNote { TailSampleKey: { } tailSampleKey } longNote)
+                yield return new BmsSampleUsage(tailSampleKey, longNote.EndTime);
+        }
     }
 
     /// <summary>
@@ -239,8 +255,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
         Overlays.Add(StageHudController);
 
-        // Add the shared store to the tree so every definition Track finishes loading before
-        // gameplay begins.
+        // The store follows the gameplay clock to load definition Tracks before their first use.
         FrameStableComponents.Add(sampleStore);
 
         var events = beatmap.BackgroundSampleEvents

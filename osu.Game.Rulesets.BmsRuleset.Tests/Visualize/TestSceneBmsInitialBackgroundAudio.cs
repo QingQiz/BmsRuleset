@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -24,7 +23,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
 {
     private ushort backgroundKey;
-    private int sampleDefinitionCount;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(null);
 
@@ -48,7 +46,6 @@ public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset, endPadding: 3000, bpm: 120);
         beatmap.BeatmapInfo.Metadata.Source = directory;
         backgroundKey = beatmap.SampleDefinitions.Single(pair => pair.Value.Equals("bgm1.wav", StringComparison.OrdinalIgnoreCase)).Key;
-        sampleDefinitionCount = beatmap.SampleDefinitions.Count;
         return beatmap;
     }
 
@@ -57,12 +54,9 @@ public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
     {
         AddStep("load player", LoadPlayer);
         AddUntilStep("drawable ruleset created", () => Player.DrawableRuleset != null);
-        AddUntilStep("sample tracks created", () => getTracks().Count == sampleDefinitionCount);
-        AddUntilStep("quarter of sample tracks loaded", () => getLoadedTrackRatio() >= 0.25);
-        AddUntilStep("half of sample tracks loaded", () => getLoadedTrackRatio() >= 0.5);
-        AddUntilStep("three quarters of sample tracks loaded", () => getLoadedTrackRatio() >= 0.75);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         AddUntilStep("sample store loaded", () => getSampleStore().IsLoaded);
+        AddUntilStep("initial background track loaded", () => getBackgroundTrack() is { IsLoaded: true });
         AddAssert("still before first note", () => Player.GameplayClockContainer.CurrentTime < Player.GameplayState.Beatmap.HitObjects[0].StartTime);
         AddAssert("sample playback enabled", () => !((ISamplePlaybackDisabler)Player).SamplePlaybackDisabled.Value);
         AddAssert("frame clock not catching up", () => !Player.DrawableRuleset.FrameStableClock.IsCatchingUp.Value);
@@ -89,14 +83,4 @@ public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
 
     private Track? getBackgroundTrack() => getSampleStore().GetTrack(backgroundKey);
 
-    private Dictionary<ushort, Track> getTracks() =>
-        (Dictionary<ushort, Track>)typeof(BmsSampleStore)
-            .GetField("tracks", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(getSampleStore())!;
-
-    private double getLoadedTrackRatio()
-    {
-        var tracks = getTracks();
-        return (double)tracks.Values.Count(track => track.IsLoaded) / tracks.Count;
-    }
 }

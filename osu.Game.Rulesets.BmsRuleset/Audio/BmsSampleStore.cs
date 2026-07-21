@@ -15,30 +15,41 @@ using osu.Framework.Logging;
 
 namespace osu.Game.Rulesets.BmsRuleset.Audio;
 
+public readonly record struct BmsSampleUsage(ushort SampleKey, double Time);
+
 /// <summary>
-///     Owns one preloaded, seekable <see cref="Track" /> for every chart sample definition.
+///     Owns seekable <see cref="Track" /> instances for chart sample definitions.
 /// </summary>
 /// <remarks>
 ///     Track identity follows the BMS definition key rather than the resolved file path. Reusing a
 ///     key therefore truncates and restarts its existing playback, while distinct keys can overlap
-///     even when they reference the same file.
+///     even when they reference the same file. When sample usages are supplied, Tracks are loaded
+///     shortly before their first scheduled use and retained until this store is disposed.
 /// </remarks>
 public partial class BmsSampleStore : Component
 {
     private static readonly TimeSpan track_load_timeout = TimeSpan.FromSeconds(30);
     private const int track_load_batch_size = 16;
+    private const double track_prefetch_time = 10_000;
 
     public double MaxTrackLengthMilliseconds => tracks.Count == 0 ? 0 : tracks.Values.Max(track => track.Length);
 
     private readonly IReadOnlyDictionary<ushort, string> sampleDefinitions;
+    private readonly IEnumerable<BmsSampleUsage>? sampleUsages;
     private readonly string? basePath;
     private readonly double rate;
 
+    private SampleLifetime[]? sampleLifetimes;
+    private int nextLifetimeIndex;
+
     private readonly Dictionary<ushort, Track> tracks = [];
+    private readonly Dictionary<ushort, Task<Track?>> trackInitialisations = [];
+    private readonly Dictionary<ushort, PendingPlay> pendingPlays = [];
     private readonly HashSet<ushort> activeKeys = [];
     private readonly HashSet<ushort> pausedKeys = [];
     private readonly Dictionary<ushort, TrackCommandQueue> commandQueues = [];
     private readonly object commandLock = new();
+    private readonly CancellationTokenSource runtimeLoadCancellation = new();
 
     private ITrackStore? trackStore;
     private bool playbackBlocked;
@@ -50,17 +61,21 @@ public partial class BmsSampleStore : Component
     public BmsSampleStore(
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
         string? basePath = null,
-        double rate = 1.0)
+        double rate = 1.0,
+        IEnumerable<BmsSampleUsage>? sampleUsages = null)
     {
         this.sampleDefinitions = sampleDefinitions
             .Where(pair => !string.IsNullOrEmpty(pair.Value))
             .ToDictionary(pair => pair.Key, pair => pair.Value);
+        this.sampleUsages = sampleUsages;
         this.basePath = basePath;
         this.rate = rate;
     }
 
     protected override void Dispose(bool isDisposing)
     {
+        runtimeLoadCancellation.Cancel();
+
         lock (commandLock)
         {
             this.isDisposing = true;
@@ -72,6 +87,15 @@ public partial class BmsSampleStore : Component
         activeKeys.Clear();
         pausedKeys.Clear();
         commandQueues.Clear();
+        pendingPlays.Clear();
+
+        foreach (var task in trackInitialisations.Values)
+        {
+            if (task.IsCompletedSuccessfully)
+                task.Result?.Dispose();
+        }
+
+        trackInitialisations.Clear();
 
         // Queue each owned track for native BASS cleanup directly. Relying only on the nested
         // TrackStore would defer this by an additional audio-collection update.
@@ -81,6 +105,7 @@ public partial class BmsSampleStore : Component
         tracks.Clear();
         trackStore?.Dispose();
         trackStore = null;
+        runtimeLoadCancellation.Dispose();
         base.Dispose(isDisposing);
     }
 
@@ -94,11 +119,26 @@ public partial class BmsSampleStore : Component
     /// </summary>
     internal void Play(ushort sampleKey, int volume = 100, double offset = 0)
     {
-        if (playbackBlocked || !tracks.TryGetValue(sampleKey, out var track))
+        if (playbackBlocked || !sampleDefinitions.ContainsKey(sampleKey))
             return;
 
         offset = Math.Max(0, offset);
+        ensureTrackLoaded(sampleKey);
 
+        if (trackInitialisations.ContainsKey(sampleKey))
+        {
+            pendingPlays[sampleKey] = new PendingPlay(volume, offset, Time.Current);
+            return;
+        }
+
+        if (!tracks.TryGetValue(sampleKey, out var track))
+            return;
+
+        playLoadedTrack(sampleKey, track, volume, offset);
+    }
+
+    private void playLoadedTrack(ushort sampleKey, Track track, int volume, double offset)
+    {
         if (track.Length <= 0 || offset >= track.Length)
             return;
 
@@ -153,7 +193,148 @@ public partial class BmsSampleStore : Component
     protected override void Update()
     {
         base.Update();
+
+        updateTrackInitialisations();
         activeKeys.RemoveWhere(sampleKey => !hasPendingCommand(sampleKey) && tracks[sampleKey].HasCompleted);
+
+        if (sampleLifetimes == null || trackStore == null)
+            return;
+
+        var loadsStarted = 0;
+
+        while (nextLifetimeIndex < sampleLifetimes.Length && loadsStarted < track_load_batch_size)
+        {
+            var lifetime = sampleLifetimes[nextLifetimeIndex];
+
+            if (lifetime.LifetimeStart > Time.Current)
+                break;
+
+            nextLifetimeIndex++;
+
+            if (tracks.ContainsKey(lifetime.SampleKey))
+                continue;
+
+            ensureTrackLoaded(lifetime.SampleKey);
+            loadsStarted++;
+        }
+    }
+
+    private void ensureTrackLoaded(ushort sampleKey)
+    {
+        if (tracks.ContainsKey(sampleKey) || trackInitialisations.ContainsKey(sampleKey))
+            return;
+
+        trackInitialisations[sampleKey] = loadTrackAsync(sampleKey, runtimeLoadCancellation.Token);
+    }
+
+    private async Task<Track?> loadTrackAsync(ushort sampleKey, CancellationToken cancellationToken)
+    {
+        if (trackStore == null || !sampleDefinitions.TryGetValue(sampleKey, out var path))
+            return null;
+
+        Track? track = null;
+
+        try
+        {
+            foreach (var lookup in new BmsSampleInfo(path).LookupNames)
+            {
+                track = await trackStore.GetAsync(lookup, cancellationToken).ConfigureAwait(false);
+
+                if (track == null)
+                    continue;
+
+                configureTrack(track);
+
+                if (!await track.SeekAsync(0).ConfigureAwait(false) || !track.IsLoaded)
+                {
+                    track.Dispose();
+                    return null;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                return track;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            track?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            track?.Dispose();
+
+            if (!cancellationToken.IsCancellationRequested)
+                Logger.Error(exception, $"Failed to initialise BMS sample key {sampleKey:X2}.");
+        }
+
+        return null;
+    }
+
+    private Task<bool>? tryCreateTrack(ushort sampleKey)
+    {
+        if (trackStore == null || !sampleDefinitions.TryGetValue(sampleKey, out var path))
+            return null;
+
+        foreach (var lookup in new BmsSampleInfo(path).LookupNames)
+        {
+            var track = trackStore.Get(lookup);
+
+            if (track == null)
+                continue;
+
+            configureTrack(track);
+
+            tracks[sampleKey] = track;
+            return track.SeekAsync(0);
+        }
+
+        return null;
+    }
+
+    private void configureTrack(Track track)
+    {
+        if (Math.Abs(rate - 1.0) > 0.001)
+            track.AddAdjustment(AdjustableProperty.Tempo, new BindableDouble(rate));
+    }
+
+    private void updateTrackInitialisations()
+    {
+        foreach (var (sampleKey, task) in trackInitialisations.ToArray())
+        {
+            if (!task.IsCompleted)
+                continue;
+
+            trackInitialisations.Remove(sampleKey);
+
+            if (task.IsCompletedSuccessfully && task.Result is { } track)
+            {
+                tracks[sampleKey] = track;
+
+                if (pendingPlays.Remove(sampleKey, out var pendingPlay))
+                {
+                    var elapsed = Math.Max(0, Time.Current - pendingPlay.RequestedAt);
+                    playLoadedTrack(sampleKey, track, pendingPlay.Volume, pendingPlay.Offset + elapsed);
+                }
+
+                continue;
+            }
+
+            pendingPlays.Remove(sampleKey);
+            var trackName = tracks.GetValueOrDefault(sampleKey)?.Name ?? $"key {sampleKey:X2}";
+            discardFailedTrack(sampleKey);
+            Logger.Log(
+                $"Failed to load BMS sample track {trackName}; this definition will be unavailable during gameplay.",
+                LoggingTarget.Runtime,
+                LogLevel.Important);
+        }
+    }
+
+    private void discardFailedTrack(ushort sampleKey)
+    {
+        if (!tracks.Remove(sampleKey, out var track))
+            return;
+
+        track.Dispose();
     }
 
     private void queueCommand(ushort sampleKey, TrackCommand command)
@@ -256,74 +437,78 @@ public partial class BmsSampleStore : Component
         resources.AddExtension("mp3");
         resources.AddExtension("ogg");
         trackStore = audioManager.GetTrackStore(resources);
-        Dictionary<ushort, Task<bool>> trackInitialisationTasks = [];
-        var loadStopwatch = Stopwatch.StartNew();
 
-        foreach (var (sampleKey, path) in sampleDefinitions)
+        if (sampleUsages != null)
         {
-            cancellationToken?.ThrowIfCancellationRequested();
-
-            if (loadStopwatch.Elapsed >= track_load_timeout)
-                break;
-
-            foreach (var lookup in new BmsSampleInfo(path).LookupNames)
+            sampleLifetimes = sampleUsages
+                .Where(usage => sampleDefinitions.ContainsKey(usage.SampleKey))
+                .GroupBy(usage => usage.SampleKey)
+                .Select(group => new SampleLifetime(group.Key, group.Min(usage => usage.Time) - track_prefetch_time))
+                .OrderBy(lifetime => lifetime.LifetimeStart)
+                .ToArray();
+            while (nextLifetimeIndex < sampleLifetimes.Length
+                   && sampleLifetimes[nextLifetimeIndex].LifetimeStart <= Time.Current)
             {
-                var track = trackStore.Get(lookup);
-
-                if (track == null)
-                    continue;
-
-                if (Math.Abs(rate - 1.0) > 0.001)
-                    track.AddAdjustment(AdjustableProperty.Tempo, new BindableDouble(rate));
-
-                tracks[sampleKey] = track;
-                trackInitialisationTasks[sampleKey] = track.SeekAsync(0);
-                break;
+                nextLifetimeIndex++;
             }
+        }
 
-            if (trackInitialisationTasks.Count < track_load_batch_size)
+        // The first lifetime window must be ready before gameplay can leave its loading state.
+        var initialKeys = sampleLifetimes == null
+            ? sampleDefinitions.Keys
+            : sampleLifetimes.Take(nextLifetimeIndex).Select(lifetime => lifetime.SampleKey);
+        preloadTracks(initialKeys, cancellationToken ?? CancellationToken.None);
+    }
+
+    private void preloadTracks(IEnumerable<ushort> sampleKeys, CancellationToken cancellationToken)
+    {
+        Dictionary<ushort, Task<bool>> tasks = [];
+        var stopwatch = Stopwatch.StartNew();
+
+        foreach (var sampleKey in sampleKeys)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (stopwatch.Elapsed >= track_load_timeout)
+                break;
+
+            if (tryCreateTrack(sampleKey) is { } task)
+                tasks[sampleKey] = task;
+
+            if (tasks.Count < track_load_batch_size)
                 continue;
 
             // Bounded batches keep the audio update queue responsive enough to continue the
             // song-select preview while gameplay resources are prepared in the background.
-            waitForTracks(trackInitialisationTasks, cancellationToken ?? CancellationToken.None, loadStopwatch);
-            trackInitialisationTasks.Clear();
+            waitForTracks(tasks, cancellationToken, stopwatch);
+            tasks.Clear();
         }
 
-        // Dependency loaders are invoked synchronously, so returning a Task here would let the
-        // drawable become loaded before the audio thread has initialised these Tracks.
-        waitForTracks(trackInitialisationTasks, cancellationToken ?? CancellationToken.None, loadStopwatch);
+        // Dependency loaders are synchronous, so the initial window must finish before returning.
+        waitForTracks(tasks, cancellationToken, stopwatch);
     }
 
-    private void waitForTracks(IReadOnlyDictionary<ushort, Task<bool>> trackInitialisationTasks, CancellationToken cancellationToken, Stopwatch stopwatch)
+    private void waitForTracks(IReadOnlyDictionary<ushort, Task<bool>> tasks, CancellationToken cancellationToken, Stopwatch stopwatch)
     {
-        while (trackInitialisationTasks.Values.Any(task => !task.IsCompleted) && stopwatch.Elapsed < track_load_timeout)
+        while (tasks.Values.Any(task => !task.IsCompleted) && stopwatch.Elapsed < track_load_timeout)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Thread.Sleep(10);
         }
 
-        var timedOutTracks = trackInitialisationTasks
-            .Where(pair => !pair.Value.IsCompleted)
-            .Select(pair => (pair.Key, Track: tracks[pair.Key]))
-            .ToArray();
-
-        var failedTracks = trackInitialisationTasks
-            .Where(pair => pair.Value.IsCompleted && (!pair.Value.IsCompletedSuccessfully || !tracks[pair.Key].IsLoaded))
-            .Select(pair => (pair.Key, Track: tracks[pair.Key]))
-            .ToArray();
-
-        foreach (var (key, track) in timedOutTracks.Concat(failedTracks))
+        foreach (var (sampleKey, task) in tasks)
         {
-            track.Dispose();
-            tracks.Remove(key);
+            var track = tracks[sampleKey];
+
+            if (task.IsCompletedSuccessfully && task.Result && track.IsLoaded)
+                continue;
+
+            Logger.Log(
+                $"{(task.IsCompleted ? "Failed to load" : "Timed out while loading")} BMS sample track {track.Name}; this definition will be unavailable during gameplay.",
+                LoggingTarget.Runtime,
+                LogLevel.Important);
+            discardFailedTrack(sampleKey);
         }
-
-        if (timedOutTracks.Length > 0)
-            Logger.Log($"Timed out while loading {timedOutTracks.Length} BMS sample tracks ({string.Join(", ", timedOutTracks.Select(pair => pair.Track.Name).Distinct())}); those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
-
-        if (failedTracks.Length > 0)
-            Logger.Log($"Failed to load {failedTracks.Length} BMS sample tracks ({string.Join(", ", failedTracks.Select(pair => pair.Track.Name).Distinct())}); those definitions will be unavailable during gameplay.", LoggingTarget.Runtime, LogLevel.Important);
     }
 
     private enum TrackCommandType
@@ -334,6 +519,10 @@ public partial class BmsSampleStore : Component
     }
 
     private readonly record struct TrackCommand(TrackCommandType Type, double Offset = 0);
+
+    private readonly record struct PendingPlay(int Volume, double Offset, double RequestedAt);
+
+    private readonly record struct SampleLifetime(ushort SampleKey, double LifetimeStart);
 
     private sealed class TrackCommandQueue(Track track)
     {

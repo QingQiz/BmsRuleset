@@ -3,6 +3,7 @@ using System.IO;
 using NUnit.Framework;
 using osu.Framework.Audio.Track;
 using osu.Framework.Testing;
+using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Audio;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
@@ -12,6 +13,57 @@ public partial class TestBmsSampleStoreRate : TestScene
 {
     private string tempDir = null!;
     private BmsSampleStore store = null!;
+
+    [Test]
+    public void ScheduledTrackLoadsTenSecondsBeforeUse()
+    {
+        var manualClock = new ManualClock();
+
+        AddStep("create scheduled sample + store", () =>
+        {
+            createWav("scheduled.wav", 1);
+            store = new BmsSampleStore(
+                new Dictionary<ushort, string> { { 1, "scheduled.wav" } },
+                tempDir,
+                sampleUsages: [new BmsSampleUsage(1, 10_001)])
+            {
+                Clock = new FramedClock(manualClock),
+            };
+            Add(store);
+        });
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddAssert("track outside prefetch window", () => store.GetTrack(1) == null);
+        AddStep("enter prefetch window", () => manualClock.CurrentTime = 1);
+        AddUntilStep("track loads in prefetch window", () => store.GetTrack(1) is { IsLoaded: true });
+        addCleanupSteps();
+    }
+
+    [Test]
+    public void ScheduledTrackRemainsLoadedAfterLastUse()
+    {
+        Track ownedTrack = null!;
+        var manualClock = new ManualClock();
+
+        AddStep("create expiring sample + store", () =>
+        {
+            createWav("retained.wav", 1);
+            store = new BmsSampleStore(
+                new Dictionary<ushort, string> { { 1, "retained.wav" } },
+                tempDir,
+                sampleUsages: [new BmsSampleUsage(1, 100)])
+            {
+                Clock = new FramedClock(manualClock),
+            };
+            Add(store);
+        });
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddAssert("scheduled track loaded during store load", () => store.GetTrack(1) is { IsLoaded: true });
+        AddStep("retain scheduled track", () => ownedTrack = store.GetTrack(1));
+        AddStep("advance past last use", () => manualClock.CurrentTime = 60_000);
+        AddAssert("track remains loaded", () => ReferenceEquals(store.GetTrack(1), ownedTrack));
+        AddAssert("track remains undisposed", () => !ownedTrack.IsDisposed);
+        addCleanupSteps();
+    }
 
     [Test]
     public void PreloadWaitsForTracks()
