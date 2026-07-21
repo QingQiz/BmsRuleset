@@ -16,10 +16,15 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 public partial class BmsBuiltInSkinTransformer(ISkin skin) : SkinTransformer(skin)
 {
     /// <inheritdoc/>
-    public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup) =>
-        lookup is BmsSkinComponentLookup or SkinComponentLookup<HitResult>
+    public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
+    {
+        if (BmsDefaultHud.TryGetMainHudWithStage(lookup, () => base.GetDrawableComponent(lookup), out var mainHud))
+            return mainHud;
+
+        return lookup is BmsSkinComponentLookup or SkinComponentLookup<HitResult>
             ? null
             : BmsDefaultHud.GetDrawableComponent(lookup) ?? base.GetDrawableComponent(lookup);
+    }
 
     /// <inheritdoc/>
     /// return null for every skin lookup, thus fall through to BmsEmbeddedSkinFallbackChain

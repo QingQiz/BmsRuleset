@@ -552,6 +552,17 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestRulesetTransformerRegeneratesStageHudMissingFromSavedLayout()
+    {
+        var savedLayout = new Container();
+        var transformer = new BmsLegacySkinTransformer(new TestDrawableSkin { Drawable = savedLayout }, createBeatmap());
+
+        var hud = transformer.GetDrawableComponent(createUserMainHudLookup());
+
+        Assert.That(hud!.ChildrenOfType<BmsStageHud>().Count(), Is.EqualTo(1));
+    }
+
+    [Test]
     public void TestSavedBmsHudLayoutRemovesDuplicateStageHuds()
     {
         using var source = new BmsEmbeddedSkinSource();

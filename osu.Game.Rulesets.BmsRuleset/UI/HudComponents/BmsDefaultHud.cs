@@ -1,5 +1,7 @@
 ﻿using System.Linq;
+using System.Reflection;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
@@ -9,6 +11,24 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 public static class BmsDefaultHud
 {
+    internal static bool TryGetMainHudWithStage(ISkinComponentLookup lookup, System.Func<Drawable?> getUserLayout, out Drawable? mainHud)
+    {
+        if (lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null } directLookup)
+        {
+            mainHud = ensureSingleStageHud(GetDrawableComponent(directLookup));
+            return true;
+        }
+
+        if (tryGetBmsMainHudLookupFromUserLookup(lookup, out var userLookup))
+        {
+            mainHud = ensureSingleStageHud(getUserLayout() ?? GetDrawableComponent(userLookup));
+            return true;
+        }
+
+        mainHud = null;
+        return false;
+    }
+
     public static Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
     {
         if (lookup is not GlobalSkinnableContainerLookup containerLookup)
@@ -27,6 +47,41 @@ public static class BmsDefaultHud
         }
 
         return null;
+    }
+
+    private static bool tryGetBmsMainHudLookupFromUserLookup(ISkinComponentLookup lookup, out GlobalSkinnableContainerLookup mainHudLookup)
+    {
+        mainHudLookup = null!;
+
+        if (lookup.GetType().FullName != "osu.Game.Skinning.UserSkinComponentLookup")
+            return false;
+
+        var component = lookup.GetType().GetField("Component", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(lookup);
+
+        if (component is not GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null } globalLookup)
+            return false;
+
+        mainHudLookup = globalLookup;
+        return true;
+    }
+
+    private static Drawable? ensureSingleStageHud(Drawable? drawable)
+    {
+        if (drawable is not Container container)
+            return drawable;
+
+        var stageHuds = container.OfType<BmsStageHud>().ToArray();
+
+        if (stageHuds.Length == 0)
+        {
+            container.Add(new BmsStageHud());
+            return drawable;
+        }
+
+        foreach (var duplicate in stageHuds.Skip(1))
+            container.Remove(duplicate, true);
+
+        return drawable;
     }
 
     private static Drawable bmsPlayfield()

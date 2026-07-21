@@ -58,7 +58,7 @@ public partial class BmsGameplayVirtualisationTest
             Anchor = Anchor.TopLeft,
             Origin = Anchor.TopLeft,
             Position = new Vector2(600, 250),
-            Size = new Vector2(0.2f, 0.5f),
+            Size = new Vector2(200, 0.5f),
         };
         var controller = new BmsStageHudController(playfield);
 
@@ -103,7 +103,7 @@ public partial class BmsGameplayVirtualisationTest
         {
             Anchor = Anchor.TopLeft,
             Origin = Anchor.TopLeft,
-            Size = new Vector2(0.1f, 1),
+            Size = new Vector2(100, 1),
             Scale = new Vector2(2),
         };
         var controller = new BmsStageHudController(playfield);
@@ -141,7 +141,7 @@ public partial class BmsGameplayVirtualisationTest
         {
             Anchor = Anchor.TopLeft,
             Origin = Anchor.TopLeft,
-            Size = new Vector2(0.1f, 1),
+            Size = new Vector2(100, 1),
             Scale = new Vector2(2),
         };
         var controller = new BmsStageHudController(playfield);
@@ -152,7 +152,7 @@ public partial class BmsGameplayVirtualisationTest
 
         Assert.That(playfield.Stage.Scale, Is.EqualTo(new Vector2(2)));
 
-        stageHud.Width = 0.15f;
+        stageHud.Width = 150;
         controller.ApplyStageTransform(new Vector2(300, 1200), new Vector2(500, 600));
 
         Assert.Multiple(() =>
@@ -185,7 +185,7 @@ public partial class BmsGameplayVirtualisationTest
         {
             Anchor = Anchor.TopLeft,
             Origin = Anchor.TopLeft,
-            Size = new Vector2(0.1f, 1),
+            Size = new Vector2(100, 1),
         };
         stageHud.NoteHeightScale.Value = 1.5f;
         var controller = new BmsStageHudController(playfield);
@@ -233,7 +233,7 @@ public partial class BmsGameplayVirtualisationTest
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = new Vector2(100, 600);
 
-        var stageHud = new BmsStageHud { Size = new Vector2(0.1f, 1) };
+        var stageHud = new BmsStageHud { Size = new Vector2(100, 1) };
         var controller = new BmsStageHudController(playfield);
 
         setDrawableParent(playfield, root);
@@ -260,7 +260,7 @@ public partial class BmsGameplayVirtualisationTest
     }
 
     [Test]
-    public void TestStageHudSizeTracksDifferentEditorAndGameplayCanvasSizes()
+    public void TestStageHudWidthIsStableAcrossEditorAndGameplayCanvasSizes()
     {
         var root = new Container { Size = new Vector2(1000, 600) };
         var hudCanvas = new Container { Size = new Vector2(800, 600) };
@@ -281,7 +281,7 @@ public partial class BmsGameplayVirtualisationTest
         {
             Anchor = Anchor.TopLeft,
             Origin = Anchor.TopLeft,
-            Size = new Vector2(0.75f, 0.5f),
+            Size = new Vector2(600, 0.5f),
         };
         var controller = new BmsStageHudController(playfield);
 
@@ -292,17 +292,26 @@ public partial class BmsGameplayVirtualisationTest
 
         Assert.That(playfield.Stage.Scale.X, Is.EqualTo(6).Within(0.001f));
 
-        // Reloading the editor-authored layout into the wider gameplay canvas retains the relative
-        // width instead of carrying over the editor's 600-pixel frame width.
+        // Reloading the editor-authored layout into a wider gameplay canvas must not rescale its width.
         var runtimeStageHud = (BmsStageHud)stageHud.CreateSerialisedInfo().CreateInstance();
         setDrawableParent(runtimeStageHud, root);
         controller.Register(runtimeStageHud);
 
         Assert.Multiple(() =>
         {
-            Assert.That(runtimeStageHud.Width, Is.EqualTo(0.75f));
-            Assert.That(playfield.Stage.Scale.X, Is.EqualTo(7.5f).Within(0.001f));
+            Assert.That(runtimeStageHud.Width, Is.EqualTo(600));
+            Assert.That(playfield.Stage.Scale.X, Is.EqualTo(6).Within(0.001f));
         });
+
+        var legacyRelativeStageHud = new BmsStageHud
+        {
+            Width = 0.3716294f,
+            Height = 0.5f,
+        };
+        setDrawableParent(legacyRelativeStageHud, root);
+        controller.Register(legacyRelativeStageHud);
+
+        Assert.That(legacyRelativeStageHud.Width, Is.EqualTo(600).Within(0.001f));
     }
 
     [Test]
@@ -327,7 +336,7 @@ public partial class BmsGameplayVirtualisationTest
             Anchor = Anchor.TopLeft,
             Origin = Anchor.TopLeft,
             Position = new Vector2(450, 150),
-            Size = new Vector2(0.1f, 0.5f),
+            Size = new Vector2(100, 0.5f),
         };
         var controller = new BmsStageHudController(playfield);
 
@@ -374,7 +383,7 @@ public partial class BmsGameplayVirtualisationTest
         setAutoSizeAxes(playfield.Stage, Axes.None);
         playfield.Stage.Size = Vector2.Zero;
 
-        var stageHud = new BmsStageHud { Size = new Vector2(0.2f, 0.5f) };
+        var stageHud = new BmsStageHud { Size = new Vector2(200, 0.5f) };
         var controller = new BmsStageHudController(playfield);
 
         setDrawableParent(playfield, root);

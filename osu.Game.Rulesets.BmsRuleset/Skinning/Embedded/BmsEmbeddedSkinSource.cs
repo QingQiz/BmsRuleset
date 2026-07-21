@@ -1,12 +1,9 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
@@ -80,7 +77,8 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
     /// </summary>
     public Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
     {
-        if (tryGetMainHudWithStage(lookup, out var mainHud))
+        if (BmsDefaultHud.TryGetMainHudWithStage(lookup,
+                () => parent?.GetDrawableComponent(lookup) ?? embeddedFallbacks?.GetDrawableComponent(lookup), out var mainHud))
             return mainHud;
 
         var drawable = lookup is
@@ -94,62 +92,6 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
         return lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents }
             ? BmsDefaultHud.GetDrawableComponent(lookup)
             : drawable;
-    }
-
-    private bool tryGetMainHudWithStage(ISkinComponentLookup lookup, out Drawable? mainHud)
-    {
-        if (lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null } directLookup)
-        {
-            mainHud = ensureSingleStageHud(BmsDefaultHud.GetDrawableComponent(directLookup));
-            return true;
-        }
-
-        if (tryGetBmsMainHudLookupFromUserLookup(lookup, out var userLookup))
-        {
-            mainHud = ensureSingleStageHud(
-                parent?.GetDrawableComponent(lookup)
-                ?? embeddedFallbacks?.GetDrawableComponent(lookup)
-                ?? BmsDefaultHud.GetDrawableComponent(userLookup));
-            return true;
-        }
-
-        mainHud = null;
-        return false;
-    }
-
-    private static bool tryGetBmsMainHudLookupFromUserLookup(ISkinComponentLookup lookup, out GlobalSkinnableContainerLookup mainHudLookup)
-    {
-        mainHudLookup = null!;
-
-        if (lookup.GetType().FullName != "osu.Game.Skinning.UserSkinComponentLookup")
-            return false;
-
-        var component = lookup.GetType().GetField("Component", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(lookup);
-
-        if (component is not GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null } globalLookup)
-            return false;
-
-        mainHudLookup = globalLookup;
-        return true;
-    }
-
-    private static Drawable? ensureSingleStageHud(Drawable? drawable)
-    {
-        if (drawable is not Container container)
-            return drawable;
-
-        var stageHuds = container.OfType<BmsStageHud>().ToArray();
-
-        if (stageHuds.Length == 0)
-        {
-            container.Add(new BmsStageHud());
-            return drawable;
-        }
-
-        foreach (var duplicate in stageHuds.Skip(1))
-            container.Remove(duplicate, true);
-
-        return drawable;
     }
 
     /// <summary>Looks up a texture, falling through parent → primary → fallback.</summary>

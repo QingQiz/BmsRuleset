@@ -125,6 +125,9 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
 
     public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
     {
+        if (BmsDefaultHud.TryGetMainHudWithStage(lookup, () => base.GetDrawableComponent(lookup), out var mainHud))
+            return mainHud;
+
         var hud = BmsDefaultHud.GetDrawableComponent(lookup);
         if (hud != null) return hud;
 

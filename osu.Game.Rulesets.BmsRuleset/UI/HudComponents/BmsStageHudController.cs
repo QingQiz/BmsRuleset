@@ -35,6 +35,12 @@ internal sealed partial class BmsStageHudController : Component
             RegisterContainer(container);
 
         stageHud = hud;
+
+        // Width used to be stored relative to the skin editor canvas, which differs from the gameplay canvas.
+        // Such values are unusably small as absolute widths and must be rebuilt from the current Stage.
+        if (stageHud.Width is > 0 and <= 1)
+            stageHud.Width = 0;
+
         scheduleStageHudSingleton();
         SetNoteHeightScale(stageHud?.NoteHeightScale.Value ?? 1);
         tryInitialiseHudSize();
@@ -167,7 +173,7 @@ internal sealed partial class BmsStageHudController : Component
 
         var parentSize = stageHud.Parent.ChildSize;
 
-        if (!isFiniteAndPositive(parentSize.X) || !isFiniteAndPositive(parentSize.Y))
+        if (!isFiniteAndPositive(parentSize.Y))
             return;
 
         if (stageHud.Size.X > 0 && stageHud.Size.Y > 0)
@@ -185,7 +191,7 @@ internal sealed partial class BmsStageHudController : Component
             return;
 
         stageHud.Size = new Vector2(
-            stageHud.Size.X > 0 ? stageHud.Size.X : nativeSize.X / parentSize.X,
+            stageHud.Size.X > 0 ? stageHud.Size.X : nativeSize.X,
             stageHud.Size.Y > 0 ? stageHud.Size.Y : nativeSize.Y / parentSize.Y);
     }
 

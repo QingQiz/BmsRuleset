@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
+using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -76,6 +77,10 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         const int animated_tail_column = 7;
         Sprite[] bodySpritesBeforeReload = null;
 
+        this.AddSetupUntilStep("stage HUD uses skin.ini width", () =>
+            Player.HUDOverlay.ChildrenOfType<BmsStageHud>().SingleOrDefault() is { Width: > 0 }
+            && Precision.AlmostEquals(Playfield.Stage.Scale.X, 1));
+
         this.AddSetupUntilStep("legacy LN skin coverage held", () =>
             Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SKIN_COVERAGE_START_TIME + 95);
         this.AddSetupAssert("animated LN body uses first frame when not held", () =>
@@ -98,6 +103,10 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         this.AddSetupStep("reload skin source", () =>
             typeof(SkinProvidingContainer).GetMethod("TriggerSourceChanged", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(((BmsTestSkins.SkinnedTestPlayer)Player).SkinSource, null));
+        this.AddSetupUntilStep("stage HUD survives skin reload", () =>
+            Player.HUDOverlay.ChildrenOfType<BmsStageHud>().Count() == 1
+            && Playfield.Stage.HasHudTransform
+            && Precision.AlmostEquals(Playfield.Stage.Scale.X, 1));
         this.AddSetupUntilStep("LN body reloads after skin change", () =>
             longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column)).ChildrenOfType<Sprite>()
                 .Any(sprite => sprite.Alpha > 0 && !bodySpritesBeforeReload.Contains(sprite)));
