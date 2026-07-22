@@ -29,6 +29,9 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
     };
 
     private HashSet<BmsLayoutVariant>? keyRestrictedVariants;
+    private FilterCriteria.OptionalRange<float> longNotePercentage;
+    private FilterCriteria.OptionalRange<float> scratchPercentage;
+    private FilterCriteria.OptionalTextFilter source;
     private string? selectedTableName;
     private string? selectedLevel;
 
@@ -72,6 +75,25 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
         if (keyRestrictedVariants != null && !keyRestrictedVariants.Contains(variant))
             return false;
 
+        if (source.HasFilter && !source.Matches(beatmapInfo.Metadata.Source))
+            return false;
+
+        if (longNotePercentage.HasFilter && !longNotePercentage.IsInRange(calculatePercentage(beatmapInfo.EndTimeObjectCount, beatmapInfo.TotalObjectCount)))
+            return false;
+
+        if (scratchPercentage.HasFilter)
+        {
+            var scratchObjectCount = 0;
+            var layoutHasScratch = Enumerable.Range(0, BmsLayout.GetTotalColumns(variant))
+                .Any(column => BmsLayout.IsScratchColumn(column, variant));
+
+            if (layoutHasScratch && !BmsBeatmapStatistics.TryGetScratchObjectCount(beatmapInfo.Difficulty, out scratchObjectCount))
+                return false;
+
+            if (!scratchPercentage.IsInRange(calculatePercentage(scratchObjectCount, beatmapInfo.TotalObjectCount)))
+                return false;
+        }
+
         var store = BmsRulesetRuntime.DifficultyTableStore;
         if (store != null && (!string.IsNullOrEmpty(selectedTableName) || !string.IsNullOrEmpty(selectedLevel)))
         {
@@ -103,6 +125,18 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
             case "keys":
                 return tryParseKeyCount(op, strValues);
 
+            case "src":
+            case "source":
+                return FilterQueryParser.TryUpdateCriteriaText(ref source, op, strValues);
+
+            case "ln":
+            case "lns":
+                return FilterQueryParser.TryUpdateCriteriaRange(ref longNotePercentage, op, strValues);
+
+            case "sc":
+            case "scratch":
+                return FilterQueryParser.TryUpdateCriteriaRange(ref scratchPercentage, op, strValues);
+
             case "tb":
             case "table":
                 selectedTableName = strValues;
@@ -120,6 +154,9 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
     public bool FilterMayChangeFromMods(FilterCriteria criteria, ValueChangedEvent<IReadOnlyList<Mod>> mods) => false;
 
     private static BmsLayoutVariant variantFromColumns(int columns) => column_to_variant.GetValueOrDefault(columns, BmsLayoutVariant.Bms5K);
+
+    private static float calculatePercentage(int matchingObjectCount, int totalObjectCount) =>
+        matchingObjectCount / (float)Math.Max(1, totalObjectCount) * 100;
 
     /// <summary>
     /// Fuzzy-match a user-typed level filter against a table entry's level.
@@ -190,44 +227,47 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 
         int? singleKeyCount = keyCounts.Count == 1 ? keyCounts.Single() : null;
 
-        var allowedKeys = new HashSet<int>(column_to_variant.Keys);
+        var allowedVariants = new HashSet<BmsLayoutVariant>(column_to_variant.Values);
 
         switch (op)
         {
             case Operator.Equal:
-                allowedKeys.IntersectWith(keyCounts);
+                allowedVariants.RemoveWhere(v => !keyCounts.Contains(BmsLayout.GetManiaKeyCount(v)));
                 break;
 
             case Operator.NotEqual:
-                allowedKeys.ExceptWith(keyCounts);
+                allowedVariants.RemoveWhere(v => keyCounts.Contains(BmsLayout.GetManiaKeyCount(v)));
                 break;
 
             case Operator.Less:
                 if (singleKeyCount == null) return false;
 
-                allowedKeys.RemoveWhere(k => k >= singleKeyCount.Value);
+                allowedVariants.RemoveWhere(v => BmsLayout.GetManiaKeyCount(v) >= singleKeyCount.Value);
                 break;
 
             case Operator.LessOrEqual:
                 if (singleKeyCount == null) return false;
 
-                allowedKeys.RemoveWhere(k => k > singleKeyCount.Value);
+                allowedVariants.RemoveWhere(v => BmsLayout.GetManiaKeyCount(v) > singleKeyCount.Value);
                 break;
 
             case Operator.Greater:
                 if (singleKeyCount == null) return false;
 
-                allowedKeys.RemoveWhere(k => k <= singleKeyCount.Value);
+                allowedVariants.RemoveWhere(v => BmsLayout.GetManiaKeyCount(v) <= singleKeyCount.Value);
                 break;
 
             case Operator.GreaterOrEqual:
                 if (singleKeyCount == null) return false;
 
-                allowedKeys.RemoveWhere(k => k < singleKeyCount.Value);
+                allowedVariants.RemoveWhere(v => BmsLayout.GetManiaKeyCount(v) < singleKeyCount.Value);
                 break;
+
+            default:
+                return false;
         }
 
-        keyRestrictedVariants = new HashSet<BmsLayoutVariant>(allowedKeys.Select(k => column_to_variant[k]));
+        keyRestrictedVariants = allowedVariants;
         return true;
     }
 }

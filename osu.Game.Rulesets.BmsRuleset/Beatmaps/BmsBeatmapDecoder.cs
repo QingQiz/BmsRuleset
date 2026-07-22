@@ -182,6 +182,8 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
                 : $"{output.Metadata.Tags} {tags}";
 
         BmsDifficultyInfo.FromParseResult(parseResult).WriteToOsuDifficulty(output);
+        BmsBeatmapStatistics.WriteScratchObjectCount(output,
+            parseResult.HitObjects.Count(h => BmsLayout.IsScratchColumn(h.Column, parseResult.LayoutVariant)));
     }
 
     private static string? firstSongSelectBackground(BmsParseResult parseResult)

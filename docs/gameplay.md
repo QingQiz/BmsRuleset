@@ -107,8 +107,22 @@ Default play uses the Normal gauge. Gauge types are selected via mods:
 
 Layout visibility filters are applied live in song select — uncheck a layout to hide all beatmaps of that type.
 
-You can also filter by key count from the search box using `k=`, `key=` or `keys=` (supports operators `=`, `!=`, `<`,
-`<=`, `>`, `>=` and comma-separated values, e.g. `keys=7` or `k>5`).
-
 The same BMS settings section also contains chart import and cleanup actions. Difficulty-table management is described
 in the [difficulty table guide](./difficulty-tables.md).
+
+## Song Select Search
+
+The song-select search box supports these BMS filters:
+
+| Filter | Short form | Value |
+|--------|------------|-------|
+| `stars` | `star`, `sr` | osu! star difficulty |
+| `keys` | `k`, `key` | Playable key count, excluding scratch; for example, `k=7` finds 7K + scratch charts |
+| `source` | `src` | Text contained in the chart's source path |
+| `ln` | `lns` | Percentage of objects that are long notes, from 0 to 100 |
+| `scratch` | `sc` | Percentage of objects in scratch lanes, from 0 to 100 |
+| `table` | `tb` | Difficulty table name or symbol |
+| `level` | `lv` | Difficulty table level |
+
+Numeric filters support `=`, `!=`, `<`, `<=`, `>` and `>=`, such as `ln>=25` or `sc<10`. Key equality filters also
+accept comma-separated values, such as `keys=5,7`.

@@ -9,4 +9,5 @@ internal sealed record BmsImportSummary(
     double Length,
     int TotalObjectCount,
     int EndTimeObjectCount,
+    int ScratchObjectCount,
     IReadOnlyList<BmsNoteTiming> StarRatingNoteTimings);

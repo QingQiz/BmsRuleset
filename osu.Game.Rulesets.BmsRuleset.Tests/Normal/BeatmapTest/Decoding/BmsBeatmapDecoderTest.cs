@@ -164,6 +164,8 @@ public class BmsBeatmapDecoderTest
             Assert.That(summary.Length, Is.EqualTo(computeImportedLength(parsed)).Within(0.000001));
             Assert.That(summary.TotalObjectCount, Is.EqualTo(parsed.HitObjects.Count));
             Assert.That(summary.EndTimeObjectCount, Is.EqualTo(parsed.HitObjects.Count(h => h.IsLongNote)));
+            Assert.That(summary.ScratchObjectCount,
+                Is.EqualTo(parsed.HitObjects.Count(h => BmsLayout.IsScratchColumn(h.Column, parsed.LayoutVariant))));
             Assert.That(summary.StarRatingNoteTimings.Count, Is.EqualTo(parsed.HitObjects.Count(h => !h.IsMine)));
             Assert.That(computeStarRating(summary.StarRatingNoteTimings, summary.Metadata.KeyCount, summary.Metadata.Rank),
                 Is.EqualTo(computeStarRating(parsed.HitObjects
@@ -197,6 +199,19 @@ public class BmsBeatmapDecoderTest
             Assert.That(summary.Metadata, Is.EqualTo(extractImportMetadata(parsed, path)));
             Assert.That(summary.Metadata.DifficultyName, Is.EqualTo("[AAA] BBB [CCC]"));
         });
+    }
+
+    [Test]
+    public void TestDecoderStoresScratchObjectCount()
+    {
+        var decoded = decode("""
+                             #BPM 120
+                             #00111:01
+                             #00116:0101
+                             """);
+
+        Assert.That(BmsBeatmapStatistics.TryGetScratchObjectCount(decoded.Difficulty, out var scratchObjectCount), Is.True);
+        Assert.That(scratchObjectCount, Is.EqualTo(2));
     }
 
     [Test]

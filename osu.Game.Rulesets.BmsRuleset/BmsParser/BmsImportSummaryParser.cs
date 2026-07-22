@@ -60,6 +60,7 @@ internal static partial class BmsChartParser
             length,
             hitObjects.Count,
             hitObjects.Count(h => h.IsLongNote),
+            hitObjects.Count(h => BmsLayout.IsScratchColumn(h.Column, layoutVariant)),
             noteTimings);
     }
 

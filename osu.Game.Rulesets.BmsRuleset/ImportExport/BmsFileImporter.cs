@@ -282,7 +282,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 summary.Bpm,
                 summary.Length,
                 summary.TotalObjectCount,
-                summary.EndTimeObjectCount
+                summary.EndTimeObjectCount,
+                summary.ScratchObjectCount
             );
         }).ToArray();
 
@@ -297,7 +298,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             return new ChartImport(
                 path, parsed.Md5, fileHash,
                 parsed.Metadata, parsed.StarRating, parsed.Bpm, parsed.Length,
-                parsed.TotalObjectCount, parsed.EndTimeObjectCount);
+                parsed.TotalObjectCount, parsed.EndTimeObjectCount, parsed.ScratchObjectCount);
         }).ToArray());
 
         return new PreparedDirectory(group.Directory, charts);
@@ -614,6 +615,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 };
                 var diff = BmsDifficultyInfo.FromChartMetadata(metadata);
                 diff.WriteToOsuDifficulty(beatmapInfo);
+                BmsBeatmapStatistics.WriteScratchObjectCount(beatmapInfo, chart.ScratchObjectCount);
 
                 DifficultyNameUpdater.GetDifficultyName(beatmapInfo, out var markerStr);
                 if (!string.IsNullOrWhiteSpace(markerStr))
@@ -669,7 +671,8 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         double Bpm,
         double Length,
         int TotalObjectCount,
-        int EndTimeObjectCount);
+        int EndTimeObjectCount,
+        int ScratchObjectCount);
 
     private sealed record PreparedDirectory(
         string Directory,
