@@ -187,6 +187,8 @@ public partial class BmsGameplayVirtualisationTest
             Origin = Anchor.TopLeft,
             Size = new Vector2(100, 1),
         };
+        stageHud.JudgementLineOffset.Value = 20;
+        stageHud.LightPositionOffset.Value = 30;
         stageHud.NoteHeightScale.Value = 1.5f;
         var controller = new BmsStageHudController(playfield);
 
@@ -198,6 +200,8 @@ public partial class BmsGameplayVirtualisationTest
         {
             Assert.That(playfield.Stage.Scale, Is.EqualTo(Vector2.One));
             Assert.That(playfield.Stage.HudViewportHeight, Is.EqualTo(600).Within(0.001f));
+            Assert.That(playfield.Stage.HitTargetPositionOffset, Is.EqualTo(20));
+            Assert.That(playfield.Stage.LightPositionOffset, Is.EqualTo(30));
             Assert.That(playfield.Stage.NoteHeightScale, Is.EqualTo(1.5f));
         });
     }
@@ -354,6 +358,8 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(playfield.Stage.MeasureLineArea.Masking, Is.True);
             Assert.That(stageHud.JudgementLineOffset.MinValue, Is.EqualTo(-80));
             Assert.That(stageHud.JudgementLineOffset.MaxValue, Is.EqualTo(220));
+            Assert.That(stageHud.LightPositionOffset.MinValue, Is.Zero);
+            Assert.That(stageHud.LightPositionOffset.MaxValue, Is.EqualTo(300));
         });
     }
 

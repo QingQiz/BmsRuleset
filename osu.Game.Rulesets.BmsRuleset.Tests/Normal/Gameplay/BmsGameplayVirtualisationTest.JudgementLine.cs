@@ -22,9 +22,9 @@ public partial class BmsGameplayVirtualisationTest
         playfield.ScrollController.SetHitTargetPosition(playfield.Stage.HitTargetPosition);
         var originalRangeScale = playfield.ScrollController.ScrollRangeScale;
         var skinPositionChanges = 0;
-        float? lightPositionOffset = null;
+        var lightPositionChanges = 0;
         playfield.Stage.SkinHitTargetPositionChanged += _ => skinPositionChanges++;
-        playfield.Stage.HitTargetPositionOffsetChanged += offset => lightPositionOffset = offset;
+        playfield.Stage.LightPositionOffsetChanged += _ => lightPositionChanges++;
 
         playfield.Stage.SetHitTargetPositionOffset(40);
 
@@ -33,6 +33,30 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(playfield.Stage.HitTargetPosition, Is.EqualTo(120));
             Assert.That(playfield.ScrollController.ScrollRangeScale, Is.EqualTo(originalRangeScale));
             Assert.That(skinPositionChanges, Is.Zero);
+            Assert.That(playfield.Stage.LightPositionOffset, Is.Zero);
+            Assert.That(lightPositionChanges, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void TestLightPositionOffsetDoesNotMoveJudgementLine()
+    {
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+        }));
+        var originalHitTargetPosition = playfield.Stage.HitTargetPosition;
+        float? lightPositionOffset = null;
+        playfield.Stage.LightPositionOffsetChanged += offset => lightPositionOffset = offset;
+
+        playfield.Stage.SetLightPositionOffset(40);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(playfield.Stage.HitTargetPosition, Is.EqualTo(originalHitTargetPosition));
+            Assert.That(playfield.Stage.HitTargetPositionOffset, Is.Zero);
+            Assert.That(playfield.Stage.LightPositionOffset, Is.EqualTo(40));
             Assert.That(lightPositionOffset, Is.EqualTo(40));
         });
     }
@@ -55,6 +79,17 @@ public partial class BmsGameplayVirtualisationTest
         var restored = (BmsStageHud)hud.CreateSerialisedInfo().CreateInstance();
 
         Assert.That(restored.JudgementLineOffset.Value, Is.EqualTo(40));
+    }
+
+    [Test]
+    public void TestLightPositionOffsetIsSerialisedWithStageHud()
+    {
+        var hud = new BmsStageHud();
+        hud.LightPositionOffset.Value = 40;
+
+        var restored = (BmsStageHud)hud.CreateSerialisedInfo().CreateInstance();
+
+        Assert.That(restored.LightPositionOffset.Value, Is.EqualTo(40));
     }
 
     [Test]

@@ -185,6 +185,8 @@
   <data name="note_random_mode_description" xml:space="preserve"><value>S-RANDOM: 40ms anti-jack - only prevents impossibly close jacks. H-RANDOM: 100ms anti-jack - actively breaks jacks into stair/trill patterns.</value></data>
   <data name="judgement_line_offset" xml:space="preserve"><value>Judgement line offset</value></data>
   <data name="judgement_line_offset_description" xml:space="preserve"><value>Moves the judgement line relative to the skin position. Positive values move it upward.</value></data>
+  <data name="light_position_offset" xml:space="preserve"><value>Light position offset</value></data>
+  <data name="light_position_offset_description" xml:space="preserve"><value>Moves column lights relative to the skin position. Positive values move them upward.</value></data>
   <data name="note_height_scale" xml:space="preserve"><value>Note height scale</value></data>
   <data name="note_height_scale_description" xml:space="preserve"><value>Scales note heads and tails without changing their positions or other Stage elements.</value></data>
   <data name="groove_low_health_colour" xml:space="preserve"><value>Groove low health colour</value></data>

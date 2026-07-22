@@ -185,6 +185,8 @@
   <data name="note_random_mode_description" xml:space="preserve"><value>S-RANDOM：40ms 防纵连，仅防止间隔过短且无法击打的纵连。H-RANDOM：100ms 防纵连，会主动将纵连拆分为楼梯或交互谱面。</value></data>
   <data name="judgement_line_offset" xml:space="preserve"><value>判定线偏移</value></data>
   <data name="judgement_line_offset_description" xml:space="preserve"><value>相对于皮肤位置移动判定线。正值会将其向上移动。</value></data>
+  <data name="light_position_offset" xml:space="preserve"><value>灯光位置偏移</value></data>
+  <data name="light_position_offset_description" xml:space="preserve"><value>相对于皮肤位置移动列灯光。正值会将其向上移动。</value></data>
   <data name="note_height_scale" xml:space="preserve"><value>音符高度缩放</value></data>
   <data name="note_height_scale_description" xml:space="preserve"><value>缩放音符头尾的高度，而不改变其位置或其他游玩区域元素。</value></data>
   <data name="groove_low_health_colour" xml:space="preserve"><value>Groove 血条低血量颜色</value></data>

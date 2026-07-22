@@ -59,6 +59,10 @@ public static class BmsStrings
 
     public static LocalisableString JudgementLineOffsetDescription => get("judgement_line_offset_description");
 
+    public static LocalisableString LightPositionOffset => get("light_position_offset");
+
+    public static LocalisableString LightPositionOffsetDescription => get("light_position_offset_description");
+
     public static LocalisableString NoteHeightScale => get("note_height_scale");
 
     public static LocalisableString NoteHeightScaleDescription => get("note_height_scale_description");

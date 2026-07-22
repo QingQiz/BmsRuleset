@@ -64,14 +64,14 @@ internal sealed partial class LegacyBmsColumnLight : CompositeDrawable, IKeyBind
         if (playfield == null)
             return;
 
-        playfield.Stage.HitTargetPositionOffsetChanged += updateLightPosition;
-        updateLightPosition(playfield.Stage.HitTargetPositionOffset);
+        playfield.Stage.LightPositionOffsetChanged += updateLightPosition;
+        updateLightPosition(playfield.Stage.LightPositionOffset);
     }
 
     protected override void Dispose(bool isDisposing)
     {
         if (playfield != null)
-            playfield.Stage.HitTargetPositionOffsetChanged -= updateLightPosition;
+            playfield.Stage.LightPositionOffsetChanged -= updateLightPosition;
 
         base.Dispose(isDisposing);
     }

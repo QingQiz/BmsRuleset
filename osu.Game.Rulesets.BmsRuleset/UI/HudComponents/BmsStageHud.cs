@@ -22,6 +22,14 @@ internal sealed partial class BmsStageHud : BmsHudComponent
         Precision = 1,
     };
 
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.LightPositionOffset), nameof(BmsStrings.LightPositionOffsetDescription))]
+    public BindableFloat LightPositionOffset { get; } = new()
+    {
+        MinValue = -768,
+        MaxValue = 768,
+        Precision = 1,
+    };
+
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.NoteHeightScale), nameof(BmsStrings.NoteHeightScaleDescription))]
     public BindableFloat NoteHeightScale { get; } = new(1)
     {
@@ -89,8 +97,10 @@ internal sealed partial class BmsStageHud : BmsHudComponent
             controller = bmsDrawableRuleset.StageHudController;
             controller.Register(this, this.FindClosestParent<ISerialisableDrawableContainer>());
             JudgementLineOffset.ValueChanged += onJudgementLineOffsetChanged;
+            LightPositionOffset.ValueChanged += onLightPositionOffsetChanged;
             NoteHeightScale.ValueChanged += onNoteHeightScaleChanged;
             controller.SetHitTargetPositionOffset(JudgementLineOffset.Value);
+            controller.SetLightPositionOffset(LightPositionOffset.Value);
             controller.SetNoteHeightScale(NoteHeightScale.Value);
         }
 
@@ -103,6 +113,7 @@ internal sealed partial class BmsStageHud : BmsHudComponent
     protected override void Dispose(bool isDisposing)
     {
         JudgementLineOffset.ValueChanged -= onJudgementLineOffsetChanged;
+        LightPositionOffset.ValueChanged -= onLightPositionOffsetChanged;
         NoteHeightScale.ValueChanged -= onNoteHeightScaleChanged;
         controller?.Unregister(this);
         controller = null;
@@ -112,12 +123,20 @@ internal sealed partial class BmsStageHud : BmsHudComponent
 
     private void onJudgementLineOffsetChanged(ValueChangedEvent<float> offset) => controller?.SetHitTargetPositionOffset(offset.NewValue);
 
+    private void onLightPositionOffsetChanged(ValueChangedEvent<float> offset) => controller?.SetLightPositionOffset(offset.NewValue);
+
     private void onNoteHeightScaleChanged(ValueChangedEvent<float> scale) => controller?.SetNoteHeightScale(scale.NewValue);
 
     internal void SetJudgementLineOffsetRange(float minimum, float maximum)
     {
         JudgementLineOffset.MinValue = minimum;
         JudgementLineOffset.MaxValue = maximum;
+    }
+
+    internal void SetLightPositionOffsetRange(float minimum, float maximum)
+    {
+        LightPositionOffset.MinValue = minimum;
+        LightPositionOffset.MaxValue = maximum;
     }
 
     private void updateEditModeVisibility() => applyEditModeVisibility(SkinEditor?.State.Value == Visibility.Visible);

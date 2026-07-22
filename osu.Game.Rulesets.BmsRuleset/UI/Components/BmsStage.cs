@@ -40,11 +40,15 @@ public sealed partial class BmsStage : CompositeDrawable
 
     internal float HitTargetPositionOffset { get; private set; }
 
+    internal float SkinLightPosition { get; private set; }
+
+    internal float LightPositionOffset { get; private set; }
+
     internal float NoteHeightScale { get; private set; } = 1;
 
     internal event Action<float>? SkinHitTargetPositionChanged;
 
-    internal event Action<float>? HitTargetPositionOffsetChanged;
+    internal event Action<float>? LightPositionOffsetChanged;
 
     private readonly BmsPlayfield playfield;
     private float heightBeforeHudTransform;
@@ -289,6 +293,8 @@ public sealed partial class BmsStage : CompositeDrawable
     {
         SkinHitTargetPosition = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
                                 ?? HIT_TARGET_POSITION;
+        SkinLightPosition = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LightPosition))?.Value
+                            ?? 0;
         applyHitTargetPosition(true);
         barLineHeight.Value = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineHeight))?.Value
                               ?? 1;
@@ -313,7 +319,15 @@ public sealed partial class BmsStage : CompositeDrawable
 
         HitTargetPositionOffset = offset;
         applyHitTargetPosition();
-        HitTargetPositionOffsetChanged?.Invoke(offset);
+    }
+
+    internal void SetLightPositionOffset(float offset)
+    {
+        if (LightPositionOffset == offset)
+            return;
+
+        LightPositionOffset = offset;
+        LightPositionOffsetChanged?.Invoke(offset);
     }
 
     internal void SetNoteHeightScale(float scale)

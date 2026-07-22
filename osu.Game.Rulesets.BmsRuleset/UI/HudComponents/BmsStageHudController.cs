@@ -26,7 +26,7 @@ internal sealed partial class BmsStageHudController : Component
         base.Update();
         tryInitialiseHudSize();
         updateStageTransform();
-        updateJudgementLineOffsetRange();
+        updatePositionOffsetRanges();
     }
 
     internal void Register(BmsStageHud hud, ISerialisableDrawableContainer? container = null)
@@ -45,10 +45,14 @@ internal sealed partial class BmsStageHudController : Component
         SetNoteHeightScale(stageHud?.NoteHeightScale.Value ?? 1);
         tryInitialiseHudSize();
         updateStageTransform();
-        updateJudgementLineOffsetRange();
+        updatePositionOffsetRanges();
+        SetHitTargetPositionOffset(stageHud.JudgementLineOffset.Value);
+        SetLightPositionOffset(stageHud.LightPositionOffset.Value);
     }
 
     internal void SetHitTargetPositionOffset(float offset) => playfield.Stage.SetHitTargetPositionOffset(offset);
+
+    internal void SetLightPositionOffset(float offset) => playfield.Stage.SetLightPositionOffset(offset);
 
     internal void SetNoteHeightScale(float scale) => playfield.Stage.SetNoteHeightScale(scale);
 
@@ -59,6 +63,7 @@ internal sealed partial class BmsStageHudController : Component
 
         stageHud = null;
         playfield.Stage.SetHitTargetPositionOffset(0);
+        playfield.Stage.SetLightPositionOffset(0);
         playfield.Stage.SetNoteHeightScale(1);
         playfield.Stage.ClearHudTransform();
     }
@@ -85,6 +90,8 @@ internal sealed partial class BmsStageHudController : Component
     protected override void Dispose(bool isDisposing)
     {
         unregisterContainer();
+        playfield.Stage.SetHitTargetPositionOffset(0);
+        playfield.Stage.SetLightPositionOffset(0);
         playfield.Stage.SetNoteHeightScale(1);
         playfield.Stage.ClearHudTransform();
 
@@ -117,7 +124,9 @@ internal sealed partial class BmsStageHudController : Component
             SetNoteHeightScale(keeper.NoteHeightScale.Value);
             tryInitialiseHudSize();
             updateStageTransform();
-            updateJudgementLineOffsetRange();
+            updatePositionOffsetRanges();
+            SetHitTargetPositionOffset(keeper.JudgementLineOffset.Value);
+            SetLightPositionOffset(keeper.LightPositionOffset.Value);
         }
         finally
         {
@@ -139,6 +148,7 @@ internal sealed partial class BmsStageHudController : Component
         {
             stageHud = null;
             playfield.Stage.SetHitTargetPositionOffset(0);
+            playfield.Stage.SetLightPositionOffset(0);
             playfield.Stage.SetNoteHeightScale(1);
             playfield.Stage.ClearHudTransform();
         }
@@ -233,7 +243,7 @@ internal sealed partial class BmsStageHudController : Component
         playfield.Stage.SetHudTransform(localCentre - playfield.DrawSize * 0.5f, scale, viewportHeight);
     }
 
-    private void updateJudgementLineOffsetRange()
+    private void updatePositionOffsetRanges()
     {
         if (stageHud == null)
             return;
@@ -247,6 +257,8 @@ internal sealed partial class BmsStageHudController : Component
             return;
 
         stageHud.SetJudgementLineOffsetRange(-skinPosition, stageHeight - skinPosition);
+        var skinLightPosition = playfield.Stage.SkinLightPosition;
+        stageHud.SetLightPositionOffsetRange(-skinLightPosition, stageHeight - skinLightPosition);
     }
 
     private static bool isFiniteAndPositive(float value) => float.IsFinite(value) && value > 0;
