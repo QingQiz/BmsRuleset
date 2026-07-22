@@ -28,9 +28,11 @@ public static partial class BmsTestSkins
             ? BmsTestLegacySkin.CreateSkinSource(resources)
             : kind == SkinKind.LegacyKeysUnderNotes
                 ? BmsTestLegacySkin.CreateSkinSource(resources, keysUnderNotes: true)
-                : new SkinProvidingContainer(kind == SkinKind.Classic
-                    ? new DefaultLegacySkin(resources)
-                    : new ArgonSkin(resources));
+                : kind == SkinKind.LegacyMissingColumnLightTexture
+                    ? BmsTestLegacySkin.CreateSkinSource(resources, includeColumnLightTexture: false)
+                    : new SkinProvidingContainer(kind == SkinKind.Classic
+                        ? new DefaultLegacySkin(resources)
+                        : new ArgonSkin(resources));
 
     public enum SkinKind
     {
@@ -40,6 +42,7 @@ public static partial class BmsTestSkins
         // A synthetic legacy skin with a comprehensive skin.ini; see BmsTestLegacySkin.
         Legacy,
         LegacyKeysUnderNotes,
+        LegacyMissingColumnLightTexture,
     }
 
     /// <inheritdoc />

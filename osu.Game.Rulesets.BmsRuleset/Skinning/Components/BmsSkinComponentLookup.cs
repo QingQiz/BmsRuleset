@@ -30,6 +30,7 @@ public class BmsSkinComponentLookup(
 public enum BmsSkinComponents
 {
     ColumnBackground,
+    ColumnLight,
     HitTarget,
     KeyArea,
     Mine,

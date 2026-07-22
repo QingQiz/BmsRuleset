@@ -5,7 +5,6 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
@@ -18,7 +17,6 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 public sealed partial class BmsStage : CompositeDrawable
 {
     public const float HIT_TARGET_POSITION = 80;
-    public const float COLUMN_SPACING = 0;
 
     public IBmsColumn[] Columns { get; }
 
@@ -92,10 +90,6 @@ public sealed partial class BmsStage : CompositeDrawable
     private readonly BindableFloat hitTargetPosition = new(HIT_TARGET_POSITION);
     private readonly BindableFloat barLineHeight = new(1);
     private readonly Bindable<Color4> barLineColour = new(Color4.White.Opacity(0.35f));
-    private readonly Drawable topBorder;
-    private readonly Drawable bottomBorder;
-    private readonly Drawable leftBorder;
-    private readonly Drawable rightBorder;
     private readonly SkinnableDrawable hitTarget;
 
     private readonly FillFlowContainer keyAreaOverNotesLayer = new()
@@ -103,7 +97,6 @@ public sealed partial class BmsStage : CompositeDrawable
         RelativeSizeAxes = Axes.Y,
         AutoSizeAxes = Axes.X,
         Direction = FillDirection.Horizontal,
-        Spacing = new Vector2(COLUMN_SPACING, 0),
     };
 
     // Stage-level flow mirroring columnFlow; holds each column's HitExplosionArea so hit explosions
@@ -114,8 +107,24 @@ public sealed partial class BmsStage : CompositeDrawable
         RelativeSizeAxes = Axes.Y,
         AutoSizeAxes = Axes.X,
         Direction = FillDirection.Horizontal,
-        Spacing = new Vector2(COLUMN_SPACING, 0),
     };
+
+    private readonly FillFlowContainer columnLightLayer = new()
+    {
+        RelativeSizeAxes = Axes.Y,
+        AutoSizeAxes = Axes.X,
+        Direction = FillDirection.Horizontal,
+    };
+
+    private readonly FillFlowContainer columnBackgroundLayer = new()
+    {
+        RelativeSizeAxes = Axes.Y,
+        AutoSizeAxes = Axes.X,
+        Direction = FillDirection.Horizontal,
+    };
+
+    private readonly SkinnableDrawable[] columnBackgrounds;
+    private readonly SkinnableDrawable[] columnLights;
 
     private readonly BmsLayoutVariant layoutVariant;
 
@@ -133,13 +142,14 @@ public sealed partial class BmsStage : CompositeDrawable
         Origin = Anchor.Centre;
 
         Columns = new IBmsColumn[playfield.TotalColumns];
+        columnBackgrounds = new SkinnableDrawable[playfield.TotalColumns];
+        columnLights = new SkinnableDrawable[playfield.TotalColumns];
 
         var columnFlow = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.Y,
             AutoSizeAxes = Axes.X,
             Direction = FillDirection.Horizontal,
-            Spacing = new Vector2(COLUMN_SPACING, 0),
         };
 
         InternalChildren =
@@ -148,11 +158,7 @@ public sealed partial class BmsStage : CompositeDrawable
             {
                 RelativeSizeAxes = Axes.Both,
             },
-            columnFlow,
-            MeasureLineArea = new BmsMeasureLineContainer
-            {
-                RelativeSizeAxes = Axes.Both,
-            },
+            columnBackgroundLayer,
             hitTarget = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, layoutVariant), _ => Empty())
             {
                 RelativeSizeAxes = Axes.X,
@@ -161,20 +167,15 @@ public sealed partial class BmsStage : CompositeDrawable
                 Origin = Anchor.Centre,
                 CentreComponent = false,
             },
-            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.StageForeground, layoutVariant))
+            columnLightLayer,
+            MeasureLineArea = new BmsMeasureLineContainer
             {
                 RelativeSizeAxes = Axes.Both,
             },
-            new Container
+            columnFlow,
+            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.StageForeground, layoutVariant))
             {
                 RelativeSizeAxes = Axes.Both,
-                Children =
-                [
-                    topBorder = new Box(),
-                    bottomBorder = new Box { Anchor = Anchor.BottomLeft },
-                    leftBorder = new Box(),
-                    rightBorder = new Box { Anchor = Anchor.TopRight, Origin = Anchor.TopRight },
-                ],
             },
             keyAreaOverNotesLayer,
             // Drawn last so hit explosions sit above the judgement line, bar lines and stage foreground.
@@ -184,8 +185,20 @@ public sealed partial class BmsStage : CompositeDrawable
         for (var i = 0; i < playfield.TotalColumns; i++)
         {
             Columns[i] = BmsColumn.Create(i, playfield);
+            columnBackgrounds[i] = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, i))
+            {
+                RelativeSizeAxes = Axes.Y,
+                CentreComponent = false,
+            };
+            columnLights[i] = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.ColumnLight, layoutVariant, i), _ => Empty())
+            {
+                RelativeSizeAxes = Axes.Y,
+                CentreComponent = false,
+            };
         }
 
+        addColumnsInVisualOrder(columnBackgroundLayer, column => columnBackgrounds[column.ColumnIndex]);
+        addColumnsInVisualOrder(columnLightLayer, column => columnLights[column.ColumnIndex]);
         addColumnsInVisualOrder(columnFlow, column => (Drawable)column);
         addColumnsInVisualOrder(keyAreaOverNotesLayer, column => column.KeyArea);
 
@@ -218,7 +231,25 @@ public sealed partial class BmsStage : CompositeDrawable
         // off-centre by half a column width).
         updateStageCentre();
         positionKeyAreas();
+        positionColumnLayers();
         positionHitExplosionAreas();
+    }
+
+    private void positionColumnLayers()
+    {
+        for (var i = 0; i < Columns.Length; i++)
+        {
+            var column = (Drawable)Columns[i];
+            positionColumnLayer(columnBackgrounds[i], column);
+            positionColumnLayer(columnLights[i], column);
+        }
+    }
+
+    private static void positionColumnLayer(Drawable layer, Drawable column)
+    {
+        layer.Width = column.DrawWidth;
+        layer.Margin = column.Margin;
+        layer.Alpha = column.Alpha;
     }
 
     private void positionKeyAreas()
@@ -264,36 +295,13 @@ public sealed partial class BmsStage : CompositeDrawable
         barLineColour.Value = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.BarLineColour))?.Value
                               ?? Color4.White.Opacity(0.35f);
 
-        var lineColour = skin.GetConfig<BmsSkinConfigurationLookup, Color4>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnLineColour))?.Value
-                         ?? Color4.White.Opacity(0.25f);
-
         updateKeyAreaLayer(skin.GetConfig<BmsSkinConfigurationLookup, bool>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.KeysUnderNotes))?.Value ?? false);
-
-        var leftLineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(
-            new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftLineWidth,
-                new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, 0)))?.Value ?? 1;
-        var rightLineWidth = skin.GetConfig<BmsSkinConfigurationLookup, float>(
-            new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightLineWidth,
-                new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, layoutVariant, Columns.Length - 1)))?.Value ?? 1;
-
-        foreach (var border in new[] { topBorder, bottomBorder, leftBorder, rightBorder })
-            border.Colour = lineColour;
-
-        topBorder.Height = bottomBorder.Height = Math.Max(leftLineWidth, rightLineWidth);
-        leftBorder.Width = leftLineWidth;
-        rightBorder.Width = rightLineWidth;
-        leftBorder.Alpha = leftLineWidth > 0 ? 1 : 0;
-        rightBorder.Alpha = rightLineWidth > 0 ? 1 : 0;
-        topBorder.Alpha = bottomBorder.Alpha = Math.Max(leftLineWidth, rightLineWidth) > 0 ? 1 : 0;
 
         Padding = new MarginPadding
         {
             Top = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.StagePaddingTop))?.Value ?? 0,
             Bottom = skin.GetConfig<BmsSkinConfigurationLookup, float>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.StagePaddingBottom))?.Value ?? 0,
         };
-
-        topBorder.Width = bottomBorder.Width = DrawWidth;
-        leftBorder.Height = rightBorder.Height = DrawHeight;
 
         updateStageCentre();
     }
@@ -321,9 +329,6 @@ public sealed partial class BmsStage : CompositeDrawable
 
         hitTargetPosition.Value = position;
         hitTarget.Y = -position;
-
-        foreach (var column in Columns)
-            ((BmsColumn)column).SetHitTargetPosition(position);
 
         if (changed && notifySkinPositionChanged)
             SkinHitTargetPositionChanged?.Invoke(SkinHitTargetPosition);

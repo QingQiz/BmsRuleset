@@ -24,6 +24,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
@@ -238,10 +239,13 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
                     .ToArray(),
             () => Is.EqualTo(Enumerable.Range(0, BmsTestLegacySkin.COLUMN_COUNT).Select(BmsTestLegacySkin.ExpectedRightLineWidth).ToArray()));
         AddAssert("per-column right spacing resolves", () =>
-                Enumerable.Range(0, BmsTestLegacySkin.COLUMN_COUNT)
+                Enumerable.Range(0, BmsTestLegacySkin.COLUMN_COUNT - 1)
                     .Select(c => getConfig<float>(LegacyManiaSkinConfigurationLookups.RightColumnSpacing, BmsSkinComponents.ColumnBackground, c, skin()).GetValueOrDefault())
                     .ToArray(),
-            () => Is.EqualTo(Enumerable.Range(0, BmsTestLegacySkin.COLUMN_COUNT).Select(BmsTestLegacySkin.ExpectedRightColumnSpacing).ToArray()));
+            () => Is.EqualTo(Enumerable.Range(0, BmsTestLegacySkin.COLUMN_COUNT - 1).Select(BmsTestLegacySkin.ExpectedRightColumnSpacing).ToArray()));
+        AddAssert("rightmost column has no outer spacing",
+            () => getConfig<float>(LegacyManiaSkinConfigurationLookups.RightColumnSpacing, BmsSkinComponents.ColumnBackground, BmsTestLegacySkin.COLUMN_COUNT - 1, skin()),
+            () => Is.Null);
         // Left spacing is null for the leftmost column (no gap to its left), so assert columns 1..7 only.
         AddAssert("per-column left spacing resolves", () =>
                 Enumerable.Range(1, BmsTestLegacySkin.COLUMN_COUNT - 1)
@@ -326,9 +330,14 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         AddAssert("column background factory produces legacy background",
             () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, BmsLayoutVariant.Bme7K, 1))?.Create(),
             Is.TypeOf<LegacyBmsColumnBackground>);
-        AddAssert("hit target factory produces legacy hit target",
+        AddAssert("column light factory produces legacy light",
+            () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.ColumnLight, BmsLayoutVariant.Bme7K, 1))?.Create(),
+            Is.TypeOf<LegacyBmsColumnLight>);
+        AddAssert("stage hit target factory produces legacy hit target",
             () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget))?.Create(),
             Is.TypeOf<LegacyBmsHitTarget>);
+        AddAssert("column hit target factory is not provided",
+            () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, BmsLayoutVariant.Bme7K, 1)) == null);
 
         // N-suffix frame animations: the explosion (lightingN-0/1/2) and column light (stage-light-0/1)
         // are provided as multi-frame textures; verify the runtime picks them up as animations.
@@ -337,20 +346,54 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
                 ?.ChildrenOfType<TextureAnimation>().SingleOrDefault()?.FrameCount,
             () => Is.EqualTo(3));
         AddAssert("column light is a multi-frame animation",
-            () => Playfield.ChildrenOfType<LegacyBmsColumnBackground>()
+            () => Playfield.ChildrenOfType<LegacyBmsColumnLight>()
                 .Select(c => c.ChildrenOfType<TextureAnimation>().SingleOrDefault()?.FrameCount ?? 0)
                 .ToArray(),
             () => Is.EqualTo(Enumerable.Repeat(2, BmsTestLegacySkin.COLUMN_COUNT).ToArray()));
 
+        AddAssert("gameplay layers render in legacy mania order", () =>
+        {
+            var stage = (CompositeDrawable)Playfield.Stage;
+            var children = aliveInternalChildren(stage);
+            var backgroundIndex = childIndexContaining<LegacyBmsColumnBackground>(stage);
+            var hitTargetIndex = childIndexContaining<LegacyBmsHitTarget>(stage);
+            var columnLightIndex = childIndexContaining<LegacyBmsColumnLight>(stage);
+            var measureLineIndex = children.Select((child, index) => (child, index)).Single(pair => pair.child == Playfield.Stage.MeasureLineArea).index;
+            var noteColumnIndex = childIndexContaining<BmsColumn>(stage);
+
+            return backgroundIndex < hitTargetIndex
+                   && hitTargetIndex < columnLightIndex
+                   && columnLightIndex < measureLineIndex
+                   && measureLineIndex < noteColumnIndex;
+        });
+
         AddAssert("legacy column backgrounds render per column",
             () => Playfield.ChildrenOfType<LegacyBmsColumnBackground>().Count(c => c.IsLoaded && c.DrawWidth > 0),
             () => Is.EqualTo(BmsTestLegacySkin.COLUMN_COUNT));
+        AddAssert("column gaps contain only configured spacing", () =>
+            Enumerable.Range(0, BmsTestLegacySkin.COLUMN_COUNT - 1).All(c =>
+                Precision.AlmostEquals(
+                    ((Drawable)Playfield.Stage.Columns[c]).Margin.Right + ((Drawable)Playfield.Stage.Columns[c + 1]).Margin.Left,
+                    BmsTestLegacySkin.ExpectedRightColumnSpacing(c) * 2)));
         AddAssert("legacy key areas render per column",
             () => Playfield.ChildrenOfType<LegacyBmsKeyArea>().Count(c => c.IsLoaded && c.DrawWidth > 0),
             () => Is.EqualTo(BmsTestLegacySkin.COLUMN_COUNT));
-        AddAssert("legacy hit target renders",
-            () => Playfield.ChildrenOfType<LegacyBmsHitTarget>().Any(c => c.IsLoaded && c.DrawWidth > 0),
-            () => Is.True);
+        AddAssert("legacy hit target renders once",
+            () => Playfield.ChildrenOfType<LegacyBmsHitTarget>().Count(c => c.IsLoaded && c.DrawWidth > 0),
+            () => Is.EqualTo(1));
+        AddAssert("hit target texture spans the stage", () =>
+        {
+            var stageQuad = Playfield.Stage.ScreenSpaceDrawQuad;
+            var targetQuad = Playfield.ChildrenOfType<LegacyBmsHitTarget>()
+                                      .Single(c => c.IsAlive && c.IsLoaded && c.DrawWidth > 0)
+                                      .Target.ScreenSpaceDrawQuad;
+
+            return new[]
+            {
+                targetQuad.TopLeft.X - stageQuad.TopLeft.X,
+                targetQuad.TopRight.X - stageQuad.TopRight.X,
+            };
+        }, () => Is.All.InRange(-1f, 1f));
 
         // The down-state key image (mania-keyND / KeyImageDown) must exist alongside the up-state,
         // and key presses during the autoplay replay must actually drive it (PressCount > 0).
@@ -470,17 +513,26 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             () => getConfig<bool>(LegacyManiaSkinConfigurationLookups.KeysUnderNotes, BmsSkinComponents.ColumnBackground, null, ((BmsTestSkins.SkinnedTestPlayer)Player).SkinSource),
             () => Is.EqualTo(BmsTestLegacySkin.ExpectedKeysUnderNotes(keysUnderNotes: true)));
 
-        AddAssert("key areas render below notes but above backgrounds", () =>
+        AddAssert("key areas render below notes", () =>
             Playfield.Stage.Columns.All(column =>
             {
                 var drawable = (CompositeDrawable)column;
                 var children = aliveInternalChildren(drawable);
-                var backgroundIndex = childIndexContaining<LegacyBmsColumnBackground>(drawable);
                 var keyAreaIndex = childIndexContaining<LegacyBmsKeyArea>(drawable);
                 var hitObjectIndex = children.Select((child, index) => (child, index)).Single(pair => pair.child == column.HitObjectContainer).index;
 
-                return backgroundIndex < keyAreaIndex && keyAreaIndex < hitObjectIndex;
+                return keyAreaIndex < hitObjectIndex;
             }));
+    }
+
+    [Test]
+    public void TestLegacySkinFallsBackColumnLightTexture()
+    {
+        createSkinScene(BmsTestSkins.SkinKind.LegacyMissingColumnLightTexture);
+
+        AddAssert("column lights use embedded fallback texture", () =>
+            Playfield.ChildrenOfType<LegacyBmsColumnLight>().All(light =>
+                light.ChildrenOfType<Sprite>().Any(sprite => sprite.Texture != null && sprite.DrawHeight > 0)));
     }
 
 }

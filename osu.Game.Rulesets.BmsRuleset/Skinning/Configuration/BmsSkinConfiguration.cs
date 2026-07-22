@@ -158,7 +158,7 @@ public sealed class BmsSkinConfiguration(BmsSkinConfigurationSection section)
 
     private float? getLeftSpacing(int? column)
     {
-        if (column == null || column == 0)
+        if (column == null || column == 0 || column >= getColumnCount())
             return null;
 
         return getArrayValue("ColumnSpacing", column - 1) / 2;
@@ -166,11 +166,18 @@ public sealed class BmsSkinConfiguration(BmsSkinConfigurationSection section)
 
     private float? getRightSpacing(int? column)
     {
-        if (column == null)
+        if (column == null || column >= getColumnCount() - 1)
             return null;
 
         return getArrayValue("ColumnSpacing", column) / 2;
     }
+
+    private int getColumnCount() => Section switch
+    {
+        BmsSkinConfigurationSection.Bms when Layout != null => BmsLayout.GetTotalColumns(Layout.Value),
+        BmsSkinConfigurationSection.Mania when Keys != null => Keys.Value,
+        _ => 0,
+    };
 
     private float? getLightScale(string key, int? column)
     {

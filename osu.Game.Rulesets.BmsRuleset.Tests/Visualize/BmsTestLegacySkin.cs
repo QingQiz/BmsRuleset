@@ -108,7 +108,7 @@ public static class BmsTestLegacySkin
 
     // Per-column spacing and line widths are all distinct so the per-column layout lookups resolve
     // to visibly different values (and regressions that alias them are caught).
-    private static readonly float[] column_spacing = [3, 6, 9, 12, 15, 18, 21, 24];
+    private static readonly float[] column_spacing = [3, 6, 9, 12, 15, 18, 21];
 
     private static readonly float[] column_line_width = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -164,9 +164,9 @@ public static class BmsTestLegacySkin
 
     public static string KeyImageDown(int column) => $"key{column}D";
 
-    public static ISkinSource CreateSkinSource(IStorageResourceProvider resources, bool keysUnderNotes = false)
+    public static ISkinSource CreateSkinSource(IStorageResourceProvider resources, bool keysUnderNotes = false, bool includeColumnLightTexture = true)
     {
-        var skin = new TestLegacyBmsSkin(resources, buildResources(keysUnderNotes));
+        var skin = new TestLegacyBmsSkin(resources, buildResources(keysUnderNotes, includeColumnLightTexture));
         return new SkinProvidingContainer(new BmsLegacySkinTransformer(skin, new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K }));
     }
 
@@ -189,7 +189,7 @@ public static class BmsTestLegacySkin
 
     public static float ExpectedRightLineWidth(int column) => column_line_width[column + 1];
 
-    private static string buildSkinIni(bool keysUnderNotes)
+    private static string buildSkinIni(bool keysUnderNotes, bool includeColumnLightTexture)
     {
         var s = new StringBuilder();
         s.AppendLine("[General]");
@@ -249,7 +249,8 @@ public static class BmsTestLegacySkin
         s.AppendLine($"StageLeft: {LEFT_STAGE_IMAGE}");
         s.AppendLine($"StageRight: {RIGHT_STAGE_IMAGE}");
         s.AppendLine($"StageBottom: {BOTTOM_STAGE_IMAGE}");
-        s.AppendLine($"StageLight: {LIGHT_IMAGE}");
+        if (includeColumnLightTexture)
+            s.AppendLine($"StageLight: {LIGHT_IMAGE}");
         s.AppendLine();
         s.AppendLine($"HitPGreat: {JUDGEMENT_PGREAT_IMAGE}");
         s.AppendLine($"HitGreat: {JUDGEMENT_GREAT_IMAGE}");
@@ -259,14 +260,14 @@ public static class BmsTestLegacySkin
         return s.ToString();
     }
 
-    private static Dictionary<string, byte[]> buildResources(bool keysUnderNotes)
+    private static Dictionary<string, byte[]> buildResources(bool keysUnderNotes, bool includeColumnLightTexture)
     {
-        var dict = buildTextures();
-        dict["skin.ini"] = Encoding.UTF8.GetBytes(buildSkinIni(keysUnderNotes));
+        var dict = buildTextures(includeColumnLightTexture);
+        dict["skin.ini"] = Encoding.UTF8.GetBytes(buildSkinIni(keysUnderNotes, includeColumnLightTexture));
         return dict;
     }
 
-    private static Dictionary<string, byte[]> buildTextures()
+    private static Dictionary<string, byte[]> buildTextures(bool includeColumnLightTexture)
     {
         var dict = new Dictionary<string, byte[]>(StringComparer.Ordinal);
 
@@ -319,8 +320,11 @@ public static class BmsTestLegacySkin
         dict[LEFT_STAGE_IMAGE] = solidPng(70, 70, 70);
         dict[RIGHT_STAGE_IMAGE] = solidPng(110, 110, 110);
         dict[BOTTOM_STAGE_IMAGE] = solidPng(40, 40, 40);
-        dict[$"{LIGHT_IMAGE}-0"] = solidPng(255, 255, 0, 16, 120);
-        dict[$"{LIGHT_IMAGE}-1"] = solidPng(255, 160, 0, 16, 120);
+        if (includeColumnLightTexture)
+        {
+            dict[$"{LIGHT_IMAGE}-0"] = solidPng(255, 255, 0, 16, 120);
+            dict[$"{LIGHT_IMAGE}-1"] = solidPng(255, 160, 0, 16, 120);
+        }
         dict[JUDGEMENT_PGREAT_IMAGE] = solidPng(255, 255, 0);
         dict[JUDGEMENT_GREAT_IMAGE] = solidPng(255, 200, 0);
         dict[JUDGEMENT_GOOD_IMAGE] = solidPng(0, 255, 0);

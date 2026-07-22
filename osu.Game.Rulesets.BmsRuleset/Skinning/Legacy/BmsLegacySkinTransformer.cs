@@ -190,10 +190,10 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
                 => createNoteFactory(bmsLookup),
             BmsSkinComponents.ColumnBackground
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsColumnBackground(this, bmsLookup)),
-            BmsSkinComponents.HitTarget when bmsLookup.ColumnIndex == null && hasAnimation(GetHitTargetImageName())
+            BmsSkinComponents.ColumnLight
+                => new BmsResolvedDrawableFactory(() => new LegacyBmsColumnLight(this, bmsLookup)),
+            BmsSkinComponents.HitTarget when bmsLookup.ColumnIndex == null
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsHitTarget(this)),
-            BmsSkinComponents.HitTarget when bmsLookup.ColumnIndex != null
-                => new BmsResolvedDrawableFactory(() => new LegacyBmsColumnHitTarget(this, bmsLookup)),
             BmsSkinComponents.KeyArea when hasAnimation(GetKeyImageName(bmsLookup, false))
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsKeyArea(this, bmsLookup)),
             BmsSkinComponents.Mine

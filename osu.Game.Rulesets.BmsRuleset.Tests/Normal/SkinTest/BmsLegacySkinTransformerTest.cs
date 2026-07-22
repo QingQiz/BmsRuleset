@@ -303,6 +303,57 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestColumnSeparatorsMatchLegacyManiaWidth()
+    {
+        var skin = createConfiguredSkin("""
+                                        [BMS]
+                                        Layout: 7K
+                                        ColumnLineWidth: 1,2,3,4,5,6,7,8,9
+                                        """);
+        var background = (LegacyBmsColumnBackground)skin.GetDrawableComponent(
+            new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, BmsLayoutVariant.Bme7K, 1));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(background.LeftSeparator.Width, Is.EqualTo(2));
+            Assert.That(background.LeftSeparator.Scale.X, Is.EqualTo(0.740f));
+            Assert.That(background.RightSeparator.Width, Is.EqualTo(3));
+            Assert.That(background.RightSeparator.Scale.X, Is.EqualTo(0.740f));
+            Assert.That(background.RightSeparator.Anchor, Is.EqualTo(Anchor.TopRight));
+            Assert.That(background.RightSeparator.Origin, Is.EqualTo(Anchor.TopLeft));
+            Assert.That(background.SeparatorContainer.RelativeSizeAxes, Is.EqualTo(Axes.Both));
+        });
+    }
+
+    [Test]
+    public void TestLastColumnSeparatorMatchesLegacyManiaOffset()
+    {
+        var skin = createConfiguredSkin("""
+                                        [BMS]
+                                        Layout: 7K
+                                        ColumnLineWidth: 1,1,1,1,1,1,1,1,1
+                                        """);
+        var background = (LegacyBmsColumnBackground)skin.GetDrawableComponent(
+            new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, BmsLayoutVariant.Bme7K, 7));
+
+        Assert.That(background.RightSeparator.X, Is.EqualTo(-0.16f));
+    }
+
+    [Test]
+    public void TestColumnSpacingDoesNotCreateOuterMargins()
+    {
+        var skin = createConfiguredSkin("""
+                                        [BMS]
+                                        Layout: 7K
+                                        ColumnSpacing: 1,2,3,4,5,6,7,100
+                                        """);
+        var lastColumn = new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, BmsLayoutVariant.Bme7K, 7);
+
+        Assert.That(skin.GetConfig<BmsSkinConfigurationLookup, float>(
+            new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.RightColumnSpacing, lastColumn)), Is.Null);
+    }
+
+    [Test]
     public void TestBms5KFallsBackToSixKeySpecialStyleBeforeFiveKey()
     {
         var skin = createConfiguredSkin("""
@@ -747,8 +798,8 @@ public class BmsLegacySkinTransformerTest
         foreach (var lookup in new[]
                  {
                      new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, BmsLayoutVariant.Bme7K, 1),
+                     new BmsSkinComponentLookup(BmsSkinComponents.ColumnLight, BmsLayoutVariant.Bme7K, 1),
                      new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1),
-                     new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, BmsLayoutVariant.Bme7K, 1),
                      new BmsSkinComponentLookup(BmsSkinComponents.HitTarget),
                      new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1),
                      new BmsSkinComponentLookup(BmsSkinComponents.StageBackground),
@@ -787,6 +838,22 @@ public class BmsLegacySkinTransformerTest
         Assert.That(skin.GetTexture("mania-key1", default, default), Is.Not.Null);
         Assert.That(skin.GetTexture("mania-key1D", default, default), Is.Not.Null);
         Assert.That(skin.GetTexture("mania-keyS", default, default), Is.Not.Null);
+    }
+
+    [Test]
+    public void TestColumnLightTextureFallsBackToEmbeddedSkin()
+    {
+        var beatmap = (BmsBeatmap)createBeatmap();
+        using var source = new BmsEmbeddedSkinSource();
+        var parent = new TestSkinSource(new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+                                                                                         [BMS]
+                                                                                         Layout: 7K
+                                                                                         ColourLight1: 0,0,0
+                                                                                         """), beatmap));
+
+        source.SetSources(parent, BmsEmbeddedSkinFallbackFactory.Create(parent.AllSources, beatmap, new DummyRenderer()));
+
+        Assert.That(source.GetAnimation("mania-stage-light", true, true), Is.Not.Null);
     }
 
     [Test]
@@ -936,7 +1003,7 @@ public class BmsLegacySkinTransformerTest
         Assert.That(skin.GetDrawableComponent(lookup), Is.Not.Null);
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget)), Is.Not.Null);
-        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
+        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, BmsLayoutVariant.Bme7K, 1)), Is.Null);
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
         Assert.That(skin.GetDrawableComponent(new SkinComponentLookup<HitResult>(HitResult.Perfect)), Is.Not.Null);
     }
@@ -1047,6 +1114,7 @@ public class BmsLegacySkinTransformerTest
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1)), Is.Not.Null);
         Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget)), Is.Not.Null);
+        Assert.That(skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, BmsLayoutVariant.Bme7K, 1)), Is.Null);
         Assert.That(skin.GetDrawableComponent(new SkinComponentLookup<HitResult>(HitResult.Perfect)), Is.Not.Null);
     }
 

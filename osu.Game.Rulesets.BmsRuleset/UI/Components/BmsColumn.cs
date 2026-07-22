@@ -77,8 +77,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
     private const float key_area_under_notes_depth = 1;
     private const float key_area_over_notes_depth = -1;
 
-    private readonly SkinnableDrawable hitTarget;
-
     private BmsColumnKeySound? keySound;
 
     [Resolved]
@@ -99,19 +97,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
         InternalChildren =
         [
-            new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, LayoutVariant, index))
-            {
-                RelativeSizeAxes = Axes.Both,
-            },
             KeyAreaUnderNotesLayer,
-            hitTarget = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.HitTarget, LayoutVariant, index))
-            {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.Centre,
-                CentreComponent = false,
-            },
         ];
 
         KeyArea = new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, LayoutVariant, index))
@@ -229,11 +215,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
                 : 0,
         };
 
-        SetHitTargetPosition(ParentPlayfield.Stage.HitTargetPosition);
-
     }
-
-    internal void SetHitTargetPosition(float position) => hitTarget.Y = -position;
 
     #region Hit explosions / landmine
 
