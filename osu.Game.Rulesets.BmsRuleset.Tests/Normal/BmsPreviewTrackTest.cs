@@ -105,6 +105,43 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
+    public void TestEventIsNotSkippedWhenTimelinePreparationExceedsSampleLength()
+    {
+        BmsPreviewTrack track = null!;
+        var timelineGate = new ManualResetEventSlim();
+
+        AddStep("start before timeline is ready", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-delayed-sample-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsEventPreviewTrack(
+                () =>
+                {
+                    timelineGate.Wait();
+                    return [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), false)];
+                },
+                new Dictionary<ushort, string> { [1] = "test.wav" },
+                directory,
+                audio);
+
+            audio.AddItem(track);
+            track.Start();
+        });
+
+        AddUntilStep("sample duration elapses", () => track.CurrentTime > 1000);
+        AddStep("complete timeline", timelineGate.Set);
+        AddUntilStep("delayed event still plays", () => getActivePlaybackCount(track) > 0);
+        AddStep("dispose track", () =>
+        {
+            track.Dispose();
+            timelineGate.Dispose();
+        });
+    }
+
+    [Test]
     public void TestLeadingEmptyTimelineIsTrimmedForEventPreview()
     {
         BmsPreviewTrack track = null!;

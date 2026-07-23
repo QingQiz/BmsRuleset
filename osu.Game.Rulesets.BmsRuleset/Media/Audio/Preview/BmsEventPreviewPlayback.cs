@@ -188,16 +188,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         if (track == null)
             return true;
 
-        var offset = Math.Max(0, currentTime - evt.Time);
-
-        if (track.Length > 0 && offset >= track.Length)
-        {
-            track.Dispose();
-            return true;
-        }
-
         owner.BindPreviewAdjustments(track, evt.Volume);
-        track.Seek(offset);
         track.Start();
         activeTracks.Add(track);
 
