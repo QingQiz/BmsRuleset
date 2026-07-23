@@ -93,7 +93,6 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
                 var expectedTick = caseTick(i);
 
                 if (longNotes[i].StartTime != expectedStartTime
-                    || longNotes[i].TickInfo.Tick != expectedTick
                     || textEvents[i].Time != expectedStartTime - text_lead_time
                     || textEvents[i].Tick != expectedTick - 48
                     || textEvents[i].Text != $"{i + 1:00} {cases[i].Text}")
@@ -286,16 +285,13 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         for (var i = 0; i < cases.Count; i++)
         {
             var startTime = first_case_time + i * case_spacing;
-            var endTime = startTime + long_note_duration;
             var tick = caseTick(i);
-            var endTick = tick + 96;
 
             beatmap.HitObjects.Add(new BmsLongNote
             {
                 StartTime = startTime,
                 Duration = long_note_duration,
                 Column = columns[i % columns.Length],
-                TickInfo = new BmsTickInfo { Tick = tick, EndTick = endTick },
             });
 
             textEvents.Add(new BmsTextEvent(startTime - text_lead_time, tick - 48, $"{i + 1:00} {cases[i].Text}"));
@@ -471,11 +467,11 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     }
 
     private bool isCaseLongNoteAlive(int index)
-        => Playfield.GetAliveObjectAtTick(caseTick(index)) is DrawableBmsHitObject { HitObject: BmsLongNote } drawable
+        => Playfield.GetAliveObjectAtTime(first_case_time + index * case_spacing) is DrawableBmsHitObject { HitObject: BmsLongNote } drawable
            && drawable.Alpha > 0;
 
     private DrawableBmsHitObject? getCaseLongNote(int index)
-        => Playfield.GetAliveObjectAtTick(caseTick(index)) is DrawableBmsHitObject { HitObject: BmsLongNote } drawable
+        => Playfield.GetAliveObjectAtTime(first_case_time + index * case_spacing) is DrawableBmsHitObject { HitObject: BmsLongNote } drawable
             ? drawable
             : null;
 

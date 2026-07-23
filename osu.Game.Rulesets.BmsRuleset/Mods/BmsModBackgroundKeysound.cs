@@ -5,7 +5,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
@@ -28,12 +27,12 @@ public class BmsModBackgroundKeysound : Mod, IApplicableAfterBeatmapConversion
 
         var starts = notes
             .Where(x => x.SampleKey.HasValue)
-            .Select(x => new BmsSampleEvent(x.StartTime, x.TickInfo.Tick, x.SampleKey!.Value, x.SampleVolume));
+            .Select(x => new BmsSampleEvent(x.StartTime, 0, x.SampleKey!.Value, x.SampleVolume));
 
         var tails = notes
             .OfType<BmsLongNote>()
             .Where(x => x.TailSampleKey.HasValue)
-            .Select(x => new BmsSampleEvent(x.EndTime, x.TickInfo.EndTick, x.TailSampleKey!.Value, x.TailSampleVolume));
+            .Select(x => new BmsSampleEvent(x.EndTime, 0, x.TailSampleKey!.Value, x.TailSampleVolume));
 
         b.BackgroundSampleEvents = b.BackgroundSampleEvents.Concat(starts).Concat(tails).ToArray();
 

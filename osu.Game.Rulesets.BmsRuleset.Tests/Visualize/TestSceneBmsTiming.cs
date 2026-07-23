@@ -30,10 +30,10 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
     private void seekToTick(long tick, double leadTime = 600)
     {
         var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
-        var target = beatmap.HitObjects.First(h => h.TickInfo.Tick >= tick);
-
-        Player.GameplayClockContainer.Seek(target.StartTime - leadTime);
+        Player.GameplayClockContainer.Seek(beatmap.TimingMap!.ProjectTickToTime(tick) - leadTime);
     }
+
+    private double timeAtTick(long tick) => ((BmsBeatmap)Player.GameplayState.Beatmap).TimingMap!.ProjectTickToTime(tick);
 
     private const string timing_chart =
         """
@@ -104,7 +104,7 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
     private DrawableBmsHitObject? getCrossSpeedLongNote()
         => Playfield.AllColumnAliveObjects()
             .OfType<DrawableBmsHitObject>()
-            .FirstOrDefault(d => d.HitObject is BmsLongNote { TickInfo.Tick: 384 });
+            .FirstOrDefault(d => d.HitObject is BmsLongNote && d.HitObject.StartTime == timeAtTick(384));
 
     // ── Negative BPM (reverse scroll) ──────────────────────────────────────
 
@@ -143,12 +143,12 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
 
         AddStep("seek normal BPM", () => seekToTick(192));
         AddUntilStep("normal notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
-        AddUntilStep("normal speed spacing measurable", () => Playfield.SpacingBetweenTicks(192, 240, excludeLongNotes: true), () => Is.GreaterThan(1));
-        AddStep("capture normal speed spacing", () => normalSpeedSpacing = Playfield.SpacingBetweenTicks(192, 240, excludeLongNotes: true));
+        AddUntilStep("normal speed spacing measurable", () => Playfield.SpacingBetweenTimes(timeAtTick(192), timeAtTick(240), excludeLongNotes: true), () => Is.GreaterThan(1));
+        AddStep("capture normal speed spacing", () => normalSpeedSpacing = Playfield.SpacingBetweenTimes(timeAtTick(192), timeAtTick(240), excludeLongNotes: true));
 
         AddStep("increase scroll speed", () => Playfield.ScrollController.AdjustScrollSpeed(0.5));
         AddAssert("scroll speed increased", () => Playfield.ScrollSpeed, () => Is.GreaterThan(8));
-        AddUntilStep("spacing increased", () => Playfield.SpacingBetweenTicks(192, 240, excludeLongNotes: true), () => Is.GreaterThan(normalSpeedSpacing));
+        AddUntilStep("spacing increased", () => Playfield.SpacingBetweenTimes(timeAtTick(192), timeAtTick(240), excludeLongNotes: true), () => Is.GreaterThan(normalSpeedSpacing));
         AddStep("decrease scroll speed", () => Playfield.ScrollController.AdjustScrollSpeed(-0.5));
         AddAssert("scroll speed restored", () => Playfield.ScrollSpeed, () => Is.EqualTo(8).Within(0.001));
 
@@ -163,9 +163,7 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
         {
             var beatmap = (BmsBeatmap)Player.GameplayState.Beatmap;
             var stop = beatmap.TimingMap!.StopEvents[0];
-            var stopObject = beatmap.HitObjects.First(h => h.TickInfo.Tick == stop.Tick);
-
-            Player.GameplayClockContainer.Seek(stopObject.StartTime + stop.Duration / 2);
+            Player.GameplayClockContainer.Seek(beatmap.TimingMap.ProjectTickToTime(stop.Tick) + stop.Duration / 2);
         });
         AddUntilStep("stop notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
 
@@ -173,9 +171,9 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
         AddUntilStep("slow notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
 
         AddStep("seek post-LN note", () => seekToTick(1056));
-        AddUntilStep("post-LN note alive", () => Playfield.GetAliveObjectAtTick(1056, excludeLongNotes: true) != null);
+        AddUntilStep("post-LN note alive", () => Playfield.GetAliveObjectAtTime(timeAtTick(1056), excludeLongNotes: true) != null);
         AddAssert("post-LN note approaches from above",
-            () => BmsPlayfieldAssertions.TopOf(Playfield.GetAliveObjectAtTick(1056, excludeLongNotes: true)!),
+            () => BmsPlayfieldAssertions.TopOf(Playfield.GetAliveObjectAtTime(timeAtTick(1056), excludeLongNotes: true)!),
             () => Is.LessThanOrEqualTo(Playfield.JudgementLineY() + 1));
 
         AddStep("seek extreme BPM", () => seekToTick(1152, 20));

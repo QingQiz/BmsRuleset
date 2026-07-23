@@ -18,13 +18,13 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 public static class BmsPlayfieldAssertions
 {
     /// <summary>
-    /// Returns the first alive <see cref="DrawableBmsHitObject"/> at the given tick, or <c>null</c>.
+    /// Returns the first alive <see cref="DrawableBmsHitObject"/> at the given start time, or <c>null</c>.
     /// </summary>
     /// <param name="playfield">The playfield to query.</param>
-    /// <param name="tick">Native BMS tick to match against <see cref="BmsHitObject.TickInfo"/>.</param>
+    /// <param name="startTime">Start time to match.</param>
     /// <param name="excludeLongNotes">If <c>true</c>, long notes are skipped — useful when a non-LN
-    /// note shares its tick with an LN body and the test only cares about the tap.</param>
-    public static DrawableBmsHitObject? GetAliveObjectAtTick(this BmsPlayfield playfield, long tick, bool excludeLongNotes = false)
+    /// note shares its start time with an LN body and the test only cares about the tap.</param>
+    public static DrawableBmsHitObject? GetAliveObjectAtTime(this BmsPlayfield playfield, double startTime, bool excludeLongNotes = false)
     {
         // After the scrolling refactor, hit objects live in per-column BmsColumnHitObjectContainer
         // instances, not in the playfield's default (empty) HitObjectContainer.
@@ -33,7 +33,7 @@ public static class BmsPlayfieldAssertions
             foreach (var (entry, d) in column.HitObjectContainer.AliveEntries)
             {
                 if (d is DrawableBmsHitObject note &&
-                    note.HitObject.TickInfo.Tick == tick &&
+                    note.HitObject.StartTime == startTime &&
                     (!excludeLongNotes || note.HitObject is not BmsLongNote))
                 {
                     return note;
@@ -45,13 +45,13 @@ public static class BmsPlayfieldAssertions
     }
 
     /// <summary>
-    /// Distance between the screen-space tops of the two notes at the given ticks,
+    /// Distance between the screen-space tops of the two notes at the given start times,
     /// or <c>0</c> if either note is not currently alive.
     /// </summary>
-    public static float SpacingBetweenTicks(this BmsPlayfield playfield, long firstTick, long secondTick, bool excludeLongNotes = false)
+    public static float SpacingBetweenTimes(this BmsPlayfield playfield, double firstTime, double secondTime, bool excludeLongNotes = false)
     {
-        var first = playfield.GetAliveObjectAtTick(firstTick, excludeLongNotes);
-        var second = playfield.GetAliveObjectAtTick(secondTick, excludeLongNotes);
+        var first = playfield.GetAliveObjectAtTime(firstTime, excludeLongNotes);
+        var second = playfield.GetAliveObjectAtTime(secondTime, excludeLongNotes);
 
         if (first == null || second == null)
             return 0;

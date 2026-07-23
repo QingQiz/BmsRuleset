@@ -367,7 +367,7 @@ public class BmsBeatmapDecoderTest
 
             if (!pressOk || !releaseOk || pressJudgement != HitResult.Perfect || releaseJudgement != HitResult.Perfect)
             {
-                var issue = $"LN tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} " +
+                var issue = $"LN start={ln.StartTime:F3}ms col={ln.Column} " +
                             $"Duration={ln.Duration:F3}ms " +
                             $"pressOffset={pressOffset:F3}ms→{pressJudgement} " +
                             $"releaseOffset={releaseOffset:F3}ms→{releaseJudgement}";
@@ -386,13 +386,13 @@ public class BmsBeatmapDecoderTest
         // Find short LNs and LNs with potential issues
         var shortLns = lns.Where(ln => ln.Duration <= great * 2).OrderBy(ln => ln.Duration).ToList();
         var shortLnsReport = string.Join("\n  ", shortLns.Take(20).Select(ln =>
-            $"tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} dur={ln.Duration:F1}ms " +
+            $"start={ln.StartTime:F1}ms col={ln.Column} dur={ln.Duration:F1}ms " +
             $"start={ln.StartTime:F1}ms end={ln.GetEndTime():F1}ms"));
 
         // Also show LNs around combo 190 (roughly 190 notes in)
         var normalNotes = hitObjects.Where(h => h is not BmsLandmine).ToList();
         var aroundCombo190 = lns.Skip(Math.Max(0, normalNotes.Take(190).Count(h => h is BmsLongNote) - 3)).Take(7)
-            .Select(ln => $"tick={ln.TickInfo.Tick}→{ln.TickInfo.EndTick} col={ln.Column} dur={ln.Duration:F1}ms " +
+            .Select(ln => $"start={ln.StartTime:F1}ms col={ln.Column} dur={ln.Duration:F1}ms " +
                           $"start={ln.StartTime:F0}ms end={ln.GetEndTime():F0}ms");
         var around190 = string.Join("\n  ", aroundCombo190);
 
@@ -1536,13 +1536,11 @@ public class BmsBeatmapDecoderTest
                              #00211:00ZZ
                              """);
 
-        var note = (BmsHitObject)beatmap.HitObjects.Single();
+        var note = (BmsLongNote)beatmap.HitObjects.Single();
 
         Assert.That(note is BmsLongNote, Is.True);
         Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("22")));
-        Assert.That(note.TickInfo.Tick, Is.EqualTo(192));
-        Assert.That(note.TickInfo.EndTick, Is.EqualTo(480));
-        Assert.That(((BmsLongNote)note).Duration, Is.EqualTo(3000).Within(0.001));
+        Assert.That(note.Duration, Is.EqualTo(3000).Within(0.001));
     }
 
     [Test]
@@ -1554,13 +1552,11 @@ public class BmsBeatmapDecoderTest
                              #00151:0102
                              """);
 
-        var note = (BmsHitObject)beatmap.HitObjects.Single();
+        var note = (BmsLongNote)beatmap.HitObjects.Single();
 
         Assert.That(note is BmsLongNote, Is.True);
         Assert.That(note.Column, Is.EqualTo(1));
-        Assert.That(note.TickInfo.Tick, Is.EqualTo(192));
-        Assert.That(note.TickInfo.EndTick, Is.EqualTo(288));
-        Assert.That(((BmsLongNote)note).Duration, Is.EqualTo(1000).Within(0.001));
+        Assert.That(note.Duration, Is.EqualTo(1000).Within(0.001));
     }
 
     [Test]
@@ -1572,12 +1568,10 @@ public class BmsBeatmapDecoderTest
                              #00151:11110000
                              """);
 
-        var note = (BmsHitObject)beatmap.HitObjects.Single();
+        var note = (BmsLongNote)beatmap.HitObjects.Single();
 
         Assert.That(note is BmsLongNote, Is.True);
-        Assert.That(note.TickInfo.Tick, Is.EqualTo(192));
-        Assert.That(note.TickInfo.EndTick, Is.EqualTo(288));
-        Assert.That(((BmsLongNote)note).Duration, Is.EqualTo(1000).Within(0.001));
+        Assert.That(note.Duration, Is.EqualTo(1000).Within(0.001));
     }
 
     [Test]
@@ -1710,9 +1704,7 @@ public class BmsBeatmapDecoderTest
         var first = (BmsHitObject)beatmap.HitObjects[0];
         var second = (BmsHitObject)beatmap.HitObjects[1];
 
-        Assert.That(first.TickInfo.Tick, Is.EqualTo(0));
         Assert.That(first.StartTime, Is.EqualTo(0).Within(0.001));
-        Assert.That(second.TickInfo.Tick, Is.EqualTo(192));
         Assert.That(second.StartTime, Is.EqualTo(2000).Within(0.001));
         Assert.That(second.StartTime - first.StartTime, Is.EqualTo(2000).Within(0.001));
     }
@@ -1848,7 +1840,6 @@ public class BmsBeatmapDecoderTest
         Assert.That(timingMap.StopEvents[0].StopValue, Is.EqualTo(192));
         Assert.That(timingMap.StopEvents[0].Bpm, Is.EqualTo(120));
         Assert.That(timingMap.StopEvents[0].Duration, Is.EqualTo(2000).Within(0.001));
-        Assert.That(note.TickInfo.Tick, Is.EqualTo(288));
         Assert.That(note.StartTime, Is.EqualTo(5000).Within(0.001));
     }
 
@@ -2780,8 +2771,8 @@ public class BmsBeatmapDecoderTest
 
         Assert.That(converted.TickResolution, Is.EqualTo(960));
         Assert.That(converted.TimingMap!.TickResolution, Is.EqualTo(960));
-        Assert.That(first.TickInfo.Tick, Is.EqualTo(960));
-        Assert.That(last.TickInfo.Tick, Is.EqualTo(1728));
+        Assert.That(first.StartTime, Is.EqualTo(converted.TimingMap.ProjectTickToTime(960)).Within(0.001));
+        Assert.That(last.StartTime, Is.EqualTo(converted.TimingMap.ProjectTickToTime(1728)).Within(0.001));
     }
 
     [Test]
@@ -2852,12 +2843,10 @@ public class BmsBeatmapDecoderTest
 
         Assert.That(first.Column, Is.EqualTo(1));
         Assert.That(first.SampleKey, Is.EqualTo(BmsChartParser.Enc("01")));
-        Assert.That(first.TickInfo.Tick, Is.EqualTo(192));
         Assert.That(first.StartTime, Is.EqualTo(2000).Within(0.001));
 
         Assert.That(second.Column, Is.EqualTo(0));
         Assert.That(second.SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
-        Assert.That(second.TickInfo.Tick, Is.EqualTo(288));
         Assert.That(second.StartTime, Is.EqualTo(3000).Within(0.001));
     }
 }

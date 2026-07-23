@@ -84,7 +84,6 @@ public partial class BmsGameplayVirtualisationTest
             130);
         var hitObject = new BmsHitObject
         {
-            TickInfo = new BmsTickInfo { Tick = 192, EndTick = 192 },
             StartTime = timingMap.ProjectTickToTime(192),
             Column = 1,
         };
@@ -138,7 +137,6 @@ public partial class BmsGameplayVirtualisationTest
             130);
         var hitObject = new BmsHitObject
         {
-            TickInfo = new BmsTickInfo { Tick = 960, EndTick = 960 },
             StartTime = timingMap.ProjectTickToTime(960),
             Column = 1,
         };
@@ -178,7 +176,7 @@ public partial class BmsGameplayVirtualisationTest
             .SelectMany(c => c.HitObjectContainer.Entries)
             .Where(e => e.HitObject is BmsHitObject)
             .Where(e => e.LifetimeStart > e.HitObject.StartTime)
-            .Select(e => $"{((BmsHitObject)e.HitObject).TickInfo.Tick}@{e.HitObject.StartTime:F1} lifetime={e.LifetimeStart:F1}")
+            .Select(e => $"{e.HitObject.StartTime:F1} lifetime={e.LifetimeStart:F1}")
             .ToArray();
 
         Assert.That(lateEntries, Is.Empty);
@@ -201,7 +199,7 @@ public partial class BmsGameplayVirtualisationTest
             .Select(e => (Entry: e, HitObject: (BmsHitObject)e.HitObject))
             .Select(x => (x.Entry, x.HitObject, Combo: Array.IndexOf(playableObjects, x.HitObject) + 1, FirstVisibleTime: findEarliestVisibleTime(beatmap, x.HitObject)))
             .Where(x => x.Entry.LifetimeStart > x.FirstVisibleTime + 1)
-            .Select(x => $"combo={x.Combo} tick={x.HitObject.TickInfo.Tick} col={x.HitObject.Column} start={x.HitObject.StartTime:F1} firstVisible={x.FirstVisibleTime:F1} lifetime={x.Entry.LifetimeStart:F1}")
+            .Select(x => $"combo={x.Combo} col={x.HitObject.Column} start={x.HitObject.StartTime:F1} firstVisible={x.FirstVisibleTime:F1} lifetime={x.Entry.LifetimeStart:F1}")
             .ToArray();
 
         Assert.That(lateEntries, Is.Empty);

@@ -24,8 +24,6 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     private const double duration = 900;
     private const double early_release_offset = -500;
     private const double repress_offset = -300;
-    private const long tick = 192;
-    private const long second_tick = 384;
 
     private BmsLongNoteMode mode = BmsLongNoteMode.ChargeNote;
 
@@ -48,14 +46,12 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
                     StartTime = start_time,
                     Duration = duration,
                     Column = 1,
-                    TickInfo = new BmsTickInfo { Tick = tick, EndTick = tick + 96 },
                 },
                 new BmsLongNote
                 {
                     StartTime = second_start_time,
                     Duration = duration,
                     Column = 1,
-                    TickInfo = new BmsTickInfo { Tick = second_tick, EndTick = second_tick + 96 },
                 },
             },
         };
@@ -111,7 +107,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         AddUntilStep("held body before release", () => Player.GameplayClockContainer.CurrentTime >= start_time + 300);
         AddAssert("held body and tail are fully opaque", () =>
         {
-            var longNote = Playfield.GetAliveObjectAtTick(tick);
+            var longNote = Playfield.GetAliveObjectAtTime(start_time);
             return longNote != null
                    && longNoteBodyOf(longNote).Alpha == 1f
                    && longNoteTailContainerOf(longNote).Alpha == 1f;
@@ -121,7 +117,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         // of greying only the body, so a coloured tail no longer clashes with a grey body.
         AddAssert("released body and tail are faded", () =>
         {
-            var longNote = Playfield.GetAliveObjectAtTick(tick);
+            var longNote = Playfield.GetAliveObjectAtTime(start_time);
             return longNote != null
                    && longNoteBodyOf(longNote).Alpha == 0.4f
                    && longNoteTailContainerOf(longNote).Alpha == 0.4f;
@@ -129,7 +125,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         AddUntilStep("pressed again after failed release", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + repress_offset + 120);
         AddAssert("failed repress has mode-specific visual", () =>
         {
-            var longNote = Playfield.GetAliveObjectAtTick(tick);
+            var longNote = Playfield.GetAliveObjectAtTime(start_time);
 
             if (longNote == null
                 || longNoteBodyOf(longNote).Alpha != expectedAlpha
@@ -153,6 +149,6 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
         AddStep("seek before normal tail", () => Player.GameplayClockContainer.Seek(second_start_time - 100));
         AddUntilStep("past tail release", () => Player.GameplayClockContainer.CurrentTime >= second_start_time + duration + 20);
-        AddAssert("tail non-poor clears long note", () => Playfield.GetAliveObjectAtTick(second_tick) == null);
+        AddAssert("tail non-poor clears long note", () => Playfield.GetAliveObjectAtTime(second_start_time) == null);
     }
 }

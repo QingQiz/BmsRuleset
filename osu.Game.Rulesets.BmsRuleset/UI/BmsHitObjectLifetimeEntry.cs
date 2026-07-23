@@ -2,7 +2,6 @@ using System;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Rulesets.Objects;
@@ -138,7 +137,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
         var floor = Math.Max(getEarlyBadWindow(hitObject), minimum_future_lifetime);
         var timingMap = getTimingMap();
 
-        if (useConstantScrollFallback(hitObject, timingMap))
+        if (useConstantScrollFallback(timingMap))
             return Math.Max(floor, computeConstantScrollFutureLifetime());
 
         var visibleTime = findEarliestVisibleWindowStart(hitObject, timingMap!);
@@ -161,17 +160,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
         return Math.Abs(table.EarlyWindowFor(HitResult.Ok));
     }
 
-    private bool useConstantScrollFallback(BmsHitObject hitObject, BmsTimingMap? timingMap)
-    {
-        if (scrollController.ConstantScrollActive || timingMap == null)
-            return true;
-
-        // Notes with Tick == EndTick == 0 and a non-zero StartTime have no meaningful scroll
-        // segment data — use the simpler time-based projection.
-        return hitObject.TickInfo.Tick == hitObject.TickInfo.EndTick
-               && hitObject.TickInfo.Tick == 0
-               && hitObject.StartTime != 0;
-    }
+    private bool useConstantScrollFallback(BmsTimingMap? timingMap) => scrollController.ConstantScrollActive || timingMap == null;
 
     /// <summary>
     ///     Probe backwards from the hit object's <c>StartTime</c> to find the earliest time

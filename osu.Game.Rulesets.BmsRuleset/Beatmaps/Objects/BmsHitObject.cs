@@ -32,8 +32,6 @@ public class BmsHitObject : HitObject
     /// </summary>
     public double ScrollPositionAtStartTime { get; set; }
 
-    public BmsTickInfo TickInfo { get; set; } = new();
-
     public static BmsHitObject CreateForKind(bool isLongNote, bool isMine)
     {
         if (isMine)
@@ -61,7 +59,6 @@ public class BmsHitObject : HitObject
 
     protected virtual void CopyTo(BmsHitObject target)
     {
-        target.TickInfo = TickInfo;
         target.StartTime = StartTime;
         target.Column = Column;
         target.SourceChannel = SourceChannel;

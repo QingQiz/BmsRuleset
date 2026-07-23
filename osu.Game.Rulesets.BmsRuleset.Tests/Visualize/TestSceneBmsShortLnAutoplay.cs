@@ -8,7 +8,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
@@ -31,7 +30,7 @@ public partial class TestSceneBmsShortLnAutoplay : BmsPlayerTestScene
     protected override bool HasCustomSteps => true;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
-        => CreateBmsPlayer(b => new BmsAutoGenerator(b).Generate().Frames.Cast<ReplayFrame>().ToList());
+        => CreateBmsPlayer(b => new BmsAutoGenerator(b).Generate().Frames.ToList());
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -43,7 +42,6 @@ public partial class TestSceneBmsShortLnAutoplay : BmsPlayerTestScene
             Total = 300,
         };
 
-        long tick = 192;
         for (var i = 0; i < ln_cols.Length; i++)
         {
             beatmap.HitObjects.Add(new BmsLongNote
@@ -51,9 +49,7 @@ public partial class TestSceneBmsShortLnAutoplay : BmsPlayerTestScene
                 StartTime = start + i * ln_spacing,
                 Duration = ln_dur,
                 Column = ln_cols[i],
-                TickInfo = new BmsTickInfo { Tick = tick, EndTick = tick + 16 },
             });
-            tick += 32;
         }
 
         var noteCols = new[] { 7, 4, 6, 5, 3, 2, 1 };
@@ -63,9 +59,7 @@ public partial class TestSceneBmsShortLnAutoplay : BmsPlayerTestScene
             {
                 StartTime = start + ln_cols.Length * ln_spacing + 200 + i * 100,
                 Column = noteCols[i],
-                TickInfo = new BmsTickInfo { Tick = tick, EndTick = tick },
             });
-            tick += 16;
         }
 
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset, endPadding: 3000, bpm: 145);

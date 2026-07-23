@@ -85,4 +85,26 @@ public class BmsBeatmapConversionTest
         Assert.That(converted.HitObjects[0].Beatmap.Rank, Is.EqualTo(1));
         Assert.That(converted.HitObjects[0].Beatmap.LayoutVariant, Is.EqualTo(BmsLayoutVariant.Bme7K));
     }
+
+    [Test]
+    public void TestFallbackTimingMapCoversHitObjectEndTime()
+    {
+        var longNote = new BmsLongNote
+        {
+            StartTime = 120000,
+            Duration = 5000,
+            Column = 1,
+        };
+        var beatmap = new BmsBeatmap
+        {
+            TotalColumns = 8,
+            HitObjects = { longNote },
+        };
+
+        var converted = (BmsBeatmap)new BmsRuleset().CreateBeatmapConverter(beatmap).Convert();
+        var timingMap = converted.TimingMap!;
+
+        Assert.That(timingMap.ProjectTickToTime(timingMap.Measures[^1].StartTick), Is.GreaterThanOrEqualTo(longNote.EndTime));
+        Assert.That(longNote.ScrollPositionAtEndTime, Is.GreaterThan(longNote.ScrollPositionAtStartTime));
+    }
 }

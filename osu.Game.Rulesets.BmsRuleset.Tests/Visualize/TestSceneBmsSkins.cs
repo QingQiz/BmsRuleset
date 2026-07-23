@@ -426,7 +426,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         var hitObject = ((BmsBeatmap)Player.GameplayState.Beatmap).HitObjects.OfType<BmsLongNote>().Single(h =>
             h.Column == column && h.StartTime == BmsTestBeatmaps.LN_SKIN_COVERAGE_START_TIME);
 
-        return Playfield.GetAliveObjectAtTick(hitObject.TickInfo.Tick);
+        return Playfield.GetAliveObjectAtTime(hitObject.StartTime);
     }
 
     private static BmsSegmentedLongNoteBody longNoteBodyOf(DrawableBmsHitObject longNote)

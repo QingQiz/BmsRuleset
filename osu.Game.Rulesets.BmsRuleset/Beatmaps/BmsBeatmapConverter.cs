@@ -7,7 +7,6 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -135,8 +134,11 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     private static BmsTimingMap createFallbackTimingMap(BmsBeatmap beatmap)
     {
+        const double fallback_bpm = 130;
+
         var tickResolution = beatmap.TickResolution;
-        var endTick = beatmap.HitObjects.Count == 0 ? tickResolution : beatmap.HitObjects.Max(h => Math.Max(h.TickInfo.Tick, h.TickInfo.EndTick));
+        var endTime = beatmap.HitObjects.Count == 0 ? 0 : beatmap.HitObjects.Max(h => h.GetEndTime());
+        var endTick = (long)Math.Ceiling(Math.Max(0, endTime) * fallback_bpm * tickResolution / (60000 * 4));
         var measureCount = Math.Max(1, (int)(endTick / tickResolution) + 1);
 
         var measures = Enumerable.Range(0, measureCount + 1)
@@ -145,7 +147,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         return new BmsTimingMap(
             tickResolution,
             measures,
-            [new BmsBpmEvent(0, 130, 0)],
+            [new BmsBpmEvent(0, fallback_bpm, 0)],
             [],
             [],
             []);

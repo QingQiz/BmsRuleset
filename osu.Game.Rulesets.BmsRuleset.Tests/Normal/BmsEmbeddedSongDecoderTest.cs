@@ -50,7 +50,7 @@ public partial class BmsEmbeddedSongDecoderTest
         Assert.That(beatmap.Metadata.Artist, Is.Not.Empty, resourceName);
         Assert.That(objects.Length, Is.GreaterThan(100), resourceName);
         Assert.That(objects, Is.Ordered.By(nameof(BmsHitObject.StartTime)), resourceName);
-        Assert.That(objects.Select(o => o.TickInfo.Tick), Is.Ordered, resourceName);
+        Assert.That(objects.Select(o => o.StartTime), Is.Ordered, resourceName);
         Assert.That(objects.All(o => o.StartTime >= 0), Is.True, resourceName);
         Assert.That(objects.All(o => o.GetEndTime() >= o.StartTime), Is.True, resourceName);
         Assert.That(beatmap.ControlPointInfo.TimingPoints, Is.Not.Empty, resourceName);
@@ -389,8 +389,6 @@ public partial class BmsEmbeddedSongDecoderTest
         Assert.That(actualFirst.Column, Is.EqualTo(expectedFirst.Column));
         Assert.That(actualFirst.SourceChannel, Is.EqualTo(BmsChartParser.Enc(expectedFirst.Channel)));
         Assert.That(actualFirst.SampleKey, Is.EqualTo(BmsChartParser.Enc(expectedFirst.Value)));
-        Assert.That(actualFirst.TickInfo.Tick, Is.EqualTo(expectedFirst.Tick));
-
         Assert.That(actualFirst.StartTime, Is.EqualTo(expected.ProjectTickToTime(expectedFirst.Tick, true)).Within(0.001));
         Assert.That(
             expected.ProjectTickToTime(expectedFirst.Tick, true) - expected.ProjectTickToTime(expectedFirst.Tick, false),

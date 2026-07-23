@@ -39,8 +39,6 @@ public static partial class BmsTestBeatmaps
             Total = 160,
         };
 
-        long nextTick = 192;
-
         int[] pattern =
         [
             0, 2, 4, 6, 1, 3, 5, 7,
@@ -57,7 +55,6 @@ public static partial class BmsTestBeatmaps
             {
                 StartTime = NORM_SCENARIO_START_TIME + i * 125,
                 Column = pattern[i],
-                TickInfo = new BmsTickInfo { Tick = nextTick++, EndTick = nextTick++ },
             });
         }
 
@@ -70,7 +67,6 @@ public static partial class BmsTestBeatmaps
                 StartTime = LN_SCENARIO_START_TIME + i * LN_SCENARIO_SPACING,
                 Column = lnScenarioColumns[i],
                 Duration = LN_SCENARIO_DURATION,
-                TickInfo = new BmsTickInfo { Tick = nextTick++, EndTick = nextTick++ },
             });
         }
 
@@ -93,15 +89,14 @@ public static partial class BmsTestBeatmaps
                 StartTime = LN_SKIN_COVERAGE_START_TIME,
                 Column = column,
                 Duration = duration,
-                TickInfo = new BmsTickInfo { Tick = nextTick++, EndTick = nextTick++ },
             });
         }
 
-        beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 6000, Column = 6, LandmineDamagePercent = 2.5, TickInfo = new BmsTickInfo { Tick = nextTick++, EndTick = nextTick++ } });
-        beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 7000, Column = 1, LandmineDamagePercent = 2.5, TickInfo = new BmsTickInfo { Tick = nextTick++, EndTick = nextTick++ } });
-        beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 8250, Column = 4, LandmineDamagePercent = 2.5, TickInfo = new BmsTickInfo { Tick = nextTick++, EndTick = nextTick++ } });
-        beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 9500, Column = 0, LandmineDamagePercent = 2.5, TickInfo = new BmsTickInfo { Tick = nextTick++, EndTick = nextTick++ } });
-        beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 11000, Column = 7, LandmineDamagePercent = 2.5, TickInfo = new BmsTickInfo { Tick = nextTick++, EndTick = nextTick++ } });
+        beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 6000, Column = 6, LandmineDamagePercent = 2.5 });
+        beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 7000, Column = 1, LandmineDamagePercent = 2.5 });
+        beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 8250, Column = 4, LandmineDamagePercent = 2.5 });
+        beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 9500, Column = 0, LandmineDamagePercent = 2.5 });
+        beatmap.HitObjects.Add(new BmsLandmine { StartTime = FIRST_NOTE_TIME + 11000, Column = 7, LandmineDamagePercent = 2.5 });
 
         return beatmap;
     }

@@ -10,7 +10,6 @@ using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
@@ -57,11 +56,6 @@ public class BmsBeatmapDecoder(Func<int, int>? randomValueSelector = null, BmsRe
         var hitObject = BmsHitObject.CreateForKind(parsedObject.IsLongNote, parsedObject.IsMine);
         hitObject.Beatmap = beatmap;
 
-        hitObject.TickInfo = new BmsTickInfo
-        {
-            Tick = parsedObject.Tick,
-            EndTick = parsedObject.EndTick,
-        };
         hitObject.StartTime = parsedObject.StartTime;
         hitObject.Column = parsedObject.Column;
         hitObject.SourceChannel = parsedObject.SourceChannel;
