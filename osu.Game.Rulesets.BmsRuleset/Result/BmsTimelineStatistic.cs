@@ -36,7 +36,6 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
     private static readonly Color4 note_colour = colours.Blue;
     private static readonly Color4 ln_colour = colours.GreenLight;
     private static readonly Color4 scratch_colour = colours.Yellow;
-    private static readonly Color4 mine_colour = colours.Red;
     private static readonly Color4 fast_colour = new(90, 175, 255, 255);
     private static readonly Color4 late_colour = new(255, 130, 92, 255);
     private static readonly Color4 failed_colour = new(70, 70, 70, 255);
@@ -94,10 +93,12 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         var note = new int[bucket_count];
         var ln = new int[bucket_count];
         var scratch = new int[bucket_count];
-        var mine = new int[bucket_count];
 
         foreach (var h in playableBeatmap.HitObjects.OfType<BmsHitObject>())
         {
+            if (h is BmsLandmine)
+                continue;
+
             var b = bucketFor(h.StartTime, duration);
 
             switch (classifyNote(h, variant))
@@ -107,15 +108,12 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
                 case NoteKind.LongNote: ln[b]++; break;
 
                 case NoteKind.Scratch: scratch[b]++; break;
-
-                case NoteKind.Mine: mine[b]++; break;
             }
         }
 
         return new SubplotData([
             new CategoryData("Scratch", scratch_colour, scratch),
             new CategoryData("ln", ln_colour, ln),
-            new CategoryData("mine", mine_colour, mine),
             new CategoryData("note", note_colour, note),
         ]);
     }
@@ -215,10 +213,9 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
 
     private static int bucketFor(double time, double duration) => Math.Clamp((int)Math.Floor(time / duration * bucket_count), 0, bucket_count - 1);
 
-    // mine takes priority, then the scratch lane, then long-note vs short note.
+    // The scratch lane takes priority over long-note vs short note.
     private static NoteKind classifyNote(BmsHitObject h, BmsLayoutVariant variant)
     {
-        if (h is BmsLandmine) return NoteKind.Mine;
         if (BmsLayout.IsScratchColumn(h.Column, variant)) return NoteKind.Scratch;
         if (h is BmsLongNote) return NoteKind.LongNote;
 
@@ -383,8 +380,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
     {
         Note,
         LongNote,
-        Scratch,
-        Mine
+        Scratch
     }
 
     internal sealed record TimelineData(SubplotData Notes, SubplotData Judgements, SubplotData FastLate, double? FailureFraction);
