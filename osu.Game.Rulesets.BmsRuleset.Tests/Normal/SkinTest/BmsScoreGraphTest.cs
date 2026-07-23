@@ -5,7 +5,6 @@ using osu.Framework.Testing;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Skinning;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SkinTest;
 

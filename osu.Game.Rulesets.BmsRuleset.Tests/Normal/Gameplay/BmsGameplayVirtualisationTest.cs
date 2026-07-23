@@ -5,8 +5,8 @@ using System.Runtime.CompilerServices;
 using NUnit.Framework;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;

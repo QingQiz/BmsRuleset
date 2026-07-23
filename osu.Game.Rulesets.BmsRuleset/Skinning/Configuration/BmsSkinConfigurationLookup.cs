@@ -1,6 +1,5 @@
 using osu.Game.Skinning;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 

@@ -13,8 +13,7 @@ using osu.Framework.Graphics;
 using NUnit.Framework;
 using osu.Framework.Graphics.Video;
 using osu.Framework.Logging;
-using osu.Framework.Testing;
-using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
+using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;

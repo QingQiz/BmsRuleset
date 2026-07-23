@@ -3,9 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics;
-using osu.Game.Rulesets.BmsRuleset.Objects;
-using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osuTK;
 
@@ -21,7 +21,7 @@ public static class BmsPlayfieldAssertions
     /// Returns the first alive <see cref="DrawableBmsHitObject"/> at the given tick, or <c>null</c>.
     /// </summary>
     /// <param name="playfield">The playfield to query.</param>
-    /// <param name="tick">Native BMS tick to match against <see cref="Objects.BmsHitObject.TickInfo"/>.</param>
+    /// <param name="tick">Native BMS tick to match against <see cref="BmsHitObject.TickInfo"/>.</param>
     /// <param name="excludeLongNotes">If <c>true</c>, long notes are skipped — useful when a non-LN
     /// note shares its tick with an LN body and the test only cares about the tap.</param>
     public static DrawableBmsHitObject? GetAliveObjectAtTick(this BmsPlayfield playfield, long tick, bool excludeLongNotes = false)

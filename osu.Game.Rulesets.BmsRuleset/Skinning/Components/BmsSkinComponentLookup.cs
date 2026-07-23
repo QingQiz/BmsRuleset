@@ -1,6 +1,4 @@
-using System;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Components;

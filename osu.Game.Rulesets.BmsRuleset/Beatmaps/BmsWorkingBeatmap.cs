@@ -9,11 +9,11 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
-using osu.Game.Rulesets.BmsRuleset.Audio.Playback;
-using osu.Game.Rulesets.BmsRuleset.Audio.Preview;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.IO.Resources;
-using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
 

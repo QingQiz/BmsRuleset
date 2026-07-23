@@ -1,6 +1,5 @@
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.Beatmaps;
 using osu.Game.Online.API;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;

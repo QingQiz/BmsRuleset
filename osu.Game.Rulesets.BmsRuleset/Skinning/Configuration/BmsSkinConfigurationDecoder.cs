@@ -6,7 +6,6 @@ using System.Reflection;
 using osu.Framework.IO.Stores;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Skinning;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;

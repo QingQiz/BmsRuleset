@@ -9,7 +9,6 @@ using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 using osu.Game.Configuration;

@@ -5,9 +5,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Testing;
-using osu.Game.Rulesets.BmsRuleset.Audio.Playback;
-using osu.Game.Rulesets.BmsRuleset.Audio.Preview;
-using osu.Game.Rulesets.BmsRuleset.Audio.Samples;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 

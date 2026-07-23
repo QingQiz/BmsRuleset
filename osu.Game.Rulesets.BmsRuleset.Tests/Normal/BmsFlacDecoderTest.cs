@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Audio.Decoding;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Decoding;
 using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;

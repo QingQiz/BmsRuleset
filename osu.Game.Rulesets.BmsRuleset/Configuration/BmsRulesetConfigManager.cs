@@ -1,5 +1,4 @@
 using osu.Game.Configuration;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.Configuration;
 
 namespace osu.Game.Rulesets.BmsRuleset.Configuration;

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
@@ -17,7 +18,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 /// </summary>
 /// <remarks>
 ///     This converter intentionally no longer targets osu!mania objects. The decoder already emits
-///     <see cref="T:osu.Game.Rulesets.BmsRuleset.Objects.BmsHitObject">BmsHitObject</see> instances for native BMS
+///     <see cref="T:BmsHitObject">BmsHitObject</see> instances for native BMS
 ///     gameplay, so conversion is currently a
 ///     type-preserving pass-through. Later, non-BMS source beatmaps can be converted here explicitly,
 ///     but BMS files should never be adapted through mania as an intermediate ruleset model.

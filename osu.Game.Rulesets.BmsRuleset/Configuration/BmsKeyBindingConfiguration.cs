@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using osu.Framework.Input.Bindings;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.IO.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Configuration;
 

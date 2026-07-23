@@ -1,8 +1,10 @@
 using System;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
@@ -283,7 +285,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
 
     /// <summary>
     ///     The BAD (late) hit-window for this object.  The entry must stay alive at least this long
-    ///     past its EndTime so the auto-miss path in <see cref="Objects.Drawables.DrawableBmsHitObject.UpdateColumnFrame" /> can fire.
+    ///     past its EndTime so the auto-miss path in <see cref="DrawableBmsHitObject.UpdateColumnFrame" /> can fire.
     /// </summary>
     private static double getLateWindow(BmsHitObject hitObject)
     {

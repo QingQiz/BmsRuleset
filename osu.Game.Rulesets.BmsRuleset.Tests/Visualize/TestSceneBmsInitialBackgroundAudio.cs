@@ -10,7 +10,7 @@ using osu.Framework.Testing;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
-using osu.Game.Rulesets.BmsRuleset.Audio.Samples;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 using osu.Game.Rulesets.BmsRuleset.UI;

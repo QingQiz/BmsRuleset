@@ -1,6 +1,7 @@
 using osu.Framework.Allocation;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects;
-using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
+using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 

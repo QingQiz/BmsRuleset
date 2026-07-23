@@ -5,7 +5,7 @@ using NUnit.Framework;
 using osu.Framework.Audio.Track;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
-using osu.Game.Rulesets.BmsRuleset.Audio.Samples;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 

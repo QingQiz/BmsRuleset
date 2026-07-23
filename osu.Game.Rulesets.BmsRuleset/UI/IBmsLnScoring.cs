@@ -1,5 +1,5 @@
-using osu.Game.Rulesets.BmsRuleset.Objects.Drawables;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 

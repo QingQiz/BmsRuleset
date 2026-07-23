@@ -13,7 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
-using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
+using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 using osu.Game.Skinning;
 using osuTK;
 

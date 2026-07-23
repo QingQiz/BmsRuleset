@@ -12,7 +12,7 @@ using osu.Game.Database;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
-using osu.Game.Rulesets.BmsRuleset.ImportExport;
+using osu.Game.Rulesets.BmsRuleset.IO.Import;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.DifficultyTable;
 

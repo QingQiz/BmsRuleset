@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using osu.Game.IO.Serialization;
+using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Replay;

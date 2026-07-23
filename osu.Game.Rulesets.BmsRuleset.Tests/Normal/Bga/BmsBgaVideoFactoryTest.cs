@@ -1,7 +1,7 @@
 using System.IO;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga;
 using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
+using osu.Game.Rulesets.BmsRuleset.Media.Video;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;
 

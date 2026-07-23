@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
