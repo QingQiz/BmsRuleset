@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Allocation;
@@ -13,7 +14,8 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Testing;
 using osu.Game.IO;
-using osu.Game.Rulesets.BmsRuleset.Audio;
+using osu.Game.Rulesets.BmsRuleset.Audio.Preview;
+using osu.Game.Rulesets.BmsRuleset.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
@@ -53,10 +55,11 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
 
-            track = createTrack(
-                [new BmsSampleEvent(0, 0, 1, 100)],
+            track = new BmsEventPreviewTrack(
+                () => [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), false)],
                 new Dictionary<ushort, string> { [1] = "test.wav" },
-                directory);
+                directory,
+                audio);
 
             audio.AddItem(track);
             track.Start();
@@ -64,6 +67,42 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
         AddUntilStep("track playing from time zero", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
+    public void TestEventAtTimeZeroPlaysWhenTimelineCompletesAfterStart()
+    {
+        BmsPreviewTrack track = null!;
+        var timelineGate = new ManualResetEventSlim();
+
+        AddStep("start before timeline is ready", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-delayed-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsEventPreviewTrack(
+                () =>
+                {
+                    timelineGate.Wait();
+                    return [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), false)];
+                },
+                new Dictionary<ushort, string> { [1] = "test.wav" },
+                directory,
+                audio);
+
+            audio.AddItem(track);
+            track.Start();
+        });
+
+        AddStep("complete timeline", timelineGate.Set);
+        AddUntilStep("track playing from original start position", () => getActivePlaybackCount(track) > 0);
+        AddStep("dispose track", () =>
+        {
+            track.Dispose();
+            timelineGate.Dispose();
+        });
     }
 
     [Test]
@@ -111,14 +150,10 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 new Dictionary<ushort, string> { [1] = "Track_01_001.wav" },
                 directory);
             audio.AddItem(track);
+            track.Start();
         });
 
-        AddAssert("fallback track resolved", () =>
-        {
-            var resolveTrack = typeof(BmsPreviewTrack).GetMethod("resolvePreviewTrack",
-                BindingFlags.Instance | BindingFlags.NonPublic)!;
-            return resolveTrack.Invoke(track, ["Track_01_001.wav"]) != null;
-        });
+        AddUntilStep("fallback track resolved", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -136,20 +171,11 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "declared.wav"), TimeSpan.FromSeconds(1));
             writePcmWave(Path.Combine(directory, "preview.wav"), TimeSpan.FromSeconds(1));
 
-            track = new BmsPreviewTrack(
-                () =>
-                {
-                    eventFactoryInvoked = true;
-                    return [];
-                },
-                new Dictionary<ushort, string>(),
-                directory,
-                audio,
-                "declared.wav");
+            track = new BmsDedicatedPreviewTrack(directory, "declared.wav", audio);
             audio.AddItem(track);
         });
 
-        AddAssert("dedicated preview is used", () => usesDedicatedPreviewAudio(track));
+        AddUntilStep("dedicated preview is used", () => usesDedicatedPreviewAudio(track));
         AddAssert("event factory is not invoked", () => !eventFactoryInvoked);
         AddStep("dispose track", () => track.Dispose());
     }
@@ -173,7 +199,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "declared.wav"), TimeSpan.FromSeconds(1));
             writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
 
-            track = new BmsPreviewTrack(
+            track = new BmsEventPreviewTrack(
                 () =>
                 {
                     eventFactoryInvoked = true;
@@ -181,8 +207,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                 },
                 new Dictionary<ushort, string> { [1] = "event.wav" },
                 directory,
-                audio,
-                "declared.wav");
+                audio);
 
             audio.AddItem(track);
             track.Start();
@@ -206,14 +231,12 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
             writePcmWave(Path.Combine(directory, "preview.wav"), TimeSpan.FromSeconds(1));
 
-            track = createTrack(
-                [],
-                new Dictionary<ushort, string>(),
-                directory,
-                "missing.wav");
+            track = new BmsDedicatedPreviewTrack(directory, "missing.wav", audio);
             audio.AddItem(track);
+            track.Start();
         });
 
+        AddUntilStep("folder preview is used", () => usesDedicatedPreviewAudio(track));
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -232,8 +255,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             track = createTrack(
                 [new BmsSampleEvent(0, 0, 1, 100)],
                 new Dictionary<ushort, string> { [1] = "event.wav" },
-                directory,
-                "missing.wav");
+                directory);
 
             audio.AddItem(track);
             track.Start();
@@ -241,6 +263,49 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
         AddUntilStep("event preview still plays", () => getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
+    public void TestBrokenDedicatedPreviewPreservesFallbackStartPosition()
+    {
+        BmsPreviewTrack track = null!;
+        var fallbackStarted = new ManualResetEventSlim();
+        var fallbackGate = new ManualResetEventSlim();
+
+        AddStep("start broken dedicated preview", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-broken-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            File.WriteAllText(Path.Combine(directory, "preview.wav"), "not audio");
+            writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsDedicatedPreviewTrack(
+                directory,
+                "preview.wav",
+                audio,
+                _ =>
+                {
+                    fallbackStarted.Set();
+                    fallbackGate.Wait();
+                    return new BmsEventPreviewTimeline(
+                        [new BmsPreviewTimelineEntry(0, 1, "event.wav", 100, false)],
+                        1000);
+                });
+
+            audio.AddItem(track);
+            track.Start();
+        });
+
+        AddUntilStep("fallback timeline requested", () => fallbackStarted.IsSet);
+        AddStep("complete fallback timeline", fallbackGate.Set);
+        AddUntilStep("fallback plays from original start position", () => getActivePlaybackCount(track) > 0);
+        AddStep("dispose track", () =>
+        {
+            track.Dispose();
+            fallbackStarted.Dispose();
+            fallbackGate.Dispose();
+        });
     }
 
     [Test]
@@ -426,7 +491,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
     private static int getActivePlaybackCount(BmsPreviewTrack track)
     {
-        var activeTracks = (IList)typeof(BmsPreviewTrack).GetField("activeTracks", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track)!;
+        var activeTracks = getPlaybackTracks(track);
         var count = 0;
 
         for (var i = 0; i < activeTracks.Count; i++)
@@ -440,7 +505,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
     private static Track? getActiveTrack(BmsPreviewTrack track)
     {
-        var activeTracks = (IList)typeof(BmsPreviewTrack).GetField("activeTracks", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track)!;
+        var activeTracks = getPlaybackTracks(track);
 
         if (activeTracks.Count == 0)
             return null;
@@ -450,7 +515,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
     private static IEnumerable<Track> getActiveTracks(BmsPreviewTrack track)
     {
-        var activeTracks = (IList)typeof(BmsPreviewTrack).GetField("activeTracks", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track)!;
+        var activeTracks = getPlaybackTracks(track);
 
         for (var i = 0; i < activeTracks.Count; i++)
             yield return (Track)activeTracks[i]!;
@@ -461,20 +526,40 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         typeof(BmsPreviewTrack).GetField("seekOffset", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(track, seekOffset);
     }
 
+    private static IList getPlaybackTracks(BmsPreviewTrack track)
+    {
+        var playback = track switch
+        {
+            BmsEventPreviewTrack => typeof(BmsEventPreviewTrack)
+                .GetField("playback", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(track),
+            BmsDedicatedPreviewTrack => typeof(BmsDedicatedPreviewTrack)
+                .GetField("fallbackPlayback", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(track),
+            _ => null,
+        };
+
+        if (playback == null)
+            return Array.Empty<object>();
+
+        return (IList)typeof(BmsEventPreviewPlayback)
+            .GetField("activeTracks", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(playback)!;
+    }
+
     private BmsPreviewTrack createTrack(
         IReadOnlyList<BmsSampleEvent> sampleEvents,
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
-        string? basePath,
-        string? previewFile = null)
-        => new(
+        string? basePath)
+        => new BmsEventPreviewTrack(
             () => sampleEvents.Select(evt => new BmsPreviewSampleEvent(evt, true)).ToArray(),
             sampleDefinitions,
             basePath,
-            audio,
-            previewFile);
+            audio);
 
     private static bool usesDedicatedPreviewAudio(BmsPreviewTrack track) =>
-        typeof(BmsPreviewTrack).GetField("previewTrack", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track) != null;
+        track is BmsDedicatedPreviewTrack
+        && typeof(BmsDedicatedPreviewTrack).GetField("previewTrack", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(track) != null;
 
     private static void writePcmWave(string path, TimeSpan duration)
     {

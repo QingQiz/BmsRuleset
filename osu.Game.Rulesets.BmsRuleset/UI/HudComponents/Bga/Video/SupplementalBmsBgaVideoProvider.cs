@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using osu.Framework.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video;
@@ -58,7 +59,7 @@ internal sealed class SupplementalBmsBgaVideoProvider : IBmsBgaVideoProvider
     private bool probeClaimsSupplementalCodec(BmsBgaVideoRequest request)
     {
         var stream = request.Stream;
-        if (stream == null || !stream.CanSeek)
+        if (!stream.CanSeek)
             return false;
 
         var position = stream.Position;

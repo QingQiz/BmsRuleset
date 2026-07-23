@@ -12,8 +12,9 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
+using osu.Game.Rulesets.BmsRuleset.Audio.Resources;
 
-namespace osu.Game.Rulesets.BmsRuleset.Audio;
+namespace osu.Game.Rulesets.BmsRuleset.Audio.Samples;
 
 public readonly record struct BmsSampleUsage(ushort SampleKey, double Time);
 
@@ -52,6 +53,7 @@ public partial class BmsSampleStore : Component
     private readonly CancellationTokenSource runtimeLoadCancellation = new();
 
     private ITrackStore? trackStore;
+    private BmsAudioResourceStore? audioResourceStore;
     private bool playbackBlocked;
     private bool isDisposing;
 
@@ -93,6 +95,14 @@ public partial class BmsSampleStore : Component
         {
             if (task.IsCompletedSuccessfully)
                 task.Result?.Dispose();
+            else if (!task.IsCompleted)
+                _ = task.ContinueWith(completedTask =>
+                {
+                    if (completedTask.IsCompletedSuccessfully)
+                        completedTask.Result?.Dispose();
+                    else
+                        _ = completedTask.Exception;
+                }, TaskContinuationOptions.ExecuteSynchronously);
         }
 
         trackInitialisations.Clear();
@@ -105,6 +115,8 @@ public partial class BmsSampleStore : Component
         tracks.Clear();
         trackStore?.Dispose();
         trackStore = null;
+        audioResourceStore?.Dispose();
+        audioResourceStore = null;
         runtimeLoadCancellation.Dispose();
         base.Dispose(isDisposing);
     }
@@ -432,10 +444,9 @@ public partial class BmsSampleStore : Component
         if (string.IsNullOrEmpty(basePath) || !Directory.Exists(basePath))
             return;
 
-        var resources = new ResourceStore<byte[]>(new BmsFileResourceStore(basePath));
-        resources.AddExtension("wav");
-        resources.AddExtension("mp3");
-        resources.AddExtension("ogg");
+        audioResourceStore = new BmsAudioResourceStore(basePath, runtimeLoadCancellation.Token);
+        var resources = new ResourceStore<byte[]>(audioResourceStore);
+        BmsAudioFormatSupport.AddExtensions(resources);
         trackStore = audioManager.GetTrackStore(resources);
 
         if (sampleUsages != null)

@@ -4,8 +4,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Audio;
+using osu.Game.Rulesets.BmsRuleset.Audio.Samples;
 
-namespace osu.Game.Rulesets.BmsRuleset.Audio;
+namespace osu.Game.Rulesets.BmsRuleset.Audio.Playback;
 
 /// <summary>
 ///     Schedules BMS background sample events through the shared per-definition Track store.

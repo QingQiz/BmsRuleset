@@ -18,9 +18,10 @@ using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
-using osu.Game.Rulesets.BmsRuleset.Audio;
+using osu.Game.Rulesets.BmsRuleset.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.IO.Resources;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Screens.Play;
@@ -164,6 +165,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
             var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), directory), audio);
             previewTrack = (BmsPreviewTrack)working.LoadTrack();
+            Assert.That(previewTrack, Is.TypeOf<BmsEventPreviewTrack>());
             previewTrack.Start();
         });
 
@@ -213,10 +215,11 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
             var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), directory), audio);
             previewTrack = (BmsPreviewTrack)working.LoadTrack();
+            Assert.That(previewTrack, Is.TypeOf<BmsDedicatedPreviewTrack>());
             previewTrack.Start();
         });
 
-        AddAssert("single-file preview is playing before loading", () =>
+        AddUntilStep("single-file preview is playing before loading", () =>
             previewTrack.IsRunning
             && previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
             && previewTrack.Volume.Value == 1
@@ -251,6 +254,63 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddUntilStep("single-file preview resumes after gameplay disposal", () =>
             previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
             && getSingleFilePreviewTrack(previewTrack)?.IsRunning == true);
+    }
+
+    [Test]
+    public void TestDedicatedPreviewDoesNotLimitGameplayClock()
+    {
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-short-preview-clock-{Guid.NewGuid()}");
+        BmsPreviewTrack previewTrack = null!;
+
+        AddStep("load short dedicated preview as gameplay clock", () =>
+        {
+            Directory.CreateDirectory(directory);
+            createdDirectories.Add(directory);
+            writePcmWave(Path.Combine(directory, "preview.wav"), TimeSpan.FromSeconds(1));
+
+            var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), directory), audio);
+            previewTrack = (BmsPreviewTrack)working.LoadTrack();
+            previewTrack.PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly;
+            previewTrack.Seek(60_000);
+            previewTrack.Start();
+        });
+
+        AddUntilStep("gameplay clock passes preview length", () => previewTrack.CurrentTime > 60_100);
+        AddAssert("gameplay clock remains running", () => previewTrack.IsRunning);
+        AddStep("restart gameplay clock past preview length", () =>
+        {
+            previewTrack.Stop();
+            previewTrack.Start();
+        });
+        AddUntilStep("restarted clock keeps advancing", () => previewTrack.CurrentTime > 60_200);
+    }
+
+    [Test]
+    public void TestBrokenDedicatedPreviewFallsBackToEvents()
+    {
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-broken-preview-fallback-{Guid.NewGuid()}");
+        BmsPreviewTrack previewTrack = null!;
+
+        AddStep("load broken dedicated preview with event fallback", () =>
+        {
+            Directory.CreateDirectory(directory);
+            createdDirectories.Add(directory);
+            File.WriteAllBytes(Path.Combine(directory, "preview.wav"), [1, 2, 3, 4]);
+            writePcmWave(Path.Combine(directory, "bgm.wav"), TimeSpan.FromSeconds(1));
+
+            var beatmap = new BmsBeatmap
+            {
+                SampleDefinitions = new Dictionary<ushort, string> { [1] = "bgm.wav" },
+                BackgroundSampleEvents = [new BmsSampleEvent(0, 0, 1, 100)],
+            };
+
+            var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, beatmap, directory), audio);
+            previewTrack = (BmsPreviewTrack)working.LoadTrack();
+            Assert.That(previewTrack, Is.TypeOf<BmsDedicatedPreviewTrack>());
+            previewTrack.Start();
+        });
+
+        AddUntilStep("event fallback becomes audible", () => getActivePreviewPlaybackCount(previewTrack) > 0);
     }
 
     [Test]
@@ -688,9 +748,10 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
     private static string getFirstPreviewEventSamplePath(Track track)
     {
-        var events = (IEnumerable)typeof(BmsPreviewTrack)
+        var playback = getEventPlayback((BmsPreviewTrack)track)!;
+        var events = (IEnumerable)typeof(BmsEventPreviewPlayback)
             .GetField("sortedEvents", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .GetValue(track)!;
+            .GetValue(playback)!;
 
         var first = events.Cast<object>().FirstOrDefault();
         return first?.GetType().GetProperty("SamplePath")?.GetValue(first) as string ?? string.Empty;
@@ -698,9 +759,12 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
     private static int getActivePreviewPlaybackCount(BmsPreviewTrack track)
     {
-        var activeTracks = (IEnumerable)typeof(BmsPreviewTrack)
-            .GetField("activeTracks", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(track)!;
+        var eventPlayback = getEventPlayback(track);
+        var activeTracks = eventPlayback != null
+            ? (IEnumerable)typeof(BmsEventPreviewPlayback)
+                .GetField("activeTracks", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(eventPlayback)!
+            : Array.Empty<Track>();
 
         var previewTrack = getSingleFilePreviewTrack(track);
 
@@ -722,9 +786,25 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             .GetValue(track)!;
 
     private static Track getSingleFilePreviewTrack(BmsPreviewTrack track) =>
-        typeof(BmsPreviewTrack)
-            .GetField("previewTrack", BindingFlags.Instance | BindingFlags.NonPublic)?
-            .GetValue(track) as Track;
+        track is BmsDedicatedPreviewTrack
+            ? typeof(BmsDedicatedPreviewTrack)
+                .GetField("previewTrack", BindingFlags.Instance | BindingFlags.NonPublic)?
+                .GetValue(track) as Track
+            : null!;
+
+    private static BmsEventPreviewPlayback getEventPlayback(BmsPreviewTrack track)
+    {
+        if (track is BmsEventPreviewTrack)
+        {
+            return (BmsEventPreviewPlayback)typeof(BmsEventPreviewTrack)
+                .GetField("playback", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(track)!;
+        }
+
+        return typeof(BmsDedicatedPreviewTrack)
+            .GetField("fallbackPlayback", BindingFlags.Instance | BindingFlags.NonPublic)?
+            .GetValue(track) as BmsEventPreviewPlayback;
+    }
 
     private static bool getBackgroundAudioPaused(BmsDrawableRuleset drawableRuleset) =>
         ((BindableBool)typeof(BmsDrawableRuleset)

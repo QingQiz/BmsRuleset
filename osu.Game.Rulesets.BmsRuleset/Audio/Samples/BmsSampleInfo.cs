@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using osu.Game.Audio;
 
-namespace osu.Game.Rulesets.BmsRuleset.Audio;
+namespace osu.Game.Rulesets.BmsRuleset.Audio.Samples;
 
 public sealed class BmsSampleInfo(string path, int volume = 100) : ISampleInfo
 {

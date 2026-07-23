@@ -5,26 +5,26 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.IO.Stores;
 
-namespace osu.Game.Rulesets.BmsRuleset.Audio;
+namespace osu.Game.Rulesets.BmsRuleset.IO.Resources;
 
 public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
 {
-
-    #region Disposal
-
     public void Dispose()
     {
-        GC.SuppressFinalize(this);
     }
 
-    #endregion
-
-    public byte[] Get(string? name) => tryResolve(name, out var path) ? File.ReadAllBytes(path) : null!;
+    public byte[] Get(string? name) => TryResolve(name, out var path) ? File.ReadAllBytes(path) : null!;
 
     public Task<byte[]> GetAsync(string? name, CancellationToken cancellationToken = default)
         => Task.Run(() => Get(name), cancellationToken);
 
-    public Stream? GetStream(string? name) => tryResolve(name, out var path) ? File.OpenRead(path) : null;
+    public Stream? GetStream(string? name)
+    {
+        if (!TryResolve(name, out var path))
+            return null;
+
+        return File.OpenRead(path);
+    }
 
     public IEnumerable<string> GetAvailableResources() => [];
 
@@ -46,7 +46,7 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
     /// Resolves <paramref name="name"/> against <c>basePath</c> to a canonical full path,
     /// returning false if the result falls outside <c>basePath</c> or does not exist.
     /// </summary>
-    private bool tryResolve(string? name, out string path)
+    internal bool TryResolve(string? name, out string path)
     {
         path = null!;
 

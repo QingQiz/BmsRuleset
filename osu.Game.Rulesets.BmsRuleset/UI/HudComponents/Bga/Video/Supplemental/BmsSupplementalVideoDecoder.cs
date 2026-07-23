@@ -7,6 +7,7 @@ using FFmpeg.AutoGen;
 using osu.Framework.Allocation;
 using osu.Framework.Platform;
 using SixLabors.ImageSharp.PixelFormats;
+using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
 
@@ -137,7 +138,8 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
                             return true;
 
                         if (error != null)
-                            return false;
+                        {
+                        }
 
                         return false;
                     }

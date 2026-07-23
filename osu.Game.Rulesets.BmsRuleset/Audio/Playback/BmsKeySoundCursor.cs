@@ -4,7 +4,7 @@ using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Audio;
+namespace osu.Game.Rulesets.BmsRuleset.Audio.Playback;
 
 /// <summary>
 ///     Pure per-column cursor that finds the next hit object whose key-sound should play on an

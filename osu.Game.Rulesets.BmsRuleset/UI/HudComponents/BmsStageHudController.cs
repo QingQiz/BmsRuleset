@@ -46,7 +46,7 @@ internal sealed partial class BmsStageHudController : Component
         tryInitialiseHudSize();
         updateStageTransform();
         updatePositionOffsetRanges();
-        SetHitTargetPositionOffset(stageHud.JudgementLineOffset.Value);
+        SetHitTargetPositionOffset(stageHud!.JudgementLineOffset.Value);
         SetLightPositionOffset(stageHud.LightPositionOffset.Value);
     }
 

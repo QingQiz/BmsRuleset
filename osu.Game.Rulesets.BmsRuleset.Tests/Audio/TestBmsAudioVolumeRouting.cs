@@ -5,7 +5,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Testing;
-using osu.Game.Rulesets.BmsRuleset.Audio;
+using osu.Game.Rulesets.BmsRuleset.Audio.Playback;
+using osu.Game.Rulesets.BmsRuleset.Audio.Preview;
+using osu.Game.Rulesets.BmsRuleset.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 
@@ -106,11 +108,11 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     {
         AddAssert("preview volume adjustments use track aggregate volume", () =>
         {
-            var track = new BmsPreviewTrack(() => [], new Dictionary<ushort, string>(), null, audioManager);
+            var track = new BmsEventPreviewTrack(() => [], new Dictionary<ushort, string>(), null, audioManager);
             var audio = new RecordingAudioComponent();
 
             typeof(BmsPreviewTrack)
-                .GetMethod("bindPreviewAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetMethod("BindPreviewAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(track, [audio, 100]);
 
             Assert.That(audio.RemovedProperties, Does.Contain(AdjustableProperty.Volume));
@@ -125,14 +127,14 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     {
         AddAssert("clock-only preview output is muted", () =>
         {
-            var track = new BmsPreviewTrack(() => [], new Dictionary<ushort, string>(), null, audioManager)
+            var track = new BmsEventPreviewTrack(() => [], new Dictionary<ushort, string>(), null, audioManager)
             {
                 PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly,
             };
             var audio = new RecordingAudioComponent();
 
             typeof(BmsPreviewTrack)
-                .GetMethod("bindPreviewAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetMethod("BindPreviewAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(track, [audio, 100]);
 
             return audio.VolumeAdjustments.Exists(adjustment => adjustment.Value == 0);
@@ -144,10 +146,10 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     {
         AddAssert("preview track playback volume uses separate bindables", () =>
         {
-            var track = new BmsPreviewTrack(() => [], new Dictionary<ushort, string>(), null, audioManager);
+            var track = new BmsEventPreviewTrack(() => [], new Dictionary<ushort, string>(), null, audioManager);
 
             var bindMethod = typeof(BmsPreviewTrack)
-                .GetMethod("bindPreviewAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                .GetMethod("BindPreviewAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
             Assert.That(bindMethod.GetParameters(), Has.Length.EqualTo(2));
 

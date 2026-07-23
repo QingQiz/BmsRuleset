@@ -1,6 +1,6 @@
 using System;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Audio;
+using osu.Game.Rulesets.BmsRuleset.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Audio;

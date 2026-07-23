@@ -1,16 +1,19 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using osu.Framework.Audio.Track;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
-using osu.Game.Rulesets.BmsRuleset.Audio;
+using osu.Game.Rulesets.BmsRuleset.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 
 [HeadlessTest]
 public partial class TestBmsSampleStoreRate : TestScene
 {
+    private const string silent_flac = "ZkxhQwAAACICQAJAAAAMAAAMAfQA8AAAAFDLQV4FuFvjFJSuG8IzvrWLhAAALAwAAABMYXZmNjEuNy4xMDABAAAAFAAAAGVuY29kZXI9TGF2ZjYxLjcuMTAw//hkCABPCQAAAHyn";
+
     private string tempDir = null!;
     private BmsSampleStore store = null!;
 
@@ -75,6 +78,20 @@ public partial class TestBmsSampleStoreRate : TestScene
         });
         AddUntilStep("wait for store load", () => store.IsLoaded);
         AddAssert("track loaded during store load", () => store.GetTrack(1) is { IsLoaded: true, Length: > 0 });
+        addCleanupSteps();
+    }
+
+    [Test]
+    public void WavDefinitionFallsBackToFlac()
+    {
+        AddStep("create FLAC sample + store", () =>
+        {
+            tempDir = Directory.CreateTempSubdirectory("bmstracks").FullName;
+            File.WriteAllBytes(Path.Combine(tempDir, "sine.flac"), Convert.FromBase64String(silent_flac));
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "sine.wav" } }, tempDir));
+        });
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddAssert("FLAC fallback track loaded", () => store.GetTrack(1) is { IsLoaded: true, Length: > 0 });
         addCleanupSteps();
     }
 

@@ -2,14 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using osu.Framework.Logging;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
-using osu.Game.Rulesets.BmsRuleset.Audio;
+using osu.Game.Rulesets.BmsRuleset.Audio.Playback;
+using osu.Game.Rulesets.BmsRuleset.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.IO.Resources;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
@@ -76,12 +79,20 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
         if (beatmap is IBmsBeatmap bmsBeatmap)
         {
-            var track = new BmsPreviewTrack(
-                () => createPreviewEvents(beatmap, bmsBeatmap),
-                bmsBeatmap.SampleDefinitions,
-                Metadata.Source,
-                audioManager,
-                bmsBeatmap.PreviewFile);
+            var useDedicatedPreview =
+                BmsRulesetRuntime.UseDedicatedPreviewAudio
+                && BmsPreviewAudioLoader.HasImmediateCandidate(Metadata.Source, bmsBeatmap.PreviewFile);
+
+            BmsPreviewTrack track = useDedicatedPreview
+                ? new BmsDedicatedPreviewTrack(
+                    Metadata.Source,
+                    bmsBeatmap.PreviewFile,
+                    audioManager,
+                    cancellationToken => BmsEventPreviewTimeline.Create(
+                        token => createPreviewEvents(beatmap, bmsBeatmap, token),
+                        bmsBeatmap.SampleDefinitions,
+                        cancellationToken))
+                : createEventPreviewTrack(beatmap, bmsBeatmap);
 
             // Stop and remove the previous preview track before registering the new one.
             // Disposing via the audio update loop also releases the per-chart SampleStore.
@@ -100,19 +111,27 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         return null!; // fall back to TrackVirtual by WorkingBeatmap.LoadTrack
     }
 
-    private static IReadOnlyList<BmsPreviewSampleEvent> createPreviewEvents(IBeatmap beatmap, IBmsBeatmap bmsBeatmap)
+    private static IReadOnlyList<BmsPreviewSampleEvent> createPreviewEvents(
+        IBeatmap beatmap,
+        IBmsBeatmap bmsBeatmap,
+        CancellationToken cancellationToken = default)
     {
         var allEvents = new List<BmsPreviewSampleEvent>(
             bmsBeatmap.BackgroundSampleEvents.Count
             + beatmap.HitObjects.Count);
 
         foreach (var evt in bmsBeatmap.BackgroundSampleEvents)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             allEvents.Add(new BmsPreviewSampleEvent(evt, true));
+        }
 
         // Song preview needs playable keysounds alongside #01 BGM because gameplay normally
         // routes those two sources through separate players.
         foreach (var obj in beatmap.HitObjects)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (obj is not BmsHitObject hit || hit is BmsLandmine)
                 continue;
 
@@ -125,6 +144,13 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         allEvents.Sort(static (a, b) => a.Event.Time.CompareTo(b.Event.Time));
         return allEvents;
     }
+
+    private BmsEventPreviewTrack createEventPreviewTrack(IBeatmap beatmap, IBmsBeatmap bmsBeatmap) =>
+        new(
+            cancellationToken => createPreviewEvents(beatmap, bmsBeatmap, cancellationToken),
+            bmsBeatmap.SampleDefinitions,
+            Metadata.Source,
+            audioManager);
 
     protected override IBeatmap GetBeatmap() => tryDecodeExternalBeatmap(BeatmapInfo) ?? inner.Beatmap;
 

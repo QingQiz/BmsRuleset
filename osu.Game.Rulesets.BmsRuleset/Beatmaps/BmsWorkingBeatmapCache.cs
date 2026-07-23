@@ -4,7 +4,7 @@ using System.IO;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
-using osu.Game.Rulesets.BmsRuleset.Audio;
+using osu.Game.Rulesets.BmsRuleset.IO.Resources;
 
 namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 

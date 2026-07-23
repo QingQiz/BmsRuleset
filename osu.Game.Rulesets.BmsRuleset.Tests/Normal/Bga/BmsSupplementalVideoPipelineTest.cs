@@ -7,6 +7,7 @@ using System.Threading;
 #nullable enable
 using NUnit.Framework;
 using osu.Framework.Timing;
+using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;

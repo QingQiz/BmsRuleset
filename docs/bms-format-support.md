@@ -26,7 +26,7 @@
 | Initial BPM             | `#BPM`                                                                     | Default 130                                                                                       |
 | Extended BPM table      | `#BPMxx`                                                                   | Real-number BPM (beyond 0–255 from channel `03`)                                                  |
 | STOP table              | `#STOPxx`                                                                  | Stop sequence durations (1 unit = 1/192 of a 4/4 measure)                                         |
-| Sample definitions      | `#WAVxx`                                                                   | Audio file paths (WAV/OGG)                                                                        |
+| Sample definitions      | `#WAVxx`                                                                   | Audio file paths (WAV/OGG/MP3/FLAC)                                                               |
 | BGA image/video slots   | `#BMPxx`                                                                   | Image or video file paths for BGA layers (see Background Animation below)                         |
 | BGA crop definitions    | `#BGAxx`                                                                   | Cropped BGA: `<bmp> <x1> <y1> <x2> <y2> <dx> <dy>` (7-field; w=x2−x1, h=y2−y1)                    |
 | Poor BGA mode           | `#POORBGA 0/1/2`                                                           | 0=Replace (hide other layers on miss), 1=Add (overlay), 2=Off                                     |
@@ -161,6 +161,9 @@ Commands are grouped by origin and listed with their status in this ruleset.
 | `#STOPxx`      | ✓      | Stop sequence duration (1 unit = 1/192 of a 4/4 measure) |
 | `#BACKBMP`     | ✓      | Background image displayed behind gameplay area          |
 | `#WAVxx` (ogg) | ✓      | Ogg Vorbis support via same `#WAVxx` command             |
+| `#WAVxx` (flac) | ✓      | FLAC support, including same-name fallback from `.wav`   |
+
+When a declared audio file is missing, same-name alternatives are tried in descending quality order: WAV, FLAC, OGG, then MP3.
 
 #### 1.5 nanasigroove Extensions
 

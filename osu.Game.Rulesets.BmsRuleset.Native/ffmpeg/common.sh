@@ -13,9 +13,9 @@ set -eu
 FFMPEG_VERSION="4.3.9"
 FFMPEG_FILE="ffmpeg-$FFMPEG_VERSION.tar.gz"
 
-# Decoder/demuxer set derived from scanning D:\BMS\LargePack (2031 BGA videos).
-# Only legacy codecs osu-framework's bundled FFmpeg lacks; framework keeps
-# modern H.264/HEVC/VP8/VP9/MPEG-4/WMV2.
+# Decoder/demuxer set derived from scanning D:\BMS\LargePack. Video support only
+# includes legacy codecs osu-framework's bundled FFmpeg lacks; FLAC is included
+# for BMS packs that replace chart-declared WAV files with lossless equivalents.
 FFMPEG_FLAGS=(
     --disable-shared
     --enable-static
@@ -28,9 +28,9 @@ FFMPEG_FLAGS=(
     --enable-avformat
     --enable-swscale
 
-    --enable-demuxer='mpegps,mpegvideo,asf,avi'
-    --enable-parser='mpegvideo,vc1'
-    --enable-decoder='mpeg1video,mpeg2video,vc1,wmv1,wmv3,mss2,msvideo1,cinepak'
+    --enable-demuxer='mpegps,mpegvideo,asf,avi,flac'
+    --enable-parser='mpegvideo,vc1,flac'
+    --enable-decoder='mpeg1video,mpeg2video,vc1,wmv1,wmv3,mss2,msvideo1,cinepak,flac'
 
     --enable-protocol=pipe
 )

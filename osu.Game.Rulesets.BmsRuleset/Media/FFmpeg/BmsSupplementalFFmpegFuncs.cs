@@ -8,7 +8,7 @@ using FFmpeg.AutoGen;
 
 // ReSharper disable InconsistentNaming
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents.Bga.Video.Supplemental;
+namespace osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
 
 internal sealed unsafe class BmsSupplementalFFmpegFuncs
 {
