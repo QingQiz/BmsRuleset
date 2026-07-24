@@ -6,8 +6,20 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 
 internal readonly record struct BmsPreviewTimelineEntry(double Time, ushort SampleKey, string SamplePath, int Volume, bool ResumeAfterSeek);
 
-internal sealed record BmsEventPreviewTimeline(IReadOnlyList<BmsPreviewTimelineEntry> Entries, double Length)
+internal sealed record BmsEventPreviewTimeline(
+    IReadOnlyList<BmsPreviewTimelineEntry> Entries,
+    double Length,
+    bool DeriveLengthFromTracks = false,
+    bool RetainLoadedTracks = false)
 {
+    internal const double DEFAULT_LENGTH = 30000;
+
+    internal static BmsEventPreviewTimeline CreateSingleFile(string samplePath) => new(
+        [new BmsPreviewTimelineEntry(0, 0, samplePath, 100, true)],
+        DEFAULT_LENGTH,
+        DeriveLengthFromTracks: true,
+        RetainLoadedTracks: true);
+
     internal static BmsEventPreviewTimeline Create(
         Func<CancellationToken, IReadOnlyList<BmsPreviewSampleEvent>> sampleEventFactory,
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
@@ -21,13 +33,12 @@ internal sealed record BmsEventPreviewTimeline(IReadOnlyList<BmsPreviewTimelineE
     {
         List<BmsPreviewTimelineEntry> entries = [];
 
-        foreach (var previewEvent in sampleEventFactory())
+        foreach (var (evt, resumeAfterSeek) in sampleEventFactory())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var evt = previewEvent.Event;
 
             if (sampleDefinitions.TryGetValue(evt.SampleKey, out var samplePath))
-                entries.Add(new BmsPreviewTimelineEntry(evt.Time, evt.SampleKey, samplePath, evt.Volume, previewEvent.ResumeAfterSeek));
+                entries.Add(new BmsPreviewTimelineEntry(evt.Time, evt.SampleKey, samplePath, evt.Volume, resumeAfterSeek));
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -41,7 +52,7 @@ internal sealed record BmsEventPreviewTimeline(IReadOnlyList<BmsPreviewTimelineE
                 entries[i] = entries[i] with { Time = entries[i].Time - leadIn };
         }
 
-        var length = entries.Count > 0 ? entries[^1].Time + 5000 : 30000;
+        var length = entries.Count > 0 ? entries[^1].Time + 5000 : DEFAULT_LENGTH;
         return new BmsEventPreviewTimeline(entries, length);
     }
 }

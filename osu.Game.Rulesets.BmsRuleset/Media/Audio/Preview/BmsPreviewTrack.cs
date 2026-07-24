@@ -17,7 +17,7 @@ public enum BmsPreviewTrackPlaybackMode
 
 public abstract class BmsPreviewTrack : Track
 {
-    private const double restore_fade_duration = 20;
+    internal const double RESTORE_FADE_DURATION = 2_500;
 
     private readonly BindableDouble previewOutputVolume = new(1);
     private readonly BindableDouble restoreFadeVolume = new(1);
@@ -25,8 +25,10 @@ public abstract class BmsPreviewTrack : Track
     private readonly StopwatchClock clock = new();
 
     private double seekOffset;
+    private double? unresolvedRestorePosition;
 
     private long restoreFadeStart;
+    private bool restoreFadePending;
     private bool restoreFadeInProgress;
 
     public override bool IsRunning
@@ -46,7 +48,7 @@ public abstract class BmsPreviewTrack : Track
             lock (clock)
             {
                 var time = seekOffset + clock.CurrentTime;
-                return PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly ? time : Math.Min(Length, time);
+                return PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly || !IsLengthFinal ? time : Math.Min(Length, time);
             }
         }
     }
@@ -65,7 +67,15 @@ public abstract class BmsPreviewTrack : Track
         }
     }
 
+    internal double RestoreFadeVolume => restoreFadeVolume.Value;
+
     protected virtual bool CanComplete => true;
+
+    protected virtual bool StartClockImmediately => true;
+
+    protected virtual bool IsLengthFinal => true;
+
+    protected bool IsRestoreFadePending => restoreFadePending;
 
     protected BmsPreviewTrack()
         : base("bms-preview")
@@ -92,14 +102,20 @@ public abstract class BmsPreviewTrack : Track
             ? Math.Max(0, seek)
             : Math.Clamp(seek, 0, Length);
         var success = clamped == seek;
-        await EnqueueAction(() => seekInternal(clamped, success)).ConfigureAwait(false);
+        await EnqueueAction(() =>
+        {
+            unresolvedRestorePosition = null;
+            seekInternal(clamped, success);
+        }).ConfigureAwait(false);
         return success;
     }
 
     public override void Reset() => EnqueueAction(() =>
     {
+        restoreFadePending = false;
         restoreFadeInProgress = false;
         restoreFadeVolume.Value = 1;
+        unresolvedRestorePosition = null;
         resetInternal();
         base.Reset();
     }).WaitSafely();
@@ -110,17 +126,23 @@ public abstract class BmsPreviewTrack : Track
         {
             if (gameplayTime is { } time)
             {
-                var clamped = Math.Clamp(time, 0, Length);
-                seekInternal(clamped, clamped == time);
+                var target = IsLengthFinal ? Math.Clamp(time, 0, Length) : Math.Max(0, time);
+
+                if (!IsLengthFinal)
+                    unresolvedRestorePosition = target;
+
+                seekInternal(target, target == time);
             }
+            else if (!IsLengthFinal)
+                unresolvedRestorePosition = CurrentTime;
 
             PlaybackMode = BmsPreviewTrackPlaybackMode.Preview;
             Volume.Value = 1;
 
-            if (CurrentTime >= Length)
+            if (IsLengthFinal && CurrentTime >= Length)
                 seekInternal(0, true);
 
-            beginRestoreFade();
+            prepareRestoreFade();
             startInternal();
         }).WaitSafely();
     }
@@ -134,6 +156,9 @@ public abstract class BmsPreviewTrack : Track
             return;
 
         if (!CanComplete)
+            return;
+
+        if (!IsLengthFinal)
             return;
 
         lock (clock)
@@ -177,6 +202,32 @@ public abstract class BmsPreviewTrack : Track
 
     protected abstract void ResetPlayback();
 
+    protected void StartClock()
+    {
+        lock (clock) clock.Start();
+    }
+
+    protected void BeginPendingRestoreFade()
+    {
+        if (!restoreFadePending)
+            return;
+
+        restoreFadePending = false;
+        restoreFadeStart = Stopwatch.GetTimestamp();
+        restoreFadeInProgress = true;
+    }
+
+    protected bool TryResolvePendingRestorePosition()
+    {
+        if (!IsLengthFinal || unresolvedRestorePosition is not { } requestedPosition)
+            return false;
+
+        unresolvedRestorePosition = null;
+        var target = requestedPosition >= Length ? 0 : requestedPosition;
+        seekInternal(target, true);
+        return true;
+    }
+
     internal void BindPreviewAdjustments(IAdjustableAudioComponent component, int volume = 100)
     {
         component.RemoveAllAdjustments(AdjustableProperty.Volume);
@@ -189,11 +240,11 @@ public abstract class BmsPreviewTrack : Track
         component.AddAdjustment(AdjustableProperty.Volume, restoreFadeVolume);
     }
 
-    private void beginRestoreFade()
+    private void prepareRestoreFade()
     {
         restoreFadeVolume.Value = 0;
-        restoreFadeStart = Stopwatch.GetTimestamp();
-        restoreFadeInProgress = true;
+        restoreFadePending = true;
+        restoreFadeInProgress = false;
     }
 
     private void updateRestoreFade()
@@ -201,7 +252,7 @@ public abstract class BmsPreviewTrack : Track
         if (!restoreFadeInProgress)
             return;
 
-        var progress = Stopwatch.GetElapsedTime(restoreFadeStart).TotalMilliseconds / restore_fade_duration;
+        var progress = Stopwatch.GetElapsedTime(restoreFadeStart).TotalMilliseconds / RESTORE_FADE_DURATION;
         restoreFadeVolume.Value = Math.Min(1, progress);
         restoreFadeInProgress = progress < 1;
     }
@@ -216,12 +267,13 @@ public abstract class BmsPreviewTrack : Track
     {
         PrepareStart();
 
-        if (Length == 0 || (PlaybackMode == BmsPreviewTrackPlaybackMode.Preview && CurrentTime >= Length))
+        if (Length == 0 || (PlaybackMode == BmsPreviewTrackPlaybackMode.Preview && IsLengthFinal && CurrentTime >= Length))
             return;
 
         StartPlayback();
 
-        lock (clock) clock.Start();
+        if (StartClockImmediately)
+            StartClock();
     }
 
     private void stopInternal()

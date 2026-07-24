@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
@@ -7,40 +8,64 @@ using osu.Framework.Logging;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 
+internal enum BmsPreviewPlaybackStartState
+{
+    Waiting,
+    Ready,
+    InitialAudioUnavailable,
+}
+
 internal sealed class BmsEventPreviewPlayback : IDisposable
 {
-    private const double event_prefetch_time = 10_000;
+    private const double event_prefetch_time = 1_000;
     private const int event_prefetch_batch_size = 16;
 
     private readonly BmsPreviewTrack owner;
     private readonly List<BmsPreviewTimelineEntry> sortedEvents = [];
     private readonly BmsPreviewAudioLoader? audioLoader;
+    private readonly bool deriveLengthFromTracks;
+    private readonly bool retainLoadedTracks;
     private readonly List<Track> activeTracks = [];
     private readonly Dictionary<int, Task<Track?>> eventTrackLoads = [];
+    private readonly Dictionary<int, Track> retainedTracks = [];
     private readonly HashSet<ushort> resumedEventKeys = [];
 
     private int nextEventIndex;
     private bool eventResyncRequired;
+    private double derivedLength;
+    private bool derivedLengthResolutionComplete;
 
-    public double Length { get; }
+    public double Length { get; private set; }
+
+    public bool IsLengthFinal => !deriveLengthFromTracks || derivedLengthResolutionComplete;
+
+    internal IReadOnlyList<BmsPreviewTimelineEntry> Events => sortedEvents;
+
+    internal IReadOnlyList<Track> ActiveTracks => activeTracks;
+
+    internal bool HasRetainedTracks => retainedTracks.Count > 0;
 
     internal BmsEventPreviewPlayback(
         BmsPreviewTrack owner,
         BmsEventPreviewTimeline timeline,
         string? basePath,
-        AudioManager audioManager)
+        AudioManager audioManager,
+        Func<CancellationToken, Task>? beforeTrackLoad = null)
     {
         this.owner = owner;
         sortedEvents.AddRange(timeline.Entries);
         Length = timeline.Length;
+        deriveLengthFromTracks = timeline.DeriveLengthFromTracks;
+        retainLoadedTracks = timeline.RetainLoadedTracks;
 
         if (basePath != null)
-            audioLoader = BmsPreviewAudioLoader.ForEventPreview(basePath, audioManager);
+            audioLoader = new BmsPreviewAudioLoader(basePath, audioManager, beforeTrackLoad);
     }
 
     public void Dispose()
     {
-        stopPreviewPlayback();
+        disposePreviewPlayback();
+        discardEventTrackLoads();
         audioLoader?.Dispose();
     }
 
@@ -106,20 +131,26 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         resumedEventKeys.Clear();
     }
 
-    public void Update(double currentTime, bool isRunning, bool previewMode)
+    public BmsPreviewPlaybackStartState Update(double currentTime, bool requireDueAudioReady)
     {
-        if (!isRunning || !previewMode)
-            return;
-
         prefetchEventTracks(currentTime);
 
         if (eventResyncRequired)
         {
-            if (!resumeEventTracks(currentTime))
-                return;
+            var resumeState = resumeEventTracks(currentTime);
+
+            if (resumeState != BmsPreviewPlaybackStartState.Ready)
+                return resumeState;
 
             eventResyncRequired = false;
+            cleanupTracks();
+            return BmsPreviewPlaybackStartState.Ready;
         }
+
+        if (requireDueAudioReady && !areDueEventTracksReady(currentTime))
+            return BmsPreviewPlaybackStartState.Waiting;
+
+        var initialAudioUnavailable = false;
 
         while (nextEventIndex < sortedEvents.Count)
         {
@@ -128,13 +159,41 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             if (currentTime < evt.Time)
                 break;
 
-            if (!tryPlayTrack(nextEventIndex, currentTime))
+            var result = tryPlayTrack(nextEventIndex, currentTime);
+
+            if (result == EventPlaybackResult.Pending)
                 break;
+
+            if (nextEventIndex == 0 && result == EventPlaybackResult.Unavailable)
+            {
+                initialAudioUnavailable = true;
+                derivedLengthResolutionComplete = true;
+            }
 
             nextEventIndex++;
         }
 
         cleanupTracks();
+        return initialAudioUnavailable
+            ? BmsPreviewPlaybackStartState.InitialAudioUnavailable
+            : BmsPreviewPlaybackStartState.Ready;
+    }
+
+    private bool areDueEventTracksReady(double currentTime)
+    {
+        if (audioLoader == null)
+            return true;
+
+        for (var i = nextEventIndex; i < sortedEvents.Count && sortedEvents[i].Time <= currentTime; i++)
+        {
+            if (retainedTracks.ContainsKey(i))
+                continue;
+
+            if (!eventTrackLoads.TryGetValue(i, out var loadTask) || !loadTask.IsCompleted)
+                return false;
+        }
+
+        return true;
     }
 
     private void prefetchEventTracks(double currentTime)
@@ -147,61 +206,65 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
         for (var i = nextEventIndex; i < sortedEvents.Count && sortedEvents[i].Time <= prefetchUntil; i++)
         {
-            if (eventTrackLoads.ContainsKey(i))
+            if (eventTrackLoads.ContainsKey(i) || retainedTracks.ContainsKey(i))
                 continue;
 
-            eventTrackLoads[i] = audioLoader.LoadEventTrackAsync(sortedEvents[i].SamplePath);
+            eventTrackLoads[i] = audioLoader.LoadTrackAsync(sortedEvents[i].SamplePath);
 
             if (++started >= event_prefetch_batch_size)
                 break;
         }
     }
 
-    private bool tryPlayTrack(int eventIndex, double currentTime)
+    private EventPlaybackResult tryPlayTrack(int eventIndex, double currentTime)
     {
         var evt = sortedEvents[eventIndex];
+
+        if (retainedTracks.TryGetValue(eventIndex, out var retainedTrack))
+        {
+            retainedTrack.Seek(0);
+            startTrack(evt, retainedTrack);
+            return EventPlaybackResult.Played;
+        }
+
+        if (audioLoader == null)
+            return EventPlaybackResult.Unavailable;
 
         if (!eventTrackLoads.TryGetValue(eventIndex, out var loadTask))
         {
             prefetchEventTracks(currentTime);
-            return false;
+            return EventPlaybackResult.Pending;
         }
 
         if (!loadTask.IsCompleted)
-            return false;
+            return EventPlaybackResult.Pending;
 
-        eventTrackLoads.Remove(eventIndex);
-        audioLoader?.MarkEventTrackConsumed(loadTask);
-
-        Track? track;
-
-        try
-        {
-            track = loadTask.GetAwaiter().GetResult();
-        }
-        catch (Exception exception)
-        {
-            Logger.Error(exception, $"Failed to load BMS event preview sample '{evt.SamplePath}'.");
-            return true;
-        }
+        var track = consumeCompletedTrack(eventIndex, "load");
 
         if (track == null)
-            return true;
+            return EventPlaybackResult.Unavailable;
 
-        owner.BindPreviewAdjustments(track, evt.Volume);
-        track.Start();
-        activeTracks.Add(track);
+        startTrack(evt, track);
 
-        return true;
+        return EventPlaybackResult.Played;
     }
 
-    private bool resumeEventTracks(double currentTime)
+    private BmsPreviewPlaybackStartState resumeEventTracks(double currentTime)
     {
         if (audioLoader == null)
-            return true;
+        {
+            if (nextEventIndex > 0 && sortedEvents[0].ResumeAfterSeek)
+            {
+                derivedLengthResolutionComplete = true;
+                return BmsPreviewPlaybackStartState.InitialAudioUnavailable;
+            }
+
+            return BmsPreviewPlaybackStartState.Ready;
+        }
 
         var allReady = true;
         var pendingKeys = new HashSet<ushort>(resumedEventKeys);
+        List<int> eventIndices = [];
 
         for (var i = nextEventIndex - 1; i >= 0; i--)
         {
@@ -212,55 +275,60 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             if (!evt.ResumeAfterSeek || !pendingKeys.Add(evt.SampleKey))
                 continue;
 
+            eventIndices.Add(i);
+
+            if (retainedTracks.ContainsKey(i))
+                continue;
+
             if (!eventTrackLoads.TryGetValue(i, out var loadTask))
             {
-                eventTrackLoads[i] = audioLoader!.LoadEventTrackAsync(evt.SamplePath);
+                eventTrackLoads[i] = audioLoader.LoadTrackAsync(evt.SamplePath);
                 allReady = false;
-                continue;
             }
-
-            if (!loadTask.IsCompleted)
-            {
+            else if (!loadTask.IsCompleted)
                 allReady = false;
-                continue;
-            }
+        }
 
-            eventTrackLoads.Remove(i);
-            audioLoader?.MarkEventTrackConsumed(loadTask);
+        if (!allReady)
+            return BmsPreviewPlaybackStartState.Waiting;
 
-            Track? track;
+        var initialAudioUnavailable = false;
 
-            try
-            {
-                track = loadTask.GetAwaiter().GetResult();
-            }
-            catch (Exception exception)
-            {
-                Logger.Error(exception, $"Failed to resume BMS event preview sample '{evt.SamplePath}'.");
-                resumedEventKeys.Add(evt.SampleKey);
-                continue;
-            }
+        foreach (var eventIndex in eventIndices)
+        {
+            var evt = sortedEvents[eventIndex];
+
+            var track = retainedTracks.TryGetValue(eventIndex, out var retainedTrack)
+                ? retainedTrack
+                : consumeCompletedTrack(eventIndex, "resume");
 
             resumedEventKeys.Add(evt.SampleKey);
 
             if (track == null)
+            {
+                if (eventIndex == 0)
+                    initialAudioUnavailable = true;
+
                 continue;
+            }
 
             var offset = currentTime - evt.Time;
             track.Seek(offset);
 
             if (track.Length <= 0 || offset >= track.Length)
             {
-                track.Dispose();
+                if (!retainLoadedTracks)
+                    track.Dispose();
+
                 continue;
             }
 
-            owner.BindPreviewAdjustments(track, evt.Volume);
-            track.Start();
-            activeTracks.Add(track);
+            startTrack(evt, track);
         }
 
-        return allReady;
+        return initialAudioUnavailable
+            ? BmsPreviewPlaybackStartState.InitialAudioUnavailable
+            : BmsPreviewPlaybackStartState.Ready;
     }
 
     private void discardEventTrackLoads()
@@ -290,11 +358,23 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             if (!track.IsDisposed)
             {
                 track.Stop();
-                track.Dispose();
+
+                if (!retainLoadedTracks)
+                    track.Dispose();
             }
         }
 
         activeTracks.Clear();
+    }
+
+    private void disposePreviewPlayback()
+    {
+        stopPreviewPlayback();
+
+        foreach (var track in retainedTracks.Values)
+            track.Dispose();
+
+        retainedTracks.Clear();
     }
 
     private void cleanupTracks()
@@ -311,9 +391,56 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
             if (track.HasCompleted)
             {
-                track.Dispose();
+                if (!retainLoadedTracks)
+                    track.Dispose();
+
                 activeTracks.RemoveAt(i);
             }
+        }
+    }
+
+    private void updateLength(BmsPreviewTimelineEntry evt, Track track)
+    {
+        if (!deriveLengthFromTracks || track.Length <= 0)
+            return;
+
+        derivedLength = Math.Max(derivedLength, evt.Time + track.Length);
+        Length = derivedLength;
+        derivedLengthResolutionComplete = true;
+    }
+
+    private void startTrack(BmsPreviewTimelineEntry evt, Track track)
+    {
+        owner.BindPreviewAdjustments(track, evt.Volume);
+        track.Start();
+        activeTracks.Add(track);
+    }
+
+    private Track? consumeCompletedTrack(int eventIndex, string operation)
+    {
+        var evt = sortedEvents[eventIndex];
+        var loadTask = eventTrackLoads[eventIndex];
+        eventTrackLoads.Remove(eventIndex);
+        audioLoader!.MarkEventTrackConsumed(loadTask);
+
+        try
+        {
+            var track = loadTask.GetAwaiter().GetResult();
+
+            if (track == null)
+                return null;
+
+            updateLength(evt, track);
+
+            if (retainLoadedTracks)
+                retainedTracks[eventIndex] = track;
+
+            return track;
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, $"Failed to {operation} BMS preview sample '{evt.SamplePath}'.");
+            return null;
         }
     }
 
@@ -335,4 +462,10 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         return low;
     }
 
+    private enum EventPlaybackResult
+    {
+        Pending,
+        Played,
+        Unavailable,
+    }
 }

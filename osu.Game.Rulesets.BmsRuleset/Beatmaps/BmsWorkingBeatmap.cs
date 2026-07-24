@@ -79,20 +79,7 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
         if (beatmap is IBmsBeatmap bmsBeatmap)
         {
-            var useDedicatedPreview =
-                BmsRulesetRuntime.UseDedicatedPreviewAudio
-                && BmsPreviewAudioLoader.HasImmediateCandidate(Metadata.Source, bmsBeatmap.PreviewFile);
-
-            BmsPreviewTrack track = useDedicatedPreview
-                ? new BmsDedicatedPreviewTrack(
-                    Metadata.Source,
-                    bmsBeatmap.PreviewFile,
-                    audioManager,
-                    cancellationToken => BmsEventPreviewTimeline.Create(
-                        token => createPreviewEvents(beatmap, bmsBeatmap, token),
-                        bmsBeatmap.SampleDefinitions,
-                        cancellationToken))
-                : createEventPreviewTrack(beatmap, bmsBeatmap);
+            var track = createPreviewTrack(beatmap, bmsBeatmap);
 
             // Stop and remove the previous preview track before registering the new one.
             // Disposing via the audio update loop also releases the per-chart SampleStore.
@@ -145,12 +132,23 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         return allEvents;
     }
 
-    private BmsEventPreviewTrack createEventPreviewTrack(IBeatmap beatmap, IBmsBeatmap bmsBeatmap) =>
-        new(
-            cancellationToken => createPreviewEvents(beatmap, bmsBeatmap, cancellationToken),
+    private BmsEventPreviewTrack createPreviewTrack(IBeatmap beatmap, IBmsBeatmap bmsBeatmap)
+    {
+        List<Func<CancellationToken, BmsEventPreviewTimeline>> timelineSources = [];
+
+        if (BmsRulesetRuntime.UseDedicatedPreviewAudio)
+        {
+            foreach (var candidate in BmsPreviewAudioLoader.GetExistingDedicatedPreviewCandidates(Metadata.Source, bmsBeatmap.PreviewFile))
+                timelineSources.Add(_ => BmsEventPreviewTimeline.CreateSingleFile(candidate));
+        }
+
+        timelineSources.Add(cancellationToken => BmsEventPreviewTimeline.Create(
+            token => createPreviewEvents(beatmap, bmsBeatmap, token),
             bmsBeatmap.SampleDefinitions,
-            Metadata.Source,
-            audioManager);
+            cancellationToken));
+
+        return new BmsEventPreviewTrack(timelineSources, Metadata.Source, audioManager);
+    }
 
     protected override IBeatmap GetBeatmap() => tryDecodeExternalBeatmap(BeatmapInfo) ?? inner.Beatmap;
 

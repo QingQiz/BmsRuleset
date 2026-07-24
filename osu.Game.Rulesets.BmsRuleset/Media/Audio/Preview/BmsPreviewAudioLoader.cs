@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
@@ -17,71 +16,47 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
 {
     private readonly BmsAudioResourceStore audioResourceStore;
     private readonly ITrackStore trackStore;
+    private readonly Func<CancellationToken, Task>? beforeTrackLoad;
     private readonly CancellationTokenSource cancellation = new();
-    private readonly Task<Track?>? loadTask;
     private readonly ConcurrentDictionary<Task<Track?>, byte> eventTrackLoads = new();
     private readonly object disposalLock = new();
 
-    private Track? loadedTrack;
-    private bool resultConsumed;
-    private bool dedicatedLoadFinished;
     private bool storesDisposed;
     private volatile bool disposed;
 
-    public bool IsPending => loadTask != null && !resultConsumed;
-
-    internal static bool HasImmediateCandidate(string basePath, string? previewFile)
+    internal static IReadOnlyList<string> GetExistingDedicatedPreviewCandidates(string basePath, string? previewFile)
     {
         using var fileStore = new BmsFileResourceStore(basePath);
+        List<string> candidates = [];
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        return getDedicatedPreviewCandidates(previewFile).Any(candidate => hasCandidate(fileStore, candidate));
+        foreach (var candidate in getDedicatedPreviewCandidates(previewFile))
+        {
+            foreach (var resolvedPath in resolveCandidatePaths(fileStore, candidate))
+            {
+                var relativePath = Path.GetRelativePath(basePath, resolvedPath);
+
+                if (seenPaths.Add(relativePath))
+                    candidates.Add(relativePath);
+            }
+        }
+
+        return candidates;
     }
 
-    private BmsPreviewAudioLoader(string basePath, AudioManager audioManager, bool loadDedicatedPreview, string? previewFile)
+    internal BmsPreviewAudioLoader(
+        string basePath,
+        AudioManager audioManager,
+        Func<CancellationToken, Task>? beforeTrackLoad = null)
     {
+        this.beforeTrackLoad = beforeTrackLoad;
         audioResourceStore = new BmsAudioResourceStore(basePath, cancellation.Token);
         var fileResources = new ResourceStore<byte[]>(audioResourceStore);
         BmsAudioResourceStore.AddExtensions(fileResources);
         trackStore = audioManager.GetTrackStore(fileResources);
-
-        if (loadDedicatedPreview)
-            loadTask = Task.Run(() => loadPreviewTrack(previewFile, cancellation.Token), cancellation.Token);
-        else
-            dedicatedLoadFinished = true;
     }
 
-    internal static BmsPreviewAudioLoader ForEventPreview(string basePath, AudioManager audioManager) =>
-        new(basePath, audioManager, false, null);
-
-    internal static BmsPreviewAudioLoader ForDedicatedPreview(string basePath, string? previewFile, AudioManager audioManager) =>
-        new(basePath, audioManager, true, previewFile);
-
-    public bool TryConsume(out Track? track, out Exception? error)
-    {
-        track = null;
-        error = null;
-
-        if (loadTask == null || resultConsumed || !loadTask.IsCompleted)
-            return false;
-
-        resultConsumed = true;
-
-        try
-        {
-            loadedTrack = loadTask.GetAwaiter().GetResult();
-            track = loadedTrack;
-        }
-        catch (Exception exception)
-        {
-            error = exception;
-        }
-
-        dedicatedLoadFinished = true;
-
-        return true;
-    }
-
-    public Task<Track?> LoadEventTrackAsync(string samplePath)
+    public Task<Track?> LoadTrackAsync(string samplePath)
     {
         var task = loadEventTrack(samplePath, cancellation.Token);
         eventTrackLoads.TryAdd(task, 0);
@@ -110,23 +85,6 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
         disposed = true;
         cancellation.Cancel();
 
-        if (loadTask != null && !resultConsumed)
-        {
-            resultConsumed = true;
-            _ = loadTask.ContinueWith(completedTask =>
-            {
-                if (completedTask.IsCompletedSuccessfully)
-                    completedTask.Result?.Dispose();
-                else
-                    _ = completedTask.Exception;
-
-                dedicatedLoadFinished = true;
-                disposeStoresIfReady();
-            }, TaskContinuationOptions.ExecuteSynchronously);
-        }
-        else
-            loadedTrack?.Dispose();
-
         foreach (var eventTask in eventTrackLoads.Keys)
         {
             if (eventTask.IsCompleted)
@@ -138,27 +96,11 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
         disposeStoresIfReady();
     }
 
-    private async Task<Track?> loadPreviewTrack(string? previewFile, CancellationToken cancellationToken)
-    {
-        foreach (var candidate in getDedicatedPreviewCandidates(previewFile))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            foreach (var lookup in new BmsSampleInfo(candidate).LookupNames)
-            {
-                var track = await trackStore.GetAsync(lookup, cancellationToken).ConfigureAwait(false);
-                if (track != null && await track.SeekAsync(0).ConfigureAwait(false) && track.IsLoaded)
-                    return track;
-
-                track?.Dispose();
-            }
-        }
-
-        return null;
-    }
-
     private async Task<Track?> loadEventTrack(string samplePath, CancellationToken cancellationToken)
     {
+        if (beforeTrackLoad != null)
+            await beforeTrackLoad(cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);
+
         foreach (var lookup in new BmsSampleInfo(samplePath).LookupNames)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -182,23 +124,23 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
             yield return $"preview.{extension}";
     }
 
-    private static bool hasCandidate(BmsFileResourceStore fileStore, string candidate)
+    private static IEnumerable<string> resolveCandidatePaths(BmsFileResourceStore fileStore, string candidate)
     {
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var lookup in new BmsSampleInfo(candidate).LookupNames)
         {
-            if (fileStore.TryResolve(lookup, out _))
-                return true;
+            if (fileStore.TryResolve(lookup, out var resolvedPath) && seenPaths.Add(resolvedPath))
+                yield return resolvedPath;
 
             var stem = Path.ChangeExtension(lookup, null);
 
             foreach (var extension in BmsAudioResourceStore.Extensions)
             {
-                if (fileStore.TryResolve($"{stem}.{extension}", out _))
-                    return true;
+                if (fileStore.TryResolve($"{stem}.{extension}", out resolvedPath) && seenPaths.Add(resolvedPath))
+                    yield return resolvedPath;
             }
         }
-
-        return false;
     }
 
     private void disposeCompletedEventTrack(Task<Track?> task)
@@ -231,7 +173,7 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
     {
         lock (disposalLock)
         {
-            if (storesDisposed || !disposed || !dedicatedLoadFinished || !eventTrackLoads.IsEmpty)
+            if (storesDisposed || !disposed || !eventTrackLoads.IsEmpty)
                 return;
 
             storesDisposed = true;

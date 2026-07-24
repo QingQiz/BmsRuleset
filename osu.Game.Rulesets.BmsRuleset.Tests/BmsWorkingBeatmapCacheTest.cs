@@ -1,5 +1,5 @@
+#nullable enable annotations
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -215,7 +215,6 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
             var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap(), directory), audio);
             previewTrack = (BmsPreviewTrack)working.LoadTrack();
-            Assert.That(previewTrack, Is.TypeOf<BmsDedicatedPreviewTrack>());
             previewTrack.Start();
         });
 
@@ -225,7 +224,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             && previewTrack.Volume.Value == 1
             && getActivePreviewPlaybackCount(previewTrack) == 1
             && getPreviewPlaybackAggregateVolume(previewTrack) > 0
-            && getSingleFilePreviewTrack(previewTrack)?.IsRunning == true);
+            && getFirstActivePreviewTrack(previewTrack)?.IsRunning == true);
 
         AddStep("load drawable ruleset under paused gameplay clock", () =>
         {
@@ -241,7 +240,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddUntilStep("single-file preview continues during loading", () =>
             previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
             && getActivePreviewPlaybackCount(previewTrack) == 1
-            && getSingleFilePreviewTrack(previewTrack)?.IsRunning == true);
+            && getFirstActivePreviewTrack(previewTrack)?.IsRunning == true);
 
         AddStep("start gameplay clock", () => gameplayClock.Start());
         AddUntilStep("single-file preview stopped for gameplay", () =>
@@ -253,7 +252,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddStep("dispose drawable ruleset while gameplay is running", () => drawableRuleset.RemoveAndDisposeImmediately());
         AddUntilStep("single-file preview resumes after gameplay disposal", () =>
             previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
-            && getSingleFilePreviewTrack(previewTrack)?.IsRunning == true);
+            && getFirstActivePreviewTrack(previewTrack)?.IsRunning == true);
     }
 
     [Test]
@@ -306,7 +305,6 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
             var working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, beatmap, directory), audio);
             previewTrack = (BmsPreviewTrack)working.LoadTrack();
-            Assert.That(previewTrack, Is.TypeOf<BmsDedicatedPreviewTrack>());
             previewTrack.Start();
         });
 
@@ -335,7 +333,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddUntilStep("preview restarts from beginning", () =>
             previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
             && previewTrack.CurrentTime < previewTrack.Length
-            && getSingleFilePreviewTrack(previewTrack)?.IsRunning == true);
+            && getFirstActivePreviewTrack(previewTrack)?.IsRunning == true);
     }
 
     [Test]
@@ -362,12 +360,12 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddStep("restore at gameplay time", () =>
         {
             BmsWorkingBeatmap.RestoreActivePreview(gameplay_time);
-            Assert.That(getRestoreFadeStart(previewTrack), Is.GreaterThan(0));
+            Assert.That(getRestoreFadeVolume(previewTrack), Is.Zero);
         });
         AddUntilStep("preview resumes from gameplay time", () =>
             previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
             && previewTrack.CurrentTime >= gameplay_time
-            && getSingleFilePreviewTrack(previewTrack) is { IsRunning: true, CurrentTime: >= gameplay_time });
+            && getFirstActivePreviewTrack(previewTrack) is { IsRunning: true, CurrentTime: >= gameplay_time });
         AddUntilStep("restore fades to full volume", () => getRestoreFadeVolume(previewTrack) == 1);
     }
 
@@ -747,64 +745,26 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     }
 
     private static string getFirstPreviewEventSamplePath(Track track)
-    {
-        var playback = getEventPlayback((BmsPreviewTrack)track)!;
-        var events = (IEnumerable)typeof(BmsEventPreviewPlayback)
-            .GetField("sortedEvents", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .GetValue(playback)!;
-
-        var first = events.Cast<object>().FirstOrDefault();
-        return first?.GetType().GetProperty("SamplePath")?.GetValue(first) as string ?? string.Empty;
-    }
+        => getEventPlayback((BmsPreviewTrack)track)?.Events.FirstOrDefault().SamplePath ?? string.Empty;
 
     private static int getActivePreviewPlaybackCount(BmsPreviewTrack track)
     {
         var eventPlayback = getEventPlayback(track);
-        var activeTracks = eventPlayback != null
-            ? (IEnumerable)typeof(BmsEventPreviewPlayback)
-                .GetField("activeTracks", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .GetValue(eventPlayback)!
-            : Array.Empty<Track>();
+        var activeTracks = eventPlayback?.ActiveTracks ?? Array.Empty<Track>();
 
-        var previewTrack = getSingleFilePreviewTrack(track);
-
-        return activeTracks.Cast<Track>().Count(active => active.IsRunning)
-               + (previewTrack?.IsRunning == true ? 1 : 0);
+        return activeTracks.Count(active => active.IsRunning);
     }
 
     private static double getPreviewPlaybackAggregateVolume(BmsPreviewTrack track) =>
-        getSingleFilePreviewTrack(track)?.AggregateVolume.Value ?? 0;
+        getFirstActivePreviewTrack(track)?.AggregateVolume.Value ?? 0;
 
-    private static double getRestoreFadeVolume(BmsPreviewTrack track) =>
-        ((BindableDouble)typeof(BmsPreviewTrack)
-            .GetField("restoreFadeVolume", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(track)!).Value;
+    private static double getRestoreFadeVolume(BmsPreviewTrack track) => track.RestoreFadeVolume;
 
-    private static long getRestoreFadeStart(BmsPreviewTrack track) =>
-        (long)typeof(BmsPreviewTrack)
-            .GetField("restoreFadeStart", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(track)!;
+    private static Track? getFirstActivePreviewTrack(BmsPreviewTrack track) =>
+        getEventPlayback(track)?.ActiveTracks.FirstOrDefault();
 
-    private static Track getSingleFilePreviewTrack(BmsPreviewTrack track) =>
-        track is BmsDedicatedPreviewTrack
-            ? typeof(BmsDedicatedPreviewTrack)
-                .GetField("previewTrack", BindingFlags.Instance | BindingFlags.NonPublic)?
-                .GetValue(track) as Track
-            : null!;
-
-    private static BmsEventPreviewPlayback getEventPlayback(BmsPreviewTrack track)
-    {
-        if (track is BmsEventPreviewTrack)
-        {
-            return (BmsEventPreviewPlayback)typeof(BmsEventPreviewTrack)
-                .GetField("playback", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .GetValue(track)!;
-        }
-
-        return typeof(BmsDedicatedPreviewTrack)
-            .GetField("fallbackPlayback", BindingFlags.Instance | BindingFlags.NonPublic)?
-            .GetValue(track) as BmsEventPreviewPlayback;
-    }
+    private static BmsEventPreviewPlayback? getEventPlayback(BmsPreviewTrack track)
+        => (track as BmsEventPreviewTrack)?.Playback;
 
     private static bool getBackgroundAudioPaused(BmsDrawableRuleset drawableRuleset) =>
         ((BindableBool)typeof(BmsDrawableRuleset)
