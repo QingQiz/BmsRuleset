@@ -2,6 +2,8 @@
 
 - Use sibling checkouts for API/source inspection: `..\osu`, `..\osu-framework`, `..\rulesets`.
 - If missing, clone `https://github.com/ppy/osu.git` and `https://github.com/ppy/osu-framework.git`; community rulesets are linked from `https://github.com/ppy/osu/discussions/13096`.
+- Treat sibling checkouts as read-only references. Never edit, format, stage, commit, or otherwise modify files in `..\osu`, `..\osu-framework`, or `..\rulesets`.
+- Make all implementation changes in this repository. Even when the root cause is upstream, use a ruleset-side solution or report the limitation instead of patching sibling source code.
 
 ## Ruleset Rules
 

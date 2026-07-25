@@ -113,23 +113,6 @@ Hard, and EX Hard clears to Full Combo, Perfect, and Max. Lowering the difficult
 conditions visible, while raising it hides lamps earned under easier conditions. Only Double Time is treated as a
 difficulty increase for lamp filtering.
 
-### Song Select Search
-
-Use these filters in the song-select search box:
-
-| Filter | Short form | Value |
-|--------|------------|-------|
-| `stars` | `star`, `sr` | osu! star difficulty |
-| `keys` | `k`, `key` | Playable key count, excluding scratch; for example, `k=7` finds 7K + scratch charts |
-| `source` | `src` | Text contained in the chart's source path |
-| `ln` | `lns` | Percentage of objects that are long notes, from 0 to 100 |
-| `scratch` | `sc` | Percentage of objects in scratch lanes, from 0 to 100 |
-| `table` | `tb` | Difficulty table name or symbol |
-| `level` | `lv` | Difficulty table level |
-
-Numeric filters support `=`, `!=`, `<`, `<=`, `>` and `>=`, such as `ln>=25` or `sc<10`. Key equality filters also
-accept comma-separated values, such as `keys=5,7`.
-
 ### Difficulty Tables
 
 **Use the LR2/beatoraja table-based discovery workflow directly inside osu!** Import a table from a URL or local JSON
