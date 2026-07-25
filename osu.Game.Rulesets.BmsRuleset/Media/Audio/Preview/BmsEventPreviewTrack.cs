@@ -64,6 +64,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         string? basePath,
         AudioManager audioManager,
         Func<CancellationToken, Task>? beforeTrackLoad = null)
+        : base(audioManager)
     {
         if (timelineSources.Count == 0)
             throw new ArgumentException(@"At least one preview timeline source is required.", nameof(timelineSources));

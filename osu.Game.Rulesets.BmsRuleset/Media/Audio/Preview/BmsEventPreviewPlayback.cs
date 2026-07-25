@@ -28,6 +28,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
     private readonly List<Track> activeTracks = [];
     private readonly Dictionary<int, Task<Track?>> eventTrackLoads = [];
     private readonly Dictionary<int, Track> retainedTracks = [];
+    private readonly Dictionary<Track, BmsPreviewTrack.PreviewPlaybackAdjustments> trackAdjustments = [];
     private readonly HashSet<ushort> resumedEventKeys = [];
 
     private int nextEventIndex;
@@ -133,6 +134,9 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     public BmsPreviewPlaybackStartState Update(double currentTime, bool requireDueAudioReady)
     {
+        foreach (var adjustments in trackAdjustments.Values)
+            adjustments.Update();
+
         prefetchEventTracks(currentTime);
 
         if (eventResyncRequired)
@@ -355,13 +359,16 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         {
             var track = activeTracks[i];
 
-            if (!track.IsDisposed)
+            if (track.IsDisposed)
             {
-                track.Stop();
-
-                if (!retainLoadedTracks)
-                    track.Dispose();
+                releasePlaybackTrack(track);
+                continue;
             }
+
+            track.Stop();
+
+            if (!retainLoadedTracks)
+                disposePlaybackTrack(track);
         }
 
         activeTracks.Clear();
@@ -372,9 +379,10 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         stopPreviewPlayback();
 
         foreach (var track in retainedTracks.Values)
-            track.Dispose();
+            disposePlaybackTrack(track);
 
         retainedTracks.Clear();
+        trackAdjustments.Clear();
     }
 
     private void cleanupTracks()
@@ -385,6 +393,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
             if (track.IsDisposed)
             {
+                releasePlaybackTrack(track);
                 activeTracks.RemoveAt(i);
                 continue;
             }
@@ -392,7 +401,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             if (track.HasCompleted)
             {
                 if (!retainLoadedTracks)
-                    track.Dispose();
+                    disposePlaybackTrack(track);
 
                 activeTracks.RemoveAt(i);
             }
@@ -411,10 +420,31 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     private void startTrack(BmsPreviewTimelineEntry evt, Track track)
     {
-        owner.BindPreviewAdjustments(track, evt.Volume);
+        var adjustments = getPlaybackTrackAdjustments(track, evt.Volume);
+        adjustments.Update();
         track.Start();
         activeTracks.Add(track);
     }
+
+    private BmsPreviewTrack.PreviewPlaybackAdjustments getPlaybackTrackAdjustments(Track track, int volume)
+    {
+        if (trackAdjustments.TryGetValue(track, out var adjustments))
+            return adjustments;
+
+        adjustments = owner.BindPreviewAdjustments(track, volume);
+        trackAdjustments.Add(track, adjustments);
+        return adjustments;
+    }
+
+    private void disposePlaybackTrack(Track track)
+    {
+        if (!track.IsDisposed)
+            track.Dispose();
+
+        releasePlaybackTrack(track);
+    }
+
+    private void releasePlaybackTrack(Track track) => trackAdjustments.Remove(track);
 
     private Track? consumeCompletedTrack(int eventIndex, string operation)
     {
