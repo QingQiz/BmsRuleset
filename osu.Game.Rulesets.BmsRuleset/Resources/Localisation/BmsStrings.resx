@@ -12,6 +12,8 @@
   <data name="standard_deviation" xml:space="preserve"><value>SD {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>Reference BPM</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA dim</value></data>
+  <data name="bga_fill_screen" xml:space="preserve"><value>Fill screen</value></data>
+  <data name="bga_fill_screen_description" xml:space="preserve"><value>Display the BGA across the full HUD area. Moving or resizing the component disables this.</value></data>
   <data name="use_dedicated_preview_audio" xml:space="preserve"><value>Use dedicated preview audio</value></data>
   <data name="dedicated_preview_audio_hint" xml:space="preserve"><value>Use #PREVIEW or preview.* files when available. Disable this to synthesize song-select previews only from BGM and keysound samples.</value></data>
   <data name="show_bms_5k" xml:space="preserve"><value>Show BMS 5K</value></data>

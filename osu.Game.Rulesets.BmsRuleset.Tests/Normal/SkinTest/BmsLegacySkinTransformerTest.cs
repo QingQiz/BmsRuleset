@@ -33,6 +33,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
+using osuTK;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 using Skin = osu.Game.Skinning.Skin;
@@ -579,7 +580,7 @@ public class BmsLegacySkinTransformerTest
         // container directly. The Playfield container therefore holds no BmsBgaDisplay.
         var bga = rulesetHud!.ChildrenOfType<BmsBgaDisplay>().SingleOrDefault();
         Assert.That(bga, Is.Not.Null);
-        Assert.That(bga!.AutoSizeToParent, Is.True);
+        Assert.That(bga!.FillScreen.Value, Is.True);
         Assert.That(bga.RenderOutsideHudVisibility, Is.True);
         Assert.That(bga.Depth, Is.EqualTo(float.MaxValue));
 

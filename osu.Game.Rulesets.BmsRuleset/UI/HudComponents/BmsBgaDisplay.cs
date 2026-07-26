@@ -14,10 +14,12 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Media.Video;
 using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 using osu.Game.Rulesets.Scoring;
@@ -52,11 +54,12 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
     private static readonly HashSet<string> video_extensions = new(video_resource_extensions, StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> image_extensions = new(image_resource_extensions, StringComparer.OrdinalIgnoreCase);
 
-    public bool AutoSizeToParent { get; init; }
-
     // Init-only and not a [SettingSource], so saved skin layouts keep using the rehost path.
     // Otherwise deserialised BGAs would stay in the HUD overlay and render above the playfield.
     public bool RenderOutsideHudVisibility { get; init; } = true;
+
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.BgaFillScreen), nameof(BmsStrings.BgaFillScreenDescription))]
+    public BindableBool FillScreen { get; } = new();
 
     private readonly Container layers;
     private readonly Dictionary<BmsBgaLayer, BmsBgaEvent> activeEvents = new();
@@ -118,7 +121,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         base.LoadComplete();
 
         bindBgaDim();
-        applyAutoSizeToParent();
+        FillScreen.BindValueChanged(e => applyFillScreen(e.NewValue), true);
 
         if (tryAddPlayfieldDisplay())
             return;
@@ -131,6 +134,9 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
     protected override void Update()
     {
         base.Update();
+
+        if (FillScreen.Value && !isFillScreenLayout())
+            disableFillScreenForCustomLayout();
 
         if (rehostedDisplay != null)
         {
@@ -261,20 +267,6 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         bgaDim.BindValueChanged(e => applyBgaDim(e.NewValue), true);
     }
 
-    private void applyAutoSizeToParent()
-    {
-        // The HUD default (AutoSizeToParent) fills the parent so the rehost host — sized to the
-        // parent quad — defines the BGA window; content letterboxes transparently via FillMode.Fit.
-        // RelativeSizeAxes is not part of osu!'s serialised skin layout, so an untouched default
-        // reloads as an absolute 1×1 component. Treat that exact shape as the persisted auto-size
-        // sentinel while leaving explicit skin-edited sizes untouched.
-        if (AutoSizeToParent || (RelativeSizeAxes == Axes.None && Size == Vector2.One))
-        {
-            RelativeSizeAxes = Axes.Both;
-            Size = Vector2.One;
-        }
-    }
-
     private void applyBgaDim(double dim)
     {
         if (rehostedDisplay != null)
@@ -291,17 +283,65 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         layers.AlwaysPresent = false;
     }
 
+    private void applyFillScreen(bool fillScreen)
+    {
+        if (!fillScreen)
+        {
+            if (isFillScreenLayout())
+                preserveCurrentLayoutAsAbsolute();
+
+            return;
+        }
+
+        Anchor = Anchor.TopLeft;
+        Origin = Anchor.TopLeft;
+        Position = Vector2.Zero;
+        Scale = Vector2.One;
+        Rotation = 0;
+        RelativeSizeAxes = Axes.Both;
+        Size = Vector2.One;
+    }
+
+    private bool isFillScreenLayout() =>
+        Anchor == Anchor.TopLeft
+        && Origin == Anchor.TopLeft
+        && Position == Vector2.Zero
+        && Scale == Vector2.One
+        && Rotation == 0
+        && RelativeSizeAxes == Axes.Both
+        && Size == Vector2.One;
+
+    private void disableFillScreenForCustomLayout()
+    {
+        preserveCurrentLayoutAsAbsolute();
+
+        FillScreen.Value = false;
+    }
+
+    private void preserveCurrentLayoutAsAbsolute()
+    {
+        if (Parent == null)
+            return;
+
+        var quad = ScreenSpaceDrawQuad;
+        var topLeft = Parent.ToLocalSpace(quad.TopLeft);
+        var width = (Parent.ToLocalSpace(quad.TopRight) - topLeft).Length;
+        var height = (Parent.ToLocalSpace(quad.BottomLeft) - topLeft).Length;
+        var scale = new Vector2(MathF.Max(0.001f, MathF.Abs(Scale.X)), MathF.Max(0.001f, MathF.Abs(Scale.Y)));
+
+        RelativeSizeAxes = Axes.None;
+        Size = new Vector2(width / scale.X, height / scale.Y);
+    }
+
     private bool tryAddPlayfieldDisplay()
     {
         var hudOverlay = this.FindClosestParent<HUDOverlay>();
-        var playfield = drawableRuleset?.Playfield as BmsPlayfield;
 
-        if (!RenderOutsideHudVisibility || isRehostedDisplay || hudOverlay is null || playfield is null)
+        if (!RenderOutsideHudVisibility || isRehostedDisplay || hudOverlay is null || drawableRuleset?.Playfield is not BmsPlayfield playfield)
             return false;
 
         rehostedDisplay = new BmsBgaDisplay(true)
         {
-            AutoSizeToParent = AutoSizeToParent,
             Anchor = Anchor,
             Origin = Origin,
             Position = Position,

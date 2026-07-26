@@ -12,6 +12,8 @@
   <data name="standard_deviation" xml:space="preserve"><value>标准差 {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>基准 BPM</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA 暗化</value></data>
+  <data name="bga_fill_screen" xml:space="preserve"><value>铺满屏幕</value></data>
+  <data name="bga_fill_screen_description" xml:space="preserve"><value>让 BGA 覆盖整个 HUD 区域。移动或调整组件大小会自动关闭此选项。</value></data>
   <data name="use_dedicated_preview_audio" xml:space="preserve"><value>使用专用预览音频</value></data>
   <data name="dedicated_preview_audio_hint" xml:space="preserve"><value>存在 #PREVIEW 或 preview.* 文件时优先使用。关闭后，选歌预览将仅由 BGM 和按键音样本合成。</value></data>
   <data name="show_bms_5k" xml:space="preserve"><value>显示 BMS 5K</value></data>

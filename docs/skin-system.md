@@ -258,12 +258,15 @@ Displays the chart-authored BGA timeline, including the base, layer 1, layer 2, 
 chart-defined crop and opacity events and shows the POOR layer briefly after a miss according to the chart's POOR BGA
 mode.
 
-The component's rectangle defines the BGA viewport. Content always preserves its aspect ratio with aspect-fit sizing.
-The default component fills the available gameplay area, but it can be moved or resized to create a smaller BGA window.
-It is rendered behind the playfield and remains there when the gameplay HUD is hidden.
+The component's rectangle defines the BGA viewport. Content always preserves its aspect ratio with aspect-fit sizing,
+scaling up or down as needed to fit inside the viewport. It is rendered behind the playfield and remains there when
+the gameplay HUD is hidden.
 
-There are no component-specific sidebar settings. **BGA dim** is a ruleset-wide gameplay setting and affects the BGA
-regardless of which saved component layout is active.
+- **Fill screen** expands the component across the full HUD area and is enabled in the default layout. Moving, resizing,
+  or rotating the component automatically disables this option and preserves the edited BGA window.
+
+**BGA dim** is a ruleset-wide gameplay setting rather than a component setting, and affects the BGA regardless of
+which saved component layout is active.
 
 ### Stage
 

@@ -52,46 +52,62 @@ public class BmsBgaDisplaySizingTest
     }
 
     [Test]
-    public void TestAutoSizeToParentFillsParent()
+    public void TestFillScreenUsesParentBounds()
     {
-        var display = new BmsBgaDisplay { AutoSizeToParent = true };
-        applyAutoSizeToParent(display);
+        var display = new BmsBgaDisplay();
+        display.FillScreen.Value = true;
+        applyFillScreen(display, true);
 
         Assert.Multiple(() =>
         {
+            Assert.That(display.Anchor, Is.EqualTo(Anchor.TopLeft));
+            Assert.That(display.Origin, Is.EqualTo(Anchor.TopLeft));
+            Assert.That(display.Position, Is.EqualTo(Vector2.Zero));
+            Assert.That(display.Scale, Is.EqualTo(Vector2.One));
+            Assert.That(display.Rotation, Is.Zero);
             Assert.That(display.RelativeSizeAxes, Is.EqualTo(Axes.Both));
-            Assert.That(display.Size, Is.EqualTo(new osuTK.Vector2(1)));
+            Assert.That(display.Size, Is.EqualTo(Vector2.One));
         });
     }
 
     [Test]
-    public void TestNonAutoSizeKeepsExplicitSize()
+    public void TestFillScreenSettingSurvivesSkinLayoutRoundTrip()
     {
-        // AutoSizeToParent defaults to false; the constructor sets an explicit 640×480 size that
-        // skin-edited layouts override. applyAutoSizeToParent must leave it untouched.
         var display = new BmsBgaDisplay();
-        applyAutoSizeToParent(display);
+        display.FillScreen.Value = true;
+        var restored = (BmsBgaDisplay)display.CreateSerialisedInfo().CreateInstance();
+
+        Assert.That(restored.FillScreen.Value, Is.True);
+    }
+
+    [Test]
+    public void TestLayoutChangeDisablesFillScreen()
+    {
+        var display = new BmsBgaDisplay();
+        display.FillScreen.Value = true;
+        applyFillScreen(display, true);
+        display.Position = new Vector2(1, 0);
+
+        disableFillScreenForCustomLayout(display);
+
+        Assert.That(display.FillScreen.Value, Is.False);
+    }
+
+    [Test]
+    public void TestDisablingFillScreenKeepsAbsoluteLayout()
+    {
+        var parent = new Container { Size = new Vector2(1000, 600) };
+        var display = new BmsBgaDisplay();
+        setDrawableParent(display, parent);
+        display.FillScreen.Value = true;
+        applyFillScreen(display, true);
+        display.FillScreen.Value = false;
+        applyFillScreen(display, false);
 
         Assert.Multiple(() =>
         {
             Assert.That(display.RelativeSizeAxes, Is.EqualTo(Axes.None));
-            Assert.That(display.Size, Is.EqualTo(new osuTK.Vector2(640, 480)));
-        });
-    }
-
-    [Test]
-    public void TestUntouchedAutoSizeSurvivesSkinLayoutRoundTrip()
-    {
-        var display = new BmsBgaDisplay { AutoSizeToParent = true };
-        applyAutoSizeToParent(display);
-
-        var restored = (BmsBgaDisplay)display.CreateSerialisedInfo().CreateInstance();
-        applyAutoSizeToParent(restored);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(restored.RelativeSizeAxes, Is.EqualTo(Axes.Both));
-            Assert.That(restored.Size, Is.EqualTo(Vector2.One));
+            Assert.That(display.Size, Is.EqualTo(new Vector2(1000, 600)));
         });
     }
 
@@ -101,12 +117,28 @@ public class BmsBgaDisplaySizingTest
         var display = new BmsBgaDisplay { Size = new Vector2(320, 240) };
 
         var restored = (BmsBgaDisplay)display.CreateSerialisedInfo().CreateInstance();
-        applyAutoSizeToParent(restored);
 
         Assert.Multiple(() =>
         {
             Assert.That(restored.RelativeSizeAxes, Is.EqualTo(Axes.None));
             Assert.That(restored.Size, Is.EqualTo(new Vector2(320, 240)));
+        });
+    }
+
+    [Test]
+    public void TestCustomSizeAndPositionSurviveSkinLayoutRoundTrip()
+    {
+        var display = new BmsBgaDisplay
+        {
+            Position = new Vector2(1, 0),
+            Size = new Vector2(640, 480),
+        };
+        var restored = (BmsBgaDisplay)display.CreateSerialisedInfo().CreateInstance();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.Position, Is.EqualTo(new Vector2(1, 0)));
+            Assert.That(restored.Size, Is.EqualTo(new Vector2(640, 480)));
         });
     }
 
@@ -351,9 +383,17 @@ public class BmsBgaDisplaySizingTest
         method!.Invoke(display, [dim]);
     }
 
-    private static void applyAutoSizeToParent(BmsBgaDisplay display)
+    private static void applyFillScreen(BmsBgaDisplay display, bool fillScreen)
     {
-        var method = typeof(BmsBgaDisplay).GetMethod("applyAutoSizeToParent", BindingFlags.NonPublic | BindingFlags.Instance);
+        var method = typeof(BmsBgaDisplay).GetMethod("applyFillScreen", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.That(method, Is.Not.Null);
+
+        method!.Invoke(display, [fillScreen]);
+    }
+
+    private static void disableFillScreenForCustomLayout(BmsBgaDisplay display)
+    {
+        var method = typeof(BmsBgaDisplay).GetMethod("disableFillScreenForCustomLayout", BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.That(method, Is.Not.Null);
 
         method!.Invoke(display, []);

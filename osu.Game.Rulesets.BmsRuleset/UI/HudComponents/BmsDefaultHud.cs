@@ -128,7 +128,7 @@ public static class BmsDefaultHud
                 },
                 new BmsBgaDisplay
                 {
-                    AutoSizeToParent = true,
+                    FillScreen = { Value = true },
                     RenderOutsideHudVisibility = true,
                     Depth = float.MaxValue,
                 },

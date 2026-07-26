@@ -31,6 +31,10 @@ public static class BmsStrings
 
     public static LocalisableString BgaDim => get("bga_dim");
 
+    public static LocalisableString BgaFillScreen => get("bga_fill_screen");
+
+    public static LocalisableString BgaFillScreenDescription => get("bga_fill_screen_description");
+
     public static LocalisableString SongProgressColour => get("song_progress_colour");
 
     public static LocalisableString SongProgressColourDescription => get("song_progress_colour_description");
