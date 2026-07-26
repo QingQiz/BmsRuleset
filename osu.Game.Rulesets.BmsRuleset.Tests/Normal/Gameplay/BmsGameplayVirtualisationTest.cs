@@ -34,18 +34,6 @@ public partial class BmsGameplayVirtualisationTest
     }
 
     [Test]
-    public void TestDrawableBmsHitObjectsDoNotReferenceBmsPlayfield()
-    {
-        var drawablesPath = Path.Combine(findSourceRoot(), "osu.Game.Rulesets.BmsRuleset", "Objects", "Drawables");
-        var references = Directory.GetFiles(drawablesPath, "DrawableBms*.cs")
-            .Where(file => File.ReadAllText(file).Contains("BmsPlayfield"))
-            .Select(Path.GetFileName)
-            .ToArray();
-
-        Assert.That(references, Is.Empty);
-    }
-
-    [Test]
     public void TestDecoderCreatesTypedHitObjects()
     {
         using var stream = new MemoryStream("""

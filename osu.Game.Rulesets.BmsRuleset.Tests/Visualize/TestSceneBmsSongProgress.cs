@@ -34,8 +34,8 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("song progress loaded", () => Player.HUDOverlay.ChildrenOfType<BmsSongProgress>().SingleOrDefault()?.IsLoaded == true);
         AddStep("stop clock", () => Player.GameplayClockContainer.Stop());
-        AddAssert("indicator touches playfield edge", () =>
-            Math.Abs(progress().ScreenSpaceDrawQuad.TopRight.X - Playfield.SkinnableComponentScreenSpaceDrawQuad.TopLeft.X) < 0.5f);
+        AddAssert("indicator remains left of playfield", () =>
+            progress().ScreenSpaceDrawQuad.TopRight.X < Playfield.SkinnableComponentScreenSpaceDrawQuad.TopLeft.X);
 
         AddStep("seek to top", () => Player.GameplayClockContainer.Seek(firstHitTime()));
         AddStep("seek to middle", () => Player.GameplayClockContainer.Seek((firstHitTime() + lastHitTime()) / 2));

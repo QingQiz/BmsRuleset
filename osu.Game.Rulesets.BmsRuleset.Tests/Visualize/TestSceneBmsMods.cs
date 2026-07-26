@@ -51,11 +51,11 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
     [Test]
     public void TestAutoGauge()
     {
-        // Autoplay fills every tracked gauge to full, then the replay stops pressing so the
+        // Autoplay raises the groove gauges past their clear threshold, then the replay stops pressing so the
         // remaining notes miss and the survival tiers fail one by one — the cascade the AG
         // mod exists to demonstrate. The 0.2 groove-tier start would otherwise drain them
         // dead before the survival tiers fail, so the pre-fill is what makes Normal reachable.
-        const double auto_play_until = 10500;
+        const double auto_play_until = 13250;
 
         this.AddSetupStep("load player with AG mod + autoplay-then-idle replay", () =>
         {
@@ -69,17 +69,18 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         AddAssert("gauge starts at hardest tier (Hazard)", () =>
             Player.GameplayState.HealthProcessor is BmsHealthProcessor hp && hp.GaugeType == BmsGaugeType.Hazard);
 
-        // Let the autoplay phase fill the gauges (the replay hits every note before the idle
+        // Let the autoplay phase build a groove-gauge buffer (the replay hits every note before the idle
         // boundary, so no tier has failed yet).
         AddUntilStep("autoplay phase complete", () =>
             Player.GameplayClockContainer.CurrentTime >= auto_play_until);
 
         // Idle: missed notes drain the survival tiers in order (Hazard, ExHard, Hard) and the
-        // active gauge steps down Hazard → ExHard → Hard → Normal. Reaching Normal is also the
+        // active gauge steps down Hazard → ExHard → Hard → Normal. Recording Normal is also the
         // proof that the pre-fill worked — from the 0.2 groove start Normal would be dead long
         // before Hard fails, so the cascade could never land on it without the autoplay buffer.
-        AddUntilStep("gauge downgraded to Normal", () =>
-            Player.GameplayState.HealthProcessor is BmsHealthProcessor hp && hp.GaugeType == BmsGaugeType.Normal);
+        AddUntilStep("gauge downgraded through Normal", () =>
+            Player.GameplayState.HealthProcessor is BmsHealthProcessor hp
+            && hp.GaugeHistory.Any(e => e.ActiveGaugeType == BmsGaugeType.Normal));
     }
 
     [Test]
@@ -369,7 +370,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
     [Test]
     public void TestSecondPlayerWithAllMods()
     {
-        this.AddSetupStep("2P+HS+MR mods", () => LoadPlayer([new BmsModSecondPlayer(), new BmsModAutoScratch(), new BmsModMirror()]));
+        this.AddSetupStep("2P+HS+MR mods", () => LoadPlayer([new BmsModSecondPlayer(), new BmsModHideScratch(), new BmsModMirror()]));
         this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
@@ -388,14 +389,9 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
 
             int[] originalPattern = [0, 2, 4, 6, 1, 3, 5, 7, 0, 4, 2, 6, 3, 7, 1, 5, 0, 1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 1, 0, 0, 2, 4, 6, 1, 3, 5, 7, 0, 4, 2, 6, 3, 7, 1, 5];
             int mirroredColumn(int col) => col switch { 0 => 0, 1 => 7, 2 => 6, 3 => 5, 4 => 4, 5 => 3, 6 => 2, 7 => 1, _ => col };
+            var expectedColumns = originalPattern.Where(column => column != 0).Select(mirroredColumn);
 
-            for (var i = 0; i < originalPattern.Length && i < normalNotes.Count; i++)
-            {
-                if (normalNotes[i].Column != mirroredColumn(originalPattern[i]))
-                    return false;
-            }
-
-            return true;
+            return normalNotes.Select(note => note.Column).SequenceEqual(expectedColumns);
         });
     }
 

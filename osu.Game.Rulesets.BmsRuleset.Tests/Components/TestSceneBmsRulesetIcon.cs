@@ -65,8 +65,8 @@ public partial class TestSceneBmsRulesetIcon : OsuTestScene
                    && rows[0].Count() == 2
                    && rows[1].Count() == 3
                    && rows.All(row => Math.Abs((row.Min(key => key.X) + row.Max(key => key.X) + 8) / 2 - 20) < 0.001f)
-                   && Math.Abs((rows[0].Key + rows[1].Key + 12) / 2 - 20) < 0.001f
-                   && rows[0].Key + 12 > rows[1].Key;
+                   && Math.Abs(rows[0].Key - 7) < 0.001f
+                   && Math.Abs(rows[1].Key - (rows[0].Key + 12) - 0.75f) < 0.001f;
         }));
         AddAssert("content fits requested sizes", () => icons.Select((icon, index) => (icon, index)).All(item =>
         {

@@ -6,6 +6,7 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays;
@@ -53,8 +54,11 @@ public partial class TestSceneBmsCautionAutoplay : BmsPlayerTestScene
         using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName)!;
         using var reader = new LineBufferedReader(stream);
 
-        var decoded = new BmsBeatmapDecoder().Decode(reader);
-        var src = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        var decoded = new BmsBeatmapDecoder(referenceBpmMode: BmsReferenceBpmMode.StartBpm).Decode(reader);
+        var src = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset())
+        {
+            ReferenceBpmMode = BmsReferenceBpmMode.StartBpm,
+        }.Convert();
 
         // Re-host on a fresh BmsBeatmap so the test WorkingBeatmap doesn't try to load the
         // chart's real audio (unavailable headlessly). Preserves the stop-projected StartTimes

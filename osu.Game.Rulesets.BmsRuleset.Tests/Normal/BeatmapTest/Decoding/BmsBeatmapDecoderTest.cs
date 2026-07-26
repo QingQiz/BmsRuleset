@@ -93,14 +93,14 @@ public class BmsBeatmapDecoderTest
         {
             Assert.That(decoded.HitObjects.Single().StartTime, Is.Zero);
             Assert.That(decodedBms.BackgroundSampleEvents.Single().Time, Is.Zero);
-            Assert.That(converted.HitObjects.Single().StartTime, Is.EqualTo(1000));
-            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(1000));
-            Assert.That(converted.TimingMap.BpmEvents[0].Time, Is.EqualTo(1000));
-            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(1000));
-            Assert.That(converted.LongNoteTailSampleEvents.Single().Time, Is.EqualTo(2000));
-            Assert.That(converted.TextEvents.TextEvents.Single().Time, Is.EqualTo(1000));
-            Assert.That(converted.Bga.Events.Single().Time, Is.EqualTo(1000));
-            Assert.That(converted.Bga.OpacityEvents.Single().Time, Is.EqualTo(1000));
+            Assert.That(converted.HitObjects.Single().StartTime, Is.EqualTo(2000));
+            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(2000));
+            Assert.That(converted.TimingMap.BpmEvents[0].Time, Is.EqualTo(2000));
+            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(2000));
+            Assert.That(converted.LongNoteTailSampleEvents.Single().Time, Is.EqualTo(3000));
+            Assert.That(converted.TextEvents.TextEvents.Single().Time, Is.EqualTo(2000));
+            Assert.That(converted.Bga.Events.Single().Time, Is.EqualTo(2000));
+            Assert.That(converted.Bga.OpacityEvents.Single().Time, Is.EqualTo(2000));
         });
     }
 
@@ -119,9 +119,9 @@ public class BmsBeatmapDecoderTest
         Assert.Multiple(() =>
         {
             Assert.That(decoded.HitObjects.Select(h => h.StartTime), Is.EqualTo([500, 1000]));
-            Assert.That(converted.HitObjects.Select(h => h.StartTime), Is.EqualTo([1000, 1500]));
-            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(500));
-            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(500));
+            Assert.That(converted.HitObjects.Select(h => h.StartTime), Is.EqualTo([2000, 2500]));
+            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(1500));
+            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(1500));
         });
     }
 
@@ -2014,9 +2014,13 @@ public class BmsBeatmapDecoderTest
         Assert.That(bmsBeatmap.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
 
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        midiEvent = converted.BackgroundSampleEvents.Single(e => e.Time == 0 && e.Tick == 0);
+        midiEvent = converted.BackgroundSampleEvents.Single(e => e.Tick == 0);
 
-        Assert.That(converted.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(midiEvent.Time, Is.EqualTo(converted.TimingMap!.ProjectTickToTime(0)));
+            Assert.That(converted.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
+        });
     }
 
     [Test]

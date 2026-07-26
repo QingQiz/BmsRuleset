@@ -103,7 +103,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         assertHitOffsetText("+150");
         assertText("Hit Scatter");
         assertText("E-POOR");
-        assertText("+300 ms");
+        assertHitScatterText("+150 ms");
     }
 
     [Test]

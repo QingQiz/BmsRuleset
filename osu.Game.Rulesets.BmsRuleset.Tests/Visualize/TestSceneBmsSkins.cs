@@ -84,9 +84,12 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
 
         this.AddSetupUntilStep("legacy LN skin coverage held", () =>
             Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SKIN_COVERAGE_START_TIME + 95);
-        this.AddSetupAssert("animated LN body uses first frame when not held", () =>
+        this.AddSetupUntilStep("animated LN body uses first frame when not held", () =>
         {
             var body = longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column));
+            if (body == null)
+                return false;
+
             body.UpdateBody(Math.Max(1, body.DrawHeight), false, false);
             return bodyAnimationFrameCount(body) == 2 && currentBodyAnimationFrame(body) == 0;
         });

@@ -54,7 +54,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
     private static readonly double? normal_release = 0;
     private static readonly double? early_release = -180;
-    private static readonly double? very_early_release = -260;
+    private static readonly double? very_early_release = -280;
     private static readonly double? late_release = 180;
     private static readonly double? very_late_release = 320;
 
@@ -377,8 +377,8 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         ]));
         cases.Add(new LongNoteVisualCase("normal press + very early release, long gap, repress through tail", [
             new RelativeInput(0, true),
-            new RelativeInput(250, false),
-            new RelativeInput(650, true),
+            new RelativeInput(150, false),
+            new RelativeInput(680, true),
             new RelativeInput(long_note_duration, false),
         ], TestsHellChargeReleaseRecovery: true));
         cases.Add(new LongNoteVisualCase("bad early press + no release, LN auto tail uses head offset", [

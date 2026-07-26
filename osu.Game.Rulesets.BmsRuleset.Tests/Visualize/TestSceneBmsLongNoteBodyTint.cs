@@ -23,7 +23,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     private const double second_start_time = 5500;
     private const double duration = 900;
     private const double early_release_offset = -500;
-    private const double repress_offset = -300;
+    private const double repress_offset = -200;
 
     private BmsLongNoteMode mode = BmsLongNoteMode.ChargeNote;
 
@@ -105,7 +105,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
         AddStep("seek before long note", () => Player.GameplayClockContainer.Seek(start_time - 100));
         AddUntilStep("held body before release", () => Player.GameplayClockContainer.CurrentTime >= start_time + 300);
-        AddAssert("held body and tail are fully opaque", () =>
+        AddUntilStep("held body and tail are fully opaque", () =>
         {
             var longNote = Playfield.GetAliveObjectAtTime(start_time);
             return longNote != null
@@ -115,7 +115,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         AddUntilStep("released body before tail", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + early_release_offset + 120);
         // Released-early fades body+tail together (matches DrawableBmsLongNote.released_alpha) instead
         // of greying only the body, so a coloured tail no longer clashes with a grey body.
-        AddAssert("released body and tail are faded", () =>
+        AddUntilStep("released body and tail are faded", () =>
         {
             var longNote = Playfield.GetAliveObjectAtTime(start_time);
             return longNote != null
@@ -123,13 +123,18 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
                    && longNoteTailContainerOf(longNote).Alpha == 0.4f;
         });
         AddUntilStep("pressed again after failed release", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + repress_offset + 120);
-        AddAssert("failed repress has mode-specific visual", () =>
+        AddUntilStep("failed repress has mode-specific alpha", () =>
+        {
+            var longNote = Playfield.GetAliveObjectAtTime(start_time);
+            return longNote != null
+                   && longNoteBodyOf(longNote).Alpha == expectedAlpha
+                   && longNoteTailContainerOf(longNote).Alpha == expectedAlpha;
+        });
+        AddUntilStep("failed repress has mode-specific position", () =>
         {
             var longNote = Playfield.GetAliveObjectAtTime(start_time);
 
-            if (longNote == null
-                || longNoteBodyOf(longNote).Alpha != expectedAlpha
-                || longNoteTailContainerOf(longNote).Alpha != expectedAlpha)
+            if (longNote == null)
                 return false;
 
             var headY = BmsPlayfieldAssertions.TopOf(noteHeadOf(longNote));
@@ -149,6 +154,6 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
         AddStep("seek before normal tail", () => Player.GameplayClockContainer.Seek(second_start_time - 100));
         AddUntilStep("past tail release", () => Player.GameplayClockContainer.CurrentTime >= second_start_time + duration + 20);
-        AddAssert("tail non-poor clears long note", () => Playfield.GetAliveObjectAtTime(second_start_time) == null);
+        AddUntilStep("tail non-poor clears long note", () => Playfield.GetAliveObjectAtTime(second_start_time) == null);
     }
 }

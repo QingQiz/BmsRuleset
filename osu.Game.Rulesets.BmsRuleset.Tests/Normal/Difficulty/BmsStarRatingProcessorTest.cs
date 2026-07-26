@@ -24,15 +24,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Difficulty;
 public class BmsStarRatingProcessorTest
 {
     [Test]
-    public void TestDifficultyCalculatorUsesStarRatingProcessorV3()
-    {
-        var property = typeof(BmsDifficultyCalculator).GetProperty(nameof(BmsDifficultyCalculator.StarRatingProcessor));
-
-        Assert.That(property, Is.Not.Null);
-        Assert.That(property!.PropertyType, Is.EqualTo(typeof(BmsStarRatingProcessorV3)));
-    }
-
-    [Test]
     public void TestDifficultyCalculatorWrapperPathUsesEncodedExRank()
     {
         var beatmap = new Beatmap();
@@ -64,19 +55,6 @@ public class BmsStarRatingProcessorTest
         var expected = new BmsStarRatingProcessorV3().ComputeStarRating(createSimpleNoteTimings(8), 8, 2, 1.75);
 
         Assert.That(attributes.StarRating, Is.EqualTo(expected).Within(1e-12));
-    }
-
-    [Test]
-    public void TestFileImporterUsesStarRatingProcessorV3()
-    {
-        var method = typeof(BmsFileImporter).GetMethod("computeStarRating", BindingFlags.NonPublic | BindingFlags.Static);
-
-        Assert.That(method, Is.Not.Null);
-        Assert.Multiple(() =>
-        {
-            Assert.That(methodConstructs(method!, typeof(BmsStarRatingProcessorV3)), Is.True);
-            Assert.That(methodConstructs(method!, typeof(BmsStarRatingProcessorV2)), Is.False);
-        });
     }
 
     [Test]

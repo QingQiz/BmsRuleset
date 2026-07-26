@@ -139,9 +139,8 @@ public partial class TestSceneBmsTiming : BmsPlayerTestScene
         AddAssert("loaded bms drawable ruleset", () => Player.DrawableRuleset, Is.TypeOf<BmsDrawableRuleset>);
         AddAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
-        AddAssert("measure lines added", () => Playfield.Stage.MeasureLineArea.Count, () => Is.GreaterThan(0));
-
         AddStep("seek normal BPM", () => seekToTick(192));
+        AddUntilStep("measure lines visible", () => Playfield.Stage.MeasureLineArea.Count, () => Is.GreaterThan(0));
         AddUntilStep("normal notes visible", () => Playfield.AllColumnAliveObjects().Count(), () => Is.GreaterThan(0));
         AddUntilStep("normal speed spacing measurable", () => Playfield.SpacingBetweenTimes(timeAtTick(192), timeAtTick(240), excludeLongNotes: true), () => Is.GreaterThan(1));
         AddStep("capture normal speed spacing", () => normalSpeedSpacing = Playfield.SpacingBetweenTimes(timeAtTick(192), timeAtTick(240), excludeLongNotes: true));

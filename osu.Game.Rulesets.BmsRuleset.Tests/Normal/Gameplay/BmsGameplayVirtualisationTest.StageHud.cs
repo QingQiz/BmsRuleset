@@ -4,6 +4,7 @@ using NUnit.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Threading;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
@@ -411,6 +412,7 @@ public partial class BmsGameplayVirtualisationTest
         var container = new TestSerialisableDrawableContainer();
 
         controller.RegisterContainer(container);
+        runScheduledTasks(controller);
 
         Assert.That(container.Components.OfType<BmsStageHud>().Count(), Is.EqualTo(1));
     }
@@ -426,6 +428,7 @@ public partial class BmsGameplayVirtualisationTest
         container.Add(first);
         container.Add(second);
         controller.RegisterContainer(container);
+        runScheduledTasks(controller);
 
         Assert.Multiple(() =>
         {
@@ -441,6 +444,7 @@ public partial class BmsGameplayVirtualisationTest
         var container = new TestSerialisableDrawableContainer();
 
         controller.RegisterContainer(container);
+        runScheduledTasks(controller);
         var duplicate = new BmsStageHud();
         container.Add(duplicate);
 
@@ -454,6 +458,7 @@ public partial class BmsGameplayVirtualisationTest
         var container = new TestSerialisableDrawableContainer();
 
         controller.RegisterContainer(container);
+        runScheduledTasks(controller);
         var original = container.Components.OfType<BmsStageHud>().Single();
         var duplicate = new BmsStageHud();
         container.Add(duplicate);
@@ -462,6 +467,7 @@ public partial class BmsGameplayVirtualisationTest
 
         controller.Register(duplicate);
         controller.RegisterContainer(container);
+        runScheduledTasks(controller);
 
         Assert.Multiple(() =>
         {
@@ -484,7 +490,9 @@ public partial class BmsGameplayVirtualisationTest
 
         container.Add(hud);
         controller.RegisterContainer(container);
+        runScheduledTasks(controller);
         container.Remove(hud, true);
+        runScheduledTasks(controller);
 
         var replacement = container.Components.OfType<BmsStageHud>().Single();
 
@@ -575,6 +583,14 @@ public partial class BmsGameplayVirtualisationTest
         Assert.That(property, Is.Not.Null);
 
         property!.SetValue(drawable, axes);
+    }
+
+    private static void runScheduledTasks(Drawable drawable)
+    {
+        var property = typeof(Drawable).GetProperty("Scheduler", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(property, Is.Not.Null);
+
+        ((Scheduler)property!.GetValue(drawable)!).Update();
     }
 
     private sealed partial class TestSerialisableDrawableContainer : CompositeDrawable, ISerialisableDrawableContainer

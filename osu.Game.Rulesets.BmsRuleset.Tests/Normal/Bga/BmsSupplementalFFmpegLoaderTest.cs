@@ -102,25 +102,13 @@ public class BmsSupplementalFFmpegLoaderTest
     }
 
     [Test]
-    public void TestOnlyHostPlatformNativeBackendIsEmbedded()
+    public void TestOnlyCompressedNativeBackendsAreEmbedded()
     {
-        // The csproj gates each native EmbeddedResource on the build host's OS so the
-        // ruleset DLL carries only the one backend the runtime can load — embedding every
-        // platform's would bloat the assembly with dead bytes per unused platform and ship
-        // a .so/.dylib the loader never touches. Assert no foreign artifact leaked in.
-        string[] resources = typeof(BmsSupplementalFFmpegFuncs).Assembly.GetManifestResourceNames();
-
-        string hostPlatform = OperatingSystem.IsWindows() ? "win-x64"
-            : OperatingSystem.IsLinux() ? "linux-x64"
-            : OperatingSystem.IsMacOS() ? "osx"
-            : "none";
-
-        string[] foreign = resources
-            .Where(n => n.Contains("bms-ffmpeg.") && !n.Contains(hostPlatform))
+        var resources = typeof(BmsSupplementalFFmpegFuncs).Assembly.GetManifestResourceNames();
+        var uncompressed = resources
+            .Where(name => name is "bms-ffmpeg.win-x64.dll" or "bms-ffmpeg.linux-x64.so" or "bms-ffmpeg.osx.dylib")
             .ToArray();
 
-        Assert.That(foreign, Is.Empty,
-            $"Foreign native backend(s) [{string.Join(", ", foreign)}] are embedded but the host is '{hostPlatform}'. " +
-            "The csproj must gate each native EmbeddedResource on the host OS, not just on Exists(...).");
+        Assert.That(uncompressed, Is.Empty);
     }
 }

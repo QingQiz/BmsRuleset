@@ -26,11 +26,11 @@ public class BmsDefaultHudTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(progress.Anchor, Is.EqualTo(Anchor.TopLeft));
-            Assert.That(progress.Origin, Is.EqualTo(Anchor.TopRight));
+            Assert.That(progress.Anchor, Is.EqualTo(Anchor.BottomLeft));
+            Assert.That(progress.Origin, Is.EqualTo(Anchor.BottomRight));
             Assert.That(progress.RelativeSizeAxes, Is.EqualTo(Axes.Y));
-            Assert.That(progress.Margin.Right, Is.Zero);
-            Assert.That(progress.Width, Is.EqualTo(8));
+            Assert.That(progress.X, Is.EqualTo(-15));
+            Assert.That(progress.Width, Is.EqualTo(4));
             Assert.That(progress.IndicatorColour.Value, Is.EqualTo(new Colour4(255, 45, 45, 255)));
         });
     }
