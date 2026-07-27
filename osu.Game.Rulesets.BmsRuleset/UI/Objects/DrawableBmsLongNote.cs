@@ -69,7 +69,12 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         // A held LN should visually stay attached to the judgement line until its tail passes it.
         if (holdingBody)
-            headY = visualState.ResolveHeldHeadY(headY, endY, bodyDirectionBeforeTailPasses);
+        {
+            // Like mania, an early hit must not stretch the LN by pulling its head to the judgement
+            // line before the chart position reaches it. A completed tail must not activate the pin later.
+            var canPinHead = Time.Current >= HitObject.StartTime && !controller.TailJudged;
+            headY = visualState.ResolveHeldHeadY(headY, endY, -HitTargetPosition, canPinHead, bodyDirectionBeforeTailPasses);
+        }
 
         var myY = Y;
         var headOffset = headY - myY;
@@ -225,13 +230,13 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     void IBmsLongNoteHooks.OnUserHeadJudged()
     {
-        visualState.PinHead(-HitTargetPosition);
+        visualState.PrepareHeadPin();
         lastHoldExplosionTime = Time.Current - hold_explosion_interval;
     }
 
     void IBmsLongNoteHooks.OnHellChargeHeadPoor(double eventTime, double lifetimeEnd)
     {
-        visualState.PinHead(-HitTargetPosition);
+        visualState.PrepareHeadPin();
         Alpha = 1;
         LifetimeEnd = lifetimeEnd;
     }

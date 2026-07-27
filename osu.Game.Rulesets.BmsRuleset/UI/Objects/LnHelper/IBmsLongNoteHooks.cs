@@ -6,7 +6,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Objects.LnHelper;
 
 internal interface IBmsLongNoteHooks
 {
-    /// <summary>Pin the visual head to the judgement line and seed the hold-explosion timer (user head judgement).</summary>
+    /// <summary>Prepare the visual head to pin once it reaches the judgement line and seed the hold-explosion timer.</summary>
     void OnUserHeadJudged();
 
     /// <summary>HCN head-POOR: pin head, keep drawable alive until <paramref name="lifetimeEnd"/>, and register the head scoring event.</summary>

@@ -327,7 +327,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
     private static IReadOnlyList<LongNoteVisualCase> createCases()
     {
-        var cases = new List<LongNoteVisualCase>();
+        var longNoteVisualCases = new List<LongNoteVisualCase>();
 
         (string Name, double? Offset)[] presses =
         [
@@ -352,81 +352,83 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         {
             foreach (var release in releases)
             {
-                var inputs = new List<RelativeInput>();
-                inputs.Add(new RelativeInput(press.Offset!.Value, true));
+                var inputs = new List<RelativeInput>
+                {
+                    new(press.Offset!.Value, true),
+                };
 
                 if (release.Offset != null)
                     inputs.Add(new RelativeInput(long_note_duration + release.Offset.Value, false));
 
-                cases.Add(new LongNoteVisualCase($"{press.Name} + {release.Name}", inputs.ToArray()));
+                longNoteVisualCases.Add(new LongNoteVisualCase($"{press.Name} + {release.Name}", inputs.ToArray()));
             }
         }
 
-        cases.Add(new LongNoteVisualCase("no press + no release", []));
-        cases.Add(new LongNoteVisualCase("normal press + early release, gap, repress for normal tail", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("no press + no release", []));
+        longNoteVisualCases.Add(new LongNoteVisualCase("normal press + early release, gap, repress for normal tail", [
             new RelativeInput(0, true),
             new RelativeInput(long_note_duration + early_release!.Value, false),
             new RelativeInput(long_note_duration - 60, true),
             new RelativeInput(long_note_duration, false),
         ]));
-        cases.Add(new LongNoteVisualCase("early press + very early release, gap, late repress", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("early press + very early release, gap, late repress", [
             new RelativeInput(early_press!.Value, true),
             new RelativeInput(long_note_duration + very_early_release!.Value, false),
             new RelativeInput(long_note_duration + late_release!.Value, true),
             new RelativeInput(long_note_duration + very_late_release!.Value, false),
         ]));
-        cases.Add(new LongNoteVisualCase("normal press + very early release, long gap, repress through tail", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("normal press + very early release, long gap, repress through tail", [
             new RelativeInput(0, true),
             new RelativeInput(150, false),
             new RelativeInput(680, true),
             new RelativeInput(long_note_duration, false),
         ], TestsHellChargeReleaseRecovery: true));
-        cases.Add(new LongNoteVisualCase("bad early press + no release, LN auto tail uses head offset", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("bad early press + no release, LN auto tail uses head offset", [
             new RelativeInput(bad_early_press!.Value, true),
         ]));
-        cases.Add(new LongNoteVisualCase("bad late press + no release, LN auto tail uses head offset", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("bad late press + no release, LN auto tail uses head offset", [
             new RelativeInput(bad_late_press!.Value, true),
         ]));
-        cases.Add(new LongNoteVisualCase("normal press + normal release, HCN body stops after tail", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("normal press + normal release, HCN body stops after tail", [
             new RelativeInput(0, true),
             new RelativeInput(long_note_duration, false),
         ], TestsHellChargePostTailStop: true));
-        cases.Add(new LongNoteVisualCase("normal press + early bad release, HCN damage stops after tail", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("normal press + early bad release, HCN damage stops after tail", [
             new RelativeInput(0, true),
-            new RelativeInput(long_note_duration + early_release!.Value, false),
+            new RelativeInput(long_note_duration + early_release.Value, false),
         ], TestsHellChargePostTailStop: true));
-        cases.Add(new LongNoteVisualCase("head early BAD edge + normal release", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("head early BAD edge + normal release", [
             new RelativeInput(bad_early_edge, true),
             new RelativeInput(long_note_duration, false),
         ]));
-        cases.Add(new LongNoteVisualCase("head before early BAD edge + no release", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("head before early BAD edge + no release", [
             new RelativeInput(before_bad_early_edge, true),
         ]));
-        cases.Add(new LongNoteVisualCase("head late BAD edge + normal release", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("head late BAD edge + normal release", [
             new RelativeInput(bad_late_edge, true),
             new RelativeInput(long_note_duration, false),
         ]));
-        cases.Add(new LongNoteVisualCase("head after late BAD edge + no release", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("head after late BAD edge + no release", [
             new RelativeInput(after_bad_late_edge, true),
         ]));
-        cases.Add(new LongNoteVisualCase("normal press + tail early BAD edge", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("normal press + tail early BAD edge", [
             new RelativeInput(0, true),
             new RelativeInput(long_note_duration + bad_early_edge, false),
         ]));
-        cases.Add(new LongNoteVisualCase("normal press + tail before early BAD edge", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("normal press + tail before early BAD edge", [
             new RelativeInput(0, true),
             new RelativeInput(long_note_duration + before_bad_early_edge, false),
         ]));
-        cases.Add(new LongNoteVisualCase("normal press + tail late BAD edge", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("normal press + tail late BAD edge", [
             new RelativeInput(0, true),
             new RelativeInput(long_note_duration + bad_late_edge, false),
         ]));
-        cases.Add(new LongNoteVisualCase("normal press + tail after late BAD edge", [
+        longNoteVisualCases.Add(new LongNoteVisualCase("normal press + tail after late BAD edge", [
             new RelativeInput(0, true),
             new RelativeInput(long_note_duration + after_bad_late_edge, false),
         ]));
 
-        return cases;
+        return longNoteVisualCases;
     }
 
     private static bool veryOffsetsAreOutsideBadWindows()
@@ -467,11 +469,11 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     }
 
     private bool isCaseLongNoteAlive(int index)
-        => Playfield.GetAliveObjectAtTime(first_case_time + index * case_spacing) is DrawableBmsHitObject { HitObject: BmsLongNote } drawable
+        => Playfield.GetAliveObjectAtTime(first_case_time + index * case_spacing) is { HitObject: BmsLongNote } drawable
            && drawable.Alpha > 0;
 
     private DrawableBmsHitObject? getCaseLongNote(int index)
-        => Playfield.GetAliveObjectAtTime(first_case_time + index * case_spacing) is DrawableBmsHitObject { HitObject: BmsLongNote } drawable
+        => Playfield.GetAliveObjectAtTime(first_case_time + index * case_spacing) is { HitObject: BmsLongNote } drawable
             ? drawable
             : null;
 
@@ -479,6 +481,13 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     {
         var tailContainer = (Container)privateField(longNote, "longNoteTailContainer");
         return BmsPlayfieldAssertions.BottomOf(tailContainer);
+    }
+
+    private static float headBottomOf(DrawableBmsHitObject longNote)
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var headContainer = (Container)longNote.GetType().GetField("NoteContainer", flags)!.GetValue(longNote)!;
+        return BmsPlayfieldAssertions.BottomOf(headContainer);
     }
 
     private static Drawable longNoteBodyOf(DrawableBmsHitObject longNote)
@@ -902,7 +911,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     {
         public bool NeedsCleanupRelease => Inputs.LastOrDefault().Press;
 
-        public double? FirstPressOffset => Inputs.FirstOrDefault(input => input.Press) is { Press: true } input
+        public double? FirstPressOffset => Inputs.FirstOrDefault(relativeInput => relativeInput.Press) is { Press: true } input
             ? input.OffsetFromHead
             : null;
 
@@ -964,8 +973,8 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
         AddStep("seek held note after tail", () =>
         {
-            var startTime = first_case_time + no_release_case_index * case_spacing;
-            Player.GameplayClockContainer.Seek(startTime + long_note_duration + 260);
+            const double start_time = first_case_time + no_release_case_index * case_spacing;
+            Player.GameplayClockContainer.Seek(start_time + long_note_duration + 260);
             Player.GameplayClockContainer.Stop();
         });
         AddUntilStep("held long note alive", () => getCaseLongNote(no_release_case_index)?.Alpha > 0);
@@ -983,6 +992,60 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
                 $"tailBottom={tailBottom}, judgementLine={judgementLine}, noteTop={BmsPlayfieldAssertions.TopOf(longNote!)}, noteBottom={BmsPlayfieldAssertions.BottomOf(longNote!)}");
             Assert.That(body.Alpha, Is.EqualTo(0),
                 $"body should not extend from the held judgement-line head toward a tail that has already crossed it. bodyHeight={body.Height}");
+        });
+    }
+
+    [Test]
+    public void TestEarlyHitHeadFallsUntilItReachesJudgementLine()
+    {
+        const int early_press_case_index = 6;
+        const double start_time = first_case_time + early_press_case_index * case_spacing;
+
+        AddStep("load player in LN mode", () => LoadPlayer([new BmsModLongNote()]));
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
+        AddStep("seek after early press but before head time", () =>
+        {
+            Player.GameplayClockContainer.Seek(start_time - 40);
+            Player.GameplayClockContainer.Stop();
+        });
+        AddUntilStep("early-hit long note alive", () => getCaseLongNote(early_press_case_index)?.Alpha > 0);
+        AddAssert("early-hit head remains above judgement line", () =>
+        {
+            var longNote = getCaseLongNote(early_press_case_index);
+            return longNote != null && headBottomOf(longNote) < Playfield.JudgementLineY() - 1;
+        });
+        AddStep("seek past head time", () => Player.GameplayClockContainer.Seek(start_time + 20));
+        AddUntilStep("held head reaches judgement line", () =>
+        {
+            var longNote = getCaseLongNote(early_press_case_index);
+            return longNote != null && Math.Abs(headBottomOf(longNote) - Playfield.JudgementLineY()) < 1;
+        });
+    }
+
+    [Test]
+    public void TestReleasedHeadResumesNaturalPosition()
+    {
+        const int very_early_release_case_index = 2;
+        const double start_time = first_case_time + very_early_release_case_index * case_spacing;
+
+        AddStep("load player in LN mode", () => LoadPlayer([new BmsModLongNote()]));
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
+        AddStep("seek after early release", () =>
+        {
+            Player.GameplayClockContainer.Seek(start_time + 700);
+            Player.GameplayClockContainer.Stop();
+        });
+        AddUntilStep("long note enters released state", () =>
+        {
+            var longNote = getCaseLongNote(very_early_release_case_index);
+            return longNote?.Alpha > 0 && Math.Abs(longNoteBodyOf(longNote).Alpha - 0.4f) < 0.01f;
+        });
+        AddAssert("released head has moved past judgement line", () =>
+        {
+            var longNote = getCaseLongNote(very_early_release_case_index);
+            return longNote != null && headBottomOf(longNote) > Playfield.JudgementLineY() + 1;
         });
     }
 
