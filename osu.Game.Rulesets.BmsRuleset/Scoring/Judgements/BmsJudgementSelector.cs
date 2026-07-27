@@ -57,9 +57,9 @@ public static class BmsJudgementSelector
         var table = BmsJudgementProfileProvider.GetTable(layout, next.Column, next.JudgementRate, tail: false);
         var nextOffset = inputTime - next.StartTime;
         var currentDTime = current.StartTime - inputTime;
-        var goodEarlyDTime = table.GoodEarlyDTime;
+        var goodFastDTime = table.GoodFastDTime;
 
-        if (currentDTime < -goodEarlyDTime && nextResult is HitResult.Perfect or HitResult.Great or HitResult.Good)
+        if (currentDTime < -goodFastDTime && nextResult is HitResult.Perfect or HitResult.Great or HitResult.Good)
             return true;
 
         if (currentResult is HitResult.Ok or HitResult.Meh && nextResult is HitResult.Perfect or HitResult.Great or HitResult.Good)

@@ -109,7 +109,7 @@ Disable **Use dedicated preview audio** in the BMS settings to always use the BG
 ### Visual Offset Calibration
 
 Adjust when notes reach the judgement line without shifting audio, judgement timing, scoring, or keysound playback.
-Positive visual offsets display notes earlier and suit players who receive more Late judgements. Negative values
+Positive visual offsets display notes earlier and suit players who receive more Slow judgements. Negative values
 display notes later and suit players who receive more Fast judgements.
 
 Valid local plays contribute visual-offset suggestions based on their median hit error. The BMS settings show recent
@@ -144,7 +144,7 @@ or removed from the BMS settings. See the [difficulty table guide](./docs/diffic
 available directly for previously saved scores, not only for the play session that just ended.
 
 The result screen goes beyond the standard osu! score summary with gauge history, note and judgement timelines,
-fast/late distribution, hit scatter and offset graphs, and per-key timing breakdowns.
+fast/slow distribution, hit scatter and offset graphs, and per-key timing breakdowns.
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/38f62e99-8977-47eb-a0bc-d87837714905" width="900" alt="BMS result screen with detailed performance analysis">

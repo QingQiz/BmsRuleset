@@ -328,7 +328,7 @@ public partial class BmsRuleset : Ruleset
         void addHeadMetrics(string prefix, BmsJudgementWindowTable table)
         {
             addJudgementMetrics(prefix, table);
-            metrics.Add(new RulesetBeatmapAttribute.AdditionalMetric($"{prefix} E-POOR early zone", $"-{formatMilliseconds(table.EarlyWindowFor(HitResult.Miss))} to -{formatMilliseconds(table.EarlyWindowFor(HitResult.Ok))} ms", BmsHitResultColours.ForHitResult(HitResult.Miss)));
+            metrics.Add(new RulesetBeatmapAttribute.AdditionalMetric($"{prefix} E-POOR fast zone", $"-{formatMilliseconds(table.FastWindowFor(HitResult.Miss))} to -{formatMilliseconds(table.FastWindowFor(HitResult.Ok))} ms", BmsHitResultColours.ForHitResult(HitResult.Miss)));
         }
 
         void addTailMetrics(string prefix, BmsJudgementWindowTable table)
@@ -343,7 +343,7 @@ public partial class BmsRuleset : Ruleset
         }
 
         static string formatWindow(BmsJudgementWindowTable table, HitResult result)
-            => $"-{formatMilliseconds(table.EarlyWindowFor(result))} to +{formatMilliseconds(table.LateWindowFor(result))} ms";
+            => $"-{formatMilliseconds(table.FastWindowFor(result))} to +{formatMilliseconds(table.SlowWindowFor(result))} ms";
 
         static string formatMilliseconds(double value) => $"{value:0.##}";
 

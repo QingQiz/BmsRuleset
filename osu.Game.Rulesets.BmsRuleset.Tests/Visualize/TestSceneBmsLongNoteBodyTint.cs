@@ -22,7 +22,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     private const double start_time = 3000;
     private const double second_start_time = 5500;
     private const double duration = 900;
-    private const double early_release_offset = -500;
+    private const double fast_release_offset = -500;
     private const double repress_offset = -200;
 
     private BmsLongNoteMode mode = BmsLongNoteMode.ChargeNote;
@@ -68,7 +68,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         [
             new BmsReplayFrame(0),
             new BmsReplayFrame(start_time, action),
-            new BmsReplayFrame(start_time + duration + early_release_offset),
+            new BmsReplayFrame(start_time + duration + fast_release_offset),
             new BmsReplayFrame(start_time + duration + repress_offset, action),
             new BmsReplayFrame(start_time + duration + 100),
             new BmsReplayFrame(second_start_time, action),
@@ -112,8 +112,8 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
                    && longNoteBodyOf(longNote).Alpha == 1f
                    && longNoteTailContainerOf(longNote).Alpha == 1f;
         });
-        AddUntilStep("released body before tail", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + early_release_offset + 120);
-        // Released-early fades body+tail together (matches DrawableBmsLongNote.released_alpha) instead
+        AddUntilStep("released body before tail", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + fast_release_offset + 120);
+        // A fast release fades body+tail together (matches DrawableBmsLongNote.released_alpha) instead
         // of greying only the body, so a coloured tail no longer clashes with a grey body.
         AddUntilStep("released body and tail are faded", () =>
         {

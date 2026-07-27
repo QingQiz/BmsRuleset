@@ -93,7 +93,7 @@ public partial class BmsGameplayVirtualisationTest
     }
 
     [Test]
-    public void TestEarlyHitObjectLifetimeStartsDuringLeadIn()
+    public void TestFastHitObjectLifetimeStartsDuringLeadIn()
     {
         var timingMap = new BmsTimingMap(
             192,
@@ -268,7 +268,7 @@ public partial class BmsGameplayVirtualisationTest
     /// <summary>
     ///     Attaches the beatmap to each of its hit objects. The decoder/converter does this for real
     ///     charts, but synthetic beatmaps built inline in tests skip that step — and lifetime code
-    ///     (e.g. BmsHitObjectLifetimeEntry.getEarlyBadWindow) reads Beatmap.Rank/LayoutVariant, so
+    ///     (e.g. BmsHitObjectLifetimeEntry.getFastBadWindow) reads Beatmap.Rank/LayoutVariant, so
     ///     leaving it null NREs. This mirrors BmsBeatmapConverter's attachment loop.
     /// </summary>
     private static BmsBeatmap attachBeatmap(BmsBeatmap beatmap)

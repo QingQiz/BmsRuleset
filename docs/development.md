@@ -75,7 +75,7 @@ The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets
 | **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT              | 4        |
 | **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                          | 4        |
 | **Skin**      | Non-legacy BMS skin — fully configurable via skin editor                                 |
-| **Skin**      | `HitGreat` → `HitGreatLate` / `HitGreatEarly` split images                               |
+| **Skin**      | `HitGreat` → `HitGreatSlow` / `HitGreatFast` split images                                |
 | **Skin**      | E-POOR judgement image                                                                   | 3        |
 | **UI**        | Lane cover / skin / movement                                                             | 2        |
 | **Perf**      | fps is not stable when a large amount of mine disposed                                   | 4        |

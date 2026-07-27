@@ -22,7 +22,7 @@ public static partial class BmsTestReplays
     /// <summary>Time appended to a press to produce its release in non-LN scenarios.</summary>
     public const double RELEASE_PADDING_MS = 20;
 
-    /// <summary>How early the deliberate empty-POOR press fires before the first note.</summary>
+    /// <summary>How fast the deliberate empty-POOR press fires before the first note.</summary>
     public const double EMPTY_POOR_LEAD_MS = 1200;
 
     /// <summary>Press offsets cycled per non-LN note to drive each hit result.</summary>
@@ -100,7 +100,7 @@ public static partial class BmsTestReplays
     /// Generates replay frames with deliberate timing offsets so that every
     /// <see cref="BmsRuleset.STATIC_VALID_HIT_RESULTS"/> hit result is produced,
     /// including a deliberate Empty-POOR. Long notes use scenario-based timing
-    /// (early/late press, mid release, no release, etc.).
+    /// (fast/slow press, mid release, no release, etc.).
     /// </summary>
     public static IList<ReplayFrame> CreateReplayFrames(BmsBeatmap beatmap)
     {
@@ -188,11 +188,11 @@ public static partial class BmsTestReplays
 
         switch ((LnScenario)index)
         {
-            case LnScenario.EarlyPress:
+            case LnScenario.FastPress:
                 addHold(actionPoints, action, hitObject.StartTime - 150, hitObject.EndTime + RELEASE_PADDING_MS);
                 break;
 
-            case LnScenario.LatePress:
+            case LnScenario.SlowPress:
                 addHold(actionPoints, action, hitObject.StartTime + 150, hitObject.EndTime + RELEASE_PADDING_MS);
                 break;
 
@@ -207,11 +207,11 @@ public static partial class BmsTestReplays
                 actionPoints.Add(new ActionPoint(hitObject.StartTime, action, true));
                 break;
 
-            case LnScenario.LateRelease:
+            case LnScenario.SlowRelease:
                 addHold(actionPoints, action, hitObject.StartTime, hitObject.EndTime + 150);
                 break;
 
-            case LnScenario.EarlyRelease:
+            case LnScenario.FastRelease:
                 addHold(actionPoints, action, hitObject.StartTime, hitObject.EndTime - 150);
                 break;
         }
@@ -227,12 +227,12 @@ public static partial class BmsTestReplays
 
     public enum LnScenario
     {
-        EarlyPress,
-        LatePress,
+        FastPress,
+        SlowPress,
         NoPress,
         MidRelease,
         NoRelease,
-        LateRelease,
-        EarlyRelease,
+        SlowRelease,
+        FastRelease,
     }
 }

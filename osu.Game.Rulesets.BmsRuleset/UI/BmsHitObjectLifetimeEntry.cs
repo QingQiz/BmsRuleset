@@ -78,7 +78,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
         var futureLifetime = computeFutureLifetime(hitObject) + Math.Max(0, getVisualOffset()) * scrollController.PlaybackRate;
         var pastLifetime = computePastLifetime();
-        var lateWindow = getLateWindow(hitObject);
+        var slowWindow = getSlowWindow(hitObject);
         var lifetimeStart = hitObject.StartTime - futureLifetime;
 
         if (currentTime is double now && now >= LifetimeStart && now <= LifetimeEnd)
@@ -92,7 +92,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
         // LifetimeEnd set corrects it.
         LifetimeEnd = hitObject is BmsLandmine
             ? hitObject.StartTime + mine_past_lifetime
-            : hitObject.GetEndTime() + Math.Max(pastLifetime, lateWindow + lifetime_margin);
+            : hitObject.GetEndTime() + Math.Max(pastLifetime, slowWindow + lifetime_margin);
         LifetimeStart = lifetimeStart;
 
         lifetimeComputed = true;
@@ -135,9 +135,9 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
     private double computeFutureLifetime(BmsHitObject hitObject)
     {
-        // Floor the future lifetime at the early BAD (Ok) window so the entry is alive before the
+        // Floor the future lifetime at the fast BAD (Ok) window so the entry is alive before the
         // earliest moment a press can be judged.
-        var floor = Math.Max(getEarlyBadWindow(hitObject), minimum_future_lifetime);
+        var floor = Math.Max(getFastBadWindow(hitObject), minimum_future_lifetime);
         var timingMap = getTimingMap();
 
         if (useConstantScrollFallback(timingMap))
@@ -151,16 +151,16 @@ internal sealed class BmsHitObjectLifetimeEntry(
     }
 
     /// <summary>
-    ///     The early BAD (Ok) hit window for this object's head judgement — the furthest ahead of
+    ///     The fast BAD (Ok) hit window for this object's head judgement — the furthest ahead of
     ///     <see cref="HitObject.StartTime" /> at which a press can still be judged. Used as the
     ///     minimum future lifetime so the entry is alive for any hittable press.
     /// </summary>
-    private static double getEarlyBadWindow(BmsHitObject hitObject)
+    private static double getFastBadWindow(BmsHitObject hitObject)
     {
         if (hitObject is BmsLandmine) return 0;
 
         var table = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
-        return Math.Abs(table.EarlyWindowFor(HitResult.Ok));
+        return Math.Abs(table.FastWindowFor(HitResult.Ok));
     }
 
     private bool useConstantScrollFallback(BmsTimingMap? timingMap) => scrollController.ConstantScrollActive || timingMap == null;
@@ -175,7 +175,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
         var earliestVisibleTime = hitObject.StartTime;
         var laterTime = hitObject.StartTime;
         var laterVisible = true;
-        // Early notes can enter during gameplay lead-in, while the maximum supported scroll window
+        // Fast notes can enter during gameplay lead-in, while the maximum supported scroll window
         // keeps the search bounded when a stationary timing segment remains visible indefinitely.
         var earliestSearchTime = Math.Min(0, hitObject.StartTime
                                              - BmsScrollController.MAX_TIME_RANGE * currentScrollRangeScale() * scrollController.PlaybackRate);
@@ -280,15 +280,15 @@ internal sealed class BmsHitObjectLifetimeEntry(
     private static double computePastLifetime() => default_past_lifetime + lifetime_margin;
 
     /// <summary>
-    ///     The BAD (late) hit-window for this object.  The entry must stay alive at least this long
+    ///     The BAD (slow) hit-window for this object.  The entry must stay alive at least this long
     ///     past its EndTime so the auto-miss path in <see cref="DrawableBmsHitObject.UpdateColumnFrame" /> can fire.
     /// </summary>
-    private static double getLateWindow(BmsHitObject hitObject)
+    private static double getSlowWindow(BmsHitObject hitObject)
     {
         if (hitObject is BmsLongNote)
         {
             var tailTable = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: true);
-            return tailTable.LateWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
+            return tailTable.SlowWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
         }
 
         return hitObject.HitWindows?.WindowFor(HitResult.Ok) ?? default_past_lifetime;

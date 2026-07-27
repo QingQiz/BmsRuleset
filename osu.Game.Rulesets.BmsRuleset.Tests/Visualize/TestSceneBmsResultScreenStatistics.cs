@@ -414,13 +414,13 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddUntilStep("direction labels stay at plot edges", () =>
         {
             var plot = plotBackgroundFor(hitScatterStatistic).ScreenSpaceDrawQuad.AABBFloat;
-            var late = hitScatterStatistic.ChildrenOfType<SpriteText>().Single(t => t.Text.ToString() == "late").ScreenSpaceDrawQuad.AABBFloat;
+            var slow = hitScatterStatistic.ChildrenOfType<SpriteText>().Single(t => t.Text.ToString() == "slow").ScreenSpaceDrawQuad.AABBFloat;
             var fast = hitScatterStatistic.ChildrenOfType<SpriteText>().Single(t => t.Text.ToString() == "fast").ScreenSpaceDrawQuad.AABBFloat;
 
             return fast.Top >= plot.Top
                    && fast.Bottom <= plot.Top + 28
-                   && late.Bottom <= plot.Bottom
-                   && late.Top >= plot.Bottom - 28;
+                   && slow.Bottom <= plot.Bottom
+                   && slow.Top >= plot.Bottom - 28;
         });
 
         AddUntilStep("axis marks touch plot", () =>

@@ -14,7 +14,7 @@
   <data name="bga_dim" xml:space="preserve"><value>BGA 暗化</value></data>
   <data name="visual_offset" xml:space="preserve"><value>视觉偏移</value></data>
   <data name="offset_milliseconds" xml:space="preserve"><value>{0:N0} 毫秒</value></data>
-  <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} 毫秒 - 音符提前显示；适合 Late 较多的玩家</value></data>
+  <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} 毫秒 - 音符提前显示；适合 Slow 较多的玩家</value></data>
   <data name="visual_offset_later" xml:space="preserve"><value>{0:N0} 毫秒 - 音符延后显示；适合 Fast 较多的玩家</value></data>
   <data name="visual_offset_suggestion_note" xml:space="preserve"><value>游玩几张 BMS 谱面后即可获得建议的视觉偏移！</value></data>
   <data name="visual_offset_suggestion_correct" xml:space="preserve"><value>根据最近 {0} 次游玩，当前视觉偏移设置正确！</value></data>
@@ -69,11 +69,11 @@
   <data name="overall" xml:space="preserve"><value>总体</value></data>
   <data name="scratch" xml:space="preserve"><value>皿</value></data>
   <data name="fast" xml:space="preserve"><value>偏快</value></data>
-  <data name="late" xml:space="preserve"><value>偏慢</value></data>
+  <data name="slow" xml:space="preserve"><value>偏慢</value></data>
   <data name="key" xml:space="preserve"><value>按键 {0}</value></data>
   <data name="notes" xml:space="preserve"><value>音符</value></data>
   <data name="judgement" xml:space="preserve"><value>判定</value></data>
-  <data name="fast_late" xml:space="preserve"><value>快/慢</value></data>
+  <data name="fast_slow" xml:space="preserve"><value>快/慢</value></data>
   <data name="note" xml:space="preserve"><value>单键</value></data>
   <data name="long_note" xml:space="preserve"><value>长按</value></data>
   <data name="mine" xml:space="preserve"><value>地雷</value></data>

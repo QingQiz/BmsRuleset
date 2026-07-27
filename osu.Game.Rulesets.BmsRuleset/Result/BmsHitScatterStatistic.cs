@@ -34,8 +34,8 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     private const double minimum_offset_range = 150;
     private const double maximum_offset_range = 300;
 
-    private static readonly Color4 early_colour = new(90, 175, 255, 255);
-    private static readonly Color4 late_colour = new(255, 130, 92, 255);
+    private static readonly Color4 fast_colour = new(90, 175, 255, 255);
+    private static readonly Color4 slow_colour = new(255, 130, 92, 255);
 
     private readonly HitScatterStatistics statistics;
     private FillFlowContainer content = null!;
@@ -310,7 +310,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             Y = y,
             X = -10,
             Text = $"{tick:+0;-0;0} ms",
-            Colour = tick < 0 ? early_colour : tick > 0 ? late_colour : Color4.White,
+            Colour = tick < 0 ? fast_colour : tick > 0 ? slow_colour : Color4.White,
             Alpha = tick == 0 ? 0.75f : 0.55f,
             Font = OsuFont.GetFont(size: 10, weight: tick == 0 ? FontWeight.SemiBold : FontWeight.Regular),
         };
@@ -343,8 +343,8 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             Children = data.Points.Select(point => createPoint(data, point)).ToArray(),
         });
 
-        dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Fast, early_colour, Anchor.TopRight));
-        dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Late, late_colour, Anchor.BottomRight));
+        dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Fast, fast_colour, Anchor.TopRight));
+        dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Slow, slow_colour, Anchor.BottomRight));
 
         return new Container
         {

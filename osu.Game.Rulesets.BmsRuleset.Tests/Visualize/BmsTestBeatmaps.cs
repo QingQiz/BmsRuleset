@@ -26,7 +26,7 @@ public static partial class BmsTestBeatmaps
 
     /// <summary>
     /// Creates a synthetic <see cref="BmsBeatmap"/> with normal notes (varied columns and timing),
-    /// long-note scenarios (early/late press, mid release, etc.), and landmines.
+    /// long-note scenarios (fast/slow press, mid release, etc.), and landmines.
     /// Designed so a replay with deliberate timing offsets can produce every hit result.
     /// </summary>
     public static BmsBeatmap CreateBeatmap()

@@ -280,7 +280,7 @@ public static class BmsStrings
 
     public static LocalisableString Fast => get("fast");
 
-    public static LocalisableString Late => get("late");
+    public static LocalisableString Slow => get("slow");
 
     public static LocalisableString Key(int number) => get("key", number);
 
@@ -288,7 +288,7 @@ public static class BmsStrings
 
     public static LocalisableString Judgement => get("judgement");
 
-    public static LocalisableString FastLate => get("fast_late");
+    public static LocalisableString FastSlow => get("fast_slow");
 
     public static LocalisableString Note => get("note");
 

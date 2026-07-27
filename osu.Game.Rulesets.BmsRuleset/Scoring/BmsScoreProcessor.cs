@@ -36,12 +36,12 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             return;
         }
 
-        // Latest possible judgement time = max object end time + worst-case late window.
+        // Latest possible judgement time = max object end time + worst-case slow window.
         var maxEndTime = beatmap.HitObjects.Max(h => h.GetEndTime());
-        var lateWindow = beatmap.HitObjects[0].HitWindows?.WindowFor(HitResult.Ok)
+        var slowWindow = beatmap.HitObjects[0].HitWindows?.WindowFor(HitResult.Ok)
                          ?? BmsHitWindows.FALLBACK_BAD_WINDOW;
 
-        latestEndTime = maxEndTime + lateWindow;
+        latestEndTime = maxEndTime + slowWindow;
     }
 
     public override int GetBaseScoreForResult(HitResult result) => result switch
@@ -128,7 +128,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     {
         // Don't call base — JudgementProcessor.Update() checks JudgedHits == MaxHits,
         // which never becomes true when mines expire without a result.  Replace with a
-        // time-based check: play is complete when the last object's late window has passed.
+        // time-based check: play is complete when the last object's slow window has passed.
         // This must also clear completion after a rewind because looping players wait for
         // that transition before they stop seeking back to the start of the beatmap.
         if (HasCompleted is BindableBool bb)

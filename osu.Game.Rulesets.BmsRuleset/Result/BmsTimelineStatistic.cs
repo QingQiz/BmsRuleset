@@ -37,7 +37,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
     private static readonly Color4 ln_colour = colours.GreenLight;
     private static readonly Color4 scratch_colour = colours.Yellow;
     private static readonly Color4 fast_colour = new(90, 175, 255, 255);
-    private static readonly Color4 late_colour = new(255, 130, 92, 255);
+    private static readonly Color4 slow_colour = new(255, 130, 92, 255);
     private static readonly Color4 failed_colour = new(70, 70, 70, 255);
 
     private readonly TimelineData data;
@@ -63,7 +63,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
             [
                 createSubplot(BmsStrings.Notes, data.Notes, null),
                 createSubplot(BmsStrings.Judgement, data.Judgements, data.FailureFraction),
-                createSubplot(BmsStrings.FastLate, data.FastLate, data.FailureFraction),
+                createSubplot(BmsStrings.FastSlow, data.FastSlow, data.FailureFraction),
             ],
         };
     }
@@ -82,10 +82,10 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
 
         var notes = createNotesSubplot(playableBeatmap, variant, duration);
         var judgements = createJudgementSubplot(scoringHitEvents, duration);
-        var fastLate = createFastLateSubplot(timingHitEvents, duration);
+        var fastSlow = createFastSlowSubplot(timingHitEvents, duration);
         var failure = score.Passed ? null : findFailureFraction(score, playableBeatmap, scoringHitEvents, duration);
 
-        return new TimelineData(notes, judgements, fastLate, failure);
+        return new TimelineData(notes, judgements, fastSlow, failure);
     }
 
     private static SubplotData createNotesSubplot(IBeatmap playableBeatmap, BmsLayoutVariant variant, double duration)
@@ -154,22 +154,22 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         ]);
     }
 
-    private static SubplotData createFastLateSubplot(IReadOnlyList<HitEvent> hitEvents, double duration)
+    private static SubplotData createFastSlowSubplot(IReadOnlyList<HitEvent> hitEvents, double duration)
     {
         var fast = new int[bucket_count];
-        var late = new int[bucket_count];
+        var slow = new int[bucket_count];
 
         foreach (var e in hitEvents.Where(isBmsHit))
         {
             var b = bucketFor(e.HitObject.GetEndTime(), duration);
 
             if (e.TimeOffset < 0) fast[b]++;
-            else if (e.TimeOffset > 0) late[b]++;
+            else if (e.TimeOffset > 0) slow[b]++;
         }
 
         return new SubplotData([
             new CategoryData("fast", fast_colour, fast),
-            new CategoryData("late", late_colour, late),
+            new CategoryData("slow", slow_colour, slow),
         ]);
     }
 
@@ -299,7 +299,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         "Great" => BmsStrings.Great,
         "Perfect" => BmsStrings.Perfect,
         "fast" => BmsStrings.Fast,
-        "late" => BmsStrings.Late,
+        "slow" => BmsStrings.Slow,
         _ => category,
     };
 
@@ -383,7 +383,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         Scratch
     }
 
-    internal sealed record TimelineData(SubplotData Notes, SubplotData Judgements, SubplotData FastLate, double? FailureFraction);
+    internal sealed record TimelineData(SubplotData Notes, SubplotData Judgements, SubplotData FastSlow, double? FailureFraction);
 
     internal sealed record SubplotData(IReadOnlyList<CategoryData> Categories);
 

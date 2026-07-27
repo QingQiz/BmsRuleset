@@ -255,7 +255,7 @@ public class BmsLongNoteJudgementTest
     }
 
     [Test]
-    public void TestEarlyReleaseBeforeTailWindowIsPoor()
+    public void TestFastReleaseBeforeTailWindowIsPoor()
     {
         var tail = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, column: 1, rank: 3, tail: true);
 
@@ -586,7 +586,7 @@ public class BmsLongNoteJudgementTest
     }
 
     [Test]
-    public void TestLongNoteVisualStateDoesNotPinAfterEarlyCompletion()
+    public void TestLongNoteVisualStateDoesNotPinAfterFastCompletion()
     {
         var visualState = new BmsLongNoteVisualState();
 

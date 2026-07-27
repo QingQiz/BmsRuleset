@@ -9,10 +9,10 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 /// <summary>
 ///     Pure per-column cursor that finds the next hit object whose key-sound should play on an
 ///     empty press. Linear-walks this column's sorted hit-object slice from a cursor that advances
-///     forward, skipping landmines, notes past their late BAD window, and notes the caller reports
+///     forward, skipping landmines, notes past their slow BAD window, and notes the caller reports
 ///     as finished (judged / expired-without-drawable). The cursor repositions via binary search
 ///     only on a backward seek; forward time progression (including normal gaps with no key press)
-///     is handled by the linear scan, which advances past notes whose late BAD window expired.
+///     is handled by the linear scan, which advances past notes whose slow BAD window expired.
 ///     Extracted from the old centralized keysound player so the seek/skip logic is unit-testable without a drawable
 ///     host; the caller supplies isFinished (which needs the column's live HitObjectContainer —
 ///     see BmsColumnKeySound.hasNoteFinished).
@@ -30,7 +30,7 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects)
     public BmsHitObject? Next(double currentTime, Func<BmsHitObject, bool> isFinished)
     {
         // Reposition only on a backward seek — the linear scan below already advances past notes
-        // whose late BAD window has expired, so forward time progression (normal gaps included)
+        // whose slow BAD window has expired, so forward time progression (normal gaps included)
         // needs no time-threshold reset.
         if (currentTime < lastSoundSearchTime)
             nextSoundIndex = findFirstSoundCandidateIndex(currentTime - maxLookAhead());
@@ -61,14 +61,14 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects)
     }
 
     /// <summary>
-    /// A note's late BAD window has fully expired at <paramref name="currentTime"/>.
+    /// A note's slow BAD window has fully expired at <paramref name="currentTime"/>.
     /// Mirrors the old centralized player's isPastBadWindow.
     /// </summary>
     private static bool isPastBadWindow(BmsHitObject hitObject, double currentTime)
         => currentTime > hitObject.StartTime + (hitObject.HitWindows?.WindowFor(HitResult.Ok) ?? BmsHitWindows.FALLBACK_BAD_WINDOW);
 
     /// <summary>
-    /// Generous lookahead for the binary-search cursor reset, covering the widest possible late
+    /// Generous lookahead for the binary-search cursor reset, covering the widest possible slow
     /// BAD window. A larger value is safe — the linear scan advances past finished notes anyway.
     /// </summary>
     private static double maxLookAhead() => 1000;

@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 ///     GOOD   → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Good">HitResult.Good</see>,
 ///     BAD    → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Ok">HitResult.Ok</see>,
 ///     POOR   → <see cref="F:osu.Game.Rulesets.Scoring.HitResult.Meh">HitResult.Meh</see>
-///     (both passive miss and in-range early keypress that consumes the note).
+///     (both passive miss and in-range fast keypress that consumes the note).
 ///     Empty POOR (keypress outside all note windows) produces no <see cref="T:osu.Game.Rulesets.Judgements.JudgementResult"/>.
 /// </remarks>
 public class BmsJudgement(BmsHitObject? source = null) : Judgement

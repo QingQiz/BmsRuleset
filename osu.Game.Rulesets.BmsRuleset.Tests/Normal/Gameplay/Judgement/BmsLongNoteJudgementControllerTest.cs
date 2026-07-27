@@ -94,7 +94,7 @@ public class BmsLongNoteJudgementControllerTest
         var lifetimeEnd = controller.ChargeTailLifetimeEnd();
 
         var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, tail: true);
-        Assert.That(lifetimeEnd, Is.EqualTo(1500 + tailTable.LateWindowFor(HitResult.Ok) + 100));
+        Assert.That(lifetimeEnd, Is.EqualTo(1500 + tailTable.SlowWindowFor(HitResult.Ok) + 100));
     }
 
     [Test]
@@ -109,7 +109,7 @@ public class BmsLongNoteJudgementControllerTest
         Assert.That(controller.LongNoteStarted, Is.True);
         Assert.That(hooks.HellChargeHeadPoor, Has.Count.EqualTo(1));
         Assert.That(hooks.HellChargeHeadPoor[0].eventTime, Is.EqualTo(1000));
-        // lifetimeEnd extends past EndTime by the tail Ok late window + margin.
+        // lifetimeEnd extends past EndTime by the tail Ok slow window + margin.
         Assert.That(hooks.HellChargeHeadPoor[0].lifetimeEnd, Is.GreaterThan(1500));
     }
 
@@ -171,7 +171,7 @@ public class BmsLongNoteJudgementControllerTest
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, start: 1000, duration: 500);
 
-        // Past the head passive-poor offset (Bme7K rank-2 head Ok late edge is +280ms).
+        // Past the head passive-poor offset (Bme7K rank-2 head Ok slow edge is +280ms).
         controller.CheckPassiveResult(currentTime: 1000 + 600);
 
         Assert.That(hooks.AppliedResults, Is.EqualTo([HitResult.Meh]));
@@ -197,7 +197,7 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
-    public void TestLongChargeHeadMissDoesNotCreateExtremeEarlyTailOffset()
+    public void TestLongChargeHeadMissDoesNotCreateExtremeFastTailOffset()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.ChargeNote, start: 1000, duration: 10_000);
 
@@ -228,7 +228,7 @@ public class BmsLongNoteJudgementControllerTest
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, start: 1000, duration: 500);
         controller.TryHit(1000, HitResult.Perfect);
 
-        // EndTime = 1500; past the tail passive-poor offset (Bme7K rank-2 tail Ok late edge is +280ms).
+        // EndTime = 1500; past the tail passive-poor offset (Bme7K rank-2 tail Ok slow edge is +280ms).
         controller.CheckPassiveResult(currentTime: 1500 + 600);
 
         Assert.That(hooks.AppliedResults, Is.EqualTo([HitResult.Meh]));
@@ -366,7 +366,7 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
-    public void TestEarlyHeadBeforeStartIsNotTreatedAsRewind()
+    public void TestFastHeadBeforeStartIsNotTreatedAsRewind()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
         controller.TryHit(987, HitResult.Great);
@@ -378,7 +378,7 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
-    public void TestRewindBeforeEarlyHeadDiscardsPendingEndpoint()
+    public void TestRewindBeforeFastHeadDiscardsPendingEndpoint()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
         controller.TryHit(987, HitResult.Great);

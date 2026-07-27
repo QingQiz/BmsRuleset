@@ -346,7 +346,7 @@ public class BmsBeatmapDecoderTest
         var pgreat = table.FrameworkWindowFor(HitResult.Perfect);
         var great = table.FrameworkWindowFor(HitResult.Great);
         var good = table.FrameworkWindowFor(HitResult.Good);
-        var bad = table.LateWindowFor(HitResult.Ok);
+        var bad = table.SlowWindowFor(HitResult.Ok);
 
         var issues = new List<string>();
 

@@ -72,11 +72,11 @@ public static class BmsJudgementProfileProvider
 
     private static BmsJudgementWindowTable pmsHead(
         double rate,
-        (double late, double early) perfect,
-        (double late, double early) great,
-        (double late, double early) good,
-        (double late, double early) bad,
-        (double late, double early) miss) => new([
+        (double slow, double fast) perfect,
+        (double slow, double fast) great,
+        (double slow, double fast) good,
+        (double slow, double fast) bad,
+        (double slow, double fast) miss) => new([
         fixedWindow(HitResult.Perfect, perfect),
         scaled(HitResult.Great, great, rate),
         scaled(HitResult.Good, good, rate),
@@ -89,10 +89,10 @@ public static class BmsJudgementProfileProvider
     /// </summary>
     private static BmsJudgementWindowTable pmsTail(
         double rate,
-        (double late, double early) perfect,
-        (double late, double early) great,
-        (double late, double early) good,
-        (double late, double early) bad) => new([
+        (double slow, double fast) perfect,
+        (double slow, double fast) great,
+        (double slow, double fast) good,
+        (double slow, double fast) bad) => new([
         scaled(HitResult.Perfect, perfect, rate),
         scaled(HitResult.Great, great, rate),
         scaled(HitResult.Good, good, rate),
@@ -101,11 +101,11 @@ public static class BmsJudgementProfileProvider
 
     private static BmsJudgementWindowTable head(
         double rate,
-        (double late, double early) perfect,
-        (double late, double early) great,
-        (double late, double early) good,
-        (double late, double early) bad,
-        (double late, double early) miss) => new([
+        (double slow, double fast) perfect,
+        (double slow, double fast) great,
+        (double slow, double fast) good,
+        (double slow, double fast) bad,
+        (double slow, double fast) miss) => new([
         scaled(HitResult.Perfect, perfect, rate),
         scaled(HitResult.Great, great, rate),
         scaled(HitResult.Good, good, rate),
@@ -115,19 +115,19 @@ public static class BmsJudgementProfileProvider
 
     private static BmsJudgementWindowTable tail(
         double rate,
-        (double late, double early) perfect,
-        (double late, double early) great,
-        (double late, double early) good,
-        (double late, double early) bad) => new([
+        (double slow, double fast) perfect,
+        (double slow, double fast) great,
+        (double slow, double fast) good,
+        (double slow, double fast) bad) => new([
         scaled(HitResult.Perfect, perfect, rate),
         scaled(HitResult.Great, great, rate),
         scaled(HitResult.Good, good, rate),
         fixedWindow(HitResult.Ok, bad),
     ]);
 
-    private static BmsJudgementWindow scaled(HitResult result, (double late, double early) row, double rate)
-        => new(result, row.late * rate, row.early * rate);
+    private static BmsJudgementWindow scaled(HitResult result, (double slow, double fast) row, double rate)
+        => new(result, row.slow * rate, row.fast * rate);
 
-    private static BmsJudgementWindow fixedWindow(HitResult result, (double late, double early) row)
-        => new(result, row.late, row.early);
+    private static BmsJudgementWindow fixedWindow(HitResult result, (double slow, double fast) row)
+        => new(result, row.slow, row.fast);
 }

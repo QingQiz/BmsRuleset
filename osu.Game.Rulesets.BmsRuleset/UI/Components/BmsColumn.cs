@@ -320,7 +320,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         IsPressed = false;
 
         // Release: find the earliest held LN in this column and let it judge the key-up.
-        // We must include LNs released before the tail window (an early release is a drop,
+        // We must include LNs released before the tail window (a fast release is a drop,
         // scored as POOR) — filtering by the release window here would leave the note
         // frozen at the judgement line until its tail time passed.
         DrawableBmsHitObject? heldNote = null;

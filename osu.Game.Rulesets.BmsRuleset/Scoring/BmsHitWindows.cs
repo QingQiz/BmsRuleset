@@ -27,7 +27,7 @@ public class BmsHitWindows(int rank = 2, BmsLayoutVariant layout = BmsLayoutVari
     /// Framework-facing symmetric window derived from the active beatoraja profile.
     /// <list type="bullet">
     ///     <item>For PGREAT / GREAT / GOOD: returns the tighter side of the asymmetric window.</item>
-    ///     <item>For BAD / Meh / Miss: returns the late side (the conservative bound used by
+    ///     <item>For BAD / Meh / Miss: returns the slow side (the conservative bound used by
     ///     framework lifetime and HUD calculations).</item>
     /// </list>
     /// </summary>
@@ -36,9 +36,9 @@ public class BmsHitWindows(int rank = 2, BmsLayoutVariant layout = BmsLayoutVari
         HitResult.Perfect => table.FrameworkWindowFor(HitResult.Perfect),
         HitResult.Great => table.FrameworkWindowFor(HitResult.Great),
         HitResult.Good => table.FrameworkWindowFor(HitResult.Good),
-        HitResult.Ok => table.LateWindowFor(HitResult.Ok),
-        HitResult.Meh => table.LateWindowFor(HitResult.Ok),
-        HitResult.Miss => table.LateWindowFor(HitResult.Ok),
+        HitResult.Ok => table.SlowWindowFor(HitResult.Ok),
+        HitResult.Meh => table.SlowWindowFor(HitResult.Ok),
+        HitResult.Miss => table.SlowWindowFor(HitResult.Ok),
         _ => 0,
     };
 

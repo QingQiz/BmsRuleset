@@ -70,7 +70,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         // A held LN should visually stay attached to the judgement line until its tail passes it.
         if (holdingBody)
         {
-            // Like mania, an early hit must not stretch the LN by pulling its head to the judgement
+            // Like mania, a fast hit must not stretch the LN by pulling its head to the judgement
             // line before the chart position reaches it. A completed tail must not activate the pin later.
             var canPinHead = Time.Current >= HitObject.StartTime && !controller.TailJudged;
             headY = visualState.ResolveHeldHeadY(headY, endY, -HitTargetPosition, canPinHead, bodyDirectionBeforeTailPasses);
@@ -100,10 +100,10 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (Math.Abs(longNoteBody.Height - bodyHeight) > 0.5f)
             longNoteBody.Height = Math.Max(1, bodyHeight);
 
-        var releasedEarly =
+        var releasedFast =
             controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !holdingBody;
         longNoteBody.UpdateBody(bodyHeight, tailAtTop, controller.LongNoteStarted);
-        longNoteBody.Alpha = bodyHeight > 0 ? releasedEarly ? released_alpha : 1f : 0;
+        longNoteBody.Alpha = bodyHeight > 0 ? releasedFast ? released_alpha : 1f : 0;
 
         if (Math.Abs(longNoteTailContainer.Y - tailOffset) > 0.5f)
             longNoteTailContainer.Y = tailOffset;
@@ -111,7 +111,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (Math.Abs(longNoteTailContainer.Height - Height) > 0.5f)
             longNoteTailContainer.Height = Height;
 
-        longNoteTailContainer.Alpha = releasedEarly ? released_alpha : 1f;
+        longNoteTailContainer.Alpha = releasedFast ? released_alpha : 1f;
     }
 
     protected override void ResetKindState()

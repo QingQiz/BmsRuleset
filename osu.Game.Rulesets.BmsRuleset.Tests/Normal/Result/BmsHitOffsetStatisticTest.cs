@@ -34,8 +34,8 @@ public class BmsHitOffsetStatisticTest
         Assert.That(statistics.Overall.Count, Is.EqualTo(7));
         Assert.That(statistics.Overall.AverageOffset, Is.EqualTo(1.5).Within(0.001));
         Assert.That(statistics.Overall.StandardDeviation, Is.EqualTo(19.358).Within(0.001));
-        Assert.That(statistics.Overall.EarlyCount, Is.EqualTo(2));
-        Assert.That(statistics.Overall.LateCount, Is.EqualTo(2));
+        Assert.That(statistics.Overall.FastCount, Is.EqualTo(2));
+        Assert.That(statistics.Overall.SlowCount, Is.EqualTo(2));
         Assert.That(statistics.Overall.BinSize, Is.EqualTo(1));
         Assert.That(statistics.Overall.BinsByResult.Values, Has.All.Length.EqualTo(101));
         Assert.That(statistics.Overall.BinsByResult.Values.SelectMany(b => b).Sum(), Is.EqualTo(7));

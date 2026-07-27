@@ -159,7 +159,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
             new OsuSpriteText
             {
                 Text = $"{summary.AverageOffset:+0.0;-0.0;0.0} ms",
-                Colour = summary.AverageOffset < 0 ? early_colour : late_colour,
+                Colour = summary.AverageOffset < 0 ? fast_colour : slow_colour,
                 Font = OsuFont.GetFont(size: 12, weight: FontWeight.SemiBold),
             },
             new OsuSpriteText
@@ -230,8 +230,8 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
             binsByResult);
     }
 
-    private static readonly Color4 early_colour = new(90, 175, 255, 255);
-    private static readonly Color4 late_colour = new(255, 130, 92, 255);
+    private static readonly Color4 fast_colour = new(90, 175, 255, 255);
+    private static readonly Color4 slow_colour = new(255, 130, 92, 255);
 
     internal sealed record HitOffsetStatistics(HitOffsetSummary Overall, IReadOnlyList<KeyHitOffsetStatistics> Keys);
 
@@ -241,8 +241,8 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
         int Count,
         double AverageOffset,
         double StandardDeviation,
-        int EarlyCount,
-        int LateCount,
+        int FastCount,
+        int SlowCount,
         double BinSize,
         IReadOnlyList<HitResult> Results,
         IReadOnlyDictionary<HitResult, int[]> BinsByResult);

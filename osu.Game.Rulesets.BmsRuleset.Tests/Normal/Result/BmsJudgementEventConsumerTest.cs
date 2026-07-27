@@ -22,7 +22,7 @@ public class BmsJudgementEventConsumerTest
         Assert.Multiple(() =>
         {
             Assert.That(data.Judgements.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(1));
-            Assert.That(data.FastLate.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(2));
+            Assert.That(data.FastSlow.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(2));
         });
     }
 

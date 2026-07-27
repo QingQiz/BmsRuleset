@@ -91,7 +91,7 @@ public class BmsJudgementProfileTest
         Assert.That(rank0.ResultForOffset(184), Is.EqualTo(HitResult.None));
         Assert.That(rank4.ResultForOffset(184), Is.EqualTo(HitResult.None));
 
-        // POOR: (-175, 500) fixed, empty-poor zone on early side
+        // POOR: (-175, 500) fixed, empty-poor zone on fast side
         Assert.That(rank0.IsEmptyPoorOffset(-200), Is.True);
         Assert.That(rank4.IsEmptyPoorOffset(-200), Is.True);
     }

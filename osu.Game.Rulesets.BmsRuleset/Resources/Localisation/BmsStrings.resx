@@ -14,7 +14,7 @@
   <data name="bga_dim" xml:space="preserve"><value>BGA dim</value></data>
   <data name="visual_offset" xml:space="preserve"><value>Visual offset</value></data>
   <data name="offset_milliseconds" xml:space="preserve"><value>{0:N0} ms</value></data>
-  <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} ms - notes appear earlier; suited to players who receive more Late judgements</value></data>
+  <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} ms - notes appear earlier; suited to players who receive more Slow judgements</value></data>
   <data name="visual_offset_later" xml:space="preserve"><value>{0:N0} ms - notes appear later; suited to players who receive more Fast judgements</value></data>
   <data name="visual_offset_suggestion_note" xml:space="preserve"><value>Play a few BMS charts to receive a suggested visual offset!</value></data>
   <data name="visual_offset_suggestion_correct" xml:space="preserve"><value>Based on {0} recent plays, your visual offset is set correctly!</value></data>
@@ -69,11 +69,11 @@
   <data name="overall" xml:space="preserve"><value>Overall</value></data>
   <data name="scratch" xml:space="preserve"><value>Scratch</value></data>
   <data name="fast" xml:space="preserve"><value>fast</value></data>
-  <data name="late" xml:space="preserve"><value>late</value></data>
+  <data name="slow" xml:space="preserve"><value>slow</value></data>
   <data name="key" xml:space="preserve"><value>Key {0}</value></data>
   <data name="notes" xml:space="preserve"><value>Notes</value></data>
   <data name="judgement" xml:space="preserve"><value>Judgement</value></data>
-  <data name="fast_late" xml:space="preserve"><value>Fast/Late</value></data>
+  <data name="fast_slow" xml:space="preserve"><value>Fast/Slow</value></data>
   <data name="note" xml:space="preserve"><value>note</value></data>
   <data name="long_note" xml:space="preserve"><value>ln</value></data>
   <data name="mine" xml:space="preserve"><value>mine</value></data>

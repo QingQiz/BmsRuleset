@@ -11,7 +11,7 @@ public class BmsJudgementSelectorTest
     private static double rankRate(int rank) => BmsJudgementProfileProvider.RateForRank(rank);
 
     [Test]
-    public void TestEarlyMissRowIsEmptyPoorAndDoesNotSelectCandidate()
+    public void TestFastMissRowIsEmptyPoorAndDoesNotSelectCandidate()
     {
         var candidate = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
 
@@ -23,7 +23,7 @@ public class BmsJudgementSelectorTest
     }
 
     [Test]
-    public void TestEarlyBadConsumesCandidate()
+    public void TestFastBadConsumesCandidate()
     {
         var candidate = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
 
@@ -52,8 +52,8 @@ public class BmsJudgementSelectorTest
         var first = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
         var second = new BmsJudgementCandidate(StartTime: 1200, EndTime: 1200, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
 
-        // inputTime=1240: first note (1000) is 240ms late → BAD (outside GOOD -150 late bound).
-        // second note (1200) is 40ms late → GREAT (inside GREAT -60 bound, better than first).
+        // inputTime=1240: first note (1000) is 240ms slow → BAD (outside GOOD -150 slow bound).
+        // second note (1200) is 40ms slow → GREAT (inside GREAT -60 bound, better than first).
         var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [first, second], inputTime: 1240);
 
         Assert.That(selection.Candidate, Is.EqualTo(second));
@@ -63,7 +63,7 @@ public class BmsJudgementSelectorTest
     [Test]
     public void TestPerCandidateJudgementRateChangesResultAtSameOffset()
     {
-        // Same StartTime (1000) and inputTime (1035 → +35ms late); only the per-candidate
+        // Same StartTime (1000) and inputTime (1035 → +35ms slow); only the per-candidate
         // JudgementRate differs. At +35ms: RANK 3 (rate 1.0) → GREAT; RANK 0 (rate 0.25)
         // → GOOD — the tighter windows shrink the GREAT/GOOD bands so +35 falls through to
         // GOOD. Proves the selector judges each candidate against its OWN rate, not a global one.

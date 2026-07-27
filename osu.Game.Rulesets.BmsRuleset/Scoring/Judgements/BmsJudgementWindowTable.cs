@@ -18,7 +18,7 @@ public sealed class BmsJudgementWindowTable
         missWindow = missRows.Length == 0 ? null : missRows[0];
     }
 
-    public double GoodEarlyDTime => hitWindows.First(row => row.Result == HitResult.Good).EarlyDTime;
+    public double GoodFastDTime => hitWindows.First(row => row.Result == HitResult.Good).FastDTime;
 
     public HitResult ResultForOffset(double timeOffset)
     {
@@ -42,7 +42,7 @@ public sealed class BmsJudgementWindowTable
     public bool IsPastPassivePoorOffset(double timeOffset)
     {
         var badWindow = hitWindows.First(row => row.Result == HitResult.Ok);
-        return timeOffset > badWindow.LateOffset;
+        return timeOffset > badWindow.SlowOffset;
     }
 
     public double FrameworkWindowFor(HitResult result)
@@ -52,19 +52,19 @@ public sealed class BmsJudgementWindowTable
         if (row == null)
             return 0;
 
-        return Math.Min(Math.Abs(row.Value.LateOffset), Math.Abs(row.Value.EarlyOffset));
+        return Math.Min(Math.Abs(row.Value.SlowOffset), Math.Abs(row.Value.FastOffset));
     }
 
-    public double LateWindowFor(HitResult result)
+    public double SlowWindowFor(HitResult result)
     {
         var row = rowFor(result);
-        return row?.LateOffset ?? 0;
+        return row?.SlowOffset ?? 0;
     }
 
-    public double EarlyWindowFor(HitResult result)
+    public double FastWindowFor(HitResult result)
     {
         var row = rowFor(result);
-        return row?.EarlyOffset ?? 0;
+        return row?.FastOffset ?? 0;
     }
 
     private BmsJudgementWindow? rowFor(HitResult result)

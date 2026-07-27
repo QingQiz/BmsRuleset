@@ -145,7 +145,7 @@ internal sealed class BmsLongNoteJudgementController
     public double ChargeTailLifetimeEnd()
     {
         var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.EffectiveJudgementRate, tail: true);
-        return ln.EndTime + tailTable.LateWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
+        return ln.EndTime + tailTable.SlowWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
     }
 
     /// <summary>
