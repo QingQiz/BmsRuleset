@@ -172,10 +172,14 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
         var earliestVisibleTime = hitObject.StartTime;
         var laterTime = hitObject.StartTime;
         var laterVisible = true;
+        // Early notes can enter during gameplay lead-in, while the maximum supported scroll window
+        // keeps the search bounded when a stationary timing segment remains visible indefinitely.
+        var earliestSearchTime = Math.Min(0, hitObject.StartTime
+                                             - BmsScrollController.MAX_TIME_RANGE * currentScrollRangeScale() * scrollController.PlaybackRate);
 
-        for (var probeTime = hitObject.StartTime; probeTime > 0;)
+        for (var probeTime = hitObject.StartTime; probeTime > earliestSearchTime;)
         {
-            var nextProbeTime = Math.Max(0, probeTime - visible_window_search_step);
+            var nextProbeTime = Math.Max(earliestSearchTime, probeTime - visible_window_search_step);
             var nextVisible = isVisibleAt(hitObject, timingMap, nextProbeTime);
 
             if (nextVisible)

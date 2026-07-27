@@ -93,6 +93,45 @@ public partial class BmsGameplayVirtualisationTest
     }
 
     [Test]
+    public void TestEarlyHitObjectLifetimeStartsDuringLeadIn()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            [
+                new BmsMeasureInfo(0, 0, 192, 1),
+                new BmsMeasureInfo(1, 192, 192, 1),
+            ],
+            [new BmsBpmEvent(0, 120, 0)],
+            [],
+            [],
+            [],
+            120);
+        var hitObject = new BmsHitObject
+        {
+            StartTime = 500,
+            Column = 1,
+        };
+        hitObject.ScrollPositionAtStartTime = timingMap.GetScrollPositionAtTime(hitObject.StartTime);
+
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TimingMap = timingMap,
+            HitObjects = { hitObject },
+        }));
+
+        playfield.Add(hitObject);
+        playfield.RefreshAllLifetimes();
+
+        var entry = playfield.Stage.Columns[hitObject.Column].HitObjectContainer.Entries.Single();
+        var expectedVisibleStart = hitObject.StartTime - BmsDrawableRuleset.ComputeScrollTime(8);
+
+        Assert.That(entry.LifetimeStart, Is.EqualTo(expectedVisibleStart).Within(1));
+        Assert.That(entry.LifetimeStart, Is.LessThan(0));
+    }
+
+    [Test]
     public void TestAlephAnotherCombo841LifetimeStartsBeforeVisibleWindow()
     {
         var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "Aleph-0 (by LeaF)", "_14ANOTHER.bms"));
