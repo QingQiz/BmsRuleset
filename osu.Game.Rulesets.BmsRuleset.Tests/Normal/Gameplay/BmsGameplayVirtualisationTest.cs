@@ -132,6 +132,31 @@ public partial class BmsGameplayVirtualisationTest
     }
 
     [Test]
+    public void TestPositiveVisualOffsetStartsLifetimeEarlier()
+    {
+        var hitObject = new BmsHitObject
+        {
+            StartTime = 3000,
+            Column = 1,
+        };
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            HitObjects = { hitObject },
+        }));
+
+        playfield.VisualOffset.Value = 500;
+        playfield.Add(hitObject);
+        playfield.RefreshAllLifetimes();
+
+        var entry = playfield.Stage.Columns[hitObject.Column].HitObjectContainer.Entries.Single();
+        var expectedVisibleStart = hitObject.StartTime - BmsDrawableRuleset.ComputeScrollTime(8) - 500;
+
+        Assert.That(entry.LifetimeStart, Is.EqualTo(expectedVisibleStart).Within(1));
+    }
+
+    [Test]
     public void TestAlephAnotherCombo841LifetimeStartsBeforeVisibleWindow()
     {
         var beatmap = decodeFilesystemBeatmap(Path.Combine(findTestSongsRoot(), "Aleph-0 (by LeaF)", "_14ANOTHER.bms"));

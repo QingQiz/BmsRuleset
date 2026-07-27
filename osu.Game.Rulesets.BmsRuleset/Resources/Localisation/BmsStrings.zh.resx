@@ -12,6 +12,16 @@
   <data name="standard_deviation" xml:space="preserve"><value>标准差 {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>基准 BPM</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA 暗化</value></data>
+  <data name="visual_offset" xml:space="preserve"><value>视觉偏移</value></data>
+  <data name="offset_milliseconds" xml:space="preserve"><value>{0:N0} 毫秒</value></data>
+  <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} 毫秒 - 音符提前显示；适合 Late 较多的玩家</value></data>
+  <data name="visual_offset_later" xml:space="preserve"><value>{0:N0} 毫秒 - 音符延后显示；适合 Fast 较多的玩家</value></data>
+  <data name="visual_offset_suggestion_note" xml:space="preserve"><value>游玩几张 BMS 谱面后即可获得建议的视觉偏移！</value></data>
+  <data name="visual_offset_suggestion_correct" xml:space="preserve"><value>根据最近 {0} 次游玩，当前视觉偏移设置正确！</value></data>
+  <data name="visual_offset_suggestion_received" xml:space="preserve"><value>根据最近 {0} 次游玩，建议的视觉偏移为 {1}。</value></data>
+  <data name="apply_suggested_visual_offset" xml:space="preserve"><value>应用建议的视觉偏移</value></data>
+  <data name="adjust_visual_offset_automatically" xml:space="preserve"><value>自动调整视觉偏移</value></data>
+  <data name="adjust_visual_offset_automatically_tooltip" xml:space="preserve"><value>每次有效的 BMS 游玩结束后，自动应用建议的视觉偏移。</value></data>
   <data name="bga_fill_screen" xml:space="preserve"><value>铺满屏幕</value></data>
   <data name="bga_fill_screen_description" xml:space="preserve"><value>让 BGA 覆盖整个 HUD 区域。移动或调整组件大小会自动关闭此选项。</value></data>
   <data name="use_dedicated_preview_audio" xml:space="preserve"><value>使用专用预览音频</value></data>
@@ -207,8 +217,6 @@
   <data name="auto_hide_delay_description" xml:space="preserve"><value>连击数停止增长后经过多少秒隐藏计数器。设为 -1 则永不自动隐藏。</value></data>
   <data name="min_visible_combo" xml:space="preserve"><value>最低可见连击数</value></data>
   <data name="min_visible_combo_description" xml:space="preserve"><value>显示计数器所需的最低连击数。</value></data>
-  <data name="score_graph" xml:space="preserve"><value>成绩图</value></data>
-  <data name="score_graph_maximum" xml:space="preserve"><value>最高 {0:D4}</value></data>
   <data name="score_graph_current" xml:space="preserve"><value>当前成绩</value></data>
   <data name="score_graph_personal_best" xml:space="preserve"><value>个人最好</value></data>
   <data name="score_graph_personal_best_short" xml:space="preserve"><value>最好</value></data>

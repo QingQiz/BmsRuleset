@@ -12,6 +12,16 @@
   <data name="standard_deviation" xml:space="preserve"><value>SD {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>Reference BPM</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA dim</value></data>
+  <data name="visual_offset" xml:space="preserve"><value>Visual offset</value></data>
+  <data name="offset_milliseconds" xml:space="preserve"><value>{0:N0} ms</value></data>
+  <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} ms - notes appear earlier; suited to players who receive more Late judgements</value></data>
+  <data name="visual_offset_later" xml:space="preserve"><value>{0:N0} ms - notes appear later; suited to players who receive more Fast judgements</value></data>
+  <data name="visual_offset_suggestion_note" xml:space="preserve"><value>Play a few BMS charts to receive a suggested visual offset!</value></data>
+  <data name="visual_offset_suggestion_correct" xml:space="preserve"><value>Based on {0} recent plays, your visual offset is set correctly!</value></data>
+  <data name="visual_offset_suggestion_received" xml:space="preserve"><value>Based on {0} recent plays, the suggested visual offset is {1}.</value></data>
+  <data name="apply_suggested_visual_offset" xml:space="preserve"><value>Apply suggested visual offset</value></data>
+  <data name="adjust_visual_offset_automatically" xml:space="preserve"><value>Adjust visual offset automatically</value></data>
+  <data name="adjust_visual_offset_automatically_tooltip" xml:space="preserve"><value>Automatically apply the visual offset suggested by each valid BMS play.</value></data>
   <data name="bga_fill_screen" xml:space="preserve"><value>Fill screen</value></data>
   <data name="bga_fill_screen_description" xml:space="preserve"><value>Display the BGA across the full HUD area. Moving or resizing the component disables this.</value></data>
   <data name="use_dedicated_preview_audio" xml:space="preserve"><value>Use dedicated preview audio</value></data>
@@ -207,8 +217,6 @@
   <data name="auto_hide_delay_description" xml:space="preserve"><value>Seconds before combo counter hides when combo hasn't grown. Set to -1 to never auto-hide.</value></data>
   <data name="min_visible_combo" xml:space="preserve"><value>Min visible combo</value></data>
   <data name="min_visible_combo_description" xml:space="preserve"><value>Minimum combo count for the counter to be visible.</value></data>
-  <data name="score_graph" xml:space="preserve"><value>Score graph</value></data>
-  <data name="score_graph_maximum" xml:space="preserve"><value>MAX {0:D4}</value></data>
   <data name="score_graph_current" xml:space="preserve"><value>Current</value></data>
   <data name="score_graph_personal_best" xml:space="preserve"><value>Personal best</value></data>
   <data name="score_graph_personal_best_short" xml:space="preserve"><value>Best</value></data>

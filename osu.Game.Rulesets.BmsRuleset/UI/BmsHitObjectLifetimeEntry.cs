@@ -9,7 +9,10 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
-internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollController scrollController)
+internal sealed class BmsHitObjectLifetimeEntry(
+    HitObject hitObject,
+    BmsScrollController scrollController,
+    Func<double> getVisualOffset)
     : HitObjectLifetimeEntry(hitObject)
 {
 
@@ -73,7 +76,7 @@ internal sealed class BmsHitObjectLifetimeEntry(HitObject hitObject, BmsScrollCo
         if (HitObject is not BmsHitObject hitObject)
             return;
 
-        var futureLifetime = computeFutureLifetime(hitObject);
+        var futureLifetime = computeFutureLifetime(hitObject) + Math.Max(0, getVisualOffset()) * scrollController.PlaybackRate;
         var pastLifetime = computePastLifetime();
         var lateWindow = getLateWindow(hitObject);
         var lifetimeStart = hitObject.StartTime - futureLifetime;

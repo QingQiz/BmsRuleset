@@ -106,6 +106,16 @@ otherwise be silent in song select can still be heard before playing.
 
 Disable **Use dedicated preview audio** in the BMS settings to always use the BGM and keysound timeline.
 
+### Visual Offset Calibration
+
+Adjust when notes reach the judgement line without shifting audio, judgement timing, scoring, or keysound playback.
+Positive visual offsets display notes earlier and suit players who receive more Late judgements. Negative values
+display notes later and suit players who receive more Fast judgements.
+
+Valid local plays contribute visual-offset suggestions based on their median hit error. The BMS settings show recent
+suggestions and can apply their average manually, or automatically apply each new suggestion after a play. Replays,
+automatic play, and plays with fewer than 50 timed hits are excluded from calibration.
+
 ### Clear Lamps
 
 Song select shows your best matching local clear status, from No Play and Failed through Assist Easy, Easy, Normal,

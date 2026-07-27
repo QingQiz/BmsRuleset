@@ -10,6 +10,7 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
@@ -205,6 +206,24 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Action = confirmDeleteAllBmsFiles,
                 Padding = SettingsPanel.CONTENT_PADDING,
             },
+            new OsuSpriteText
+            {
+                Text = BmsStrings.VisualOffset,
+                Font = OsuFont.GetFont(size: 18),
+                Margin = new MarginPadding { Vertical = VERTICAL_PADDING },
+                Padding = SettingsPanel.CONTENT_PADDING,
+            },
+            new VisualOffsetAdjustControl
+            {
+                Current = manager.GetBindable<double>(BmsRulesetSetting.VisualOffset),
+                Margin = new MarginPadding { Bottom = 5 },
+            },
+            new SettingsItemV2(new FormCheckBox
+            {
+                Caption = BmsStrings.AdjustVisualOffsetAutomatically,
+                HintText = BmsStrings.AdjustVisualOffsetAutomaticallyTooltip,
+                Current = manager.GetBindable<bool>(BmsRulesetSetting.AutomaticallyAdjustVisualOffset),
+            }),
             new DifficultyTableSettings(manager),
         ];
     }

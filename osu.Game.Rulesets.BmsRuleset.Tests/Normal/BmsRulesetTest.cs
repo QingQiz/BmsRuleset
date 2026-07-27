@@ -79,6 +79,41 @@ public class BmsRulesetTest
     }
 
     [Test]
+    public void TestVisualOffsetDefaultsAndRange()
+    {
+        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
+
+        Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.Zero);
+        Assert.That(config.Get<bool>(BmsRulesetSetting.AutomaticallyAdjustVisualOffset), Is.False);
+
+        config.SetValue(BmsRulesetSetting.VisualOffset, 1000d);
+        Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.EqualTo(BmsRulesetConfigManager.MAX_VISUAL_OFFSET));
+
+        config.SetValue(BmsRulesetSetting.VisualOffset, -1000d);
+        Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.EqualTo(BmsRulesetConfigManager.MIN_VISUAL_OFFSET));
+    }
+
+    [Test]
+    public void TestAutomaticVisualOffsetAppliesSuggestion()
+    {
+        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
+        BmsRulesetRuntime.VisualOffsetSuggestions.Clear();
+
+        try
+        {
+            config.SetValue(BmsRulesetSetting.VisualOffset, 10d);
+            config.SetValue(BmsRulesetSetting.AutomaticallyAdjustVisualOffset, true);
+
+            Assert.That(BmsDrawableRuleset.AddVisualOffsetSuggestion(config, 20), Is.EqualTo(30));
+            Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.EqualTo(30));
+        }
+        finally
+        {
+            BmsRulesetRuntime.VisualOffsetSuggestions.Clear();
+        }
+    }
+
+    [Test]
     public void TestDedicatedPreviewAudioSettingUpdatesCurrentValue()
     {
         using var config = (BmsRulesetConfigManager)ruleset.CreateConfig(null);

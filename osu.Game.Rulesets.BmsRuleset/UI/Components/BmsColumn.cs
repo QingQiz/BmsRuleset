@@ -134,7 +134,10 @@ public partial class BmsColumn : Playfield, IBmsColumn
         => new BmsColumnHitObjectContainer(ParentPlayfield.ScrollController, () => HitTargetPosition, () => ParentPlayfield.IsResumeRewinding);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
-        => new BmsHitObjectLifetimeEntry(hitObject, ParentPlayfield.ScrollController);
+        => new BmsHitObjectLifetimeEntry(
+            hitObject,
+            ParentPlayfield.ScrollController,
+            () => ParentPlayfield.VisualOffset.Value);
 
     protected override void LoadComplete()
     {

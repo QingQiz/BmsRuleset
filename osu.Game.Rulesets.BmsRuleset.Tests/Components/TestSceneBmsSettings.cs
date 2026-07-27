@@ -8,9 +8,11 @@ using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.IO.Import;
+using osu.Game.Rulesets.BmsRuleset.Settings.Components;
 using osu.Game.Tests.Visual;
 using DT = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
 
@@ -32,6 +34,7 @@ public partial class TestSceneBmsSettings : OsuTestScene
     {
         storage = new TemporaryNativeStorage($"{nameof(TestSceneBmsSettings)}-{Guid.NewGuid()}");
         previousStore = BmsRulesetRuntime.DifficultyTableStore;
+        BmsRulesetRuntime.VisualOffsetSuggestions.Clear();
 
         var syncManager = new CollectionSyncManager();
         var store = new DifficultyTableStore(null, storage.GetFullPath("difficulty-tables"), syncManager);
@@ -66,6 +69,7 @@ public partial class TestSceneBmsSettings : OsuTestScene
         base.Dispose(isDisposing);
 
         BmsRulesetRuntime.DifficultyTableStore = previousStore;
+        BmsRulesetRuntime.VisualOffsetSuggestions.Clear();
         storage.Dispose();
     }
 
@@ -91,6 +95,19 @@ public partial class TestSceneBmsSettings : OsuTestScene
             getTableHeader("Local Practice Table with a long name that wraps across multiple lines").TriggerClickWithSound();
         });
         AddStep("scroll to difficulty tables", () => scroll.ScrollTo(getTableHeader("Satellite Difficulty Table"), false));
+    }
+
+    [Test]
+    public void TestVisualOffsetSuggestionCanBeApplied()
+    {
+        VisualOffsetAdjustControl control = null!;
+
+        AddStep("get visual offset control", () => control = settings.ChildrenOfType<VisualOffsetAdjustControl>().Single());
+        AddStep("add visual offset suggestion", () => BmsRulesetRuntime.VisualOffsetSuggestions.Add(20, 0));
+        AddUntilStep("suggestion is displayed", () => control.SuggestedOffset.Value == 20);
+        AddStep("apply suggestion", () => control.ChildrenOfType<RoundedButton>().Single().TriggerClick());
+        AddAssert("visual offset is updated", () => control.Current.Value == 20);
+        AddAssert("suggestion history is cleared", () => BmsRulesetRuntime.VisualOffsetSuggestions.History.Count == 0);
     }
 
     private OsuClickableContainer getTableHeader(string tableName) => settings.ChildrenOfType<OsuClickableContainer>()

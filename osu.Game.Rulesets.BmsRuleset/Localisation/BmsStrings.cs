@@ -31,6 +31,30 @@ public static class BmsStrings
 
     public static LocalisableString BgaDim => get("bga_dim");
 
+    public static LocalisableString VisualOffset => get("visual_offset");
+
+    public static LocalisableString OffsetMilliseconds(double value) => get("offset_milliseconds", value);
+
+    public static LocalisableString VisualOffsetTooltip(double value) => value switch
+    {
+        > 0 => get("visual_offset_earlier", value),
+        < 0 => get("visual_offset_later", value),
+        _ => OffsetMilliseconds(value),
+    };
+
+    public static LocalisableString VisualOffsetSuggestionNote => get("visual_offset_suggestion_note");
+
+    public static LocalisableString VisualOffsetSuggestionCorrect(int plays) => get("visual_offset_suggestion_correct", plays);
+
+    public static LocalisableString VisualOffsetSuggestionReceived(int plays, LocalisableString value) =>
+        get("visual_offset_suggestion_received", plays, value);
+
+    public static LocalisableString ApplySuggestedVisualOffset => get("apply_suggested_visual_offset");
+
+    public static LocalisableString AdjustVisualOffsetAutomatically => get("adjust_visual_offset_automatically");
+
+    public static LocalisableString AdjustVisualOffsetAutomaticallyTooltip => get("adjust_visual_offset_automatically_tooltip");
+
     public static LocalisableString BgaFillScreen => get("bga_fill_screen");
 
     public static LocalisableString BgaFillScreenDescription => get("bga_fill_screen_description");
@@ -102,10 +126,6 @@ public static class BmsStrings
     public static LocalisableString MinVisibleCombo => get("min_visible_combo");
 
     public static LocalisableString MinVisibleComboDescription => get("min_visible_combo_description");
-
-    public static LocalisableString ScoreGraph => get("score_graph");
-
-    public static LocalisableString ScoreGraphMaximum(int score) => get("score_graph_maximum", score);
 
     public static LocalisableString ScoreGraphCurrent => get("score_graph_current");
 

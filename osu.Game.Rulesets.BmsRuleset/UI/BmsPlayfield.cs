@@ -1,5 +1,6 @@
 ﻿using System;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Bindings;
@@ -10,7 +11,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
@@ -147,6 +147,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public BmsTimingMap? TimingMap { get; }
 
     internal BmsScrollController ScrollController { get; }
+
+    /// <summary>
+    /// Applied only to predictable scrolling visuals so judgements remain based on <c>Time.Current</c>.
+    /// </summary>
+    internal BindableDouble VisualOffset { get; } = new();
 
     #endregion
 
@@ -308,6 +313,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         return initialOffset * Math.Pow(1 - progress, 3);
     }
 
+    internal static double ComputeDisplayTime(double currentTime, double visualOffset, double playbackRate, double resumeRewindOffset) =>
+        currentTime + visualOffset * playbackRate + resumeRewindOffset;
+
     [BackgroundDependencyLoader(true)]
     private void load()
     {
@@ -318,7 +326,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         skinCache.WarmLongNoteTextures(Beatmap, host.Renderer);
     }
 
-    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) => new BmsHitObjectLifetimeEntry(hitObject, ScrollController);
+    protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject) =>
+        new BmsHitObjectLifetimeEntry(hitObject, ScrollController, () => VisualOffset.Value);
 
     protected override void LoadComplete()
     {
@@ -336,6 +345,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             }
         }
 
+        VisualOffset.BindValueChanged(_ => RefreshAllLifetimes());
         RefreshAllLifetimes();
     }
 
@@ -344,8 +354,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (IsResumeRewindAnimating && Time.Elapsed > 0)
             resumeRewindAnimationElapsed += Time.Elapsed / Math.Max(Math.Abs(Clock.Rate), 0.01);
 
-        var visualOffset = ComputeResumeRewindVisualOffset(resumeRewindInitialVisualOffset, resumeRewindAnimationElapsed);
-        DisplayTime = Time.Current + visualOffset;
+        var resumeRewindOffset = ComputeResumeRewindVisualOffset(resumeRewindInitialVisualOffset, resumeRewindAnimationElapsed);
+        DisplayTime = ComputeDisplayTime(Time.Current, VisualOffset.Value, ScrollController.PlaybackRate, resumeRewindOffset);
         ScrollController.Update(DisplayTime);
 
         // Playfield.Update normally reverts results newer than the clock. During the resume lead-in,

@@ -9,6 +9,8 @@ internal static class BmsRulesetRuntime
 
     internal static DifficultyTableStore? DifficultyTableStore { get; set; }
 
+    internal static BmsVisualOffsetSuggestionStore VisualOffsetSuggestions { get; } = new();
+
     internal static BmsReferenceBpmMode CurrentReferenceBpmMode =>
         ConfigManager?.Get<BmsReferenceBpmMode>(BmsRulesetSetting.ReferenceBpmMode) ?? BmsReferenceBpmMode.MainBpm;
 

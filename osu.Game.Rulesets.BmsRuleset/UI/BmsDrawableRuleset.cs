@@ -17,7 +17,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Mods;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
@@ -245,11 +244,43 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             if (!passed)
                 scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
 
+            recordVisualOffsetSuggestion();
             return;
         }
 
         if (healthProcessor.Health.Value < 0.8)
             scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
+
+        recordVisualOffsetSuggestion();
+    }
+
+    private void recordVisualOffsetSuggestion()
+    {
+        if (ReplayScore != null || gameplayState == null || Config is not BmsRulesetConfigManager config)
+            return;
+
+        if (gameplayState.Mods.Any(mod => !mod.UserPlayable))
+            return;
+
+        var hitEvents = gameplayState.Score.ScoreInfo.HitEvents;
+
+        if (hitEvents.Count(HitEventExtensions.AffectsUnstableRate) < 50
+            || hitEvents.CalculateMedianHitError() is not double medianHitError)
+            return;
+
+        AddVisualOffsetSuggestion(config, medianHitError);
+    }
+
+    internal static double AddVisualOffsetSuggestion(BmsRulesetConfigManager config, double medianHitError)
+    {
+        var suggestion = BmsRulesetRuntime.VisualOffsetSuggestions.Add(
+            medianHitError,
+            config.Get<double>(BmsRulesetSetting.VisualOffset));
+
+        if (config.Get<bool>(BmsRulesetSetting.AutomaticallyAdjustVisualOffset))
+            config.SetValue(BmsRulesetSetting.VisualOffset, suggestion);
+
+        return suggestion;
     }
 
     [BackgroundDependencyLoader]
@@ -275,6 +306,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (Config is BmsRulesetConfigManager config)
         {
             config.BindWith(BmsRulesetSetting.BgaDim, BgaDim);
+            config.BindWith(BmsRulesetSetting.VisualOffset, ((BmsPlayfield)Playfield).VisualOffset);
             ((BmsPlayfield)Playfield).ScrollController.SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
         }
 
