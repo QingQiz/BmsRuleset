@@ -6,6 +6,7 @@ using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Audio;
 using osu.Framework.Testing;
+using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
@@ -32,6 +33,23 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     public void LateBackgroundEventRequiresReconstruction(double eventTime, double currentTime, bool expected)
     {
         Assert.That(BmsBackgroundAudioPlayer.IsEventTooLateForDirectStart(eventTime, currentTime), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void BackgroundPlayerUsesRawAudioClock()
+    {
+        var audioClock = new ManualClock { CurrentTime = 250 };
+        var player = new BmsBackgroundAudioPlayer([], new BindableBool());
+
+        player.UseAudioClock(audioClock);
+        player.Clock.ProcessFrame();
+
+        Assert.That(player.Clock.CurrentTime, Is.EqualTo(250));
+
+        audioClock.CurrentTime = 500;
+        player.Clock.ProcessFrame();
+
+        Assert.That(player.Clock.CurrentTime, Is.EqualTo(500));
     }
 
     [Test]

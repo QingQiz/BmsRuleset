@@ -81,6 +81,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
     private readonly BindableBool backgroundAudioPaused = new(true);
 
+    private BmsBackgroundAudioPlayer backgroundAudioPlayer = null!;
+
     private BmsPreviewTrack? previewTrackBeforePlay;
 
     [Cached]
@@ -301,7 +303,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
         // This component also coordinates pause/seek blocking for KeySounds in the shared Track
         // store, so it must exist even when the chart has no background sample events.
-        FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events, backgroundAudioPaused));
+        FrameStableComponents.Add(backgroundAudioPlayer = new BmsBackgroundAudioPlayer(events, backgroundAudioPaused));
 
         if (Config is BmsRulesetConfigManager config)
         {
@@ -408,6 +410,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (previewTrackBeforePlay == null)
             return;
 
+        backgroundAudioPlayer.UseAudioClock(previewTrackBeforePlay);
         BmsWorkingBeatmap.SwitchActivePreviewToGameplayClockOnly();
         stoppedPreviewForGameplay = true;
     }

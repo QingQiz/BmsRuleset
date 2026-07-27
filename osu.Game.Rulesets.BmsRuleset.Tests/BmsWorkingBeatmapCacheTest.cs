@@ -16,8 +16,10 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
+using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -192,6 +194,12 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             && previewTrack.Volume.Value == 1
             && getActivePreviewPlaybackCount(previewTrack) == 0);
         AddAssert("gameplay clock track is still running", () => previewTrack.IsRunning);
+        AddAssert("background audio uses raw preview clock", () =>
+        {
+            var playerClock = drawableRuleset.ChildrenOfType<BmsBackgroundAudioPlayer>().Single().Clock;
+            return playerClock is FramedClock
+                   && Math.Abs(playerClock.CurrentTime - previewTrack.CurrentTime) < 50;
+        });
 
         AddStep("dispose drawable ruleset while gameplay is running", () => drawableRuleset.RemoveAndDisposeImmediately());
         AddAssert("preview is restored after gameplay disposal", () =>
