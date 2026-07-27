@@ -208,7 +208,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             },
             new OsuSpriteText
             {
-                Text = BmsStrings.VisualOffset,
+                Text = BmsStrings.BmsVisualOffset,
                 Font = OsuFont.GetFont(size: 18),
                 Margin = new MarginPadding { Vertical = VERTICAL_PADDING },
                 Padding = SettingsPanel.CONTENT_PADDING,

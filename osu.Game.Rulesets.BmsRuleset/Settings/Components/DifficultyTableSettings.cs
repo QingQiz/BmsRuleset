@@ -82,7 +82,7 @@ internal partial class DifficultyTableSettings : FillFlowContainer
         [
             new OsuSpriteText
             {
-                Text = BmsStrings.DifficultyTables,
+                Text = BmsStrings.BmsDifficultyTables,
                 Font = OsuFont.GetFont(size: 18),
                 Margin = new MarginPadding { Vertical = SettingsSubsection.VERTICAL_PADDING },
                 Padding = SettingsPanel.CONTENT_PADDING,

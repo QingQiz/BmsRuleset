@@ -13,6 +13,7 @@
   <data name="reference_bpm" xml:space="preserve"><value>基准 BPM</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA 暗化</value></data>
   <data name="visual_offset" xml:space="preserve"><value>视觉偏移</value></data>
+  <data name="bms_visual_offset" xml:space="preserve"><value>BMS 视觉偏移</value></data>
   <data name="offset_milliseconds" xml:space="preserve"><value>{0:N0} 毫秒</value></data>
   <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} 毫秒 - 音符提前显示；适合 Slow 较多的玩家</value></data>
   <data name="visual_offset_later" xml:space="preserve"><value>{0:N0} 毫秒 - 音符延后显示；适合 Fast 较多的玩家</value></data>
@@ -36,7 +37,7 @@
   <data name="cleanup_orphaned_sets" xml:space="preserve"><value>清理失去源文件的 BMS 谱面集</value></data>
   <data name="cleanup_orphaned_sets_tooltip" xml:space="preserve"><value>移除源文件（音频、图片）已无法在磁盘上找到的 BMS 谱面</value></data>
   <data name="delete_all_imported_files" xml:space="preserve"><value>删除所有已导入的 BMS 文件</value></data>
-  <data name="difficulty_tables" xml:space="preserve"><value>难度表</value></data>
+  <data name="bms_difficulty_tables" xml:space="preserve"><value>BMS 难度表</value></data>
   <data name="difficulty_table_warning" xml:space="preserve"><value>在选歌界面添加或移除难度表可能导致界面卡顿，请先返回主菜单。</value></data>
   <data name="delete_all_confirmation" xml:space="preserve"><value>所有已导入的 BMS 谱面都将被永久删除，此操作无法撤销！</value></data>
   <data name="cleanup_orphans_confirmation" xml:space="preserve"><value>源目录已不存在的 BMS 谱面将被移除，此操作无法撤销。&#10;&#10;删除后需要重新导入。若要保留这些谱面，请立即取消并将文件移回原位置。</value></data>

@@ -33,6 +33,8 @@ public static class BmsStrings
 
     public static LocalisableString VisualOffset => get("visual_offset");
 
+    public static LocalisableString BmsVisualOffset => get("bms_visual_offset");
+
     public static LocalisableString OffsetMilliseconds(double value) => get("offset_milliseconds", value);
 
     public static LocalisableString VisualOffsetTooltip(double value) => value switch
@@ -214,7 +216,7 @@ public static class BmsStrings
 
     public static LocalisableString DeleteAllImportedFiles => get("delete_all_imported_files");
 
-    public static LocalisableString DifficultyTables => get("difficulty_tables");
+    public static LocalisableString BmsDifficultyTables => get("bms_difficulty_tables");
 
     public static LocalisableString DifficultyTableWarning => get("difficulty_table_warning");
 

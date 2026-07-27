@@ -13,6 +13,7 @@
   <data name="reference_bpm" xml:space="preserve"><value>Reference BPM</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA dim</value></data>
   <data name="visual_offset" xml:space="preserve"><value>Visual offset</value></data>
+  <data name="bms_visual_offset" xml:space="preserve"><value>BMS Visual offset</value></data>
   <data name="offset_milliseconds" xml:space="preserve"><value>{0:N0} ms</value></data>
   <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} ms - notes appear earlier; suited to players who receive more Slow judgements</value></data>
   <data name="visual_offset_later" xml:space="preserve"><value>{0:N0} ms - notes appear later; suited to players who receive more Fast judgements</value></data>
@@ -36,7 +37,7 @@
   <data name="cleanup_orphaned_sets" xml:space="preserve"><value>Clean up orphaned BMS sets</value></data>
   <data name="cleanup_orphaned_sets_tooltip" xml:space="preserve"><value>Removes BMS beatmaps whose source files (audio, images) can no longer be found on disk</value></data>
   <data name="delete_all_imported_files" xml:space="preserve"><value>Delete all imported BMS files</value></data>
-  <data name="difficulty_tables" xml:space="preserve"><value>Difficulty Tables</value></data>
+  <data name="bms_difficulty_tables" xml:space="preserve"><value>BMS Difficulty Tables</value></data>
   <data name="difficulty_table_warning" xml:space="preserve"><value>Adding or removing difficulty tables while on the song select screen may freeze the UI. Switch to the main menu first.</value></data>
   <data name="delete_all_confirmation" xml:space="preserve"><value>All imported BMS beatmaps will be permanently deleted. This cannot be undone!</value></data>
   <data name="cleanup_orphans_confirmation" xml:space="preserve"><value>BMS beatmaps whose source directory no longer exists will be removed. This cannot be undone.&#10;&#10;After deletion, you will need to re-import them. Cancel now and move the files back to their original location if you want to keep them.</value></data>
