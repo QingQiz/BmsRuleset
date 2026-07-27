@@ -38,14 +38,27 @@ public class BmsLongNoteModeModsTest
         Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.LongNote));
     }
 
-    [Test]
-    public void TestLockedChartIgnoresModeMods()
+    [TestCase(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.LongNote, BmsLongNoteMode.HellChargeNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote, BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, BmsLongNoteMode.ChargeNote)]
+    public void TestModeModOverridesLockedMode(BmsLongNoteMode targetMode, BmsLongNoteMode lockedMode)
     {
-        var beatmap = createBeatmap(BmsLongNoteMode.ChargeNote);
+        var beatmap = createBeatmap(lockedMode);
 
-        new BmsModHellChargeNote().ApplyToBeatmap(beatmap);
+        BmsModLongNoteModeBase mod = targetMode switch
+        {
+            BmsLongNoteMode.LongNote => new BmsModLongNote(),
+            BmsLongNoteMode.ChargeNote => new BmsModChargeNote(),
+            BmsLongNoteMode.HellChargeNote => new BmsModHellChargeNote(),
+            _ => throw new System.ArgumentOutOfRangeException(nameof(targetMode)),
+        };
 
-        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().Beatmap.LockedLongNoteMode, Is.EqualTo(BmsLongNoteMode.ChargeNote));
+        mod.ApplyToBeatmap(beatmap);
+
+        Assert.That(beatmap.HitObjects.OfType<BmsLongNote>().Single().Beatmap.LockedLongNoteMode, Is.EqualTo(targetMode));
     }
 
     [Test]

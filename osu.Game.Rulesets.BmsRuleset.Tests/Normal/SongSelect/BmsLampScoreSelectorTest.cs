@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -124,6 +125,32 @@ public class BmsLampScoreSelectorTest
         Assert.That(BmsLampScoreSelector.SelectBest([hideScratchConstantScore], [new BmsModHideScratch()]), Is.Null);
         Assert.That(BmsLampScoreSelector.SelectBest([hideScratchConstantScore], [new BmsModHideScratch(), new BmsModConstant(), new BmsModHalfTime()]), Is.SameAs(hideScratchConstantScore));
         Assert.That(BmsLampScoreSelector.SelectBest([hideScratchConstantScore], [new BmsModHideScratch(), new BmsModHalfTime()]), Is.Null);
+    }
+
+    [TestCase(typeof(BmsModLongNote))]
+    [TestCase(typeof(BmsModChargeNote))]
+    [TestCase(typeof(BmsModHellChargeNote))]
+    public void TestLongNoteModeModsUseDifficultyReductionMatching(Type modType)
+    {
+        var noModScore = score(900);
+        var modeScore = score(1_000, create(modType));
+
+        Assert.That(BmsLampScoreSelector.SelectBest([modeScore, noModScore], []), Is.SameAs(noModScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([noModScore], [create(modType)]), Is.SameAs(noModScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([modeScore], [create(modType)]), Is.SameAs(modeScore));
+    }
+
+    [TestCase(typeof(BmsModLongNote), typeof(BmsModChargeNote))]
+    [TestCase(typeof(BmsModLongNote), typeof(BmsModHellChargeNote))]
+    [TestCase(typeof(BmsModChargeNote), typeof(BmsModLongNote))]
+    [TestCase(typeof(BmsModChargeNote), typeof(BmsModHellChargeNote))]
+    [TestCase(typeof(BmsModHellChargeNote), typeof(BmsModLongNote))]
+    [TestCase(typeof(BmsModHellChargeNote), typeof(BmsModChargeNote))]
+    public void TestDifferentLongNoteModeScoresDoNotMatch(Type scoreModType, Type selectedModType)
+    {
+        var modeScore = score(1_000, create(scoreModType));
+
+        Assert.That(BmsLampScoreSelector.SelectBest([modeScore], [create(selectedModType)]), Is.Null);
     }
 
     [Test]

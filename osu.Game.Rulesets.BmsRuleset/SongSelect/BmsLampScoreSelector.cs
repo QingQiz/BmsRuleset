@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 
@@ -32,6 +33,9 @@ public static class BmsLampScoreSelector
         reductionModMatches<BmsModHideScratch>(score.Mods, selectedMods) &&
         reductionModMatches<BmsModAutoScratch>(score.Mods, selectedMods) &&
         reductionModMatches<BmsModConstant>(score.Mods, selectedMods) &&
+        reductionModMatches<BmsModLongNote>(score.Mods, selectedMods) &&
+        reductionModMatches<BmsModChargeNote>(score.Mods, selectedMods) &&
+        reductionModMatches<BmsModHellChargeNote>(score.Mods, selectedMods) &&
         rateModsMatch(score.Mods, selectedMods);
 
     private static bool reductionModMatches<TMod>(IEnumerable<Mod> scoreMods, IEnumerable<Mod> selectedMods)
@@ -46,7 +50,7 @@ public static class BmsLampScoreSelector
         var selectedRateMod = rateMod(selectedMods);
 
         return scoreRateMod == selectedRateMod ||
-               scoreRateMod == null && selectedRateMod?.type == typeof(BmsModHalfTime);
+               (scoreRateMod == null && selectedRateMod?.type == typeof(BmsModHalfTime));
     }
 
     private static (Type type, double speedChange)? rateMod(IEnumerable<Mod> mods)
