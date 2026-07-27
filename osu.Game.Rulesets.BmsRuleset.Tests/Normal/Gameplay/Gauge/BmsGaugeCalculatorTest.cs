@@ -29,6 +29,12 @@ public class BmsGaugeCalculatorTest
     }
 
     [Test]
+    public void TestDefaultTotalFormulaAboveMinimum()
+    {
+        Assert.That(BmsGaugeCalculator.CalculateDefaultTotal(200), Is.EqualTo(178.94117647058823).Within(0.0000001));
+    }
+
+    [Test]
     public void TestLimitIncrementScalesRecovery()
     {
         var profile = BmsGaugeProfileFactory.Create(BmsGaugeType.Hard);

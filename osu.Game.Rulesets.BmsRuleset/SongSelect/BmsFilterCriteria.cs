@@ -5,6 +5,7 @@ using System.Text;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.Filter;
@@ -66,8 +67,7 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
 
     public bool Matches(BeatmapInfo beatmapInfo, FilterCriteria criteria)
     {
-        var keyCount = BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty);
-        var variant = variantFromColumns(keyCount);
+        var variant = GetVariant(beatmapInfo);
 
         if (!enabledVariants.Contains(variant))
             return false;
@@ -114,6 +114,15 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
         }
 
         return true;
+    }
+
+    internal static BmsLayoutVariant GetVariant(BeatmapInfo beatmapInfo)
+    {
+        var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(beatmapInfo);
+        var keyCount = foreignConverter?.GetConvertedDifficultyInfo(beatmapInfo).KeyCount
+                       ?? BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty);
+
+        return variantFromColumns(keyCount);
     }
 
     public bool TryParseCustomKeywordCriteria(string key, Operator op, string strValues)

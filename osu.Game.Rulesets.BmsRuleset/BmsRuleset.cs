@@ -9,6 +9,7 @@ using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
@@ -77,6 +78,7 @@ public partial class BmsRuleset : Ruleset
         BmsEditorPatcher.InstallOnce();
         BmsReplayPatcher.InstallOnce();
         BmsSongSelectLampPatcher.InstallOnce();
+        BmsConvertedBeatmapFilterPatcher.InstallOnce();
         BmsLocalLeaderboardPatcher.InstallOnce();
         BmsDifficultyIconPatcher.InstallOnce();
         BmsRankingHitResultColourPatcher.InstallOnce();
@@ -109,7 +111,13 @@ public partial class BmsRuleset : Ruleset
     };
 
     public override int GetVariantForBeatmap(IBeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
-        => (int)BmsLayout.VariantFromTotalColumns(BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty));
+    {
+        var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(beatmapInfo);
+        var keyCount = foreignConverter?.GetConvertedDifficultyInfo(beatmapInfo).KeyCount
+                       ?? BmsDifficultyInfo.GetKeyCount(beatmapInfo.Difficulty);
+
+        return (int)BmsLayout.VariantFromTotalColumns(keyCount);
+    }
 
     public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0) =>
         BmsKeyBindingConfiguration.GetDefaultKeyBindings(variant);
@@ -181,9 +189,24 @@ public partial class BmsRuleset : Ruleset
     /// <summary>Bar maximum for the EXRANK attribute (200% = full bar; 100% = NORMAL at midpoint).</summary>
     private const float exrank_display_max = 200;
 
+    public override BeatmapDifficulty GetAdjustedDisplayDifficulty(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
+    {
+        var adjustedDifficulty = new BeatmapDifficulty(beatmapInfo.Difficulty);
+        var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(beatmapInfo);
+
+        foreignConverter?.GetConvertedDifficultyInfo(beatmapInfo).WriteToOsuDifficulty(adjustedDifficulty);
+
+        foreach (var mod in mods.OfType<IApplicableToDifficulty>())
+            mod.ApplyToDifficulty(adjustedDifficulty);
+
+        return adjustedDifficulty;
+    }
+
     public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
     {
-        var original = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
+        var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(beatmapInfo);
+        var original = foreignConverter?.GetConvertedDifficultyInfo(beatmapInfo)
+                       ?? BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
         var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
         var adjusted = BmsDifficultyInfo.FromOsuDifficulty(adjustedDifficulty);
         var colours = new OsuColour();

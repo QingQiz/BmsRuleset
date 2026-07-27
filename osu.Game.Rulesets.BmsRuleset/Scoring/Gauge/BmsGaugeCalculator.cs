@@ -20,10 +20,16 @@ public class BmsGaugeCalculator
 
         Total = total > 0
             ? total
-            : Math.Max(7.605 * noteCount / (0.01 * noteCount + 6.5), 160.0);
+            : CalculateDefaultTotal(NoteCount);
 
         var perNoteMaxPercent = Math.Max(Math.Min(0.15, (2 * Total - 320) / noteCount), 0);
         limitIncrementScale = perNoteMaxPercent / 0.15;
+    }
+
+    public static double CalculateDefaultTotal(int noteCount)
+    {
+        noteCount = Math.Max(1, noteCount);
+        return Math.Max(7.605 * noteCount / (0.01 * noteCount + 6.5), 160.0);
     }
 
     public double GetDeltaFor(HitResult result, double currentHealth)

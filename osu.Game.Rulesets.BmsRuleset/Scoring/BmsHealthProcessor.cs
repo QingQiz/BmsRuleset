@@ -5,7 +5,6 @@ using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
@@ -337,9 +336,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             total = bmsBeatmap.Total;
 
         if (total <= 0)
-        {
-            total = Math.Max(7.605 * noteCount / (0.01 * noteCount + 6.5), 160.0);
-        }
+            total = BmsGaugeCalculator.CalculateDefaultTotal(noteCount);
 
         foreach (var state in gaugeStates)
         {
@@ -384,7 +381,7 @@ public partial class BmsHealthProcessor : HealthProcessor
                 state.IsHpFailed)).ToArray()));
     }
 
-    private double currentTime => Clock == null ? 0 : Time.Current;
+    private double currentTime => Time.Current;
 
     private sealed class GaugeState
     {

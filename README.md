@@ -142,6 +142,12 @@ fast/late distribution, hit scatter and offset graphs, and per-key timing breakd
   <sub>Inspect where a run was lost, down to timing direction and individual keys.</sub>
 </p>
 
+### osu!mania 7K Conversion
+
+Official osu!mania 7K charts can be played as BMS. The seven lanes map to the BME key columns with scratch left empty;
+note timing, holds, BPM, time signatures, offsets, and scroll-velocity changes are preserved. Other key counts are not supported yet.
+To enable conversion, select the BMS ruleset and turn on **Show converts** in the song select filter panel.
+
 ## Documentation
 
 The README stays focused on getting started. Detailed behavior and technical references live in:

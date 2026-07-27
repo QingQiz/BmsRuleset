@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
@@ -10,6 +12,19 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 [TestFixture]
 public class BmsFilterCriteriaTest
 {
+    [Test]
+    public void TestMania7KConvertUsesBme7KVariant()
+    {
+        var beatmap = createBeatmap(7);
+        beatmap.Ruleset = new RulesetInfo { OnlineID = 3, ShortName = "mania" };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(BmsFilterCriteria.GetVariant(beatmap), Is.EqualTo(BmsLayoutVariant.Bme7K));
+            Assert.That(new BmsRuleset().GetVariantForBeatmap(beatmap), Is.EqualTo((int)BmsLayoutVariant.Bme7K));
+        });
+    }
+
     [TestCase(7, 8, true)]
     [TestCase(7, 6, false)]
     [TestCase(14, 16, true)]

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
@@ -13,14 +14,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
 /// <inheritdoc />
 /// <summary>
-///     Keeps BMS beatmaps in BMS-owned object space.
+///     Keeps native BMS beatmaps in BMS-owned object space and delegates supported foreign conversions.
 /// </summary>
 /// <remarks>
-///     This converter intentionally no longer targets osu!mania objects. The decoder already emits
-///     <see cref="T:BmsHitObject">BmsHitObject</see> instances for native BMS
-///     gameplay, so conversion is currently a
-///     type-preserving pass-through. Later, non-BMS source beatmaps can be converted here explicitly,
-///     but BMS files should never be adapted through mania as an intermediate ruleset model.
+///     Native BMS decoding emits <see cref="BmsHitObject"/> instances directly. Foreign ruleset
+///     conversion details are kept outside this converter.
 /// </remarks>
 public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapConverter<BmsHitObject>(beatmap, ruleset)
 {
@@ -30,11 +28,16 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
 
     public BmsReferenceBpmMode? ReferenceBpmMode { get; init; }
 
-    public override bool CanConvert() =>
-        Beatmap is BmsDecodedBeatmap { RawLines.Length: > 0 }
-        // Song select can ask the active ruleset for statistics while its selected beatmap is stale.
-        // Returning an empty BMS conversion is less disruptive than logging a conversion exception.
-        || Beatmap.HitObjects.Any();
+    public override bool CanConvert()
+    {
+        if (Beatmap is IBmsBeatmap or BmsDecodedBeatmap { RawLines.Length: > 0 })
+            return true;
+
+        if (Beatmap.HitObjects.Count > 0 && Beatmap.HitObjects.All(h => h is BmsHitObject))
+            return true;
+
+        return BmsForeignBeatmapConverterRegistry.FindConverter(Beatmap) != null;
+    }
 
     protected override Beatmap<BmsHitObject> CreateBeatmap() => new BmsBeatmap();
 
@@ -179,13 +182,12 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         }
     }
 
-    private static BmsBeatmap convertToBmsBeatmap(IBeatmap original, CancellationToken cancellationToken)
+    private BmsBeatmap convertToBmsBeatmap(IBeatmap original, CancellationToken cancellationToken)
     {
         var converted = new BmsBeatmap
         {
             BeatmapInfo = original.BeatmapInfo,
             ControlPointInfo = original.ControlPointInfo,
-            HitObjects = original.HitObjects.OfType<BmsHitObject>().Select(h => h.ToTypedHitObject()).OrderBy(h => h.StartTime).ToList(),
             Breaks = original.Breaks,
             AudioLeadIn = original.AudioLeadIn,
             StackLeniency = original.StackLeniency,
@@ -202,6 +204,21 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
             Bookmarks = original.Bookmarks,
             BeatmapVersion = original.BeatmapVersion,
         };
+
+        var foreignConverter = BmsForeignBeatmapConverterRegistry.FindConverter(original);
+
+        if (foreignConverter != null)
+        {
+            foreignConverter.Convert(original, converted, cancellationToken);
+            converted.HitObjects = converted.HitObjects.OrderBy(h => h.StartTime).ToList();
+        }
+        else
+        {
+            converted.HitObjects = original.HitObjects
+                .SelectMany(h => ConvertHitObject(h, original, cancellationToken))
+                .OrderBy(h => h.StartTime)
+                .ToList();
+        }
 
         cancellationToken.ThrowIfCancellationRequested();
         return converted;

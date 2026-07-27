@@ -11,6 +11,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Editor;
@@ -193,6 +194,12 @@ public class BmsRulesetTest
     }
 
     [Test]
+    public void TestInitialisationInstallsConvertedBeatmapFilterPatch()
+    {
+        Assert.That(BmsConvertedBeatmapFilterPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
     public void TestEditorDisablePatchPostsNotification()
     {
         var dependencies = new DependencyContainer();
@@ -312,6 +319,43 @@ public class BmsRulesetTest
 
         Assert.That(lnModeAttr, Is.Not.Null);
         Assert.That(lnModeAttr.AdditionalMetrics[0].Value.ToString(), Is.EqualTo("CN"));
+    }
+
+    [Test]
+    public void TestMania7KConvertAttributesUseConvertedBmsDifficulty()
+    {
+        var beatmapInfo = new BeatmapInfo(
+            new RulesetInfo { OnlineID = 3, ShortName = "mania" },
+            new BeatmapDifficulty
+            {
+                CircleSize = 7,
+                OverallDifficulty = 8,
+                ApproachRate = 9,
+                DrainRate = 5,
+            })
+        {
+            TotalObjectCount = 200,
+        };
+        var expectedTotal = BmsGaugeCalculator.CalculateDefaultTotal(beatmapInfo.TotalObjectCount);
+        var adjustedDifficulty = ruleset.GetAdjustedDisplayDifficulty(beatmapInfo, Array.Empty<Mod>());
+        var attributes = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>()).ToArray();
+        var rank = attributes.Single(attribute => attribute.Acronym == "RK");
+        var total = attributes.Single(attribute => attribute.Acronym == "TL");
+        var lnMode = attributes.Single(attribute => attribute.Acronym == "LM");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(adjustedDifficulty.CircleSize, Is.EqualTo(BmsLayout.BME7_KEY_COLUMNS));
+            Assert.That(adjustedDifficulty.OverallDifficulty, Is.EqualTo(2));
+            Assert.That(adjustedDifficulty.ApproachRate, Is.EqualTo(expectedTotal).Within(0.0001));
+            Assert.That(adjustedDifficulty.DrainRate, Is.EqualTo(2));
+            Assert.That(rank.OriginalValue, Is.EqualTo(2));
+            Assert.That(rank.AdjustedValue, Is.EqualTo(2));
+            Assert.That(total.OriginalValue, Is.EqualTo(expectedTotal).Within(0.0001));
+            Assert.That(total.AdjustedValue, Is.EqualTo(expectedTotal).Within(0.0001));
+            Assert.That(lnMode.OriginalValue, Is.EqualTo(2));
+            Assert.That(lnMode.AdditionalMetrics[0].Value.ToString(), Is.EqualTo("CN"));
+        });
     }
 
     [Test]

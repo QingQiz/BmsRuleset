@@ -133,19 +133,8 @@ public readonly struct BmsDifficultyInfo
     public void WriteToOsuDifficulty(IBeatmap beatmap)
     {
         beatmap.BeatmapInfo.DifficultyName = ToDisplayName();
-
-        var od = EncodeOverallDifficulty(Rank, ExRank);
-        beatmap.Difficulty.OverallDifficulty = od;
-        beatmap.BeatmapInfo.Difficulty.OverallDifficulty = od;
-
-        beatmap.Difficulty.CircleSize = KeyCount;
-        beatmap.BeatmapInfo.Difficulty.CircleSize = KeyCount;
-
-        beatmap.Difficulty.ApproachRate = (float)Total;
-        beatmap.BeatmapInfo.Difficulty.ApproachRate = (float)Total;
-
-        beatmap.Difficulty.DrainRate = (float)LockedLongNoteMode;
-        beatmap.BeatmapInfo.Difficulty.DrainRate = (float)LockedLongNoteMode;
+        WriteToOsuDifficulty(beatmap.Difficulty);
+        WriteToOsuDifficulty(beatmap.BeatmapInfo.Difficulty);
     }
 
     /// <summary>
@@ -156,12 +145,19 @@ public readonly struct BmsDifficultyInfo
     public void WriteToOsuDifficulty(BeatmapInfo beatmap)
     {
         beatmap.DifficultyName = ToDisplayName();
+        WriteToOsuDifficulty(beatmap.Difficulty);
+    }
 
+    /// <summary>
+    /// Writes BMS difficulty parameters to an osu! <see cref="BeatmapDifficulty"/>.
+    /// </summary>
+    public void WriteToOsuDifficulty(BeatmapDifficulty difficulty)
+    {
         var od = EncodeOverallDifficulty(Rank, ExRank);
-        beatmap.Difficulty.OverallDifficulty = od;
-        beatmap.Difficulty.CircleSize = KeyCount;
-        beatmap.Difficulty.ApproachRate = (float)Total;
-        beatmap.Difficulty.DrainRate = (float)LockedLongNoteMode;
+        difficulty.OverallDifficulty = od;
+        difficulty.CircleSize = KeyCount;
+        difficulty.ApproachRate = (float)Total;
+        difficulty.DrainRate = (float)LockedLongNoteMode;
     }
 
     /// <summary>
