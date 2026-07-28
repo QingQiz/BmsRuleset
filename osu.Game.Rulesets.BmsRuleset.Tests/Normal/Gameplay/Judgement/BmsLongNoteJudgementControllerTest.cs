@@ -428,6 +428,25 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
+    public void TestFastReleaseBeforeTailWindowRecordsFastPoorOffset()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
+        controller.TryHit(1000, HitResult.Perfect);
+        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, tail: true);
+
+        controller.TryRelease(1200, -300, tailTable);
+
+        var tailEndpoint = hooks.AppliedJudgements.Single().endpoints.Last();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hooks.AppliedJudgements.Single().result, Is.EqualTo(HitResult.Meh));
+            Assert.That(tailEndpoint.Kind, Is.EqualTo(BmsLongNoteEndpointKind.Tail));
+            Assert.That(tailEndpoint.TimeOffset, Is.EqualTo(-300));
+        });
+    }
+
+    [Test]
     public void TestPassiveNormalHeadPoorDoesNotInventTailEvent()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);

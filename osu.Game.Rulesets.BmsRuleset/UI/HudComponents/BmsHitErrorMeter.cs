@@ -80,7 +80,8 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     private readonly DrawablePool<JudgementLine> judgementLinePool = new(max_concurrent_judgements);
 
     private BmsHitErrorMeterDomain domain;
-    private double poorDisplayOffset;
+    private double fastPoorDisplayOffset;
+    private double slowPoorDisplayOffset;
     private double floatingAverage;
     private BmsScoreProcessor? scoreProcessor;
 
@@ -132,7 +133,8 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         domain = CreateDomain(layout, judgementRate);
 
         var headWindows = BmsJudgementProfileProvider.GetTable(layout, 1, judgementRate, tail: false);
-        poorDisplayOffset = headWindows.SlowWindowFor(HitResult.Ok);
+        fastPoorDisplayOffset = -headWindows.FastWindowFor(HitResult.Ok);
+        slowPoorDisplayOffset = headWindows.SlowWindowFor(HitResult.Ok);
 
         InternalChild = rotatedContent = new Container
         {
@@ -404,7 +406,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
         foreach (var observation in GetTimingObservations(judgement))
         {
-            var displayOffset = GetDisplayOffset(observation, poorDisplayOffset, ShowPoor.Value);
+            var displayOffset = GetDisplayOffset(observation, fastPoorDisplayOffset, slowPoorDisplayOffset, ShowPoor.Value);
 
             if (displayOffset == null)
                 continue;
@@ -462,11 +464,17 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         return [new BmsHitErrorTimingObservation(judgement.TimeOffset, judgement.Type)];
     }
 
-    internal static double? GetDisplayOffset(BmsHitErrorTimingObservation observation, double poorDisplayOffset, bool showPoor)
+    internal static double? GetDisplayOffset(
+        BmsHitErrorTimingObservation observation,
+        double fastPoorDisplayOffset,
+        double slowPoorDisplayOffset,
+        bool showPoor)
     {
-        // Passive POOR has no finite late edge, so align it with the end of the visible BAD window.
+        // POOR has no finite miss-side edge, so retain its timing direction at the corresponding BAD boundary.
         if (observation.Result == HitResult.Meh)
-            return showPoor ? poorDisplayOffset : null;
+            return showPoor
+                ? observation.TimeOffset < 0 ? fastPoorDisplayOffset : slowPoorDisplayOffset
+                : null;
 
         return observation.Result.IsHit() ? observation.TimeOffset : null;
     }

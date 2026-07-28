@@ -61,19 +61,23 @@ public class BmsHitErrorMeterTest
     }
 
     [Test]
-    public void TestPoorUsesBadWindowSlowEdgeOnlyWhenEnabled()
+    public void TestPoorUsesBadWindowEdgeMatchingTimingDirectionOnlyWhenEnabled()
     {
         var windows = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 0.75, tail: false);
+        var badWindowFastEdge = -windows.FastWindowFor(HitResult.Ok);
         var badWindowSlowEdge = windows.SlowWindowFor(HitResult.Ok);
-        var poor = new BmsHitErrorTimingObservation(281, HitResult.Meh);
+        var fastPoor = new BmsHitErrorTimingObservation(-281, HitResult.Meh);
+        var slowPoor = new BmsHitErrorTimingObservation(281, HitResult.Meh);
 
         Assert.Multiple(() =>
         {
+            Assert.That(badWindowFastEdge, Is.EqualTo(-220));
             Assert.That(badWindowSlowEdge, Is.EqualTo(280));
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(poor, badWindowSlowEdge, showPoor: false), Is.Null);
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(poor, badWindowSlowEdge, showPoor: true), Is.EqualTo(badWindowSlowEdge));
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(fastPoor, badWindowFastEdge, badWindowSlowEdge, showPoor: false), Is.Null);
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(fastPoor, badWindowFastEdge, badWindowSlowEdge, showPoor: true), Is.EqualTo(badWindowFastEdge));
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(slowPoor, badWindowFastEdge, badWindowSlowEdge, showPoor: true), Is.EqualTo(badWindowSlowEdge));
             Assert.That(BmsHitErrorMeter.GetDisplayOffset(
-                new BmsHitErrorTimingObservation(-12, HitResult.Perfect), badWindowSlowEdge, showPoor: false), Is.EqualTo(-12));
+                new BmsHitErrorTimingObservation(-12, HitResult.Perfect), badWindowFastEdge, badWindowSlowEdge, showPoor: false), Is.EqualTo(-12));
         });
     }
 

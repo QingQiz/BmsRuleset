@@ -54,6 +54,25 @@ public class BmsHitOffsetStatisticTest
     }
 
     [Test]
+    public void TestPoorUsesEdgeMatchingTimingDirection()
+    {
+        var statistics = BmsHitOffsetStatistic.CreateStatistics(
+            createBeatmap(BmsLayoutVariant.Bms5K),
+            [
+                new HitEvent(-500, 1, HitResult.Meh, new BmsNote { Column = 0, StartTime = 1000 }, null, null),
+                new HitEvent(500, 1, HitResult.Meh, new BmsNote { Column = 0, StartTime = 2000 }, null, null),
+            ]);
+
+        var poorBins = statistics.Overall.BinsByResult[HitResult.Meh];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(poorBins[0], Is.EqualTo(1));
+            Assert.That(poorBins[^1], Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void TestPmsStatisticsHaveNoScratch()
     {
         var statistics = BmsHitOffsetStatistic.CreateStatistics(

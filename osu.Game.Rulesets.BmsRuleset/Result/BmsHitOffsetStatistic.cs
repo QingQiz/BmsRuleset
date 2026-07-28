@@ -196,7 +196,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
             {
                 if (!binsByResult.TryGetValue(result, out var untimedBins))
                     binsByResult[result] = untimedBins = new int[bin_count];
-                untimedBins[result == HitResult.Miss ? 0 : bin_count - 1]++;
+                untimedBins[result == HitResult.Miss || offset < 0 ? 0 : bin_count - 1]++;
                 continue;
             }
 
