@@ -16,6 +16,7 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
 {
     private const double judged_note_time = 9000;
     private const double pause_time = 10000;
+    private const double pause_boundary_note_time = pause_time - 100;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => new(allowPause: true, showResults: false);
 
@@ -28,6 +29,7 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
             HitObjects =
             {
                 new BmsNote { StartTime = judged_note_time, Column = 1 },
+                new BmsNote { StartTime = pause_boundary_note_time, Column = 2 },
                 new BmsNote { StartTime = 30000, Column = 1 },
             },
         };
@@ -81,6 +83,31 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
         AddStep("resume again", () => Player.Resume());
         AddAssert("reuses first rewind target", () => Player.GameplayClockContainer.CurrentTime, () => Is.EqualTo(pause_time - BmsPlayfield.RESUME_REWIND_DURATION).Within(250));
         AddAssert("rewind window unchanged", () => Playfield.ResumeRewindEndTime, () => Is.EqualTo(pause_time).Within(250));
+    }
+
+    [Test]
+    public void TestNoteCrossingJudgementLineAtPauseRemainsHittable()
+    {
+        var judgedHitsBeforePress = 0;
+
+        AddStep("load player", () => LoadPlayer());
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Playfield.Stage.IsLoaded);
+        AddStep("seek to pause boundary", () =>
+        {
+            Player.GameplayClockContainer.Stop();
+            Player.GameplayClockContainer.Seek(pause_time);
+            Player.GameplayClockContainer.Start();
+        });
+        AddStep("pause", () => Player.Pause());
+        AddStep("resume", () => Player.Resume());
+        AddUntilStep("boundary note reaches line during rewind", () =>
+            Playfield.IsResumeRewinding
+            && Player.GameplayClockContainer.CurrentTime >= pause_boundary_note_time
+            && Playfield.AllColumnAliveObjects().Any(drawable => drawable.HitObject.StartTime == pause_boundary_note_time));
+        AddStep("capture judged hits", () => judgedHitsBeforePress = Player.ScoreProcessor.JudgedHits);
+        AddStep("press boundary note key", () => InputManager.PressKey(Key.S));
+        AddAssert("boundary note judged on key down", () => Player.ScoreProcessor.JudgedHits, () => Is.EqualTo(judgedHitsBeforePress + 1));
+        AddStep("release boundary note key", () => InputManager.ReleaseKey(Key.S));
     }
 
     private double expectedRewindTime() => Player.Score.ScoreInfo.Pauses.Single() - BmsPlayfield.RESUME_REWIND_DURATION;

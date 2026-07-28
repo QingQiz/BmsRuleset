@@ -201,9 +201,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                 return true;
         }
 
-        if (IsResumeRewinding)
-            return false;
-
         var column = BmsKeyBindingConfiguration.ActionToColumn(e.Action, LayoutVariant);
 
         if (column == null || column.Value >= TotalColumns)
@@ -225,9 +222,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             case BmsAction.DecreaseScrollSpeed:
                 return;
         }
-
-        if (IsResumeRewinding)
-            return;
 
         var column = BmsKeyBindingConfiguration.ActionToColumn(e.Action, LayoutVariant);
 

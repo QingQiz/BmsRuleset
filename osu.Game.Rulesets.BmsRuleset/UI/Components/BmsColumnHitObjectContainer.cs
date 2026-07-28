@@ -1,7 +1,6 @@
 using System;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Rulesets.UI;
 
@@ -13,12 +12,18 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private readonly BmsScrollController scrollController;
     private readonly Func<float> getHitTargetPosition;
     private readonly Func<bool> isResumeRewinding;
+    private readonly Func<double> getResumeRewindEndTime;
 
-    internal BmsColumnHitObjectContainer(BmsScrollController scrollController, Func<float> getHitTargetPosition, Func<bool> isResumeRewinding)
+    internal BmsColumnHitObjectContainer(
+        BmsScrollController scrollController,
+        Func<float> getHitTargetPosition,
+        Func<bool> isResumeRewinding,
+        Func<double> getResumeRewindEndTime)
     {
         this.scrollController = scrollController;
         this.getHitTargetPosition = getHitTargetPosition;
         this.isResumeRewinding = isResumeRewinding;
+        this.getResumeRewindEndTime = getResumeRewindEndTime;
         RelativeSizeAxes = Axes.Both;
     }
 
@@ -43,6 +48,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         var hitTarget = getHitTargetPosition();
         var scale = scrollController.ScrollSpeedMultiplier / Math.Max(1.0, scrollController.ScrollRange)
                     * Math.Max(1f, DrawHeight - hitTarget);
+        var resumeRewinding = isResumeRewinding();
 
         // Position all alive entries in this column
         foreach (var entry in AliveEntries)
@@ -62,8 +68,30 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             }
 
             // Keeping judgement controllers frozen avoids replaying misses or resetting an active long note.
-            if (!isResumeRewinding())
+            if (!resumeRewinding)
                 note.UpdateColumnFrame();
+        }
+    }
+
+    protected override void UpdateAfterChildren()
+    {
+        base.UpdateAfterChildren();
+
+        if (!isResumeRewinding())
+            return;
+
+        var rewindEndTime = getResumeRewindEndTime();
+
+        foreach (var note in AliveEntries.Values)
+        {
+            if (note is not ILongNoteHolder longNoteHolder || note.HitObject is not BmsLongNote longNote)
+                continue;
+
+            // Pooled drawables reset their LN controller when they re-enter lifetime, while their
+            // framework result remains authoritative. EndTime covers HCN head-POOR, whose endpoints
+            // are scored synthetically without applying a result to the parent drawable.
+            if (longNote.EndTime <= rewindEndTime || (note.Judged && !longNoteHolder.IsHoldingLongNote))
+                note.Alpha = 0;
         }
     }
 }

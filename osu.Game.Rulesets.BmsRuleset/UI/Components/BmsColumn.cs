@@ -131,7 +131,11 @@ public partial class BmsColumn : Playfield, IBmsColumn
         keysUnderNotes ? key_area_under_notes_depth : key_area_over_notes_depth;
 
     protected override HitObjectContainer CreateHitObjectContainer()
-        => new BmsColumnHitObjectContainer(ParentPlayfield.ScrollController, () => HitTargetPosition, () => ParentPlayfield.IsResumeRewinding);
+        => new BmsColumnHitObjectContainer(
+            ParentPlayfield.ScrollController,
+            () => HitTargetPosition,
+            () => ParentPlayfield.IsResumeRewinding,
+            () => ParentPlayfield.ResumeRewindEndTime);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
         => new BmsHitObjectLifetimeEntry(
