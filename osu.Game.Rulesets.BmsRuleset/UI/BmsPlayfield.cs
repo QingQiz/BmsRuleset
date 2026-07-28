@@ -422,8 +422,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private void requestJudgementDisplay(HitResult result)
     {
-        if (result == HitResult.Meh && textEventManager.Mistake != null)
-            gameplayEvents.RaiseText(textEventManager.Mistake);
+        if (result == HitResult.Meh)
+            textEventManager.TriggerMistake(gameplayEvents.RaiseText);
 
         gameplayEvents.RaiseJudgementDisplayed(result);
     }

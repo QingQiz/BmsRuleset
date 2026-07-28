@@ -32,5 +32,9 @@ public class BmsTextEventManager(BmsTextEvents events)
         lastTime = time;
     }
 
-    public string? Mistake => events.MistakeText;
+    public void TriggerMistake(Action<string> showText)
+    {
+        if (!string.IsNullOrEmpty(events.MistakeText))
+            showText(events.MistakeText);
+    }
 }
