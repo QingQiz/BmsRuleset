@@ -76,9 +76,9 @@ public class BmsReplayArchiveTest
                 HitResult.Meh,
                 [new BmsTimingObservation(BmsTimingObservationKind.Note, 3000, 3000, 1, HitResult.Meh)]),
             new BmsJudgementEvent(
-                BmsJudgementSource.From(new HitObject { StartTime = 4000 }),
+                new BmsJudgementSource(3600, 3, BmsJudgementSourceKind.EmptyPoor),
                 HitResult.Miss,
-                [new BmsTimingObservation(BmsTimingObservationKind.Note, 4000, 4000, 1, HitResult.Miss)]),
+                [new BmsTimingObservation(BmsTimingObservationKind.Note, 4000, 3600, 1, HitResult.Miss)]),
         ]);
 
         using var archive = BmsReplayArchive.Create(original);
@@ -107,12 +107,12 @@ public class BmsReplayArchiveTest
 
         // Empty POOR: round-trips as a base HitObject (no BmsHitObject), preserving press time + Miss.
         var emptyPoor = restored.ScoreInfo.HitEvents[4];
-        Assert.That(emptyPoor.TimeOffset, Is.EqualTo(0));
+        Assert.That(emptyPoor.TimeOffset, Is.EqualTo(-400));
         Assert.That(emptyPoor.GameplayRate, Is.EqualTo(1));
         Assert.That(emptyPoor.Result, Is.EqualTo(HitResult.Miss));
         Assert.That(emptyPoor.HitObject, Is.TypeOf<HitObject>());
         Assert.That(emptyPoor.HitObject, Is.Not.TypeOf<BmsHitObject>());
-        Assert.That(emptyPoor.HitObject.StartTime, Is.EqualTo(4000));
+        Assert.That(emptyPoor.HitObject.StartTime, Is.EqualTo(3600));
     }
 
     [Test]

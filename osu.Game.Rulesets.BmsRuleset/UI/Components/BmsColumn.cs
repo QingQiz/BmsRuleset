@@ -297,7 +297,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
         var selection = BmsJudgementSelector.SelectPress(LayoutVariant, Index, candidates.Select(c => c.Candidate), time);
 
-        if (selection.Candidate is { } selectedCandidate)
+        if (!selection.IsEmptyPoor && selection.Candidate is { } selectedCandidate)
         {
             var target = candidates.First(c => c.Candidate.Equals(selectedCandidate)).Drawable;
             if (target.TryHit(selection.Result))
@@ -309,7 +309,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
         keySound?.PlayKeySound();
 
-        return selection.IsEmptyPoor ? PressOutcome.EmptyPoor : PressOutcome.Empty;
+        return selection is { IsEmptyPoor: true, Candidate: { } emptyPoorCandidate }
+            ? PressOutcome.ForEmptyPoor(emptyPoorCandidate.StartTime, emptyPoorCandidate.Column)
+            : PressOutcome.Empty;
     }
 
     public void HandleRelease(double time)

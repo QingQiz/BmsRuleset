@@ -86,8 +86,8 @@ See the [skin system guide](./docs/skin-system.md) for the complete `skin.ini` r
 
 ### Visually Editable Skin Components
 
-Arrange, resize, and configure the playfield, combo, judgement display, gauge, song progress, BGA, chart messages, and
-live score comparison directly through osu!'s visual skin editor.
+Arrange, resize, and configure the playfield, combo, judgement display, hit error meter, gauge, song progress, BGA,
+chart messages, and live score comparison directly through osu!'s visual skin editor.
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c3690c49-3a00-4970-abd8-0e93220d6f11" width="900" alt="BMS components in the osu! visual skin editor">

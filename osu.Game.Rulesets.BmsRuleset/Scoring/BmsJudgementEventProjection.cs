@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
@@ -20,8 +19,13 @@ public static class BmsJudgementEventProjection
         {
             var observation = judgementEvent.TimingObservations[^1];
             var hitObject = createScoringHitObject(judgementEvent.Source, observation);
+
+            // E-POOR stays anchored to the press for timeline ordering, while its timing error is
+            // measured against the upcoming note that caused the non-consuming miss row.
             var hitEvent = new HitEvent(
-                observation.ActualTime - hitObject.GetEndTime(),
+                judgementEvent.Source.Kind == BmsJudgementSourceKind.EmptyPoor
+                    ? observation.TimeOffset
+                    : observation.ActualTime - hitObject.GetEndTime(),
                 observation.GameplayRate,
                 judgementEvent.Result,
                 hitObject,

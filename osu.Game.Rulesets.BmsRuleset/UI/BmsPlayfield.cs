@@ -211,10 +211,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         var outcome = Stage.Columns[column.Value].HandlePress(Time.Current);
 
-        if (outcome == PressOutcome.EmptyPoor)
-            registerEmptyPoor();
+        if (outcome is { Kind: PressOutcomeKind.EmptyPoor, ExpectedTime: { } expectedTime })
+            registerEmptyPoor(expectedTime, outcome.Column);
 
-        return outcome == PressOutcome.Hit;
+        return outcome.Kind == PressOutcomeKind.Hit;
     }
 
     public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
@@ -413,9 +413,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         requestJudgementDisplay(result.Type);
     }
 
-    private void registerEmptyPoor()
+    private void registerEmptyPoor(double expectedTime, int column)
     {
-        scoreProcessor?.RegisterEmptyPoor(Time.Current);
+        scoreProcessor?.RegisterEmptyPoor(Time.Current, expectedTime, column);
         healthProcessor?.RegisterEmptyPoor(Time.Current);
         requestJudgementDisplay(HitResult.Miss);
     }

@@ -71,6 +71,12 @@
   <data name="scratch" xml:space="preserve"><value>Scratch</value></data>
   <data name="fast" xml:space="preserve"><value>fast</value></data>
   <data name="slow" xml:space="preserve"><value>slow</value></data>
+  <data name="hit_error_meter_show_empty_poor" xml:space="preserve"><value>Show E-POOR</value></data>
+  <data name="hit_error_meter_show_empty_poor_description" xml:space="preserve"><value>Shows E-POOR judgements and their grey timing window on the fast side.</value></data>
+  <data name="hit_error_meter_show_poor" xml:space="preserve"><value>Show POOR</value></data>
+  <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>Shows POOR judgements at the latest end of the meter.</value></data>
+  <data name="hit_error_meter_fade_duration" xml:space="preserve"><value>Judgement fade duration</value></data>
+  <data name="hit_error_meter_fade_duration_description" xml:space="preserve"><value>Seconds taken for judgement lines to fade out.</value></data>
   <data name="key" xml:space="preserve"><value>Key {0}</value></data>
   <data name="notes" xml:space="preserve"><value>Notes</value></data>
   <data name="judgement" xml:space="preserve"><value>Judgement</value></data>

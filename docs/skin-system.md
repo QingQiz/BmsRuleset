@@ -195,6 +195,28 @@ replaces the previous result and restarts that judgement image's animation. Imag
 There are no component-specific sidebar settings. Use the editor controls to set the popup's position and scale, and
 use the skin image files to change its artwork or animation.
 
+### Hit Error Meter
+
+Shows timing errors on a horizontal axis with Fast on the left and Slow on the right. The white 0 ms marker remains
+at the visual centre. Both sides reserve the same amount of space, so asymmetric BMS timing windows leave unused space
+on the shorter side instead of shifting the centre.
+
+The coloured judgement windows form one continuous bar. E-POOR adds a grey segment beyond the Fast BAD window without
+shortening the other sections. POOR has no finite late edge and is therefore drawn at the final Slow position.
+
+- **Judgement line thickness** controls the width of each displayed timing line from 1 to 8 (default 4).
+- **Judgement fade duration** controls how many seconds a timing line takes to fade out, from 0.1 to 20 seconds
+  (default 5 seconds).
+- **Show colour bars** toggles the judgement-window bar.
+- **Show moving average** toggles the average-position chevron. POOR and E-POOR never affect this average.
+- **Show E-POOR** toggles both E-POOR timing lines and the additional grey Fast-side segment. It is enabled by default.
+- **Show POOR** toggles POOR timing lines at the final Slow position. It is enabled by default.
+- **Centre marker style** selects a circle, line, or no marker at 0 ms. Both visible styles use white.
+- **Label style** selects Fast/Slow icons, text labels, or no labels.
+
+Horizontal resizing changes the length of the timing axis. Vertical resizing changes the span of the judgement lines;
+the two directions can be adjusted independently.
+
 ### Score Graph
 
 Tracks the current EX score against two references throughout the chart:

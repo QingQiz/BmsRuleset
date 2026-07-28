@@ -3,7 +3,6 @@ using System.Reflection;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Screens.Play.HUD;
-using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -132,11 +131,10 @@ public static class BmsDefaultHud
                     RenderOutsideHudVisibility = true,
                     Depth = float.MaxValue,
                 },
-                new BarHitErrorMeter
+                new BmsHitErrorMeter
                 {
                     Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.CentreRight,
-                    Rotation = 90,
+                    Origin = Anchor.BottomCentre,
                     Scale = new Vector2(2),
                 },
                 new ArgonScoreCounter

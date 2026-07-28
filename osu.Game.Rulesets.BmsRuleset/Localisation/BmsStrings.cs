@@ -284,6 +284,18 @@ public static class BmsStrings
 
     public static LocalisableString Slow => get("slow");
 
+    public static LocalisableString HitErrorMeterShowEmptyPoor => get("hit_error_meter_show_empty_poor");
+
+    public static LocalisableString HitErrorMeterShowEmptyPoorDescription => get("hit_error_meter_show_empty_poor_description");
+
+    public static LocalisableString HitErrorMeterShowPoor => get("hit_error_meter_show_poor");
+
+    public static LocalisableString HitErrorMeterShowPoorDescription => get("hit_error_meter_show_poor_description");
+
+    public static LocalisableString HitErrorMeterFadeDuration => get("hit_error_meter_fade_duration");
+
+    public static LocalisableString HitErrorMeterFadeDurationDescription => get("hit_error_meter_fade_duration_description");
+
     public static LocalisableString Key(int number) => get("key", number);
 
     public static LocalisableString Notes => get("notes");

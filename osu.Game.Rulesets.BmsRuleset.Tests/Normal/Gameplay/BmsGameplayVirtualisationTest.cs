@@ -7,7 +7,9 @@ using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
 
@@ -129,6 +131,32 @@ public partial class BmsGameplayVirtualisationTest
 
         Assert.That(entry.LifetimeStart, Is.EqualTo(expectedVisibleStart).Within(1));
         Assert.That(entry.LifetimeStart, Is.LessThan(0));
+    }
+
+    [Test]
+    public void TestLifetimeCoversFastEmptyPoorWindow()
+    {
+        var hitObject = new BmsHitObject
+        {
+            StartTime = 1000,
+            Column = 1,
+        };
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            HitObjects = { hitObject },
+        }));
+        playfield.ScrollController.SetConfiguredScrollSpeed(100);
+        playfield.ScrollController.ConstantScrollActive = true;
+
+        playfield.Add(hitObject);
+        playfield.RefreshAllLifetimes();
+
+        var entry = playfield.Stage.Columns[hitObject.Column].HitObjectContainer.Entries.Single();
+        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
+
+        Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(hitObject.StartTime - table.FastWindowFor(HitResult.Miss)));
     }
 
     [Test]

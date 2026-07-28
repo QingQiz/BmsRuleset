@@ -135,9 +135,9 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
     private double computeFutureLifetime(BmsHitObject hitObject)
     {
-        // Floor the future lifetime at the fast BAD (Ok) window so the entry is alive before the
-        // earliest moment a press can be judged.
-        var floor = Math.Max(getFastBadWindow(hitObject), minimum_future_lifetime);
+        // E-POOR is timed against the next note without consuming it, so the candidate must exist
+        // throughout the earlier miss row as well as the hittable BAD window.
+        var floor = Math.Max(getFastInputWindow(hitObject), minimum_future_lifetime);
         var timingMap = getTimingMap();
 
         if (useConstantScrollFallback(timingMap))
@@ -151,16 +151,15 @@ internal sealed class BmsHitObjectLifetimeEntry(
     }
 
     /// <summary>
-    ///     The fast BAD (Ok) hit window for this object's head judgement — the furthest ahead of
-    ///     <see cref="HitObject.StartTime" /> at which a press can still be judged. Used as the
-    ///     minimum future lifetime so the entry is alive for any hittable press.
+    ///     The furthest fast-side input window for this object's head judgement. This includes the
+    ///     non-consuming E-POOR row so it can still be associated with the upcoming note.
     /// </summary>
-    private static double getFastBadWindow(BmsHitObject hitObject)
+    private static double getFastInputWindow(BmsHitObject hitObject)
     {
         if (hitObject is BmsLandmine) return 0;
 
         var table = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
-        return Math.Abs(table.FastWindowFor(HitResult.Ok));
+        return Math.Max(table.FastWindowFor(HitResult.Ok), table.FastWindowFor(HitResult.Miss));
     }
 
     private bool useConstantScrollFallback(BmsTimingMap? timingMap) => scrollController.ConstantScrollActive || timingMap == null;

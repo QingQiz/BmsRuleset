@@ -41,9 +41,7 @@ The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets
 |---------------|------------------------------------------------------------------------------------------|----------|
 | **Audio**     | `#WAVCMD` (MacBeat) — pitch/volume/playback-time per WAV slot                            |
 | **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                  |
-| **Converter** | Mania 7K → BMS chart conversion                                                          | 3        |
 | **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |
-| **Input**     | Judgement offset adjustment capability                                                   |
 | **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |          |
 | **Parser**    | `#@BGAxx` — extended BGA crop with dest w/h (9 fields); only 7-field `#BGAxx` parsed     | 2        |
 | **Parser**    | `#SWBGAxx` — switchable BGA definition                                                   | 3        |
@@ -74,7 +72,6 @@ The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets
 | **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                   | 3        |
 | **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT              | 4        |
 | **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                          | 4        |
-| **Skin**      | Non-legacy BMS skin — fully configurable via skin editor                                 |
 | **Skin**      | `HitGreat` → `HitGreatSlow` / `HitGreatFast` split images                                |
 | **Skin**      | E-POOR judgement image                                                                   | 3        |
 | **UI**        | Lane cover / skin / movement                                                             | 2        |

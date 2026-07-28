@@ -81,8 +81,8 @@ BMS 元数据，而不会影响原始文件。
 
 ### 可视化编辑的皮肤组件
 
-通过 osu! 的可视化皮肤编辑器，直接排列、缩放和配置游玩区域、Combo、判定显示、血条、歌曲进度、BGA、
-谱面文字以及实时成绩对比。
+通过 osu! 的可视化皮肤编辑器，直接排列、缩放和配置游玩区域、Combo、判定显示、误差条、血条、歌曲进度、
+BGA、谱面文字以及实时成绩对比。
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c3690c49-3a00-4970-abd8-0e93220d6f11" width="900" alt="osu! 可视化皮肤编辑器中的 BMS 组件">

@@ -15,7 +15,7 @@ public static class BmsJudgementSelector
     {
         BmsJudgementCandidate? selected = null;
         HitResult selectedResult = HitResult.None;
-        var hasEmptyPoor = false;
+        BmsJudgementCandidate? emptyPoorCandidate = null;
 
         foreach (var candidate in candidates.OrderBy(c => c.StartTime).ThenBy(c => c.Column))
         {
@@ -35,14 +35,14 @@ public static class BmsJudgementSelector
             }
 
             if (candidate.Column == column && table.IsEmptyPoorOffset(offset))
-                hasEmptyPoor = true;
+                emptyPoorCandidate ??= candidate;
         }
 
         if (selected != null)
             return new BmsJudgementSelection(selected, selectedResult, false);
 
-        return hasEmptyPoor
-            ? new BmsJudgementSelection(null, HitResult.Miss, true)
+        return emptyPoorCandidate != null
+            ? new BmsJudgementSelection(emptyPoorCandidate, HitResult.Miss, true)
             : new BmsJudgementSelection(null, HitResult.None, false);
     }
 

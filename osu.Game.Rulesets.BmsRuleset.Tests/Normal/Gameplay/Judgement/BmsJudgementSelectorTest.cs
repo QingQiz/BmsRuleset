@@ -11,15 +11,27 @@ public class BmsJudgementSelectorTest
     private static double rankRate(int rank) => BmsJudgementProfileProvider.RateForRank(rank);
 
     [Test]
-    public void TestFastMissRowIsEmptyPoorAndDoesNotSelectCandidate()
+    public void TestFastMissRowIsEmptyPoorForNextCandidate()
     {
         var candidate = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
 
         var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [candidate], inputTime: 600);
 
         Assert.That(selection.IsEmptyPoor, Is.True);
-        Assert.That(selection.Candidate, Is.Null);
+        Assert.That(selection.Candidate, Is.EqualTo(candidate));
         Assert.That(selection.Result, Is.EqualTo(HitResult.Miss));
+    }
+
+    [Test]
+    public void TestEmptyPoorUsesNearestUpcomingCandidate()
+    {
+        var next = new BmsJudgementCandidate(StartTime: 1000, EndTime: 1000, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
+        var later = new BmsJudgementCandidate(StartTime: 1100, EndTime: 1100, Column: 1, JudgementRate: rankRate(3), IsLongNote: false);
+
+        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [later, next], inputTime: 600);
+
+        Assert.That(selection.IsEmptyPoor, Is.True);
+        Assert.That(selection.Candidate, Is.EqualTo(next));
     }
 
     [Test]

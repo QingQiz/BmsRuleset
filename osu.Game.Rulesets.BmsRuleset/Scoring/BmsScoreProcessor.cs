@@ -7,7 +7,6 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Mods;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
@@ -25,6 +24,8 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     private readonly Dictionary<JudgementResult, BmsJudgementEvent> eventsByResult = new();
 
     public IReadOnlyList<BmsJudgementEvent> JudgementEvents => judgementEvents;
+
+    public event Action<BmsTimingObservation>? EmptyPoorRegistered;
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
@@ -86,14 +87,16 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     }
 
     public void RegisterEmptyPoor(double eventTime)
+        => RegisterEmptyPoor(eventTime, eventTime, 0);
+
+    public void RegisterEmptyPoor(double eventTime, double expectedTime, int column)
     {
         ScoreResultCounts[HitResult.Miss] = ScoreResultCounts.GetValueOrDefault(HitResult.Miss) + 1;
 
-        var source = new BmsJudgementSource(eventTime, 0, BmsJudgementSourceKind.EmptyPoor);
-        judgementEvents.Add(new BmsJudgementEvent(source, HitResult.Miss,
-        [
-            new BmsTimingObservation(BmsTimingObservationKind.Note, eventTime, eventTime, 1, HitResult.Miss),
-        ]));
+        var source = new BmsJudgementSource(eventTime, column, BmsJudgementSourceKind.EmptyPoor);
+        var observation = new BmsTimingObservation(BmsTimingObservationKind.Note, expectedTime, eventTime, 1, HitResult.Miss);
+        judgementEvents.Add(new BmsJudgementEvent(source, HitResult.Miss, [observation]));
+        EmptyPoorRegistered?.Invoke(observation);
     }
 
     /// <summary>

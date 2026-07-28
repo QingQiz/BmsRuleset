@@ -202,6 +202,30 @@ public partial class BmsScoreProcessorTest
     }
 
     [Test]
+    public void TestRegisterEmptyPoorUsesNextNoteOffset()
+    {
+        var processor = new BmsScoreProcessor();
+        BmsTimingObservation? registeredObservation = null;
+        processor.EmptyPoorRegistered += observation => registeredObservation = observation;
+
+        processor.RegisterEmptyPoor(eventTime: 600, expectedTime: 1000, column: 2);
+
+        var score = new ScoreInfo();
+        processor.PopulateScore(score);
+        var judgementEvent = processor.JudgementEvents.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(judgementEvent.Source.StartTime, Is.EqualTo(600));
+            Assert.That(judgementEvent.Source.Column, Is.EqualTo(2));
+            Assert.That(judgementEvent.TimingObservations.Single().TimeOffset, Is.EqualTo(-400));
+            Assert.That(registeredObservation?.TimeOffset, Is.EqualTo(-400));
+            Assert.That(score.HitEvents.Single().HitObject.StartTime, Is.EqualTo(600));
+            Assert.That(score.HitEvents.Single().TimeOffset, Is.EqualTo(-400));
+        });
+    }
+
+    [Test]
     public void TestEmptyPoorDoesNotBlockXRank()
     {
         var processor = new BmsScoreProcessor();

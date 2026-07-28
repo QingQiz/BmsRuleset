@@ -95,4 +95,24 @@ public class BmsJudgementEventProjectionTest
 
         Assert.That(scoring.Select(e => e.Result), Is.EqualTo([HitResult.Perfect, HitResult.Meh]));
     }
+
+    [Test]
+    public void TestEmptyPoorProjectionKeepsPressTimeAndNextNoteOffset()
+    {
+        var judgementEvent = new BmsJudgementEvent(
+            new BmsJudgementSource(600, 2, BmsJudgementSourceKind.EmptyPoor),
+            HitResult.Miss,
+            [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 600, 1, HitResult.Miss)]);
+
+        var scoring = BmsJudgementEventProjection.CreateScoringHitEvents([judgementEvent]).Single();
+        var timing = BmsJudgementEventProjection.CreateTimingHitEvents([judgementEvent]).Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(scoring.HitObject.StartTime, Is.EqualTo(600));
+            Assert.That(scoring.TimeOffset, Is.EqualTo(-400));
+            Assert.That(timing.HitObject.StartTime, Is.EqualTo(600));
+            Assert.That(timing.TimeOffset, Is.EqualTo(-400));
+        });
+    }
 }

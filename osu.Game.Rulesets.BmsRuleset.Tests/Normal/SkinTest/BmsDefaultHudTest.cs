@@ -96,4 +96,49 @@ public class BmsDefaultHudTest
 
         Assert.That(restoredAccuracy.Y - restoredScore.Y, Is.EqualTo(60));
     }
+
+    [Test]
+    public void TestMainHudUsesBmsHitErrorMeter()
+    {
+        var hud = BmsDefaultHud.GetDrawableComponent(new GlobalSkinnableContainerLookup(
+            GlobalSkinnableContainers.MainHUDComponents,
+            new BmsRuleset().RulesetInfo));
+
+        Assert.That(hud, Is.Not.Null);
+        var meter = hud!.ChildrenOfType<BmsHitErrorMeter>().Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(meter.AutoSizeAxes, Is.EqualTo(Axes.None));
+            Assert.That(meter.Size, Is.EqualTo(new Vector2(204, 26)));
+            Assert.That(meter.Rotation, Is.Zero);
+            Assert.That(meter.Origin, Is.EqualTo(Anchor.BottomCentre));
+            Assert.That(meter.ShowEmptyPoor.Value, Is.True);
+            Assert.That(meter.ShowPoor.Value, Is.True);
+            Assert.That(meter.JudgementFadeDuration.Value, Is.EqualTo(5));
+        });
+    }
+
+    [Test]
+    public void TestHitErrorMeterIndependentSizeSurvivesLayoutRoundTrip()
+    {
+        var meter = new BmsHitErrorMeter
+        {
+            Width = 320,
+            Height = 52,
+        };
+        meter.ShowEmptyPoor.Value = false;
+        meter.ShowPoor.Value = false;
+        meter.JudgementFadeDuration.Value = 1.5f;
+
+        var restored = (BmsHitErrorMeter)meter.CreateSerialisedInfo().CreateInstance();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.Size, Is.EqualTo(new Vector2(320, 52)));
+            Assert.That(restored.ShowEmptyPoor.Value, Is.False);
+            Assert.That(restored.ShowPoor.Value, Is.False);
+            Assert.That(restored.JudgementFadeDuration.Value, Is.EqualTo(1.5f));
+        });
+    }
 }
