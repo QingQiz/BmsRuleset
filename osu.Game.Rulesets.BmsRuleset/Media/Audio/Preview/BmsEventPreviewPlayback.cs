@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
-using osu.Framework.Logging;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 
@@ -469,7 +468,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, $"Failed to {operation} BMS preview sample '{evt.SamplePath}'.");
+            BmsAudioLogger.LogLoadFailure($"Failed to {operation} BMS preview sample '{evt.SamplePath}'.", exception);
             return null;
         }
     }

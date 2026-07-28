@@ -276,7 +276,7 @@ public partial class BmsSampleStore : Component
             track?.Dispose();
 
             if (!cancellationToken.IsCancellationRequested)
-                Logger.Error(exception, $"Failed to initialise BMS sample key {sampleKey:X2}.");
+                BmsAudioLogger.LogLoadFailure($"Failed to initialise BMS sample key {sampleKey:X2}.", exception);
         }
 
         return null;
@@ -334,10 +334,7 @@ public partial class BmsSampleStore : Component
             pendingPlays.Remove(sampleKey);
             var trackName = tracks.GetValueOrDefault(sampleKey)?.Name ?? $"key {sampleKey:X2}";
             discardFailedTrack(sampleKey);
-            Logger.Log(
-                $"Failed to load BMS sample track {trackName}; this definition will be unavailable during gameplay.",
-                LoggingTarget.Runtime,
-                LogLevel.Important);
+            BmsAudioLogger.LogLoadFailure($"Failed to load BMS sample track {trackName}; this definition will be unavailable during gameplay.");
         }
     }
 
@@ -514,10 +511,8 @@ public partial class BmsSampleStore : Component
             if (task.IsCompletedSuccessfully && task.Result && track.IsLoaded)
                 continue;
 
-            Logger.Log(
-                $"{(task.IsCompleted ? "Failed to load" : "Timed out while loading")} BMS sample track {track.Name}; this definition will be unavailable during gameplay.",
-                LoggingTarget.Runtime,
-                LogLevel.Important);
+            BmsAudioLogger.LogLoadFailure(
+                $"{(task.IsCompleted ? "Failed to load" : "Timed out while loading")} BMS sample track {track.Name}; this definition will be unavailable during gameplay.");
             discardFailedTrack(sampleKey);
         }
     }

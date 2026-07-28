@@ -5,7 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.IO.Stores;
-using osu.Framework.Logging;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Decoding;
 
 namespace osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
@@ -76,7 +76,7 @@ internal sealed class BmsAudioResourceStore(string basePath, CancellationToken c
             if (BmsFlacDecoder.TryDecodeToWave(File.ReadAllBytes(path), out var wave, out var error))
                 return wave;
 
-            Logger.Log($"Failed to decode FLAC resource '{resourceName}': {error}", LoggingTarget.Runtime, LogLevel.Error);
+            BmsAudioLogger.LogLoadFailure($"Failed to decode FLAC resource '{resourceName}': {error}");
         }
         catch (OperationCanceledException)
         {
@@ -84,7 +84,7 @@ internal sealed class BmsAudioResourceStore(string basePath, CancellationToken c
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, $"Failed to decode FLAC resource '{resourceName}'.");
+            BmsAudioLogger.LogLoadFailure($"Failed to decode FLAC resource '{resourceName}'.", exception);
         }
         finally
         {
