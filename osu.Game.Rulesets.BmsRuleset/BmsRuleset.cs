@@ -171,6 +171,7 @@ public partial class BmsRuleset : Ruleset
             new BmsModRotationRandom(),
 
             new BmsModMirror(),
+            new BmsModInvert(),
             new BmsModSecondPlayer(),
         ],
         ModType.Fun =>

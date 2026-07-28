@@ -73,6 +73,7 @@ Default play uses the Normal gauge. Gauge types are selected via mods:
 | Double Time / Half Time  |                                                                 |         |
 | No Fail                  |                                                                 |         |
 | Mirror                   | Mirrors the key layout                                          |         |
+| Invert (IN)              | Converts each note except the lane's last into a hold note      |         |
 | 2P                       | change the player layout from 1P to 2P                          |         |
 | Auto Scratch (AS)        | auto play scratch lane                                          |         |
 | Hide Scratch (HS)        | Remove the scratch notes and hide scratch lane                  |         |

@@ -68,6 +68,7 @@
 | Double Time / Half Time  |                            | |
 | No Fail                  |                            |     |
 | Mirror                   | 镜像键位布局                     |     |
+| 反键 (IN)                  | 将每条轨道中除最后一个音符外的音符转换为长按音符   |     |
 | 2P                       | 将玩家布局从 1P 切换为 2P           |     |
 | Auto Scratch (AS)        | 自动播放 皿                     |     |
 | Hide Scratch (HS)        | 删除 皿 列的 note，并隐藏该列         |     |

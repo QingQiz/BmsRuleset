@@ -180,6 +180,7 @@
   <data name="mod_branch_replay" xml:space="preserve"><value>保存 BMS 随机与分支选择，以供回放时重现。</value></data>
   <data name="mod_constant" xml:space="preserve"><value>禁用由 BPM 引起的滚动速度变化。</value></data>
   <data name="mod_hide_scratch" xml:space="preserve"><value>移除皿和对应轨道。</value></data>
+  <data name="mod_invert" xml:space="preserve"><value>将每个音符转换为长按音符，并在同一轨道的下一个音符前结束。</value></data>
   <data name="mod_lane_random" xml:space="preserve"><value>重新排列轨道。可指定轨道顺序，或随机生成一种排列。</value></data>
   <data name="mod_mirror" xml:space="preserve"><value>镜像翻转按键布局。</value></data>
   <data name="mod_note_random" xml:space="preserve"><value>逐音符随机排列。&#10;S-RANDOM 使用 40ms 防纵连窗口打乱每个音符。&#10;H-RANDOM 将窗口扩大至 100ms，以更混乱的排列为代价强力拆分纵连。</value></data>

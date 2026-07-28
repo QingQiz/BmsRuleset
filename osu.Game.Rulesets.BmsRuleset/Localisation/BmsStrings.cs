@@ -502,6 +502,8 @@ public static class BmsStrings
 
     public static LocalisableString ModHideScratch => get("mod_hide_scratch");
 
+    public static LocalisableString ModInvert => get("mod_invert");
+
     public static LocalisableString ModLaneRandom => get("mod_lane_random");
 
     public static LocalisableString ModMirror => get("mod_mirror");
