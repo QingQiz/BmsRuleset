@@ -1,15 +1,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.Graphics;
+using osu.Game.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects;
@@ -24,6 +26,8 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
     public override string Name => "Auto Scratch";
 
     public override string Acronym => "AS";
+
+    public override IconUsage? Icon => OsuIcon.ModSpunOut;
 
     public override LocalisableString Description => BmsStrings.ModAutoScratch;
 

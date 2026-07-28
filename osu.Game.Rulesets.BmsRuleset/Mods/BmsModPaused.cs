@@ -1,5 +1,7 @@
 using System.Linq;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -11,6 +13,8 @@ public class BmsModPaused : Mod, IApplicableMod
     public override string Name => "Paused";
 
     public override string Acronym => "PA";
+
+    public override IconUsage? Icon => OsuIcon.ModClassic;
 
     public override LocalisableString Description => BmsStrings.ModPaused;
 

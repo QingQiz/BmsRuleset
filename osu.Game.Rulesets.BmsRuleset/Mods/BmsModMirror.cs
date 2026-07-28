@@ -1,6 +1,8 @@
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Beatmaps;
+using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.Mods;
@@ -12,6 +14,8 @@ public class BmsModMirror : Mod, IApplicableAfterBeatmapConversion
     public override string Name => "Mirror";
 
     public override string Acronym => "MR";
+
+    public override IconUsage? Icon => OsuIcon.ModMirror;
 
     public override LocalisableString Description => BmsStrings.ModMirror;
 
