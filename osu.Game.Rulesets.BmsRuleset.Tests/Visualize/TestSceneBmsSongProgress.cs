@@ -8,11 +8,13 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Containers;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
@@ -63,6 +65,12 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("hit error meter loaded", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().SingleOrDefault()?.IsLoaded == true);
         AddAssert("meter has one window bar", () => meter().ChildrenOfType<Container>().Count(child => child.Name == "judgement windows") == 1);
+        AddAssert("window bars use BMS judgement colours", () =>
+        {
+            HitResult[] results = [HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok];
+            return results.All(result => meter().ChildrenOfType<Box>().Single(child => child.Name == $"{result} window").Colour == BmsHitResultColours.ForHitResult(result))
+                   && meter().ChildrenOfType<Box>().Single(child => child.Name == "empty poor window").Colour == BmsHitResultColours.ForHitResult(HitResult.Miss);
+        });
         AddAssert("centre marker is white", () =>
         {
             var markers = meter().ChildrenOfType<Drawable>()
@@ -85,6 +93,30 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             label("slow label").ScreenSpaceDrawQuad.Centre.X - label("fast label").ScreenSpaceDrawQuad.Centre.X > originalLabelDistance);
         AddStep("stretch vertically", () => meter().Height = 52);
         AddAssert("vertical stretch widens judgement lines", () => judgements().ScreenSpaceDrawQuad.AABBFloat.Height > originalJudgementHeight);
+    }
+
+    [Test]
+    public void TestPoorLineUsesBadWindowEnd()
+    {
+        BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
+        Box badWindow() => meter().ChildrenOfType<Box>().Single(child => child.Name == $"{HitResult.Ok} window");
+        BmsHitErrorMeter.JudgementLine poorLine() => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Single();
+
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddUntilStep("hit error meter loaded", () => meter().IsLoaded);
+        AddStep("register POOR", () =>
+        {
+            var hitObject = Player.GameplayState.Beatmap.HitObjects.OfType<BmsNote>().First();
+            Player.GameplayState.ScoreProcessor.ApplyResult(new JudgementResult(hitObject, hitObject.CreateJudgement())
+            {
+                Type = HitResult.Meh,
+            });
+        });
+        AddUntilStep("POOR line appears", () => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 1);
+        AddAssert("POOR line uses BMS colour", () => poorLine().Colour == BmsHitResultColours.ForHitResult(HitResult.Meh));
+        AddAssert("POOR line is at BAD window end", () =>
+            Math.Abs(poorLine().ScreenSpaceDrawQuad.Centre.X - badWindow().ScreenSpaceDrawQuad.AABBFloat.Right) < 0.5f);
     }
 
     [Test]

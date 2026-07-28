@@ -80,6 +80,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     private readonly DrawablePool<JudgementLine> judgementLinePool = new(max_concurrent_judgements);
 
     private BmsHitErrorMeterDomain domain;
+    private double poorDisplayOffset;
     private double floatingAverage;
     private BmsScoreProcessor? scoreProcessor;
 
@@ -131,6 +132,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         domain = CreateDomain(layout, judgementRate);
 
         var headWindows = BmsJudgementProfileProvider.GetTable(layout, 1, judgementRate, tail: false);
+        poorDisplayOffset = headWindows.SlowWindowFor(HitResult.Ok);
 
         InternalChild = rotatedContent = new Container
         {
@@ -263,7 +265,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
             RelativeSizeAxes = Axes.Both,
             Y = emptyPoorTop,
             Height = Math.Max(0, emptyPoorBottom - emptyPoorTop),
-            Colour = OsuColour.Gray(0.5f),
+            Colour = BmsHitResultColours.ForHitResult(HitResult.Miss),
         });
 
         foreach (var result in results)
@@ -273,11 +275,12 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
             target.Add(new Box
             {
+                Name = $"{result} window",
                 RelativePositionAxes = Axes.Y,
                 RelativeSizeAxes = Axes.Both,
                 Y = top,
                 Height = Math.Max(0, bottom - top),
-                Colour = GetColourForHitResult(result),
+                Colour = BmsHitResultColours.ForHitResult(result),
             });
         }
     }
@@ -401,7 +404,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
         foreach (var observation in GetTimingObservations(judgement))
         {
-            var displayOffset = GetDisplayOffset(observation, domain, ShowPoor.Value);
+            var displayOffset = GetDisplayOffset(observation, poorDisplayOffset, ShowPoor.Value);
 
             if (displayOffset == null)
                 continue;
@@ -436,7 +439,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         judgementLinePool.Get(drawableJudgement =>
         {
             drawableJudgement.Y = domain.RelativePosition(timeOffset);
-            drawableJudgement.Colour = GetColourForHitResult(result);
+            drawableJudgement.Colour = BmsHitResultColours.ForHitResult(result);
             judgementsContainer.Add(drawableJudgement);
         });
 
@@ -459,11 +462,11 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         return [new BmsHitErrorTimingObservation(judgement.TimeOffset, judgement.Type)];
     }
 
-    internal static double? GetDisplayOffset(BmsHitErrorTimingObservation observation, BmsHitErrorMeterDomain domain, bool showPoor)
+    internal static double? GetDisplayOffset(BmsHitErrorTimingObservation observation, double poorDisplayOffset, bool showPoor)
     {
-        // Passive POOR has no finite late edge, so it is represented by the meter's terminal slot.
+        // Passive POOR has no finite late edge, so align it with the end of the visible BAD window.
         if (observation.Result == HitResult.Meh)
-            return showPoor ? domain.SlowOffset : null;
+            return showPoor ? poorDisplayOffset : null;
 
         return observation.Result.IsHit() ? observation.TimeOffset : null;
     }

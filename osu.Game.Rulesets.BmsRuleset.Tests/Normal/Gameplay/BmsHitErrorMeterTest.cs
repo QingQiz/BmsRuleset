@@ -61,17 +61,19 @@ public class BmsHitErrorMeterTest
     }
 
     [Test]
-    public void TestPoorUsesTerminalSlowPositionOnlyWhenEnabled()
+    public void TestPoorUsesBadWindowSlowEdgeOnlyWhenEnabled()
     {
-        var domain = new BmsHitErrorMeterDomain(-500, 500);
+        var windows = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 0.75, tail: false);
+        var badWindowSlowEdge = windows.SlowWindowFor(HitResult.Ok);
         var poor = new BmsHitErrorTimingObservation(281, HitResult.Meh);
 
         Assert.Multiple(() =>
         {
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(poor, domain, showPoor: false), Is.Null);
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(poor, domain, showPoor: true), Is.EqualTo(500));
+            Assert.That(badWindowSlowEdge, Is.EqualTo(280));
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(poor, badWindowSlowEdge, showPoor: false), Is.Null);
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(poor, badWindowSlowEdge, showPoor: true), Is.EqualTo(badWindowSlowEdge));
             Assert.That(BmsHitErrorMeter.GetDisplayOffset(
-                new BmsHitErrorTimingObservation(-12, HitResult.Perfect), domain, showPoor: false), Is.EqualTo(-12));
+                new BmsHitErrorTimingObservation(-12, HitResult.Perfect), badWindowSlowEdge, showPoor: false), Is.EqualTo(-12));
         });
     }
 
