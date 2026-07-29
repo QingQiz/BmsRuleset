@@ -50,7 +50,7 @@ The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets
 | **Parser**    | `#POORBGAxx` — per-slot POOR BGA crop definition (distinct from scalar `#POORBGA` mode)  | 2        |
 | **Parser**    | `#BGAEXPAND` — global BGA scaling mode (0=stretch, 1=keep aspect, 2=no expand)           | 2        |
 | **Parser**    | `#BGAOFF` — disable BGA for the chart                                                    | 2        |
-| **Parser**    | BMSON support                                                                            | 1        |
+| **Parser**    | [BMSON support](bmson-support-plan.md)                                                   | 1        |
 | **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                            |
 | **Parser**    | `#CDDA` — CD audio                                                                       |
 | **Parser**    | `#CHARFILE` / `#ExtChr` — character / skin                                               |
