@@ -7,6 +7,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Mods;
 
@@ -30,6 +31,10 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion
             return;
 
         var newObjects = new List<BmsHitObject>();
+        var tailSampleEvents = bmsBeatmap.HitObjects
+            .OfType<BmsLongNote>()
+            .Where(longNote => longNote.TailSampleKey.HasValue)
+            .Select(longNote => new BmsSampleEvent(longNote.EndTime, 0, longNote.TailSampleKey!.Value, longNote.TailSampleVolume));
 
         foreach (var column in bmsBeatmap.HitObjects.Where(hitObject => hitObject is not BmsLandmine).GroupBy(hitObject => hitObject.Column))
         {
@@ -59,9 +64,27 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion
                     ScrollPositionAtEndTime = bmsBeatmap.TimingMap?.GetScrollPositionAtTime(source.StartTime + duration) ?? 0,
                 });
             }
+
+            var last = locations[^1];
+            newObjects.Add(new BmsNote
+            {
+                Beatmap = bmsBeatmap,
+                StartTime = last.StartTime,
+                Column = last.Column,
+                SourceChannel = last.SourceChannel,
+                SampleKey = last.SampleKey,
+                SampleVolume = last.SampleVolume,
+                Samples = last.Samples.ToList(),
+                JudgementRate = last.JudgementRate,
+                ScrollPositionAtStartTime = last.ScrollPositionAtStartTime,
+            });
         }
 
         newObjects.AddRange(bmsBeatmap.HitObjects.OfType<BmsLandmine>());
+        bmsBeatmap.BackgroundSampleEvents = bmsBeatmap.BackgroundSampleEvents
+            .Concat(tailSampleEvents)
+            .OrderBy(sampleEvent => sampleEvent.Time)
+            .ToArray();
         bmsBeatmap.HitObjects = newObjects.OrderBy(hitObject => hitObject.StartTime).ToList();
         bmsBeatmap.Breaks.Clear();
     }

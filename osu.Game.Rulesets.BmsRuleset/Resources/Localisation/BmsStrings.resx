@@ -180,7 +180,7 @@
   <data name="mod_branch_replay" xml:space="preserve"><value>Stores BMS random/switch branch decisions for replay playback.</value></data>
   <data name="mod_constant" xml:space="preserve"><value>Disables BPM-based scroll speed changes.</value></data>
   <data name="mod_hide_scratch" xml:space="preserve"><value>Remove scratch notes and scratch columns.</value></data>
-  <data name="mod_invert" xml:space="preserve"><value>Converts each note into a hold note that ends shortly before the next note in the same lane.</value></data>
+  <data name="mod_invert" xml:space="preserve"><value>Converts each note except the last in each lane into a hold note that ends shortly before the next note.</value></data>
   <data name="mod_lane_random" xml:space="preserve"><value>Permutes lane columns. Set a custom lane order or let it generate a random permutation.</value></data>
   <data name="mod_mirror" xml:space="preserve"><value>Mirrors the key layout.</value></data>
   <data name="mod_note_random" xml:space="preserve"><value>Per-note randomisation.&#x20;&#10;S-RANDOM shuffles every note with a 40ms anti-jack window.&#x20;&#10;H-RANDOM widens it to 100ms, aggressively breaking jacks at the cost of more chaotic patterns.</value></data>
