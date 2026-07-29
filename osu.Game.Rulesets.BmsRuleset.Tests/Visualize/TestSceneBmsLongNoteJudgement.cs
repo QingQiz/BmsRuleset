@@ -1023,6 +1023,36 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         });
     }
 
+    [TestCase(100, true)]
+    [TestCase(-100, false)]
+    public void TestVisualOffsetChangesPinnedHeadPosition(double visualOffset, bool belowJudgementLine)
+    {
+        const int fast_press_case_index = 6;
+        const double start_time = first_case_time + fast_press_case_index * case_spacing;
+
+        AddStep("load player in LN mode", () => LoadPlayer([new BmsModLongNote()]));
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
+        AddStep("set visual offset", () => Playfield.VisualOffset.Value = visualOffset);
+        AddStep("seek after head time", () =>
+        {
+            Player.GameplayClockContainer.Seek(start_time + 20);
+            Player.GameplayClockContainer.Stop();
+        });
+        AddUntilStep("fast-hit long note alive", () => getCaseLongNote(fast_press_case_index)?.Alpha > 0);
+        AddUntilStep("visual offset moves held head", () =>
+        {
+            var longNote = getCaseLongNote(fast_press_case_index);
+            if (longNote == null)
+                return false;
+
+            return belowJudgementLine
+                ? headBottomOf(longNote) > Playfield.JudgementLineY() + 1
+                : headBottomOf(longNote) < Playfield.JudgementLineY() - 1;
+        });
+        AddStep("reset visual offset", () => Playfield.VisualOffset.Value = 0);
+    }
+
     [Test]
     public void TestReleasedHeadResumesNaturalPosition()
     {

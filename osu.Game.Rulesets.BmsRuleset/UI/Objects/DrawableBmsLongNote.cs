@@ -67,13 +67,15 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         const float max_piece_height = 4096;
         var holdingBody = isHoldingBody();
 
-        // A held LN should visually stay attached to the judgement line until its tail passes it.
+        visualState.CaptureHeadYAtStartTime(headY, Time.Current, HitObject.StartTime);
+
+        // Capturing once keeps later speed changes on the body and tail from moving a held head.
         if (holdingBody)
         {
-            // Like mania, a fast hit must not stretch the LN by pulling its head to the judgement
-            // line before the chart position reaches it. A completed tail must not activate the pin later.
+            // Like mania, a fast hit must not stretch the LN by fixing its head
+            // before the chart time reaches it. A completed tail must not activate the pin later.
             var canPinHead = Time.Current >= HitObject.StartTime && !controller.TailJudged;
-            headY = visualState.ResolveHeldHeadY(headY, endY, -HitTargetPosition, canPinHead, bodyDirectionBeforeTailPasses);
+            headY = visualState.ResolveHeldHeadY(headY, endY, canPinHead, bodyDirectionBeforeTailPasses);
         }
 
         var myY = Y;
