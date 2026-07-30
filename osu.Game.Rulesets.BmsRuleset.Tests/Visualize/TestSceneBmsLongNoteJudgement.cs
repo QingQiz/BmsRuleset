@@ -607,8 +607,8 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         return new CaseExpectation(resultCounts, sequence, expectedHealthEvents);
     }
 
-    // beatoraja carries the head offset until LN completion; manual release can only replace it
-    // when the release-side miss is worse, while auto-tail keeps the stored head offset.
+    // beatoraja judges an auto-tail with the stored head result. A manual release uses the wider
+    // tail table and can replace the head offset when the release-side miss is worse.
     private static IReadOnlyList<HitResult> expectedJudgementSequence(LongNoteVisualCase testCase, BmsLongNoteMode mode)
     {
         var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
@@ -643,15 +643,16 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         if (mode == BmsLongNoteMode.LongNote)
         {
             var releaseBeforeTail = testCase.FirstReleaseOffsetAfter(firstPress.Value, onlyBeforeTail: true);
+
+            if (releaseBeforeTail == null)
+                return [headResult];
+
             var judgeOffset = firstPress.Value;
 
-            if (releaseBeforeTail != null)
-            {
-                var releaseOffsetFromTail = releaseBeforeTail.Value - long_note_duration;
-                judgeOffset = Math.Abs(firstPress.Value) > Math.Abs(releaseOffsetFromTail)
-                    ? firstPress.Value
-                    : releaseOffsetFromTail;
-            }
+            var releaseOffsetFromTail = releaseBeforeTail.Value - long_note_duration;
+            judgeOffset = Math.Abs(firstPress.Value) > Math.Abs(releaseOffsetFromTail)
+                ? firstPress.Value
+                : releaseOffsetFromTail;
 
             var result = tailTable.ResultForOffset(judgeOffset);
             return [result == HitResult.None ? HitResult.Meh : result];

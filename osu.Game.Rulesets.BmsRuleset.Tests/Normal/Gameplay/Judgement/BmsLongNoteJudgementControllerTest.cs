@@ -223,29 +223,34 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
-    public void TestPassiveTailMissAppliesMehAfterEndTime()
+    public void TestAutomaticNormalTailDoesNotBecomePoorAfterEndTime()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, start: 1000, duration: 500);
         controller.TryHit(1000, HitResult.Perfect);
 
-        // EndTime = 1500; past the tail passive-poor offset (Bme7K rank-2 tail Ok slow edge is +280ms).
+        // A delayed update must preserve beatoraja's stored head judgement instead of using
+        // the elapsed time past the tail as a release offset.
         controller.CheckPassiveResult(currentTime: 1500 + 600);
 
-        Assert.That(hooks.AppliedResults, Is.EqualTo([HitResult.Meh]));
+        Assert.That(hooks.AppliedResults, Is.EqualTo([HitResult.Perfect]));
         Assert.That(controller.TailJudged, Is.True);
     }
 
     [Test]
-    public void TestAutomaticNormalTailUsesHeadJudgementOffset()
+    public void TestAutomaticNormalTailUsesHeadJudgementOffsetAndWindow()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, start: 1000, duration: 500);
-        controller.TryHit(987, HitResult.Great);
+        controller.TryHit(1080, HitResult.Good);
 
-        controller.CheckPassiveResult(1500);
+        controller.CheckPassiveResult(2000);
 
-        Assert.That(hooks.AppliedEndpoints.Last().endpointTime, Is.EqualTo(1500));
-        Assert.That(hooks.AppliedEndpoints.Last().eventTime, Is.EqualTo(1487));
-        Assert.That(hooks.AppliedEndpoints.Last().eventTime - hooks.AppliedEndpoints.Last().endpointTime, Is.EqualTo(-13));
+        Assert.Multiple(() =>
+        {
+            Assert.That(hooks.AppliedResults, Is.EqualTo([HitResult.Good]));
+            Assert.That(hooks.AppliedEndpoints.Last().endpointTime, Is.EqualTo(1500));
+            Assert.That(hooks.AppliedEndpoints.Last().eventTime, Is.EqualTo(1580));
+            Assert.That(hooks.AppliedEndpoints.Last().eventTime - hooks.AppliedEndpoints.Last().endpointTime, Is.EqualTo(80));
+        });
     }
 
     [Test]

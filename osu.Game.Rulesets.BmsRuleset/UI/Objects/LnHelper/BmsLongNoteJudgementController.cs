@@ -139,7 +139,7 @@ internal sealed class BmsLongNoteJudgementController
         }
 
         if (tailOffset >= 0)
-            applyLongNoteReleaseResult(tailTable, tailOffset, currentTime, gameplayRate, automatic: true);
+            applyLongNoteReleaseResult(headTable, tailOffset, currentTime, gameplayRate, automatic: true);
     }
 
     public double ChargeTailLifetimeEnd()
@@ -214,16 +214,15 @@ internal sealed class BmsLongNoteJudgementController
     }
 
     private void applyLongNoteReleaseResult(
-        BmsJudgementWindowTable tailTable,
+        BmsJudgementWindowTable resultTable,
         double tailOffset,
         double eventTime,
         double gameplayRate,
         bool automatic)
     {
-        var useHeadOffset = automatic && !tailTable.IsPastPassivePoorOffset(tailOffset)
-                            || Math.Abs(headJudgeOffset) > Math.Abs(tailOffset);
+        var useHeadOffset = automatic || Math.Abs(headJudgeOffset) > Math.Abs(tailOffset);
         var heldOffset = useHeadOffset ? headJudgeOffset : tailOffset;
-        var result = tailTable.ResultForOffset(heldOffset);
+        var result = resultTable.ResultForOffset(heldOffset);
         var endpointResult = result == HitResult.None ? HitResult.Meh : result;
 
         var tailEndpoint = endpoint(
