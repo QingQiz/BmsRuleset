@@ -73,8 +73,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (holdingBody)
         {
             // Like mania, a fast hit must not stretch the LN by fixing its head
-            // before the chart time reaches it. A completed tail must not activate the pin later.
-            var canPinHead = Time.Current >= HitObject.StartTime && !controller.TailJudged;
+            // before the chart time reaches it.
+            var canPinHead = Time.Current >= HitObject.StartTime;
             headY = visualState.ResolveHeldHeadY(headY, endY, canPinHead, bodyDirectionBeforeTailPasses);
         }
 
