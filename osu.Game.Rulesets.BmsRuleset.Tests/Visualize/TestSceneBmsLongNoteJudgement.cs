@@ -1050,6 +1050,17 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
                 ? headBottomOf(longNote) > Playfield.JudgementLineY() + 1
                 : headBottomOf(longNote) < Playfield.JudgementLineY() - 1;
         });
+        AddStep("invert visual offset", () => Playfield.VisualOffset.Value = -visualOffset);
+        AddUntilStep("held head follows changed visual offset", () =>
+        {
+            var longNote = getCaseLongNote(fast_press_case_index);
+            if (longNote == null)
+                return false;
+
+            return belowJudgementLine
+                ? headBottomOf(longNote) < Playfield.JudgementLineY() - 1
+                : headBottomOf(longNote) > Playfield.JudgementLineY() + 1;
+        });
         AddStep("reset visual offset", () => Playfield.VisualOffset.Value = 0);
     }
 

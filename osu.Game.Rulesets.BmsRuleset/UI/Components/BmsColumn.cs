@@ -70,6 +70,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal double ScrollSpeedMultiplier => ParentPlayfield.ScrollController.ScrollSpeedMultiplier;
 
+    internal double VisualOffset => ParentPlayfield.VisualOffset.Value;
+
     internal float NoteHeightScale => ParentPlayfield.Stage.NoteHeightScale;
 
     protected BmsPlayfield ParentPlayfield { get; }

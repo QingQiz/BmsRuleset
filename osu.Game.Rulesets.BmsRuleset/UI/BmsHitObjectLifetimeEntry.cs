@@ -23,6 +23,8 @@ internal sealed class BmsHitObjectLifetimeEntry(
     /// </summary>
     private bool lifetimeComputed;
 
+    private double? lifetimeStartWithoutVisualOffset;
+
     #region Constants
 
     /// <summary>
@@ -76,10 +78,12 @@ internal sealed class BmsHitObjectLifetimeEntry(
         if (HitObject is not BmsHitObject hitObject)
             return;
 
-        var futureLifetime = computeFutureLifetime(hitObject) + Math.Max(0, getVisualOffset()) * scrollController.PlaybackRate;
+        var futureLifetime = computeFutureLifetime(hitObject);
         var pastLifetime = computePastLifetime();
         var slowWindow = getSlowWindow(hitObject);
-        var lifetimeStart = hitObject.StartTime - futureLifetime;
+        var baseLifetimeStart = hitObject.StartTime - futureLifetime;
+        lifetimeStartWithoutVisualOffset = baseLifetimeStart;
+        var lifetimeStart = computeLifetimeStartWithVisualOffset(baseLifetimeStart);
 
         if (currentTime is double now && now >= LifetimeStart && now <= LifetimeEnd)
             lifetimeStart = Math.Min(lifetimeStart, now);
@@ -95,6 +99,21 @@ internal sealed class BmsHitObjectLifetimeEntry(
             : hitObject.GetEndTime() + Math.Max(pastLifetime, slowWindow + lifetime_margin);
         LifetimeStart = lifetimeStart;
 
+        lifetimeComputed = true;
+    }
+
+    public void ApplyVisualOffset()
+    {
+        if (lifetimeStartWithoutVisualOffset is not { } baseLifetimeStart)
+        {
+            RefreshLifetime();
+            return;
+        }
+
+        var lifetimeStart = Math.Min(LifetimeStart, computeLifetimeStartWithVisualOffset(baseLifetimeStart));
+
+        lifetimeComputed = false;
+        LifetimeStart = lifetimeStart;
         lifetimeComputed = true;
     }
 
@@ -300,6 +319,9 @@ internal sealed class BmsHitObjectLifetimeEntry(
     private double currentScrollRangeScale() => scrollController.ScrollRangeScale > 0 ? scrollController.ScrollRangeScale : 1;
 
     private BmsTimingMap? getTimingMap() => scrollController.TimingMap;
+
+    private double computeLifetimeStartWithVisualOffset(double baseLifetimeStart) =>
+        baseLifetimeStart - Math.Max(0, getVisualOffset()) * scrollController.PlaybackRate;
 
     #endregion
 

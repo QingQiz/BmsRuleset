@@ -264,6 +264,15 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         }
     }
 
+    internal void ApplyVisualOffsetToAllLifetimes()
+    {
+        foreach (var column in Stage.Columns)
+        {
+            if (column.HitObjectContainer is BmsColumnHitObjectContainer container)
+                container.ApplyVisualOffsetToAllEntries();
+        }
+    }
+
     #endregion
 
     #region Lifecycle
@@ -339,7 +348,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             }
         }
 
-        VisualOffset.BindValueChanged(_ => RefreshAllLifetimes());
+        VisualOffset.BindValueChanged(_ => ApplyVisualOffsetToAllLifetimes());
         RefreshAllLifetimes();
     }
 

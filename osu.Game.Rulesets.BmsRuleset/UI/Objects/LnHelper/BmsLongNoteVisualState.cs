@@ -7,30 +7,38 @@ internal sealed class BmsLongNoteVisualState
     private float? headYAtStartTime;
     private double? previousHeadTime;
     private float previousHeadY;
+    private double previousVisualOffset = double.NaN;
     private int? heldBodyDirection;
 
     public void PrepareHeadPin() => heldBodyDirection = null;
 
-    public void CaptureHeadYAtStartTime(float realHeadY, double currentTime, double startTime)
+    public void UpdateHeadYAtStartTime(float realHeadY, double currentTime, double startTime, double visualOffset)
     {
-        if (headYAtStartTime != null)
-            return;
+        var visualOffsetChanged = previousVisualOffset != visualOffset;
 
-        if (currentTime < startTime)
+        // Reuse the observed visual displacement so an offset change does not require a timing-map query.
+        if (headYAtStartTime != null && visualOffsetChanged && previousHeadTime != null)
+            headYAtStartTime += realHeadY - previousHeadY;
+
+        if (headYAtStartTime == null)
         {
-            previousHeadTime = currentTime;
-            previousHeadY = realHeadY;
-            return;
+            if (currentTime >= startTime)
+            {
+                if (!visualOffsetChanged && previousHeadTime is { } previousTime && currentTime > previousTime)
+                {
+                    var progress = (float)Math.Clamp((startTime - previousTime) / (currentTime - previousTime), 0, 1);
+                    headYAtStartTime = previousHeadY + (realHeadY - previousHeadY) * progress;
+                }
+                else
+                {
+                    headYAtStartTime = realHeadY;
+                }
+            }
         }
 
-        if (previousHeadTime is { } previousTime && currentTime > previousTime)
-        {
-            var progress = (float)Math.Clamp((startTime - previousTime) / (currentTime - previousTime), 0, 1);
-            headYAtStartTime = previousHeadY + (realHeadY - previousHeadY) * progress;
-            return;
-        }
-
-        headYAtStartTime = realHeadY;
+        previousHeadTime = currentTime;
+        previousHeadY = realHeadY;
+        previousVisualOffset = visualOffset;
     }
 
     public float ResolveHeldHeadY(float realHeadY, float realTailY, bool canPin, Func<float, float, int> directionResolver)
@@ -38,10 +46,7 @@ internal sealed class BmsLongNoteVisualState
         if (!canPin || headYAtStartTime == null)
             return realHeadY;
 
-        if (heldBodyDirection == null)
-        {
-            heldBodyDirection = directionResolver(realHeadY, realTailY);
-        }
+        heldBodyDirection ??= directionResolver(realHeadY, realTailY);
 
         return headYAtStartTime.Value;
     }
@@ -54,6 +59,7 @@ internal sealed class BmsLongNoteVisualState
         headYAtStartTime = null;
         previousHeadTime = null;
         previousHeadY = 0;
+        previousVisualOffset = double.NaN;
         heldBodyDirection = null;
     }
 }

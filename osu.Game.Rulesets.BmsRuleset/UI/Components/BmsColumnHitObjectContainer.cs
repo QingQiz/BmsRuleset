@@ -40,6 +40,15 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         }
     }
 
+    internal void ApplyVisualOffsetToAllEntries()
+    {
+        foreach (var entry in Entries)
+        {
+            if (entry is BmsHitObjectLifetimeEntry bmsEntry)
+                bmsEntry.ApplyVisualOffset();
+        }
+    }
+
     protected override void UpdateAfterChildrenLife()
     {
         base.UpdateAfterChildrenLife();

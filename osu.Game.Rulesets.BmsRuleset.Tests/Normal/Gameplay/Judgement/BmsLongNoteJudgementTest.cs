@@ -574,11 +574,10 @@ public class BmsLongNoteJudgementTest
         var visualState = new BmsLongNoteVisualState();
 
         visualState.PrepareHeadPin();
-        visualState.CaptureHeadYAtStartTime(20, 980, 1000);
+        visualState.UpdateHeadYAtStartTime(20, 980, 1000, 0);
         var fallingHead = visualState.ResolveHeldHeadY(
             realHeadY: 20, realTailY: 40, canPin: false, directionResolver: (_, _) => 1);
-        visualState.CaptureHeadYAtStartTime(80, 1020, 1000);
-        visualState.CaptureHeadYAtStartTime(100, 1040, 1000);
+        visualState.UpdateHeadYAtStartTime(80, 1020, 1000, 0);
         var fixedHead = visualState.ResolveHeldHeadY(
             realHeadY: 80, realTailY: 100, canPin: true, directionResolver: (_, _) => 1);
 
@@ -594,7 +593,7 @@ public class BmsLongNoteJudgementTest
         var visualState = new BmsLongNoteVisualState();
 
         visualState.PrepareHeadPin();
-        visualState.CaptureHeadYAtStartTime(50, 980, 1000);
+        visualState.UpdateHeadYAtStartTime(50, 980, 1000, 0);
         var fallingHead = visualState.ResolveHeldHeadY(
             realHeadY: 20, realTailY: 40, canPin: false, directionResolver: (_, _) => 1);
         var completedHead = visualState.ResolveHeldHeadY(
@@ -610,7 +609,7 @@ public class BmsLongNoteJudgementTest
         var visualState = new BmsLongNoteVisualState();
 
         visualState.PrepareHeadPin();
-        visualState.CaptureHeadYAtStartTime(50, 1000, 1000);
+        visualState.UpdateHeadYAtStartTime(50, 1000, 1000, 0);
         Assert.That(visualState.ResolveHeldHeadY(
             realHeadY: 50, realTailY: 70, canPin: true, directionResolver: (_, _) => 1), Is.EqualTo(50));
 

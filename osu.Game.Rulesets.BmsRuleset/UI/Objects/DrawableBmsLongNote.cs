@@ -66,10 +66,10 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     {
         const float max_piece_height = 4096;
         var holdingBody = isHoldingBody();
+        var visualOffset = ParentColumn?.VisualOffset ?? 0;
 
-        visualState.CaptureHeadYAtStartTime(headY, Time.Current, HitObject.StartTime);
+        visualState.UpdateHeadYAtStartTime(headY, Time.Current, HitObject.StartTime, visualOffset);
 
-        // Capturing once keeps later speed changes on the body and tail from moving a held head.
         if (holdingBody)
         {
             // Like mania, a fast hit must not stretch the LN by fixing its head
