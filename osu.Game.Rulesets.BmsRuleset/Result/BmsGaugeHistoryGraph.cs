@@ -74,7 +74,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
     internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap)
     {
         if (BmsScoreGaugeHistoryStore.TryGet(score, out var gaugeHistory) && gaugeHistory.Count > 0)
-            return createSeries(score, gaugeHistory);
+            return createSeries(score, gaugeHistory, graphDuration(playableBeatmap, gaugeHistory.Max(e => e.Time)));
 
         var hitEvents = (BmsJudgementEventStore.TryGet(score, out var judgementEvents)
                 ? BmsJudgementEventProjection.CreateScoringHitEvents(judgementEvents)
@@ -89,7 +89,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             noteCount = 1;
 
         var total = playableBeatmap is BmsBeatmap bmsBeatmap ? bmsBeatmap.Total : 0;
-        var duration = Math.Max(1, hitEvents.Max(e => e.HitObject.GetEndTime()));
+        var duration = graphDuration(playableBeatmap, hitEvents.Max(e => e.HitObject.GetEndTime()));
 
         var gaugeTypes = gaugeTypesFor(score.Mods).ToArray();
         var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes);
@@ -97,11 +97,10 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         return gaugeTypes.Select(type => createSeries(type, hitEvents, total, noteCount, duration, type == finalGaugeType)).ToArray();
     }
 
-    private static IReadOnlyList<GaugeSeries> createSeries(ScoreInfo score, IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory)
+    private static IReadOnlyList<GaugeSeries> createSeries(ScoreInfo score, IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory, double duration)
     {
         var ordered = gaugeHistory.ToArray();
 
-        var duration = Math.Max(1, ordered.Max(e => e.Time));
         var gaugeTypes = ordered
             .SelectMany(e => e.States.Select(s => s.GaugeType))
             .Distinct()
@@ -111,6 +110,20 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes) ?? ordered[^1].ActiveGaugeType;
         return gaugeTypes.Select(type => createSeries(type, ordered, duration, type == finalGaugeType)).ToArray();
     }
+
+    private static double graphDuration(IBeatmap playableBeatmap, double lastEventTime)
+    {
+        var beatmapEndTime = playableBeatmap.HitObjects
+            .Select(hitObject => hitObject.GetEndTime())
+            .DefaultIfEmpty(0)
+            .Max();
+
+        return Math.Max(1, Math.Max(beatmapEndTime, lastEventTime));
+    }
+
+    // Late LN results must retain their application order, so clamp their plotted time instead of reordering gauge states.
+    private static float monotonicGraphTime(double eventTime, double duration, float previousTime)
+        => Math.Max(previousTime, (float)Math.Clamp(eventTime / duration, 0, 1));
 
     private static GaugeSeries createSeries(BmsGaugeType type, IReadOnlyList<BmsGaugeHistoryEvent> history, double duration, bool isFinalUsedGauge)
     {
@@ -124,7 +137,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
 
         foreach (var gaugeEvent in history)
         {
-            var time = (float)Math.Clamp(gaugeEvent.Time / duration, 0, 1);
+            var time = monotonicGraphTime(gaugeEvent.Time, duration, points[^1].Time);
             var state = gaugeEvent.States.FirstOrDefault(s => s.GaugeType == type);
 
             if (state != null)
@@ -314,7 +327,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
 
         foreach (var hitEvent in hitEvents)
         {
-            var time = (float)Math.Clamp(hitEvent.HitObject.GetEndTime() / duration, 0, 1);
+            var time = monotonicGraphTime(hitEvent.HitObject.GetEndTime(), duration, points[^1].Time);
 
             if (!failed)
             {

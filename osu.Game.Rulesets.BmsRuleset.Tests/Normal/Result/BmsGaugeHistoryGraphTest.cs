@@ -3,6 +3,7 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Result;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
@@ -98,6 +99,60 @@ public class BmsGaugeHistoryGraphTest
     }
 
     [Test]
+    public void TestInvertGaugeFailureUsesPlayableBeatmapDuration()
+    {
+        var score = new ScoreInfo { Mods = [new BmsModInvert(), new BmsModHardGauge()] };
+        BmsScoreGaugeHistoryStore.Set(score,
+        [
+            new BmsGaugeHistoryEvent(1500, BmsGaugeType.Hard,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
+            ]),
+        ]);
+        var beatmap = new BmsBeatmap
+        {
+            HitObjects =
+            {
+                new BmsLongNote { StartTime = 1000, Duration = 500 },
+                new BmsNote { StartTime = 3000 },
+            },
+        };
+
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, beatmap).Single();
+
+        Assert.That(series.FailurePoint, Is.Not.Null);
+        Assert.That(series.FailurePoint!.Value.Time, Is.EqualTo(0.5f));
+        Assert.That(series.Points.Last().Time, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TestFallbackGaugeFailureUsesPlayableBeatmapDuration()
+    {
+        var score = new ScoreInfo
+        {
+            Mods = [new BmsModInvert(), new BmsModHazardGauge()],
+            HitEvents =
+            [
+                new HitEvent(0, 1, HitResult.Ok, new BmsLongNote { StartTime = 1000, Duration = 500 }, null, null),
+            ],
+        };
+        var beatmap = new BmsBeatmap
+        {
+            HitObjects =
+            {
+                new BmsLongNote { StartTime = 1000, Duration = 500 },
+                new BmsNote { StartTime = 3000 },
+            },
+        };
+
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, beatmap).Single();
+
+        Assert.That(series.FailurePoint, Is.Not.Null);
+        Assert.That(series.FailurePoint!.Value.Time, Is.EqualTo(0.5f));
+        Assert.That(series.Points.Last().Time, Is.EqualTo(1));
+    }
+
+    [Test]
     public void TestPersistedHistoryPreservesCanonicalSnapshotOrder()
     {
         var score = new ScoreInfo { Mods = [new BmsModAutoGauge()] };
@@ -117,8 +172,11 @@ public class BmsGaugeHistoryGraphTest
 
         var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap());
 
-        Assert.That(series.Single(s => s.Name == "Easy").IsFinalUsedGauge, Is.True);
-        Assert.That(series.Single(s => s.Name == "Easy").Points[^1].Health, Is.EqualTo(0.9f));
+        var easySeries = series.Single(s => s.Name == "Easy");
+
+        Assert.That(easySeries.IsFinalUsedGauge, Is.True);
+        Assert.That(easySeries.Points[^1].Health, Is.EqualTo(0.9f));
+        Assert.That(easySeries.Points.Select(p => p.Time), Is.Ordered.Ascending);
     }
 
     [Test]
@@ -142,6 +200,7 @@ public class BmsGaugeHistoryGraphTest
         var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap()).Single();
 
         Assert.That(series.Points[1].Health, Is.GreaterThan(series.Points[2].Health));
+        Assert.That(series.Points.Select(p => p.Time), Is.Ordered.Ascending);
     }
 
     [Test]
