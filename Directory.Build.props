@@ -11,7 +11,7 @@
         <!-- Shared year.milestone base; bump this to move osu + ruleset together. -->
         <OsuBase Condition="'$(OsuBase)' == ''">2026.726</OsuBase>
         <!-- Ruleset's own "small version". osu's revision is always 0 by convention. -->
-        <RulesetRevision Condition="'$(RulesetRevision)' == ''">0</RulesetRevision>
+        <RulesetRevision Condition="'$(RulesetRevision)' == ''">1</RulesetRevision>
         <!-- Version passed to osu (nuget ref / local checkout target): always base + .0. -->
         <OsuVersion>$(OsuBase).0</OsuVersion>
         <!-- Defaults true: $(OsuVersion) targets a local osu checkout (../osu) because that version
