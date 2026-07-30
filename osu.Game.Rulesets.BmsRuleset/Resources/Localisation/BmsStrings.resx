@@ -199,6 +199,9 @@
   <data name="seed" xml:space="preserve"><value>Seed</value></data>
   <data name="seed_description" xml:space="preserve"><value>Use a custom seed for deterministic randomisation.</value></data>
   <data name="note_random_seed_description" xml:space="preserve"><value>Use a custom seed for deterministic randomisation (required for replay consistency).</value></data>
+  <data name="invert_seed_description" xml:space="preserve"><value>Use a custom seed for reproducible random LN lengths.</value></data>
+  <data name="randomise_long_note_length" xml:space="preserve"><value>Randomise LN length</value></data>
+  <data name="randomise_long_note_length_description" xml:space="preserve"><value>Choose each LN length at random while leaving a playable gap before the next note.</value></data>
   <data name="lane_order" xml:space="preserve"><value>Lane Order</value></data>
   <data name="lane_order_description" xml:space="preserve"><value>Comma-separated direct lane mapping (e.g. "0,3,1,4,2,5").</value></data>
   <data name="note_random_mode" xml:space="preserve"><value>Mode</value></data>

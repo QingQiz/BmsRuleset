@@ -141,6 +141,68 @@ public class BmsModInvertTest
     }
 
     [Test]
+    public void TestRandomLengthIsDeterministicAndPlayable()
+    {
+        var first = createEvenlySpacedBeatmap();
+        var second = createEvenlySpacedBeatmap();
+        var differentSeed = createEvenlySpacedBeatmap();
+
+        applyRandomLength(first, 12345);
+        applyRandomLength(second, 12345);
+        applyRandomLength(differentSeed, 54321);
+
+        var firstDurations = first.HitObjects.OfType<BmsLongNote>().Select(longNote => longNote.Duration).ToArray();
+        var secondDurations = second.HitObjects.OfType<BmsLongNote>().Select(longNote => longNote.Duration).ToArray();
+        var differentDurations = differentSeed.HitObjects.OfType<BmsLongNote>().Select(longNote => longNote.Duration).ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstDurations, Is.EqualTo(secondDurations));
+            Assert.That(firstDurations, Is.Not.EqualTo(differentDurations));
+            Assert.That(firstDurations, Has.All.InRange(125, 875));
+        });
+
+        var notesByColumn = first.HitObjects.GroupBy(hitObject => hitObject.Column);
+
+        foreach (var column in notesByColumn)
+        {
+            var ordered = column.OrderBy(hitObject => hitObject.StartTime).ToArray();
+
+            for (var i = 0; i < ordered.Length - 1; i++)
+                Assert.That(((BmsLongNote)ordered[i]).EndTime, Is.LessThan(ordered[i + 1].StartTime));
+        }
+    }
+
+    [Test]
+    public void TestRandomLengthSplitsIntervalsShorterThanHalfBeat()
+    {
+        var beatmap = createBeatmap(
+            new BmsNote { StartTime = 1000, Column = 1 },
+            new BmsNote { StartTime = 1200, Column = 1 });
+        var mod = new BmsModInvert { RandomiseLength = { Value = true }, Seed = { Value = 12345 } };
+
+        mod.ApplyToBeatmap(beatmap);
+
+        assertLongNote(beatmap.HitObjects[0], 1, 1000, 100);
+    }
+
+    [Test]
+    public void TestRandomSeedOnlyGeneratedWhenEnabled()
+    {
+        var disabled = new BmsModInvert();
+        disabled.ApplyToBeatmap(createEvenlySpacedBeatmap());
+
+        var enabled = new BmsModInvert { RandomiseLength = { Value = true } };
+        enabled.ApplyToBeatmap(createEvenlySpacedBeatmap());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(disabled.Seed.Value, Is.Null);
+            Assert.That(enabled.Seed.Value, Is.Not.Null);
+        });
+    }
+
+    [Test]
     public void TestRegisteredAsConversionMod()
     {
         var mod = new BmsRuleset().GetModsFor(ModType.Conversion).OfType<BmsModInvert>().Single();
@@ -149,7 +211,22 @@ public class BmsModInvertTest
         {
             Assert.That(mod.Acronym, Is.EqualTo("IN"));
             Assert.That(mod.Type, Is.EqualTo(ModType.Conversion));
+            Assert.That(mod.RandomiseLength.Value, Is.False);
         });
+    }
+
+    private static BmsBeatmap createEvenlySpacedBeatmap() => createBeatmap(
+        new BmsNote { StartTime = 1000, Column = 1 },
+        new BmsNote { StartTime = 2000, Column = 1 },
+        new BmsNote { StartTime = 3000, Column = 1 },
+        new BmsNote { StartTime = 1000, Column = 2 },
+        new BmsNote { StartTime = 2000, Column = 2 },
+        new BmsNote { StartTime = 3000, Column = 2 });
+
+    private static void applyRandomLength(BmsBeatmap beatmap, int seed)
+    {
+        var mod = new BmsModInvert { RandomiseLength = { Value = true }, Seed = { Value = seed } };
+        mod.ApplyToBeatmap(beatmap);
     }
 
     private static BmsBeatmap createBeatmap(params BmsHitObject[] hitObjects)

@@ -77,6 +77,12 @@ public static class BmsStrings
 
     public static LocalisableString NoteRandomSeedDescription => get("note_random_seed_description");
 
+    public static LocalisableString InvertSeedDescription => get("invert_seed_description");
+
+    public static LocalisableString RandomiseLongNoteLength => get("randomise_long_note_length");
+
+    public static LocalisableString RandomiseLongNoteLengthDescription => get("randomise_long_note_length_description");
+
     public static LocalisableString LaneOrder => get("lane_order");
 
     public static LocalisableString LaneOrderDescription => get("lane_order_description");

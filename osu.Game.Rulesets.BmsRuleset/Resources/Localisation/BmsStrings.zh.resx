@@ -199,6 +199,9 @@
   <data name="seed" xml:space="preserve"><value>随机种子</value></data>
   <data name="seed_description" xml:space="preserve"><value>使用自定义随机种子以生成可重复的随机排列。</value></data>
   <data name="note_random_seed_description" xml:space="preserve"><value>使用自定义随机种子以生成可重复的随机排列（确保回放一致性所必需）。</value></data>
+  <data name="invert_seed_description" xml:space="preserve"><value>使用自定义随机种子以生成可重复的随机 LN 长度。</value></data>
+  <data name="randomise_long_note_length" xml:space="preserve"><value>随机 LN 长度</value></data>
+  <data name="randomise_long_note_length_description" xml:space="preserve"><value>随机选择每个 LN 的长度，并在下一个音符前保留可操作的间隔。</value></data>
   <data name="lane_order" xml:space="preserve"><value>轨道顺序</value></data>
   <data name="lane_order_description" xml:space="preserve"><value>以逗号分隔的直接轨道映射（例如“0,3,1,4,2,5”）。</value></data>
   <data name="note_random_mode" xml:space="preserve"><value>模式</value></data>

@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Framework.Utils;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
+using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -13,7 +17,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
 
-public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion
+public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion, IHasSeed
 {
     public override string Name => "Invert";
 
@@ -25,10 +29,24 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion
 
     public override ModType Type => ModType.Conversion;
 
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.RandomiseLongNoteLength), nameof(BmsStrings.RandomiseLongNoteLengthDescription))]
+    public Bindable<bool> RandomiseLength { get; } = new();
+
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.Seed), nameof(BmsStrings.InvertSeedDescription), SettingControlType = typeof(SettingsNumberBox))]
+    public Bindable<int?> Seed { get; } = new();
+
     public void ApplyToBeatmap(IBeatmap beatmap)
     {
         if (beatmap is not BmsBeatmap bmsBeatmap)
             return;
+
+        Random? rng = null;
+
+        if (RandomiseLength.Value)
+        {
+            Seed.Value ??= RNG.Next();
+            rng = new Random((int)Seed.Value);
+        }
 
         var newObjects = new List<BmsHitObject>();
         var tailSampleEvents = bmsBeatmap.HitObjects
@@ -47,7 +65,7 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion
                 var duration = nextStartTime - source.StartTime;
                 var beatLength = beatmap.ControlPointInfo.TimingPointAt(nextStartTime).BeatLength;
 
-                duration = Math.Max(duration / 2, duration - beatLength / 4);
+                duration = getLongNoteDuration(duration, beatLength, rng);
 
                 newObjects.Add(new BmsLongNote
                 {
@@ -87,5 +105,18 @@ public class BmsModInvert : Mod, IApplicableAfterBeatmapConversion
             .ToArray();
         bmsBeatmap.HitObjects = newObjects.OrderBy(hitObject => hitObject.StartTime).ToList();
         bmsBeatmap.Breaks.Clear();
+    }
+
+    private static double getLongNoteDuration(double interval, double beatLength, Random? rng)
+    {
+        var quarterBeat = beatLength / 4;
+
+        // Leave both the LN and its release gap at least a quarter beat where spacing permits; tight intervals are split evenly.
+        var minimumDuration = Math.Min(interval / 2, quarterBeat);
+        var maximumDuration = Math.Max(interval / 2, interval - quarterBeat);
+
+        return rng == null
+            ? maximumDuration
+            : minimumDuration + rng.NextDouble() * (maximumDuration - minimumDuration);
     }
 }

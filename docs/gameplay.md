@@ -67,20 +67,20 @@ Default play uses the Normal gauge. Gauge types are selected via mods:
 
 ## Mods
 
-| Mod                      | Description                                                     |         |
-|--------------------------|-----------------------------------------------------------------|---------|
+| Mod                      | Description                                                     | Options                                            |
+|--------------------------|-----------------------------------------------------------------|----------------------------------------------------|
 | Autoplay                 | auto play                                                       |         |
-| Double Time / Half Time  |                                                                 |         |
+| Double Time / Half Time  |                                                                 | Speed; adjust pitch                                |
 | No Fail                  |                                                                 |         |
 | Mirror                   | Mirrors the key layout                                          |         |
-| Invert (IN)              | Converts each note except the lane's last into a hold note      |         |
+| Invert (IN)              | Converts each note except the lane's last into a hold note      | Randomise LN length; seed                          |
 | 2P                       | change the player layout from 1P to 2P                          |         |
 | Auto Scratch (AS)        | auto play scratch lane                                          |         |
 | Hide Scratch (HS)        | Remove the scratch notes and hide scratch lane                  |         |
 | Background Keysound (BK) | Play all keysounds as background audio instead of on key press. |         |
-| Lane Random (LR)         | RANDOM: permutes lane columns                                   |         |
-| Note Random (NR)         | S-RANDOM / H-RANDOM: per-note random                            |         |
-| Rotation Random (RR)     | R-RANDOM: rotate + optional mirror                              |         |
+| Lane Random (LR)         | RANDOM: permutes lane columns                                   | Include scratch; seed; lane order                  |
+| Note Random (NR)         | S-RANDOM / H-RANDOM: per-note random                            | Include scratch; mode; seed                        |
+| Rotation Random (RR)     | R-RANDOM: rotate + optional mirror                              | Include scratch; seed                              |
 | Assist Easy Gauge (E2)   | Use Assist Easy BMS gauge                                       |         |
 | Easy Gauge (E1)          | Use Easy BMS gauge                                              |         |
 | Hard Gauge (H1)          | Use Hard BMS gauge                                              |         |
