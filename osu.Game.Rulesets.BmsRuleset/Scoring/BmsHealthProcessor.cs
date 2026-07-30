@@ -381,7 +381,7 @@ public partial class BmsHealthProcessor : HealthProcessor
                 state.IsHpFailed)).ToArray()));
     }
 
-    private double currentTime => Time.Current;
+    private double currentTime => Clock?.CurrentTime ?? 0;
 
     private sealed class GaugeState
     {
