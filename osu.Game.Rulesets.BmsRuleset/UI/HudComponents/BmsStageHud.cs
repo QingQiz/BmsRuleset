@@ -4,6 +4,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Settings.Components;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
@@ -14,6 +15,10 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 internal sealed partial class BmsStageHud : BmsHudComponent
 {
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ScaleStageWidthByColumns), nameof(BmsStrings.ScaleStageWidthByColumnsDescription),
+        SettingControlType = typeof(StageWidthScalingCheckbox))]
+    public BindableFloat ProportionalWidthReference { get; } = new();
+
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.JudgementLineOffset), nameof(BmsStrings.JudgementLineOffsetDescription))]
     public BindableFloat JudgementLineOffset { get; } = new()
     {
@@ -40,6 +45,7 @@ internal sealed partial class BmsStageHud : BmsHudComponent
 
     private readonly Container editHandle;
     private BmsStageHudController? controller;
+    private float currentStageWidth;
 
     [Resolved]
     private DrawableRuleset drawableRuleset { get; set; } = null!;
@@ -126,6 +132,10 @@ internal sealed partial class BmsStageHud : BmsHudComponent
     private void onLightPositionOffsetChanged(ValueChangedEvent<float> offset) => controller?.SetLightPositionOffset(offset.NewValue);
 
     private void onNoteHeightScaleChanged(ValueChangedEvent<float> scale) => controller?.SetNoteHeightScale(scale.NewValue);
+
+    internal float GetCurrentStageWidth() => currentStageWidth;
+
+    internal void SetCurrentStageWidth(float width) => currentStageWidth = width;
 
     internal void SetJudgementLineOffsetRange(float minimum, float maximum)
     {

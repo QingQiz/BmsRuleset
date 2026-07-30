@@ -103,6 +103,10 @@ public static class BmsStrings
 
     public static LocalisableString NoteHeightScaleDescription => get("note_height_scale_description");
 
+    public static LocalisableString ScaleStageWidthByColumns => get("scale_stage_width_by_columns");
+
+    public static LocalisableString ScaleStageWidthByColumnsDescription => get("scale_stage_width_by_columns_description");
+
     public static LocalisableString GrooveLowHealthColour => get("groove_low_health_colour");
 
     public static LocalisableString GrooveLowHealthColourDescription => get("groove_low_health_colour_description");

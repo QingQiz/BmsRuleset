@@ -9,6 +9,10 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 internal sealed partial class BmsStageHudController : Component
 {
+    // HUD resizing is applied through Stage.Scale.X, so this remains the skin/layout-derived
+    // baseline width. It changes when the layout or skin column widths change, not when the HUD is resized.
+    internal float StageWidth => playfield.Stage.DrawWidth;
+
     private readonly BmsPlayfield playfield;
 
     private BmsStageHud? stageHud;
@@ -24,6 +28,7 @@ internal sealed partial class BmsStageHudController : Component
     protected override void Update()
     {
         base.Update();
+        normaliseProportionalHudWidth();
         tryInitialiseHudSize();
         updateStageTransform();
         updatePositionOffsetRanges();
@@ -41,6 +46,7 @@ internal sealed partial class BmsStageHudController : Component
         if (stageHud.Width is > 0 and <= 1)
             stageHud.Width = 0;
 
+        normaliseProportionalHudWidth();
         scheduleStageHudSingleton();
         SetNoteHeightScale(stageHud?.NoteHeightScale.Value ?? 1);
         tryInitialiseHudSize();
@@ -62,6 +68,7 @@ internal sealed partial class BmsStageHudController : Component
             return;
 
         stageHud = null;
+        hud.SetCurrentStageWidth(0);
         playfield.Stage.SetHitTargetPositionOffset(0);
         playfield.Stage.SetLightPositionOffset(0);
         playfield.Stage.SetNoteHeightScale(1);
@@ -121,6 +128,7 @@ internal sealed partial class BmsStageHudController : Component
                 stageHudContainer.Remove(duplicate, true);
 
             stageHud = keeper;
+            normaliseProportionalHudWidth();
             SetNoteHeightScale(keeper.NoteHeightScale.Value);
             tryInitialiseHudSize();
             updateStageTransform();
@@ -135,6 +143,24 @@ internal sealed partial class BmsStageHudController : Component
     }
 
     private bool stageHudContainerLoaded => stageHudContainer is not SkinnableContainer skinnableContainer || skinnableContainer.ComponentsLoaded;
+
+    private void normaliseProportionalHudWidth()
+    {
+        if (stageHud == null)
+            return;
+
+        var reference = stageHud.ProportionalWidthReference.Value;
+        var current = StageWidth;
+        stageHud.SetCurrentStageWidth(current);
+
+        if (!isFiniteAndPositive(reference) || !isFiniteAndPositive(current) || !isFiniteAndPositive(stageHud.Width))
+            return;
+
+        // Keeping the HUD bounds in the current layout's units makes the editor handle match the
+        // proportionally-sized Stage while preserving the configured width ratio across layouts.
+        stageHud.Width *= current / reference;
+        stageHud.ProportionalWidthReference.Value = current;
+    }
 
     // Registration can run during asynchronous layout loading while the previous content is being disposed.
     // Deferring repair keeps child mutations on the update thread after SkinnableContainer has swapped content.
@@ -229,7 +255,8 @@ internal sealed partial class BmsStageHudController : Component
     {
         var stageSize = new Vector2(playfield.Stage.DrawWidth, playfield.Stage.HudBaseDrawHeight);
         var contentScale = Math.Abs(stageHud?.Scale.Y ?? 0);
-        var scale = new Vector2(localSize.X / stageSize.X, contentScale);
+        var widthReference = stageHud?.ProportionalWidthReference.Value is > 0 and var reference ? reference : stageSize.X;
+        var scale = new Vector2(localSize.X / widthReference, contentScale);
         var viewportHeight = localSize.Y / contentScale;
 
         if (!isFiniteAndPositive(scale.X) || !isFiniteAndPositive(scale.Y) || !isFiniteAndPositive(viewportHeight))

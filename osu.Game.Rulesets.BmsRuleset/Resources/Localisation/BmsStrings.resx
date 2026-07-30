@@ -212,6 +212,8 @@
   <data name="light_position_offset_description" xml:space="preserve"><value>Moves column lights relative to the skin position. Positive values move them upward.</value></data>
   <data name="note_height_scale" xml:space="preserve"><value>Note height scale</value></data>
   <data name="note_height_scale_description" xml:space="preserve"><value>Scales note heads and tails without changing their positions or other Stage elements.</value></data>
+  <data name="scale_stage_width_by_columns" xml:space="preserve"><value>Scale Stage width by columns</value></data>
+  <data name="scale_stage_width_by_columns_description" xml:space="preserve"><value>Applies the configured-to-original Stage width ratio to each column, allowing layouts with more columns to use a wider Stage.</value></data>
   <data name="groove_low_health_colour" xml:space="preserve"><value>Groove low health colour</value></data>
   <data name="groove_low_health_colour_description" xml:space="preserve"><value>Colour of the groove gauge in the red zone (below red zone threshold).</value></data>
   <data name="groove_mid_health_colour" xml:space="preserve"><value>Groove mid health colour</value></data>

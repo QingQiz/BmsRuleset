@@ -4,10 +4,14 @@ using NUnit.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Testing;
 using osu.Framework.Threading;
+using osu.Game.Configuration;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Settings.Components;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
@@ -81,6 +85,89 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(playfield.Stage.Columns.All(column => ((BmsColumn)column).Masking), Is.True);
             Assert.That(playfield.Stage.MeasureLineArea.Masking, Is.True);
         });
+    }
+
+    [Test]
+    public void TestStageHudCanScaleWidthRelativeToOriginalStage()
+    {
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+        }));
+        playfield.Stage.RelativeSizeAxes = Axes.None;
+        setAutoSizeAxes(playfield.Stage, Axes.None);
+        playfield.Stage.Size = new Vector2(150, 600);
+
+        var stageHud = new BmsStageHud();
+        stageHud.ProportionalWidthReference.Value = 100;
+        var controller = new BmsStageHudController(playfield);
+        controller.Register(stageHud);
+        controller.ApplyStageTransform(new Vector2(200, 600), Vector2.Zero);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(playfield.Stage.Scale.X, Is.EqualTo(2).Within(0.001f));
+            Assert.That(playfield.Stage.DrawWidth * playfield.Stage.Scale.X, Is.EqualTo(300).Within(0.001f));
+        });
+
+        stageHud.ProportionalWidthReference.Value = 0;
+        controller.ApplyStageTransform(new Vector2(200, 600), Vector2.Zero);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(playfield.Stage.Scale.X, Is.EqualTo(200f / 150).Within(0.001f));
+            Assert.That(playfield.Stage.DrawWidth * playfield.Stage.Scale.X, Is.EqualTo(200).Within(0.001f));
+        });
+    }
+
+    [Test]
+    public void TestProportionalStageHudBoundsFollowCurrentStageWidth()
+    {
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+        }));
+        playfield.Stage.RelativeSizeAxes = Axes.None;
+        setAutoSizeAxes(playfield.Stage, Axes.None);
+        playfield.Stage.Size = new Vector2(150, 600);
+
+        var stageHud = new BmsStageHud { Width = 200 };
+        stageHud.ProportionalWidthReference.Value = 100;
+        var controller = new BmsStageHudController(playfield);
+        controller.Register(stageHud);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(stageHud.Width, Is.EqualTo(300).Within(0.001f));
+            Assert.That(stageHud.ProportionalWidthReference.Value, Is.EqualTo(150));
+        });
+    }
+
+    [Test]
+    public void TestWidthScalingCheckboxCapturesCurrentStageWidth()
+    {
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+        }));
+        playfield.Stage.RelativeSizeAxes = Axes.None;
+        setAutoSizeAxes(playfield.Stage, Axes.None);
+        playfield.Stage.Size = new Vector2(150, 600);
+
+        var stageHud = new BmsStageHud();
+        var controller = new BmsStageHudController(playfield);
+        controller.Register(stageHud);
+        var setting = stageHud.CreateSettingsControls().OfType<StageWidthScalingCheckbox>().Single();
+        var checkbox = setting.ChildrenOfType<OsuCheckbox>().Single();
+
+        checkbox.Current.Value = true;
+        Assert.That(stageHud.ProportionalWidthReference.Value, Is.EqualTo(150));
+
+        checkbox.Current.Value = false;
+        Assert.That(stageHud.ProportionalWidthReference.Value, Is.Zero);
     }
 
     [Test]

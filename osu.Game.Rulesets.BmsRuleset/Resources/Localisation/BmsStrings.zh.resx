@@ -212,6 +212,8 @@
   <data name="light_position_offset_description" xml:space="preserve"><value>相对于皮肤位置移动列灯光。正值会将其向上移动。</value></data>
   <data name="note_height_scale" xml:space="preserve"><value>音符高度缩放</value></data>
   <data name="note_height_scale_description" xml:space="preserve"><value>缩放音符头尾的高度，而不改变其位置或其他游玩区域元素。</value></data>
+  <data name="scale_stage_width_by_columns" xml:space="preserve"><value>按列缩放游玩区域宽度</value></data>
+  <data name="scale_stage_width_by_columns_description" xml:space="preserve"><value>将配置宽度相对于原始游玩区域宽度的比例应用到每列，使列数更多的布局使用更宽的游玩区域。</value></data>
   <data name="groove_low_health_colour" xml:space="preserve"><value>Groove 血条低血量颜色</value></data>
   <data name="groove_low_health_colour_description" xml:space="preserve"><value>Groove 血条红色区域（低于红色区域阈值）的颜色。</value></data>
   <data name="groove_mid_health_colour" xml:space="preserve"><value>Groove 血条中等血量颜色</value></data>
