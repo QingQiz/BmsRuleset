@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
-using osu.Framework.Logging;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 
@@ -189,7 +188,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, "Failed to prepare BMS event preview timeline.");
+            BmsLogger.Error(exception, "Failed to prepare BMS event preview timeline.");
             timeline = new BmsEventPreviewTimeline([], BmsEventPreviewTimeline.DEFAULT_LENGTH);
         }
 

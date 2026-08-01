@@ -36,7 +36,7 @@ public static class BmsConvertedBeatmapFilterPatcher
 
             if (missingMembers.Length > 0)
             {
-                Logger.Log(
+                BmsLogger.Log(
                     $"BMS converted beatmap filter patch cannot be installed. Missing: {string.Join(", ", missingMembers)}.",
                     level: LogLevel.Error);
                 return;
@@ -49,7 +49,7 @@ public static class BmsConvertedBeatmapFilterPatcher
             }
             catch (Exception exception)
             {
-                Logger.Error(exception, "Failed to install the BMS converted beatmap filter patch.");
+                BmsLogger.Error(exception, "Failed to install the BMS converted beatmap filter patch.");
             }
         }
     }
@@ -75,7 +75,7 @@ public static class BmsConvertedBeatmapFilterPatcher
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, $"Failed to evaluate BMS conversion visibility for {beatmap}.");
+            BmsLogger.Error(exception, $"Failed to evaluate BMS conversion visibility for {beatmap}.");
         }
     }
 }

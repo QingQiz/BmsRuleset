@@ -141,7 +141,7 @@ public static partial class BmsSongSelectLampPatcher
         }
         catch (Exception e)
         {
-            Logger.Error(e, "BMS song select lamp patch failed during a rank update.");
+            BmsLogger.Error(e, "BMS song select lamp patch failed during a rank update.");
             hideLamp(rankDisplay, restoreRulesetMark: true);
         }
     }
@@ -221,8 +221,8 @@ public static partial class BmsSongSelectLampPatcher
         disabled = true;
 
         if (exception == null)
-            Logger.Log(message, LoggingTarget.Runtime, LogLevel.Important);
+            BmsLogger.Log(message, LogLevel.Important);
         else
-            Logger.Error(exception, message);
+            BmsLogger.Error(exception, message);
     }
 }

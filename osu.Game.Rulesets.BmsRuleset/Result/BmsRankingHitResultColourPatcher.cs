@@ -52,7 +52,7 @@ public static class BmsRankingHitResultColourPatcher
 
             if (missingMembers.Length > 0)
             {
-                Logger.Log("BMS RankingHitResultColourPatcher: Cannot install Harmony patch. Missing: " + string.Join(", ", missingMembers), level: LogLevel.Error);
+                BmsLogger.Log("BMS RankingHitResultColourPatcher: Cannot install Harmony patch. Missing: " + string.Join(", ", missingMembers), level: LogLevel.Error);
                 return;
             }
 
@@ -63,7 +63,7 @@ public static class BmsRankingHitResultColourPatcher
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "BMS RankingHitResultColourPatcher: Failed to install Harmony patch. Ranking hit result colours will remain osu! defaults.");
+                BmsLogger.Error(ex, "BMS RankingHitResultColourPatcher: Failed to install Harmony patch. Ranking hit result colours will remain osu! defaults.");
             }
         }
     }

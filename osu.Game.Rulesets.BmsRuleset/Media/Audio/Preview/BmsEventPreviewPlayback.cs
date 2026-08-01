@@ -468,7 +468,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         }
         catch (Exception exception)
         {
-            BmsAudioLogger.LogLoadFailure($"Failed to {operation} BMS preview sample '{evt.SamplePath}'.", exception);
+            BmsLogger.LogAudioFailure($"Failed to {operation} BMS preview sample '{evt.SamplePath}'.", exception);
             return null;
         }
     }

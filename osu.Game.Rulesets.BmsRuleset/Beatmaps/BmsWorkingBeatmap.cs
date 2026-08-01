@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using osu.Framework.Logging;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
@@ -231,7 +230,7 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         }
         catch (Exception e)
         {
-            Logger.Error(e, $"BMS external beatmap decode failed for {chartPath}");
+            BmsLogger.Error(e, $"BMS external beatmap decode failed for {chartPath}");
             return null;
         }
     }

@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Database;
 using osu.Game.Graphics;
@@ -291,7 +290,7 @@ internal partial class DifficultyTableSettings : FillFlowContainer
         }
         catch (Exception e)
         {
-            Logger.Error(e, $"Failed to import difficulty table from: {pathOrUrl}");
+            BmsLogger.Error(e, $"Failed to import difficulty table from: {pathOrUrl}");
         }
     }
 
@@ -325,7 +324,7 @@ internal partial class DifficultyTableSettings : FillFlowContainer
         }
         catch (Exception e)
         {
-            Logger.Error(e, $"Failed to delete difficulty table: {table.SourcePath}");
+            BmsLogger.Error(e, $"Failed to delete difficulty table: {table.SourcePath}");
         }
     }
 
@@ -367,7 +366,7 @@ internal partial class DifficultyTableSettings : FillFlowContainer
         }
         catch (Exception e)
         {
-            Logger.Error(e, $"Failed to update difficulty table: {table.SourcePath}");
+            BmsLogger.Error(e, $"Failed to update difficulty table: {table.SourcePath}");
         }
     }
 }

@@ -36,7 +36,7 @@ public static class BmsEditorPatcher
 
             if (missingMembers.Length > 0)
             {
-                Logger.Log(
+                BmsLogger.Log(
                     "BMS EditorPatcher: Cannot install Harmony patch. Missing: "
                     + $"{string.Join(", ", missingMembers)}. BMS editor entry will not be disabled.",
                     level: LogLevel.Error);
@@ -50,7 +50,7 @@ public static class BmsEditorPatcher
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "BMS EditorPatcher: Failed to install Harmony patch. BMS editor entry will not be disabled.");
+                BmsLogger.Error(ex, "BMS EditorPatcher: Failed to install Harmony patch. BMS editor entry will not be disabled.");
             }
         }
     }

@@ -111,7 +111,7 @@ public static class BmsLocalLeaderboardPatcher
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "BMS LocalLeaderboardPatcher: Failed while fetching BMS local leaderboard scores.");
+            BmsLogger.Error(ex, "BMS LocalLeaderboardPatcher: Failed while fetching BMS local leaderboard scores.");
             return true;
         }
     }
@@ -172,8 +172,8 @@ public static class BmsLocalLeaderboardPatcher
         disabled = true;
 
         if (exception == null)
-            Logger.Log(message, level: LogLevel.Error);
+            BmsLogger.Log(message, level: LogLevel.Error);
         else
-            Logger.Error(exception, message);
+            BmsLogger.Error(exception, message);
     }
 }

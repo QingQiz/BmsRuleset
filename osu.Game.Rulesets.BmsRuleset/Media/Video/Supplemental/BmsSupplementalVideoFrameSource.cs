@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
-using osu.Framework.Logging;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 
@@ -136,7 +135,7 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
     {
         faultMessage = message ?? "Supplemental video decoder failed.";
         isFaulted = true;
-        Logger.Log($"[BGA] Supplemental video path faulted: {faultMessage}", "bms-bga");
+        BmsLogger.Log($"[BGA] Supplemental video path faulted: {faultMessage}");
     }
 
     public void Dispose()
@@ -155,7 +154,7 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, "Failed while stopping a supplemental BGA video worker.");
+            BmsLogger.Error(exception, "Failed while stopping a supplemental BGA video worker.");
         }
 
         while (queuedFrames.TryDequeue(out var frame))

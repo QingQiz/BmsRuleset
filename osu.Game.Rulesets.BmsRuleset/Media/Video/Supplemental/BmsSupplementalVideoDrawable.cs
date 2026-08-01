@@ -6,7 +6,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.Logging;
 using osu.Framework.Timing;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
@@ -72,7 +71,7 @@ internal sealed partial class BmsSupplementalVideoDrawable : CompositeDrawable
         // chance to warm — it pays the stream copy + FFmpeg init on the game thread, but only then.
         if (frameSource != null)
         {
-            Logger.Log("[BGA] Supplemental FFmpeg video path selected (pre-warmed)", "bms-bga");
+            BmsLogger.Log("[BGA] Supplemental FFmpeg video path selected (pre-warmed)");
             return;
         }
 
@@ -85,7 +84,7 @@ internal sealed partial class BmsSupplementalVideoDrawable : CompositeDrawable
         frameSource = new BmsSupplementalVideoFrameSource(memory.ToArray());
         frameSource.Start();
 
-        Logger.Log("[BGA] Supplemental FFmpeg video path selected", "bms-bga");
+        BmsLogger.Log("[BGA] Supplemental FFmpeg video path selected");
     }
 
     protected override void Update()

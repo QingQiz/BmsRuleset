@@ -11,7 +11,6 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.IO.Stores;
-using osu.Framework.Logging;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
@@ -276,7 +275,7 @@ public partial class BmsSampleStore : Component
             track?.Dispose();
 
             if (!cancellationToken.IsCancellationRequested)
-                BmsAudioLogger.LogLoadFailure($"Failed to initialise BMS sample key {sampleKey:X2}.", exception);
+                BmsLogger.LogAudioFailure($"Failed to initialise BMS sample key {sampleKey:X2}.", exception);
         }
 
         return null;
@@ -334,7 +333,7 @@ public partial class BmsSampleStore : Component
             pendingPlays.Remove(sampleKey);
             var trackName = tracks.GetValueOrDefault(sampleKey)?.Name ?? $"key {sampleKey:X2}";
             discardFailedTrack(sampleKey);
-            BmsAudioLogger.LogLoadFailure($"Failed to load BMS sample track {trackName}; this definition will be unavailable during gameplay.");
+            BmsLogger.LogAudioFailure($"Failed to load BMS sample track {trackName}; this definition will be unavailable during gameplay.");
         }
     }
 
@@ -417,7 +416,7 @@ public partial class BmsSampleStore : Component
             }
             catch (Exception exception)
             {
-                Logger.Error(exception, $"Failed to execute an audio command for BMS sample key {sampleKey:X2}.");
+                BmsLogger.Error(exception, $"Failed to execute an audio command for BMS sample key {sampleKey:X2}.");
             }
         }
     }
@@ -511,7 +510,7 @@ public partial class BmsSampleStore : Component
             if (task.IsCompletedSuccessfully && task.Result && track.IsLoaded)
                 continue;
 
-            BmsAudioLogger.LogLoadFailure(
+            BmsLogger.LogAudioFailure(
                 $"{(task.IsCompleted ? "Failed to load" : "Timed out while loading")} BMS sample track {track.Name}; this definition will be unavailable during gameplay.");
             discardFailedTrack(sampleKey);
         }

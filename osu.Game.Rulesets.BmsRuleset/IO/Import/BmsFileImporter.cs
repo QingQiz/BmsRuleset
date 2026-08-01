@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
-using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -87,7 +86,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 {
                     var title = set.Metadata.Title;
                     var source = set.Beatmaps.FirstOrDefault(b => !string.IsNullOrEmpty(b.Metadata.Source))?.Metadata.Source ?? "(unknown)";
-                    Logger.Log($"BMS cleanup: marking orphan set \"{title}\" (source: {source})");
+                    BmsLogger.Log($"BMS cleanup: marking orphan set \"{title}\" (source: {source})");
                     set.DeletePending = true;
                 }
 
@@ -103,7 +102,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         }
         catch (Exception e)
         {
-            Logger.Error(e, $"BMS cleanup failed: {e.Message}");
+            BmsLogger.Error(e, $"BMS cleanup failed: {e.Message}");
 
             notification.CompletionText = BmsStrings.CleanupFailed;
             notification.State = ProgressNotificationState.Cancelled;
@@ -115,7 +114,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     {
         if (beatmaps == null)
         {
-            Logger.Log("BMS delete: BeatmapManager is unavailable; cannot delete BMS beatmaps.");
+            BmsLogger.Log("BMS delete: BeatmapManager is unavailable; cannot delete BMS beatmaps.");
             return;
         }
 
@@ -153,7 +152,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             }
             catch (OperationCanceledException)
             {
-                Logger.Log($"BMS delete: cancelled after {cnt} sets");
+                BmsLogger.Log($"BMS delete: cancelled after {cnt} sets");
                 notification.CompletionText = cnt > 0
                     ? BmsStrings.DeleteCancelled(cnt)
                     : BmsStrings.DeleteWasCancelled;
@@ -161,7 +160,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             }
             catch (Exception e)
             {
-                Logger.Error(e, $"BMS delete failed: {e.Message}");
+                BmsLogger.Error(e, $"BMS delete failed: {e.Message}");
 
                 notification.CompletionText = BmsStrings.DeleteFailed;
                 notification.State = ProgressNotificationState.Cancelled;
@@ -326,7 +325,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         }
         catch (Exception e)
         {
-            Logger.Log($"BMS import: SR computation failed: {e.Message}");
+            BmsLogger.Log($"BMS import: SR computation failed: {e.Message}");
             return 0;
         }
     }
@@ -409,14 +408,14 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         }
         catch (OperationCanceledException)
         {
-            Logger.Log("BMS import: cancelled");
+            BmsLogger.Log("BMS import: cancelled");
             notification.CompletionText = BmsStrings.ImportWasCancelled;
             notification.State = ProgressNotificationState.Cancelled;
         }
         catch (Exception e)
         {
-            Logger.Log($"BMS import: scan failed: {e.Message}");
-            Logger.Log(e.ToString());
+            BmsLogger.Log($"BMS import: scan failed: {e.Message}");
+            BmsLogger.Log(e.ToString());
             notification.CompletionText = BmsStrings.ImportFailed;
             notification.State = ProgressNotificationState.Cancelled;
         }
@@ -449,11 +448,11 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             catch (OperationCanceledException e)
             {
                 // Producer cancelled — items already queued will still be consumed.
-                Logger.Log($"BMS import: producer error: {e.Message}");
+                BmsLogger.Log($"BMS import: producer error: {e.Message}");
             }
             catch (Exception e)
             {
-                Logger.Log($"BMS import: producer error: {e.Message}");
+                BmsLogger.Log($"BMS import: producer error: {e.Message}");
             }
             finally
             {
@@ -508,7 +507,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         }
         catch (OperationCanceledException)
         {
-            Logger.Log($"BMS import: cancelled after {imported} of {groups.Length} sets");
+            BmsLogger.Log($"BMS import: cancelled after {imported} of {groups.Length} sets");
             notification.CompletionText = imported > 0
                 ? BmsStrings.ImportCancelledProgress(imported, groups.Length)
                 : BmsStrings.ImportWasCancelled;
@@ -635,7 +634,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         }
         catch (Exception e)
         {
-            Logger.Error(e, $"BMS import: failed to import {prepared.Directory}: {e.Message}");
+            BmsLogger.Error(e, $"BMS import: failed to import {prepared.Directory}: {e.Message}");
             return false;
         }
 

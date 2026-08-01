@@ -33,7 +33,7 @@ public static class BmsDifficultyIconPatcher
 
             if (missingMembers.Length > 0)
             {
-                Logger.Log("BMS DifficultyIconPatcher: Cannot install Harmony patch. Missing: " + string.Join(", ", missingMembers), level: LogLevel.Error);
+                BmsLogger.Log("BMS DifficultyIconPatcher: Cannot install Harmony patch. Missing: " + string.Join(", ", missingMembers), level: LogLevel.Error);
                 return;
             }
 
@@ -44,7 +44,7 @@ public static class BmsDifficultyIconPatcher
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "BMS DifficultyIconPatcher: Failed to install Harmony patch. Difficulty icons may use osu!'s fallback icon.");
+                BmsLogger.Error(ex, "BMS DifficultyIconPatcher: Failed to install Harmony patch. Difficulty icons may use osu!'s fallback icon.");
             }
         }
     }

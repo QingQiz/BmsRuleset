@@ -6,7 +6,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Logging;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Database;
@@ -376,7 +375,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, "Failed to load the BMS score graph personal best.");
+            BmsLogger.Error(exception, "Failed to load the BMS score graph personal best.");
         }
     }
 

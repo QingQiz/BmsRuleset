@@ -111,7 +111,7 @@ public static class BmsReplayPatcher
         }
         catch (Exception e)
         {
-            Logger.Error(e, "BMS replay patch failed to attach replay data to a local score.");
+            BmsLogger.Error(e, "BMS replay patch failed to attach replay data to a local score.");
         }
     }
 
@@ -202,7 +202,7 @@ public static class BmsReplayPatcher
         }
         catch (Exception e)
         {
-            Logger.Error(e, "BMS replay patch failed to restore replay data from a local score.");
+            BmsLogger.Error(e, "BMS replay patch failed to restore replay data from a local score.");
             __result = new Score { ScoreInfo = score };
         }
 
@@ -253,7 +253,7 @@ public static class BmsReplayPatcher
         }
         catch (Exception e)
         {
-            Logger.Error(e, "BMS replay patch failed to restore hit events for the statistics panel.");
+            BmsLogger.Error(e, "BMS replay patch failed to restore hit events for the statistics panel.");
         }
     }
 
@@ -274,8 +274,8 @@ public static class BmsReplayPatcher
         disabled = true;
 
         if (exception == null)
-            Logger.Log(message, LoggingTarget.Runtime, LogLevel.Important);
+            BmsLogger.Log(message, LogLevel.Important);
         else
-            Logger.Error(exception, message);
+            BmsLogger.Error(exception, message);
     }
 }

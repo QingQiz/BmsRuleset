@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
@@ -34,7 +34,7 @@ public static class BmsWorkingBeatmapPatcher
 
             if (missingMembers.Length > 0)
             {
-                Logger.Log(
+                BmsLogger.Log(
                     "BMS WorkingBeatmapPatcher: Cannot install Harmony patch. Missing: "
                     + $"{string.Join(", ", missingMembers)}. BMS preview audio will not be available.",
                     level: LogLevel.Error);
@@ -49,7 +49,7 @@ public static class BmsWorkingBeatmapPatcher
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "BMS WorkingBeatmapPatcher: Failed to install Harmony patch. BMS preview audio will not be available.");
+                BmsLogger.Error(ex, "BMS WorkingBeatmapPatcher: Failed to install Harmony patch. BMS preview audio will not be available.");
                 return false;
             }
         }
@@ -74,7 +74,7 @@ public static class BmsWorkingBeatmapPatcher
         }
         catch (Exception e)
         {
-            Logger.Error(e, "BMS WorkingBeatmapPatcher: Failed to wrap a BMS working beatmap. Falling back to osu!'s default working beatmap.");
+            BmsLogger.Error(e, "BMS WorkingBeatmapPatcher: Failed to wrap a BMS working beatmap. Falling back to osu!'s default working beatmap.");
         }
     }
     // ReSharper restore InconsistentNaming

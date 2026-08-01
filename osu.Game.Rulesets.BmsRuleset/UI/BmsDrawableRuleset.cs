@@ -5,7 +5,6 @@ using HarmonyLib;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Input;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Input.Handlers;
 using osu.Game.Replays;
@@ -362,7 +361,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         }
         catch (System.Exception exception)
         {
-            Logger.Error(exception, "Failed to clear the pause cooldown for a BMS resume rewind.");
+            BmsLogger.Error(exception, "Failed to clear the pause cooldown for a BMS resume rewind.");
         }
     }
 
@@ -395,7 +394,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         }
         catch (System.Exception exception)
         {
-            Logger.Error(exception, $"Failed to {(enabled ? "restore" : "disable")} frame-stable BMS playback for a resume rewind.");
+            BmsLogger.Error(exception, $"Failed to {(enabled ? "restore" : "disable")} frame-stable BMS playback for a resume rewind.");
             return false;
         }
     }

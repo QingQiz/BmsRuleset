@@ -1,5 +1,4 @@
 using osu.Framework.Graphics;
-using osu.Framework.Logging;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Video;
 
@@ -11,7 +10,7 @@ internal sealed class MissingBmsBgaVideoProvider : IBmsBgaVideoProvider
 
     public Drawable? Create(BmsBgaVideoRequest request)
     {
-        Logger.Log($"[BGA] No video provider accepted '{request.Path}'.", "bms-bga");
+        BmsLogger.Log($"[BGA] No video provider accepted '{request.Path}'.");
         return null;
     }
 }

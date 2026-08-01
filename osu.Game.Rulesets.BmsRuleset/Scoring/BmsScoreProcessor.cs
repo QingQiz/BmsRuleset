@@ -306,7 +306,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
             if (field == null)
             {
-                Logger.Log(
+                BmsLogger.Log(
                     "BMS ScoreProcessor: Could not find JudgementResult.ComboAfterJudgement backing field. "
                     + "The osu! framework may have changed; BAD/POOR combo-break revert will not function correctly.",
                     level: LogLevel.Error);
@@ -317,7 +317,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "BMS ScoreProcessor: Failed to bind ComboAfterJudgement setter via reflection. "
+            BmsLogger.Error(ex, "BMS ScoreProcessor: Failed to bind ComboAfterJudgement setter via reflection. "
                              + "BAD/POOR combo-break revert will not function correctly.");
             return (_, _) => { };
         }

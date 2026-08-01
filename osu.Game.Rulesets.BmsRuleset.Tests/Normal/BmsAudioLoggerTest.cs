@@ -1,7 +1,7 @@
 using System;
 using NUnit.Framework;
 using osu.Framework.Logging;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio;
+using osu.Game.Rulesets.BmsRuleset;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 
@@ -24,7 +24,7 @@ public class BmsAudioLoggerTest
 
         try
         {
-            BmsAudioLogger.LogLoadFailure(message, exception);
+            BmsLogger.LogAudioFailure(message, exception);
         }
         finally
         {
@@ -39,7 +39,8 @@ public class BmsAudioLoggerTest
         {
             Assert.That(capturedEntry.Level, Is.EqualTo(LogLevel.Verbose));
             Assert.That(capturedEntry.Level, Is.LessThan(LogLevel.Important));
-            Assert.That(capturedEntry.Target, Is.EqualTo(LoggingTarget.Runtime));
+            Assert.That(capturedEntry.Target, Is.Null);
+            Assert.That(capturedEntry.LoggerName, Is.EqualTo("bms"));
             Assert.That(capturedEntry.Message, Is.EqualTo(message));
             Assert.That(capturedEntry.Exception, Is.SameAs(exception));
         });

@@ -6,7 +6,6 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using osu.Framework.Logging;
 using osu.Game.Database;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -169,7 +168,7 @@ public partial class DifficultyTableStore
                 ? headerDataUrl
                 : new Uri(new Uri(effectiveSource), headerDataUrl).ToString();
 
-            Logger.Log($"Fetching chart data from {dataUrl}");
+            BmsLogger.Log($"Fetching chart data from {dataUrl}");
             var dataJson = await http_client.GetStringAsync(dataUrl).ConfigureAwait(false);
 
             // Cache data separately so startup can restore without re-downloading.
@@ -389,7 +388,7 @@ public partial class DifficultyTableStore
         }
         catch (Exception e)
         {
-            Logger.Error(e, $"Failed to read cached difficulty table {cachePath}: {e.Message}");
+            BmsLogger.Error(e, $"Failed to read cached difficulty table {cachePath}: {e.Message}");
             return null;
         }
     }
