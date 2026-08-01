@@ -9,6 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
@@ -34,6 +35,15 @@ public partial class BmsGameplayVirtualisationTest
         // Hit objects are routed to per-column BmsColumnHitObjectContainers.
         Assert.That(playfield.Stage.Columns[1].HitObjectContainer.GetType().Name, Is.EqualTo("BmsColumnHitObjectContainer"));
     }
+
+    [TestCase(HitResult.Meh, false)]
+    [TestCase(HitResult.Ok, true)]
+    [TestCase(HitResult.Good, true)]
+    [TestCase(HitResult.Great, true)]
+    [TestCase(HitResult.Perfect, true)]
+    [TestCase(HitResult.Miss, false)]
+    public void TestHitExplosionResultFilter(HitResult result, bool expected)
+        => Assert.That(BmsColumn.ShouldTriggerHitExplosion(result), Is.EqualTo(expected));
 
     [Test]
     public void TestDecoderCreatesTypedHitObjects()
@@ -157,6 +167,30 @@ public partial class BmsGameplayVirtualisationTest
         var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
 
         Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(hitObject.StartTime - table.FastWindowFor(HitResult.Miss)));
+    }
+
+    [Test]
+    public void TestTapLifetimeOutlivesPassivePoorWindow()
+    {
+        var hitObject = new BmsNote
+        {
+            StartTime = 1000,
+            Column = 1,
+        };
+        var playfield = new BmsPlayfield(attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            HitObjects = { hitObject },
+        }));
+
+        playfield.Add(hitObject);
+        playfield.RefreshAllLifetimes();
+
+        var entry = playfield.Stage.Columns[hitObject.Column].HitObjectContainer.Entries.Single();
+        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
+
+        Assert.That(entry.LifetimeEnd, Is.GreaterThan(hitObject.StartTime + table.SlowWindowFor(HitResult.Ok)));
     }
 
     [Test]

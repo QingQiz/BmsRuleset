@@ -6,6 +6,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Tests.Visual;
 using osuTK.Input;
 
@@ -17,6 +18,8 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
     private const double judged_note_time = 9000;
     private const double pause_time = 10000;
     private const double pause_boundary_note_time = pause_time - 100;
+
+    private DrawableBmsHitObject judgedNote = null!;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => new(allowPause: true, showResults: false);
 
@@ -108,6 +111,34 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
         AddStep("press boundary note key", () => InputManager.PressKey(Key.S));
         AddAssert("boundary note judged on key down", () => Player.ScoreProcessor.JudgedHits, () => Is.EqualTo(judgedHitsBeforePress + 1));
         AddStep("release boundary note key", () => InputManager.ReleaseKey(Key.S));
+    }
+
+    [Test]
+    public void TestTapVisibilityRestoresAfterResultRevert()
+    {
+        AddStep("load player", () => LoadPlayer());
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Playfield.Stage.IsLoaded);
+        AddStep("seek to judged note", () =>
+        {
+            Player.GameplayClockContainer.Stop();
+            Player.GameplayClockContainer.Seek(judged_note_time);
+            Player.GameplayClockContainer.Start();
+        });
+        AddUntilStep("note alive", () => (judgedNote = Playfield.GetAliveObjectAtTime(judged_note_time)) != null);
+        AddStep("stop at judged note", () => Player.GameplayClockContainer.Stop());
+        AddStep("judge note", () => Playfield.Stage.Columns[1].HandlePress(judged_note_time));
+        AddAssert("judged note hidden", () => judgedNote!.Alpha, () => Is.Zero);
+        AddStep("seek before judgement", () =>
+        {
+            Player.GameplayClockContainer.Seek(judged_note_time - 100);
+            Player.GameplayClockContainer.Start();
+        });
+        AddUntilStep("note restored", () =>
+        {
+            judgedNote = Playfield.GetAliveObjectAtTime(judged_note_time);
+            return judgedNote is { Judged: false, Alpha: 1 };
+        });
+        AddStep("stop after restore", () => Player.GameplayClockContainer.Stop());
     }
 
     private double expectedRewindTime() => Player.Score.ScoreInfo.Pauses.Single() - BmsPlayfield.RESUME_REWIND_DURATION;

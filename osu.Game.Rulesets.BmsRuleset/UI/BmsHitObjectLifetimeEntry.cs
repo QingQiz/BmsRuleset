@@ -298,8 +298,8 @@ internal sealed class BmsHitObjectLifetimeEntry(
     private static double computePastLifetime() => default_past_lifetime + lifetime_margin;
 
     /// <summary>
-    ///     The BAD (slow) hit-window for this object.  The entry must stay alive at least this long
-    ///     past its EndTime so the auto-miss path in <see cref="DrawableBmsHitObject.UpdateColumnFrame" /> can fire.
+    ///     The BAD (slow) hit-window for this object. The entry must stay alive beyond this boundary
+    ///     so its final drawable update can apply the passive result before lifetime removal begins.
     /// </summary>
     private static double getSlowWindow(BmsHitObject hitObject)
     {
@@ -309,7 +309,8 @@ internal sealed class BmsHitObjectLifetimeEntry(
             return tailTable.SlowWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
         }
 
-        return hitObject.HitWindows?.WindowFor(HitResult.Ok) ?? default_past_lifetime;
+        var table = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
+        return table.SlowWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
     }
 
     #endregion

@@ -2,11 +2,15 @@
 using System;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Pooling;
+using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
@@ -80,6 +84,20 @@ public partial class TestSceneBmsShortLnAutoplay : BmsPlayerTestScene
         {
             int nonPerfect = Player.ScoreProcessor.Statistics.Where(kv => kv.Key != HitResult.Perfect).Sum(kv => kv.Value);
             return nonPerfect == 0;
+        });
+
+        AddAssert("short LN hit explosions stay within preloaded pools", () =>
+        {
+            var poolSizes = Playfield.Stage.Columns
+                                     .Cast<BmsColumn>()
+                                     .SelectMany(column => column.ChildrenOfType<DrawablePool<BmsHitExplosion>>())
+                                     .Select(pool => pool.CurrentPoolSize)
+                                     .Order()
+                                     .ToArray();
+
+            return poolSizes.SequenceEqual(Enumerable.Repeat(2, Playfield.TotalColumns)
+                                                      .Concat(Enumerable.Repeat(3, Playfield.TotalColumns))
+                                                      .Order());
         });
     }
 }

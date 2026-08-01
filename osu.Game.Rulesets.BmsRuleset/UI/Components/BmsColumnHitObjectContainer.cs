@@ -77,7 +77,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             }
 
             // Keeping judgement controllers frozen avoids replaying misses or resetting an active long note.
-            if (!resumeRewinding)
+            if (!resumeRewinding && note.RequiresColumnFrameUpdate)
                 note.UpdateColumnFrame();
         }
     }

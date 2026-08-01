@@ -22,6 +22,8 @@ public sealed partial class BmsStage : CompositeDrawable
 
     public BmsMeasureLineContainer MeasureLineArea { get; }
 
+    internal Container ColumnArea { get; }
+
     public float HitTargetPosition => hitTargetPosition.Value;
 
     public float BarLineHeight => barLineHeight.Value;
@@ -156,6 +158,14 @@ public sealed partial class BmsStage : CompositeDrawable
             Direction = FillDirection.Horizontal,
         };
 
+        // A shared mask preserves stage-bound clipping without forcing a separate draw boundary per column.
+        ColumnArea = new Container
+        {
+            RelativeSizeAxes = Axes.Y,
+            AutoSizeAxes = Axes.X,
+            Masking = true,
+            Child = columnFlow,
+        };
         InternalChildren =
         [
             new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.StageBackground, layoutVariant))
@@ -176,7 +186,7 @@ public sealed partial class BmsStage : CompositeDrawable
             {
                 RelativeSizeAxes = Axes.Both,
             },
-            columnFlow,
+            ColumnArea,
             new SkinnableDrawable(new BmsSkinComponentLookup(BmsSkinComponents.StageForeground, layoutVariant))
             {
                 RelativeSizeAxes = Axes.Both,

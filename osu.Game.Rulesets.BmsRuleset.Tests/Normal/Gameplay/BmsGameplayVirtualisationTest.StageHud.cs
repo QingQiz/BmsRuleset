@@ -82,7 +82,9 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(playfield.Stage.X, Is.EqualTo(200).Within(0.001f));
             Assert.That(playfield.Stage.Y, Is.EqualTo(100).Within(0.001f));
             Assert.That(playfield.Stage.Masking, Is.False);
-            Assert.That(playfield.Stage.Columns.All(column => ((BmsColumn)column).Masking), Is.True);
+            Assert.That(playfield.Stage.ColumnArea.Masking, Is.True);
+            Assert.That(playfield.Stage.Columns.All(column => !((BmsColumn)column).Masking), Is.True);
+            Assert.That(playfield.Stage.Columns.All(column => !column.HitExplosionArea.Masking), Is.True);
             Assert.That(playfield.Stage.MeasureLineArea.Masking, Is.True);
         });
     }
@@ -442,7 +444,9 @@ public partial class BmsGameplayVirtualisationTest
             Assert.That(playfield.Stage.Height, Is.EqualTo(300).Within(0.001f));
             Assert.That(playfield.Stage.HudViewportHeight, Is.EqualTo(300).Within(0.001f));
             Assert.That(playfield.Stage.Masking, Is.False);
-            Assert.That(playfield.Stage.Columns.All(column => ((BmsColumn)column).Masking), Is.True);
+            Assert.That(playfield.Stage.ColumnArea.Masking, Is.True);
+            Assert.That(playfield.Stage.Columns.All(column => !((BmsColumn)column).Masking), Is.True);
+            Assert.That(playfield.Stage.Columns.All(column => !column.HitExplosionArea.Masking), Is.True);
             Assert.That(playfield.Stage.MeasureLineArea.Masking, Is.True);
             Assert.That(stageHud.JudgementLineOffset.MinValue, Is.EqualTo(-80));
             Assert.That(stageHud.JudgementLineOffset.MaxValue, Is.EqualTo(220));

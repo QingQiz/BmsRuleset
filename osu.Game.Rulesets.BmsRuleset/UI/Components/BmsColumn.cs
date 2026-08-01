@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Pooling;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
@@ -14,6 +15,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 
@@ -33,7 +35,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     // Owned by the column but parented to a stage-level layer (above the judgement line) by BmsStage,
     // so hit explosions render on top of the stage hitTarget instead of behind it.
-    public Container HitExplosionArea { get; } = new() { RelativeSizeAxes = Axes.Y, Masking = true };
+    public Container HitExplosionArea { get; } = new() { RelativeSizeAxes = Axes.Y };
 
     public Drawable KeyArea { get; }
 
@@ -80,6 +82,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
     private const float key_area_over_notes_depth = -1;
 
     private BmsColumnKeySound? keySound;
+    private readonly BmsHitExplosionPool normalHitExplosionPool;
+    private readonly BmsHitExplosionPool longNoteHitExplosionPool;
 
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
@@ -93,12 +97,18 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
         RelativeSizeAxes = Axes.Y;
         Width = defaultColumnWidth(index, LayoutVariant);
-        Masking = true;
-        BorderThickness = 0;
         HitObjectContainer.Depth = HIT_OBJECT_DEPTH;
+
+        normalHitExplosionPool = new BmsHitExplosionPool(
+            new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, LayoutVariant, Index), 2);
+        longNoteHitExplosionPool = new BmsHitExplosionPool(
+            // Head, first hold pulse, and tail can overlap within the explosion fade lifetime.
+            new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, LayoutVariant, Index, true), 3);
 
         InternalChildren =
         [
+            normalHitExplosionPool,
+            longNoteHitExplosionPool,
             KeyAreaUnderNotesLayer,
         ];
 
@@ -235,11 +245,14 @@ public partial class BmsColumn : Playfield, IBmsColumn
     /// </summary>
     public void TriggerHitExplosion(bool isLongNote)
     {
-        HitExplosionArea.Add(new BmsHitExplosion(new BmsSkinComponentLookup(
-            BmsSkinComponents.HitExplosion,
-            LayoutVariant,
-            Index,
-            isLongNote), ParentPlayfield.Stage.HitTargetPositionOffset));
+        var pool = isLongNote ? longNoteHitExplosionPool : normalHitExplosionPool;
+        HitExplosionArea.Add(pool.Get(explosion => explosion.ApplyPositionOffset(ParentPlayfield.Stage.HitTargetPositionOffset)));
+    }
+
+    private sealed partial class BmsHitExplosionPool(BmsSkinComponentLookup lookup, int initialSize)
+        : DrawablePool<BmsHitExplosion>(initialSize)
+    {
+        protected override BmsHitExplosion CreateNewDrawable() => new(lookup);
     }
 
     /// <summary>
@@ -268,9 +281,13 @@ public partial class BmsColumn : Playfield, IBmsColumn
         if (bmsHitObject.HitObject is BmsLandmine)
             return;
 
-        if (result.IsHit)
+        // BMS POOR is represented by framework Meh, which IsHit() considers successful even though
+        // it must not produce the hit feedback reserved for BAD and better judgements.
+        if (ShouldTriggerHitExplosion(result.Type))
             TriggerHitExplosion(bmsHitObject.HitObject is BmsLongNote);
     }
+
+    internal static bool ShouldTriggerHitExplosion(HitResult result) => result != HitResult.Meh && result.IsHit();
 
     #endregion
 

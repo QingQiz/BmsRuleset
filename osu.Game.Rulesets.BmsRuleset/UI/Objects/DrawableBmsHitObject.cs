@@ -21,6 +21,10 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected virtual bool SkipFurtherUpdates => false;
 
+    protected virtual bool RequiresResultBeforeKindPostState => false;
+
+    internal virtual bool RequiresColumnFrameUpdate => true;
+
     protected BmsLayoutVariant LayoutVariant => ParentColumn?.LayoutVariant ?? HitObject?.Beatmap.LayoutVariant ?? BmsLayoutVariant.Bme7K;
 
     protected float HitTargetPosition => ParentColumn?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION;
@@ -28,6 +32,8 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     protected double ScrollSpeedMultiplier => ParentColumn?.ScrollSpeedMultiplier ?? 1;
 
     protected Container NoteContainer = null!;
+
+    private float appliedNoteHeightScale = float.NaN;
 
     [Resolved(CanBeNull = true)]
     protected BmsColumn? ParentColumn { get; private set; }
@@ -60,7 +66,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
         if (!Judged && !SkipFurtherUpdates)
         {
-            if (!UpdateKindState())
+            if (!UpdateKindState() && RequiresResultBeforeKindPostState)
                 UpdateResult(false);
         }
 
@@ -76,6 +82,10 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     internal void ApplyNoteHeightScale(float scale)
     {
+        if (scale == appliedNoteHeightScale)
+            return;
+
+        appliedNoteHeightScale = scale;
         NoteContainer.Scale = new Vector2(1, scale);
         ApplyNoteHeightScaleToKind(scale);
     }
