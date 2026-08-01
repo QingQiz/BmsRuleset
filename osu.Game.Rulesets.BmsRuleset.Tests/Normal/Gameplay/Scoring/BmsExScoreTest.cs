@@ -164,6 +164,29 @@ public class BmsExScoreTest
         });
     }
 
+    [Test]
+    public void TestPersonalBestJudgementCursorKeepsSnapshotUntilBoundaryOrSeek()
+    {
+        BmsJudgementEvent[] events =
+        [
+            createEvent(new BmsJudgementSource(100, 0, BmsJudgementSourceKind.Note), HitResult.Perfect),
+            createEvent(new BmsJudgementSource(200, 0, BmsJudgementSourceKind.Note), HitResult.Great),
+        ];
+        var cursor = new BmsScoreGraph.JudgementProgressCursor();
+        cursor.SetProgression(BmsScoreGraph.CreateJudgementProgression(events));
+
+        var beforeFirst = cursor.GetCountsAtTime(50);
+        var first = cursor.GetCountsAtTime(100);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cursor.GetCountsAtTime(150), Is.SameAs(first));
+            Assert.That(cursor.GetCountsAtTime(200), Is.Not.SameAs(first));
+            Assert.That(cursor.GetCountsAtTime(150), Is.SameAs(first));
+            Assert.That(cursor.GetCountsAtTime(50), Is.SameAs(beforeFirst));
+        });
+    }
+
     private static BmsJudgementEvent createEvent(BmsJudgementSource source, HitResult result, double? actualTime = null) => new(
         source,
         result,

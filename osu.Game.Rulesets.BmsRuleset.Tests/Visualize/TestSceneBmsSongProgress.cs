@@ -156,4 +156,22 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 1);
         AddUntilStep("error line expires", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 0);
     }
+
+    [Test]
+    public void TestHitErrorMeterCapsConcurrentLines()
+    {
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddStep("register judgement barrage", () =>
+        {
+            var processor = (BmsScoreProcessor)Player.GameplayState.ScoreProcessor;
+
+            for (var i = 0; i < 100; i++)
+                processor.RegisterEmptyPoor(BmsTestBeatmaps.FIRST_NOTE_TIME - i, BmsTestBeatmaps.FIRST_NOTE_TIME, 0);
+        });
+        AddUntilStep("scheduled judgements processed", () =>
+            Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 50);
+        AddAssert("judgement lines remain capped", () =>
+            Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() <= 50);
+    }
 }

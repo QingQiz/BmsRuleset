@@ -426,15 +426,14 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     {
         const int arrow_move_duration = 800;
 
-        if (judgementsContainer.Count > max_concurrent_judgements)
+        if (judgementsContainer.Count >= max_concurrent_judgements)
         {
-            const double quick_fade_time = 100;
-            var old = judgementsContainer.FirstOrDefault(j => j.LifetimeEnd > Clock.CurrentTime + quick_fade_time * 1.1);
+            var old = judgementsContainer.FirstOrDefault();
 
             if (old != null)
             {
                 old.ClearTransforms();
-                old.FadeOut(quick_fade_time).Expire();
+                judgementsContainer.Remove(old, disposeImmediately: false);
             }
         }
 

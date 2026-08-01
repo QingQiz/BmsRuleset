@@ -98,6 +98,11 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
     private ScoreRank targetRank = ScoreRank.B;
     private int[] personalBestProgression = [];
     private readonly JudgementProgressCursor personalBestJudgementProgress = new();
+    private readonly int[] displayedCurrentJudgementCounts = new int[displayed_judgements.Length];
+    private IReadOnlyList<int>? displayedPersonalBestJudgementCounts;
+    private int displayedCurrentScore;
+    private int displayedJudgedEvents;
+    private bool currentDisplayValid;
 
     [Resolved(CanBeNull = true)]
     private GameplayState? gameplayState { get; set; }
@@ -135,7 +140,6 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
     public BmsScoreGraph()
     {
-        Box background1;
         OsuSpriteText personalBestJudgementHeader1;
         OsuSpriteText currentJudgementHeader1;
         Anchor = Anchor.CentreLeft;
@@ -158,7 +162,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
         InternalChildren =
         [
-            background1 = new Box
+            new Box
             {
                 RelativeSizeAxes = Axes.Both,
                 Colour = new Color4(13, 16, 20, 242),
@@ -310,9 +314,28 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             return;
 
         var currentScore = BmsExScore.Calculate(scoreProcessor.Statistics);
-        var judgedEvents = BmsExScore.CountScoringEvents(scoreProcessor.JudgementEvents);
+        var judgedEvents = scoreProcessor.ScoringJudgementEventCount;
 
-        updateDisplay(currentScore, judgedEvents);
+        if (!currentDisplayValid || currentScore != displayedCurrentScore || judgedEvents != displayedJudgedEvents)
+        {
+            updateScoreDisplay(currentScore, judgedEvents);
+            displayedCurrentScore = currentScore;
+            displayedJudgedEvents = judgedEvents;
+        }
+
+        updateCurrentJudgementCounts(scoreProcessor.Statistics, !currentDisplayValid);
+
+        var personalBestCounts = drawableRuleset == null
+            ? null
+            : personalBestJudgementProgress.GetCountsAtTime(drawableRuleset.FrameStableClock.CurrentTime);
+
+        if (!ReferenceEquals(personalBestCounts, displayedPersonalBestJudgementCounts))
+        {
+            updatePersonalBestJudgementCounts(personalBestCounts);
+            displayedPersonalBestJudgementCounts = personalBestCounts;
+        }
+
+        currentDisplayValid = true;
     }
 
     private void loadPersonalBest()
@@ -452,6 +475,13 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
     private void updateDisplay(int currentScore, int judgedEvents)
     {
+        updateScoreDisplay(currentScore, judgedEvents);
+        updateCurrentJudgementCounts(scoreProcessor?.Statistics, true);
+        updatePersonalBestJudgementCounts(null);
+    }
+
+    private void updateScoreDisplay(int currentScore, int judgedEvents)
+    {
         var clampedJudgedEvents = Math.Clamp(judgedEvents, 0, totalScoringEvents);
         var personalBestScore = ScoreAtProgress(
             personalBestFinalScore,
@@ -469,18 +499,30 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         currentBar.SetScores(currentScore, currentScore, maximumExScore);
         personalBestBar.SetScores(personalBestScore, personalBestFinalScore, maximumExScore);
         targetBar.SetScores(targetScore, targetFinalScore, maximumExScore);
-        updateJudgementCounts(scoreProcessor?.Statistics, drawableRuleset?.FrameStableClock.CurrentTime);
     }
 
-    private void updateJudgementCounts(IReadOnlyDictionary<HitResult, int>? currentStatistics, double? currentTime)
+    private void updateCurrentJudgementCounts(IReadOnlyDictionary<HitResult, int>? currentStatistics, bool force)
     {
-        foreach (var result in displayed_judgements)
+        for (var i = 0; i < displayed_judgements.Length; i++)
         {
+            var result = displayed_judgements[i];
+            var count = currentStatistics?.GetValueOrDefault(result) ?? 0;
+
+            if (!force && count == displayedCurrentJudgementCounts[i])
+                continue;
+
+            displayedCurrentJudgementCounts[i] = count;
             var texts = judgementCountTexts[result];
-            texts.Current.Text = BmsStrings.ScoreGraphJudgementCount(currentStatistics?.GetValueOrDefault(result) ?? 0);
-            var personalBestCount = currentTime == null
-                ? null
-                : personalBestJudgementProgress.GetCountAtTime(currentTime.Value, result);
+            texts.Current.Text = BmsStrings.ScoreGraphJudgementCount(count);
+        }
+    }
+
+    private void updatePersonalBestJudgementCounts(IReadOnlyList<int>? counts)
+    {
+        for (var i = 0; i < displayed_judgements.Length; i++)
+        {
+            var texts = judgementCountTexts[displayed_judgements[i]];
+            var personalBestCount = counts?[i];
             texts.PersonalBest.Text = personalBestCount == null
                 ? BmsStrings.ScoreGraphJudgementUnavailable
                 : BmsStrings.ScoreGraphJudgementCount(personalBestCount.Value);
@@ -790,6 +832,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
     internal sealed class JudgementProgressCursor
     {
         private IReadOnlyList<JudgementSnapshot> progression = [];
+        private readonly int[] zeroCounts = new int[displayed_judgements.Length];
         private int snapshotIndex = -1;
         private double lastTime = double.NegativeInfinity;
 
@@ -801,6 +844,21 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         }
 
         public int? GetCountAtTime(double time, HitResult result)
+        {
+            var counts = GetCountsAtTime(time);
+
+            if (counts == null)
+                return null;
+
+            var resultIndex = Array.IndexOf(displayed_judgements, result);
+
+            if (resultIndex < 0)
+                return 0;
+
+            return counts[resultIndex];
+        }
+
+        public IReadOnlyList<int>? GetCountsAtTime(double time)
         {
             if (progression.Count == 0)
                 return null;
@@ -816,13 +874,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             }
 
             lastTime = time;
-
-            var resultIndex = Array.IndexOf(displayed_judgements, result);
-
-            if (resultIndex < 0 || snapshotIndex < 0)
-                return 0;
-
-            return progression[snapshotIndex].Counts[resultIndex];
+            return snapshotIndex < 0 ? zeroCounts : progression[snapshotIndex].Counts;
         }
     }
 
