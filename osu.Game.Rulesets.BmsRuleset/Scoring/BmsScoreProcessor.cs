@@ -22,8 +22,12 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     private double latestEndTime = double.MaxValue;
     private readonly List<BmsJudgementEvent> judgementEvents = [];
     private readonly Dictionary<JudgementResult, BmsJudgementEvent> eventsByResult = new();
+    private readonly List<TimingHitEventEntry> timingHitEventEntries = [];
+    private readonly List<HitEvent> timingHitEvents = [];
 
     public IReadOnlyList<BmsJudgementEvent> JudgementEvents => judgementEvents;
+
+    public int ScoringJudgementEventCount { get; private set; }
 
     public event Action<BmsTimingObservation>? EmptyPoorRegistered;
 
@@ -95,7 +99,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
         var source = new BmsJudgementSource(eventTime, column, BmsJudgementSourceKind.EmptyPoor);
         var observation = new BmsTimingObservation(BmsTimingObservationKind.Note, expectedTime, eventTime, 1, HitResult.Miss);
-        judgementEvents.Add(new BmsJudgementEvent(source, HitResult.Miss, [observation]));
+        addJudgementEvent(new BmsJudgementEvent(source, HitResult.Miss, [observation]));
         EmptyPoorRegistered?.Invoke(observation);
     }
 
@@ -116,8 +120,8 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     public override void PopulateScore(ScoreInfo score)
     {
         base.PopulateScore(score);
-        score.HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents(judgementEvents);
-        BmsJudgementEventStore.Set(score, judgementEvents);
+        score.HitEvents = timingHitEvents;
+        BmsJudgementEventStore.SetView(score, judgementEvents);
 
         // Attribution (e.g. which gauge an Auto Gauge run resolved to) is owned by the mods
         // that introduce the behaviour, so the score processor stays free of gauge-specific logic.
@@ -143,6 +147,9 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         base.Reset(storeResults);
         judgementEvents.Clear();
         eventsByResult.Clear();
+        timingHitEventEntries.Clear();
+        timingHitEvents.Clear();
+        ScoringJudgementEventCount = 0;
     }
 
     /// <summary>
@@ -176,15 +183,16 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         base.RemoveScoreChange(result);
 
         if (eventsByResult.Remove(result, out var judgementEvent))
-            judgementEvents.Remove(judgementEvent);
+            removeJudgementEvent(judgementEvent);
     }
 
     protected override HitEvent CreateHitEvent(JudgementResult result)
     {
         var frameworkEvent = base.CreateHitEvent(result);
         var judgementEvent = createJudgementEvent(result);
-        judgementEvents.Add(judgementEvent);
+        addJudgementEvent(judgementEvent);
         eventsByResult.Add(result, judgementEvent);
+
         return BmsJudgementEventProjection.CreateTimingHitEvent(
             judgementEvent.Source,
             judgementEvent.TimingObservations[^1],
@@ -205,6 +213,89 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement is BmsJudgement { MaxResult: HitResult.Meh }
         ? HitResult.IgnoreMiss
         : base.GetSimulatedHitResult(judgement);
+
+    private void addJudgementEvent(BmsJudgementEvent judgementEvent)
+    {
+        judgementEvents.Add(judgementEvent);
+        addTimingHitEvents(judgementEvent);
+
+        if (judgementEvent.Source.IsScoring)
+            ScoringJudgementEventCount++;
+    }
+
+    private void removeJudgementEvent(BmsJudgementEvent judgementEvent)
+    {
+        judgementEvents.Remove(judgementEvent);
+        removeTimingHitEvents(judgementEvent);
+
+        if (judgementEvent.Source.IsScoring)
+            ScoringJudgementEventCount--;
+    }
+
+    private void addTimingHitEvents(BmsJudgementEvent judgementEvent)
+    {
+        foreach (var observation in judgementEvent.TimingObservations)
+        {
+            var insertionIndex = findTimingInsertionIndex(observation.ActualTime);
+            var hitObject = BmsJudgementEventProjection.CreateTimingHitEvent(judgementEvent.Source, observation, null).HitObject;
+
+            timingHitEventEntries.Insert(insertionIndex, new TimingHitEventEntry(judgementEvent, observation, hitObject));
+            timingHitEvents.Insert(insertionIndex, createTimingHitEvent(insertionIndex));
+            repairNextTimingHitEvent(insertionIndex);
+        }
+    }
+
+    private void removeTimingHitEvents(BmsJudgementEvent judgementEvent)
+    {
+        for (var i = timingHitEventEntries.Count - 1; i >= 0; i--)
+        {
+            if (!ReferenceEquals(timingHitEventEntries[i].JudgementEvent, judgementEvent))
+                continue;
+
+            timingHitEventEntries.RemoveAt(i);
+            timingHitEvents.RemoveAt(i);
+            repairNextTimingHitEvent(i - 1);
+        }
+    }
+
+    private int findTimingInsertionIndex(double actualTime)
+    {
+        var low = 0;
+        var high = timingHitEventEntries.Count;
+
+        // Match OrderBy's stable ordering by placing equal-time observations after existing entries.
+        while (low < high)
+        {
+            var middle = low + (high - low) / 2;
+
+            if (timingHitEventEntries[middle].Observation.ActualTime <= actualTime)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
+    }
+
+    private HitEvent createTimingHitEvent(int index)
+    {
+        var entry = timingHitEventEntries[index];
+        return new HitEvent(
+            entry.Observation.TimeOffset,
+            entry.Observation.GameplayRate,
+            entry.Observation.Result,
+            entry.HitObject,
+            index == 0 ? null : timingHitEvents[index - 1].HitObject,
+            null);
+    }
+
+    private void repairNextTimingHitEvent(int index)
+    {
+        var nextIndex = index + 1;
+
+        if (nextIndex < timingHitEvents.Count)
+            timingHitEvents[nextIndex] = createTimingHitEvent(nextIndex);
+    }
 
     private static Action<JudgementResult, int> createComboAfterSetter()
     {
@@ -285,4 +376,9 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             return 0;
         }
     }
+
+    private readonly record struct TimingHitEventEntry(
+        BmsJudgementEvent JudgementEvent,
+        BmsTimingObservation Observation,
+        HitObject HitObject);
 }

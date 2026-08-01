@@ -12,11 +12,21 @@ public static class BmsJudgementEventStore
     public static void Set(ScoreInfo score, IEnumerable<BmsJudgementEvent> judgementEvents)
     {
         var copy = judgementEvents.ToArray();
+        set(score, copy);
+    }
 
+    internal static void SetView(ScoreInfo score, IReadOnlyList<BmsJudgementEvent> judgementEvents)
+        => set(score, judgementEvents);
+
+    private static void set(ScoreInfo score, IReadOnlyList<BmsJudgementEvent> judgementEvents)
+    {
         lock (events)
         {
+            if (events.TryGetValue(score, out var existing) && ReferenceEquals(existing.Events, judgementEvents))
+                return;
+
             events.Remove(score);
-            events.Add(score, new Holder(copy));
+            events.Add(score, new Holder(judgementEvents));
         }
     }
 
