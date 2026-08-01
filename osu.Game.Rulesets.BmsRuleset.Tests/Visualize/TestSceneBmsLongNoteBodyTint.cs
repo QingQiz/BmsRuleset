@@ -82,10 +82,10 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         return (Drawable)longNote.GetType().GetField("longNoteBody", flags)!.GetValue(longNote)!;
     }
 
-    private static Drawable longNoteTailContainerOf(DrawableBmsHitObject longNote)
+    private static Drawable longNoteTailOf(DrawableBmsHitObject longNote)
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-        return (Drawable)longNote.GetType().GetField("longNoteTailContainer", flags)!.GetValue(longNote)!;
+        return (Drawable)longNote.GetType().GetField("longNoteTail", flags)!.GetValue(longNote)!;
     }
 
     private static Drawable noteHeadOf(DrawableBmsHitObject longNote)
@@ -110,7 +110,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
             var longNote = Playfield.GetAliveObjectAtTime(start_time);
             return longNote != null
                    && longNoteBodyOf(longNote).Alpha == 1f
-                   && longNoteTailContainerOf(longNote).Alpha == 1f;
+                   && longNoteTailOf(longNote).Alpha == 1f;
         });
         AddUntilStep("released body before tail", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + fast_release_offset + 120);
         // A fast release fades body+tail together (matches DrawableBmsLongNote.released_alpha) instead
@@ -120,7 +120,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
             var longNote = Playfield.GetAliveObjectAtTime(start_time);
             return longNote != null
                    && longNoteBodyOf(longNote).Alpha == 0.4f
-                   && longNoteTailContainerOf(longNote).Alpha == 0.4f;
+                   && longNoteTailOf(longNote).Alpha == 0.4f;
         });
         AddUntilStep("pressed again after failed release", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + repress_offset + 120);
         AddUntilStep("failed repress has mode-specific alpha", () =>
@@ -128,7 +128,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
             var longNote = Playfield.GetAliveObjectAtTime(start_time);
             return longNote != null
                    && longNoteBodyOf(longNote).Alpha == expectedAlpha
-                   && longNoteTailContainerOf(longNote).Alpha == expectedAlpha;
+                   && longNoteTailOf(longNote).Alpha == expectedAlpha;
         });
         AddUntilStep("failed repress has mode-specific position", () =>
         {

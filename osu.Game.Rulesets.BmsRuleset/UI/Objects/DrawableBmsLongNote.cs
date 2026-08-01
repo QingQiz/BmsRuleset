@@ -1,7 +1,6 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
@@ -25,6 +24,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.HoldNoteHead;
 
+    protected override bool RequiresResultBeforeKindPostState => true;
+
     private BmsLongNote ln => (BmsLongNote)HitObject;
 
     // Re-trigger the LN hit light this often while holding so the explosion pulses throughout the
@@ -38,8 +39,15 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private readonly BmsLongNoteJudgementController controller = new();
 
     private double lastHoldExplosionTime;
+    private bool bodyGeometryValid;
+    private float lastHeadOffset;
+    private float lastBodyTailOffset;
+    private float lastTailOffset;
+    private float lastBodyWidth;
+    private float lastNoteHeight;
+    private bool lastHoldingBody;
+    private bool lastReleasedFast;
     private BmsSegmentedLongNoteBody longNoteBody = null!;
-    private Container longNoteTailContainer = null!;
     private BmsCachedSkinnableDrawable longNoteTail = null!;
 
     [Resolved(CanBeNull = true)]
@@ -85,6 +93,34 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             ? visualState.VisibleBodyTailOffset(headOffset, tailOffset)
             : tailOffset;
 
+        var releasedFast =
+            controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !holdingBody;
+        var geometryChanged = !bodyGeometryValid
+                              || Math.Abs(lastHeadOffset - headOffset) > 0.5f
+                              || Math.Abs(lastBodyTailOffset - bodyTailOffset) > 0.5f
+                              || Math.Abs(lastTailOffset - tailOffset) > 0.5f
+                              || Math.Abs(lastBodyWidth - longNoteBody.DrawWidth) >= 1
+                              || Math.Abs(lastNoteHeight - Height) > 0.5f
+                              || lastHoldingBody != holdingBody
+                              || lastReleasedFast != releasedFast;
+
+        if (!geometryChanged)
+        {
+            // Static LNs move with their parent. Their relative body geometry does not need to be
+            // invalidated every frame, but animated skins must still be allowed to advance.
+            longNoteBody.UpdateAnimation(controller.LongNoteStarted);
+            return;
+        }
+
+        bodyGeometryValid = true;
+        lastHeadOffset = headOffset;
+        lastBodyTailOffset = bodyTailOffset;
+        lastTailOffset = tailOffset;
+        lastBodyWidth = longNoteBody.DrawWidth;
+        lastNoteHeight = Height;
+        lastHoldingBody = holdingBody;
+        lastReleasedFast = releasedFast;
+
         if (Math.Abs(NoteContainer.Y - headOffset) > 0.5f)
             NoteContainer.Y = headOffset;
 
@@ -102,26 +138,26 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (Math.Abs(longNoteBody.Height - bodyHeight) > 0.5f)
             longNoteBody.Height = Math.Max(1, bodyHeight);
 
-        var releasedFast =
-            controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !holdingBody;
         longNoteBody.UpdateBody(bodyHeight, tailAtTop, controller.LongNoteStarted);
         longNoteBody.Alpha = bodyHeight > 0 ? releasedFast ? released_alpha : 1f : 0;
 
-        if (Math.Abs(longNoteTailContainer.Y - tailOffset) > 0.5f)
-            longNoteTailContainer.Y = tailOffset;
+        if (Math.Abs(longNoteTail.Y - tailOffset) > 0.5f)
+            longNoteTail.Y = tailOffset;
 
-        if (Math.Abs(longNoteTailContainer.Height - Height) > 0.5f)
-            longNoteTailContainer.Height = Height;
+        if (Math.Abs(longNoteTail.Height - Height) > 0.5f)
+            longNoteTail.Height = Height;
 
-        longNoteTailContainer.Alpha = releasedFast ? released_alpha : 1f;
+        longNoteTail.Alpha = releasedFast ? released_alpha : 1f;
     }
 
     protected override void ResetKindState()
     {
         controller.Reset();
         visualState.Reset();
+        bodyGeometryValid = false;
+        longNoteBody.ResetBody();
         longNoteBody.Alpha = 0;
-        longNoteTailContainer.Alpha = 0;
+        longNoteTail.Alpha = 0;
     }
 
     protected override void ApplyNoteHeightScaleToKind(float scale) => longNoteTail.Scale = new Vector2(1, scale);
@@ -148,21 +184,15 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
                 BodyColour = Color4.Cyan,
                 Alpha = 0,
             },
-            longNoteTailContainer = new Container
+            longNoteTail = new BmsCachedSkinnableDrawable(
+                new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail,
+                    LayoutVariant, Column))
             {
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopLeft,
                 RelativeSizeAxes = Axes.X,
                 Alpha = 0,
-                Children =
-                [
-                    longNoteTail = new BmsCachedSkinnableDrawable(
-                        new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail,
-                            LayoutVariant, Column))
-                    {
-                        ComponentAnchor = Anchor.BottomCentre,
-                    },
-                ],
+                ComponentAnchor = Anchor.BottomCentre,
             },
         ]);
     }
@@ -259,7 +289,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         visualState.Reset();
         longNoteBody.Alpha = 0;
-        longNoteTailContainer.Alpha = 0;
+        longNoteTail.Alpha = 0;
         this.FadeOut();
         LifetimeEnd = Time.Current;
     }

@@ -97,6 +97,9 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column)) is { } body
             && body.Colour == Color4.White
             && body.ChildrenOfType<Sprite>().Any(s => s.Alpha > 0 && s.Texture != null));
+        this.AddSetupAssert("animated LN body uses one stretched sprite", () =>
+            longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column)) is { Masking: false } body
+            && body.ChildrenOfType<Sprite>().Count(sprite => sprite.Alpha > 0 && sprite.Texture != null) == 1);
         this.AddSetupUntilStep("animated LN body advances frames while held", () =>
             bodyAnimationFrameCount(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 2
             && currentBodyAnimationFrame(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 1);

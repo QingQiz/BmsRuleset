@@ -479,8 +479,8 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
     private static float tailBottomOf(DrawableBmsHitObject longNote)
     {
-        var tailContainer = (Container)privateField(longNote, "longNoteTailContainer");
-        return BmsPlayfieldAssertions.BottomOf(tailContainer);
+        var tail = (Drawable)privateField(longNote, "longNoteTail");
+        return BmsPlayfieldAssertions.BottomOf(tail);
     }
 
     private static float headBottomOf(DrawableBmsHitObject longNote)

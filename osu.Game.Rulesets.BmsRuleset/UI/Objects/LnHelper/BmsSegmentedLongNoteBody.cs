@@ -36,18 +36,16 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         set => fallback.Colour = value;
     }
 
-    private const float max_source_slice_height = 1024;
     private const double body_animation_frame_length = 30;
 
     private readonly Box fallback;
-    private readonly Container segmentContainer;
     private readonly List<Sprite> spritePool = [];
 
     private readonly List<(int SegmentIndex, float Height)> reusablePartSizes = new();
     private readonly List<BmsLongNoteSegmentComposer.Part> reusableParts = new();
 
     // Animation frames are time-varying images (for example classic mania-note1L-0..5).
-    // They are not spatial segments. We choose one frame, then split that frame spatially if needed.
+    // The selected frame is stretched across the complete body content behind the dynamic mask.
     private Texture[] bodyFrames = [];
 
     // Spatial slices are top-to-bottom body pieces. For ultra-tall raw resources these are decoded
@@ -58,6 +56,8 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
 
     private float lastBodyHeight = -1;
     private float lastDrawWidth = -1;
+    private float contentHeight = -1;
+    private float contentOffset;
     private int currentFrameIndex;
     private bool tailAtTop;
     private int? column;
@@ -79,17 +79,10 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         Masking = true;
         RelativeSizeAxes = Axes.X;
 
-        InternalChildren =
-        [
-            fallback = new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-            },
-            segmentContainer = new Container
-            {
-                RelativeSizeAxes = Axes.X,
-            },
-        ];
+        InternalChild = fallback = new Box
+        {
+            RelativeSizeAxes = Axes.Both,
+        };
     }
 
     #region Disposal
@@ -119,6 +112,31 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         ensureSlicesLoaded();
     }
 
+    public void ResetBody()
+    {
+        lastBodyHeight = -1;
+        contentHeight = -1;
+        contentOffset = 0;
+    }
+
+    public void UpdateAnimation(bool isHolding)
+    {
+        ensureSlicesLoaded();
+
+        if (bodyFrames.Length <= 1 || (!isHolding && currentFrameIndex == 0))
+            return;
+
+        var nextFrameIndex = isHolding
+            ? (int)(Time.Current / body_animation_frame_length) % bodyFrames.Length
+            : 0;
+
+        if (currentFrameIndex == nextFrameIndex)
+            return;
+
+        currentFrameIndex = nextFrameIndex;
+        updateAnimationFrameTexture();
+    }
+
     public void UpdateBody(float bodyHeight, bool newTailAtTop, bool isHolding)
     {
         ensureSlicesLoaded();
@@ -126,7 +144,7 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         if (slices.Length == 0 && bodyFrames.Length == 0)
             return;
 
-        var heightChanged = Math.Abs(lastBodyHeight - bodyHeight) >= 1;
+        var heightChanged = Math.Abs(lastBodyHeight - bodyHeight) >= 0.5f;
         var width = Math.Max(1, DrawWidth);
         var widthChanged = Math.Abs(lastDrawWidth - width) >= 1;
         var directionChanged = tailAtTop != newTailAtTop;
@@ -134,8 +152,9 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
             ? (int)(Time.Current / body_animation_frame_length) % bodyFrames.Length
             : 0;
         var frameChanged = currentFrameIndex != nextFrameIndex;
+        var capacityExceeded = bodyHeight > contentHeight;
 
-        if (!heightChanged && !widthChanged && !directionChanged && !frameChanged)
+        if (!heightChanged && !widthChanged && !directionChanged && !frameChanged && !capacityExceeded)
             return;
 
         lastBodyHeight = bodyHeight;
@@ -143,12 +162,31 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         currentFrameIndex = nextFrameIndex;
         tailAtTop = newTailAtTop;
 
-        // Classic -0..5 LN bodies are animation frames that advance only while the note is held.
-        // A frame change can alter aspect ratio, so rebuild spatial slices from the selected frame.
-        if (bodyFrames.Length > 0)
-            updateSlicesFromCurrentFrame();
+        if (capacityExceeded)
+            contentHeight = bodyHeight;
 
-        rebuildSegments();
+        if (bodyFrames.Length > 0)
+        {
+            if (spritePool.Count == 0)
+            {
+                rebuildSegments();
+                return;
+            }
+
+            if (heightChanged || capacityExceeded || directionChanged)
+                updateAnimationFrameGeometry();
+
+            if (frameChanged)
+                updateAnimationFrameTexture();
+
+            updateContentAlignment();
+            return;
+        }
+
+        if (widthChanged || directionChanged || frameChanged || capacityExceeded)
+            rebuildSegments();
+        else
+            updateContentAlignment();
     }
 
     protected override void LoadComplete()
@@ -185,12 +223,15 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
 
     private void loadSlices()
     {
+        Masking = true;
         bodyFrames = [];
         slices = [];
         naturalHeights = [];
         parts = [];
         currentFrameIndex = 0;
-        segmentContainer.Clear(disposeChildren: true);
+        foreach (var sprite in spritePool)
+            RemoveInternal(sprite, true);
+
         spritePool.Clear();
 
         if (skin == null || column == null)
@@ -213,58 +254,36 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
         }
         else
         {
-            // Normal legacy lookup returned animation frames. They are not spatial segments; pick
-            // one frame in UpdateBody(), then crop only that frame if it is still too tall to draw.
+            // Animation frames share one full-body texture phase. Geometry and UV cropping expose
+            // the visible length directly, so advancing the animation only replaces the texture.
             bodyFrames = textures.Value.Textures;
-            updateSlicesFromCurrentFrame();
+            Masking = false;
         }
-    }
-
-    private void updateSlicesFromCurrentFrame()
-    {
-        slices = [];
-        naturalHeights = [];
-
-        if (bodyFrames.Length == 0)
-            return;
-
-        var texture = bodyFrames[Math.Clamp(currentFrameIndex, 0, bodyFrames.Length - 1)];
-
-        if (texture.DisplayWidth <= 0 || texture.DisplayHeight <= 0)
-            return;
-
-        // For ordinary textures this crop happens after texture upload, so it cannot fix max-size
-        // downscaling. It is still useful for sprite geometry: huge body frames are drawn as several
-        // manageable cropped regions rather than one very tall sprite.
-        var count = Math.Max(1, (int)Math.Ceiling(texture.DisplayHeight / max_source_slice_height));
-        var sliceTextures = new Texture[count];
-        var sliceHeights = new float[count];
-
-        for (var i = 0; i < count; i++)
-        {
-            var y = texture.Height * i / (float)count;
-            var nextY = texture.Height * (i + 1) / (float)count;
-            var height = nextY - y;
-
-            var slice = texture.Crop(new RectangleF(0, y, texture.Width, height), wrapModeS: WrapMode.ClampToEdge, wrapModeT: WrapMode.ClampToEdge);
-            slice.ScaleAdjust = texture.ScaleAdjust;
-            sliceTextures[i] = slice;
-            sliceHeights[i] = displayHeightFor(slice);
-        }
-
-        slices = sliceTextures;
-        naturalHeights = sliceHeights;
     }
 
     private void rebuildSegments()
     {
-        segmentContainer.Height = Math.Max(1, lastBodyHeight);
         fallback.Alpha = 1;
         parts = [];
 
-        if (slices.Length == 0 || lastBodyHeight <= 0)
+        if (bodyFrames.Length > 0 && contentHeight > 0)
+        {
+            fallback.Alpha = 0;
+            ensureSpritePoolSize(1);
+
+            for (var i = 1; i < spritePool.Count; i++)
+                spritePool[i].Alpha = 0;
+
+            updateAnimationFrameGeometry();
+            updateAnimationFrameTexture();
+            updateContentAlignment();
+            return;
+        }
+
+        if (slices.Length == 0 || contentHeight <= 0)
         {
             syncSprites();
+            updateContentAlignment();
             return;
         }
 
@@ -275,8 +294,44 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
             naturalHeights[i] = displayHeightFor(slices[i]);
 
         fallback.Alpha = 0;
-        parts = BmsLongNoteSegmentComposer.ComposeInto(naturalHeights, lastBodyHeight, tailAtTop, reusablePartSizes, reusableParts);
+        parts = BmsLongNoteSegmentComposer.ComposeInto(naturalHeights, contentHeight, tailAtTop, reusablePartSizes, reusableParts);
         syncSprites();
+        updateContentAlignment();
+    }
+
+    private void updateAnimationFrameGeometry()
+    {
+        var visibleHeight = Math.Max(1, lastBodyHeight);
+        contentOffset = 0;
+
+        if (spritePool.Count == 0)
+            return;
+
+        var sprite = spritePool[0];
+        sprite.Alpha = lastBodyHeight > 0 ? 1 : 0;
+        sprite.Height = visibleHeight;
+        sprite.Scale = new Vector2(1, tailAtTop ? 1 : -1);
+        sprite.Y = tailAtTop ? 0 : visibleHeight;
+        sprite.TextureRectangle = new RectangleF(0, 0, 1, Math.Max(1, contentHeight / visibleHeight));
+    }
+
+    private void updateAnimationFrameTexture()
+    {
+        if (spritePool.Count == 0 || bodyFrames.Length == 0)
+            return;
+
+        spritePool[0].Texture = bodyFrames[Math.Clamp(currentFrameIndex, 0, bodyFrames.Length - 1)];
+    }
+
+    private void updateContentAlignment()
+    {
+        var y = bodyFrames.Length > 0 || tailAtTop ? 0 : lastBodyHeight - contentHeight;
+
+        if (Math.Abs(contentOffset - y) <= 0.5f)
+            return;
+
+        contentOffset = y;
+        syncSpritePositions();
     }
 
     private float displayHeightFor(Texture texture)
@@ -287,21 +342,7 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
 
     private void syncSprites()
     {
-        while (spritePool.Count < parts.Count)
-        {
-            // Pool sprites because LN height changes every frame while scrolling. Creating/destroying
-            // child drawables per frame would be far more expensive than hiding unused pooled sprites.
-            var sprite = new Sprite
-            {
-                Anchor = Anchor.TopLeft,
-                Origin = Anchor.TopLeft,
-                RelativeSizeAxes = Axes.X,
-                Width = 1,
-                FillMode = FillMode.Stretch,
-            };
-            spritePool.Add(sprite);
-            segmentContainer.Add(sprite);
-        }
+        ensureSpritePoolSize(parts.Count);
 
         for (var i = parts.Count; i < spritePool.Count; i++)
             spritePool[i].Alpha = 0;
@@ -314,7 +355,32 @@ public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
             sprite.Texture = slices[part.SegmentIndex];
             sprite.Height = part.Height;
             sprite.Scale = new Vector2(1, part.FlipY ? -1 : 1);
-            sprite.Y = part.Y;
+            sprite.Y = contentOffset + part.Y;
+        }
+    }
+
+    private void syncSpritePositions()
+    {
+        for (var i = 0; i < parts.Count; i++)
+            spritePool[i].Y = contentOffset + parts[i].Y;
+    }
+
+    private void ensureSpritePoolSize(int count)
+    {
+        while (spritePool.Count < count)
+        {
+            // Retain the high-water capacity so pooled LN drawables can change skin, direction, or
+            // content length without repeatedly creating and destroying child drawables.
+            var sprite = new Sprite
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
+                RelativeSizeAxes = Axes.X,
+                Width = 1,
+                FillMode = FillMode.Stretch,
+            };
+            spritePool.Add(sprite);
+            AddInternal(sprite);
         }
     }
 }

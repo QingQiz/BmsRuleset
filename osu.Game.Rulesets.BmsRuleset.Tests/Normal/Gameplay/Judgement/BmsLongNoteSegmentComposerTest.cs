@@ -59,4 +59,31 @@ public class BmsLongNoteSegmentComposerTest
         Assert.That(parts.Select(p => p.Y), Is.EqualTo(new[] { 0, 10 }));
         Assert.That(parts.Any(p => p.FlipY), Is.False);
     }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestLargerBodyCanBeTailAlignedAndClipped(bool tailAtTop)
+    {
+        const float visible_height = 25;
+        const float content_height = 95;
+
+        var direct = visibleGeometry(BmsLongNoteSegmentComposer.Compose([10, 20, 30], visible_height, tailAtTop), 0, visible_height);
+        var contentOffset = tailAtTop ? 0 : visible_height - content_height;
+        var clipped = visibleGeometry(BmsLongNoteSegmentComposer.Compose([10, 20, 30], content_height, tailAtTop), contentOffset, visible_height);
+
+        Assert.That(clipped, Is.EqualTo(direct));
+    }
+
+    private static (int SegmentIndex, float Top, float Bottom, bool FlipY)[] visibleGeometry(
+        System.Collections.Generic.IReadOnlyList<BmsLongNoteSegmentComposer.Part> parts, float contentOffset, float maskHeight)
+    {
+        return parts.Select(part =>
+            {
+                var partTop = contentOffset + (part.FlipY ? part.Y - part.Height : part.Y);
+                var partBottom = contentOffset + (part.FlipY ? part.Y : part.Y + part.Height);
+                return (part.SegmentIndex, Top: System.Math.Max(0, partTop), Bottom: System.Math.Min(maskHeight, partBottom), part.FlipY);
+            })
+            .Where(part => part.Bottom > part.Top)
+            .ToArray();
+    }
 }
