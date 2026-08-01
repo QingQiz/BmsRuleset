@@ -25,6 +25,8 @@ internal sealed class BmsLongNoteJudgementController
 
     private IBmsLongNoteHooks hooks = null!;
     private BmsLongNote ln = null!;
+    private BmsJudgementWindowTable headTable = null!;
+    private BmsJudgementWindowTable tailTable = null!;
     private BmsLongNoteMode mode;
 
     private bool headJudged;
@@ -35,6 +37,8 @@ internal sealed class BmsLongNoteJudgementController
     {
         ln = hitObject;
         this.hooks = hooks;
+        headTable = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
+        tailTable = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: true);
         refreshMode();
     }
 
@@ -98,8 +102,6 @@ internal sealed class BmsLongNoteJudgementController
 
     public void CheckPassiveResult(double currentTime, double gameplayRate = 1)
     {
-        var headTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.EffectiveJudgementRate, tail: false);
-
         if (!LongNoteStarted)
         {
             if (!headTable.IsPastPassivePoorOffset(currentTime - ln.StartTime))
@@ -127,7 +129,6 @@ internal sealed class BmsLongNoteJudgementController
             return;
         }
 
-        var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.EffectiveJudgementRate, tail: true);
         var tailOffset = currentTime - ln.EndTime;
 
         if (IsChargeMode)
@@ -144,7 +145,6 @@ internal sealed class BmsLongNoteJudgementController
 
     public double ChargeTailLifetimeEnd()
     {
-        var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.EffectiveJudgementRate, tail: true);
         return ln.EndTime + tailTable.SlowWindowFor(HitResult.Ok) + passive_poor_lifetime_margin;
     }
 
@@ -163,7 +163,6 @@ internal sealed class BmsLongNoteJudgementController
 
         if (IsChargeMode && headJudged && !TailJudged)
         {
-            var tailTable = BmsJudgementProfileProvider.GetTable(ln.Beatmap.LayoutVariant, ln.Column, ln.EffectiveJudgementRate, tail: true);
             var tailOffset = currentTime - ln.EndTime;
 
             if (tailTable.IsPastPassivePoorOffset(tailOffset))

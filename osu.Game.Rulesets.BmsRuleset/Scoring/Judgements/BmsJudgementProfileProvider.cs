@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.Scoring;
 
@@ -8,6 +9,7 @@ public static class BmsJudgementProfileProvider
 {
     private static readonly double[] rank_rates = [0.25, 0.50, 0.75, 1.00, 1.25];
     private static readonly double[] pms_rank_rates = [0.33, 0.50, 0.70, 1.00, 1.33];
+    private static readonly ConcurrentDictionary<ProfileKey, BmsJudgementProfile> profiles = new();
 
     public static BmsJudgementWindowTable GetTable(BmsLayoutVariant layout, int column, int rank, bool tail)
         => getTable(layout, column, RateForRank(layout, rank), tail);
@@ -23,7 +25,7 @@ public static class BmsJudgementProfileProvider
 
     private static BmsJudgementWindowTable getTable(BmsLayoutVariant layout, int column, double judgementRate, bool tail)
     {
-        var profile = createProfile(layout, judgementRate);
+        var profile = profiles.GetOrAdd(new ProfileKey(layout, judgementRate), static key => createProfile(key.Layout, key.Rate));
         var scratch = BmsLayout.IsScratchColumn(column, layout);
 
         return tail
@@ -51,6 +53,8 @@ public static class BmsJudgementProfileProvider
             BmsLayoutVariant.Pms9K or BmsLayoutVariant.Pms9K2P or BmsLayoutVariant.Pms9KDouble => pms(rate),
             _ => sevenKeys(rate),
         };
+
+    private readonly record struct ProfileKey(BmsLayoutVariant Layout, double Rate);
 
     private static BmsJudgementProfile fiveKeys(double rate) => new(
         head(rate, (-20, 20), (-50, 50), (-100, 100), (-150, 150), (-150, 500)),

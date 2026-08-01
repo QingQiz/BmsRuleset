@@ -7,18 +7,47 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 
 public sealed class BmsJudgementWindowTable
 {
-    private readonly IReadOnlyList<BmsJudgementWindow> hitWindows;
+    private readonly BmsJudgementWindow[] hitWindows;
     private readonly BmsJudgementWindow? missWindow;
+    private readonly double? goodFastDTime;
+    private readonly double? passivePoorOffset;
 
     public BmsJudgementWindowTable(IEnumerable<BmsJudgementWindow> rows)
     {
-        var allRows = rows.ToArray();
-        hitWindows = allRows.Where(row => row.Result != HitResult.Miss).ToArray();
-        var missRows = allRows.Where(row => row.Result == HitResult.Miss).ToArray();
-        missWindow = missRows.Length == 0 ? null : missRows[0];
+        var allRows = rows as BmsJudgementWindow[] ?? rows.ToArray();
+        var hitCount = 0;
+        BmsJudgementWindow? miss = null;
+
+        foreach (var row in allRows)
+        {
+            if (row.Result == HitResult.Miss)
+                miss ??= row;
+            else
+                hitCount++;
+        }
+
+        var hits = new BmsJudgementWindow[hitCount];
+        var hitIndex = 0;
+
+        foreach (var row in allRows)
+        {
+            if (row.Result != HitResult.Miss)
+            {
+                hits[hitIndex++] = row;
+
+                if (row.Result == HitResult.Good)
+                    goodFastDTime ??= row.FastDTime;
+
+                if (row.Result == HitResult.Ok)
+                    passivePoorOffset ??= row.SlowOffset;
+            }
+        }
+
+        hitWindows = hits;
+        missWindow = miss;
     }
 
-    public double GoodFastDTime => hitWindows.First(row => row.Result == HitResult.Good).FastDTime;
+    public double GoodFastDTime => goodFastDTime ?? throw new InvalidOperationException("Sequence contains no matching element");
 
     public HitResult ResultForOffset(double timeOffset)
     {
@@ -41,8 +70,7 @@ public sealed class BmsJudgementWindowTable
 
     public bool IsPastPassivePoorOffset(double timeOffset)
     {
-        var badWindow = hitWindows.First(row => row.Result == HitResult.Ok);
-        return timeOffset > badWindow.SlowOffset;
+        return timeOffset > (passivePoorOffset ?? throw new InvalidOperationException("Sequence contains no matching element"));
     }
 
     public double FrameworkWindowFor(HitResult result)

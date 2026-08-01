@@ -13,13 +13,23 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
 
     // The framework already performs passive result checks; normal notes have no BMS-specific frame state.
     internal override bool RequiresColumnFrameUpdate => false;
+
+    private double passivePoorOffset;
+
+    protected override void OnApply()
+    {
+        base.OnApply();
+
+        var table = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.EffectiveJudgementRate, tail: false);
+        passivePoorOffset = table.SlowWindowFor(HitResult.Ok);
+    }
+
     protected override void CheckForResult(bool userTriggered, double timeOffset)
     {
         if (userTriggered || HitObject == null)
             return;
 
-        var table = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.EffectiveJudgementRate, tail: false);
-        if (table.IsPastPassivePoorOffset(timeOffset))
+        if (timeOffset > passivePoorOffset)
             ApplyResult(HitResult.Meh);
     }
 

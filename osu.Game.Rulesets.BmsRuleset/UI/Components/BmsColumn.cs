@@ -84,6 +84,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
     private BmsColumnKeySound? keySound;
     private readonly BmsHitExplosionPool normalHitExplosionPool;
     private readonly BmsHitExplosionPool longNoteHitExplosionPool;
+    private readonly List<(DrawableBmsHitObject Drawable, BmsJudgementCandidate Candidate)> pressCandidates = [];
+    private readonly List<BmsJudgementCandidate> pressJudgementCandidates = [];
 
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
@@ -299,7 +301,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
     {
         IsPressed = true;
 
-        var candidates = new List<(DrawableBmsHitObject Drawable, BmsJudgementCandidate Candidate)>();
+        pressCandidates.Clear();
+        pressJudgementCandidates.Clear();
 
         foreach (var alive in HitObjectContainer.AliveEntries.Values)
         {
@@ -310,19 +313,33 @@ public partial class BmsColumn : Playfield, IBmsColumn
                 continue;
             }
 
-            candidates.Add((d, new BmsJudgementCandidate(
+            var candidate = new BmsJudgementCandidate(
                 d.HitObject.StartTime,
                 d.HitObject.GetEndTime(),
                 d.HitObject.Column,
                 d.HitObject.EffectiveJudgementRate,
-                d.HitObject is BmsLongNote)));
+                d.HitObject is BmsLongNote);
+            pressCandidates.Add((d, candidate));
+            pressJudgementCandidates.Add(candidate);
         }
 
-        var selection = BmsJudgementSelector.SelectPress(LayoutVariant, Index, candidates.Select(c => c.Candidate), time);
+        var selection = BmsJudgementSelector.SelectPress(LayoutVariant, Index, pressJudgementCandidates, time);
 
         if (!selection.IsEmptyPoor && selection.Candidate is { } selectedCandidate)
         {
-            var target = candidates.First(c => c.Candidate.Equals(selectedCandidate)).Drawable;
+            DrawableBmsHitObject? target = null;
+            foreach (var candidate in pressCandidates)
+            {
+                if (candidate.Candidate.Equals(selectedCandidate))
+                {
+                    target = candidate.Drawable;
+                    break;
+                }
+            }
+
+            if (target == null)
+                return PressOutcome.Empty;
+
             if (target.TryHit(selection.Result))
             {
                 keySound?.PlaySample(target.HitObject.SampleKey, target.HitObject.SampleVolume);
