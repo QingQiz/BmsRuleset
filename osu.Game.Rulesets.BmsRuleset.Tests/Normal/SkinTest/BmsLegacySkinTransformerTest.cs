@@ -1133,6 +1133,22 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
+    public void TestRulesetIgnoresBeatmapSkin()
+    {
+        using var beatmapSkin = new LegacyBeatmapSkin(new BeatmapInfo(), null);
+        var transformer = new BmsRuleset().CreateSkinTransformer(beatmapSkin, createBeatmap());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(transformer, Is.Not.Null);
+            Assert.That(transformer!.GetDrawableComponent(createUserMainHudLookup()), Is.Null);
+            Assert.That(transformer.GetTexture("mania-note1", WrapMode.None, WrapMode.None), Is.Null);
+            Assert.That(transformer.GetSample(new SampleInfo("normal-hitnormal")), Is.Null);
+            Assert.That(transformer.GetConfig<SkinConfiguration.LegacySetting, decimal>(SkinConfiguration.LegacySetting.Version), Is.Null);
+        });
+    }
+
+    [Test]
     public void TestRulesetTransformsCurrentSkin()
     {
         var transformer = new BmsRuleset().CreateSkinTransformer(new TestSkinIniSkin("""

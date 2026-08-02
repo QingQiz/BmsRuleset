@@ -253,6 +253,7 @@ public partial class BmsRuleset : Ruleset
 
     public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap) => skin switch
     {
+        LegacyBeatmapSkin => new BmsIgnoredBeatmapSkinTransformer(skin),
         ArgonSkin or ArgonProSkin or TrianglesSkin or DefaultLegacySkin or RetroSkin => new BmsBuiltInSkinTransformer(skin),
         Skin => new BmsLegacySkinTransformer(skin, beatmap),
         _ => null,

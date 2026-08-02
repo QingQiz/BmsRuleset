@@ -94,6 +94,15 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     }
 
     [Test]
+    public void TestBmsWorkingBeatmapIgnoresBeatmapSkin()
+    {
+        BmsWorkingBeatmap working = null!;
+
+        AddStep("create working beatmap", () => working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio), audio));
+        AddAssert("beatmap skin is ignored", () => working.Skin == null);
+    }
+
+    [Test]
     public void TestBmsWorkingBeatmapTransfersTrackForSameBeatmapRefetch()
     {
         var beatmapId = Guid.NewGuid();

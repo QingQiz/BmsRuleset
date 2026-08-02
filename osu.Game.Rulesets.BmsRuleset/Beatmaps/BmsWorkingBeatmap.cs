@@ -20,8 +20,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 
 /// <summary>
 ///     A <see cref="WorkingBeatmap" /> that wraps a normally-created working beatmap but
-///     overrides <see cref="GetBeatmapTrack" /> to return a <see cref="BmsPreviewTrack" />
-///     for BMS charts.  All other members are delegated to the inner working beatmap.
+///     overrides resource handling required by BMS charts, including preview playback and
+///     disabling osu! beatmap skins. Other members are delegated to the inner working beatmap.
 /// </summary>
 public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, TextureStore? externalTextureStore = null)
     : WorkingBeatmap(createWrapperBeatmapInfo(inner), audioManager)
@@ -151,7 +151,9 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
     protected override IBeatmap GetBeatmap() => tryDecodeExternalBeatmap(BeatmapInfo) ?? inner.Beatmap;
 
-    protected override ISkin GetSkin() => inner.Skin;
+    // BMS charts do not contain osu! beatmap skins. Keeping this source out of the skin chain also
+    // prevents an empty LegacyBeatmapSkin from overriding the selected user skin during gameplay.
+    protected override ISkin GetSkin() => null!;
 
     protected override Storyboard GetStoryboard() => inner.Storyboard;
 

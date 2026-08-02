@@ -16,8 +16,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 /// </summary>
 /// <remarks>
 /// This is the last-resort visual layer in the BMS skin source chain: it is only consulted
-/// after the user's selected skin, LegacyBeatmapSkin, and all other osu!
-/// skin sources have failed to satisfy a lookup.
+/// after the user's selected skin and all other supported osu! skin sources have failed to
+/// satisfy a lookup. Beatmap skins are intentionally excluded from BMS gameplay.
 /// </remarks>
 public sealed class BmsEmbeddedSkin : ISkin, IDisposable
 {
