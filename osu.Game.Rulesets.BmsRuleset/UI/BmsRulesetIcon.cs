@@ -1,7 +1,11 @@
 using System;
+using System.Collections.Generic;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.IO.Stores;
+using osu.Framework.Platform;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
@@ -11,6 +15,9 @@ public sealed partial class BmsRulesetIcon : CompositeDrawable
     private const float design_size = 40;
 
     private readonly Container iconContent;
+
+    private static readonly object font_store_lock = new();
+    private static readonly HashSet<FontStore> registered_font_stores = [];
 
     public BmsRulesetIcon()
     {
@@ -48,6 +55,24 @@ public sealed partial class BmsRulesetIcon : CompositeDrawable
         };
     }
 
+    [BackgroundDependencyLoader]
+    private void load(FontStore store, GameHost host)
+    {
+        lock (font_store_lock)
+        {
+            if (!registered_font_stores.Add(store))
+                return;
+
+            var resources = createResourceStore();
+            var glyphStore = new GlyphStore(new ResourceStore<byte[]>(resources), "Fonts/bmsIcons", host.CreateTextureLoaderStore(createResourceStore()));
+
+            // Mod icons can be constructed in the same frame as the ruleset icon. Load the
+            // tiny font synchronously so SpriteIcon does not cache a missing glyph.
+            glyphStore.LoadFontAsync().GetAwaiter().GetResult();
+            store.AddTextureSource(glyphStore);
+        }
+    }
+
     protected override void Update()
     {
         base.Update();
@@ -65,4 +90,7 @@ public sealed partial class BmsRulesetIcon : CompositeDrawable
         CornerRadius = 1.5f,
         Child = new Box { RelativeSizeAxes = Axes.Both },
     };
+
+    private static IResourceStore<byte[]> createResourceStore()
+        => new NamespacedResourceStore<byte[]>(new DllResourceStore(typeof(BmsRuleset).Assembly), @"Resources");
 }

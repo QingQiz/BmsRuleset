@@ -5,7 +5,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
-using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -26,7 +25,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
     public override string Acronym => "AS";
 
-    public override IconUsage? Icon => OsuIcon.ModSpunOut;
+    public override IconUsage? Icon => BmsIcons.AutoScratch;
 
     public override LocalisableString Description => BmsStrings.ModAutoScratch;
 

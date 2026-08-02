@@ -4,7 +4,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Beatmaps;
-using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -20,7 +19,7 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
 
     public override string Acronym => "HS";
 
-    public override IconUsage? Icon => OsuIcon.ModHoldOff;
+    public override IconUsage? Icon => BmsIcons.HideScratch;
 
     public override LocalisableString Description => BmsStrings.ModHideScratch;
 

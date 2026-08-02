@@ -2,10 +2,10 @@ using System;
 using System.Linq;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -34,7 +34,7 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
 
     public override string Acronym => "AG";
 
-    public override IconUsage? Icon => OsuIcon.ModBarrelRoll;
+    public override IconUsage? Icon => BmsIcons.AutoGauge;
 
     public override LocalisableString Description => BmsStrings.ModAutoGauge;
 
