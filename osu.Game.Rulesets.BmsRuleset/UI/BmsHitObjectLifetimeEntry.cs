@@ -46,9 +46,9 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
     /// <summary>
     ///     Mines only need a single frame to check whether the column is pressed; after that they
-    ///     can die immediately.  10 ms past-lifetime ensures they are alive on exactly one check.
+    ///     can die shortly afterwards. A 100 ms past-lifetime keeps the check reliable across frame boundaries.
     /// </summary>
-    private const double mine_past_lifetime = 0;
+    private const double mine_past_lifetime = 100;
 
     /// <summary>
     ///     Step-size used when probing backwards from StartTime to find the earliest visible frame.
