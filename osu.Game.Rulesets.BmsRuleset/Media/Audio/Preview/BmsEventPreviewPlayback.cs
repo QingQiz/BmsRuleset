@@ -23,6 +23,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
     private readonly List<BmsPreviewTimelineEntry> sortedEvents = [];
     private readonly BmsPreviewAudioLoader? audioLoader;
     private readonly bool deriveLengthFromTracks;
+    private readonly bool extendLengthFromTracks;
     private readonly bool retainLoadedTracks;
     private readonly List<Track> activeTracks = [];
     private readonly Dictionary<int, Task<Track?>> eventTrackLoads = [];
@@ -56,6 +57,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         sortedEvents.AddRange(timeline.Entries);
         Length = timeline.Length;
         deriveLengthFromTracks = timeline.DeriveLengthFromTracks;
+        extendLengthFromTracks = timeline.ExtendLengthFromTracks;
         retainLoadedTracks = timeline.RetainLoadedTracks;
 
         if (basePath != null)
@@ -409,12 +411,14 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     private void updateLength(BmsPreviewTimelineEntry evt, Track track)
     {
-        if (!deriveLengthFromTracks || track.Length <= 0)
+        if ((!deriveLengthFromTracks && !extendLengthFromTracks) || track.Length <= 0)
             return;
 
         derivedLength = Math.Max(derivedLength, evt.Time + track.Length);
-        Length = derivedLength;
-        derivedLengthResolutionComplete = true;
+        Length = deriveLengthFromTracks ? derivedLength : Math.Max(Length, derivedLength);
+
+        if (deriveLengthFromTracks)
+            derivedLengthResolutionComplete = true;
     }
 
     private void startTrack(BmsPreviewTimelineEntry evt, Track track)

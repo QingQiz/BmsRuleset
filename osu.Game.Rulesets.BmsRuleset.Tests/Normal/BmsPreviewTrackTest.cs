@@ -356,6 +356,34 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
+    public void TestEventTimelineExtendsToLoadedTrackLength()
+    {
+        BmsPreviewTrack track = null!;
+
+        AddStep("create event timeline with long BGM", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-long-bgm-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            writePcmWave(Path.Combine(directory, "bgm.wav"), TimeSpan.FromSeconds(6));
+
+            track = createTrack(
+                [new BmsSampleEvent(0, 0, 1, 100)],
+                new Dictionary<ushort, string> { [1] = "bgm.wav" },
+                directory);
+
+            audio.AddItem(track);
+            track.Start();
+        });
+
+        AddUntilStep("BGM is playing", () => getActivePlaybackCount(track) == 1);
+        AddAssert("timeline includes full BGM", () => track.Length, () => Is.EqualTo(6000).Within(1));
+        AddStep("seek past event tail", () => track.Seek(5500));
+        AddUntilStep("BGM remains playable past event tail", () => getActivePlaybackCount(track) == 1);
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
     public void TestUnknownShortSingleFileRestoreRestartsFromBeginning()
     {
         BmsPreviewTrack track = null!;

@@ -10,7 +10,8 @@ internal sealed record BmsEventPreviewTimeline(
     IReadOnlyList<BmsPreviewTimelineEntry> Entries,
     double Length,
     bool DeriveLengthFromTracks = false,
-    bool RetainLoadedTracks = false)
+    bool RetainLoadedTracks = false,
+    bool ExtendLengthFromTracks = false)
 {
     internal const double DEFAULT_LENGTH = 30000;
 
@@ -53,6 +54,6 @@ internal sealed record BmsEventPreviewTimeline(
         }
 
         var length = entries.Count > 0 ? entries[^1].Time + 5000 : DEFAULT_LENGTH;
-        return new BmsEventPreviewTimeline(entries, length);
+        return new BmsEventPreviewTimeline(entries, length, ExtendLengthFromTracks: true);
     }
 }
