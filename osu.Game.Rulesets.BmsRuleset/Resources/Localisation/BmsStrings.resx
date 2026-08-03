@@ -27,6 +27,8 @@
   <data name="bga_fill_screen_description" xml:space="preserve"><value>Display the BGA across the full HUD area. Moving or resizing the component disables this.</value></data>
   <data name="use_dedicated_preview_audio" xml:space="preserve"><value>Use dedicated preview audio</value></data>
   <data name="dedicated_preview_audio_hint" xml:space="preserve"><value>Use #PREVIEW or preview.* files when available. Disable this to synthesize song-select previews only from BGM and keysound samples.</value></data>
+  <data name="unlock_frame_rate_limit" xml:space="preserve"><value>Unlock frame rate limit</value></data>
+  <data name="unlock_frame_rate_limit_hint" xml:space="preserve"><value>Remove osu!'s 1000 Hz frame and input polling cap during BMS gameplay. Higher GC and GPU pressure may cause extra stutters; disable this option if that happens.</value></data>
   <data name="show_bms_5k" xml:space="preserve"><value>Show BMS 5K</value></data>
   <data name="show_bme_7k" xml:space="preserve"><value>Show BME 7K</value></data>
   <data name="show_pms_9k" xml:space="preserve"><value>Show PMS 9K</value></data>

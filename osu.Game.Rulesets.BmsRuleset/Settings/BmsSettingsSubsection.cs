@@ -146,6 +146,12 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             }),
             new SettingsItemV2(new FormCheckBox
             {
+                Caption = BmsStrings.UnlockFrameRateLimit,
+                HintText = BmsStrings.UnlockFrameRateLimitHint,
+                Current = manager.GetBindable<bool>(BmsRulesetSetting.UnlockFrameRateLimit),
+            }),
+            new SettingsItemV2(new FormCheckBox
+            {
                 Caption = BmsStrings.UseDedicatedPreviewAudio,
                 HintText = BmsStrings.DedicatedPreviewAudioHint,
                 Current = useDedicatedPreviewAudio,

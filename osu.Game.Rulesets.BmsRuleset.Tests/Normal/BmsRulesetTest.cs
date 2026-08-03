@@ -79,6 +79,14 @@ public class BmsRulesetTest
     }
 
     [Test]
+    public void TestFrameRateUnlockIsDisabledByDefault()
+    {
+        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
+
+        Assert.That(config.Get<bool>(BmsRulesetSetting.UnlockFrameRateLimit), Is.False);
+    }
+
+    [Test]
     public void TestVisualOffsetDefaultsAndRange()
     {
         using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);

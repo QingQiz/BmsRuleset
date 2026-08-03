@@ -206,6 +206,10 @@ public static class BmsStrings
 
     public static LocalisableString DedicatedPreviewAudioHint => get("dedicated_preview_audio_hint");
 
+    public static LocalisableString UnlockFrameRateLimit => get("unlock_frame_rate_limit");
+
+    public static LocalisableString UnlockFrameRateLimitHint => get("unlock_frame_rate_limit_hint");
+
     public static LocalisableString ShowBms5K => get("show_bms_5k");
 
     public static LocalisableString ShowBme7K => get("show_bme_7k");

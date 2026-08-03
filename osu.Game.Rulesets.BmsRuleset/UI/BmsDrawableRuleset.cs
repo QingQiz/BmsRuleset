@@ -1,10 +1,13 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Configuration;
 using osu.Framework.Input;
+using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Input.Handlers;
 using osu.Game.Replays;
@@ -29,15 +32,6 @@ using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI;
 
-/// <inheritdoc />
-/// <summary>
-///     Minimal native BMS gameplay surface.
-/// </summary>
-/// <remarks>
-///     This class is the first step away from the old mania-backed implementation. It deliberately
-///     avoids any mania types and wires BMS hit objects into a native playfield. The visuals are simple
-///     placeholders that currently use projected object time for vertical positioning.
-/// </remarks>
 public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 {
     public BmsDrawableRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
@@ -80,6 +74,10 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
     private readonly BindableBool backgroundAudioPaused = new(true);
 
+    private Bindable<bool>? unlockFrameRateLimit;
+
+    private IDisposable? frameRateUnlockLease;
+
     private BmsBackgroundAudioPlayer backgroundAudioPlayer = null!;
 
     private BmsPreviewTrack? previewTrackBeforePlay;
@@ -103,6 +101,12 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     [Resolved(CanBeNull = true)]
     private Player? player { get; set; }
 
+    [Resolved]
+    private GameHost host { get; set; } = null!;
+
+    [Resolved]
+    private FrameworkConfigManager frameworkConfig { get; set; } = null!;
+
     private bool stoppedPreviewForGameplay;
 
     private double? pendingResumeRewindFrom;
@@ -122,6 +126,9 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             gameplayClockContainer.IsPaused.ValueChanged -= onGameplayPausedChanged;
 
         backgroundAudioPaused.UnbindAll();
+        unlockFrameRateLimit?.UnbindAll();
+        frameRateUnlockLease?.Dispose();
+        frameRateUnlockLease = null;
 
         if (previewTrackBeforePlay == null || !stoppedPreviewForGameplay)
             return;
@@ -309,9 +316,23 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             config.BindWith(BmsRulesetSetting.BgaDim, BgaDim);
             config.BindWith(BmsRulesetSetting.VisualOffset, ((BmsPlayfield)Playfield).VisualOffset);
             ((BmsPlayfield)Playfield).ScrollController.SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
+
+            unlockFrameRateLimit = config.GetBindable<bool>(BmsRulesetSetting.UnlockFrameRateLimit);
+            unlockFrameRateLimit.BindValueChanged(onUnlockFrameRateLimitChanged, true);
         }
 
         ((BmsPlayfield)Playfield).ScrollController.SetPlaybackRate(getRate(Mods));
+    }
+
+    private void onUnlockFrameRateLimitChanged(ValueChangedEvent<bool> unlocked)
+    {
+        frameRateUnlockLease?.Dispose();
+        frameRateUnlockLease = unlocked.NewValue
+            ? BmsFrameRateUnlock.Acquire(
+                host,
+                frameworkConfig.GetBindable<ExecutionMode>(FrameworkSetting.ExecutionMode),
+                frameworkConfig.GetBindable<FrameSync>(FrameworkSetting.FrameSync))
+            : null;
     }
 
     private void onGameplayPausedChanged(ValueChangedEvent<bool> paused)
@@ -331,7 +352,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (pendingResumeRewindFrom == null || gameplayState == null)
             return;
 
-        var recordedPauseTime = (int)System.Math.Round(pendingResumeRewindFrom.Value);
+        var recordedPauseTime = (int)Math.Round(pendingResumeRewindFrom.Value);
 
         if (gameplayState.Score.ScoreInfo.Pauses.Contains(recordedPauseTime))
         {
@@ -359,7 +380,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             // would otherwise prevent another pause until the resume lead-in has fully caught up.
             player_last_pause_action_time_field.SetValue(player, null);
         }
-        catch (System.Exception exception)
+        catch (Exception exception)
         {
             BmsLogger.Error(exception, "Failed to clear the pause cooldown for a BMS resume rewind.");
         }
@@ -392,7 +413,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             frame_stable_playback_setter.Invoke(this, [enabled]);
             return true;
         }
-        catch (System.Exception exception)
+        catch (Exception exception)
         {
             BmsLogger.Error(exception, $"Failed to {(enabled ? "restore" : "disable")} frame-stable BMS playback for a resume rewind.");
             return false;

@@ -23,6 +23,7 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
         SetDefault(BmsRulesetSetting.VisualOffset, 0.0, MIN_VISUAL_OFFSET, MAX_VISUAL_OFFSET, 1.0);
         SetDefault(BmsRulesetSetting.AutomaticallyAdjustVisualOffset, false);
         SetDefault(BmsRulesetSetting.UseDedicatedPreviewAudio, true);
+        SetDefault(BmsRulesetSetting.UnlockFrameRateLimit, false);
 
         SetDefault(BmsRulesetSetting.ShowBms5K, true);
         SetDefault(BmsRulesetSetting.ShowBme7K, true);
@@ -54,4 +55,5 @@ public enum BmsRulesetSetting
     DifficultyTableHistory,
     DifficultyTableSubdividedTables,
     UseDedicatedPreviewAudio,
+    UnlockFrameRateLimit,
 }

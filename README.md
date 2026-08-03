@@ -116,6 +116,13 @@ Valid local plays contribute visual-offset suggestions based on their median hit
 suggestions and can apply their average manually, or automatically apply each new suggestion after a play. Replays,
 automatic play, and plays with fewer than 50 timed hits are excluded from calibration.
 
+### Uncapped BMS Frame Rate
+
+Enable **Unlock frame rate limit** in the BMS settings to remove osu!'s 1000 Hz cap from BMS rendering, updates, and
+input polling during BMS gameplay.
+
+**Side effects:** Higher GC and GPU pressure may cause extra stutters. Disable this option if that happens.
+
 ### Clear Lamps
 
 Song select shows your best matching local clear status, from No Play and Failed through Assist Easy, Easy, Normal,
