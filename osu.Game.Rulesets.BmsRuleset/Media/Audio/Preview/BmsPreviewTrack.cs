@@ -18,9 +18,12 @@ public enum BmsPreviewTrackPlaybackMode
 public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 {
     internal const double RESTORE_FADE_DURATION = 2_500;
+    internal const double SEEK_FADE_OUT_DURATION = 20;
+    internal const double SEEK_FADE_IN_DURATION = 50;
 
     private readonly BindableDouble previewOutputVolume = new(1);
     private readonly BindableDouble restoreFadeVolume = new(1);
+    private readonly BindableDouble seekFadeVolume = new(1);
     private readonly IAggregateAudioAdjustment audioManagerAdjustments;
 
     private readonly StopwatchClock clock = new();
@@ -30,6 +33,12 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 
     private long restoreFadeStart;
     private bool restoreFadeInProgress;
+
+    private double? pendingSeekPosition;
+    private bool pendingSeekSuccess;
+    private long seekFadeStart;
+    private double seekFadeStartVolume = 1;
+    private SeekFadePhase seekFadePhase;
 
     public override bool IsRunning
     {
@@ -69,6 +78,8 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 
     internal double RestoreFadeVolume => restoreFadeVolume.Value;
 
+    internal double SeekFadeVolume => seekFadeVolume.Value;
+
     protected virtual bool CanComplete => true;
 
     protected virtual bool StartClockImmediately => true;
@@ -76,6 +87,8 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
     protected virtual bool IsLengthFinal => true;
 
     protected bool IsRestoreFadePending { get; private set; }
+
+    protected bool IsSeekFadePending => seekFadePhase == SeekFadePhase.WaitingForAudio;
 
     protected BmsPreviewTrack(IAggregateAudioAdjustment audioManagerAdjustments)
         : base("bms-preview")
@@ -107,13 +120,14 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
         await EnqueueAction(() =>
         {
             unresolvedRestorePosition = null;
-            seekInternal(clamped, success);
+            requestSeek(clamped, success);
         }).ConfigureAwait(false);
         return success;
     }
 
     public override void Reset() => EnqueueAction(() =>
     {
+        cancelSeekFade();
         IsRestoreFadePending = false;
         restoreFadeInProgress = false;
         restoreFadeVolume.Value = 1;
@@ -126,6 +140,8 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
     {
         EnqueueAction(() =>
         {
+            cancelSeekFade();
+
             if (gameplayTime is { } time)
             {
                 var target = IsLengthFinal ? Math.Clamp(time, 0, Length) : Math.Max(0, time);
@@ -153,6 +169,7 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
     {
         base.UpdateState();
         updateRestoreFade();
+        updateSeekFade();
 
         if (PlaybackMode == BmsPreviewTrackPlaybackMode.GameplayClockOnly)
             return;
@@ -217,6 +234,15 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
         IsRestoreFadePending = false;
         restoreFadeStart = Stopwatch.GetTimestamp();
         restoreFadeInProgress = true;
+    }
+
+    protected void BeginPendingSeekFade()
+    {
+        if (!IsSeekFadePending)
+            return;
+
+        seekFadeStart = Stopwatch.GetTimestamp();
+        seekFadePhase = SeekFadePhase.FadingIn;
     }
 
     protected bool TryResolvePendingRestorePosition()
@@ -322,7 +348,8 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
             volume.Value = owner.AggregateVolume.Value
                            * eventVolume
                            * owner.previewOutputVolume.Value
-                           * owner.restoreFadeVolume.Value;
+                           * owner.restoreFadeVolume.Value
+                           * owner.seekFadeVolume.Value;
             balance.Value = owner.AggregateBalance.Value;
             frequency.Value = owner.AggregateFrequency.Value;
             tempo.Value = owner.AggregateTempo.Value;
@@ -344,8 +371,108 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 
     private void stopInternal()
     {
+        if (pendingSeekPosition is { })
+            performPendingSeek();
+
         lock (clock) clock.Stop();
         StopPlayback();
+        cancelSeekFade();
+    }
+
+    private void requestSeek(double seek, bool success)
+    {
+        if (PlaybackMode != BmsPreviewTrackPlaybackMode.Preview || !IsRunning)
+        {
+            cancelSeekFade();
+            cancelRestoreFade();
+            seekInternal(seek, success);
+            return;
+        }
+
+        pendingSeekPosition = seek;
+        pendingSeekSuccess = success;
+
+        if (seekFadePhase == SeekFadePhase.FadingOut)
+            return;
+
+        if (seekFadeVolume.Value <= 0)
+        {
+            performPendingSeek();
+            return;
+        }
+
+        seekFadeStartVolume = seekFadeVolume.Value;
+        seekFadeStart = Stopwatch.GetTimestamp();
+        seekFadePhase = SeekFadePhase.FadingOut;
+    }
+
+    private void updateSeekFade()
+    {
+        if (PlaybackMode != BmsPreviewTrackPlaybackMode.Preview && seekFadePhase != SeekFadePhase.None)
+        {
+            completePendingSeek();
+            return;
+        }
+
+        switch (seekFadePhase)
+        {
+            case SeekFadePhase.FadingOut:
+            {
+                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_OUT_DURATION;
+                seekFadeVolume.Value = seekFadeStartVolume * Math.Max(0, 1 - progress);
+
+                if (progress >= 1)
+                    performPendingSeek();
+
+                break;
+            }
+
+            case SeekFadePhase.FadingIn:
+            {
+                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_IN_DURATION;
+                seekFadeVolume.Value = Math.Min(1, progress);
+
+                if (progress >= 1)
+                    seekFadePhase = SeekFadePhase.None;
+
+                break;
+            }
+        }
+    }
+
+    private void performPendingSeek()
+    {
+        if (pendingSeekPosition is not { } seek)
+            return;
+
+        var success = pendingSeekSuccess;
+        pendingSeekPosition = null;
+        seekFadeVolume.Value = 0;
+        cancelRestoreFade();
+        seekInternal(seek, success);
+        seekFadePhase = SeekFadePhase.WaitingForAudio;
+    }
+
+    private void completePendingSeek()
+    {
+        if (pendingSeekPosition is { })
+            performPendingSeek();
+
+        cancelSeekFade();
+    }
+
+    private void cancelSeekFade()
+    {
+        pendingSeekPosition = null;
+        seekFadePhase = SeekFadePhase.None;
+        seekFadeVolume.Value = 1;
+    }
+
+    private void cancelRestoreFade()
+    {
+        IsRestoreFadePending = false;
+        restoreFadeInProgress = false;
+        restoreFadeVolume.Value = 1;
     }
 
     private void seekInternal(double seek, bool success)
@@ -369,5 +496,13 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
         lock (clock) clock.Reset();
         seekOffset = 0;
         ResetPlayback();
+    }
+
+    private enum SeekFadePhase
+    {
+        None,
+        FadingOut,
+        WaitingForAudio,
+        FadingIn,
     }
 }

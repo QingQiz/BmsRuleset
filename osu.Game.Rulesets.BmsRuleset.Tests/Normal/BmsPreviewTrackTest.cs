@@ -842,6 +842,58 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
+    public void TestSeekWhileRunningFadesAroundAudioReconstruction()
+    {
+        BmsPreviewTrack track = null!;
+        Track initialTrack = null!;
+        var seekAudioLoadCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var audioLoadCount = 0;
+        var observedFadeIn = false;
+
+        AddStep("create running preview", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-seek-fade-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            writePcmWave(Path.Combine(directory, "bgm.wav"), TimeSpan.FromSeconds(3));
+
+            track = new BmsEventPreviewTrack(
+                _ => BmsEventPreviewTimeline.Create(
+                    () => [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), true)],
+                    new Dictionary<ushort, string> { [1] = "bgm.wav" }),
+                directory,
+                audio,
+                async _ =>
+                {
+                    if (Interlocked.Increment(ref audioLoadCount) > 1)
+                        await seekAudioLoadCompletion.Task.ConfigureAwait(false);
+                });
+
+            audio.AddItem(track);
+            track.Start();
+        });
+
+        AddUntilStep("initial audio is running", () => getActivePlaybackCount(track) == 1);
+        AddStep("capture initial audio", () => initialTrack = getActiveTrack(track)!);
+        AddAssert("seek fade durations are short", () =>
+            BmsPreviewTrack.SEEK_FADE_OUT_DURATION == 20
+            && BmsPreviewTrack.SEEK_FADE_IN_DURATION == 50);
+        AddStep("seek while running", () => track.Seek(1500));
+        AddUntilStep("old audio fades before reconstruction", () =>
+            Volatile.Read(ref audioLoadCount) > 1
+            && getActivePlaybackCount(track) == 0
+            && getSeekFadeVolume(track) == 0
+            && initialTrack.AggregateVolume.Value == 0);
+        AddStep("complete target audio load", seekAudioLoadCompletion.SetResult);
+        AddUntilStep("target audio fades in", () =>
+        {
+            observedFadeIn |= getActivePlaybackCount(track) == 1 && getSeekFadeVolume(track) < 1;
+            return observedFadeIn;
+        });
+        AddUntilStep("seek fade completes", () => getSeekFadeVolume(track) == 1);
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
     public void TestEventTracksAreCreatedOnDemandAndFollowRateAdjustments()
     {
         BmsPreviewTrack track = null!;
@@ -923,6 +975,8 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     private static Track? getActiveTrack(BmsPreviewTrack track) => getPlaybackTracks(track).FirstOrDefault();
 
     private static double getRestoreFadeVolume(BmsPreviewTrack track) => track.RestoreFadeVolume;
+
+    private static double getSeekFadeVolume(BmsPreviewTrack track) => track.SeekFadeVolume;
 
     private static IEnumerable<Track> getActiveTracks(BmsPreviewTrack track) => getPlaybackTracks(track);
 

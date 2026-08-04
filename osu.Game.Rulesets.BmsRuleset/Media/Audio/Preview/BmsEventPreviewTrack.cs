@@ -121,7 +121,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
 
         var previewMode = PlaybackMode == BmsPreviewTrackPlaybackMode.Preview;
         var shouldUpdatePlayback = previewMode && (IsRunning || previewStartPending);
-        var requireDueAudioReady = previewStartPending || IsRestoreFadePending;
+        var requireDueAudioReady = previewStartPending || IsRestoreFadePending || IsSeekFadePending;
         var startState = shouldUpdatePlayback
             ? Playback?.Update(CurrentTime, requireDueAudioReady) ?? BmsPreviewPlaybackStartState.Waiting
             : BmsPreviewPlaybackStartState.Waiting;
@@ -142,7 +142,10 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         }
 
         if (startState != BmsPreviewPlaybackStartState.Waiting)
+        {
             BeginPendingRestoreFade();
+            BeginPendingSeekFade();
+        }
 
         if (previewStartPending && startState != BmsPreviewPlaybackStartState.Waiting)
         {

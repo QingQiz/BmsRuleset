@@ -356,6 +356,11 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     private void stopPreviewPlayback()
     {
+        // A seek reaches zero volume in the same update that stops these channels, before the
+        // regular playback update can propagate the final adjustment value.
+        foreach (var adjustments in trackAdjustments.Values)
+            adjustments.Update();
+
         for (var i = 0; i < activeTracks.Count; i++)
         {
             var track = activeTracks[i];
