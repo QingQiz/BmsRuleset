@@ -27,7 +27,8 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
         AttributesToSkip = FileAttributes.ReparsePoint,
     };
 
-    private readonly string basePath = Path.GetFullPath(basePath);
+    // In-memory working beatmaps may use an empty source; resolve it as the current directory.
+    private readonly string basePath = Path.GetFullPath(string.IsNullOrEmpty(basePath) ? "." : basePath);
     private Lazy<MojibakeAliasIndex>? aliasIndex;
 
     public void Dispose()
