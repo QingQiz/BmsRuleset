@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Timing;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
@@ -55,13 +54,6 @@ public partial class BmsBackgroundAudioPlayer(
         base.LoadComplete();
         LifetimeStart = double.MinValue;
         LifetimeEnd = double.MaxValue;
-    }
-
-    internal void UseAudioClock(IClock audioClock)
-    {
-        // osu! applies audio offsets to the gameplay clock rather than the audio source. Following
-        // the raw source clock keeps synthesized BMS background audio on the audio side of that offset.
-        Clock = new FramedClock(audioClock);
     }
 
     protected override void Update()
