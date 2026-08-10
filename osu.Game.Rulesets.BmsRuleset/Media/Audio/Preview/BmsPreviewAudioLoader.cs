@@ -5,17 +5,21 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
+using osu.Framework.Audio.Mixing;
 using osu.Framework.Audio.Track;
 using osu.Framework.IO.Stores;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 
 internal sealed class BmsPreviewAudioLoader : IDisposable
 {
+    private readonly AudioManager audioManager;
     private readonly BmsAudioResourceStore audioResourceStore;
     private readonly ITrackStore trackStore;
+    private readonly AudioMixer? mixer;
     private readonly Func<CancellationToken, Task>? beforeTrackLoad;
     private readonly CancellationTokenSource cancellation = new();
     private readonly ConcurrentDictionary<Task<Track?>, byte> eventTrackLoads = new();
@@ -23,6 +27,8 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
 
     private bool storesDisposed;
     private volatile bool disposed;
+
+    internal bool UsesDedicatedMixer => mixer != null;
 
     internal static IReadOnlyList<string> GetExistingDedicatedPreviewCandidates(string basePath, string? previewFile)
     {
@@ -49,11 +55,21 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
         AudioManager audioManager,
         Func<CancellationToken, Task>? beforeTrackLoad = null)
     {
+        this.audioManager = audioManager;
         this.beforeTrackLoad = beforeTrackLoad;
+        BmsKeysoundMixerPatcher.InstallOnce();
+        BmsKeysoundMixerPatcher.BindGlobalMixer(audioManager);
+
+        if (BmsKeysoundMixerPatcher.EnableReverseStreamWorkaround)
+            BmsTrackAudioPatcher.InstallOnce();
+
+        if (BmsKeysoundMixerPatcher.IsInstalled)
+            mixer = audioManager.CreateAudioMixer(BmsKeysoundMixerPatcher.PREVIEW_MIXER_IDENTIFIER);
+
         audioResourceStore = new BmsAudioResourceStore(basePath, cancellation.Token);
         var fileResources = new ResourceStore<byte[]>(audioResourceStore);
         BmsAudioResourceStore.AddExtensions(fileResources);
-        trackStore = audioManager.GetTrackStore(fileResources);
+        trackStore = audioManager.GetTrackStore(fileResources, mixer);
     }
 
     public Task<Track?> LoadTrackAsync(string samplePath)
@@ -65,6 +81,9 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
     }
 
     public void MarkEventTrackConsumed(Task<Track?> task) => eventTrackLoads.TryRemove(task, out _);
+
+    public void ApplyTailRamp(Track track, double offset) =>
+        BmsKeysoundMixerPatcher.TryApplyTailRamp(mixer, track, offset);
 
     public void DiscardEventTrack(Task<Track?> task)
     {
@@ -105,7 +124,10 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var track = await trackStore.GetAsync(lookup, cancellationToken).ConfigureAwait(false);
+            Track? track;
+            using (BmsTrackAudioPatcher.EnterBmsTrackScope())
+                track = await trackStore.GetAsync(lookup, cancellationToken).ConfigureAwait(false);
+
             if (track != null && await track.SeekAsync(0).ConfigureAwait(false) && track.IsLoaded)
                 return track;
 
@@ -180,6 +202,8 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
         }
 
         trackStore.Dispose();
+        mixer?.Dispose();
+        BmsKeysoundMixerPatcher.UnbindGlobalMixer(audioManager);
         audioResourceStore.Dispose();
         cancellation.Dispose();
     }

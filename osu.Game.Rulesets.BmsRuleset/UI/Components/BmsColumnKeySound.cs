@@ -27,7 +27,7 @@ public sealed partial class BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObj
     public void PlaySample(ushort? sampleKey, int volume = 100)
     {
         if (sampleKey is { } key)
-            sampleStore.Play(key, volume);
+            sampleStore.QueueLivePlay(key, volume);
     }
 
     /// <summary>

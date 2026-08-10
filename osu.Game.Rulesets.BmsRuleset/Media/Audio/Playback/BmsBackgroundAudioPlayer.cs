@@ -90,11 +90,22 @@ public partial class BmsBackgroundAudioPlayer(
         {
             var evt = sortedEvents[nextIndex];
 
+            // Undefined background keys are silent, but must not hold valid events at the same
+            // timestamp behind the scheduling boundary.
+            if (!sampleStore.HasSampleDefinition(evt.SampleKey))
+            {
+                nextIndex++;
+                continue;
+            }
+
             if (Time.Current < evt.Time)
                 break;
 
+            // Background samples and player-triggered keysounds from this ruleset update must
+            // enter one mixer batch. Pre-scheduling BGM lets it reach the output buffer before a
+            // simultaneous key press can be submitted, making the background layer sound early.
             if (Time.Current - evt.Time < allowable_late_start)
-                sampleStore.Play(evt.SampleKey, evt.Volume);
+                sampleStore.QueueLivePlay(evt.SampleKey, evt.Volume);
 
             nextIndex++;
         }
@@ -200,6 +211,11 @@ public partial class BmsBackgroundAudioPlayer(
         if (playbackBlocked)
         {
             playbackBlockedAt = Time.Current;
+
+            // Delayed native mixer starts cannot be resumed relative to a paused gameplay clock.
+            if (sampleStore.SupportsScheduling)
+                resyncRequired = true;
+
             return;
         }
 

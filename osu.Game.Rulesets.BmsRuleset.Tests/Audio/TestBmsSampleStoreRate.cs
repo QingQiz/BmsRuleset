@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
+using osu.Framework;
 using osu.Framework.Audio.Track;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
@@ -16,6 +19,54 @@ public partial class TestBmsSampleStoreRate : TestScene
 
     private string tempDir = null!;
     private BmsSampleStore store = null!;
+
+    [Test]
+    public void NativeMixerPatchInstallsOnDesktopBassPlatforms()
+    {
+        if (!BmsAudioPlatform.SupportsNativeBass)
+            Assert.Ignore("The native BMS mixer patch is only enabled on Windows and Linux.");
+
+        AddStep("create sample + store", () =>
+        {
+            createWav("native-mixer.wav", 1);
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "native-mixer.wav" } }, tempDir));
+        });
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddAssert("native mixer patch installed", () => BmsKeysoundMixerPatcher.IsInstalled);
+        AddAssert("desktop reverse stream patch installed", () => BmsTrackAudioPatcher.IsInstalled);
+        AddAssert("desktop float mixer and limiter enabled", () => BmsKeysoundMixerPatcher.EnableFloatMixerAndLimiter);
+        addCleanupSteps();
+    }
+
+    [Test]
+    public void MaxConcurrentTrackCountUsesTrackDuration()
+    {
+        BmsSampleUsage[] usages =
+        [
+            new BmsSampleUsage(1, 100),
+            new BmsSampleUsage(2, 200),
+            new BmsSampleUsage(1, 300),
+            new BmsSampleUsage(3, 400),
+        ];
+
+        Assert.That(BmsSampleTrackRegistry.SelectMaxConcurrentTrackCount(usages.Where(usage => usage.SampleKey == 1), 250), Is.EqualTo(2));
+        Assert.That(BmsSampleTrackRegistry.SelectMaxConcurrentTrackCount(usages.Where(usage => usage.SampleKey == 1), 100), Is.EqualTo(1));
+
+        Assert.That(BmsSampleTrackRegistry.SelectMaxConcurrentTrackCount(
+            [new BmsSampleUsage(1, 100), new BmsSampleUsage(1, 200), new BmsSampleUsage(1, 250)],
+            200), Is.EqualTo(3));
+
+        Assert.That(BmsSampleTrackRegistry.SelectMaxConcurrentTrackCount(
+            [new BmsSampleUsage(1, 300, CandidateStartTime: 0, CandidateEndTime: 500), new BmsSampleUsage(1, 400)],
+            100), Is.EqualTo(2));
+
+        Assert.That(BmsSampleTrackRegistry.SelectMaxConcurrentTrackCount(
+            [
+                new BmsSampleUsage(1, 1_000, CandidateStartTime: 0, CandidateEndTime: 1_280),
+                new BmsSampleUsage(1, 100_000, CandidateStartTime: 720, CandidateEndTime: 100_280),
+            ],
+            1_000), Is.EqualTo(2));
+    }
 
     [Test]
     public void ScheduledTrackLoadsTenSecondsBeforeUse()
@@ -38,6 +89,23 @@ public partial class TestBmsSampleStoreRate : TestScene
         AddAssert("track outside prefetch window", () => store.GetTrack(1) == null);
         AddStep("enter prefetch window", () => manualClock.CurrentTime = 1);
         AddUntilStep("track loads in prefetch window", () => store.GetTrack(1) is { IsLoaded: true });
+        addCleanupSteps();
+    }
+
+    [Test]
+    public void ScheduledTrackUsesEarliestCandidateTime()
+    {
+        AddStep("create early-candidate sample + store", () =>
+        {
+            createWav("early-candidate.wav", 1);
+            store = new BmsSampleStore(
+                new Dictionary<ushort, string> { { 1, "early-candidate.wav" } },
+                tempDir,
+                sampleUsages: [new BmsSampleUsage(1, 100_000, CandidateStartTime: 1_000, CandidateEndTime: 100_280)]);
+            Add(store);
+        });
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddAssert("track loaded for early candidate", () => store.GetTrack(1) is { IsLoaded: true });
         addCleanupSteps();
     }
 
@@ -149,6 +217,34 @@ public partial class TestBmsSampleStoreRate : TestScene
     }
 
     [Test]
+    public void LiveKeysoundsWaitForBatchFlush()
+    {
+        AddStep("create live sample + store", () =>
+        {
+            createWav("live.wav", 6);
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string>
+            {
+                { 1, "live.wav" },
+                { 2, "live.wav" },
+            }, tempDir));
+        });
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddStep("queue live chord", () =>
+        {
+            store.QueueLivePlay(1);
+            store.QueueLivePlay(2);
+        });
+        AddAssert("tracks wait for flush", () =>
+            store.GetTrack(1)?.IsRunning != true
+            && store.GetTrack(2)?.IsRunning != true);
+        AddStep("submit live chord", () => store.SubmitLivePlayBatch());
+        AddUntilStep("tracks start together", () =>
+            store.GetTrack(1)?.IsRunning == true
+            && store.GetTrack(2)?.IsRunning == true);
+        addCleanupSteps();
+    }
+
+    [Test]
     public void ZeroKeyIsPlayableForLandmines()
     {
         AddStep("create landmine sample + store", () =>
@@ -203,6 +299,16 @@ public partial class TestBmsSampleStoreRate : TestScene
         });
         AddUntilStep("store loads without timeout", () => store.IsLoaded);
         AddAssert("invalid track is unavailable", () => store.GetTrack(1) == null);
+        addCleanupSteps();
+    }
+
+    [Test]
+    public void EmptySampleDefinitionIsUnavailable()
+    {
+        AddStep("create store with empty definition", () =>
+            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, string.Empty } }, tempDir)));
+        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddAssert("empty definition is unavailable", () => !store.HasSampleDefinition(1));
         addCleanupSteps();
     }
 

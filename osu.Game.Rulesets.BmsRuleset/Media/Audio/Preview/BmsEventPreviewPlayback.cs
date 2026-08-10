@@ -46,6 +46,8 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     internal bool HasRetainedTracks => retainedTracks.Count > 0;
 
+    internal bool UsesDedicatedMixer => audioLoader?.UsesDedicatedMixer == true;
+
     internal BmsEventPreviewPlayback(
         BmsPreviewTrack owner,
         BmsEventPreviewTimeline timeline,
@@ -430,6 +432,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
     {
         var adjustments = getPlaybackTrackAdjustments(track, evt.Volume);
         adjustments.Update();
+        audioLoader?.ApplyTailRamp(track, track.CurrentTime);
         track.Start();
         activeTracks.Add(track);
     }

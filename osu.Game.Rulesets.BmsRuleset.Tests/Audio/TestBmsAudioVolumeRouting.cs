@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
@@ -56,15 +55,8 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     {
         AddAssert("gameplay Track volume uses aggregate volume", () =>
         {
-            var store = new BmsSampleStore(new Dictionary<ushort, string>());
-            typeof(BmsSampleStore)
-                .GetProperty("audioManager", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .SetValue(store, audioManager);
-
             var audio = new RecordingAudioComponent();
-            typeof(BmsSampleStore)
-                .GetMethod("bindTrackVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(store, [audio, 100]);
+            BmsSamplePlaybackController.BindTrackVolumeAdjustments(audio, 100, audioManager.AggregateVolume);
 
             Assert.That(audio.RemovedProperties, Does.Contain(AdjustableProperty.Volume));
             Assert.That(audio.VolumeAdjustments, Has.Some.SameAs(audioManager.AggregateVolume));
@@ -80,21 +72,11 @@ public partial class TestBmsAudioVolumeRouting : TestScene
     {
         AddAssert("gameplay Track volume uses separate bindables", () =>
         {
-            var store = new BmsSampleStore(new Dictionary<ushort, string>());
-            typeof(BmsSampleStore)
-                .GetProperty("audioManager", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .SetValue(store, audioManager);
-
-            var bindMethod = typeof(BmsSampleStore)
-                .GetMethod("bindTrackVolumeAdjustments", BindingFlags.Instance | BindingFlags.NonPublic)!;
-
-            Assert.That(bindMethod.GetParameters(), Has.Length.EqualTo(2));
-
             var first = new RecordingAudioComponent();
             var second = new RecordingAudioComponent();
 
-            bindMethod.Invoke(store, [first, 40]);
-            bindMethod.Invoke(store, [second, 80]);
+            BmsSamplePlaybackController.BindTrackVolumeAdjustments(first, 40, audioManager.AggregateVolume);
+            BmsSamplePlaybackController.BindTrackVolumeAdjustments(second, 80, audioManager.AggregateVolume);
 
             Assert.That(first.VolumeAdjustments[0], Is.Not.SameAs(second.VolumeAdjustments[0]));
             Assert.That(first.VolumeAdjustments[0].Value, Is.EqualTo(0.4));

@@ -22,6 +22,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -177,6 +178,15 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             stopPreviewForGameplay();
     }
 
+    protected override void UpdateAfterChildren()
+    {
+        base.UpdateAfterChildren();
+
+        // Columns receive input independently while the playfield updates. Submitting here preserves
+        // one mixer target for every keysound produced by the same ruleset update.
+        sampleStore.SubmitLivePlayBatch();
+    }
+
     protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);
 
     protected override ReplayInputHandler CreateReplayInputHandler(Replay replay) => new BmsFramedReplayInputHandler(replay);
@@ -216,15 +226,47 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         foreach (var evt in beatmap.BackgroundSampleEvents)
             yield return new BmsSampleUsage(evt.SampleKey, evt.Time);
 
-        foreach (var hitObject in beatmap.HitObjects)
+        foreach (var column in beatmap.HitObjects
+                                      .Where(hitObject => hitObject is not BmsLandmine)
+                                      .GroupBy(hitObject => hitObject.Column))
         {
-            if (hitObject.SampleKey is { } sampleKey)
-                yield return new BmsSampleUsage(sampleKey, hitObject.StartTime);
+            BmsHitObject? previousHitObject = null;
 
-            if (hitObject is BmsLongNote { TailSampleKey: { } tailSampleKey } longNote)
-                yield return new BmsSampleUsage(tailSampleKey, longNote.EndTime);
+            foreach (var hitObject in column.OrderBy(hitObject => hitObject.StartTime))
+            {
+                if (hitObject.SampleKey is { } sampleKey)
+                {
+                    // Once the preceding note can be judged, this note can become the column's next
+                    // keysound candidate; a long chart gap therefore creates an equally long lead.
+                    var earliestTriggerTime = previousHitObject == null
+                        ? 0
+                        : Math.Max(0, previousHitObject.StartTime - getFastJudgementWindow(previousHitObject));
+                    var latestTriggerTime = hitObject.StartTime + getSlowJudgementWindow(hitObject);
+
+                    yield return new BmsSampleUsage(sampleKey, hitObject.StartTime, earliestTriggerTime, latestTriggerTime);
+                }
+
+                if (hitObject is BmsLongNote { TailSampleKey: { } tailSampleKey } longNote)
+                    yield return new BmsSampleUsage(tailSampleKey, longNote.EndTime);
+
+                previousHitObject = hitObject;
+            }
         }
     }
+
+    private static double getFastJudgementWindow(BmsHitObject hitObject) =>
+        BmsJudgementProfileProvider.GetTable(
+            hitObject.Beatmap.LayoutVariant,
+            hitObject.Column,
+            hitObject.EffectiveJudgementRate,
+            tail: false).FastWindowFor(HitResult.Ok);
+
+    private static double getSlowJudgementWindow(BmsHitObject hitObject) =>
+        BmsJudgementProfileProvider.GetTable(
+            hitObject.Beatmap.LayoutVariant,
+            hitObject.Column,
+            hitObject.EffectiveJudgementRate,
+            tail: false).SlowWindowFor(HitResult.Ok);
 
     /// <summary>
     ///     Called when all hit objects have been judged (play completed).
