@@ -65,14 +65,17 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             if (entry.Value is not DrawableBmsHitObject note)
                 continue;
 
-            var offset = (float)((note.HitObject!.ScrollPositionAtStartTime - currentScrollPos) * scale);
+            var hitObject = note.HitObject!;
+            var startPosition = scrollController.GetVisualScrollPosition(hitObject.StartTime, hitObject.ScrollPositionAtStartTime);
+            var offset = (float)((startPosition - currentScrollPos) * scale);
             var y = -(hitTarget + offset);
 
             note.Y = y;
 
-            if (note is ILongNoteHolder ln && note.HitObject is BmsLongNote longNote)
+            if (note is ILongNoteHolder ln && hitObject is BmsLongNote longNote)
             {
-                var endOffset = (float)((longNote.ScrollPositionAtEndTime - currentScrollPos) * scale);
+                var endPosition = scrollController.GetVisualScrollPosition(longNote.EndTime, longNote.ScrollPositionAtEndTime);
+                var endOffset = (float)((endPosition - currentScrollPos) * scale);
                 ln.UpdateBodyGeometry(y, -(hitTarget + endOffset));
             }
 

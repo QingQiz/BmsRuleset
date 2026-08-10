@@ -95,6 +95,9 @@ internal sealed class BmsScrollController(BmsTimingMap? timingMap)
             : TimingMap?.GetSpeedFactorAtTime(currentTime) ?? 1.0;
     }
 
+    public double GetVisualScrollPosition(double time, double mappedScrollPosition) =>
+        ConstantScrollActive ? time : mappedScrollPosition;
+
     public float YForScrollProgress(double progress, double parentHeight, double hitTargetPosition, double noteHeight = 0)
         => (float)(parentHeight - hitTargetPosition - progress * ScrollCoordinateScale(parentHeight, hitTargetPosition) - noteHeight);
 

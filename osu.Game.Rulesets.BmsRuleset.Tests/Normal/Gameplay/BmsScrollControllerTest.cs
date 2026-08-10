@@ -52,6 +52,20 @@ public class BmsScrollControllerTest
     }
 
     [Test]
+    public void TestVisualScrollPositionUsesTimeWithConstantScroll()
+    {
+        var controller = new BmsScrollController(null);
+
+        Assert.That(controller.GetVisualScrollPosition(60000, 120000), Is.EqualTo(120000));
+
+        controller.ConstantScrollActive = true;
+        controller.Update(59000);
+
+        Assert.That(controller.GetVisualScrollPosition(60000, 120000), Is.EqualTo(60000));
+        Assert.That(controller.GetVisualScrollPosition(60000, 120000) - controller.CurrentScrollPosition, Is.EqualTo(1000));
+    }
+
+    [Test]
     public void TestCroppedViewportPreservesVisibleTime()
     {
         var controller = new BmsScrollController(null);
