@@ -44,7 +44,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private float lastBodyTailOffset;
     private float lastTailOffset;
     private float lastBodyWidth;
-    private float lastNoteHeight;
+    private float lastVisualNoteHeight;
+    private float noteHeightScale = 1;
     private bool lastHoldingBody;
     private bool lastReleasedFast;
     private BmsSegmentedLongNoteBody longNoteBody = null!;
@@ -92,6 +93,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         var bodyTailOffset = holdingBody
             ? visualState.VisibleBodyTailOffset(headOffset, tailOffset)
             : tailOffset;
+        var visualNoteHeight = NoteVisualHeight * noteHeightScale;
 
         var releasedFast =
             controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !holdingBody;
@@ -100,7 +102,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
                               || Math.Abs(lastBodyTailOffset - bodyTailOffset) > 0.5f
                               || Math.Abs(lastTailOffset - tailOffset) > 0.5f
                               || Math.Abs(lastBodyWidth - longNoteBody.DrawWidth) >= 1
-                              || Math.Abs(lastNoteHeight - Height) > 0.5f
+                              || Math.Abs(lastVisualNoteHeight - visualNoteHeight) > 0.5f
                               || lastHoldingBody != holdingBody
                               || lastReleasedFast != releasedFast;
 
@@ -117,19 +119,22 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         lastBodyTailOffset = bodyTailOffset;
         lastTailOffset = tailOffset;
         lastBodyWidth = longNoteBody.DrawWidth;
-        lastNoteHeight = Height;
+        lastVisualNoteHeight = visualNoteHeight;
         lastHoldingBody = holdingBody;
         lastReleasedFast = releasedFast;
 
         if (Math.Abs(NoteContainer.Y - headOffset) > 0.5f)
             NoteContainer.Y = headOffset;
 
-        var tailAtTop = bodyTailOffset < headOffset;
-        var bodyTop = Math.Min(headOffset, bodyTailOffset);
-        var bodyBottom = Math.Max(headOffset, bodyTailOffset);
+        // Half-overlap keeps rounded or transparent endpoint edges visually connected, matching mania.
+        var bodyHeadCentre = BmsLongNoteGeometry.BodyCentreOffset(headOffset, visualNoteHeight);
+        var bodyTailCentre = BmsLongNoteGeometry.BodyCentreOffset(bodyTailOffset, visualNoteHeight);
+        var tailAtTop = bodyTailCentre < bodyHeadCentre;
+        var bodyTop = Math.Min(bodyHeadCentre, bodyTailCentre);
+        var bodyBottom = Math.Max(bodyHeadCentre, bodyTailCentre);
 
-        var visibleTop = Math.Max(bodyTop, headOffset - max_piece_height);
-        var visibleBottom = Math.Min(bodyBottom, headOffset + max_piece_height);
+        var visibleTop = Math.Max(bodyTop, bodyHeadCentre - max_piece_height);
+        var visibleBottom = Math.Min(bodyBottom, bodyHeadCentre + max_piece_height);
         var bodyHeight = Math.Max(0, visibleBottom - visibleTop);
 
         if (Math.Abs(longNoteBody.Y - visibleTop) > 0.5f)
@@ -160,7 +165,11 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         longNoteTail.Alpha = 0;
     }
 
-    protected override void ApplyNoteHeightScaleToKind(float scale) => longNoteTail.Scale = new Vector2(1, scale);
+    protected override void ApplyNoteHeightScaleToKind(float scale)
+    {
+        noteHeightScale = scale;
+        longNoteTail.Scale = new Vector2(1, scale);
+    }
 
     protected override void OnApply()
     {

@@ -38,7 +38,6 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     [Resolved(CanBeNull = true)]
     protected BmsColumn? ParentColumn { get; private set; }
 
-
     protected DrawableBmsHitObject()
         : base(null!)
     {
@@ -168,4 +167,6 @@ public abstract partial class DrawableBmsHitObject<TCol> : DrawableBmsHitObject
         NoteContainer.Add(cachedSkinnableDrawable);
         AddInternal(NoteContainer);
     }
+
+    protected float NoteVisualHeight => cachedSkinnableDrawable?.Drawable.DrawHeight ?? 0;
 }

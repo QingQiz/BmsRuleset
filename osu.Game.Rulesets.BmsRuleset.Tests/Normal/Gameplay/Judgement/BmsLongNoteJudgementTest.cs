@@ -356,6 +356,19 @@ public class BmsLongNoteJudgementTest
         Assert.That(BmsLongNoteGeometry.VisibleBodyTailOffset(headOffset: 0, tailOffset: -100, direction), Is.EqualTo(0));
     }
 
+    [TestCase(100, 60, 20, 90, 50)]
+    [TestCase(60, 100, 20, 50, 90)]
+    [TestCase(100, 60, 30, 85, 45)]
+    public void TestBodyEndpointsLieAtNoteCentres(
+        float headOffset, float tailOffset, float noteHeight, float expectedHeadCentre, float expectedTailCentre)
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(BmsLongNoteGeometry.BodyCentreOffset(headOffset, noteHeight), Is.EqualTo(expectedHeadCentre));
+            Assert.That(BmsLongNoteGeometry.BodyCentreOffset(tailOffset, noteHeight), Is.EqualTo(expectedTailCentre));
+        });
+    }
+
     [Test]
     public void TestHellChargeBodyTrackerEmitsRepressRecoveryPulse()
     {

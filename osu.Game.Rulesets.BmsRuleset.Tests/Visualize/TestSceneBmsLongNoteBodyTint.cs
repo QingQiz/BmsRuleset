@@ -94,6 +94,13 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         return (Drawable)typeof(DrawableBmsHitObject).GetField("NoteContainer", flags)!.GetValue(longNote)!;
     }
 
+    private static Drawable noteHeadDrawableOf(DrawableBmsHitObject longNote)
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+        var cachedSkinnableDrawable = longNote.GetType().BaseType!.GetField("cachedSkinnableDrawable", flags)!.GetValue(longNote)!;
+        return (Drawable)cachedSkinnableDrawable.GetType().GetProperty("Drawable", flags)!.GetValue(cachedSkinnableDrawable)!;
+    }
+
     [TestCase(BmsLongNoteMode.ChargeNote, 0.4f, false)]
     [TestCase(BmsLongNoteMode.HellChargeNote, 1f, true)]
     public void TestFailedBodyRepressVisual(BmsLongNoteMode mode, float expectedAlpha, bool expectedPinned)
@@ -111,6 +118,23 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
             return longNote != null
                    && longNoteBodyOf(longNote).Alpha == 1f
                    && longNoteTailOf(longNote).Alpha == 1f;
+        });
+        AddUntilStep("body starts at head centre", () =>
+        {
+            var longNote = Playfield.GetAliveObjectAtTime(start_time);
+
+            if (longNote == null)
+                return false;
+
+            var bodyTop = BmsPlayfieldAssertions.TopOf(longNoteBodyOf(longNote));
+            var bodyBottom = BmsPlayfieldAssertions.BottomOf(longNoteBodyOf(longNote));
+            var headDrawable = noteHeadDrawableOf(longNote);
+            var headTop = BmsPlayfieldAssertions.TopOf(headDrawable);
+            var headBottom = BmsPlayfieldAssertions.BottomOf(headDrawable);
+
+            var headCentre = (headTop + headBottom) / 2;
+            var bodyEdgeNearHead = Math.Abs(bodyTop - headCentre) < Math.Abs(bodyBottom - headCentre) ? bodyTop : bodyBottom;
+            return Math.Abs(bodyEdgeNearHead - headCentre) <= 1;
         });
         AddUntilStep("released body before tail", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + fast_release_offset + 120);
         // A fast release fades body+tail together (matches DrawableBmsLongNote.released_alpha) instead

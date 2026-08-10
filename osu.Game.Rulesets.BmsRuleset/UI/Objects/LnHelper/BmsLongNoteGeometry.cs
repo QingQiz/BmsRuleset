@@ -4,6 +4,9 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Objects.LnHelper;
 
 internal static class BmsLongNoteGeometry
 {
+    public static float BodyCentreOffset(float noteAnchorOffset, float noteHeight)
+        => noteAnchorOffset - noteHeight / 2;
+
     public static float VisibleBodyTailOffset(float headOffset, float tailOffset, int? heldBodyDirection)
     {
         if (heldBodyDirection is not { } direction || direction == 0)
