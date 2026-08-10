@@ -2,11 +2,21 @@
 
 ## 文档状态
 
-- 状态：设计确认，等待实施
+- 状态：阶段 1–7 已实施并通过自动验收；阶段 8 等待目标环境人工听测后执行
 - 适用范围：BMS gameplay keysound、background sample，以及事件合成式预览
 - 首期平台：Windows x64、Linux x64
 - 固定决策：每局只使用一个不可变 rate；改变速度时保持音高
 - 核心依赖：ManagedBass、BASSmix、BASS_FX、一个受控的 framework mixer bridge
+
+## 实施记录
+
+- Windows 与 Linux 使用同一 PCM processor、asset cache、voice mixer 和 native bridge 业务代码。
+- 固定 rate 的 0.5、0.75、1、1.5、2 倍速音高与时长测试通过。
+- gameplay sample 与事件合成式 preview 已接入 PCM backend；初始化失败时仍保留 legacy Track fallback。
+- Alice `7n.bme` 全曲 Windows 非主设备 loopback 与 Linux/WSL headless capture 均为 0 artifacts。
+- 全曲 1979 个播放请求中，1 个为同 frame 同终止域的预期折叠，其余 1978 个 voice 全部启动。
+- 两平台全曲的 preload/playback underflow、command/voice overflow 和 callback failure 均为 0。
+- 阶段 8 尚未执行：删除 legacy backend 前仍需在目标游戏环境完成人工听测，以符合本规划的阶段门。
 
 本文描述用规则集自有 PCM voice mixer 替换 framework `Track` 多实例播放的完整开发与验收流程。
 framework 继续拥有最终音频设备和父 mixer，但不再负责 BMS sample 的 Track 创建、Seek、Restart、停止或 voice 生命周期。

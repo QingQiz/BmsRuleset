@@ -10,6 +10,7 @@ using osu.Framework.Audio.Track;
 using osu.Framework.IO.Stores;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
@@ -18,8 +19,12 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
 {
     private readonly AudioManager audioManager;
     private readonly BmsAudioResourceStore audioResourceStore;
-    private readonly ITrackStore trackStore;
+    private readonly ITrackStore? trackStore;
     private readonly AudioMixer? mixer;
+    private readonly BmsPcmVoiceMixer? pcmMixer;
+    private readonly BmsBassMixerBridge? pcmBridge;
+    private readonly BmsPcmAssetCache? pcmCache;
+    private readonly double rate;
     private readonly Func<CancellationToken, Task>? beforeTrackLoad;
     private readonly CancellationTokenSource cancellation = new();
     private readonly ConcurrentDictionary<Task<Track?>, byte> eventTrackLoads = new();
@@ -27,6 +32,7 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
 
     private bool storesDisposed;
     private volatile bool disposed;
+    private float pcmMasterGain = -1;
 
     internal bool UsesDedicatedMixer => mixer != null;
 
@@ -53,20 +59,33 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
     internal BmsPreviewAudioLoader(
         string basePath,
         AudioManager audioManager,
-        Func<CancellationToken, Task>? beforeTrackLoad = null)
+        Func<CancellationToken, Task>? beforeTrackLoad = null,
+        double rate = 1)
     {
         this.audioManager = audioManager;
         this.beforeTrackLoad = beforeTrackLoad;
+        this.rate = rate;
+        audioResourceStore = new BmsAudioResourceStore(basePath, cancellation.Token);
+
+        BmsPcmMixerPatcher.InstallOnce();
+
+        if (BmsPcmMixerPatcher.IsInstalled)
+        {
+            mixer = audioManager.CreateAudioMixer(BmsPcmMixerPatcher.MIXER_IDENTIFIER);
+            pcmMixer = new BmsPcmVoiceMixer();
+            pcmBridge = new BmsBassMixerBridge(mixer, pcmMixer);
+            pcmCache = new BmsPcmAssetCache(async (identity, token) =>
+                (byte[]?)await audioResourceStore.GetAsync(identity, token).ConfigureAwait(false), rate);
+            pcmBridge.EnsureAttached();
+            return;
+        }
+
         BmsKeysoundMixerPatcher.InstallOnce();
         BmsKeysoundMixerPatcher.BindGlobalMixer(audioManager);
-
-        if (BmsKeysoundMixerPatcher.EnableReverseStreamWorkaround)
-            BmsTrackAudioPatcher.InstallOnce();
 
         if (BmsKeysoundMixerPatcher.IsInstalled)
             mixer = audioManager.CreateAudioMixer(BmsKeysoundMixerPatcher.PREVIEW_MIXER_IDENTIFIER);
 
-        audioResourceStore = new BmsAudioResourceStore(basePath, cancellation.Token);
         var fileResources = new ResourceStore<byte[]>(audioResourceStore);
         BmsAudioResourceStore.AddExtensions(fileResources);
         trackStore = audioManager.GetTrackStore(fileResources, mixer);
@@ -74,7 +93,9 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
 
     public Task<Track?> LoadTrackAsync(string samplePath)
     {
-        var task = loadEventTrack(samplePath, cancellation.Token);
+        var task = pcmCache != null
+            ? loadPcmEventTrack(samplePath, cancellation.Token)
+            : loadEventTrack(samplePath, cancellation.Token);
         eventTrackLoads.TryAdd(task, 0);
         _ = task.ContinueWith(_ => disposeCompletedEventTrack(task), TaskContinuationOptions.ExecuteSynchronously);
         return task;
@@ -83,7 +104,24 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
     public void MarkEventTrackConsumed(Task<Track?> task) => eventTrackLoads.TryRemove(task, out _);
 
     public void ApplyTailRamp(Track track, double offset) =>
-        BmsKeysoundMixerPatcher.TryApplyTailRamp(mixer, track, offset);
+        _ = track is BmsPcmPreviewVoiceTrack || BmsKeysoundMixerPatcher.TryApplyTailRamp(mixer, track, offset);
+
+    public void UpdatePcmBridge()
+    {
+        pcmBridge?.EnsureAttached();
+
+        if (pcmMixer == null)
+            return;
+
+        var aggregateVolume = audioManager.AggregateVolume.Value;
+        var gain = double.IsFinite(aggregateVolume) ? (float)Math.Max(0, aggregateVolume) : 0;
+
+        if (Math.Abs(gain - pcmMasterGain) <= 0.000001f)
+            return;
+
+        pcmMasterGain = gain;
+        pcmMixer.SubmitControl(BmsVoiceCommandType.SetMasterGain, pcmMixer.RenderedFrames, 0, gain);
+    }
 
     public void DiscardEventTrack(Task<Track?> task)
     {
@@ -126,7 +164,7 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
 
             Track? track;
             using (BmsTrackAudioPatcher.EnterBmsTrackScope())
-                track = await trackStore.GetAsync(lookup, cancellationToken).ConfigureAwait(false);
+                track = await trackStore!.GetAsync(lookup, cancellationToken).ConfigureAwait(false);
 
             if (track != null && await track.SeekAsync(0).ConfigureAwait(false) && track.IsLoaded)
                 return track;
@@ -135,6 +173,54 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
         }
 
         return null;
+    }
+
+    private async Task<Track?> loadPcmEventTrack(string samplePath, CancellationToken cancellationToken)
+    {
+        if (beforeTrackLoad != null)
+            await beforeTrackLoad(cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        if (!tryResolvePcmIdentity(samplePath, out var identity))
+            return null;
+
+        var lease = pcmCache!.Acquire(identity);
+
+        try
+        {
+            await lease.Ready.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+            if (lease.Asset.State is not (BmsPcmAssetState.Ready or BmsPcmAssetState.Complete))
+            {
+                lease.Dispose();
+                return null;
+            }
+
+            return new BmsPcmPreviewVoiceTrack(lease, pcmMixer!, rate, samplePath);
+        }
+        catch
+        {
+            lease.Dispose();
+            throw;
+        }
+    }
+
+    private bool tryResolvePcmIdentity(string samplePath, out string identity)
+    {
+        foreach (var lookup in new BmsSampleInfo(samplePath).LookupNames)
+        {
+            if (audioResourceStore.TryResolve(lookup, out identity))
+                return true;
+
+            var stem = Path.ChangeExtension(lookup, null);
+            foreach (var extension in BmsAudioResourceStore.Extensions)
+            {
+                if (audioResourceStore.TryResolve($"{stem}.{extension}", out identity))
+                    return true;
+            }
+        }
+
+        identity = null!;
+        return false;
     }
 
     private static IEnumerable<string> getDedicatedPreviewCandidates(string? previewFile)
@@ -201,9 +287,12 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
             storesDisposed = true;
         }
 
-        trackStore.Dispose();
+        pcmBridge?.Dispose();
+        pcmCache?.Dispose();
+        trackStore?.Dispose();
         mixer?.Dispose();
-        BmsKeysoundMixerPatcher.UnbindGlobalMixer(audioManager);
+        if (pcmCache == null)
+            BmsKeysoundMixerPatcher.UnbindGlobalMixer(audioManager);
         audioResourceStore.Dispose();
         cancellation.Dispose();
     }

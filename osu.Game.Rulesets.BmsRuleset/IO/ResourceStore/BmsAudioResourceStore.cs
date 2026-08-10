@@ -54,6 +54,8 @@ internal sealed class BmsAudioResourceStore(string basePath, CancellationToken c
 
     public IEnumerable<string> GetAvailableResources() => [];
 
+    internal bool TryResolve(string? name, out string path) => fileStore.TryResolve(name, out path);
+
     public void Dispose()
     {
         flacWaveCache.Clear();

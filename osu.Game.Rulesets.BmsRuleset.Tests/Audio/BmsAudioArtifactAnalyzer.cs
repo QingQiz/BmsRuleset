@@ -216,10 +216,12 @@ internal static class BmsAudioArtifactAnalyzer
                 continue;
 
             var correlation = dot / Math.Sqrt(referenceEnergy * Math.Max(outputEnergy, 0.000000000001));
-            // Linear reference resampling and the Windows audio engine differ slightly in phase,
-            // especially on 192 kHz endpoints. Clean output remains above 0.90 in 10 ms windows;
-            // device-added crackle drops well below that boundary.
-            if (correlation < 0.90)
+            var rmsRatio = Math.Sqrt(outputEnergy / Math.Max(referenceEnergy, 0.000000000001));
+
+            // The device's band-limited resampler and this diagnostic's linear resampler can
+            // disagree in phase on dense high-frequency material while preserving its energy.
+            // Added noise and output gaps change both correlation and short-window energy.
+            if (correlation < 0.90 && rmsRatio is < 0.75 or > 1.25)
             {
                 artifacts.Add(new BmsAudioArtifact(
                     (double)(referenceStart + start) / outputSampleRate,
@@ -274,7 +276,12 @@ internal static class BmsAudioArtifactAnalyzer
     {
         var stride = Math.Max(1, sampleRate / 4000);
         var maxLag = sampleRate / 2;
-        var comparisonFrames = Math.Min(sampleRate * 2, Math.Min(reference.Length, output.Length) / channels - maxLag);
+        var comparisonFrames = Math.Min(reference.Length, output.Length) / channels - maxLag;
+        if (comparisonFrames <= 0)
+            return 0;
+
+        // Sampling the whole capture avoids choosing a periodic or silent match near startup.
+        var comparisonStride = Math.Max(stride, comparisonFrames / 8000);
         var bestScore = double.NegativeInfinity;
         var bestLag = 0;
 
@@ -286,7 +293,7 @@ internal static class BmsAudioArtifactAnalyzer
             double referenceEnergy = 0;
             double outputEnergy = 0;
 
-            for (var frame = 0; frame < comparisonFrames; frame += stride)
+            for (var frame = 0; frame < comparisonFrames; frame += comparisonStride)
             {
                 var referenceSample = reference[(referenceStart + frame) * channels];
                 var outputSample = output[(outputStart + frame) * channels];

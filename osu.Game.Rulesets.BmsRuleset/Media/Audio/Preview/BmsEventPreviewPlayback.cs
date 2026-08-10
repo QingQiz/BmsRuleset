@@ -63,7 +63,17 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         retainLoadedTracks = timeline.RetainLoadedTracks;
 
         if (basePath != null)
-            audioLoader = new BmsPreviewAudioLoader(basePath, audioManager, beforeTrackLoad);
+        {
+            // Preview startup can temporarily expose an aggregate frequency of zero while the
+            // audio device is being rebound. BMS rate changes are tempo-only, so use that stable
+            // component rather than deriving the fixed processing rate from the transient product.
+            var previewRate = Math.Abs(owner.AggregateTempo.Value);
+            audioLoader = new BmsPreviewAudioLoader(
+                basePath,
+                audioManager,
+                beforeTrackLoad,
+                double.IsFinite(previewRate) && previewRate is >= 0.05 and <= 2 ? previewRate : 1);
+        }
     }
 
     public void Dispose()
@@ -137,8 +147,14 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     public BmsPreviewPlaybackStartState Update(double currentTime, bool requireDueAudioReady)
     {
-        foreach (var adjustments in trackAdjustments.Values)
+        audioLoader?.UpdatePcmBridge();
+
+        foreach (var (track, adjustments) in trackAdjustments)
+        {
             adjustments.Update();
+            if (track is BmsPcmPreviewVoiceTrack pcmTrack)
+                pcmTrack.SynchroniseGain();
+        }
 
         prefetchEventTracks(currentTime);
 
@@ -430,6 +446,9 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     private void startTrack(BmsPreviewTimelineEntry evt, Track track)
     {
+        if (track is BmsPcmPreviewVoiceTrack pcmTrack)
+            pcmTrack.ConfigureTerminationDomain(evt.SampleKey);
+
         var adjustments = getPlaybackTrackAdjustments(track, evt.Volume);
         adjustments.Update();
         audioLoader?.ApplyTailRamp(track, track.CurrentTime);

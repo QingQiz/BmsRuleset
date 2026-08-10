@@ -106,6 +106,20 @@ public class BmsAudioArtifactAnalyzerTest
             artifact.Kind == "output_mismatch" && Math.Abs(artifact.Time - 1) < 0.02));
     }
 
+    [Test]
+    public void ResamplerPhaseDifferenceWithoutEnergyChangeIsNotNoise()
+    {
+        const int output_rate = 48000;
+        var reference = createSine(2, 12000, sample_rate);
+        var output = createSine(2, 12000, output_rate);
+        addSyncPulse(reference, sample_rate);
+        addSyncPulse(output, output_rate);
+
+        var artifacts = BmsAudioArtifactAnalyzer.CompareResampledOutput(reference, sample_rate, 2, output, output_rate, 2);
+
+        Assert.That(artifacts, Is.Empty);
+    }
+
     private static void addSyncPulse(float[] samples, int rate)
     {
         var start = rate / 4;
