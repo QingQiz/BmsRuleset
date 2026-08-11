@@ -7,7 +7,6 @@ using osu.Framework.Graphics.Audio;
 using osu.Framework.Testing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 
@@ -48,42 +47,6 @@ public partial class TestBmsAudioVolumeRouting : TestScene
         Assert.That(selected, Has.Count.EqualTo(2));
         Assert.That(selected, Has.Exactly(1).Matches<BmsBackgroundAudioPlayer.SeekedBgm>(item => item.Event.SampleKey == 1 && item.Event.Time == 1000));
         Assert.That(selected, Has.Exactly(1).Matches<BmsBackgroundAudioPlayer.SeekedBgm>(item => item.Event.SampleKey == 2));
-    }
-
-    [Test]
-    public void GameplayTracksUseAggregateVolumeOnly()
-    {
-        AddAssert("gameplay Track volume uses aggregate volume", () =>
-        {
-            var audio = new RecordingAudioComponent();
-            BmsSamplePlaybackController.BindTrackVolumeAdjustments(audio, 100, audioManager.AggregateVolume);
-
-            Assert.That(audio.RemovedProperties, Does.Contain(AdjustableProperty.Volume));
-            Assert.That(audio.VolumeAdjustments, Has.Some.SameAs(audioManager.AggregateVolume));
-            Assert.That(audio.VolumeAdjustments, Has.None.SameAs(audioManager.VolumeTrack));
-            Assert.That(audio.VolumeAdjustments, Has.None.SameAs(audioManager.VolumeSample));
-
-            return true;
-        });
-    }
-
-    [Test]
-    public void GameplayTrackVolumeAdjustmentIsPerPlayback()
-    {
-        AddAssert("gameplay Track volume uses separate bindables", () =>
-        {
-            var first = new RecordingAudioComponent();
-            var second = new RecordingAudioComponent();
-
-            BmsSamplePlaybackController.BindTrackVolumeAdjustments(first, 40, audioManager.AggregateVolume);
-            BmsSamplePlaybackController.BindTrackVolumeAdjustments(second, 80, audioManager.AggregateVolume);
-
-            Assert.That(first.VolumeAdjustments[0], Is.Not.SameAs(second.VolumeAdjustments[0]));
-            Assert.That(first.VolumeAdjustments[0].Value, Is.EqualTo(0.4));
-            Assert.That(second.VolumeAdjustments[0].Value, Is.EqualTo(0.8));
-
-            return true;
-        });
     }
 
     [Test]
@@ -257,46 +220,4 @@ public partial class TestBmsAudioVolumeRouting : TestScene
         }
     }
 
-    private sealed class RecordingAudioComponent : IAdjustableAudioComponent
-    {
-        public BindableNumber<double> Volume { get; } = new BindableDouble(1);
-
-        public BindableNumber<double> Balance { get; } = new BindableDouble();
-
-        public BindableNumber<double> Frequency { get; } = new BindableDouble(1);
-
-        public BindableNumber<double> Tempo { get; } = new BindableDouble(1);
-
-        public IBindable<double> AggregateVolume => Volume;
-
-        public IBindable<double> AggregateBalance => Balance;
-
-        public IBindable<double> AggregateFrequency => Frequency;
-
-        public IBindable<double> AggregateTempo => Tempo;
-
-        public List<AdjustableProperty> RemovedProperties { get; } = [];
-
-        public List<IBindable<double>> VolumeAdjustments { get; } = [];
-
-        public void BindAdjustments(IAggregateAudioAdjustment component)
-        {
-        }
-
-        public void UnbindAdjustments(IAggregateAudioAdjustment component)
-        {
-        }
-
-        public void AddAdjustment(AdjustableProperty type, IBindable<double> adjustBindable)
-        {
-            if (type == AdjustableProperty.Volume)
-                VolumeAdjustments.Add(adjustBindable);
-        }
-
-        public void RemoveAdjustment(AdjustableProperty type, IBindable<double> adjustBindable)
-        {
-        }
-
-        public void RemoveAllAdjustments(AdjustableProperty type) => RemovedProperties.Add(type);
-    }
 }

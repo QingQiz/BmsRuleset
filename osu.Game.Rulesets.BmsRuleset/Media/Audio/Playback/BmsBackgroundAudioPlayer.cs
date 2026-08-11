@@ -9,7 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 
 /// <summary>
-///     Schedules BMS background sample events through the shared per-definition Track store.
+///     Submits BMS background sample events to the shared PCM voice mixer.
 /// </summary>
 public partial class BmsBackgroundAudioPlayer(
     IReadOnlyList<BmsBackgroundAudioPlayer.BgmEvent> sortedEvents,
@@ -130,8 +130,8 @@ public partial class BmsBackgroundAudioPlayer(
                      sortedEvents,
                      nextIndex,
                      currentTime,
-                     sampleStore.MaxTrackLengthMilliseconds,
-                     sampleStore.GetTrackLength))
+                     sampleStore.MaxSampleLengthMilliseconds,
+                     sampleStore.GetSampleLength))
         {
             sampleStore.Play(seeked.Event.SampleKey, seeked.Event.Volume, seeked.Offset);
         }
@@ -212,7 +212,7 @@ public partial class BmsBackgroundAudioPlayer(
         {
             playbackBlockedAt = Time.Current;
 
-            // Delayed native mixer starts cannot be resumed relative to a paused gameplay clock.
+            // Future mixer commands need a fresh epoch after the gameplay clock stops advancing.
             if (sampleStore.SupportsScheduling)
                 resyncRequired = true;
 
@@ -223,7 +223,7 @@ public partial class BmsBackgroundAudioPlayer(
             return;
 
         // Catch-up can advance the gameplay clock while samples are disabled. Reconstruct once
-        // on the next update instead of briefly resuming tracks from their stale positions.
+        // on the next update instead of briefly resuming voices from stale positions.
         if (resyncRequired || Math.Abs(Time.Current - playbackBlockedAt) >= allowable_late_start)
         {
             resyncRequired = true;

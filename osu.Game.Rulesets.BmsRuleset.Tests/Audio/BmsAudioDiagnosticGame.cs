@@ -9,7 +9,7 @@ using System.Text.Json;
 using ManagedBass;
 using osu.Framework.Allocation;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 // ReSharper disable LocalizableElement
@@ -20,6 +20,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
 {
     private const double start_delay = 1000;
     private const double finish_tail = 3000;
+    private const double scheduling_lead = 200;
 
     private readonly string chartPath;
     private readonly double requestedStartTime;
@@ -123,13 +124,11 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC volume={requestedVolume:0.###}");
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC sample_gain={requestedSampleGain:0.###}");
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC sample_key={(requestedSampleKeys == null ? "all" : string.Join(",", requestedSampleKeys.Select(key => key.ToString("X"))))}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC reverse_stream_requested={BmsKeysoundMixerPatcher.EnableReverseStreamWorkaround}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC float_mixer={BmsKeysoundMixerPatcher.IsInstalled && BmsKeysoundMixerPatcher.EnableFloatMixerAndLimiter}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC limiter={BmsKeysoundMixerPatcher.IsInstalled && BmsKeysoundMixerPatcher.EnableFloatMixerAndLimiter}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC native_scheduling={BmsKeysoundMixerPatcher.EnableNativeScheduling}");
+        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC pcm_mixer_patch={BmsPcmMixerPatcher.IsInstalled}");
+        Console.WriteLine("BMS_AUDIO_DIAGNOSTIC limiter=true");
+        Console.WriteLine("BMS_AUDIO_DIAGNOSTIC native_scheduling=true");
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC live_batch={liveBatch}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC reverse_stream_workaround={BmsTrackAudioPatcher.IsInstalled}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC pcm_backend={sampleStore.UsesPcmBackend}");
+        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC pcm_backend={sampleStore.Mixer != null}");
 
         if (Bass.GetInfo(out var deviceInfo))
         {
@@ -184,11 +183,9 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
 
         var chartTime = requestedStartTime + Time.Current - playbackStartTime;
 
-        var schedulingLead = !liveBatch && BmsKeysoundMixerPatcher.EnableNativeScheduling
-            ? BmsKeysoundMixerPatcher.NativeScheduleLeadMilliseconds
-            : 0;
+        var currentSchedulingLead = liveBatch ? 0 : scheduling_lead;
 
-        while (nextEventIndex < events.Length && events[nextEventIndex].Time - schedulingLead <= chartTime)
+        while (nextEventIndex < events.Length && events[nextEventIndex].Time - currentSchedulingLead <= chartTime)
         {
             var evt = events[nextEventIndex];
             var volume = (int)Math.Round(evt.Volume * requestedSampleGain);
@@ -202,21 +199,19 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
 
             if (evt.Time > chartTime)
             {
-                if (!sampleStore.CanSchedule(evt.SampleKey))
+                if (sampleStore.CanSchedule(evt.SampleKey))
+                    sampleStore.SchedulePlay(evt.SampleKey, volume, evt.Time);
+                else
                 {
                     if (traceScheduling)
-                        Console.WriteLine($"BMS_AUDIO_SCHEDULE_BLOCKED chart={evt.Time:0.###} now={chartTime:0.###} key={evt.SampleKey:X2} {sampleStore.GetScheduleDiagnostic(evt.SampleKey)}");
+                        Console.WriteLine($"BMS_AUDIO_SCHEDULE_BLOCKED chart={evt.Time:0.###} now={chartTime:0.###} key={evt.SampleKey:X2} {sampleStore.GetScheduleDiagnostic()}");
 
                     sampleStore.Play(evt.SampleKey, volume);
-                    nextEventIndex++;
-                    continue;
                 }
-
-                sampleStore.SchedulePlay(evt.SampleKey, volume, evt.Time - chartTime, evt.Time);
             }
             else
             {
-                if (traceScheduling && chartTime - evt.Time > BmsKeysoundMixerPatcher.NativeScheduleLeadMilliseconds)
+                if (traceScheduling && chartTime - evt.Time > scheduling_lead)
                     Console.WriteLine($"BMS_AUDIO_SCHEDULE_LATE chart={evt.Time:0.###} now={chartTime:0.###} late={chartTime - evt.Time:0.###} key={evt.SampleKey:X2}");
 
                 sampleStore.Play(evt.SampleKey, volume);
@@ -289,17 +284,14 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
 
             var report = BmsAudioArtifactAnalyzer.Analyze(captured, sampleRate, channels);
 
-            if (sampleStore.UsesPcmBackend)
+            // PCM source files can legitimately contain drum transients with a larger
+            // one-frame derivative than their local neighbourhood. Retrigger continuity is
+            // covered by the offline voice-mixer tests; end-to-end capture should report
+            // clipping and divergence from the pre-device reference instead.
+            report = report with
             {
-                // PCM source files can legitimately contain drum transients with a larger
-                // one-frame derivative than their local neighbourhood. Retrigger continuity is
-                // covered by the offline voice-mixer tests; end-to-end capture should report
-                // clipping and divergence from the pre-device reference instead.
-                report = report with
-                {
-                    Artifacts = report.Artifacts.Where(artifact => artifact.Kind != "discontinuity").ToArray(),
-                };
-            }
+                Artifacts = report.Artifacts.Where(artifact => artifact.Kind != "discontinuity").ToArray(),
+            };
 
             if (useLoopback && captureSession != null && mixerCaptured.Length > 0)
             {
@@ -356,18 +348,18 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
 
     private string formatLimiterDiagnostics()
     {
-        var diagnostics = BmsKeysoundMixerPatcher.GetLimiterDiagnostics(sampleStore.Mixer);
-        return $"callbacks={diagnostics.CallbackCount} limited_frames={diagnostics.LimitedFrameCount} peak={diagnostics.Peak:0.###}";
+        var diagnostics = sampleStore.Diagnostics;
+        return $"limited_frames={diagnostics.LimitedFrames} input_peak={diagnostics.InputPeak:0.###} output_peak={diagnostics.OutputPeak:0.###} gain={diagnostics.LimiterGain:0.###}";
     }
 
     private string formatPcmDiagnostics()
     {
-        var audio = sampleStore.PcmDiagnostics;
-        var cache = sampleStore.PcmCacheDiagnostics;
+        var audio = sampleStore.Diagnostics;
+        var cache = sampleStore.CacheDiagnostics;
         return $"rendered={audio.RenderedFrames} active={audio.ActiveVoices} draining={audio.DrainingVoices} peak_voices={audio.PeakVoices} " +
                $"submitted_voices={audio.SubmittedVoices} folded_voices={audio.FoldedVoices} started_voices={audio.StartedVoices} queued={audio.QueuedCommands} " +
-               $"queue_overflows={audio.QueueOverflows} voice_overflows={audio.VoicePoolOverflows} preload_underflows={sampleStore.PcmPreloadUnderflows} " +
-               $"playback_underflows={audio.PlaybackUnderflows} callback_failures={sampleStore.PcmBridgeCallbackFailures} " +
+               $"queue_overflows={audio.QueueOverflows} voice_overflows={audio.VoicePoolOverflows} preload_underflows={sampleStore.PreloadUnderflows} " +
+               $"playback_underflows={audio.PlaybackUnderflows} callback_failures={sampleStore.BridgeCallbackFailures} " +
                $"assets={cache.LoadedAssets}/{cache.PreparingAssets}/{cache.FailedAssets} resident={cache.ResidentPcmBytes} peak_resident={cache.PeakResidentPcmBytes}";
     }
 

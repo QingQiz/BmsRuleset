@@ -68,7 +68,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
         AddUntilStep("track playing from time zero", () => getActivePlaybackCount(track) > 0);
         AddAssert("preview uses patched mixer when available", () =>
-            ((BmsEventPreviewTrack)track).Playback?.UsesDedicatedMixer == (BmsPcmMixerPatcher.IsInstalled || BmsKeysoundMixerPatcher.IsInstalled));
+            ((BmsEventPreviewTrack)track).Playback?.UsesDedicatedMixer == BmsPcmMixerPatcher.IsInstalled);
         AddStep("dispose track", () => track.Dispose());
     }
 

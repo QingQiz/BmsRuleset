@@ -25,7 +25,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private readonly Dictionary<ushort, string> resolvedResources = [];
     private readonly Dictionary<ushort, BmsPcmAssetLease> leases = [];
     private readonly Dictionary<ushort, double> lifetimeEnds = [];
-    private readonly Dictionary<ushort, double> trackLengths = [];
+    private readonly Dictionary<ushort, double> sampleLengths = [];
     private readonly Dictionary<ushort, PendingPlay> pendingPlays = [];
     private readonly List<PendingLivePlay> livePlays = [];
 
@@ -42,9 +42,9 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     internal long PreloadUnderflows { get; private set; }
 
-    internal double MaxTrackLengthMilliseconds => trackLengths.Count == 0
+    internal double MaxSampleLengthMilliseconds => sampleLengths.Count == 0
         ? leases.Count == 0 ? 0 : leases.Values.Max(lease => getOriginalLength(lease.Asset))
-        : trackLengths.Values.Max();
+        : sampleLengths.Values.Max();
 
     internal BmsPcmPlaybackController(
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
@@ -114,10 +114,10 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         resolvedResources.ContainsKey(sampleKey)
         && (!leases.TryGetValue(sampleKey, out var lease) || lease.Asset.State != BmsPcmAssetState.Failed);
 
-    internal double GetTrackLength(ushort sampleKey) =>
+    internal double GetSampleLength(ushort sampleKey) =>
         leases.TryGetValue(sampleKey, out var lease)
-            ? rememberTrackLength(sampleKey, lease.Asset)
-            : trackLengths.GetValueOrDefault(sampleKey);
+            ? rememberSampleLength(sampleKey, lease.Asset)
+            : sampleLengths.GetValueOrDefault(sampleKey);
 
     internal bool IsSampleReady(ushort sampleKey) =>
         leases.TryGetValue(sampleKey, out var lease)
@@ -255,7 +255,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         foreach (var (sampleKey, lease) in leases.ToArray())
         {
-            rememberTrackLength(sampleKey, lease.Asset);
+            rememberSampleLength(sampleKey, lease.Asset);
 
             if (!lifetimeEnds.TryGetValue(sampleKey, out var lastTriggerTime) || !lease.Asset.IsComplete)
                 continue;
@@ -392,11 +392,11 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         asset.OriginalDurationMilliseconds
         ?? (asset.TotalFrameCount < 0 ? 0 : asset.TotalFrameCount * 1000d / asset.SampleRate * rate);
 
-    private double rememberTrackLength(ushort sampleKey, BmsPcmAsset asset)
+    private double rememberSampleLength(ushort sampleKey, BmsPcmAsset asset)
     {
         var length = getOriginalLength(asset);
         if (length > 0)
-            trackLengths[sampleKey] = length;
+            sampleLengths[sampleKey] = length;
 
         return length;
     }
@@ -408,7 +408,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         while (nextLifetimeIndex < lifetimes.Length && lifetimes[nextLifetimeIndex].StartTime <= chartTime)
         {
             var sampleKey = lifetimes[nextLifetimeIndex].SampleKey;
-            var knownLength = trackLengths.GetValueOrDefault(sampleKey);
+            var knownLength = sampleLengths.GetValueOrDefault(sampleKey);
 
             // An unknown duration may belong to a long BGM that still spans the seek target.
             if (knownLength <= 0 || lifetimeEnds[sampleKey] + knownLength >= chartTime)

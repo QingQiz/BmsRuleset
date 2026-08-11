@@ -4,7 +4,6 @@ using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Mixing;
-using osu.Framework.Audio.Track;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
@@ -25,8 +24,8 @@ public readonly record struct BmsSampleUsage(
 ///     Coordinates BMS sample resources and playback for the ruleset.
 /// </summary>
 /// <remarks>
-///     Track loading and playback state live in dedicated collaborators. This class remains the
-///     Component-facing facade so callers do not need to know which subsystem owns a request.
+///     PCM loading and playback state live in dedicated collaborators. This class remains the
+///     Component-facing facade for gameplay-facing requests.
 /// </remarks>
 public partial class BmsSampleStore(
     IReadOnlyDictionary<ushort, string> sampleDefinitions,
@@ -35,8 +34,6 @@ public partial class BmsSampleStore(
     IEnumerable<BmsSampleUsage>? sampleUsages = null) : Component
 {
     private AudioMixer? mixer;
-    private BmsSampleTrackRegistry? trackRegistry;
-    private BmsSamplePlaybackController? playbackController;
     private BmsPcmVoiceMixer? pcmMixer;
     private BmsPcmPlaybackController? pcmPlaybackController;
     private BmsBassMixerBridge? pcmBridge;
@@ -44,120 +41,66 @@ public partial class BmsSampleStore(
     [Resolved]
     private AudioManager audioManager { get; set; } = null!;
 
-    public double MaxTrackLengthMilliseconds =>
-        pcmPlaybackController?.MaxTrackLengthMilliseconds
-        ?? trackRegistry?.MaxTrackLengthMilliseconds
-        ?? 0;
+    public double MaxSampleLengthMilliseconds => pcmPlaybackController?.MaxSampleLengthMilliseconds ?? 0;
 
     internal AudioMixer? Mixer => mixer;
 
-    internal bool UsesPcmBackend => pcmPlaybackController != null;
+    internal BmsAudioDiagnostics Diagnostics => pcmMixer?.GetDiagnostics() ?? default;
 
-    internal BmsAudioDiagnostics PcmDiagnostics => pcmMixer?.GetDiagnostics() ?? default;
+    internal BmsPcmAssetCacheDiagnostics CacheDiagnostics => pcmPlaybackController?.GetCacheDiagnostics() ?? default;
 
-    internal BmsPcmAssetCacheDiagnostics PcmCacheDiagnostics => pcmPlaybackController?.GetCacheDiagnostics() ?? default;
+    internal bool IsSampleReady(ushort sampleKey) => pcmPlaybackController?.IsSampleReady(sampleKey) == true;
 
-    internal bool IsPcmSampleReady(ushort sampleKey) => pcmPlaybackController?.IsSampleReady(sampleKey) == true;
+    internal long PreloadUnderflows => pcmPlaybackController?.PreloadUnderflows ?? 0;
 
-    internal long PcmPreloadUnderflows => pcmPlaybackController?.PreloadUnderflows ?? 0;
-
-    internal long PcmBridgeCallbackFailures => pcmBridge?.CallbackFailures ?? 0;
+    internal long BridgeCallbackFailures => pcmBridge?.CallbackFailures ?? 0;
 
     protected override void Dispose(bool isDisposing)
     {
-        playbackController?.Dispose();
-        playbackController = null;
         pcmPlaybackController?.Dispose();
         pcmPlaybackController = null;
         pcmBridge?.Dispose();
         pcmBridge = null;
         pcmMixer = null;
-        trackRegistry?.Dispose();
-        trackRegistry = null;
         mixer?.Dispose();
         mixer = null;
-        if (audioManager != null)
-            BmsKeysoundMixerPatcher.UnbindGlobalMixer(audioManager);
         base.Dispose(isDisposing);
     }
 
-    internal Track? GetTrack(ushort sampleKey) => trackRegistry?.GetTrack(sampleKey);
+    internal double GetSampleLength(ushort sampleKey) => pcmPlaybackController?.GetSampleLength(sampleKey) ?? 0;
 
-    internal double GetTrackLength(ushort sampleKey) =>
-        pcmPlaybackController?.GetTrackLength(sampleKey)
-        ?? trackRegistry?.GetTrackLength(sampleKey)
-        ?? 0;
+    internal bool HasSampleDefinition(ushort sampleKey) => pcmPlaybackController?.HasSampleDefinition(sampleKey) == true;
 
-    internal bool HasSampleDefinition(ushort sampleKey) =>
-        pcmPlaybackController?.HasSampleDefinition(sampleKey)
-        ?? trackRegistry?.HasSampleDefinition(sampleKey)
-        ?? false;
+    internal bool SupportsScheduling => pcmPlaybackController != null;
 
-    internal bool SupportsScheduling => pcmPlaybackController != null || playbackController?.SupportsScheduling == true;
+    internal void QueueLivePlay(ushort sampleKey, int volume = 100) => pcmPlaybackController?.QueueLivePlay(sampleKey, volume);
 
-    internal void QueueLivePlay(ushort sampleKey, int volume = 100)
-    {
-        if (pcmPlaybackController != null)
-            pcmPlaybackController.QueueLivePlay(sampleKey, volume);
-        else
-            playbackController?.QueueLivePlay(sampleKey, volume);
-    }
+    internal void SubmitLivePlayBatch() => pcmPlaybackController?.SubmitLivePlayBatch();
 
-    internal void SubmitLivePlayBatch()
-    {
-        if (pcmPlaybackController != null)
-            pcmPlaybackController.SubmitLivePlayBatch();
-        else
-            playbackController?.SubmitLivePlayBatch();
-    }
+    internal void Play(ushort sampleKey, int volume = 100, double offset = 0) => pcmPlaybackController?.Play(sampleKey, volume, offset);
 
-    internal void Play(ushort sampleKey, int volume = 100, double offset = 0)
-    {
-        if (pcmPlaybackController != null)
-            pcmPlaybackController.Play(sampleKey, volume, offset);
-        else
-            playbackController?.Play(sampleKey, volume, offset);
-    }
+    internal bool CanSchedule(ushort sampleKey) => pcmPlaybackController?.CanSchedule(sampleKey) == true;
 
-    internal bool CanSchedule(ushort sampleKey) =>
-        pcmPlaybackController?.CanSchedule(sampleKey)
-        ?? playbackController?.CanSchedule(sampleKey)
-        ?? false;
+    internal string GetScheduleDiagnostic() => pcmPlaybackController == null
+        ? "pcm_state=unavailable"
+        : $"pcm_state={pcmPlaybackController.GetCacheDiagnostics()}";
 
-    internal string GetScheduleDiagnostic(ushort sampleKey) => pcmPlaybackController != null
-        ? $"pcm_state={pcmPlaybackController.GetCacheDiagnostics()}"
-        : playbackController?.GetScheduleDiagnostic(sampleKey) ?? string.Empty;
-
-    internal void SchedulePlay(ushort sampleKey, int volume, double delay, double targetTime)
-    {
-        if (pcmPlaybackController != null)
-            pcmPlaybackController.SchedulePlay(sampleKey, volume, targetTime);
-        else
-            playbackController?.SchedulePlay(sampleKey, volume, delay, targetTime);
-    }
+    internal void SchedulePlay(ushort sampleKey, int volume, double targetTime) =>
+        pcmPlaybackController?.SchedulePlay(sampleKey, volume, targetTime);
 
     internal void SetPlaybackBlocked(bool blocked)
     {
-        if (pcmPlaybackController != null)
-            pcmPlaybackController.SetPlaybackBlocked(blocked);
-        else
-            playbackController?.SetPlaybackBlocked(blocked);
+        pcmPlaybackController?.SetPlaybackBlocked(blocked);
     }
 
     internal void ResumeAll()
     {
-        if (pcmPlaybackController != null)
-            pcmPlaybackController.ResumeAll();
-        else
-            playbackController?.ResumeAll();
+        pcmPlaybackController?.ResumeAll();
     }
 
     internal void StopAll()
     {
-        if (pcmPlaybackController != null)
-            pcmPlaybackController.StopAll();
-        else
-            playbackController?.StopAll();
+        pcmPlaybackController?.StopAll();
     }
 
     protected override void Update()
@@ -167,12 +110,6 @@ public partial class BmsSampleStore(
         var now = Time.Current;
         pcmBridge?.EnsureAttached();
         pcmPlaybackController?.Update(now);
-
-        if (trackRegistry != null)
-        {
-            var completedLoads = trackRegistry.Update(now);
-            playbackController?.Update(completedLoads, now);
-        }
     }
 
     [BackgroundDependencyLoader]
@@ -180,63 +117,39 @@ public partial class BmsSampleStore(
     {
         BmsPcmMixerPatcher.InstallOnce();
 
-        if (BmsPcmMixerPatcher.IsInstalled)
+        if (!BmsPcmMixerPatcher.IsInstalled)
+            return;
+
+        try
         {
-            try
-            {
-                mixer = audioManager.CreateAudioMixer(BmsPcmMixerPatcher.MIXER_IDENTIFIER);
-                pcmMixer = new BmsPcmVoiceMixer();
-                pcmBridge = new BmsBassMixerBridge(mixer, pcmMixer);
-                pcmPlaybackController = new BmsPcmPlaybackController(
-                    sampleDefinitions,
-                    basePath,
-                    rate,
-                    sampleUsages,
-                    audioManager.AggregateVolume,
-                    () => Time.Current,
-                    pcmMixer);
-                pcmPlaybackController.Initialise(cancellationToken ?? CancellationToken.None, Time.Current);
-                pcmBridge.EnsureAttached();
+            mixer = audioManager.CreateAudioMixer(BmsPcmMixerPatcher.MIXER_IDENTIFIER);
+            pcmMixer = new BmsPcmVoiceMixer();
+            pcmBridge = new BmsBassMixerBridge(mixer, pcmMixer);
+            pcmPlaybackController = new BmsPcmPlaybackController(
+                sampleDefinitions,
+                basePath,
+                rate,
+                sampleUsages,
+                audioManager.AggregateVolume,
+                () => Time.Current,
+                pcmMixer);
+            pcmPlaybackController.Initialise(cancellationToken ?? CancellationToken.None, Time.Current);
+            pcmBridge.EnsureAttached();
 
-                if (pcmPlaybackController.IsInitialised)
-                    return;
-            }
-            catch (Exception exception)
-            {
-                BmsLogger.LogAudioFailure("Failed to initialise the BMS PCM playback backend. Falling back to framework Tracks.", exception);
-            }
-
-            pcmPlaybackController?.Dispose();
-            pcmPlaybackController = null;
-            pcmBridge?.Dispose();
-            pcmBridge = null;
-            pcmMixer = null;
-            mixer?.Dispose();
-            mixer = null;
+            if (pcmPlaybackController.IsInitialised)
+                return;
+        }
+        catch (Exception exception)
+        {
+            BmsLogger.LogAudioFailure("Failed to initialise BMS PCM playback. Gameplay samples will be unavailable.", exception);
         }
 
-        initialiseTrackBackend(cancellationToken ?? CancellationToken.None);
-    }
-
-    private void initialiseTrackBackend(CancellationToken cancellationToken)
-    {
-        trackRegistry = new BmsSampleTrackRegistry(sampleDefinitions, basePath, rate, sampleUsages);
-        BmsKeysoundMixerPatcher.InstallOnce();
-        BmsKeysoundMixerPatcher.BindGlobalMixer(audioManager);
-
-        if (BmsKeysoundMixerPatcher.EnableReverseStreamWorkaround)
-            BmsTrackAudioPatcher.InstallOnce();
-
-        if (BmsKeysoundMixerPatcher.IsInstalled)
-            mixer = audioManager.CreateAudioMixer(BmsKeysoundMixerPatcher.MIXER_IDENTIFIER);
-
-        playbackController = new BmsSamplePlaybackController(
-            trackRegistry,
-            mixer,
-            audioManager.AggregateVolume,
-            rate,
-            () => Time.Current);
-
-        trackRegistry.Initialise(audioManager, mixer, cancellationToken, Time.Current);
+        pcmPlaybackController?.Dispose();
+        pcmPlaybackController = null;
+        pcmBridge?.Dispose();
+        pcmBridge = null;
+        pcmMixer = null;
+        mixer?.Dispose();
+        mixer = null;
     }
 }

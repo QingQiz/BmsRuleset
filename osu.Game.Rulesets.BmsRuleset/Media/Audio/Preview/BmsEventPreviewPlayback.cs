@@ -451,7 +451,6 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
         var adjustments = getPlaybackTrackAdjustments(track, evt.Volume);
         adjustments.Update();
-        audioLoader?.ApplyTailRamp(track, track.CurrentTime);
         track.Start();
         activeTracks.Add(track);
     }

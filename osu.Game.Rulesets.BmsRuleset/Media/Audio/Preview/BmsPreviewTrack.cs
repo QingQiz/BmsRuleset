@@ -266,8 +266,8 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
     /// </remarks>
     public new void BindAdjustments(IAggregateAudioAdjustment component)
     {
-        // Event tracks receive AudioManager adjustments through their TrackStore, while wrapper and mod
-        // adjustments must remain on the logical owner so they can be mirrored without double-applying globals.
+        // The PCM mixer follows AudioManager aggregate gain directly, while wrapper and mod adjustments
+        // must remain on the logical owner so they can be mirrored without double-applying globals.
         if (!ReferenceEquals(component, audioManagerAdjustments))
             base.BindAdjustments(component);
     }
