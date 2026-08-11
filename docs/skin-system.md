@@ -154,6 +154,21 @@ sprite.
 This works for any image key: `NoteImage`, `KeyImage`/`KeyImageD`, `StageLight`, `LightingN`,
 `LightingL`, `StageHint`, judgement images, etc.
 
+### Missing image resources
+
+Image-name defaults apply only when the corresponding configuration key is absent. If a key is
+present, its value remains authoritative: the ruleset searches the active skin hierarchy for that
+exact resource name, and renders no image when no source provides it. It does not retry with the
+legacy default filename.
+
+For example, an omitted `KeyImage1` uses `mania-key1` and may retrieve it from a fallback skin.
+`KeyImage1: custom-key` with no `custom-key` resource renders an empty up-state instead of retrying
+`mania-key1`.
+
+Long-note heads and tails retain osu!mania's semantic fallback chain (tail to head to normal note,
+and head to normal note). Judgement images also retain osu!mania's component-level fallback, so a
+lower-priority skin may provide the complete judgement component when the current skin cannot.
+
 ### osu!mania Skin Compatibility
 
 You can also use `[Mania]` sections from a standard osu!mania skin. The ruleset will match on:

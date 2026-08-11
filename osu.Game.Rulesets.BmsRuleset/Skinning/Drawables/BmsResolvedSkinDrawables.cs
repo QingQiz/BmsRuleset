@@ -1,9 +1,13 @@
 using System;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
+using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
@@ -11,16 +15,32 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning.Drawables;
 internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
 {
     private readonly float? widthForNoteHeightScale;
-    private readonly Drawable noteAnimation;
+    private readonly BmsSkinComponentLookup lookup;
 
-    public BmsResolvedNotePiece(Texture[] textures, float? widthForNoteHeightScale)
+    private Drawable? noteAnimation;
+
+    public BmsResolvedNotePiece(BmsSkinComponentLookup lookup, Texture[] textures, float? widthForNoteHeightScale)
     {
+        this.lookup = lookup;
         this.widthForNoteHeightScale = widthForNoteHeightScale;
 
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
         Origin = Anchor.TopLeft;
 
+        if (textures.Length > 0)
+            setTextures(textures);
+    }
+
+    [BackgroundDependencyLoader]
+    private void load(ISkinSource skin)
+    {
+        if (noteAnimation == null)
+            setTextures(BmsLegacyTextureResolver.ResolveNoteTextures(skin, lookup));
+    }
+
+    private void setTextures(Texture[] textures)
+    {
         InternalChild = noteAnimation = createTextureDrawable(textures, true).With(d =>
         {
             d.Anchor = Anchor.TopLeft;
@@ -43,7 +63,7 @@ internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
             return;
 
         var noteWidth = widthForNoteHeightScale ?? DrawWidth;
-        noteAnimation.Scale = Vector2.Divide(new Vector2(DrawWidth, noteWidth), Math.Max(1, texture.DisplayWidth));
+        noteAnimation?.Scale = Vector2.Divide(new Vector2(DrawWidth, noteWidth), Math.Max(1, texture.DisplayWidth));
     }
 
     private static Drawable createTextureDrawable(Texture[] textures, bool looping)

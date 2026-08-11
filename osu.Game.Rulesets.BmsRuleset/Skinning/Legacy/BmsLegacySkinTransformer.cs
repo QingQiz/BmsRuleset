@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
@@ -194,17 +193,15 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsColumnLight(this, bmsLookup)),
             BmsSkinComponents.HitTarget when bmsLookup.ColumnIndex == null
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsHitTarget(this)),
-            BmsSkinComponents.KeyArea when hasAnimation(GetKeyImageName(bmsLookup, false))
+            BmsSkinComponents.KeyArea
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsKeyArea(this, bmsLookup)),
             BmsSkinComponents.Mine
                 => createNoteFactory(bmsLookup),
             BmsSkinComponents.HitExplosion
-                => hasAnimation(GetHitExplosionImageName(bmsLookup))
-                    ? new BmsResolvedDrawableFactory(() => new LegacyBmsHitExplosion(this, bmsLookup))
-                    : null,
-            BmsSkinComponents.StageBackground when hasAnyAnimation(GetStageBackgroundImageNames())
+                => new BmsResolvedDrawableFactory(() => new LegacyBmsHitExplosion(this, bmsLookup)),
+            BmsSkinComponents.StageBackground
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsStageBackground(this)),
-            BmsSkinComponents.StageForeground when hasAnimation(GetStageForegroundImageName())
+            BmsSkinComponents.StageForeground
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsStageForeground(this)),
             BmsSkinComponents.HoldNoteHead
                 => createNoteFactory(bmsLookup),
@@ -214,20 +211,14 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
         };
     }
 
-    private BmsResolvedDrawableFactory? createNoteFactory(BmsSkinComponentLookup lookup)
+    private BmsResolvedDrawableFactory createNoteFactory(BmsSkinComponentLookup lookup)
     {
         var textures = BmsLegacyTextureResolver.ResolveNoteTextures(this, lookup);
-
-        if (textures.Length == 0)
-            return null;
-
         var widthForNoteHeightScale = GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale)?.Value;
-        return new BmsResolvedDrawableFactory(() => new BmsResolvedNotePiece(textures, widthForNoteHeightScale));
+        return new BmsResolvedDrawableFactory(() => new BmsResolvedNotePiece(lookup, textures, widthForNoteHeightScale));
     }
 
     private bool hasAnimation(string name) => GetLegacyAnimation(name) != null;
-
-    private bool hasAnyAnimation(params string[] names) => names.Any(hasAnimation);
 
     private Drawable? getResult(HitResult result)
     {

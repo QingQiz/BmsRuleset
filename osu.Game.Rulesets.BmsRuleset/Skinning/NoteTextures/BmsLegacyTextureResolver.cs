@@ -75,10 +75,15 @@ public static class BmsLegacyTextureResolver
         var configuredNote = skin.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value;
         var bodyIsShortNoteFallback = !string.IsNullOrWhiteSpace(configuredBody) && configuredBody == configuredNote;
 
-        yield return bodyIsShortNoteFallback ? null : configuredBody;
-        yield return $"mania-note{fallback}L";
-        yield return configuredNote;
-        yield return $"mania-note{fallback}";
+        if (bodyIsShortNoteFallback)
+        {
+            yield return $"mania-note{fallback}L";
+            yield return configuredNote;
+        }
+        else
+        {
+            yield return configuredBody ?? $"mania-note{fallback}L";
+        }
     }
 
     private static IEnumerable<string?> enumerateNoteCandidates(ISkin? skin, BmsSkinComponentLookup lookup, string fallback)
@@ -86,32 +91,32 @@ public static class BmsLegacyTextureResolver
         switch (lookup.Component)
         {
             case BmsSkinComponents.Mine:
-                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.Hit100, lookup))?.Value;
-                yield return "mania-noteS";
+                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.Hit100, lookup))?.Value
+                             ?? "mania-noteS";
 
                 break;
 
             case BmsSkinComponents.HoldNoteHead:
-                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup))?.Value;
-                yield return $"mania-note{fallback}H";
-                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value;
-                yield return $"mania-note{fallback}";
+                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup))?.Value
+                             ?? $"mania-note{fallback}H";
+                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value
+                             ?? $"mania-note{fallback}";
 
                 break;
 
             case BmsSkinComponents.HoldNoteTail:
-                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteTailImage, lookup))?.Value;
-                yield return $"mania-note{fallback}T";
-                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup))?.Value;
-                yield return $"mania-note{fallback}H";
-                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value;
-                yield return $"mania-note{fallback}";
+                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteTailImage, lookup))?.Value
+                             ?? $"mania-note{fallback}T";
+                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, lookup))?.Value
+                             ?? $"mania-note{fallback}H";
+                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value
+                             ?? $"mania-note{fallback}";
 
                 break;
 
             default:
-                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value;
-                yield return $"mania-note{fallback}";
+                yield return skin?.GetConfig<BmsSkinConfigurationLookup, string>(new BmsSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.NoteImage, lookup))?.Value
+                             ?? $"mania-note{fallback}";
 
                 break;
         }

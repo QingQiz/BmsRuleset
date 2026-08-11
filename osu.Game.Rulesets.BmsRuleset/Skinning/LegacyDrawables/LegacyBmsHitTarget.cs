@@ -1,3 +1,4 @@
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -13,20 +14,28 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 /// </summary>
 internal sealed partial class LegacyBmsHitTarget : CompositeDrawable
 {
-    internal Drawable Target { get; }
+    internal Drawable Target { get; private set; } = null!;
+
+    private readonly string targetImage;
+    private readonly bool showJudgementLine;
+    private readonly Color4 lineColour;
 
     public LegacyBmsHitTarget(BmsLegacySkinTransformer transformer)
     {
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        var targetImage = transformer.GetHitTargetImageName();
-        var showJudgementLine = transformer.GetManiaConfig<bool>(LegacyManiaSkinConfigurationLookups.ShowJudgementLine)?.Value ?? true;
-        var lineColour = transformer.GetManiaConfig<Color4>(LegacyManiaSkinConfigurationLookups.JudgementLineColour)?.Value ?? Color4.White;
+        targetImage = transformer.GetHitTargetImageName();
+        showJudgementLine = transformer.GetManiaConfig<bool>(LegacyManiaSkinConfigurationLookups.ShowJudgementLine)?.Value ?? true;
+        lineColour = transformer.GetManiaConfig<Color4>(LegacyManiaSkinConfigurationLookups.JudgementLineColour)?.Value ?? Color4.White;
+    }
 
+    [BackgroundDependencyLoader]
+    private void load(ISkinSource skin)
+    {
         InternalChildren =
         [
-            Target = transformer.GetLegacyAnimation(targetImage)?.With(d =>
+            Target = skin.GetAnimation(targetImage, true, true)?.With(d =>
             {
                 d.RelativeSizeAxes = Axes.X;
                 d.Width = 1;

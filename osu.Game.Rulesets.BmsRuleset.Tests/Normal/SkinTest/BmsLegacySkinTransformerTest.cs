@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
@@ -29,6 +30,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
+using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
@@ -218,6 +220,83 @@ public class BmsLegacySkinTransformerTest
 
     private static readonly IStorageResourceProvider storage_resources = new TestStorageResourceProvider();
 
+    public sealed record ImageFallbackCase(
+        string Configuration,
+        string CustomResource,
+        string[] DefaultResources,
+        BmsSkinComponentLookup Lookup,
+        int VisibleSpritesWhenConfigured,
+        int VisibleSpritesWhenMissing);
+
+    private static IEnumerable<TestCaseData> imageFallbackCases()
+    {
+        ImageFallbackCase[] cases =
+        [
+            new("NoteImage1", "custom-note", ["mania-note1"], new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1), 1, 0),
+            new("MineImage1", "custom-mine", ["mania-noteS"], new BmsSkinComponentLookup(BmsSkinComponents.Mine, BmsLayoutVariant.Bme7K, 1), 1, 0),
+            new("KeyImage1", "custom-key", ["mania-key1", "mania-key1D"], new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1), 2, 1),
+            new("KeyImage1D", "custom-key-down", ["mania-key1", "mania-key1D"], new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1), 2, 1),
+            new("NoteImage1H", "custom-head", ["mania-note1H"], new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteHead, BmsLayoutVariant.Bme7K, 1), 1, 0),
+            new("NoteImage1T", "custom-tail", ["mania-note1T"], new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, BmsLayoutVariant.Bme7K, 1), 1, 0),
+            new("StageHint", "custom-target", ["mania-stage-hint"], new BmsSkinComponentLookup(BmsSkinComponents.HitTarget), 2, 1),
+            new("StageLeft", "custom-stage-left", ["mania-stage-left", "mania-stage-right"], new BmsSkinComponentLookup(BmsSkinComponents.StageBackground), 2, 1),
+            new("StageRight", "custom-stage-right", ["mania-stage-left", "mania-stage-right"], new BmsSkinComponentLookup(BmsSkinComponents.StageBackground), 2, 1),
+            new("StageBottom", "custom-stage-bottom", ["mania-stage-bottom"], new BmsSkinComponentLookup(BmsSkinComponents.StageForeground), 1, 0),
+            new("StageLight", "custom-stage-light", ["mania-stage-light"], new BmsSkinComponentLookup(BmsSkinComponents.ColumnLight, BmsLayoutVariant.Bme7K, 1), 1, 0),
+            new("LightingN", "custom-lighting-n", ["lightingN"], new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1), 1, 0),
+            new("LightingL", "custom-lighting-l", ["lightingL"], new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1, true), 1, 0),
+        ];
+
+        foreach (var testCase in cases)
+        {
+            yield return new TestCaseData(testCase, true)
+                .SetName($"{testCase.Configuration} configured resource exists");
+            yield return new TestCaseData(testCase, false)
+                .SetName($"{testCase.Configuration} configured resource missing");
+        }
+    }
+
+    private static IEnumerable<TestCaseData> unconfiguredImageFallbackCases()
+    {
+        foreach (var configuredCase in imageFallbackCases())
+        {
+            var testCase = (ImageFallbackCase)configuredCase.Arguments[0];
+
+            yield return new TestCaseData(testCase, true)
+                .SetName($"{testCase.Configuration} unconfigured default resource exists");
+            yield return new TestCaseData(testCase, false)
+                .SetName($"{testCase.Configuration} unconfigured default resource falls back by name");
+        }
+    }
+
+    public sealed record JudgementFallbackCase(string Configuration, HitResult Result, string DefaultResource);
+
+    private static IEnumerable<TestCaseData> judgementFallbackCases()
+    {
+        JudgementFallbackCase[] cases =
+        [
+            new("HitPGreat", HitResult.Perfect, "mania-hit300g"),
+            new("HitGreat", HitResult.Great, "mania-hit300"),
+            new("HitGood", HitResult.Good, "mania-hit200"),
+            new("HitBad", HitResult.Ok, "mania-hit50"),
+            new("HitPoor", HitResult.Meh, "mania-hit0"),
+        ];
+
+        bool[] states = [true, false];
+
+        foreach (var testCase in cases)
+        {
+            foreach (var configured in states)
+            {
+                foreach (var currentSkinHasResource in states)
+                {
+                    yield return new TestCaseData(testCase, configured, currentSkinHasResource)
+                        .SetName($"{testCase.Configuration} {(configured ? "configured" : "unconfigured")} resource {(currentSkinHasResource ? "exists" : "falls back as component")}");
+                }
+            }
+        }
+    }
+
     private class TestSkinIniSkin(string skinIni, IEnumerable<string> textures = null) : Skin(new SkinInfo("Test", "Test"), null, new TestByteResourceStore(new Dictionary<string, byte[]>
     {
         ["skin.ini"] = Encoding.UTF8.GetBytes(skinIni),
@@ -290,6 +369,21 @@ public class BmsLegacySkinTransformerTest
             LayoutVariant = layoutVariant,
             TotalColumns = totalColumns,
         };
+
+    private static Drawable createLoadedDrawable(BmsEmbeddedSkinSource source, BmsSkinComponentLookup lookup)
+    {
+        var drawable = ((IBmsGameplaySkinDrawableSource)source).GetDrawableFactory(lookup)?.Create();
+        Assert.That(drawable, Is.Not.Null);
+
+        if (!drawable!.ChildrenOfType<Sprite>().Any())
+        {
+            var dependencies = new DependencyContainer();
+            dependencies.CacheAs<ISkinSource>(source);
+            dependencies.Inject(drawable);
+        }
+
+        return drawable!;
+    }
 
     private static ISkinComponentLookup createUserMainHudLookup()
     {
@@ -663,7 +757,11 @@ public class BmsLegacySkinTransformerTest
                                         KeyImage1: custom-key
                                         """, ["custom-key"]);
 
+        var source = new TestSkinSource(skin);
         var keyArea = skin.GetDrawableComponent(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1));
+        var dependencies = new DependencyContainer();
+        dependencies.CacheAs<ISkinSource>(source);
+        dependencies.Inject(keyArea!);
 
         Assert.That(keyArea, Is.Not.Null);
         var sprite = keyArea!.ChildrenOfType<Sprite>().Single();
@@ -684,6 +782,144 @@ public class BmsLegacySkinTransformerTest
             Assert.That(sprite.RelativeSizeAxes, Is.EqualTo(Axes.X));
             Assert.That(sprite.Width, Is.EqualTo(1));
         });
+    }
+
+    [TestCase(true, true, true, TestName = "Key image - configured resource exists")]
+    [TestCase(true, false, false, TestName = "Key image - configured resource missing")]
+    [TestCase(false, true, true, TestName = "Key image - default-named resource exists")]
+    [TestCase(false, false, true, TestName = "Key image - default-named resource falls back by name")]
+    public void TestKeyImageFallbackSemantics(bool configured, bool currentSkinHasResource, bool expectedVisible)
+    {
+        var beatmap = (BmsBeatmap)createBeatmap();
+        var configuredLine = configured ? "KeyImage1: custom-key" : string.Empty;
+        var currentResource = configured ? "custom-key" : "mania-key1";
+        string[] currentTextures = currentSkinHasResource ? [currentResource] : [];
+        var current = new BmsLegacySkinTransformer(new TestSkinIniSkin($"""
+                                                                        [BMS]
+                                                                        Layout: 7K
+                                                                        {configuredLine}
+                                                                        """, currentTextures), beatmap);
+        var fallback = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+                                                                         [BMS]
+                                                                         Layout: 7K
+                                                                         """, ["mania-key1"]), beatmap);
+
+        using var source = new BmsEmbeddedSkinSource();
+        source.SetSources(new TestSkinSource(current), new BmsEmbeddedSkinFallbackChain(fallback, null));
+
+        var lookup = new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1);
+        var keyArea = ((IBmsGameplaySkinDrawableSource)source).GetDrawableFactory(lookup)?.Create();
+        var dependencies = new DependencyContainer();
+        dependencies.CacheAs<ISkinSource>(source);
+        dependencies.Inject(keyArea!);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(keyArea, Is.TypeOf<LegacyBmsKeyArea>());
+            Assert.That(keyArea!.ChildrenOfType<Sprite>().Any(), Is.EqualTo(expectedVisible));
+        });
+    }
+
+    [TestCaseSource(nameof(imageFallbackCases))]
+    public void TestConfiguredImageFallbackSemantics(ImageFallbackCase testCase, bool currentSkinHasResource)
+    {
+        var beatmap = (BmsBeatmap)createBeatmap();
+        string[] currentTextures = currentSkinHasResource ? [testCase.CustomResource] : [];
+        var current = new BmsLegacySkinTransformer(new TestSkinIniSkin($"""
+                                                                        [BMS]
+                                                                        Layout: 7K
+                                                                        {testCase.Configuration}: {testCase.CustomResource}
+                                                                        """, currentTextures), beatmap);
+        var fallback = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+                                                                         [BMS]
+                                                                         Layout: 7K
+                                                                         """, testCase.DefaultResources), beatmap);
+
+        using var source = new BmsEmbeddedSkinSource();
+        source.SetSources(new TestSkinSource(current), new BmsEmbeddedSkinFallbackChain(fallback, null));
+
+        var drawable = createLoadedDrawable(source, testCase.Lookup);
+        var expectedCount = currentSkinHasResource ? testCase.VisibleSpritesWhenConfigured : testCase.VisibleSpritesWhenMissing;
+
+        Assert.That(drawable.ChildrenOfType<Sprite>().Count(), Is.EqualTo(expectedCount));
+    }
+
+    [TestCaseSource(nameof(unconfiguredImageFallbackCases))]
+    public void TestUnconfiguredImageFallbackSemantics(ImageFallbackCase testCase, bool currentSkinHasDefaultResource)
+    {
+        var beatmap = (BmsBeatmap)createBeatmap();
+        var currentTextures = currentSkinHasDefaultResource ? testCase.DefaultResources : [];
+        var current = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+                                                                        [BMS]
+                                                                        Layout: 7K
+                                                                        """, currentTextures), beatmap);
+        var fallback = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+                                                                         [BMS]
+                                                                         Layout: 7K
+                                                                         """, testCase.DefaultResources), beatmap);
+
+        using var source = new BmsEmbeddedSkinSource();
+        source.SetSources(new TestSkinSource(current), new BmsEmbeddedSkinFallbackChain(fallback, null));
+
+        var drawable = createLoadedDrawable(source, testCase.Lookup);
+
+        Assert.That(drawable.ChildrenOfType<Sprite>().Count(), Is.EqualTo(testCase.VisibleSpritesWhenConfigured));
+    }
+
+    [TestCase(true, true, true, TestName = "NoteImageL configured resource exists")]
+    [TestCase(true, false, false, TestName = "NoteImageL configured resource missing")]
+    [TestCase(false, true, true, TestName = "NoteImageL unconfigured default resource exists")]
+    [TestCase(false, false, true, TestName = "NoteImageL unconfigured default resource falls back by name")]
+    public void TestHoldBodyImageFallbackSemantics(bool configured, bool currentSkinHasResource, bool expectedVisible)
+    {
+        var beatmap = (BmsBeatmap)createBeatmap();
+        var configuredLine = configured ? "NoteImage1L: custom-body" : string.Empty;
+        var currentResource = configured ? "custom-body" : "mania-note1L";
+        string[] currentTextures = currentSkinHasResource ? [currentResource] : [];
+        var current = new BmsLegacySkinTransformer(new TestSkinIniSkin($"""
+                                                                        [BMS]
+                                                                        Layout: 7K
+                                                                        {configuredLine}
+                                                                        """, currentTextures), beatmap);
+        var fallback = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+                                                                         [BMS]
+                                                                         Layout: 7K
+                                                                         """, ["mania-note1L"]), beatmap);
+
+        using var source = new BmsEmbeddedSkinSource();
+        source.SetSources(new TestSkinSource(current), new BmsEmbeddedSkinFallbackChain(fallback, null));
+        using var cache = new BmsLongNoteBodySource.BmsLongNoteBodyTextureCache();
+
+        var resolved = BmsLongNoteBodySource.Resolve(
+            source,
+            new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1),
+            new DummyRenderer(),
+            cache);
+
+        Assert.That(resolved != null, Is.EqualTo(expectedVisible));
+    }
+
+    [TestCaseSource(nameof(judgementFallbackCases))]
+    public void TestJudgementImageFallbackSemantics(JudgementFallbackCase testCase, bool configured, bool currentSkinHasResource)
+    {
+        var beatmap = (BmsBeatmap)createBeatmap();
+        var configuredLine = configured ? $"{testCase.Configuration}: custom-judgement" : string.Empty;
+        var currentResource = configured ? "custom-judgement" : testCase.DefaultResource;
+        string[] currentTextures = currentSkinHasResource ? [currentResource] : [];
+        var current = new BmsLegacySkinTransformer(new TestSkinIniSkin($"""
+                                                                        [BMS]
+                                                                        Layout: 7K
+                                                                        {configuredLine}
+                                                                        """, currentTextures), beatmap);
+        var fallback = new BmsLegacySkinTransformer(new TestSkinIniSkin("""
+                                                                         [BMS]
+                                                                         Layout: 7K
+                                                                         """, [testCase.DefaultResource]), beatmap);
+
+        using var source = new BmsEmbeddedSkinSource();
+        source.SetSources(new TestSkinSource(current), new BmsEmbeddedSkinFallbackChain(fallback, null));
+
+        Assert.That(source.GetDrawableComponent(new SkinComponentLookup<HitResult>(testCase.Result)), Is.Not.Null);
     }
 
     [Test]

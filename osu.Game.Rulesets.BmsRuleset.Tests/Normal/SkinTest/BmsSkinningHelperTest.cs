@@ -422,7 +422,7 @@ public class BmsSkinningHelperTest
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1);
 
         Assert.That(BmsLegacyTextureResolver.HoldBodyImageCandidates(skin, lookup).Where(c => c != null),
-            Is.EqualTo(new[] { "mania-note1L", "note", "mania-note1" }));
+            Is.EqualTo(new[] { "mania-note1L", "note" }));
     }
 
     [Test]

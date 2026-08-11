@@ -151,6 +151,17 @@ lightingN-2.png
 适用于任何图像键：`NoteImage`、`KeyImage`/`KeyImageD`、`StageLight`、`LightingN`、
 `LightingL`、`StageHint`、判定图像等。
 
+### 图片资源缺失
+
+只有对应配置键不存在时，才会采用默认图片名。配置键存在时，其值具有决定性：规则集会在活动皮肤层级中查找这个
+确切的资源名；如果所有来源都不提供该资源，则不绘制图片，不会再尝试 legacy 默认文件名。
+
+例如，未配置 `KeyImage1` 时会使用 `mania-key1`，并且可以从后备皮肤取得该资源；如果配置了
+`KeyImage1: custom-key`，但没有 `custom-key` 资源，则未按下状态保持空白，不会再尝试 `mania-key1`。
+
+LN 头尾保留 osu!mania 的语义后备链（尾部依次到头部、普通 note，头部到普通 note）。判定图片也保留
+osu!mania 的组件级后备：当前皮肤无法提供判定组件时，可以由更低优先级的皮肤提供完整判定组件。
+
 ### osu!mania 皮肤兼容
 
 你也可以使用标准 osu!mania 皮肤的 `[Mania]` 段。规则集会匹配：

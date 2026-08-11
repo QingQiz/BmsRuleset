@@ -6,6 +6,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
@@ -19,8 +20,9 @@ namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 /// </remarks>
 internal sealed partial class LegacyBmsStageBackground : CompositeDrawable
 {
-    private readonly Drawable? leftSprite;
-    private readonly Drawable? rightSprite;
+    private Drawable? leftSprite;
+    private Drawable? rightSprite;
+    private readonly string[] images;
 
     [Resolved(CanBeNull = true)]
     private BmsPlayfield? playfield { get; set; }
@@ -30,16 +32,20 @@ internal sealed partial class LegacyBmsStageBackground : CompositeDrawable
         RelativeSizeAxes = Axes.Both;
         Masking = false;
 
-        var images = transformer.GetStageBackgroundImageNames();
+        images = transformer.GetStageBackgroundImageNames();
+    }
 
+    [BackgroundDependencyLoader]
+    private void load(ISkinSource skin)
+    {
         InternalChildren =
         [
-            leftSprite = transformer.GetLegacyAnimation(images[0])?.With(d =>
+            leftSprite = skin.GetAnimation(images[0], true, true)?.With(d =>
             {
                 d.Anchor = Anchor.TopLeft;
                 d.Origin = Anchor.TopRight;
             }) ?? Empty(),
-            rightSprite = transformer.GetLegacyAnimation(images[1])?.With(d =>
+            rightSprite = skin.GetAnimation(images[1], true, true)?.With(d =>
             {
                 d.Anchor = Anchor.TopRight;
                 d.Origin = Anchor.TopLeft;

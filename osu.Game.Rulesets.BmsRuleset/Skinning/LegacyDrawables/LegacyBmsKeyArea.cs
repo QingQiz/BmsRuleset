@@ -1,27 +1,39 @@
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
+using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
 
 internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingHandler<BmsAction>
 {
     private readonly BmsSkinComponentLookup lookup;
-    private readonly Drawable? upSprite;
-    private readonly Drawable? downSprite;
+    private readonly string upImage;
+    private readonly string downImage;
+
+    private Drawable? upSprite;
+    private Drawable? downSprite;
 
     public LegacyBmsKeyArea(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup)
     {
         this.lookup = lookup;
+        upImage = transformer.GetKeyImageName(lookup, false);
+        downImage = transformer.GetKeyImageName(lookup, true);
 
         RelativeSizeAxes = Axes.Both;
+    }
 
-        upSprite = transformer.GetLegacyAnimation(transformer.GetKeyImageName(lookup, false))?.With(d =>
+    [BackgroundDependencyLoader]
+    private void load(ISkinSource skin)
+    {
+        upSprite = skin.GetAnimation(upImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true)?.With(d =>
         {
             d.Anchor = Anchor.BottomCentre;
             d.Origin = Anchor.BottomCentre;
@@ -29,7 +41,7 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
             d.Width = 1;
         });
 
-        downSprite = transformer.GetLegacyAnimation(transformer.GetKeyImageName(lookup, true))?.With(d =>
+        downSprite = skin.GetAnimation(downImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true)?.With(d =>
         {
             d.Anchor = Anchor.BottomCentre;
             d.Origin = Anchor.BottomCentre;
