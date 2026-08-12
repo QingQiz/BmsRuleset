@@ -10,7 +10,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
 {
     private readonly string? basePath;
     private readonly AudioManager audioManager;
-    private readonly Func<CancellationToken, Task>? beforeTrackLoad;
+    private readonly Func<CancellationToken, Task>? beforeAssetLoad;
     private readonly CancellationTokenSource timelineCancellation = new();
     private readonly IReadOnlyList<Func<CancellationToken, BmsEventPreviewTimeline>> timelineSources;
 
@@ -53,8 +53,8 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         Func<CancellationToken, BmsEventPreviewTimeline> timelineFactory,
         string? basePath,
         AudioManager audioManager,
-        Func<CancellationToken, Task>? beforeTrackLoad = null)
-        : this([timelineFactory], basePath, audioManager, beforeTrackLoad)
+        Func<CancellationToken, Task>? beforeAssetLoad = null)
+        : this([timelineFactory], basePath, audioManager, beforeAssetLoad)
     {
     }
 
@@ -62,7 +62,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         IReadOnlyList<Func<CancellationToken, BmsEventPreviewTimeline>> timelineSources,
         string? basePath,
         AudioManager audioManager,
-        Func<CancellationToken, Task>? beforeTrackLoad = null)
+        Func<CancellationToken, Task>? beforeAssetLoad = null)
         : base(audioManager)
     {
         if (timelineSources.Count == 0)
@@ -70,7 +70,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
 
         this.basePath = basePath;
         this.audioManager = audioManager;
-        this.beforeTrackLoad = beforeTrackLoad;
+        this.beforeAssetLoad = beforeAssetLoad;
         this.timelineSources = timelineSources;
         Length = BmsEventPreviewTimeline.DEFAULT_LENGTH;
         timelineTask = prepareTimelineSource();
@@ -134,11 +134,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
             Length = Playback.Length;
 
             if (TryResolvePendingRestorePosition())
-            {
-                startState = Playback.HasRetainedTracks
-                    ? Playback.Update(CurrentTime, requireDueAudioReady)
-                    : BmsPreviewPlaybackStartState.Waiting;
-            }
+                startState = Playback.Update(CurrentTime, requireDueAudioReady);
         }
 
         if (startState != BmsPreviewPlaybackStartState.Waiting)
@@ -218,7 +214,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
 
     private void activateTimeline(BmsEventPreviewTimeline timeline)
     {
-        Playback = new BmsEventPreviewPlayback(this, timeline, basePath, audioManager, beforeTrackLoad);
+        Playback = new BmsEventPreviewPlayback(this, timeline, basePath, audioManager, beforeAssetLoad);
         Length = Playback.Length;
         var restorePositionResolved = TryResolvePendingRestorePosition();
         var activationPosition = restorePositionResolved ? CurrentTime : pendingPreviewPosition ?? CurrentTime;

@@ -6,6 +6,7 @@ using System.Threading;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
@@ -20,6 +21,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private readonly double rate;
     private readonly IBindable<double> aggregateVolume;
     private readonly Func<double> currentTime;
+    private readonly Func<CancellationToken, System.Threading.Tasks.Task>? beforeAssetLoad;
     private readonly BmsPcmVoiceMixer mixer;
     private readonly BmsPlaybackClockMapper clockMapper;
     private readonly Dictionary<ushort, string> resolvedResources = [];
@@ -53,7 +55,8 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         IEnumerable<BmsSampleUsage>? sampleUsages,
         IBindable<double> aggregateVolume,
         Func<double> currentTime,
-        BmsPcmVoiceMixer mixer)
+        BmsPcmVoiceMixer mixer,
+        Func<CancellationToken, System.Threading.Tasks.Task>? beforeAssetLoad = null)
     {
         this.sampleDefinitions = sampleDefinitions
             .Where(pair => !string.IsNullOrEmpty(pair.Value))
@@ -64,11 +67,12 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         this.aggregateVolume = aggregateVolume;
         this.currentTime = currentTime;
         this.mixer = mixer;
+        this.beforeAssetLoad = beforeAssetLoad;
         clockMapper = new BmsPlaybackClockMapper(rate);
         lastMasterGain = sanitiseAggregateVolume();
     }
 
-    internal void Initialise(CancellationToken cancellationToken, double chartTime)
+    internal void Initialise(CancellationToken cancellationToken, double chartTime, bool waitForInitialAssets = true)
     {
         if (string.IsNullOrEmpty(basePath) || !Directory.Exists(basePath))
             return;
@@ -76,7 +80,12 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         resourceStore = new BmsAudioResourceStore(basePath, cancellationToken);
         resolveResources();
         assetCache = new BmsPcmAssetCache(async (identity, token) =>
-            (byte[]?)await resourceStore.GetAsync(identity, token).ConfigureAwait(false), rate);
+        {
+            if (beforeAssetLoad != null)
+                await beforeAssetLoad(token).WaitAsync(token).ConfigureAwait(false);
+
+            return (byte[]?)await resourceStore.GetAsync(identity, token).ConfigureAwait(false);
+        }, rate);
         clockMapper.Rebase(chartTime, mixer.RenderedFrames);
         mixer.SubmitControl(BmsVoiceCommandType.SetMasterGain, mixer.RenderedFrames, epoch, lastMasterGain);
 
@@ -92,6 +101,9 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             foreach (var sampleKey in resolvedResources.Keys)
                 ensureLease(sampleKey);
         }
+
+        if (!waitForInitialAssets)
+            return;
 
         var initialReadyTasks = leases.Values.Select(lease => lease.Ready).ToArray();
         if (initialReadyTasks.Length == 0)
@@ -123,13 +135,33 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         leases.TryGetValue(sampleKey, out var lease)
         && lease.Asset.State is BmsPcmAssetState.Ready or BmsPcmAssetState.Complete;
 
-    internal void QueueLivePlay(ushort sampleKey, int volume)
+    internal bool IsSampleReady(ushort sampleKey, double offset)
+    {
+        if (!leases.TryGetValue(sampleKey, out var lease)
+            || lease.Asset.State is not (BmsPcmAssetState.Ready or BmsPcmAssetState.Complete))
+            return false;
+
+        if (lease.Asset.IsComplete)
+            return true;
+
+        var sourceOffset = clockMapper.MapSourceOffset(offset);
+        // A voice seeking past the published frontier would be released by the real-time mixer
+        // before the decoder can catch up, so retain the same startup margin used at offset zero.
+        var requiredFrames = sourceOffset + BmsFixedRatePcmProcessor.DEFAULT_CHUNK_FRAMES * 2L;
+        return lease.Asset.PublishedFrameCount >= requiredFrames;
+    }
+
+    internal void PrepareSample(ushort sampleKey) => ensureLease(sampleKey);
+
+    internal void QueueLivePlay(ushort sampleKey, int volume) => QueuePlay(sampleKey, volume, 0);
+
+    internal void QueuePlay(ushort sampleKey, int volume, double offset)
     {
         if (playbackBlocked || !HasSampleDefinition(sampleKey))
             return;
 
         ensureLease(sampleKey);
-        livePlays.Add(new PendingLivePlay(sampleKey, volume));
+        livePlays.Add(new PendingLivePlay(sampleKey, volume, Math.Max(0, offset)));
     }
 
     internal void SubmitLivePlayBatch()
@@ -154,7 +186,11 @@ internal sealed class BmsPcmPlaybackController : IDisposable
                 continue;
             }
 
-            plays.Add(createPlay(asset, pending.SampleKey, pending.Volume, targetFrame, 0));
+            var sourceOffset = clockMapper.MapSourceOffset(pending.Offset);
+            if (asset.TotalFrameCount >= 0 && sourceOffset >= asset.TotalFrameCount)
+                continue;
+
+            plays.Add(createPlay(asset, pending.SampleKey, pending.Volume, targetFrame, sourceOffset));
         }
 
         livePlays.Clear();
@@ -356,12 +392,10 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         if (resourceStore!.TryResolve(lookup, out identity))
             return true;
 
-        if (Path.HasExtension(lookup))
-            return false;
-
+        var stem = Path.ChangeExtension(lookup, null);
         foreach (var extension in BmsAudioResourceStore.Extensions)
         {
-            if (resourceStore.TryResolve($"{lookup}.{extension}", out identity))
+            if (resourceStore.TryResolve($"{stem}.{extension}", out identity))
                 return true;
         }
 
@@ -430,5 +464,5 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     private readonly record struct PendingPlay(int Volume, double Offset, double RequestedAt);
 
-    private readonly record struct PendingLivePlay(ushort SampleKey, int Volume);
+    private readonly record struct PendingLivePlay(ushort SampleKey, int Volume, double Offset);
 }

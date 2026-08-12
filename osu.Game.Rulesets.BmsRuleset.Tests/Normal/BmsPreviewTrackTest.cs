@@ -136,8 +136,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         AddWaitStep("wait while timeline is pending", 10);
         AddAssert("preview clock has not started", () => !track.IsRunning && track.CurrentTime == 0);
         AddStep("complete timeline", timelineGate.Set);
-        AddUntilStep("preview clock starts", () => track.IsRunning);
-        AddAssert("first audio is already playing", () => getActivePlaybackCount(track) > 0);
+        AddUntilStep("clock and first audio start", () => track.IsRunning && getActivePlaybackCount(track) > 0);
         AddStep("dispose track", () =>
         {
             track.Dispose();
@@ -221,8 +220,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             track.Start();
         });
 
-        AddUntilStep("preview clock starts", () => track.IsRunning);
-        AddAssert("all initial audio is already playing", () => getActivePlaybackCount(track) == 18);
+        AddUntilStep("clock and all initial audio start", () => track.IsRunning && getActivePlaybackCount(track) == 18);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -237,7 +235,9 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         {
             var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-prefetch-boundary-{Guid.NewGuid():N}");
             Directory.CreateDirectory(directory);
-            writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
+            writePcmWave(Path.Combine(directory, "first.wav"), TimeSpan.FromSeconds(1));
+            writePcmWave(Path.Combine(directory, "second.wav"), TimeSpan.FromSeconds(1));
+            writePcmWave(Path.Combine(directory, "third.wav"), TimeSpan.FromSeconds(1));
 
             track = new BmsEventPreviewTrack(
                 _ => BmsEventPreviewTimeline.Create(
@@ -249,9 +249,9 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                     ],
                     new Dictionary<ushort, string>
                     {
-                        [1] = "test.wav",
-                        [2] = "test.wav",
-                        [3] = "test.wav",
+                        [1] = "first.wav",
+                        [2] = "second.wav",
+                        [3] = "third.wav",
                     }),
                 directory,
                 audio,
@@ -327,8 +327,6 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     public void TestSingleFileTimelineUsesLoadedTrackLength()
     {
         BmsPreviewTrack track = null!;
-        Track loadedTrack = null!;
-
         AddStep("create single-file timeline", () =>
         {
             var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-single-timeline-{Guid.NewGuid():N}");
@@ -347,11 +345,9 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
         AddUntilStep("single file is playing", () => getActivePlaybackCount(track) == 1);
         AddAssert("timeline uses audio length", () => track.Length, () => Is.EqualTo(1000).Within(1));
-        AddStep("capture loaded track", () => loadedTrack = getActiveTrack(track)!);
         AddStep("seek single-file timeline", () => track.Seek(500));
-        AddUntilStep("loaded track is reused after seek", () =>
-            ReferenceEquals(getActiveTrack(track), loadedTrack)
-            && loadedTrack is { IsRunning: true, CurrentTime: >= 400 });
+        AddUntilStep("cached sample resumes after seek", () =>
+            getActivePlaybackCount(track) == 1 && track.CurrentTime >= 400);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -406,10 +402,8 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             track.RestorePreview(10_000);
         });
 
-        AddUntilStep("preview clock starts", () => track.IsRunning);
-        AddAssert("single file started from beginning with clock", () =>
-            getActiveTrack(track) is { IsRunning: true, CurrentTime: < 200 }
-            && track.CurrentTime < 200);
+        AddUntilStep("single file starts from beginning with clock", () =>
+            getActivePlaybackCount(track) == 1 && track.CurrentTime < 200);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -439,8 +433,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         });
 
         AddUntilStep("single file resumes past default length", () =>
-            getActiveTrack(track) is { IsRunning: true, CurrentTime: >= 30_000 }
-            && track.CurrentTime >= 30_000);
+            getActivePlaybackCount(track) == 1 && track.CurrentTime >= 30_000);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -468,10 +461,8 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             track.RestorePreview(10_000);
         });
 
-        AddUntilStep("preview clock starts", () => track.IsRunning);
-        AddAssert("short fallback started from beginning with clock", () =>
-            getActiveTrack(track) is { IsRunning: true, CurrentTime: < 200 }
-            && track.CurrentTime < 200);
+        AddUntilStep("short fallback starts from beginning with clock", () =>
+            getActivePlaybackCount(track) == 1 && track.CurrentTime < 200);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -502,8 +493,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         });
 
         AddUntilStep("long fallback preserves restore position", () =>
-            getActiveTrack(track) is { IsRunning: true, CurrentTime: >= 30_000 }
-            && track.CurrentTime >= 30_000);
+            getActivePlaybackCount(track) == 1 && track.CurrentTime >= 30_000);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -693,9 +683,8 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         AddUntilStep("fallback timeline requested", () => fallbackStarted.IsSet);
         AddAssert("preview clock waits for fallback audio", () => !track.IsRunning && track.CurrentTime == 0);
         AddStep("complete fallback timeline", fallbackGate.Set);
-        AddUntilStep("preview clock starts", () => track.IsRunning);
-        AddAssert("fallback plays from original start position", () =>
-            getActiveTrack(track) is { IsRunning: true, CurrentTime: < 200 });
+        AddUntilStep("fallback plays from original start position", () =>
+            getActivePlaybackCount(track) == 1 && track.CurrentTime < 200);
         AddStep("dispose track", () =>
         {
             track.Dispose();
@@ -732,7 +721,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         });
 
         AddUntilStep("fallback resumes at requested position", () =>
-            getActiveTrack(track) is { IsRunning: true, CurrentTime: >= 400 });
+            getActivePlaybackCount(track) == 1 && track.CurrentTime >= 400);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -792,7 +781,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         });
 
         AddUntilStep("background track resumes from gameplay position", () =>
-            getActiveTrack(track) is { IsRunning: true, CurrentTime: >= 900 });
+            getActivePlaybackCount(track) == 1 && track.CurrentTime >= 900);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -830,14 +819,14 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         AddUntilStep("initial track is running", () => getActivePlaybackCount(track) == 1);
         AddStep("seek while running", () => track.Seek(1500));
         AddUntilStep("tracks resumed at seek target", () =>
-            getActivePlaybackCount(track) == 2
-            && getActiveTracks(track).All(active => active.CurrentTime >= 400));
+            getActivePlaybackCount(track) == 2 && track.CurrentTime >= 1400);
         AddStep("stop asynchronously", () => stopTask = track.StopAsync());
         AddUntilStep("stop completes", () => stopTask.IsCompleted && !track.IsRunning && getActivePlaybackCount(track) == 0);
         AddStep("start asynchronously", () => startTask = track.StartAsync());
         AddUntilStep("start completes", () => startTask.IsCompleted && track.IsRunning && getActivePlaybackCount(track) == 2);
         AddStep("reset", () => track.Reset());
-        AddAssert("reset completes at beginning", () => !track.IsRunning && track.CurrentTime == 0 && getActivePlaybackCount(track) == 0);
+        AddAssert("clock resets immediately", () => !track.IsRunning && track.CurrentTime == 0);
+        AddUntilStep("reset drains active audio", () => getActivePlaybackCount(track) == 0);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -845,9 +834,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     public void TestSeekWhileRunningFadesAroundAudioReconstruction()
     {
         BmsPreviewTrack track = null!;
-        Track initialTrack = null!;
-        var seekAudioLoadCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var audioLoadCount = 0;
+        var observedFadeOut = false;
         var observedFadeIn = false;
 
         AddStep("create running preview", () =>
@@ -861,29 +848,22 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                     () => [new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), true)],
                     new Dictionary<ushort, string> { [1] = "bgm.wav" }),
                 directory,
-                audio,
-                async _ =>
-                {
-                    if (Interlocked.Increment(ref audioLoadCount) > 1)
-                        await seekAudioLoadCompletion.Task.ConfigureAwait(false);
-                });
+                audio);
 
             audio.AddItem(track);
             track.Start();
         });
 
         AddUntilStep("initial audio is running", () => getActivePlaybackCount(track) == 1);
-        AddStep("capture initial audio", () => initialTrack = getActiveTrack(track)!);
         AddAssert("seek fade durations are short", () =>
             BmsPreviewTrack.SEEK_FADE_OUT_DURATION == 20
             && BmsPreviewTrack.SEEK_FADE_IN_DURATION == 50);
         AddStep("seek while running", () => track.Seek(1500));
-        AddUntilStep("old audio fades before reconstruction", () =>
-            Volatile.Read(ref audioLoadCount) > 1
-            && getActivePlaybackCount(track) == 0
-            && getSeekFadeVolume(track) == 0
-            && initialTrack.AggregateVolume.Value == 0);
-        AddStep("complete target audio load", seekAudioLoadCompletion.SetResult);
+        AddUntilStep("output fades before reconstruction", () =>
+        {
+            observedFadeOut |= getSeekFadeVolume(track) < 0.5 && getPlaybackOutputGain(track) < 0.5;
+            return observedFadeOut;
+        });
         AddUntilStep("target audio fades in", () =>
         {
             observedFadeIn |= getActivePlaybackCount(track) == 1 && getSeekFadeVolume(track) < 1;
@@ -894,7 +874,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
-    public void TestEventTracksAreCreatedOnDemandAndFollowRateAdjustments()
+    public void TestEventVoicesAreCreatedOnDemandAndFollowRateAdjustments()
     {
         BmsPreviewTrack track = null!;
         var tempo = new BindableDouble(1.5);
@@ -917,7 +897,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         AddAssert("event tracks are not preloaded", () => getActivePlaybackCount(track) == 0);
         AddStep("start event preview", () => track.Start());
         AddUntilStep("event track starts", () => getActivePlaybackCount(track) > 0);
-        AddAssert("event track inherits tempo", () => getActiveTrack(track)?.AggregateTempo.Value == tempo.Value);
+        AddAssert("preview clock inherits tempo", () => track.AggregateTempo.Value == tempo.Value);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -970,22 +950,14 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     private static int getActivePlaybackCount(BmsPreviewTrack track) =>
-        getPlaybackTracks(track).Count(activeTrack => activeTrack.IsRunning);
-
-    private static Track? getActiveTrack(BmsPreviewTrack track) => getPlaybackTracks(track).FirstOrDefault();
+        track is BmsEventPreviewTrack { Playback: { } playback } ? playback.ActiveVoiceCount : 0;
 
     private static double getRestoreFadeVolume(BmsPreviewTrack track) => track.RestoreFadeVolume;
 
     private static double getSeekFadeVolume(BmsPreviewTrack track) => track.SeekFadeVolume;
 
-    private static IEnumerable<Track> getActiveTracks(BmsPreviewTrack track) => getPlaybackTracks(track);
-
-    private static IReadOnlyList<Track> getPlaybackTracks(BmsPreviewTrack track)
-    {
-        return track is BmsEventPreviewTrack { Playback: { } playback }
-            ? playback.ActiveTracks
-            : [];
-    }
+    private static double getPlaybackOutputGain(BmsPreviewTrack track) =>
+        track is BmsEventPreviewTrack { Playback: { } playback } ? playback.OutputGain : 0;
 
     private BmsPreviewTrack createTrack(
         IReadOnlyList<BmsSampleEvent> sampleEvents,

@@ -137,7 +137,7 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
         if (BmsRulesetRuntime.UseDedicatedPreviewAudio)
         {
-            foreach (var candidate in BmsPreviewAudioLoader.GetExistingDedicatedPreviewCandidates(Metadata.Source, bmsBeatmap.PreviewFile))
+            foreach (var candidate in BmsPreviewAudioResolver.GetExistingDedicatedPreviewCandidates(Metadata.Source, bmsBeatmap.PreviewFile))
                 timelineSources.Add(_ => BmsEventPreviewTimeline.CreateSingleFile(candidate));
         }
 

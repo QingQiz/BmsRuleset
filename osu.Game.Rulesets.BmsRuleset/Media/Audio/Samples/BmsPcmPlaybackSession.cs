@@ -3,17 +3,17 @@ using System.Collections.Generic;
 using System.Threading;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Mixing;
+using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 /// <summary>
-///     Owns the PCM backend used by gameplay sample playback.
+///     Owns a PCM playback backend and its native audio bridge.
 /// </summary>
 /// <remarks>
-///     Keeping backend construction and teardown here leaves <see cref="BmsSamplePlayback"/> as a
-///     small Component-facing facade.
+///     Gameplay and preview have different lifecycle facades but share the same backend ownership.
 /// </remarks>
 internal sealed class BmsPcmPlaybackSession : IDisposable
 {
@@ -23,6 +23,8 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
     private readonly IEnumerable<BmsSampleUsage>? sampleUsages;
     private readonly AudioManager audioManager;
     private readonly Func<double> currentTime;
+    private readonly IBindable<double>? aggregateVolume;
+    private readonly Func<CancellationToken, System.Threading.Tasks.Task>? beforeAssetLoad;
 
     private BmsPcmVoiceMixer? pcmMixer;
     private BmsBassMixerBridge? pcmBridge;
@@ -34,7 +36,9 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
         double rate,
         IEnumerable<BmsSampleUsage>? sampleUsages,
         AudioManager audioManager,
-        Func<double> currentTime)
+        Func<double> currentTime,
+        IBindable<double>? aggregateVolume = null,
+        Func<CancellationToken, System.Threading.Tasks.Task>? beforeAssetLoad = null)
     {
         this.sampleDefinitions = sampleDefinitions;
         this.basePath = basePath;
@@ -42,11 +46,15 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
         this.sampleUsages = sampleUsages;
         this.audioManager = audioManager;
         this.currentTime = currentTime;
+        this.aggregateVolume = aggregateVolume;
+        this.beforeAssetLoad = beforeAssetLoad;
     }
 
     internal bool IsInitialised => Controller?.IsInitialised == true;
 
     internal BmsPcmPlaybackController? Controller { get; private set; }
+
+    internal BmsAudioDiagnostics AudioDiagnostics => pcmMixer?.GetDiagnostics() ?? default;
 
     internal AudioMixer? DiagnosticMixer { get; private set; }
 
@@ -56,7 +64,7 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
         Controller?.PreloadUnderflows ?? 0,
         pcmBridge?.CallbackFailures ?? 0);
 
-    internal void Initialise(CancellationToken cancellationToken, double chartTime)
+    internal void Initialise(CancellationToken cancellationToken, double chartTime, bool waitForInitialAssets = true)
     {
         BmsPcmMixerPatcher.InstallOnce();
 
@@ -71,10 +79,11 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
             basePath,
             rate,
             sampleUsages,
-            audioManager.AggregateVolume,
+            aggregateVolume ?? audioManager.AggregateVolume,
             currentTime,
-            pcmMixer);
-        Controller.Initialise(cancellationToken, chartTime);
+            pcmMixer,
+            beforeAssetLoad);
+        Controller.Initialise(cancellationToken, chartTime, waitForInitialAssets);
         pcmBridge.EnsureAttached();
     }
 

@@ -80,6 +80,11 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 
     internal double SeekFadeVolume => seekFadeVolume.Value;
 
+    internal double PreviewPlaybackGain => AggregateVolume.Value
+                                           * previewOutputVolume.Value
+                                           * restoreFadeVolume.Value
+                                           * seekFadeVolume.Value;
+
     protected virtual bool CanComplete => true;
 
     protected virtual bool StartClockImmediately => true;
@@ -288,13 +293,6 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 
     void IAdjustableAudioComponent.UnbindAdjustments(IAggregateAudioAdjustment component) => UnbindAdjustments(component);
 
-    internal PreviewPlaybackAdjustments BindPreviewAdjustments(IAdjustableAudioComponent component, int volume = 100)
-    {
-        var adjustments = new PreviewPlaybackAdjustments(this, Math.Max(0, volume) / 100.0);
-        component.BindAdjustments(adjustments);
-        return adjustments;
-    }
-
     private void prepareRestoreFade()
     {
         restoreFadeVolume.Value = 0;
@@ -316,44 +314,6 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
     {
         lock (clock)
             clock.Rate = Rate;
-    }
-
-    internal sealed class PreviewPlaybackAdjustments : IAggregateAudioAdjustment
-    {
-        private readonly BmsPreviewTrack owner;
-        private readonly double eventVolume;
-
-        private readonly BindableDouble volume = new(1);
-        private readonly BindableDouble balance = new();
-        private readonly BindableDouble frequency = new(1);
-        private readonly BindableDouble tempo = new(1);
-
-        public IBindable<double> AggregateVolume => volume;
-
-        public IBindable<double> AggregateBalance => balance;
-
-        public IBindable<double> AggregateFrequency => frequency;
-
-        public IBindable<double> AggregateTempo => tempo;
-
-        internal PreviewPlaybackAdjustments(BmsPreviewTrack owner, double eventVolume)
-        {
-            this.owner = owner;
-            this.eventVolume = eventVolume;
-            Update();
-        }
-
-        internal void Update()
-        {
-            volume.Value = owner.AggregateVolume.Value
-                           * eventVolume
-                           * owner.previewOutputVolume.Value
-                           * owner.restoreFadeVolume.Value
-                           * owner.seekFadeVolume.Value;
-            balance.Value = owner.AggregateBalance.Value;
-            frequency.Value = owner.AggregateFrequency.Value;
-            tempo.Value = owner.AggregateTempo.Value;
-        }
     }
 
     private void startInternal()
@@ -417,26 +377,26 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
         switch (seekFadePhase)
         {
             case SeekFadePhase.FadingOut:
-                {
-                    var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_OUT_DURATION;
-                    seekFadeVolume.Value = seekFadeStartVolume * Math.Max(0, 1 - progress);
+            {
+                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_OUT_DURATION;
+                seekFadeVolume.Value = seekFadeStartVolume * Math.Max(0, 1 - progress);
 
-                    if (progress >= 1)
-                        performPendingSeek();
+                if (progress >= 1)
+                    performPendingSeek();
 
-                    break;
-                }
+                break;
+            }
 
             case SeekFadePhase.FadingIn:
-                {
-                    var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_IN_DURATION;
-                    seekFadeVolume.Value = Math.Min(1, progress);
+            {
+                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_IN_DURATION;
+                seekFadeVolume.Value = Math.Min(1, progress);
 
-                    if (progress >= 1)
-                        seekFadePhase = SeekFadePhase.None;
+                if (progress >= 1)
+                    seekFadePhase = SeekFadePhase.None;
 
-                    break;
-                }
+                break;
+            }
         }
     }
 
@@ -455,7 +415,7 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 
     private void completePendingSeek()
     {
-        if (pendingSeekPosition is { })
+        if (pendingSeekPosition is not null)
             performPendingSeek();
 
         cancelSeekFade();

@@ -233,7 +233,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             && previewTrack.Volume.Value == 1
             && getActivePreviewPlaybackCount(previewTrack) == 1
             && getPreviewPlaybackAggregateVolume(previewTrack) > 0
-            && getFirstActivePreviewTrack(previewTrack)?.IsRunning == true);
+            && getActivePreviewPlaybackCount(previewTrack) == 1);
 
         AddStep("load drawable ruleset under paused gameplay clock", () =>
         {
@@ -249,7 +249,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddUntilStep("single-file preview continues during loading", () =>
             previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
             && getActivePreviewPlaybackCount(previewTrack) == 1
-            && getFirstActivePreviewTrack(previewTrack)?.IsRunning == true);
+            && getActivePreviewPlaybackCount(previewTrack) == 1);
 
         AddStep("start gameplay clock", () => gameplayClock.Start());
         AddUntilStep("single-file preview stopped for gameplay", () =>
@@ -261,7 +261,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddStep("dispose drawable ruleset while gameplay is running", () => drawableRuleset.RemoveAndDisposeImmediately());
         AddUntilStep("single-file preview resumes after gameplay disposal", () =>
             previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
-            && getFirstActivePreviewTrack(previewTrack)?.IsRunning == true);
+            && getActivePreviewPlaybackCount(previewTrack) == 1);
     }
 
     [Test]
@@ -342,7 +342,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddUntilStep("preview restarts from beginning", () =>
             previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
             && previewTrack.CurrentTime < previewTrack.Length
-            && getFirstActivePreviewTrack(previewTrack)?.IsRunning == true);
+            && getActivePreviewPlaybackCount(previewTrack) == 1);
     }
 
     [Test]
@@ -374,7 +374,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddUntilStep("preview resumes from gameplay time", () =>
             previewTrack.PlaybackMode == BmsPreviewTrackPlaybackMode.Preview
             && previewTrack.CurrentTime >= gameplay_time
-            && getFirstActivePreviewTrack(previewTrack) is { IsRunning: true, CurrentTime: >= gameplay_time });
+            && getActivePreviewPlaybackCount(previewTrack) == 1);
         AddUntilStep("restore fades to full volume", () => getRestoreFadeVolume(previewTrack) == 1);
     }
 
@@ -757,20 +757,12 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         => getEventPlayback((BmsPreviewTrack)track)?.Events.FirstOrDefault().SamplePath ?? string.Empty;
 
     private static int getActivePreviewPlaybackCount(BmsPreviewTrack track)
-    {
-        var eventPlayback = getEventPlayback(track);
-        var activeTracks = eventPlayback?.ActiveTracks ?? Array.Empty<Track>();
-
-        return activeTracks.Count(active => active.IsRunning);
-    }
+        => getEventPlayback(track)?.ActiveVoiceCount ?? 0;
 
     private static double getPreviewPlaybackAggregateVolume(BmsPreviewTrack track) =>
-        getFirstActivePreviewTrack(track)?.AggregateVolume.Value ?? 0;
+        getEventPlayback(track)?.OutputGain ?? 0;
 
     private static double getRestoreFadeVolume(BmsPreviewTrack track) => track.RestoreFadeVolume;
-
-    private static Track? getFirstActivePreviewTrack(BmsPreviewTrack track) =>
-        getEventPlayback(track)?.ActiveTracks.FirstOrDefault();
 
     private static BmsEventPreviewPlayback? getEventPlayback(BmsPreviewTrack track)
         => (track as BmsEventPreviewTrack)?.Playback;

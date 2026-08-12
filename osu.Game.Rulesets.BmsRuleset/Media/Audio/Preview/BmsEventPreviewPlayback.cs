@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Audio;
-using osu.Framework.Audio.Track;
+using osu.Framework.Bindables;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 
@@ -20,84 +22,96 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
     private const int event_prefetch_batch_size = 16;
 
     private readonly BmsPreviewTrack owner;
+    private readonly AudioManager audioManager;
     private readonly List<BmsPreviewTimelineEntry> sortedEvents = [];
-    private readonly BmsPreviewAudioLoader? audioLoader;
-    private readonly bool deriveLengthFromTracks;
-    private readonly bool extendLengthFromTracks;
-    private readonly bool retainLoadedTracks;
-    private readonly List<Track> activeTracks = [];
-    private readonly Dictionary<int, Task<Track?>> eventTrackLoads = [];
-    private readonly Dictionary<int, Track> retainedTracks = [];
-    private readonly Dictionary<Track, BmsPreviewTrack.PreviewPlaybackAdjustments> trackAdjustments = [];
-    private readonly HashSet<ushort> resumedEventKeys = [];
+    private readonly bool deriveLengthFromSamples;
+    private readonly bool extendLengthFromSamples;
+    private readonly BindableDouble masterGain = new(1);
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly HashSet<ushort> preparedSamples = [];
+    private readonly Dictionary<ushort, double> sampleEndTimes = [];
+    private readonly List<ushort> unresolvedSampleLengths = [];
 
+    private BmsPcmPlaybackSession? playbackSession;
     private int nextEventIndex;
     private bool eventResyncRequired;
     private double derivedLength;
     private bool derivedLengthResolutionComplete;
+    private bool disposed;
 
     public double Length { get; private set; }
 
-    public bool IsLengthFinal => !deriveLengthFromTracks || derivedLengthResolutionComplete;
+    public bool IsLengthFinal => !deriveLengthFromSamples || derivedLengthResolutionComplete;
 
     internal IReadOnlyList<BmsPreviewTimelineEntry> Events => sortedEvents;
 
-    internal IReadOnlyList<Track> ActiveTracks => activeTracks;
+    internal int ActiveVoiceCount => playbackSession?.AudioDiagnostics.ActiveVoices ?? 0;
 
-    internal bool HasRetainedTracks => retainedTracks.Count > 0;
+    internal double OutputGain => masterGain.Value;
 
     internal BmsEventPreviewPlayback(
         BmsPreviewTrack owner,
         BmsEventPreviewTimeline timeline,
         string? basePath,
         AudioManager audioManager,
-        Func<CancellationToken, Task>? beforeTrackLoad = null)
+        Func<CancellationToken, Task>? beforeAssetLoad = null)
     {
         this.owner = owner;
+        this.audioManager = audioManager;
         sortedEvents.AddRange(timeline.Entries);
         Length = timeline.Length;
-        deriveLengthFromTracks = timeline.DeriveLengthFromTracks;
-        extendLengthFromTracks = timeline.ExtendLengthFromTracks;
-        retainLoadedTracks = timeline.RetainLoadedTracks;
+        deriveLengthFromSamples = timeline.DeriveLengthFromSamples;
+        extendLengthFromSamples = timeline.ExtendLengthFromSamples;
 
-        if (basePath != null)
+        if (deriveLengthFromSamples || extendLengthFromSamples)
         {
-            // Preview startup can temporarily expose an aggregate frequency of zero while the
-            // audio device is being rebound. BMS rate changes are tempo-only, so use that stable
-            // component rather than deriving the fixed processing rate from the transient product.
-            var previewRate = Math.Abs(owner.AggregateTempo.Value);
-            audioLoader = new BmsPreviewAudioLoader(
-                basePath,
-                audioManager,
-                beforeTrackLoad,
-                double.IsFinite(previewRate) && previewRate is >= 0.05 and <= 2 ? previewRate : 1);
+            foreach (var group in sortedEvents.GroupBy(evt => evt.SampleKey))
+                sampleEndTimes[group.Key] = group.Max(evt => evt.Time);
         }
+
+        if (basePath == null)
+            return;
+
+        var definitions = sortedEvents
+            .GroupBy(evt => evt.SampleKey)
+            .ToDictionary(group => group.Key, group => group.First().SamplePath);
+        var previewRate = Math.Abs(owner.AggregateTempo.Value);
+        var rate = double.IsFinite(previewRate) && previewRate is >= 0.05 and <= 2 ? previewRate : 1;
+
+        playbackSession = new BmsPcmPlaybackSession(
+            definitions,
+            basePath,
+            rate,
+            [],
+            audioManager,
+            () => owner.CurrentTime,
+            masterGain,
+            beforeAssetLoad);
+        playbackSession.Initialise(cancellation.Token, owner.CurrentTime, waitForInitialAssets: false);
     }
 
     public void Dispose()
     {
-        disposePreviewPlayback();
-        discardEventTrackLoads();
-        audioLoader?.Dispose();
+        if (disposed)
+            return;
+
+        disposed = true;
+        cancellation.Cancel();
+        playbackSession?.Dispose();
+        playbackSession = null;
+        cancellation.Dispose();
     }
 
     public void EnterPreview(double currentTime)
     {
-        if (currentTime <= 0)
-        {
-            nextEventIndex = 0;
-            eventResyncRequired = false;
-            return;
-        }
-
-        nextEventIndex = findFirstEventAfter(currentTime);
-        eventResyncRequired = true;
+        nextEventIndex = currentTime <= 0 ? 0 : findFirstEventAfter(currentTime);
+        eventResyncRequired = currentTime > 0;
     }
 
     public void ExitPreview()
     {
         eventResyncRequired = false;
-        stopAndDiscardPreviewPlayback();
+        stopPlayback();
     }
 
     public void Start(double currentTime)
@@ -109,117 +123,88 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             return;
         }
 
-        eventResyncRequired = activeTracks.Count == 0;
+        eventResyncRequired = ActiveVoiceCount == 0;
 
         if (eventResyncRequired)
             nextEventIndex = findFirstEventAfter(currentTime);
     }
 
-    public void Stop()
-    {
-        stopPreviewPlayback();
-        discardEventTrackLoads();
-        resumedEventKeys.Clear();
-    }
+    public void Stop() => stopPlayback();
 
     public void Seek(double seek, bool previewMode)
     {
-        stopPreviewPlayback();
-        discardEventTrackLoads();
-        resumedEventKeys.Clear();
+        stopPlayback();
 
-        if (previewMode)
-        {
-            nextEventIndex = seek == 0 ? 0 : findFirstEventAfter(seek);
-            eventResyncRequired = seek > 0;
-        }
+        if (!previewMode)
+            return;
+
+        nextEventIndex = seek == 0 ? 0 : findFirstEventAfter(seek);
+        eventResyncRequired = seek > 0;
     }
 
     public void Reset()
     {
         nextEventIndex = 0;
-        stopPreviewPlayback();
-        discardEventTrackLoads();
-        resumedEventKeys.Clear();
+        eventResyncRequired = false;
+        stopPlayback();
     }
 
     public BmsPreviewPlaybackStartState Update(double currentTime, bool requireDueAudioReady)
     {
-        audioLoader?.UpdatePcmBridge();
-
-        foreach (var (track, adjustments) in trackAdjustments)
-        {
-            adjustments.Update();
-            if (track is BmsPcmPreviewVoiceTrack pcmTrack)
-                pcmTrack.SynchroniseGain();
-        }
-
-        prefetchEventTracks(currentTime);
+        updateMasterGain();
+        playbackSession?.Update(currentTime);
+        prefetchSamples(currentTime);
+        updateLengthFromPreparedSamples();
 
         if (eventResyncRequired)
         {
-            var resumeState = resumeEventTracks(currentTime);
-
-            if (resumeState != BmsPreviewPlaybackStartState.Ready)
-                return resumeState;
+            var state = resumeBackgroundSamples(currentTime);
+            if (state != BmsPreviewPlaybackStartState.Ready)
+                return state;
 
             eventResyncRequired = false;
-            cleanupTracks();
             return BmsPreviewPlaybackStartState.Ready;
         }
 
-        if (requireDueAudioReady && !areDueEventTracksReady(currentTime))
+        if (requireDueAudioReady && !areDueSamplesResolved(currentTime))
             return BmsPreviewPlaybackStartState.Waiting;
 
+        var controller = playbackSession?.Controller;
         var initialAudioUnavailable = false;
 
-        while (nextEventIndex < sortedEvents.Count)
+        while (nextEventIndex < sortedEvents.Count && sortedEvents[nextEventIndex].Time <= currentTime)
         {
             var evt = sortedEvents[nextEventIndex];
 
-            if (currentTime < evt.Time)
-                break;
-
-            var result = tryPlayTrack(nextEventIndex, currentTime);
-
-            if (result == EventPlaybackResult.Pending)
-                break;
-
-            if (nextEventIndex == 0 && result == EventPlaybackResult.Unavailable)
+            if (controller == null || !controller.HasSampleDefinition(evt.SampleKey))
             {
-                initialAudioUnavailable = true;
-                derivedLengthResolutionComplete = true;
+                if (nextEventIndex == 0)
+                {
+                    initialAudioUnavailable = true;
+                    derivedLengthResolutionComplete = true;
+                }
+
+                nextEventIndex++;
+                continue;
             }
 
+            if (!controller.IsSampleReady(evt.SampleKey))
+                break;
+
+            controller.QueuePlay(evt.SampleKey, evt.Volume, 0);
             nextEventIndex++;
         }
 
-        cleanupTracks();
+        controller?.SubmitLivePlayBatch();
         return initialAudioUnavailable
             ? BmsPreviewPlaybackStartState.InitialAudioUnavailable
             : BmsPreviewPlaybackStartState.Ready;
     }
 
-    private bool areDueEventTracksReady(double currentTime)
+    private void prefetchSamples(double currentTime)
     {
-        if (audioLoader == null)
-            return true;
-
-        for (var i = nextEventIndex; i < sortedEvents.Count && sortedEvents[i].Time <= currentTime; i++)
-        {
-            if (retainedTracks.ContainsKey(i))
-                continue;
-
-            if (!eventTrackLoads.TryGetValue(i, out var loadTask) || !loadTask.IsCompleted)
-                return false;
-        }
-
-        return true;
-    }
-
-    private void prefetchEventTracks(double currentTime)
-    {
-        if (audioLoader == null)
+        var controller = playbackSession?.Controller;
+        if (controller == null)
             return;
 
         var started = 0;
@@ -227,278 +212,131 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
         for (var i = nextEventIndex; i < sortedEvents.Count && sortedEvents[i].Time <= prefetchUntil; i++)
         {
-            if (eventTrackLoads.ContainsKey(i) || retainedTracks.ContainsKey(i))
+            var sampleKey = sortedEvents[i].SampleKey;
+            if (!prepareSample(controller, sampleKey))
                 continue;
-
-            eventTrackLoads[i] = audioLoader.LoadTrackAsync(sortedEvents[i].SamplePath);
 
             if (++started >= event_prefetch_batch_size)
                 break;
         }
     }
 
-    private EventPlaybackResult tryPlayTrack(int eventIndex, double currentTime)
+    private bool areDueSamplesResolved(double currentTime)
     {
-        var evt = sortedEvents[eventIndex];
+        var controller = playbackSession?.Controller;
+        if (controller == null)
+            return true;
 
-        if (retainedTracks.TryGetValue(eventIndex, out var retainedTrack))
+        for (var i = nextEventIndex; i < sortedEvents.Count && sortedEvents[i].Time <= currentTime; i++)
         {
-            retainedTrack.Seek(0);
-            startTrack(evt, retainedTrack);
-            return EventPlaybackResult.Played;
+            var key = sortedEvents[i].SampleKey;
+            if (controller.HasSampleDefinition(key) && !controller.IsSampleReady(key))
+                return false;
         }
 
-        if (audioLoader == null)
-            return EventPlaybackResult.Unavailable;
-
-        if (!eventTrackLoads.TryGetValue(eventIndex, out var loadTask))
-        {
-            prefetchEventTracks(currentTime);
-            return EventPlaybackResult.Pending;
-        }
-
-        if (!loadTask.IsCompleted)
-            return EventPlaybackResult.Pending;
-
-        var track = consumeCompletedTrack(eventIndex, "load");
-
-        if (track == null)
-            return EventPlaybackResult.Unavailable;
-
-        startTrack(evt, track);
-
-        return EventPlaybackResult.Played;
+        return true;
     }
 
-    private BmsPreviewPlaybackStartState resumeEventTracks(double currentTime)
+    private BmsPreviewPlaybackStartState resumeBackgroundSamples(double currentTime)
     {
-        if (audioLoader == null)
-        {
-            if (nextEventIndex > 0 && sortedEvents[0].ResumeAfterSeek)
-            {
-                derivedLengthResolutionComplete = true;
-                return BmsPreviewPlaybackStartState.InitialAudioUnavailable;
-            }
+        var controller = playbackSession?.Controller;
+        if (controller == null)
+            return nextEventIndex > 0 && sortedEvents[0].ResumeAfterSeek
+                ? BmsPreviewPlaybackStartState.InitialAudioUnavailable
+                : BmsPreviewPlaybackStartState.Ready;
 
-            return BmsPreviewPlaybackStartState.Ready;
-        }
-
-        var allReady = true;
-        var pendingKeys = new HashSet<ushort>(resumedEventKeys);
-        var eventIndices = new List<int>();
+        var resumeEvents = new List<BmsPreviewTimelineEntry>();
+        var seenKeys = new HashSet<ushort>();
 
         for (var i = nextEventIndex - 1; i >= 0; i--)
         {
             var evt = sortedEvents[i];
-
-            // Events are scanned newest-first, so only the latest active trigger per definition
-            // should own a pending load during seek reconstruction.
-            if (!evt.ResumeAfterSeek || !pendingKeys.Add(evt.SampleKey))
+            if (!evt.ResumeAfterSeek || !seenKeys.Add(evt.SampleKey))
                 continue;
 
-            eventIndices.Add(i);
-
-            if (retainedTracks.ContainsKey(i))
-                continue;
-
-            if (!eventTrackLoads.TryGetValue(i, out var loadTask))
-            {
-                eventTrackLoads[i] = audioLoader.LoadTrackAsync(evt.SamplePath);
-                allReady = false;
-            }
-            else if (!loadTask.IsCompleted)
-                allReady = false;
+            prepareSample(controller, evt.SampleKey);
+            resumeEvents.Add(evt);
         }
 
-        if (!allReady)
+        if (resumeEvents.Any(evt => controller.HasSampleDefinition(evt.SampleKey)
+                                    && !controller.IsSampleReady(evt.SampleKey, currentTime - evt.Time)))
             return BmsPreviewPlaybackStartState.Waiting;
 
         var initialAudioUnavailable = false;
 
-        foreach (var eventIndex in eventIndices)
+        foreach (var evt in resumeEvents)
         {
-            var evt = sortedEvents[eventIndex];
-
-            var track = retainedTracks.TryGetValue(eventIndex, out var retainedTrack)
-                ? retainedTrack
-                : consumeCompletedTrack(eventIndex, "resume");
-
-            resumedEventKeys.Add(evt.SampleKey);
-
-            if (track == null)
+            if (!controller.HasSampleDefinition(evt.SampleKey))
             {
-                if (eventIndex == 0)
+                if (evt.Equals(sortedEvents[0]))
                     initialAudioUnavailable = true;
 
                 continue;
             }
 
             var offset = currentTime - evt.Time;
-            track.Seek(offset);
-
-            if (track.Length <= 0 || offset >= track.Length)
-            {
-                if (!retainLoadedTracks)
-                    track.Dispose();
-
-                continue;
-            }
-
-            startTrack(evt, track);
+            if (offset < controller.GetSampleLength(evt.SampleKey))
+                controller.QueuePlay(evt.SampleKey, evt.Volume, offset);
         }
 
+        controller.SubmitLivePlayBatch();
         return initialAudioUnavailable
             ? BmsPreviewPlaybackStartState.InitialAudioUnavailable
             : BmsPreviewPlaybackStartState.Ready;
     }
 
-    private void discardEventTrackLoads()
+    private void updateLengthFromPreparedSamples()
     {
-        if (audioLoader == null)
+        if (!deriveLengthFromSamples && !extendLengthFromSamples)
             return;
 
-        foreach (var task in eventTrackLoads.Values)
-            audioLoader.DiscardEventTrack(task);
-
-        eventTrackLoads.Clear();
-    }
-
-    private void stopAndDiscardPreviewPlayback()
-    {
-        stopPreviewPlayback();
-        discardEventTrackLoads();
-        resumedEventKeys.Clear();
-    }
-
-    private void stopPreviewPlayback()
-    {
-        // A seek reaches zero volume in the same update that stops these channels, before the
-        // regular playback update can propagate the final adjustment value.
-        foreach (var adjustments in trackAdjustments.Values)
-            adjustments.Update();
-
-        for (var i = 0; i < activeTracks.Count; i++)
-        {
-            var track = activeTracks[i];
-
-            if (track.IsDisposed)
-            {
-                releasePlaybackTrack(track);
-                continue;
-            }
-
-            track.Stop();
-
-            if (!retainLoadedTracks)
-                disposePlaybackTrack(track);
-        }
-
-        activeTracks.Clear();
-    }
-
-    private void disposePreviewPlayback()
-    {
-        stopPreviewPlayback();
-
-        foreach (var track in retainedTracks.Values)
-            disposePlaybackTrack(track);
-
-        retainedTracks.Clear();
-        trackAdjustments.Clear();
-    }
-
-    private void cleanupTracks()
-    {
-        for (var i = activeTracks.Count - 1; i >= 0; i--)
-        {
-            var track = activeTracks[i];
-
-            if (track.IsDisposed)
-            {
-                releasePlaybackTrack(track);
-                activeTracks.RemoveAt(i);
-                continue;
-            }
-
-            if (track.HasCompleted)
-            {
-                if (!retainLoadedTracks)
-                    disposePlaybackTrack(track);
-
-                activeTracks.RemoveAt(i);
-            }
-        }
-    }
-
-    private void updateLength(BmsPreviewTimelineEntry evt, Track track)
-    {
-        if ((!deriveLengthFromTracks && !extendLengthFromTracks) || track.Length <= 0)
+        var controller = playbackSession?.Controller;
+        if (controller == null)
             return;
 
-        derivedLength = Math.Max(derivedLength, evt.Time + track.Length);
-        Length = deriveLengthFromTracks ? derivedLength : Math.Max(Length, derivedLength);
+        for (var i = unresolvedSampleLengths.Count - 1; i >= 0; i--)
+        {
+            var sampleKey = unresolvedSampleLengths[i];
+            if (!controller.IsSampleReady(sampleKey))
+                continue;
 
-        if (deriveLengthFromTracks)
+            var sampleLength = controller.GetSampleLength(sampleKey);
+            if (sampleLength <= 0)
+                continue;
+
+            unresolvedSampleLengths.RemoveAt(i);
+            derivedLength = Math.Max(derivedLength, sampleEndTimes[sampleKey] + sampleLength);
+        }
+
+        if (derivedLength <= 0)
+            return;
+
+        Length = deriveLengthFromSamples ? derivedLength : Math.Max(Length, derivedLength);
+
+        if (deriveLengthFromSamples)
             derivedLengthResolutionComplete = true;
     }
 
-    private void startTrack(BmsPreviewTimelineEntry evt, Track track)
+    private void updateMasterGain()
     {
-        if (track is BmsPcmPreviewVoiceTrack pcmTrack)
-            pcmTrack.ConfigureTerminationDomain(evt.SampleKey);
-
-        var adjustments = getPlaybackTrackAdjustments(track, evt.Volume);
-        adjustments.Update();
-        track.Start();
-        activeTracks.Add(track);
+        var global = audioManager.AggregateVolume.Value;
+        var gain = owner.PreviewPlaybackGain * (double.IsFinite(global) ? Math.Max(0, global) : 0);
+        masterGain.Value = double.IsFinite(gain) ? Math.Max(0, gain) : 0;
     }
 
-    private BmsPreviewTrack.PreviewPlaybackAdjustments getPlaybackTrackAdjustments(Track track, int volume)
+    private void stopPlayback() => playbackSession?.Controller?.StopAll();
+
+    private bool prepareSample(BmsPcmPlaybackController controller, ushort sampleKey)
     {
-        if (trackAdjustments.TryGetValue(track, out var adjustments))
-            return adjustments;
+        if (!preparedSamples.Add(sampleKey))
+            return false;
 
-        adjustments = owner.BindPreviewAdjustments(track, volume);
-        trackAdjustments.Add(track, adjustments);
-        return adjustments;
-    }
+        controller.PrepareSample(sampleKey);
 
-    private void disposePlaybackTrack(Track track)
-    {
-        if (!track.IsDisposed)
-            track.Dispose();
+        if (sampleEndTimes.ContainsKey(sampleKey))
+            unresolvedSampleLengths.Add(sampleKey);
 
-        releasePlaybackTrack(track);
-    }
-
-    private void releasePlaybackTrack(Track track) => trackAdjustments.Remove(track);
-
-    private Track? consumeCompletedTrack(int eventIndex, string operation)
-    {
-        var evt = sortedEvents[eventIndex];
-        var loadTask = eventTrackLoads[eventIndex];
-        eventTrackLoads.Remove(eventIndex);
-        audioLoader!.MarkEventTrackConsumed(loadTask);
-
-        try
-        {
-            var track = loadTask.GetAwaiter().GetResult();
-
-            if (track == null)
-                return null;
-
-            updateLength(evt, track);
-
-            if (retainLoadedTracks)
-                retainedTracks[eventIndex] = track;
-
-            return track;
-        }
-        catch (Exception exception)
-        {
-            BmsLogger.LogAudioFailure($"Failed to {operation} BMS preview sample '{evt.SamplePath}'.", exception);
-            return null;
-        }
+        return true;
     }
 
     private int findFirstEventAfter(double time)
@@ -517,12 +355,5 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         }
 
         return low;
-    }
-
-    private enum EventPlaybackResult
-    {
-        Pending,
-        Played,
-        Unavailable,
     }
 }

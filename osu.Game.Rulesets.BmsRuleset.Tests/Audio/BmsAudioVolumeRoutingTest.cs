@@ -91,61 +91,6 @@ public partial class BmsAudioVolumeRoutingTest : TestScene
     }
 
     [Test]
-    public void PreviewEventTracksRetainInheritedZeroAdjustments()
-    {
-        AddAssert("event tracks retain inherited zero adjustments", () =>
-        {
-            var track = new TestPreviewTrack(new AudioAdjustments());
-            var inherited = new AudioAdjustments();
-            inherited.Volume.Value = 0.25;
-            inherited.Balance.Value = -0.25;
-            inherited.Frequency.Value = 0.75;
-            inherited.Tempo.Value = 0.5;
-            var audio = new AudioAdjustments();
-            audio.BindAdjustments(inherited);
-
-            track.BindPreviewAdjustments(audio, 40);
-            assertAdjustments(audio, 0.1, -0.25, 0.75, 0.5);
-
-            inherited.Volume.Value = 0;
-            inherited.Balance.Value = 0.5;
-            inherited.Frequency.Value = 0;
-            inherited.Tempo.Value = 0;
-
-            assertAdjustments(audio, 0, 0.5, 0, 0);
-            return true;
-        });
-    }
-
-    [Test]
-    public void PreviewEventTracksMirrorOwnerAdjustments()
-    {
-        AddAssert("event tracks mirror owner adjustments", () =>
-        {
-            var track = new TestPreviewTrack(new AudioAdjustments());
-            var audio = new AudioAdjustments();
-            var adjustments = track.BindPreviewAdjustments(audio, 40);
-
-            track.Volume.Value = 0;
-            track.Balance.Value = -0.5;
-            track.Frequency.Value = 0;
-            track.Tempo.Value = 0;
-            adjustments.Update();
-
-            assertAdjustments(audio, 0, -0.5, 0, 0);
-
-            track.Volume.Value = 0.5;
-            track.Balance.Value = 0.25;
-            track.Frequency.Value = 1.5;
-            track.Tempo.Value = 0.75;
-            adjustments.Update();
-
-            assertAdjustments(audio, 0.2, 0.25, 1.5, 0.75);
-            return true;
-        });
-    }
-
-    [Test]
     public void PreviewOutputIsMutedInGameplayClockOnlyMode()
     {
         AddAssert("clock-only preview output is muted", () =>
@@ -157,34 +102,18 @@ public partial class BmsAudioVolumeRoutingTest : TestScene
             {
                 PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly,
             };
-            var audio = new AudioAdjustments();
-
-            track.BindPreviewAdjustments(audio, 100);
-
-            return audio.AggregateVolume.Value == 0;
+            return track.PreviewPlaybackGain == 0;
         });
     }
 
     [Test]
-    public void PreviewTrackVolumeIsIsolatedPerPlayback()
+    public void PreviewMixerGainFollowsOwnerVolume()
     {
-        AddAssert("preview track playback volume is isolated", () =>
+        AddAssert("preview mixer gain follows owner volume", () =>
         {
-            var track = new BmsEventPreviewTrack(
-                _ => new BmsEventPreviewTimeline([], BmsEventPreviewTimeline.DEFAULT_LENGTH),
-                null,
-                audioManager);
-
-            var first = new AudioAdjustments();
-            var second = new AudioAdjustments();
-
-            track.BindPreviewAdjustments(first, 40);
-            track.BindPreviewAdjustments(second, 80);
-
-            Assert.That(first.AggregateVolume.Value, Is.EqualTo(0.4));
-            Assert.That(second.AggregateVolume.Value, Is.EqualTo(0.8));
-
-            return true;
+            var track = new TestPreviewTrack(new AudioAdjustments());
+            track.Volume.Value = 0.4;
+            return track.PreviewPlaybackGain == 0.4;
         });
     }
 
