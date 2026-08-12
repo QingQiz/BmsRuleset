@@ -15,7 +15,7 @@
 - gameplay sample 与事件合成式 preview 已接入 PCM backend；初始化失败时 sample 保持不可用，不再回退 framework Track。
 - Alice `7n.bme` 全曲 Windows 非主设备 loopback 与 Linux/WSL headless capture 均为 0 artifacts。
 - 全曲 1979 个播放请求中，1 个为同 frame 同终止域的预期折叠，其余 1978 个 voice 全部启动。
-- 两平台全曲的 preload/playback underflow、command/voice overflow 和 callback failure 均为 0。
+- 两平台全曲的 preload/playback underflow、command loss、voice overflow 和 callback failure 均为 0。
 - 目标环境人工听测确认无杂音后，阶段 8 已删除 legacy Track backend、旧 Harmony patch 和过渡诊断/测试。
 
 本文描述用规则集自有 PCM voice mixer 替换 framework `Track` 多实例播放的完整开发与验收流程。
@@ -225,7 +225,9 @@ NextVoiceInDomain
 
 ### `BmsVoiceCommandQueue`
 
-使用 update thread 单生产者、audio callback 单消费者的固定容量 SPSC ring buffer。
+使用 update thread 单生产者、audio callback 单消费者的分段 SPSC ring buffer。每段固定容量并可循环复用；只有 producer
+积压超过当前段剩余容量时才创建新段。新段及完整 batch 在 producer 线程填充完成后一次性发布，audio callback 只读取和切段，
+不得分配、复制或等待。
 
 命令至少包括：
 
@@ -241,7 +243,7 @@ ReplaceEpoch
 
 命令包含绝对目标 frame 和 epoch。seek 或重新建立时间线时递增 epoch，callback 必须忽略旧 epoch 命令。
 
-队列满不能覆盖未消费命令。开发构建应立即报告失败；发布构建应记录一次高优先级诊断并采用不会硬切旧 voice 的降级策略。
+命令不得因初始段容量不足而丢弃。段扩展次数和队列高水位必须可诊断；无法分配新段属于会话级致命错误，不能静默继续播放。
 
 ### `BmsBassMixerBridge`
 
@@ -412,7 +414,8 @@ eventVolume / 100 * AudioManager.AggregateVolume
 | 文件缺失或无法解码 | 标记 SampleKey unavailable，保持静音并记录路径 |
 | PCM 启动缓冲未准备好 | 不阻塞；记录 preload underflow，测试视为失败 |
 | Active voice 后续 chunk underflow | 对该 voice 快速淡出，记录高优先级诊断，不硬切 |
-| command ring 满 | 不覆盖旧命令；记录 queue overflow，测试视为失败 |
+| command segment 扩展 | producer 创建并完整填充新段后原子发布；callback 无分配地切段 |
+| command segment 无法分配 | 终止音频会话并报告致命错误，不静默丢弃命令 |
 | voice pool 满 | 不抢占任意其他终止域；记录容量错误，测试视为失败 |
 | bridge 安装失败 | 开发阶段回退旧 Track 后端并明确记录原因 |
 | mixer/device 重建 | 重建或重新挂载 bridge，保留可恢复的逻辑状态 |
@@ -426,7 +429,8 @@ eventVolume / 100 * AudioManager.AggregateVolume
 ```text
 RenderedFrames
 ActiveVoices / DrainingVoices / PeakVoices
-QueuedCommands / QueueHighWater / QueueOverflows
+QueuedCommands / QueueHighWater / QueueExpansions
+VoicePoolExpansions / VoicePoolOverflows
 LoadedAssets / PreparingAssets / FailedAssets
 ResidentPcmBytes / PeakResidentPcmBytes
 ReadyAheadFrames
@@ -587,7 +591,7 @@ Media/Audio/Mixing/BmsAudioDiagnostics.cs
 
 - Alice 19 秒、22 秒、26 秒及 2 分钟后无已知滋滋声或卡顿。
 - Windows 与 Linux 的自动分析均通过同一判定规则。
-- `PreloadUnderflows`、`PlaybackUnderflows`、`QueueOverflows` 为零。
+- `PreloadUnderflows`、`PlaybackUnderflows`、`VoicePoolOverflows` 和非预期 command loss 为零；`QueueExpansions` 与 `VoicePoolExpansions` 仅作容量诊断。
 - 无 keysound 丢失；同 sample 同 frame 的语义折叠除外。
 - 用户在目标环境完成听测确认。
 
@@ -665,7 +669,7 @@ Media/Audio/Mixing/BmsAudioDiagnostics.cs
 | render callback 分配 | 稳态 0 bytes/callback |
 | callback 阻塞 | 0 次 lock wait、0 次文件 IO、0 次 Task wait |
 | playback underflow | 完整验收曲目为 0 |
-| command overflow | 0 |
+| command loss | 0 |
 | 非预期 voice drop | 0 |
 | 输出范围 | limiter 后有限值且不超过目标峰值 |
 | 内存 | 完整播放后回落并达到稳定平台，无随时间单调增长 |
@@ -698,7 +702,7 @@ git diff --check
 7. 使用同步脉冲或可靠瞬态完成对齐，避免纯正弦的周期歧义。
 8. 生成整曲分窗相关率、RMS ratio、peak、样本差分和 artifact event 曲线。
 9. 单独标记 Alice 19、22、26 秒和 2 分钟后的区间。
-10. 检查 engine diagnostics，确认 underflow、overflow、voice drop、callback over-budget 均为零。
+10. 检查 engine diagnostics，确认 underflow、command loss、voice overflow、voice drop、callback over-budget 均为零，并记录 queue expansion。
 11. 自动分析通过后再进行人工听测；人工听测不能替代自动门禁。
 12. 保存 JSON、完整 WAV、曲线和构建 commit，保证结果可追溯。
 
@@ -731,7 +735,7 @@ git diff --check
 
 ### 性能与数据结构
 
-- callback 数据结构是否固定容量并有明确 overflow 行为。
+- callback 是否只消费固定容量 segment，并且扩段仅发生在 producer。
 - domain 查找是否避免每 frame 扫描全部历史 voice。
 - chunk 调度是否根据 deadline，而非简单 FIFO。
 - 处理 worker 并发是否有上限。
@@ -756,7 +760,7 @@ git diff --check
 | Windows global mixer 与 Linux普通 mixer 行为不同 | bridge 两模式集成测试，业务 mixer 保持同一代码 |
 | callback 异常导致 native 崩溃 | callback 边界 catch、安全静音、延迟错误上报 |
 | 播放位置映射使用了错误的 generated/audible 时间 | loopback 同步脉冲、整曲相关曲线和 rate/seek 测试 |
-| 固定容量估计不足 | chart 压力测试、高水位诊断；扩大容量不改变算法 |
+| 初始 command segment 容量估计不足 | producer 分段扩展、batch 原子发布、高水位与扩段次数诊断 |
 | 迁移期间旧新后端行为混合 | backend interface、单会话只选择一个后端、分阶段删除旧代码 |
 
 ## 回滚策略

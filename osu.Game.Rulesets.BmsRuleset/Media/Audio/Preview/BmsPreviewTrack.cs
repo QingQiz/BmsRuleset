@@ -417,26 +417,26 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
         switch (seekFadePhase)
         {
             case SeekFadePhase.FadingOut:
-            {
-                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_OUT_DURATION;
-                seekFadeVolume.Value = seekFadeStartVolume * Math.Max(0, 1 - progress);
+                {
+                    var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_OUT_DURATION;
+                    seekFadeVolume.Value = seekFadeStartVolume * Math.Max(0, 1 - progress);
 
-                if (progress >= 1)
-                    performPendingSeek();
+                    if (progress >= 1)
+                        performPendingSeek();
 
-                break;
-            }
+                    break;
+                }
 
             case SeekFadePhase.FadingIn:
-            {
-                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_IN_DURATION;
-                seekFadeVolume.Value = Math.Min(1, progress);
+                {
+                    var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_IN_DURATION;
+                    seekFadeVolume.Value = Math.Min(1, progress);
 
-                if (progress >= 1)
-                    seekFadePhase = SeekFadePhase.None;
+                    if (progress >= 1)
+                        seekFadePhase = SeekFadePhase.None;
 
-                break;
-            }
+                    break;
+                }
         }
     }
 

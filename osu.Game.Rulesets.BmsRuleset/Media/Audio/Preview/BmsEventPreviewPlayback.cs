@@ -46,8 +46,6 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     internal bool HasRetainedTracks => retainedTracks.Count > 0;
 
-    internal bool UsesDedicatedMixer => audioLoader?.UsesDedicatedMixer == true;
-
     internal BmsEventPreviewPlayback(
         BmsPreviewTrack owner,
         BmsEventPreviewTimeline timeline,
@@ -287,7 +285,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
         var allReady = true;
         var pendingKeys = new HashSet<ushort>(resumedEventKeys);
-        List<int> eventIndices = [];
+        var eventIndices = new List<int>();
 
         for (var i = nextEventIndex - 1; i >= 0; i--)
         {

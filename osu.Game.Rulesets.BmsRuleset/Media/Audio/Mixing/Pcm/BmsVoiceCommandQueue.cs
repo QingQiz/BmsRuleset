@@ -1,91 +1,180 @@
 using System;
 using System.Threading;
 
-namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 
+/// <summary>
+///     A segmented single-producer, single-consumer queue whose consumer never allocates or blocks.
+/// </summary>
 internal sealed class BmsVoiceCommandQueue
 {
-    private readonly BmsVoiceCommand[] commands;
-    private int readIndex;
-    private int writeIndex;
+    private readonly int segmentCapacity;
+    private Segment readSegment;
+    private Segment writeSegment;
+    private int count;
+    private long expansionCount;
 
-    internal int Capacity => commands.Length - 1;
+    internal int Count => Volatile.Read(ref count);
 
-    internal int Count
+    internal long ExpansionCount => Interlocked.Read(ref expansionCount);
+
+    internal BmsVoiceCommandQueue(int segmentCapacity)
     {
-        get
-        {
-            var read = Volatile.Read(ref readIndex);
-            var write = Volatile.Read(ref writeIndex);
-            return write >= read ? write - read : commands.Length - read + write;
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(segmentCapacity, 1);
+
+        this.segmentCapacity = segmentCapacity;
+        readSegment = writeSegment = new Segment(segmentCapacity);
     }
 
-    internal int AvailableCapacity => Capacity - Count;
-
-    internal BmsVoiceCommandQueue(int capacity)
+    internal void Enqueue(BmsVoiceCommand command)
     {
-        if (capacity < 1)
-            throw new ArgumentOutOfRangeException(nameof(capacity));
+        var segment = writeSegment;
 
-        commands = new BmsVoiceCommand[checked(capacity + 1)];
+        if (tryEnqueue(segment, command))
+            return;
+
+        var next = new Segment(segmentCapacity);
+        if (!tryEnqueue(next, command))
+            throw new InvalidOperationException("A new command segment could not accept one command.");
+
+        publishNextSegment(segment, next);
     }
 
-    internal bool TryEnqueue(BmsVoiceCommand command)
+    internal void Enqueue(ReadOnlySpan<BmsVoiceCommand> batch)
     {
-        var write = writeIndex;
-        var nextWrite = increment(write);
+        if (batch.IsEmpty)
+            return;
 
-        if (nextWrite == Volatile.Read(ref readIndex))
-            return false;
+        var segment = writeSegment;
 
-        commands[write] = command;
-        Volatile.Write(ref writeIndex, nextWrite);
-        return true;
-    }
+        if (tryEnqueue(segment, batch))
+            return;
 
-    internal bool TryEnqueue(ReadOnlySpan<BmsVoiceCommand> batch)
-    {
-        if (batch.Length > AvailableCapacity)
-            return false;
+        var next = new Segment(Math.Max(segmentCapacity, batch.Length));
+        if (!tryEnqueue(next, batch))
+            throw new InvalidOperationException("A new command segment could not accept its initial batch.");
 
-        foreach (var command in batch)
-        {
-            if (!TryEnqueue(command))
-                throw new InvalidOperationException("The SPSC command queue capacity changed during a producer-only batch.");
-        }
-
-        return true;
+        publishNextSegment(segment, next);
     }
 
     internal bool TryPeek(out BmsVoiceCommand command)
     {
-        var read = readIndex;
-
-        if (read == Volatile.Read(ref writeIndex))
+        while (true)
         {
-            command = default;
-            return false;
-        }
+            var segment = readSegment;
+            var read = segment.ReadIndex;
 
-        command = commands[read];
-        return true;
+            if (read != Volatile.Read(ref segment.WriteIndex))
+            {
+                command = segment.Commands[read];
+                return true;
+            }
+
+            var next = Volatile.Read(ref segment.Next);
+            if (next == null)
+            {
+                command = default;
+                return false;
+            }
+
+            readSegment = next;
+        }
     }
 
     internal bool TryDequeue(out BmsVoiceCommand command)
     {
-        var read = readIndex;
-
-        if (read == Volatile.Read(ref writeIndex))
+        while (true)
         {
-            command = default;
-            return false;
-        }
+            var segment = readSegment;
+            var read = segment.ReadIndex;
 
-        command = commands[read];
-        Volatile.Write(ref readIndex, increment(read));
+            if (read != Volatile.Read(ref segment.WriteIndex))
+            {
+                command = segment.Commands[read];
+                segment.Commands[read] = default;
+                Volatile.Write(ref segment.ReadIndex, segment.Increment(read));
+                Interlocked.Decrement(ref count);
+                return true;
+            }
+
+            var next = Volatile.Read(ref segment.Next);
+            if (next == null)
+            {
+                command = default;
+                return false;
+            }
+
+            readSegment = next;
+        }
+    }
+
+    private bool tryEnqueue(Segment segment, BmsVoiceCommand command)
+    {
+        var write = segment.WriteIndex;
+        var nextWrite = segment.Increment(write);
+
+        if (nextWrite == Volatile.Read(ref segment.ReadIndex))
+            return false;
+
+        segment.Commands[write] = command;
+        Interlocked.Increment(ref count);
+        Volatile.Write(ref segment.WriteIndex, nextWrite);
         return true;
     }
 
-    private int increment(int index) => ++index == commands.Length ? 0 : index;
+    private bool tryEnqueue(Segment segment, ReadOnlySpan<BmsVoiceCommand> batch)
+    {
+        if (batch.Length > segment.AvailableCapacity)
+            return false;
+
+        var write = segment.WriteIndex;
+
+        foreach (var command in batch)
+        {
+            segment.Commands[write] = command;
+            write = segment.Increment(write);
+        }
+
+        // Publishing once keeps a same-frame chord invisible until the complete batch is ready.
+        Interlocked.Add(ref count, batch.Length);
+        Volatile.Write(ref segment.WriteIndex, write);
+        return true;
+    }
+
+    private void publishNextSegment(Segment previous, Segment next)
+    {
+        // The new segment is fully populated before the callback can observe the link.
+        Volatile.Write(ref previous.Next, next);
+        writeSegment = next;
+        Interlocked.Increment(ref expansionCount);
+    }
+
+    private sealed class Segment
+    {
+        internal readonly BmsVoiceCommand[] Commands;
+        internal int ReadIndex;
+        internal int WriteIndex;
+        internal Segment? Next;
+
+        internal int Capacity => Commands.Length - 1;
+
+        internal int Count
+        {
+            get
+            {
+                var read = Volatile.Read(ref ReadIndex);
+                var write = WriteIndex;
+                return write >= read ? write - read : Commands.Length - read + write;
+            }
+        }
+
+        internal int AvailableCapacity => Capacity - Count;
+
+        internal Segment(int capacity)
+        {
+            Commands = new BmsVoiceCommand[checked(capacity + 1)];
+        }
+
+        internal int Increment(int index) => ++index == Commands.Length ? 0 : index;
+    }
 }

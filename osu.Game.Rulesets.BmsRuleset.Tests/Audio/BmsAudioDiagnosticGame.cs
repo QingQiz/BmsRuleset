@@ -123,12 +123,15 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC interval={requestedStartTime / 1000:0.###}-{playbackEndTime / 1000:0.###}s");
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC volume={requestedVolume:0.###}");
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC sample_gain={requestedSampleGain:0.###}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC sample_key={(requestedSampleKeys == null ? "all" : string.Join(",", requestedSampleKeys.Select(key => key.ToString("X"))))}");
+        var sampleKeys = requestedSampleKeys == null
+            ? "all"
+            : string.Join(",", requestedSampleKeys.Select(key => key.ToString("X")));
+        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC sample_key={sampleKeys}");
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC pcm_mixer_patch={BmsPcmMixerPatcher.IsInstalled}");
         Console.WriteLine("BMS_AUDIO_DIAGNOSTIC limiter=true");
         Console.WriteLine("BMS_AUDIO_DIAGNOSTIC native_scheduling=true");
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC live_batch={liveBatch}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC pcm_backend={sampleStore.Mixer != null}");
+        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC pcm_backend={sampleStore.DiagnosticMixer != null}");
 
         if (Bass.GetInfo(out var deviceInfo))
         {
@@ -167,7 +170,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
                 var capturePair = captureGlobal
                     ? BmsAudioCaptureSession.StartGlobalPair(Audio, captureDuration, silentCapture)
                     : BmsAudioCaptureSession.StartPair(
-                        sampleStore.Mixer ?? throw new InvalidOperationException("The BMS diagnostic mixer is unavailable."),
+                        sampleStore.DiagnosticMixer ?? throw new InvalidOperationException("The BMS diagnostic mixer is unavailable."),
                         captureDuration,
                         silentCapture);
                 preLimiterCaptureSession = capturePair.Before;
@@ -204,7 +207,11 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
                 else
                 {
                     if (traceScheduling)
-                        Console.WriteLine($"BMS_AUDIO_SCHEDULE_BLOCKED chart={evt.Time:0.###} now={chartTime:0.###} key={evt.SampleKey:X2} {sampleStore.GetScheduleDiagnostic()}");
+                    {
+                        Console.WriteLine(
+                            $"BMS_AUDIO_SCHEDULE_BLOCKED chart={evt.Time:0.###} now={chartTime:0.###} " +
+                            $"key={evt.SampleKey:X2} pcm_state={sampleStore.DiagnosticSnapshot.Cache}");
+                    }
 
                     sampleStore.Play(evt.SampleKey, volume);
                 }
@@ -212,7 +219,11 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
             else
             {
                 if (traceScheduling && chartTime - evt.Time > scheduling_lead)
-                    Console.WriteLine($"BMS_AUDIO_SCHEDULE_LATE chart={evt.Time:0.###} now={chartTime:0.###} late={chartTime - evt.Time:0.###} key={evt.SampleKey:X2}");
+                {
+                    Console.WriteLine(
+                        $"BMS_AUDIO_SCHEDULE_LATE chart={evt.Time:0.###} now={chartTime:0.###} " +
+                        $"late={chartTime - evt.Time:0.###} key={evt.SampleKey:X2}");
+                }
 
                 sampleStore.Play(evt.SampleKey, volume);
             }
@@ -328,9 +339,15 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
 
             var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
 
-            Console.WriteLine($"BMS_AUDIO_ARTIFACT_RESULT source={(useLoopback ? "wasapi-loopback" : "mixer")} detected={report.HasArtifacts} count={report.Artifacts.Count} peak={report.Peak:0.######}");
+            Console.WriteLine(
+                $"BMS_AUDIO_ARTIFACT_RESULT source={(useLoopback ? "wasapi-loopback" : "mixer")} " +
+                $"detected={report.HasArtifacts} count={report.Artifacts.Count} peak={report.Peak:0.######}");
             foreach (var artifact in report.Artifacts.Take(100))
-                Console.WriteLine($"BMS_AUDIO_ARTIFACT time={artifact.Time:0.######} kind={artifact.Kind} score={artifact.Score:0.###} magnitude={artifact.Magnitude:0.######}");
+            {
+                Console.WriteLine(
+                    $"BMS_AUDIO_ARTIFACT time={artifact.Time:0.######} kind={artifact.Kind} " +
+                    $"score={artifact.Score:0.###} magnitude={artifact.Magnitude:0.######}");
+            }
 
             if (!string.IsNullOrEmpty(reportPath))
             {
@@ -348,19 +365,23 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
 
     private string formatLimiterDiagnostics()
     {
-        var diagnostics = sampleStore.Diagnostics;
-        return $"limited_frames={diagnostics.LimitedFrames} input_peak={diagnostics.InputPeak:0.###} output_peak={diagnostics.OutputPeak:0.###} gain={diagnostics.LimiterGain:0.###}";
+        var diagnostics = sampleStore.DiagnosticSnapshot.Audio;
+        return $"limited_frames={diagnostics.LimitedFrames} input_peak={diagnostics.InputPeak:0.###} " +
+               $"output_peak={diagnostics.OutputPeak:0.###} gain={diagnostics.LimiterGain:0.###}";
     }
 
     private string formatPcmDiagnostics()
     {
-        var audio = sampleStore.Diagnostics;
-        var cache = sampleStore.CacheDiagnostics;
+        var diagnostics = sampleStore.DiagnosticSnapshot;
+        var audio = diagnostics.Audio;
+        var cache = diagnostics.Cache;
         return $"rendered={audio.RenderedFrames} active={audio.ActiveVoices} draining={audio.DrainingVoices} peak_voices={audio.PeakVoices} " +
-               $"submitted_voices={audio.SubmittedVoices} folded_voices={audio.FoldedVoices} started_voices={audio.StartedVoices} queued={audio.QueuedCommands} " +
-               $"queue_overflows={audio.QueueOverflows} voice_overflows={audio.VoicePoolOverflows} preload_underflows={sampleStore.PreloadUnderflows} " +
-               $"playback_underflows={audio.PlaybackUnderflows} callback_failures={sampleStore.BridgeCallbackFailures} " +
-               $"assets={cache.LoadedAssets}/{cache.PreparingAssets}/{cache.FailedAssets} resident={cache.ResidentPcmBytes} peak_resident={cache.PeakResidentPcmBytes}";
+               $"submitted_voices={audio.SubmittedVoices} folded_voices={audio.FoldedVoices} started_voices={audio.StartedVoices} " +
+               $"queued={audio.QueuedCommands} queue_high_water={audio.QueueHighWater} queue_expansions={audio.QueueExpansions} " +
+               $"voice_expansions={audio.VoicePoolExpansions} voice_overflows={audio.VoicePoolOverflows} preload_underflows={diagnostics.PreloadUnderflows} " +
+               $"playback_underflows={audio.PlaybackUnderflows} callback_failures={diagnostics.BridgeCallbackFailures} " +
+               $"assets={cache.LoadedAssets}/{cache.PreparingAssets}/{cache.FailedAssets} resident={cache.ResidentPcmBytes} " +
+               $"peak_resident={cache.PeakResidentPcmBytes} evictions={cache.EvictionCount}";
     }
 
     private static IEnumerable<ScheduledSample> collectEvents(BmsParseResult parsed)
@@ -416,7 +437,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         if (index + 1 >= args.Count)
             throw new ArgumentException($"Argument {name} must be a hexadecimal sample key.");
 
-        HashSet<ushort> values = [];
+        var values = new HashSet<ushort>();
 
         foreach (var argument in args[index + 1].Split(','))
         {

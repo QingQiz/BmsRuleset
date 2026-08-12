@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
@@ -100,9 +100,9 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         try
         {
             System.Threading.Tasks.Task.WhenAll(initialReadyTasks)
-                  .WaitAsync(initial_ready_timeout, cancellationToken)
-                  .GetAwaiter()
-                  .GetResult();
+                .WaitAsync(initial_ready_timeout, cancellationToken)
+                .GetAwaiter()
+                .GetResult();
         }
         catch (TimeoutException)
         {
@@ -144,7 +144,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         }
 
         var targetFrame = mixer.RenderedFrames;
-        List<BmsVoicePlay> plays = [];
+        var plays = new List<BmsVoicePlay>();
 
         foreach (var pending in livePlays)
         {

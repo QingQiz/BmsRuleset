@@ -11,7 +11,7 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 
 [HeadlessTest]
-public partial class TestBmsAudioVolumeRouting : TestScene
+public partial class BmsAudioVolumeRoutingTest : TestScene
 {
     [Resolved]
     private AudioManager audioManager { get; set; } = null!;

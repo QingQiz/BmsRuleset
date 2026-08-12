@@ -7,7 +7,7 @@ using ManagedBass;
 using ManagedBass.Mix;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Mixing;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
@@ -26,10 +26,6 @@ internal sealed class BmsBassMixerBridge : IDisposable
     private int attachedMixerHandle;
     private long callbackFailures;
     private bool disposed;
-
-    internal int StreamHandle => Volatile.Read(ref streamHandle);
-
-    internal int AttachedMixerHandle => Volatile.Read(ref attachedMixerHandle);
 
     internal long CallbackFailures => Interlocked.Read(ref callbackFailures);
 

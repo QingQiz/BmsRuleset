@@ -144,12 +144,12 @@ public partial class BmsBackgroundAudioPlayer(
         double maxLength,
         Func<ushort, double> getLength)
     {
-        List<SeekedBgm> result = [];
+        var result = new List<SeekedBgm>();
 
         if (maxLength <= 0)
             return result;
 
-        HashSet<ushort> seenKeys = [];
+        var seenKeys = new HashSet<ushort>();
 
         for (var i = nextEventIndex - 1; i >= 0; i--)
         {
@@ -213,7 +213,7 @@ public partial class BmsBackgroundAudioPlayer(
             playbackBlockedAt = Time.Current;
 
             // Future mixer commands need a fresh epoch after the gameplay clock stops advancing.
-            if (sampleStore.SupportsScheduling)
+            if (sampleStore.IsPlaybackAvailable)
                 resyncRequired = true;
 
             return;

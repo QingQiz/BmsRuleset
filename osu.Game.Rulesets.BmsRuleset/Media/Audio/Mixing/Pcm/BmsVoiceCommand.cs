@@ -1,8 +1,8 @@
-using System;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
-namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 
+// Keeping slice and pitch in the domain avoids changing retrigger identity when BMSON support is added.
 internal readonly record struct BmsTerminationDomain(
     ushort SampleKey,
     int Pitch = 0,
@@ -23,7 +23,6 @@ internal enum BmsVoiceCommandType : byte
     Play,
     Pause,
     Resume,
-    StopAll,
     SetMasterGain,
     ReplaceEpoch,
     StopVoice,

@@ -1,18 +1,11 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
-
-internal readonly record struct BmsPcmAssetKey(string ResourceIdentity, long RateKey, int PipelineVersion)
-{
-    internal static BmsPcmAssetKey Create(string resourceIdentity, double rate) =>
-        new(resourceIdentity, (long)Math.Round(rate * 1_000_000), BmsFixedRatePcmProcessor.PIPELINE_VERSION);
-}
 
 internal readonly record struct BmsPcmAssetCacheDiagnostics(
     int LoadedAssets,
@@ -24,8 +17,8 @@ internal readonly record struct BmsPcmAssetCacheDiagnostics(
 
 internal sealed class BmsPcmAssetCache : IDisposable
 {
-    internal const long DEFAULT_SOFT_BUDGET = 512L * 1024 * 1024;
-    internal const int DEFAULT_STARTUP_FRAMES = BmsFixedRatePcmProcessor.DEFAULT_CHUNK_FRAMES * 2;
+    private const long default_soft_budget = 512L * 1024 * 1024;
+    private const int default_startup_frames = BmsFixedRatePcmProcessor.DEFAULT_CHUNK_FRAMES * 2;
 
     private readonly Func<string, CancellationToken, Task<byte[]?>> resourceLoader;
     private readonly double rate;
@@ -33,7 +26,7 @@ internal sealed class BmsPcmAssetCache : IDisposable
     private readonly int startupFrames;
     private readonly SemaphoreSlim processingSlots;
     private readonly CancellationTokenSource disposalCancellation = new();
-    private readonly ConcurrentDictionary<BmsPcmAssetKey, CacheEntry> entries = new();
+    private readonly ConcurrentDictionary<string, CacheEntry> entries = new();
     private readonly object lifecycleLock = new();
 
     private long residentPcmBytes;
@@ -45,22 +38,17 @@ internal sealed class BmsPcmAssetCache : IDisposable
         Func<string, CancellationToken, Task<byte[]?>> resourceLoader,
         double rate,
         int maximumConcurrentProcessors = 2,
-        long softBudget = DEFAULT_SOFT_BUDGET,
-        int startupFrames = DEFAULT_STARTUP_FRAMES)
+        long softBudget = default_soft_budget,
+        int startupFrames = default_startup_frames)
     {
         ArgumentNullException.ThrowIfNull(resourceLoader);
 
         if (!double.IsFinite(rate) || rate < 0.05 || rate > 2)
             throw new ArgumentOutOfRangeException(nameof(rate));
 
-        if (maximumConcurrentProcessors <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maximumConcurrentProcessors));
-
-        if (softBudget <= 0)
-            throw new ArgumentOutOfRangeException(nameof(softBudget));
-
-        if (startupFrames <= 0)
-            throw new ArgumentOutOfRangeException(nameof(startupFrames));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumConcurrentProcessors);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(softBudget);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(startupFrames);
 
         this.resourceLoader = resourceLoader;
         this.rate = rate;
@@ -76,10 +64,9 @@ internal sealed class BmsPcmAssetCache : IDisposable
         lock (lifecycleLock)
         {
             ObjectDisposedException.ThrowIf(disposed, this);
-            var key = BmsPcmAssetKey.Create(resourceIdentity, rate);
-            var entry = entries.GetOrAdd(key, createEntry);
+            var entry = entries.GetOrAdd(resourceIdentity, createEntry);
             entry.AddReference();
-            return new BmsPcmAssetLease(entry.Asset, entry.Ready, entry.Completion, () => release(entry));
+            return new BmsPcmAssetLease(entry.Asset, entry.Ready, () => release(entry));
         }
     }
 
@@ -174,15 +161,15 @@ internal sealed class BmsPcmAssetCache : IDisposable
         disposalCancellation.Dispose();
     }
 
-    private CacheEntry createEntry(BmsPcmAssetKey key)
+    private CacheEntry createEntry(string resourceIdentity)
     {
         var asset = new BmsPcmAsset(BmsFixedRatePcmProcessor.OUTPUT_SAMPLE_RATE, BmsFixedRatePcmProcessor.OUTPUT_CHANNELS);
         var entry = new CacheEntry(asset);
-        entry.Completion = Task.Run(() => processEntry(key, entry), CancellationToken.None);
+        entry.Completion = Task.Run(() => processEntry(resourceIdentity, entry), CancellationToken.None);
         return entry;
     }
 
-    private async Task processEntry(BmsPcmAssetKey key, CacheEntry entry)
+    private async Task processEntry(string resourceIdentity, CacheEntry entry)
     {
         var acquiredSlot = false;
 
@@ -191,9 +178,9 @@ internal sealed class BmsPcmAssetCache : IDisposable
             await processingSlots.WaitAsync(disposalCancellation.Token).ConfigureAwait(false);
             acquiredSlot = true;
 
-            var data = await resourceLoader(key.ResourceIdentity, disposalCancellation.Token).ConfigureAwait(false);
+            var data = await resourceLoader(resourceIdentity, disposalCancellation.Token).ConfigureAwait(false);
             if (data == null || data.Length == 0)
-                throw new InvalidOperationException($"BMS audio resource '{key.ResourceIdentity}' is unavailable.");
+                throw new InvalidOperationException($"BMS audio resource '{resourceIdentity}' is unavailable.");
 
             using var processor = BmsFixedRatePcmProcessor.CreateFromMemory(data, rate);
             entry.Asset.SetOriginalDuration(processor.OriginalDurationMilliseconds);
@@ -221,13 +208,13 @@ internal sealed class BmsPcmAssetCache : IDisposable
         catch (OperationCanceledException) when (disposalCancellation.IsCancellationRequested)
         {
             entry.Asset.Fail();
-            entry.MarkCancelled(disposalCancellation.Token);
+            entry.MarkUnavailable();
         }
         catch (Exception exception)
         {
             entry.Asset.Fail();
-            entry.MarkFailed(exception);
-            BmsLogger.LogAudioFailure($"Failed to prepare BMS PCM resource '{key.ResourceIdentity}'.", exception);
+            entry.MarkUnavailable();
+            BmsLogger.LogAudioFailure($"Failed to prepare BMS PCM resource '{resourceIdentity}'.", exception);
         }
         finally
         {
@@ -283,9 +270,7 @@ internal sealed class BmsPcmAssetCache : IDisposable
             ready.TrySetResult();
         }
 
-        internal void MarkCancelled(CancellationToken cancellationToken) => ready.TrySetResult();
-
-        internal void MarkFailed(Exception exception) => ready.TrySetResult();
+        internal void MarkUnavailable() => ready.TrySetResult();
     }
 }
 
@@ -297,13 +282,10 @@ internal sealed class BmsPcmAssetLease : IDisposable
 
     internal Task Ready { get; }
 
-    internal Task Completion { get; }
-
-    internal BmsPcmAssetLease(BmsPcmAsset asset, Task ready, Task completion, Action release)
+    internal BmsPcmAssetLease(BmsPcmAsset asset, Task ready, Action release)
     {
         Asset = asset;
         Ready = ready;
-        Completion = completion;
         this.release = release;
     }
 

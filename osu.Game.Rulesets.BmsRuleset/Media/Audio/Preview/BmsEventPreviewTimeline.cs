@@ -32,7 +32,7 @@ internal sealed record BmsEventPreviewTimeline(
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
         CancellationToken cancellationToken = default)
     {
-        List<BmsPreviewTimelineEntry> entries = [];
+        var entries = new List<BmsPreviewTimelineEntry>();
 
         foreach (var (evt, resumeAfterSeek) in sampleEventFactory())
         {

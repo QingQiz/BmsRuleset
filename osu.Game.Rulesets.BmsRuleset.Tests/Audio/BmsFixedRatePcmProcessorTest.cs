@@ -13,17 +13,18 @@ public class BmsFixedRatePcmProcessorTest
     {
         var input = createSine(48000, 4800, 440, 1);
         using var processor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 48000, 1, 37), 1, 113);
-        var asset = processor.Process();
+        var chunks = BmsPcmTestHelpers.ProcessChunks(processor);
+        var asset = BmsPcmTestHelpers.CreateAsset(chunks);
 
         Assert.Multiple(() =>
         {
             Assert.That(asset.SampleRate, Is.EqualTo(44100));
             Assert.That(asset.Channels, Is.EqualTo(2));
             Assert.That(asset.TotalFrameCount, Is.EqualTo(4410));
-            Assert.That(asset.Chunks, Has.Count.EqualTo(40));
+            Assert.That(chunks, Has.Length.EqualTo(40));
         });
 
-        var output = asset.Chunks.SelectMany(chunk => chunk.Samples).ToArray();
+        var output = chunks.SelectMany(chunk => chunk.Samples).ToArray();
         for (var i = 0; i < output.Length; i += 2)
             Assert.That(output[i + 1], Is.EqualTo(output[i]).Within(0.000001f));
 
@@ -37,8 +38,8 @@ public class BmsFixedRatePcmProcessorTest
         using var fineProcessor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 32000, 2, 2), 1, 17);
         using var coarseProcessor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 32000, 2, 317), 1, 509);
 
-        var fine = fineProcessor.Process().Chunks.SelectMany(chunk => chunk.Samples).ToArray();
-        var coarse = coarseProcessor.Process().Chunks.SelectMany(chunk => chunk.Samples).ToArray();
+        var fine = BmsPcmTestHelpers.ProcessChunks(fineProcessor).SelectMany(chunk => chunk.Samples).ToArray();
+        var coarse = BmsPcmTestHelpers.ProcessChunks(coarseProcessor).SelectMany(chunk => chunk.Samples).ToArray();
 
         Assert.That(coarse, Is.EqualTo(fine));
     }
@@ -51,7 +52,7 @@ public class BmsFixedRatePcmProcessorTest
         using var cancellation = new System.Threading.CancellationTokenSource();
         cancellation.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() => processor.Process(cancellation.Token));
+        Assert.Throws<OperationCanceledException>(() => BmsPcmTestHelpers.ProcessChunks(processor, cancellation.Token));
     }
 
     private static float[] createSine(int sampleRate, int frames, double frequency, int channels)

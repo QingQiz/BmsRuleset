@@ -13,8 +13,6 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Testing;
 using osu.Game.IO;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -67,8 +65,6 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         });
 
         AddUntilStep("track playing from time zero", () => getActivePlaybackCount(track) > 0);
-        AddAssert("preview uses patched mixer when available", () =>
-            ((BmsEventPreviewTrack)track).Playback?.UsesDedicatedMixer == BmsPcmMixerPatcher.IsInstalled);
         AddStep("dispose track", () => track.Dispose());
     }
 

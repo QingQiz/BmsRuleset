@@ -227,8 +227,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             yield return new BmsSampleUsage(evt.SampleKey, evt.Time);
 
         foreach (var column in beatmap.HitObjects
-                                      .Where(hitObject => hitObject is not BmsLandmine)
-                                      .GroupBy(hitObject => hitObject.Column))
+                     .Where(hitObject => hitObject is not BmsLandmine)
+                     .GroupBy(hitObject => hitObject.Column))
         {
             BmsHitObject? previousHitObject = null;
 
@@ -337,7 +337,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
         Overlays.Add(StageHudController);
 
-        // The store follows the gameplay clock to load definition Tracks before their first use.
+        // The store follows the gameplay clock to load PCM samples before their first use.
         FrameStableComponents.Add(sampleStore);
 
         var events = beatmap.BackgroundSampleEvents

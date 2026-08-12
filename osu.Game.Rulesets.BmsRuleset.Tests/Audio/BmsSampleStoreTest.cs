@@ -6,13 +6,14 @@ using osu.Framework;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 
 [HeadlessTest]
-public partial class TestBmsSampleStoreRate : TestScene
+public partial class BmsSampleStoreTest : TestScene
 {
     private const string silent_flac = "ZkxhQwAAACICQAJAAAAMAAAMAfQA8AAAAFDLQV4FuFvjFJSuG8IzvrWLhAAALAwAAABMYXZmNjEuNy4xMDABAAAAFAAAAGVuY29kZXI9TGF2ZjYxLjcuMTAw//hkCABPCQAAAHyn";
 
@@ -31,13 +32,13 @@ public partial class TestBmsSampleStoreRate : TestScene
             Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "native-mixer.wav" } }, tempDir));
         });
         AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddAssert("PCM backend initialised", () => store.Mixer != null);
+        AddAssert("PCM backend initialised", () => store.DiagnosticMixer != null);
         AddAssert("PCM float mixer patch installed", () => BmsPcmMixerPatcher.IsInstalled);
         addCleanupSteps();
     }
 
     [Test]
-    public void ScheduledTrackLoadsTenSecondsBeforeUse()
+    public void ScheduledSampleLoadsTenSecondsBeforeUse()
     {
         var manualClock = new ManualClock();
 
@@ -61,7 +62,7 @@ public partial class TestBmsSampleStoreRate : TestScene
     }
 
     [Test]
-    public void ScheduledTrackUsesEarliestCandidateTime()
+    public void ScheduledSampleUsesEarliestCandidateTime()
     {
         AddStep("create early-candidate sample + store", () =>
         {
@@ -78,7 +79,7 @@ public partial class TestBmsSampleStoreRate : TestScene
     }
 
     [Test]
-    public void ScheduledTrackRemainsLoadedAfterLastUse()
+    public void ScheduledSampleRemainsLoadedAfterLastUse()
     {
         var manualClock = new ManualClock();
 
@@ -102,7 +103,7 @@ public partial class TestBmsSampleStoreRate : TestScene
     }
 
     [Test]
-    public void PreloadWaitsForTracks()
+    public void PreloadWaitsForSamples()
     {
         AddStep("create sample + store", () =>
         {
@@ -134,7 +135,7 @@ public partial class TestBmsSampleStoreRate : TestScene
         AddStep("create batched sample store", () =>
         {
             createWav("batched.wav", 1);
-            Dictionary<ushort, string> definitions = [];
+            var definitions = new Dictionary<ushort, string>();
 
             for (ushort sampleKey = 1; sampleKey <= 17; sampleKey++)
                 definitions.Add(sampleKey, "batched.wav");
@@ -156,9 +157,9 @@ public partial class TestBmsSampleStoreRate : TestScene
     }
 
     [Test]
-    public void SameFileWithDifferentKeysCreatesIndependentTracks()
+    public void SameFileWithDifferentKeysCreatesIndependentVoices()
     {
-        long startedVoices = 0;
+        var startedVoices = 0L;
 
         AddStep("create shared sample + store", () =>
         {
@@ -170,22 +171,22 @@ public partial class TestBmsSampleStoreRate : TestScene
             }, tempDir));
         });
         AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddAssert("shared PCM is decoded once", () => store.CacheDiagnostics.LoadedAssets == 1);
-        AddStep("remember voice count", () => startedVoices = store.Diagnostics.StartedVoices);
+        AddAssert("shared PCM is decoded once", () => store.DiagnosticSnapshot.Cache.LoadedAssets == 1);
+        AddStep("remember voice count", () => startedVoices = store.DiagnosticSnapshot.Audio.StartedVoices);
         AddStep("play both keys", () =>
         {
             store.Play(1);
             store.Play(2);
         });
         AddUntilStep("different keys overlap", () =>
-            store.Diagnostics.StartedVoices >= startedVoices + 2 && store.Diagnostics.ActiveVoices >= 2);
+            store.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2 && store.DiagnosticSnapshot.Audio.ActiveVoices >= 2);
         addCleanupSteps();
     }
 
     [Test]
     public void LiveKeysoundsWaitForBatchFlush()
     {
-        long startedVoices = 0;
+        var startedVoices = 0L;
 
         AddStep("create live sample + store", () =>
         {
@@ -197,23 +198,23 @@ public partial class TestBmsSampleStoreRate : TestScene
             }, tempDir));
         });
         AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddStep("remember voice count", () => startedVoices = store.Diagnostics.StartedVoices);
+        AddStep("remember voice count", () => startedVoices = store.DiagnosticSnapshot.Audio.StartedVoices);
         AddStep("queue live chord", () =>
         {
             store.QueueLivePlay(1);
             store.QueueLivePlay(2);
         });
-        AddAssert("samples wait for submit", () => store.Diagnostics.StartedVoices == startedVoices);
+        AddAssert("samples wait for submit", () => store.DiagnosticSnapshot.Audio.StartedVoices == startedVoices);
         AddStep("submit live chord", () => store.SubmitLivePlayBatch());
         AddUntilStep("samples start together", () =>
-            store.Diagnostics.StartedVoices >= startedVoices + 2 && store.Diagnostics.ActiveVoices >= 2);
+            store.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2 && store.DiagnosticSnapshot.Audio.ActiveVoices >= 2);
         addCleanupSteps();
     }
 
     [Test]
     public void ZeroKeyIsPlayableForLandmines()
     {
-        long startedVoices = 0;
+        var startedVoices = 0L;
 
         AddStep("create landmine sample + store", () =>
         {
@@ -221,17 +222,17 @@ public partial class TestBmsSampleStoreRate : TestScene
             Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 0, "landmine.wav" } }, tempDir));
         });
         AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddStep("remember voice count", () => startedVoices = store.Diagnostics.StartedVoices);
+        AddStep("remember voice count", () => startedVoices = store.DiagnosticSnapshot.Audio.StartedVoices);
         AddStep("play key zero", () => store.Play(0));
         AddUntilStep("landmine sample is playing", () =>
-            store.Diagnostics.StartedVoices > startedVoices && store.Diagnostics.ActiveVoices > 0);
+            store.DiagnosticSnapshot.Audio.StartedVoices > startedVoices && store.DiagnosticSnapshot.Audio.ActiveVoices > 0);
         addCleanupSteps();
     }
 
     [Test]
-    public void SameKeyRetriggersExistingTrack()
+    public void SameKeyRetriggersWithNewVoice()
     {
-        long startedVoices = 0;
+        var startedVoices = 0L;
 
         AddStep("create sample + store", () =>
         {
@@ -239,16 +240,16 @@ public partial class TestBmsSampleStoreRate : TestScene
             Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "retrigger.wav" } }, tempDir));
         });
         AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddStep("remember voice count", () => startedVoices = store.Diagnostics.StartedVoices);
+        AddStep("remember voice count", () => startedVoices = store.DiagnosticSnapshot.Audio.StartedVoices);
         AddStep("start from offset", () => store.Play(1, offset: 1000));
-        AddUntilStep("offset voice started", () => store.Diagnostics.StartedVoices >= startedVoices + 1);
+        AddUntilStep("offset voice started", () => store.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 1);
         AddStep("retrigger same key", () => store.Play(1));
-        AddUntilStep("same key starts another logical voice", () => store.Diagnostics.StartedVoices >= startedVoices + 2);
+        AddUntilStep("same key starts another logical voice", () => store.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2);
         addCleanupSteps();
     }
 
     [Test]
-    public void RateUsesTrackTempo()
+    public void RateUsesFixedRateTempo()
     {
         AddStep("create sample + rate store", () =>
         {
@@ -256,7 +257,7 @@ public partial class TestBmsSampleStoreRate : TestScene
             Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "rate.wav" } }, tempDir, rate: 2));
         });
         AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddAssert("fixed-rate backend selected", () => store.Mixer != null);
+        AddAssert("fixed-rate backend selected", () => store.DiagnosticMixer != null);
         AddAssert("sample keeps source length", () => sampleLength(1) is >= 900 and <= 1100);
         addCleanupSteps();
     }
@@ -286,7 +287,7 @@ public partial class TestBmsSampleStoreRate : TestScene
     }
 
     [Test]
-    public void DisposalReleasesOwnedTracks()
+    public void DisposalReleasesOwnedPcmAssets()
     {
         AddStep("create sample + store", () =>
         {
@@ -295,7 +296,7 @@ public partial class TestBmsSampleStoreRate : TestScene
         });
         AddUntilStep("wait for store load", () => store.IsLoaded);
         AddStep("expire store", () => store.Expire());
-        AddUntilStep("owned audio is disposed", () => store.CacheDiagnostics.ResidentPcmBytes == 0);
+        AddUntilStep("owned audio is disposed", () => store.DiagnosticSnapshot.Cache.ResidentPcmBytes == 0);
         AddUntilStep("cleanup temp dir", () =>
         {
             try

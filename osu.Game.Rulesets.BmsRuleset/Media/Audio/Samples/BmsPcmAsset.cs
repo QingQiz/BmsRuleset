@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
@@ -22,7 +21,7 @@ internal sealed class BmsPcmAsset
 {
     private const int chunks_per_page = 64;
 
-    private BmsPcmChunk[][] chunkPages = [];
+    private BmsPcmChunk[]?[] chunkPages = [];
     private int publishedChunkCount;
     private long publishedFrameCount;
     private long totalFrameCount = -1;
@@ -42,20 +41,6 @@ internal sealed class BmsPcmAsset
 
     internal bool IsComplete => State == BmsPcmAssetState.Complete;
 
-    internal IReadOnlyList<BmsPcmChunk> Chunks
-    {
-        get
-        {
-            var count = Volatile.Read(ref publishedChunkCount);
-            var result = new BmsPcmChunk[count];
-
-            for (var i = 0; i < count; i++)
-                result[i] = getPublishedChunk(i);
-
-            return result;
-        }
-    }
-
     internal long ResidentBytes => Interlocked.Read(ref residentBytes);
 
     internal double? OriginalDurationMilliseconds
@@ -69,25 +54,11 @@ internal sealed class BmsPcmAsset
 
     internal BmsPcmAsset(int sampleRate, int channels)
     {
-        if (sampleRate <= 0)
-            throw new ArgumentOutOfRangeException(nameof(sampleRate));
-
-        if (channels <= 0)
-            throw new ArgumentOutOfRangeException(nameof(channels));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sampleRate);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(channels);
 
         SampleRate = sampleRate;
         Channels = channels;
-    }
-
-    internal BmsPcmAsset(IEnumerable<BmsPcmChunk> chunks, long totalFrameCount, int sampleRate, int channels)
-        : this(sampleRate, channels)
-    {
-        ArgumentNullException.ThrowIfNull(chunks);
-
-        foreach (var chunk in chunks)
-            Publish(chunk);
-
-        Complete(totalFrameCount);
     }
 
     internal void Publish(BmsPcmChunk chunk)
@@ -97,7 +68,7 @@ internal sealed class BmsPcmAsset
 
         var expectedStart = Interlocked.Read(ref publishedFrameCount);
         if (chunk.StartFrame != expectedStart || chunk.FrameCount <= 0 || chunk.Samples.Length != chunk.FrameCount * Channels)
-            throw new ArgumentException("PCM chunks must be contiguous and contain complete interleaved frames.", nameof(chunk));
+            throw new ArgumentException(@"PCM chunks must be contiguous and contain complete interleaved frames.", nameof(chunk));
 
         var chunkIndex = Volatile.Read(ref publishedChunkCount);
         var pageIndex = chunkIndex / chunks_per_page;
@@ -106,14 +77,14 @@ internal sealed class BmsPcmAsset
 
         if (pageIndex >= pages.Length)
         {
-            var expanded = new BmsPcmChunk[Math.Max(pageIndex + 1, Math.Max(1, pages.Length * 2))][];
+            var expanded = new BmsPcmChunk[]?[Math.Max(pageIndex + 1, Math.Max(1, pages.Length * 2))];
             Array.Copy(pages, expanded, pages.Length);
             pages = expanded;
             Volatile.Write(ref chunkPages, pages);
         }
 
-        pages[pageIndex] ??= new BmsPcmChunk[chunks_per_page];
-        pages[pageIndex][pageOffset] = chunk;
+        var page = pages[pageIndex] ??= new BmsPcmChunk[chunks_per_page];
+        page[pageOffset] = chunk;
 
         Interlocked.Add(ref residentBytes, (long)chunk.Samples.Length * sizeof(float));
         Interlocked.Exchange(ref publishedFrameCount, chunk.EndFrame);
@@ -129,7 +100,7 @@ internal sealed class BmsPcmAsset
     internal void Complete(long frameCount)
     {
         if (frameCount < 0 || frameCount != PublishedFrameCount)
-            throw new ArgumentOutOfRangeException(nameof(frameCount), "The completed length must match all published PCM chunks.");
+            throw new ArgumentOutOfRangeException(nameof(frameCount), @"The completed length must match all published PCM chunks.");
 
         Interlocked.Exchange(ref totalFrameCount, frameCount);
         Volatile.Write(ref state, (int)BmsPcmAssetState.Complete);
@@ -199,6 +170,6 @@ internal sealed class BmsPcmAsset
     private BmsPcmChunk getPublishedChunk(int index)
     {
         var pages = Volatile.Read(ref chunkPages);
-        return pages[index / chunks_per_page][index % chunks_per_page];
+        return pages[index / chunks_per_page]![index % chunks_per_page];
     }
 }

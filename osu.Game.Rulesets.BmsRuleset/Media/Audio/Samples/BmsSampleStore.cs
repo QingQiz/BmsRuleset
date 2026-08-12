@@ -5,7 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Mixing;
 using osu.Framework.Graphics;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
@@ -17,8 +17,15 @@ public readonly record struct BmsSampleUsage(
     double? CandidateEndTime = null)
 {
     public double EarliestTriggerTime => CandidateStartTime ?? Time;
+
     public double LatestTriggerTime => CandidateEndTime ?? Time;
 }
+
+internal readonly record struct BmsSampleStoreDiagnostics(
+    BmsAudioDiagnostics Audio,
+    BmsPcmAssetCacheDiagnostics Cache,
+    long PreloadUnderflows,
+    long BridgeCallbackFailures);
 
 /// <summary>
 ///     Coordinates BMS sample resources and playback for the ruleset.
@@ -33,7 +40,6 @@ public partial class BmsSampleStore(
     double rate = 1.0,
     IEnumerable<BmsSampleUsage>? sampleUsages = null) : Component
 {
-    private AudioMixer? mixer;
     private BmsPcmVoiceMixer? pcmMixer;
     private BmsPcmPlaybackController? pcmPlaybackController;
     private BmsBassMixerBridge? pcmBridge;
@@ -43,17 +49,15 @@ public partial class BmsSampleStore(
 
     public double MaxSampleLengthMilliseconds => pcmPlaybackController?.MaxSampleLengthMilliseconds ?? 0;
 
-    internal AudioMixer? Mixer => mixer;
+    internal AudioMixer? DiagnosticMixer { get; private set; }
 
-    internal BmsAudioDiagnostics Diagnostics => pcmMixer?.GetDiagnostics() ?? default;
-
-    internal BmsPcmAssetCacheDiagnostics CacheDiagnostics => pcmPlaybackController?.GetCacheDiagnostics() ?? default;
+    internal BmsSampleStoreDiagnostics DiagnosticSnapshot => new(
+        pcmMixer?.GetDiagnostics() ?? default,
+        pcmPlaybackController?.GetCacheDiagnostics() ?? default,
+        pcmPlaybackController?.PreloadUnderflows ?? 0,
+        pcmBridge?.CallbackFailures ?? 0);
 
     internal bool IsSampleReady(ushort sampleKey) => pcmPlaybackController?.IsSampleReady(sampleKey) == true;
-
-    internal long PreloadUnderflows => pcmPlaybackController?.PreloadUnderflows ?? 0;
-
-    internal long BridgeCallbackFailures => pcmBridge?.CallbackFailures ?? 0;
 
     protected override void Dispose(bool isDisposing)
     {
@@ -62,8 +66,8 @@ public partial class BmsSampleStore(
         pcmBridge?.Dispose();
         pcmBridge = null;
         pcmMixer = null;
-        mixer?.Dispose();
-        mixer = null;
+        DiagnosticMixer?.Dispose();
+        DiagnosticMixer = null;
         base.Dispose(isDisposing);
     }
 
@@ -71,7 +75,7 @@ public partial class BmsSampleStore(
 
     internal bool HasSampleDefinition(ushort sampleKey) => pcmPlaybackController?.HasSampleDefinition(sampleKey) == true;
 
-    internal bool SupportsScheduling => pcmPlaybackController != null;
+    internal bool IsPlaybackAvailable => pcmPlaybackController != null;
 
     internal void QueueLivePlay(ushort sampleKey, int volume = 100) => pcmPlaybackController?.QueueLivePlay(sampleKey, volume);
 
@@ -80,10 +84,6 @@ public partial class BmsSampleStore(
     internal void Play(ushort sampleKey, int volume = 100, double offset = 0) => pcmPlaybackController?.Play(sampleKey, volume, offset);
 
     internal bool CanSchedule(ushort sampleKey) => pcmPlaybackController?.CanSchedule(sampleKey) == true;
-
-    internal string GetScheduleDiagnostic() => pcmPlaybackController == null
-        ? "pcm_state=unavailable"
-        : $"pcm_state={pcmPlaybackController.GetCacheDiagnostics()}";
 
     internal void SchedulePlay(ushort sampleKey, int volume, double targetTime) =>
         pcmPlaybackController?.SchedulePlay(sampleKey, volume, targetTime);
@@ -122,9 +122,9 @@ public partial class BmsSampleStore(
 
         try
         {
-            mixer = audioManager.CreateAudioMixer(BmsPcmMixerPatcher.MIXER_IDENTIFIER);
+            DiagnosticMixer = audioManager.CreateAudioMixer(BmsPcmMixerPatcher.MIXER_IDENTIFIER);
             pcmMixer = new BmsPcmVoiceMixer();
-            pcmBridge = new BmsBassMixerBridge(mixer, pcmMixer);
+            pcmBridge = new BmsBassMixerBridge(DiagnosticMixer, pcmMixer);
             pcmPlaybackController = new BmsPcmPlaybackController(
                 sampleDefinitions,
                 basePath,
@@ -149,7 +149,7 @@ public partial class BmsSampleStore(
         pcmBridge?.Dispose();
         pcmBridge = null;
         pcmMixer = null;
-        mixer?.Dispose();
-        mixer = null;
+        DiagnosticMixer?.Dispose();
+        DiagnosticMixer = null;
     }
 }

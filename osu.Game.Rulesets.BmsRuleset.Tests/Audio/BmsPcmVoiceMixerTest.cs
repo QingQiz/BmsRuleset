@@ -1,6 +1,6 @@
 using System;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
@@ -20,8 +20,8 @@ public class BmsPcmVoiceMixerTest
             new(asset, domain, 100, 0.2f),
         ];
 
-        Assert.That(mixer.SubmitPlayBatch(plays), Is.True);
-        var output = mixer.RenderFrames(200, 31);
+        mixer.SubmitPlayBatch(plays);
+        var output = BmsPcmTestHelpers.RenderFrames(mixer, 200, 31);
 
         Assert.Multiple(() =>
         {
@@ -44,13 +44,125 @@ public class BmsPcmVoiceMixerTest
         ];
 
         mixer.SubmitPlayBatch(plays);
-        var output = mixer.RenderFrames(80);
+        var output = BmsPcmTestHelpers.RenderFrames(mixer, 80);
 
         Assert.Multiple(() =>
         {
             Assert.That(output[63 * 2], Is.Zero);
             Assert.That(output[64 * 2], Is.GreaterThan(0));
             Assert.That(output[64 * 2 + 1], Is.EqualTo(output[64 * 2]).Within(0.00001f));
+        });
+    }
+
+    [Test]
+    public void ChordLargerThanInitialCommandSegmentIsNotDropped()
+    {
+        var asset = createConstantAsset(100, 0.1f);
+        var mixer = new BmsPcmVoiceMixer(voiceCapacity: 4, commandSegmentCapacity: 1);
+        BmsVoicePlay[] plays =
+        [
+            new(asset, new BmsTerminationDomain(1), 0),
+            new(asset, new BmsTerminationDomain(2), 0),
+            new(asset, new BmsTerminationDomain(3), 0),
+        ];
+
+        mixer.SubmitPlayBatch(plays);
+        BmsPcmTestHelpers.RenderFrames(mixer, 1);
+        var diagnostics = mixer.GetDiagnostics();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostics.StartedVoices, Is.EqualTo(3));
+            Assert.That(diagnostics.ActiveVoices, Is.EqualTo(3));
+            Assert.That(diagnostics.QueueExpansions, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void OverlappingVoicesExpandBeyondInitialVoiceSegment()
+    {
+        var asset = createConstantAsset(100, 0.1f);
+        var mixer = new BmsPcmVoiceMixer(voiceCapacity: 1);
+        mixer.SubmitPlayBatch([
+            new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0),
+            new BmsVoicePlay(asset, new BmsTerminationDomain(2), 0),
+            new BmsVoicePlay(asset, new BmsTerminationDomain(3), 0),
+        ]);
+
+        BmsPcmTestHelpers.RenderFrames(mixer, 1);
+        var diagnostics = mixer.GetDiagnostics();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostics.StartedVoices, Is.EqualTo(3));
+            Assert.That(diagnostics.ActiveVoices, Is.EqualTo(3));
+            Assert.That(diagnostics.VoicePoolExpansions, Is.EqualTo(1));
+            Assert.That(diagnostics.VoicePoolOverflows, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void RenderingExpandedVoiceSegmentsDoesNotAllocate()
+    {
+        var asset = createConstantAsset(1000, 0.1f);
+        var mixer = new BmsPcmVoiceMixer(voiceCapacity: 1);
+        mixer.SubmitPlayBatch([
+            new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0),
+            new BmsVoicePlay(asset, new BmsTerminationDomain(2), 0),
+        ]);
+        var output = new float[2];
+
+        mixer.Render(output);
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        mixer.Render(output);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.That(allocated, Is.Zero);
+    }
+
+    [Test]
+    public void CompletedVoicesReuseExpandedSegments()
+    {
+        var asset = createConstantAsset(1, 0.1f);
+        var mixer = new BmsPcmVoiceMixer(voiceCapacity: 1);
+        BmsVoicePlay[] plays =
+        [
+            new(asset, new BmsTerminationDomain(1), 0),
+            new(asset, new BmsTerminationDomain(2), 0),
+        ];
+
+        mixer.SubmitPlayBatch(plays);
+        BmsPcmTestHelpers.RenderFrames(mixer, 1);
+        mixer.SubmitPlayBatch(plays);
+        BmsPcmTestHelpers.RenderFrames(mixer, 1);
+        var diagnostics = mixer.GetDiagnostics();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostics.StartedVoices, Is.EqualTo(4));
+            Assert.That(diagnostics.VoicePoolExpansions, Is.EqualTo(1));
+            Assert.That(diagnostics.VoicePoolOverflows, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void RejectedPlayReleasesVoiceReservation()
+    {
+        var asset = createConstantAsset(100, 0.1f);
+        var mixer = new BmsPcmVoiceMixer(voiceCapacity: 1);
+        mixer.SubmitControl(BmsVoiceCommandType.ReplaceEpoch, 0, 1);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0, Epoch: 0)]);
+
+        BmsPcmTestHelpers.RenderFrames(mixer, 1);
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0, Epoch: 1)]);
+        BmsPcmTestHelpers.RenderFrames(mixer, 1);
+        var diagnostics = mixer.GetDiagnostics();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostics.StartedVoices, Is.EqualTo(1));
+            Assert.That(diagnostics.VoicePoolExpansions, Is.Zero);
+            Assert.That(diagnostics.VoicePoolOverflows, Is.Zero);
         });
     }
 
@@ -67,7 +179,7 @@ public class BmsPcmVoiceMixerTest
         ];
 
         mixer.SubmitPlayBatch(plays);
-        var output = mixer.RenderFrames(88);
+        var output = BmsPcmTestHelpers.RenderFrames(mixer, 88);
         var diagnostics = mixer.GetDiagnostics();
 
         Assert.That(output[^2], Is.EqualTo(0.3f).Within(0.00001f));
@@ -91,8 +203,8 @@ public class BmsPcmVoiceMixerTest
         oneFrameMixer.SubmitPlayBatch(plays);
         largeBlockMixer.SubmitPlayBatch(plays);
 
-        var oneFrame = oneFrameMixer.RenderFrames(1000, 1);
-        var largeBlock = largeBlockMixer.RenderFrames(1000, 257);
+        var oneFrame = BmsPcmTestHelpers.RenderFrames(oneFrameMixer, 1000, 1);
+        var largeBlock = BmsPcmTestHelpers.RenderFrames(largeBlockMixer, 1000, 257);
 
         Assert.That(largeBlock, Is.EqualTo(oneFrame));
     }
@@ -104,7 +216,7 @@ public class BmsPcmVoiceMixerTest
         var mixer = new BmsPcmVoiceMixer();
         mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0)]);
 
-        var output = mixer.RenderFrames(100);
+        var output = BmsPcmTestHelpers.RenderFrames(mixer, 100);
         var diagnostics = mixer.GetDiagnostics();
 
         Assert.Multiple(() =>
@@ -144,7 +256,7 @@ public class BmsPcmVoiceMixerTest
             samples[frame * 2 + 1] = value;
         }
 
-        var asset = new BmsPcmAsset([new BmsPcmChunk(0, frames, samples)], frames, 44100, 2);
+        var asset = BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, frames, samples)]);
         var mixer = new BmsPcmVoiceMixer();
         var domain = new BmsTerminationDomain(1);
         mixer.SubmitPlayBatch([
@@ -153,7 +265,7 @@ public class BmsPcmVoiceMixerTest
             new BmsVoicePlay(asset, domain, 2000),
         ]);
 
-        var output = mixer.RenderFrames(4000, 113);
+        var output = BmsPcmTestHelpers.RenderFrames(mixer, 4000, 113);
         var report = BmsAudioArtifactAnalyzer.Analyze(output, 44100, 2);
 
         Assert.That(report.Artifacts, Has.None.Property(nameof(BmsAudioArtifact.Kind)).EqualTo("discontinuity"));
@@ -163,7 +275,7 @@ public class BmsPcmVoiceMixerTest
     {
         var samples = new float[frames * 2];
         Array.Fill(samples, value);
-        return new BmsPcmAsset([new BmsPcmChunk(0, frames, samples)], frames, 44100, 2);
+        return BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, frames, samples)]);
     }
 
     private static BmsPcmAsset createAlternatingAsset(int frames, float value)
@@ -175,6 +287,6 @@ public class BmsPcmVoiceMixerTest
             samples[frame * 2 + 1] = samples[frame * 2];
         }
 
-        return new BmsPcmAsset([new BmsPcmChunk(0, frames, samples)], frames, 44100, 2);
+        return BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, frames, samples)]);
     }
 }

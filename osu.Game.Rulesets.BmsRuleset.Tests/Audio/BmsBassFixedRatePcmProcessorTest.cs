@@ -34,8 +34,9 @@ public class BmsBassFixedRatePcmProcessorTest
     {
         var wave = createWave(44100, 44100 * 2, 440);
         using var processor = BmsFixedRatePcmProcessor.CreateFromMemory(wave, rate, 1024);
-        var asset = processor.Process();
-        var samples = asset.Chunks.SelectMany(chunk => chunk.Samples).ToArray();
+        var chunks = BmsPcmTestHelpers.ProcessChunks(processor);
+        var asset = BmsPcmTestHelpers.CreateAsset(chunks);
+        var samples = chunks.SelectMany(chunk => chunk.Samples).ToArray();
         var expectedFrames = 44100 * 2 / rate;
 
         Assert.Multiple(() =>
@@ -62,8 +63,9 @@ public class BmsBassFixedRatePcmProcessorTest
             Assert.That(first.Asset.State, Is.AnyOf(BmsPcmAssetState.Ready, BmsPcmAssetState.Complete));
         });
 
-        await first.Completion;
+        await BmsPcmTestHelpers.WaitForCompletionAsync(first.Asset);
         Assert.That(first.Asset.IsComplete, Is.True);
+
     }
 
     private static byte[] createWave(int sampleRate, int frames, double frequency)

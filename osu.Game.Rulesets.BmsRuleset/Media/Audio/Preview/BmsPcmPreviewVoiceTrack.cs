@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Audio.Track;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
@@ -139,8 +139,7 @@ internal sealed class BmsPcmPreviewVoiceTrack : Track
             sourceOffset,
             VoiceId: voiceId);
 
-        if (!mixer.SubmitPlayBatch([play]))
-            return;
+        mixer.SubmitPlayBatch([play]);
 
         startPosition = position;
         startOutputFrame = targetFrame;

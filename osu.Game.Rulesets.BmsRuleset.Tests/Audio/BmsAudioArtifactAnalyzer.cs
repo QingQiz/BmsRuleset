@@ -192,7 +192,7 @@ internal static class BmsAudioArtifactAnalyzer
         var outputStart = Math.Max(0, lag);
         var availableFrames = Math.Min(resampled.Length / outputChannels - referenceStart, output.Length / outputChannels - outputStart);
         var windowFrames = Math.Max(1, outputSampleRate / 100); // 10 ms.
-        List<BmsAudioArtifact> artifacts = [];
+        var artifacts = new List<BmsAudioArtifact>();
 
         for (var start = 0; start + windowFrames <= availableFrames; start += windowFrames)
         {

@@ -8,7 +8,7 @@ using osu.Framework.Audio;
 using osu.Framework.Audio.Mixing;
 using osu.Framework.Audio.Track;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
@@ -32,12 +32,10 @@ internal sealed class BmsPreviewAudioLoader : IDisposable
     private volatile bool disposed;
     private float pcmMasterGain = -1;
 
-    internal bool UsesDedicatedMixer => mixer != null;
-
     internal static IReadOnlyList<string> GetExistingDedicatedPreviewCandidates(string basePath, string? previewFile)
     {
         using var fileStore = new BmsFileResourceStore(basePath);
-        List<string> candidates = [];
+        var candidates = new List<string>();
         var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var candidate in getDedicatedPreviewCandidates(previewFile))

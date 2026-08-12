@@ -1,7 +1,7 @@
 using System;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
 
-namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 
 internal sealed class BmsPlaybackClockMapper
 {
@@ -15,8 +15,7 @@ internal sealed class BmsPlaybackClockMapper
         if (!double.IsFinite(rate) || rate < 0.05 || rate > 2)
             throw new ArgumentOutOfRangeException(nameof(rate));
 
-        if (sampleRate <= 0)
-            throw new ArgumentOutOfRangeException(nameof(sampleRate));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sampleRate);
 
         this.rate = rate;
         this.sampleRate = sampleRate;

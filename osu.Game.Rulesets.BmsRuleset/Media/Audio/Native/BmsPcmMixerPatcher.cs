@@ -15,7 +15,7 @@ internal static class BmsPcmMixerPatcher
     internal const string MIXER_IDENTIFIER = "bms-pcm";
 
     private const string harmony_id = "osu.Game.Rulesets.BmsRuleset.PcmFloatMixer";
-    private static readonly object installLock = new();
+    private static readonly object install_lock = new();
 
     internal static bool IsInstalled { get; private set; }
 
@@ -24,7 +24,7 @@ internal static class BmsPcmMixerPatcher
         if (!BmsAudioPlatform.SupportsNativeBass)
             return;
 
-        lock (installLock)
+        lock (install_lock)
         {
             if (IsInstalled)
                 return;
@@ -64,6 +64,7 @@ internal static class BmsPcmMixerPatcher
             {
                 yield return new CodeInstruction(OpCodes.Ldarg_0);
                 yield return new CodeInstruction(OpCodes.Call, adjustFlagsMethod);
+
                 patchedCalls++;
             }
 

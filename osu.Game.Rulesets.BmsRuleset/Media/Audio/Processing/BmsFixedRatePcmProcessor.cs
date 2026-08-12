@@ -23,8 +23,6 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
     internal const int OUTPUT_SAMPLE_RATE = 44100;
     internal const int OUTPUT_CHANNELS = 2;
     internal const int DEFAULT_CHUNK_FRAMES = 4096;
-    internal const int PIPELINE_VERSION = 1;
-
     private const int source_buffer_frames = 4096;
 
     private readonly IBmsPcmSource source;
@@ -32,49 +30,25 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
     private bool processingStarted;
     private bool disposed;
 
-    internal double Rate { get; }
-
     internal double? OriginalDurationMilliseconds => source.OriginalDurationMilliseconds;
 
     internal BmsFixedRatePcmProcessor(IBmsPcmSource source, double rate, int chunkFrames = DEFAULT_CHUNK_FRAMES)
     {
         ArgumentNullException.ThrowIfNull(source);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(chunkFrames);
 
         if (!double.IsFinite(rate) || rate < 0.05 || rate > 2)
-            throw new ArgumentOutOfRangeException(nameof(rate), "BMS audio rate must be between 0.05 and 2.");
+            throw new ArgumentOutOfRangeException(nameof(rate), @"BMS audio rate must be between 0.05 and 2.");
 
         if (source.SampleRate <= 0 || source.Channels <= 0)
-            throw new ArgumentException("The PCM source must expose a valid sample format.", nameof(source));
-
-        if (chunkFrames <= 0)
-            throw new ArgumentOutOfRangeException(nameof(chunkFrames));
+            throw new ArgumentException(@"The PCM source must expose a valid sample format.", nameof(source));
 
         this.source = source;
         this.chunkFrames = chunkFrames;
-        Rate = rate;
     }
-
-    internal static BmsFixedRatePcmProcessor CreateFromFile(string path, double rate, int chunkFrames = DEFAULT_CHUNK_FRAMES) =>
-        new(BmsBassPcmSource.FromFile(path, rate), rate, chunkFrames);
 
     internal static BmsFixedRatePcmProcessor CreateFromMemory(byte[] data, double rate, int chunkFrames = DEFAULT_CHUNK_FRAMES) =>
         new(BmsBassPcmSource.FromMemory(data, rate), rate, chunkFrames);
-
-    internal BmsPcmAsset Process(CancellationToken cancellationToken = default)
-    {
-        ObjectDisposedException.ThrowIf(disposed, this);
-
-        List<BmsPcmChunk> chunks = [];
-        var totalFrames = 0L;
-
-        foreach (var chunk in ProcessChunks(cancellationToken))
-        {
-            chunks.Add(chunk);
-            totalFrames += chunk.FrameCount;
-        }
-
-        return new BmsPcmAsset(chunks, totalFrames, OUTPUT_SAMPLE_RATE, OUTPUT_CHANNELS);
-    }
 
     internal IEnumerable<BmsPcmChunk> ProcessChunks(CancellationToken cancellationToken = default)
     {
@@ -87,48 +61,13 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
 
         var sourceChannels = source.Channels;
         var inputBuffer = new float[source_buffer_frames * sourceChannels];
-        List<float> pendingSamples = new(inputBuffer.Length * 2);
+        var pendingSamples = new List<float>(inputBuffer.Length * 2);
         var pendingStartFrame = 0L;
         var sourceFramesRead = 0L;
         var sourceEnded = false;
         var sourcePosition = 0d;
         var outputFrame = 0L;
         var sourceFramesPerOutputFrame = (double)source.SampleRate / OUTPUT_SAMPLE_RATE;
-
-        bool ensureSourceFrame(long requiredFrame)
-        {
-            while (sourceFramesRead <= requiredFrame && !sourceEnded)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var samplesRead = source.Read(inputBuffer, 0, inputBuffer.Length);
-
-                if (samplesRead < 0 || samplesRead > inputBuffer.Length)
-                    throw new InvalidOperationException("The PCM source returned an invalid sample count.");
-
-                if (samplesRead == 0)
-                {
-                    sourceEnded = true;
-                    break;
-                }
-
-                if (samplesRead % sourceChannels != 0)
-                    throw new InvalidOperationException("The PCM source returned an incomplete sample frame.");
-
-                for (var i = 0; i < samplesRead; i++)
-                    pendingSamples.Add(inputBuffer[i]);
-
-                sourceFramesRead += samplesRead / sourceChannels;
-            }
-
-            return requiredFrame < sourceFramesRead;
-        }
-
-        float getSample(long frame, int outputChannel)
-        {
-            var inputChannel = sourceChannels == 1 ? 0 : Math.Min(outputChannel, sourceChannels - 1);
-            var index = checked((int)((frame - pendingStartFrame) * sourceChannels + inputChannel));
-            return pendingSamples[index];
-        }
 
         while (true)
         {
@@ -174,7 +113,43 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
                 Array.Resize(ref samples, producedFrames * OUTPUT_CHANNELS);
 
             yield return new BmsPcmChunk(outputFrame, producedFrames, samples);
+
             outputFrame += producedFrames;
+        }
+
+        float getSample(long frame, int outputChannel)
+        {
+            var inputChannel = sourceChannels == 1 ? 0 : Math.Min(outputChannel, sourceChannels - 1);
+            var index = checked((int)((frame - pendingStartFrame) * sourceChannels + inputChannel));
+            return pendingSamples[index];
+        }
+
+        bool ensureSourceFrame(long requiredFrame)
+        {
+            while (sourceFramesRead <= requiredFrame && !sourceEnded)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var samplesRead = source.Read(inputBuffer, 0, inputBuffer.Length);
+
+                if (samplesRead < 0 || samplesRead > inputBuffer.Length)
+                    throw new InvalidOperationException("The PCM source returned an invalid sample count.");
+
+                if (samplesRead == 0)
+                {
+                    sourceEnded = true;
+                    break;
+                }
+
+                if (samplesRead % sourceChannels != 0)
+                    throw new InvalidOperationException("The PCM source returned an incomplete sample frame.");
+
+                for (var i = 0; i < samplesRead; i++)
+                    pendingSamples.Add(inputBuffer[i]);
+
+                sourceFramesRead += samplesRead / sourceChannels;
+            }
+
+            return requiredFrame < sourceFramesRead;
         }
     }
 
@@ -239,13 +214,6 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
             }
         }
 
-        internal static BmsBassPcmSource FromFile(string path, double rate)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(path);
-            var handle = Bass.CreateStream(path, 0, 0, BassFlags.Decode | BassFlags.Float | BassFlags.Prescan);
-            return new BmsBassPcmSource(handle, null, rate);
-        }
-
         internal static BmsBassPcmSource FromMemory(byte[] data, double rate)
         {
             ArgumentNullException.ThrowIfNull(data);
@@ -258,7 +226,7 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
             ObjectDisposedException.ThrowIf(outputHandle == 0, this);
 
             if (offset != 0)
-                throw new ArgumentOutOfRangeException(nameof(offset), "BASS PCM reads must start at the beginning of the supplied buffer.");
+                throw new ArgumentOutOfRangeException(nameof(offset), @"BASS PCM reads must start at the beginning of the supplied buffer.");
 
             if (count < 0 || count > buffer.Length)
                 throw new ArgumentOutOfRangeException(nameof(count));

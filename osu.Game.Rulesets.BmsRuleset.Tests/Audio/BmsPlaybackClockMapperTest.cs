@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 
