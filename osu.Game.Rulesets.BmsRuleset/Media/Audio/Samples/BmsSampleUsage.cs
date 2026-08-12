@@ -4,7 +4,8 @@ public readonly record struct BmsSampleUsage(
     ushort SampleKey,
     double Time,
     double? CandidateStartTime = null,
-    double? CandidateEndTime = null)
+    double? CandidateEndTime = null,
+    bool ResumeAfterSeek = false)
 {
     public double EarliestTriggerTime => CandidateStartTime ?? Time;
 

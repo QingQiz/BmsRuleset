@@ -27,6 +27,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private readonly Dictionary<ushort, string> resolvedResources = [];
     private readonly Dictionary<ushort, BmsPcmAssetLease> leases = [];
     private readonly Dictionary<ushort, double> lifetimeEnds = [];
+    private readonly HashSet<ushort> resumableSamples = [];
     private readonly Dictionary<ushort, double> sampleLengths = [];
     private readonly Dictionary<ushort, PendingPlay> pendingPlays = [];
     private readonly List<PendingLivePlay> livePlays = [];
@@ -41,6 +42,8 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private bool disposed;
 
     internal bool IsInitialised => assetCache != null;
+
+    internal IEnumerable<ushort> PreparedSampleKeys => leases.Keys;
 
     internal long PreloadUnderflows { get; private set; }
 
@@ -90,11 +93,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         mixer.SubmitControl(BmsVoiceCommandType.SetMasterGain, mixer.RenderedFrames, epoch, lastMasterGain);
 
         lifetimes = createLifetimes();
-        while (nextLifetimeIndex < lifetimes.Length && lifetimes[nextLifetimeIndex].StartTime <= chartTime)
-        {
-            ensureLease(lifetimes[nextLifetimeIndex].SampleKey);
-            nextLifetimeIndex++;
-        }
+        rebuildLifetimeSchedule(chartTime);
 
         if (sampleUsages == null)
         {
@@ -414,7 +413,12 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             .ToArray();
 
         foreach (var group in groups)
+        {
             lifetimeEnds[group.Key] = group.Max(usage => usage.LatestTriggerTime);
+
+            if (group.Any(usage => usage.ResumeAfterSeek))
+                resumableSamples.Add(group.Key);
+        }
 
         return groups
             .Select(group => new SampleLifetime(group.Key, group.Min(usage => usage.EarliestTriggerTime) - preload_time))
@@ -443,9 +447,12 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         {
             var sampleKey = lifetimes[nextLifetimeIndex].SampleKey;
             var knownLength = sampleLengths.GetValueOrDefault(sampleKey);
+            var mayStillBePlaying = resumableSamples.Contains(sampleKey)
+                                    && (knownLength <= 0 || lifetimeEnds[sampleKey] + knownLength >= chartTime);
 
-            // An unknown duration may belong to a long BGM that still spans the seek target.
-            if (knownLength <= 0 || lifetimeEnds[sampleKey] + knownLength >= chartTime)
+            // Only background samples need their duration resolved after a seek. Historical
+            // keysounds must stay skipped even though their duration is not known yet.
+            if (lifetimeEnds[sampleKey] >= chartTime || mayStillBePlaying)
                 ensureLease(sampleKey);
 
             nextLifetimeIndex++;

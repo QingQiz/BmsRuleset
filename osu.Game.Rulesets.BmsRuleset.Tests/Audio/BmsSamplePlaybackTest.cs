@@ -79,6 +79,50 @@ public partial class BmsSamplePlaybackTest : TestScene
     }
 
     [Test]
+    public void InitialisingPastUsageSkipsExpiredUnknownSample()
+    {
+        var manualClock = new ManualClock { CurrentTime = 60_000 };
+
+        AddStep("create playback past sample lifetime", () =>
+        {
+            createWav("expired-at-load.wav", 1);
+            playback = new BmsSamplePlayback(
+                new Dictionary<ushort, string> { { 1, "expired-at-load.wav" } },
+                tempDir,
+                sampleUsages: [new BmsSampleUsage(1, 100)])
+            {
+                Clock = new FramedClock(manualClock),
+            };
+            Add(playback);
+        });
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddAssert("expired sample was not loaded", () => !isSampleReady(1));
+        addCleanupSteps();
+    }
+
+    [Test]
+    public void InitialisingPastResumableUsageLoadsUnknownSample()
+    {
+        var manualClock = new ManualClock { CurrentTime = 500 };
+
+        AddStep("create playback within unknown background sample", () =>
+        {
+            createWav("resumable-at-load.wav", 1);
+            playback = new BmsSamplePlayback(
+                new Dictionary<ushort, string> { { 1, "resumable-at-load.wav" } },
+                tempDir,
+                sampleUsages: [new BmsSampleUsage(1, 100, ResumeAfterSeek: true)])
+            {
+                Clock = new FramedClock(manualClock),
+            };
+            Add(playback);
+        });
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddAssert("resumable sample was loaded", () => isSampleReady(1));
+        addCleanupSteps();
+    }
+
+    [Test]
     public void ScheduledSampleRemainsLoadedAfterLastUse()
     {
         var manualClock = new ManualClock();

@@ -18,9 +18,6 @@ internal enum BmsPreviewPlaybackStartState
 
 internal sealed class BmsEventPreviewPlayback : IDisposable
 {
-    private const double event_prefetch_time = 1_000;
-    private const int event_prefetch_batch_size = 16;
-
     private readonly BmsPreviewTrack owner;
     private readonly AudioManager audioManager;
     private readonly List<BmsPreviewTimelineEntry> sortedEvents = [];
@@ -28,9 +25,8 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
     private readonly bool extendLengthFromSamples;
     private readonly BindableDouble masterGain = new(1);
     private readonly CancellationTokenSource cancellation = new();
-    private readonly HashSet<ushort> preparedSamples = [];
     private readonly Dictionary<ushort, double> sampleEndTimes = [];
-    private readonly List<ushort> unresolvedSampleLengths = [];
+    private readonly HashSet<ushort> pendingSampleLengths = [];
 
     private BmsPcmPlaybackSession? playbackSession;
     private int nextEventIndex;
@@ -75,6 +71,9 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         var definitions = sortedEvents
             .GroupBy(evt => evt.SampleKey)
             .ToDictionary(group => group.Key, group => group.First().SamplePath);
+        var sampleUsages = sortedEvents
+            .Select(evt => new BmsSampleUsage(evt.SampleKey, evt.Time, ResumeAfterSeek: evt.ResumeAfterSeek))
+            .ToArray();
         var previewRate = Math.Abs(owner.AggregateTempo.Value);
         var rate = double.IsFinite(previewRate) && previewRate is >= 0.05 and <= 2 ? previewRate : 1;
 
@@ -82,7 +81,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             definitions,
             basePath,
             rate,
-            [],
+            sampleUsages,
             audioManager,
             () => owner.CurrentTime,
             masterGain,
@@ -153,7 +152,6 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
     {
         updateMasterGain();
         playbackSession?.Update(currentTime);
-        prefetchSamples(currentTime);
         updateLengthFromPreparedSamples();
 
         if (eventResyncRequired)
@@ -201,26 +199,6 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             : BmsPreviewPlaybackStartState.Ready;
     }
 
-    private void prefetchSamples(double currentTime)
-    {
-        var controller = playbackSession?.Controller;
-        if (controller == null)
-            return;
-
-        var started = 0;
-        var prefetchUntil = currentTime + event_prefetch_time;
-
-        for (var i = nextEventIndex; i < sortedEvents.Count && sortedEvents[i].Time <= prefetchUntil; i++)
-        {
-            var sampleKey = sortedEvents[i].SampleKey;
-            if (!prepareSample(controller, sampleKey))
-                continue;
-
-            if (++started >= event_prefetch_batch_size)
-                break;
-        }
-    }
-
     private bool areDueSamplesResolved(double currentTime)
     {
         var controller = playbackSession?.Controller;
@@ -254,7 +232,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             if (!evt.ResumeAfterSeek || !seenKeys.Add(evt.SampleKey))
                 continue;
 
-            prepareSample(controller, evt.SampleKey);
+            controller.PrepareSample(evt.SampleKey);
             resumeEvents.Add(evt);
         }
 
@@ -275,7 +253,10 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             }
 
             var offset = currentTime - evt.Time;
-            if (offset < controller.GetSampleLength(evt.SampleKey))
+            var sampleLength = controller.GetSampleLength(evt.SampleKey);
+            updateLength(evt.SampleKey, sampleLength);
+
+            if (offset < sampleLength)
                 controller.QueuePlay(evt.SampleKey, evt.Volume, offset);
         }
 
@@ -294,18 +275,19 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
         if (controller == null)
             return;
 
-        for (var i = unresolvedSampleLengths.Count - 1; i >= 0; i--)
+        foreach (var sampleKey in controller.PreparedSampleKeys)
         {
-            var sampleKey = unresolvedSampleLengths[i];
+            if (sampleEndTimes.ContainsKey(sampleKey))
+                pendingSampleLengths.Add(sampleKey);
+        }
+
+        foreach (var sampleKey in pendingSampleLengths.ToArray())
+        {
             if (!controller.IsSampleReady(sampleKey))
                 continue;
 
             var sampleLength = controller.GetSampleLength(sampleKey);
-            if (sampleLength <= 0)
-                continue;
-
-            unresolvedSampleLengths.RemoveAt(i);
-            derivedLength = Math.Max(derivedLength, sampleEndTimes[sampleKey] + sampleLength);
+            updateLength(sampleKey, sampleLength);
         }
 
         if (derivedLength <= 0)
@@ -326,17 +308,13 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     private void stopPlayback() => playbackSession?.Controller?.StopAll();
 
-    private bool prepareSample(BmsPcmPlaybackController controller, ushort sampleKey)
+    private void updateLength(ushort sampleKey, double sampleLength)
     {
-        if (!preparedSamples.Add(sampleKey))
-            return false;
+        if (sampleLength <= 0 || !sampleEndTimes.Remove(sampleKey, out var eventTime))
+            return;
 
-        controller.PrepareSample(sampleKey);
-
-        if (sampleEndTimes.ContainsKey(sampleKey))
-            unresolvedSampleLengths.Add(sampleKey);
-
-        return true;
+        pendingSampleLengths.Remove(sampleKey);
+        derivedLength = Math.Max(derivedLength, eventTime + sampleLength);
     }
 
     private int findFirstEventAfter(double time)

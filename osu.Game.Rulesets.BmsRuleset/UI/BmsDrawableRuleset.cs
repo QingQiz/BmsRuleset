@@ -224,7 +224,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     private static IEnumerable<BmsSampleUsage> getSampleUsages(BmsBeatmap beatmap)
     {
         foreach (var evt in beatmap.BackgroundSampleEvents)
-            yield return new BmsSampleUsage(evt.SampleKey, evt.Time);
+            yield return new BmsSampleUsage(evt.SampleKey, evt.Time, ResumeAfterSeek: true);
 
         foreach (var column in beatmap.HitObjects
                      .Where(hitObject => hitObject is not BmsLandmine)

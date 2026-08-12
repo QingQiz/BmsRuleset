@@ -225,7 +225,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
-    public void TestEventTimelinePrefetchesOneSecondAhead()
+    public void TestEventTimelineUsesGameplayPreloadWindow()
     {
         BmsPreviewTrack track = null!;
         var audioLoadCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -244,8 +244,8 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                     () =>
                     [
                         new BmsPreviewSampleEvent(new BmsSampleEvent(0, 0, 1, 100), false),
-                        new BmsPreviewSampleEvent(new BmsSampleEvent(1000, 0, 2, 100), false),
-                        new BmsPreviewSampleEvent(new BmsSampleEvent(1001, 0, 3, 100), false),
+                        new BmsPreviewSampleEvent(new BmsSampleEvent(10_000, 0, 2, 100), false),
+                        new BmsPreviewSampleEvent(new BmsSampleEvent(10_001, 0, 3, 100), false),
                     ],
                     new Dictionary<ushort, string>
                     {
@@ -265,9 +265,9 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             track.Start();
         });
 
-        AddUntilStep("events through one second start loading", () => Volatile.Read(ref audioLoadCount) >= 2);
-        AddWaitStep("allow additional prefetch updates", 5);
-        AddAssert("event after one second is not prefetched", () => Volatile.Read(ref audioLoadCount) == 2);
+        AddUntilStep("events through ten seconds start loading", () => Volatile.Read(ref audioLoadCount) >= 2);
+        AddWaitStep("allow additional preload updates", 5);
+        AddAssert("event after ten seconds is not preloaded", () => Volatile.Read(ref audioLoadCount) == 2);
         AddStep("dispose track", () =>
         {
             track.Dispose();
@@ -757,6 +757,45 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
+    public void TestRestoreDoesNotPreparePastKeysounds()
+    {
+        BmsPreviewTrack track = null!;
+        var audioLoadCount = 0;
+
+        AddStep("restore past non-resumable keysound", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-past-keysound-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            writePcmWave(Path.Combine(directory, "event.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsEventPreviewTrack(
+                _ => BmsEventPreviewTimeline.Create(
+                    () => [new BmsPreviewSampleEvent(new BmsSampleEvent(1000, 0, 1, 100), false)],
+                    new Dictionary<ushort, string> { [1] = "event.wav" }),
+                directory,
+                audio,
+                _ =>
+                {
+                    Interlocked.Increment(ref audioLoadCount);
+                    return Task.CompletedTask;
+                })
+            {
+                PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly,
+            };
+
+            audio.AddItem(track);
+            track.Seek(1500);
+            track.PlaybackMode = BmsPreviewTrackPlaybackMode.Preview;
+            track.Start();
+        });
+
+        AddUntilStep("preview clock starts", () => track.IsRunning);
+        AddWaitStep("allow preload updates", 5);
+        AddAssert("past keysound was not prepared", () => Volatile.Read(ref audioLoadCount) == 0);
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
     public void TestRestoreAfterClockOnlyPlaybackResumesActiveBackgroundTrack()
     {
         BmsPreviewTrack track = null!;
@@ -894,9 +933,9 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             track.AddAdjustment(AdjustableProperty.Tempo, tempo);
         });
 
-        AddAssert("event tracks are not preloaded", () => getActivePlaybackCount(track) == 0);
+        AddAssert("event voices are not created before playback", () => getActivePlaybackCount(track) == 0);
         AddStep("start event preview", () => track.Start());
-        AddUntilStep("event track starts", () => getActivePlaybackCount(track) > 0);
+        AddUntilStep("event voice starts", () => getActivePlaybackCount(track) > 0);
         AddAssert("preview clock inherits tempo", () => track.AggregateTempo.Value == tempo.Value);
         AddStep("dispose track", () => track.Dispose());
     }
