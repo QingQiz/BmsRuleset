@@ -13,12 +13,12 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 
 [HeadlessTest]
-public partial class BmsSampleStoreTest : TestScene
+public partial class BmsSamplePlaybackTest : TestScene
 {
     private const string silent_flac = "ZkxhQwAAACICQAJAAAAMAAAMAfQA8AAAAFDLQV4FuFvjFJSuG8IzvrWLhAAALAwAAABMYXZmNjEuNy4xMDABAAAAFAAAAGVuY29kZXI9TGF2ZjYxLjcuMTAw//hkCABPCQAAAHyn";
 
     private string tempDir = null!;
-    private BmsSampleStore store = null!;
+    private BmsSamplePlayback playback = null!;
 
     [Test]
     public void NativeMixerPatchInstallsOnDesktopBassPlatforms()
@@ -26,13 +26,13 @@ public partial class BmsSampleStoreTest : TestScene
         if (!BmsAudioPlatform.SupportsNativeBass)
             Assert.Ignore("The native BMS mixer patch is only enabled on Windows and Linux.");
 
-        AddStep("create sample + store", () =>
+        AddStep("create sample + playback", () =>
         {
             createWav("native-mixer.wav", 1);
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "native-mixer.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "native-mixer.wav" } }, tempDir));
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddAssert("PCM backend initialised", () => store.DiagnosticMixer != null);
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddAssert("PCM backend initialised", () => playback.DiagnosticMixer != null);
         AddAssert("PCM float mixer patch installed", () => BmsPcmMixerPatcher.IsInstalled);
         addCleanupSteps();
     }
@@ -42,19 +42,19 @@ public partial class BmsSampleStoreTest : TestScene
     {
         var manualClock = new ManualClock();
 
-        AddStep("create scheduled sample + store", () =>
+        AddStep("create scheduled sample + playback", () =>
         {
             createWav("scheduled.wav", 1);
-            store = new BmsSampleStore(
+            playback = new BmsSamplePlayback(
                 new Dictionary<ushort, string> { { 1, "scheduled.wav" } },
                 tempDir,
                 sampleUsages: [new BmsSampleUsage(1, 10_001)])
             {
                 Clock = new FramedClock(manualClock),
             };
-            Add(store);
+            Add(playback);
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddAssert("sample outside prefetch window", () => !isSampleReady(1));
         AddStep("enter prefetch window", () => manualClock.CurrentTime = 1);
         AddUntilStep("sample loads in prefetch window", () => isSampleReady(1));
@@ -64,16 +64,16 @@ public partial class BmsSampleStoreTest : TestScene
     [Test]
     public void ScheduledSampleUsesEarliestCandidateTime()
     {
-        AddStep("create early-candidate sample + store", () =>
+        AddStep("create early-candidate sample + playback", () =>
         {
             createWav("early-candidate.wav", 1);
-            store = new BmsSampleStore(
+            playback = new BmsSamplePlayback(
                 new Dictionary<ushort, string> { { 1, "early-candidate.wav" } },
                 tempDir,
                 sampleUsages: [new BmsSampleUsage(1, 100_000, CandidateStartTime: 1_000, CandidateEndTime: 100_280)]);
-            Add(store);
+            Add(playback);
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddUntilStep("sample loaded for early candidate", () => isSampleReady(1));
         addCleanupSteps();
     }
@@ -83,48 +83,48 @@ public partial class BmsSampleStoreTest : TestScene
     {
         var manualClock = new ManualClock();
 
-        AddStep("create expiring sample + store", () =>
+        AddStep("create expiring sample + playback", () =>
         {
             createWav("retained.wav", 1);
-            store = new BmsSampleStore(
+            playback = new BmsSamplePlayback(
                 new Dictionary<ushort, string> { { 1, "retained.wav" } },
                 tempDir,
                 sampleUsages: [new BmsSampleUsage(1, 100)])
             {
                 Clock = new FramedClock(manualClock),
             };
-            Add(store);
+            Add(playback);
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddAssert("scheduled sample loaded during store load", () => isSampleReady(1));
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddAssert("scheduled sample loaded during playback load", () => isSampleReady(1));
         AddStep("advance past last use", () => manualClock.CurrentTime = 60_000);
-        AddUntilStep("expired PCM lease is released", () => !store.IsSampleReady(1));
+        AddUntilStep("expired PCM lease is released", () => !playback.IsSampleReady(1));
         addCleanupSteps();
     }
 
     [Test]
     public void PreloadWaitsForSamples()
     {
-        AddStep("create sample + store", () =>
+        AddStep("create sample + playback", () =>
         {
             createWav("sine.wav", 1);
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "sine.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "sine.wav" } }, tempDir));
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddAssert("sample loaded during store load", () => isSampleReady(1) && sampleLength(1) > 0);
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddAssert("sample loaded during playback load", () => isSampleReady(1) && sampleLength(1) > 0);
         addCleanupSteps();
     }
 
     [Test]
     public void WavDefinitionFallsBackToFlac()
     {
-        AddStep("create FLAC sample + store", () =>
+        AddStep("create FLAC sample + playback", () =>
         {
             tempDir = Directory.CreateTempSubdirectory("bmstracks").FullName;
             File.WriteAllBytes(Path.Combine(tempDir, "sine.flac"), Convert.FromBase64String(silent_flac));
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "sine.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "sine.wav" } }, tempDir));
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddAssert("FLAC fallback sample loaded", () => isSampleReady(1) && sampleLength(1) > 0);
         addCleanupSteps();
     }
@@ -132,7 +132,7 @@ public partial class BmsSampleStoreTest : TestScene
     [Test]
     public void PreloadCompletesAcrossBatches()
     {
-        AddStep("create batched sample store", () =>
+        AddStep("create batched sample playback", () =>
         {
             createWav("batched.wav", 1);
             var definitions = new Dictionary<ushort, string>();
@@ -140,9 +140,9 @@ public partial class BmsSampleStoreTest : TestScene
             for (ushort sampleKey = 1; sampleKey <= 17; sampleKey++)
                 definitions.Add(sampleKey, "batched.wav");
 
-            Add(store = new BmsSampleStore(definitions, tempDir));
+            Add(playback = new BmsSamplePlayback(definitions, tempDir));
         });
-        AddUntilStep("wait for batched store load", () => store.IsLoaded);
+        AddUntilStep("wait for batched playback load", () => playback.IsLoaded);
         AddAssert("all batches loaded", () =>
         {
             for (ushort sampleKey = 1; sampleKey <= 17; sampleKey++)
@@ -161,25 +161,25 @@ public partial class BmsSampleStoreTest : TestScene
     {
         var startedVoices = 0L;
 
-        AddStep("create shared sample + store", () =>
+        AddStep("create shared sample + playback", () =>
         {
             createWav("shared.wav", 6);
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string>
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string>
             {
                 { 1, "shared.wav" },
                 { 2, "shared.wav" },
             }, tempDir));
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddAssert("shared PCM is decoded once", () => store.DiagnosticSnapshot.Cache.LoadedAssets == 1);
-        AddStep("remember voice count", () => startedVoices = store.DiagnosticSnapshot.Audio.StartedVoices);
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddAssert("shared PCM is decoded once", () => playback.DiagnosticSnapshot.Cache.LoadedAssets == 1);
+        AddStep("remember voice count", () => startedVoices = playback.DiagnosticSnapshot.Audio.StartedVoices);
         AddStep("play both keys", () =>
         {
-            store.Play(1);
-            store.Play(2);
+            playback.Play(1);
+            playback.Play(2);
         });
         AddUntilStep("different keys overlap", () =>
-            store.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2 && store.DiagnosticSnapshot.Audio.ActiveVoices >= 2);
+            playback.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2 && playback.DiagnosticSnapshot.Audio.ActiveVoices >= 2);
         addCleanupSteps();
     }
 
@@ -188,26 +188,26 @@ public partial class BmsSampleStoreTest : TestScene
     {
         var startedVoices = 0L;
 
-        AddStep("create live sample + store", () =>
+        AddStep("create live sample + playback", () =>
         {
             createWav("live.wav", 6);
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string>
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string>
             {
                 { 1, "live.wav" },
                 { 2, "live.wav" },
             }, tempDir));
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddStep("remember voice count", () => startedVoices = store.DiagnosticSnapshot.Audio.StartedVoices);
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddStep("remember voice count", () => startedVoices = playback.DiagnosticSnapshot.Audio.StartedVoices);
         AddStep("queue live chord", () =>
         {
-            store.QueueLivePlay(1);
-            store.QueueLivePlay(2);
+            playback.QueueLivePlay(1);
+            playback.QueueLivePlay(2);
         });
-        AddAssert("samples wait for submit", () => store.DiagnosticSnapshot.Audio.StartedVoices == startedVoices);
-        AddStep("submit live chord", () => store.SubmitLivePlayBatch());
+        AddAssert("samples wait for submit", () => playback.DiagnosticSnapshot.Audio.StartedVoices == startedVoices);
+        AddStep("submit live chord", () => playback.SubmitLivePlayBatch());
         AddUntilStep("samples start together", () =>
-            store.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2 && store.DiagnosticSnapshot.Audio.ActiveVoices >= 2);
+            playback.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2 && playback.DiagnosticSnapshot.Audio.ActiveVoices >= 2);
         addCleanupSteps();
     }
 
@@ -216,16 +216,16 @@ public partial class BmsSampleStoreTest : TestScene
     {
         var startedVoices = 0L;
 
-        AddStep("create landmine sample + store", () =>
+        AddStep("create landmine sample + playback", () =>
         {
             createWav("landmine.wav", 1);
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 0, "landmine.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 0, "landmine.wav" } }, tempDir));
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddStep("remember voice count", () => startedVoices = store.DiagnosticSnapshot.Audio.StartedVoices);
-        AddStep("play key zero", () => store.Play(0));
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddStep("remember voice count", () => startedVoices = playback.DiagnosticSnapshot.Audio.StartedVoices);
+        AddStep("play key zero", () => playback.Play(0));
         AddUntilStep("landmine sample is playing", () =>
-            store.DiagnosticSnapshot.Audio.StartedVoices > startedVoices && store.DiagnosticSnapshot.Audio.ActiveVoices > 0);
+            playback.DiagnosticSnapshot.Audio.StartedVoices > startedVoices && playback.DiagnosticSnapshot.Audio.ActiveVoices > 0);
         addCleanupSteps();
     }
 
@@ -234,30 +234,30 @@ public partial class BmsSampleStoreTest : TestScene
     {
         var startedVoices = 0L;
 
-        AddStep("create sample + store", () =>
+        AddStep("create sample + playback", () =>
         {
             createWav("retrigger.wav", 6);
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "retrigger.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "retrigger.wav" } }, tempDir));
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddStep("remember voice count", () => startedVoices = store.DiagnosticSnapshot.Audio.StartedVoices);
-        AddStep("start from offset", () => store.Play(1, offset: 1000));
-        AddUntilStep("offset voice started", () => store.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 1);
-        AddStep("retrigger same key", () => store.Play(1));
-        AddUntilStep("same key starts another logical voice", () => store.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2);
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddStep("remember voice count", () => startedVoices = playback.DiagnosticSnapshot.Audio.StartedVoices);
+        AddStep("start from offset", () => playback.Play(1, offset: 1000));
+        AddUntilStep("offset voice started", () => playback.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 1);
+        AddStep("retrigger same key", () => playback.Play(1));
+        AddUntilStep("same key starts another logical voice", () => playback.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2);
         addCleanupSteps();
     }
 
     [Test]
     public void RateUsesFixedRateTempo()
     {
-        AddStep("create sample + rate store", () =>
+        AddStep("create sample + rate playback", () =>
         {
             createWav("rate.wav", 1);
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "rate.wav" } }, tempDir, rate: 2));
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "rate.wav" } }, tempDir, rate: 2));
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddAssert("fixed-rate backend selected", () => store.DiagnosticMixer != null);
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddAssert("fixed-rate backend selected", () => playback.DiagnosticMixer != null);
         AddAssert("sample keeps source length", () => sampleLength(1) is >= 900 and <= 1100);
         addCleanupSteps();
     }
@@ -265,38 +265,38 @@ public partial class BmsSampleStoreTest : TestScene
     [Test]
     public void InvalidAudioDoesNotWaitForTimeout()
     {
-        AddStep("create invalid sample + store", () =>
+        AddStep("create invalid sample + playback", () =>
         {
             tempDir = Directory.CreateTempSubdirectory("bmstracks").FullName;
             File.WriteAllBytes(Path.Combine(tempDir, "invalid.wav"), [0, 1, 2, 3]);
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "invalid.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "invalid.wav" } }, tempDir));
         });
-        AddUntilStep("store loads without timeout", () => store.IsLoaded);
-        AddAssert("invalid sample is unavailable", () => !store.HasSampleDefinition(1));
+        AddUntilStep("playback loads without timeout", () => playback.IsLoaded);
+        AddAssert("invalid sample is unavailable", () => !playback.HasSampleDefinition(1));
         addCleanupSteps();
     }
 
     [Test]
     public void EmptySampleDefinitionIsUnavailable()
     {
-        AddStep("create store with empty definition", () =>
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, string.Empty } }, tempDir)));
-        AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddAssert("empty definition is unavailable", () => !store.HasSampleDefinition(1));
+        AddStep("create playback with empty definition", () =>
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, string.Empty } }, tempDir)));
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddAssert("empty definition is unavailable", () => !playback.HasSampleDefinition(1));
         addCleanupSteps();
     }
 
     [Test]
     public void DisposalReleasesOwnedPcmAssets()
     {
-        AddStep("create sample + store", () =>
+        AddStep("create sample + playback", () =>
         {
             createWav("dispose.wav", 1);
-            Add(store = new BmsSampleStore(new Dictionary<ushort, string> { { 1, "dispose.wav" } }, tempDir));
+            Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "dispose.wav" } }, tempDir));
         });
-        AddUntilStep("wait for store load", () => store.IsLoaded);
-        AddStep("expire store", () => store.Expire());
-        AddUntilStep("owned audio is disposed", () => store.DiagnosticSnapshot.Cache.ResidentPcmBytes == 0);
+        AddUntilStep("wait for playback load", () => playback.IsLoaded);
+        AddStep("expire playback", () => playback.Expire());
+        AddUntilStep("owned audio is disposed", () => playback.DiagnosticSnapshot.Cache.ResidentPcmBytes == 0);
         AddUntilStep("cleanup temp dir", () =>
         {
             try
@@ -313,9 +313,9 @@ public partial class BmsSampleStoreTest : TestScene
         });
     }
 
-    private bool isSampleReady(ushort sampleKey) => store.IsSampleReady(sampleKey);
+    private bool isSampleReady(ushort sampleKey) => playback.IsSampleReady(sampleKey);
 
-    private double sampleLength(ushort sampleKey) => store.GetSampleLength(sampleKey);
+    private double sampleLength(ushort sampleKey) => playback.GetSampleLength(sampleKey);
 
     private void createWav(string filename, int seconds)
     {
@@ -347,7 +347,7 @@ public partial class BmsSampleStoreTest : TestScene
 
     private void addCleanupSteps()
     {
-        AddStep("expire store", () => store.Expire());
+        AddStep("expire playback", () => playback.Expire());
         AddUntilStep("cleanup temp dir", () =>
         {
             try

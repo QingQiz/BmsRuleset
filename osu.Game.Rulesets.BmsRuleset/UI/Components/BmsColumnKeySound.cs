@@ -21,13 +21,13 @@ public sealed partial class BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObj
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
     [Resolved]
-    private BmsSampleStore sampleStore { get; set; } = null!;
+    private BmsSamplePlayback samplePlayback { get; set; } = null!;
 
-    /// <summary>Triggers a note-hit / LN-tail definition in the shared Track store.</summary>
+    /// <summary>Triggers a note-hit / LN-tail definition through shared sample playback.</summary>
     public void PlaySample(ushort? sampleKey, int volume = 100)
     {
         if (sampleKey is { } key)
-            sampleStore.QueueLivePlay(key, volume);
+            samplePlayback.QueueLivePlay(key, volume);
     }
 
     /// <summary>

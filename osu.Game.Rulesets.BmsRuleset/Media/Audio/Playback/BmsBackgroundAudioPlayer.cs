@@ -33,11 +33,11 @@ public partial class BmsBackgroundAudioPlayer(
     private bool resyncRequired;
 
     [Resolved]
-    private BmsSampleStore sampleStore { get; set; } = null!;
+    private BmsSamplePlayback samplePlayback { get; set; } = null!;
 
     protected override void Dispose(bool isDisposing)
     {
-        sampleStore.StopAll();
+        samplePlayback.StopAll();
         base.Dispose(isDisposing);
     }
 
@@ -92,7 +92,7 @@ public partial class BmsBackgroundAudioPlayer(
 
             // Undefined background keys are silent, but must not hold valid events at the same
             // timestamp behind the scheduling boundary.
-            if (!sampleStore.HasSampleDefinition(evt.SampleKey))
+            if (!samplePlayback.HasSampleDefinition(evt.SampleKey))
             {
                 nextIndex++;
                 continue;
@@ -105,7 +105,7 @@ public partial class BmsBackgroundAudioPlayer(
             // enter one mixer batch. Pre-scheduling BGM lets it reach the output buffer before a
             // simultaneous key press can be submitted, making the background layer sound early.
             if (Time.Current - evt.Time < allowable_late_start)
-                sampleStore.QueueLivePlay(evt.SampleKey, evt.Volume);
+                samplePlayback.QueueLivePlay(evt.SampleKey, evt.Volume);
 
             nextIndex++;
         }
@@ -123,17 +123,17 @@ public partial class BmsBackgroundAudioPlayer(
 
     private void handleSeek(double currentTime)
     {
-        sampleStore.StopAll();
+        samplePlayback.StopAll();
         nextIndex = findFirstEventAfter(currentTime);
 
         foreach (var seeked in SelectEventsForSeek(
                      sortedEvents,
                      nextIndex,
                      currentTime,
-                     sampleStore.MaxSampleLengthMilliseconds,
-                     sampleStore.GetSampleLength))
+                     samplePlayback.MaxSampleLengthMilliseconds,
+                     samplePlayback.GetSampleLength))
         {
-            sampleStore.Play(seeked.Event.SampleKey, seeked.Event.Volume, seeked.Offset);
+            samplePlayback.Play(seeked.Event.SampleKey, seeked.Event.Volume, seeked.Offset);
         }
     }
 
@@ -206,14 +206,14 @@ public partial class BmsBackgroundAudioPlayer(
             return;
 
         playbackBlocked = blocked;
-        sampleStore.SetPlaybackBlocked(playbackBlocked);
+        samplePlayback.SetPlaybackBlocked(playbackBlocked);
 
         if (playbackBlocked)
         {
             playbackBlockedAt = Time.Current;
 
             // Future mixer commands need a fresh epoch after the gameplay clock stops advancing.
-            if (sampleStore.IsPlaybackAvailable)
+            if (samplePlayback.IsPlaybackAvailable)
                 resyncRequired = true;
 
             return;
@@ -230,6 +230,6 @@ public partial class BmsBackgroundAudioPlayer(
             return;
         }
 
-        sampleStore.ResumeAll();
+        samplePlayback.ResumeAll();
     }
 }

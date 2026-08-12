@@ -54,27 +54,27 @@ public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
         AddStep("load player", LoadPlayer);
         AddUntilStep("drawable ruleset created", () => Player.DrawableRuleset != null);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
-        AddUntilStep("sample store loaded", () => getSampleStore().IsLoaded);
-        AddUntilStep("initial background sample loaded", () => getSampleStore().IsSampleReady(backgroundKey));
+        AddUntilStep("sample playback loaded", () => getSamplePlayback().IsLoaded);
+        AddUntilStep("initial background sample loaded", () => getSamplePlayback().IsSampleReady(backgroundKey));
         AddAssert("still before first note", () => Player.GameplayClockContainer.CurrentTime < Player.GameplayState.Beatmap.HitObjects[0].StartTime);
         AddAssert("sample playback enabled", () => !((ISamplePlaybackDisabler)Player).SamplePlaybackDisabled.Value);
         AddAssert("frame clock not catching up", () => !Player.DrawableRuleset.FrameStableClock.IsCatchingUp.Value);
         AddUntilStep("past first background event", () => Player.GameplayClockContainer.CurrentTime >= 1000);
         AddUntilStep("background starts or first note reached", () =>
-            getSampleStore().DiagnosticSnapshot.Audio.ActiveVoices > 0
+            getSamplePlayback().DiagnosticSnapshot.Audio.ActiveVoices > 0
             || Player.GameplayClockContainer.CurrentTime >= Player.GameplayState.Beatmap.HitObjects[0].StartTime);
         AddAssert("long background sample started before first note", () =>
-            getSampleStore().DiagnosticSnapshot.Audio.ActiveVoices > 0
+            getSamplePlayback().DiagnosticSnapshot.Audio.ActiveVoices > 0
             && Player.GameplayClockContainer.CurrentTime < Player.GameplayState.Beatmap.HitObjects[0].StartTime);
         AddUntilStep("background is audible or first note reached", () =>
-            getSampleStore().DiagnosticSnapshot.Audio.OutputPeak > 0
+            getSamplePlayback().DiagnosticSnapshot.Audio.OutputPeak > 0
             || Player.GameplayClockContainer.CurrentTime >= Player.GameplayState.Beatmap.HitObjects[0].StartTime);
-        AddAssert("long background sample is audible", () => getSampleStore().DiagnosticSnapshot.Audio.OutputPeak > 0);
+        AddAssert("long background sample is audible", () => getSamplePlayback().DiagnosticSnapshot.Audio.OutputPeak > 0);
     }
 
-    private BmsSampleStore getSampleStore() =>
-        (BmsSampleStore)typeof(BmsDrawableRuleset)
-            .GetField("sampleStore", BindingFlags.Instance | BindingFlags.NonPublic)!
+    private BmsSamplePlayback getSamplePlayback() =>
+        (BmsSamplePlayback)typeof(BmsDrawableRuleset)
+            .GetField("samplePlayback", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(Player.DrawableRuleset)!;
 
 }

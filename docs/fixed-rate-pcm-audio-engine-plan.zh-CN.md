@@ -81,7 +81,7 @@ SampleKey + Pitch + Slice(start, duration)
 
 ### 固定 rate
 
-本局 rate 在 `BmsDrawableRuleset` 创建 `BmsSampleStore` 时确定，之后保持不可变：
+本局 rate 在 `BmsDrawableRuleset` 创建 `BmsSamplePlayback` 时确定，之后保持不可变：
 
 ```text
 tempo = rate
@@ -103,7 +103,7 @@ BmsFixedRatePcmProcessor -- BASS decode -> BASS_FX tempo -> 44.1 kHz float stere
 BmsPcmAssetCache -- immutable PCM chunks + usage/lifetime + memory budget
         |
         v
-BmsSampleStore facade -- QueueLivePlay / SubmitLivePlayBatch / Play / StopAll
+BmsSamplePlayback facade -- QueueLivePlay / SubmitLivePlayBatch / Play / StopAll
         |
         v
 BmsPcmVoiceMixer -- command queue -> voice state -> fade -> sum -> limiter
@@ -290,7 +290,7 @@ ReplaceEpoch
 
 ## 播放与批处理
 
-`BmsSampleStore` 继续作为调用 facade，保留：
+`BmsSamplePlayback` 继续作为调用 facade，保留：
 
 ```text
 QueueLivePlay
@@ -460,7 +460,7 @@ Media/Audio/Mixing/BmsPlaybackClockMapper.cs
 Media/Audio/Mixing/BmsAudioDiagnostics.cs
 ```
 
-不要让 `BmsSampleStore` 再次承担解码、缓存、实时混音、线程队列和诊断格式化。它只协调各组件并维持现有调用 API。
+不要让 `BmsSamplePlayback` 承担解码、缓存、实时混音、线程队列和诊断格式化。它只协调 gameplay 调用与 Component 生命周期；后端组装和所有权由 `BmsPcmPlaybackSession` 负责。
 
 ## 开发阶段与验收门
 
@@ -549,7 +549,7 @@ Media/Audio/Mixing/BmsAudioDiagnostics.cs
 
 工作内容：
 
-- `BmsSampleStore` 切换到 PCM backend。
+- `BmsSamplePlayback` 切换到 PCM backend。
 - 保持 `BmsColumnKeySound`、`BmsBackgroundAudioPlayer` 和 `BmsDrawableRuleset` 的 facade 调用稳定。
 - BGM 与 live keysound 进入同一个 update batch。
 - 接入 landmine、LN tail、empty press、autoplay/replay 禁音和 Background Keysound mod。

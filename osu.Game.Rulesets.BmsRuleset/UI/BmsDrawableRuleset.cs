@@ -39,7 +39,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         : base(ruleset, beatmap, mods)
     {
         var bmsBeatmap = (BmsBeatmap)beatmap;
-        sampleStore = new BmsSampleStore(
+        samplePlayback = new BmsSamplePlayback(
             bmsBeatmap.SampleDefinitions,
             getSource(bmsBeatmap),
             getRate(Mods),
@@ -81,7 +81,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     private BmsPreviewTrack? previewTrackBeforePlay;
 
     [Cached]
-    private readonly BmsSampleStore sampleStore;
+    private readonly BmsSamplePlayback samplePlayback;
 
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
     [Resolved(CanBeNull = true)]
@@ -184,7 +184,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
         // Columns receive input independently while the playfield updates. Submitting here preserves
         // one mixer target for every keysound produced by the same ruleset update.
-        sampleStore.SubmitLivePlayBatch();
+        samplePlayback.SubmitLivePlayBatch();
     }
 
     protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);
@@ -337,8 +337,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
         Overlays.Add(StageHudController);
 
-        // The store follows the gameplay clock to load PCM samples before their first use.
-        FrameStableComponents.Add(sampleStore);
+        // Sample playback follows the gameplay clock to load PCM samples before their first use.
+        FrameStableComponents.Add(samplePlayback);
 
         var events = beatmap.BackgroundSampleEvents
             .OrderBy(e => e.Time)
@@ -347,7 +347,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             .ToList();
 
         // This component also coordinates pause/seek blocking for KeySounds in the shared Track
-        // store, so it must exist even when the chart has no background sample events.
+        // playback component, so it must exist even when the chart has no background sample events.
         FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events, backgroundAudioPaused));
 
         if (Config is BmsRulesetConfigManager config)
