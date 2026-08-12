@@ -1,9 +1,9 @@
 using System;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
-public class BmsTextEventManager(BmsTextEvents events)
+public class BmsGameplayTextEventController(BmsTextEvents events)
 {
     private int index;
     private double lastTime = double.MinValue;

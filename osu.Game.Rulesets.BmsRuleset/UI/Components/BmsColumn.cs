@@ -11,6 +11,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;

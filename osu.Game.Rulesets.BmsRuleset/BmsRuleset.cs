@@ -28,6 +28,7 @@ using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Filter;

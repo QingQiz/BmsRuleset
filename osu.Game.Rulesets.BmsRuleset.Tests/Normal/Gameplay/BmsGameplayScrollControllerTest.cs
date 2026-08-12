@@ -1,16 +1,16 @@
 using System.Collections.Generic;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
 
 [TestFixture]
-public class BmsScrollControllerTest
+public class BmsGameplayScrollControllerTest
 {
     [Test]
     public void TestAdjustScrollSpeedAppliesPresetAndNotifies()
     {
-        var controller = new BmsScrollController(null);
+        var controller = new BmsGameplayScrollController(null);
         var notifications = new List<double>();
         controller.ScrollSpeedChanged += notifications.Add;
 
@@ -24,7 +24,7 @@ public class BmsScrollControllerTest
     [Test]
     public void TestConfiguredScrollSpeedUpdatesBaseWithoutNotification()
     {
-        var controller = new BmsScrollController(null);
+        var controller = new BmsGameplayScrollController(null);
         var notifications = new List<double>();
         controller.ScrollSpeedChanged += notifications.Add;
 
@@ -43,7 +43,7 @@ public class BmsScrollControllerTest
     [Test]
     public void TestUpdateFallsBackToCurrentTimeWithoutTimingMap()
     {
-        var controller = new BmsScrollController(null);
+        var controller = new BmsGameplayScrollController(null);
 
         controller.Update(1234);
 
@@ -54,7 +54,7 @@ public class BmsScrollControllerTest
     [Test]
     public void TestCroppedViewportPreservesVisibleTime()
     {
-        var controller = new BmsScrollController(null);
+        var controller = new BmsGameplayScrollController(null);
         controller.SetHitTargetPosition(80);
         var visibleProgress = controller.ScrollRange / controller.ScrollSpeedMultiplier;
 
@@ -69,8 +69,8 @@ public class BmsScrollControllerTest
     [TestCase(1.5)]
     public void TestPlaybackRatePreservesTravelDistance(double playbackRate)
     {
-        var normal = new BmsScrollController(null);
-        var adjusted = new BmsScrollController(null);
+        var normal = new BmsGameplayScrollController(null);
+        var adjusted = new BmsGameplayScrollController(null);
         adjusted.SetPlaybackRate(playbackRate);
 
         var normalPosition = normal.YForScrollProgress(1000, 768, 124.8);

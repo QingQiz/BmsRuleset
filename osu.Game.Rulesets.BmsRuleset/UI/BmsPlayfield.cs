@@ -16,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
@@ -52,7 +53,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public BmsPlayfield(BmsBeatmap beatmap)
     {
         Beatmap = beatmap;
-        textEventManager = new BmsTextEventManager(beatmap.TextEvents);
+        textEventController = new BmsGameplayTextEventController(beatmap.TextEvents);
 
         activeSkin = new BmsEmbeddedSkinSource();
         skinCache = new BmsGameplaySkinCache(activeSkin);
@@ -60,7 +61,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         TotalColumns = Math.Max(1, beatmap.TotalColumns);
         LayoutVariant = beatmap.LayoutVariant;
         TimingMap = beatmap.TimingMap;
-        ScrollController = new BmsScrollController(TimingMap);
+        ScrollController = new BmsGameplayScrollController(TimingMap);
         ScrollController.ScrollSpeedChanged += onScrollSpeedChanged;
 
         Anchor = Anchor.Centre;
@@ -123,11 +124,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region BmsEvents
 
-    private readonly BmsTextEventManager textEventManager;
+    private readonly BmsGameplayTextEventController textEventController;
 
     private void triggerEvents()
     {
-        textEventManager.Update(Time.Current, gameplayEvents.RaiseText);
+        textEventController.Update(Time.Current, gameplayEvents.RaiseText);
     }
 
     #endregion
@@ -146,7 +147,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public BmsTimingMap? TimingMap { get; }
 
-    internal BmsScrollController ScrollController { get; }
+    internal BmsGameplayScrollController ScrollController { get; }
 
     /// <summary>
     /// Applied only to predictable scrolling visuals so judgements remain based on <c>Time.Current</c>.
@@ -426,7 +427,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     private void requestJudgementDisplay(HitResult result)
     {
         if (result == HitResult.Meh)
-            textEventManager.TriggerMistake(gameplayEvents.RaiseText);
+            textEventController.TriggerMistake(gameplayEvents.RaiseText);
 
         gameplayEvents.RaiseJudgementDisplayed(result);
     }

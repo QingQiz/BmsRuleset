@@ -6,11 +6,11 @@ using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 internal sealed class BmsHitObjectLifetimeEntry(
     HitObject hitObject,
-    BmsScrollController scrollController,
+    BmsGameplayScrollController scrollController,
     Func<double> getVisualOffset)
     : HitObjectLifetimeEntry(hitObject)
 {
@@ -195,7 +195,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
         // Fast notes can enter during gameplay lead-in, while the maximum supported scroll window
         // keeps the search bounded when a stationary timing segment remains visible indefinitely.
         var earliestSearchTime = Math.Min(0, hitObject.StartTime
-                                             - BmsScrollController.MAX_TIME_RANGE * currentScrollRangeScale() * scrollController.PlaybackRate);
+                                             - BmsGameplayScrollController.MAX_TIME_RANGE * currentScrollRangeScale() * scrollController.PlaybackRate);
 
         for (var probeTime = hitObject.StartTime; probeTime > earliestSearchTime;)
         {
@@ -271,7 +271,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
         if (!double.IsFinite(speedFactor) || speedFactor < 0.001)
             return double.PositiveInfinity;
 
-        return BmsScrollController.ComputeScrollTime(BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED)
+        return BmsGameplayScrollController.ComputeScrollTime(BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED)
                * currentScrollRangeScale()
                * scrollController.PlaybackRate
                / Math.Max(0.001, scrollController.ScrollSpeed / BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED * speedFactor);
@@ -284,7 +284,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     private double computeConstantScrollFutureLifetime()
     {
         var speed = Math.Max(0.001, scrollController.ScrollSpeed);
-        return BmsScrollController.ComputeScrollTime(speed) * currentScrollRangeScale() * scrollController.PlaybackRate + lifetime_margin;
+        return BmsGameplayScrollController.ComputeScrollTime(speed) * currentScrollRangeScale() * scrollController.PlaybackRate + lifetime_margin;
     }
 
     #endregion

@@ -1,7 +1,7 @@
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 public interface IBmsLnScoring
 {

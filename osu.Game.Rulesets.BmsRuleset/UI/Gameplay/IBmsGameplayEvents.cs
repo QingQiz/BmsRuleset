@@ -1,7 +1,7 @@
 using System;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 public interface IBmsGameplayEvents
 {

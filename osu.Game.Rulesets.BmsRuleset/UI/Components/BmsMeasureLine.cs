@@ -2,6 +2,7 @@ using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 
@@ -9,7 +10,7 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
 {
 
     private readonly Box line;
-    private BmsScrollController? scrollController;
+    private BmsGameplayScrollController? scrollController;
     private BmsStage? stage;
 
     // Two coordinate representations of the same measure line:
@@ -30,7 +31,7 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
         };
     }
 
-    internal void Apply(BmsMeasureLineContainer.MeasureLineInfo info, BmsScrollController scrollController, BmsStage stage)
+    internal void Apply(BmsMeasureLineContainer.MeasureLineInfo info, BmsGameplayScrollController scrollController, BmsStage stage)
     {
         this.scrollController = scrollController;
         this.stage = stage;

@@ -3,21 +3,21 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
 
 [TestFixture]
-public class BmsTextEventManagerTest
+public class BmsGameplayTextEventControllerTest
 {
     [TestCase(null)]
     [TestCase("")]
     public void TestMistakeWithoutTextDoesNotTrigger(string? mistakeText)
     {
-        var manager = new BmsTextEventManager(new BmsTextEvents(mistakeText, []));
+        var controller = new BmsGameplayTextEventController(new BmsTextEvents(mistakeText, []));
         var received = new List<string>();
 
-        manager.TriggerMistake(received.Add);
+        controller.TriggerMistake(received.Add);
 
         Assert.That(received, Is.Empty);
     }
@@ -25,10 +25,10 @@ public class BmsTextEventManagerTest
     [Test]
     public void TestMistakeWithTextTriggers()
     {
-        var manager = new BmsTextEventManager(new BmsTextEvents("mistake", []));
+        var controller = new BmsGameplayTextEventController(new BmsTextEvents("mistake", []));
         var received = new List<string>();
 
-        manager.TriggerMistake(received.Add);
+        controller.TriggerMistake(received.Add);
 
         Assert.That(received, Is.EqualTo(["mistake"]));
     }

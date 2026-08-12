@@ -18,6 +18,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Result;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens;

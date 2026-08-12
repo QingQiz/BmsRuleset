@@ -2,9 +2,9 @@ using System;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
-internal sealed class BmsScrollController(BmsTimingMap? timingMap)
+internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 {
     public const double MAX_TIME_RANGE = 11485;
 

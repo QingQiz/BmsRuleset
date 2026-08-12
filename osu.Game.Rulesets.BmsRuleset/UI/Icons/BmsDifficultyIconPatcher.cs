@@ -6,7 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps.Drawables;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Icons;
 
 public static class BmsDifficultyIconPatcher
 {

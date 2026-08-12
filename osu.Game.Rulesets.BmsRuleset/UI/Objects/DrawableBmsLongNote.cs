@@ -7,6 +7,7 @@ using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects.LnHelper;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;

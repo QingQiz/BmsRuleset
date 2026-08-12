@@ -1,6 +1,7 @@
 using System;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Rulesets.UI;
 
@@ -9,13 +10,13 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 {
 
-    private readonly BmsScrollController scrollController;
+    private readonly BmsGameplayScrollController scrollController;
     private readonly Func<float> getHitTargetPosition;
     private readonly Func<bool> isResumeRewinding;
     private readonly Func<double> getResumeRewindEndTime;
 
     internal BmsColumnHitObjectContainer(
-        BmsScrollController scrollController,
+        BmsGameplayScrollController scrollController,
         Func<float> getHitTargetPosition,
         Func<bool> isResumeRewinding,
         Func<double> getResumeRewindEndTime)

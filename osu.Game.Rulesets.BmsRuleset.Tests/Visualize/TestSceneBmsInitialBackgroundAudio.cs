@@ -3,7 +3,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Audio;
@@ -73,8 +72,6 @@ public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
     }
 
     private BmsSamplePlayback getSamplePlayback() =>
-        (BmsSamplePlayback)typeof(BmsDrawableRuleset)
-            .GetField("samplePlayback", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(Player.DrawableRuleset)!;
+        ((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback;
 
 }

@@ -768,9 +768,7 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         => (track as BmsEventPreviewTrack)?.Playback;
 
     private static bool getBackgroundAudioPaused(BmsDrawableRuleset drawableRuleset) =>
-        ((BindableBool)typeof(BmsDrawableRuleset)
-            .GetField("backgroundAudioPaused", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(drawableRuleset)!).Value;
+        drawableRuleset.BackgroundAudioPaused.Value;
 
     private static void writePcmWave(string path, TimeSpan duration)
     {
