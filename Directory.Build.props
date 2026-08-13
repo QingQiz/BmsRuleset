@@ -13,7 +13,7 @@
         <!-- Official osu!lazer tag revision used by the local osu checkout and OsuVersion. -->
         <OsuRevision Condition="'$(OsuRevision)' == ''">2</OsuRevision>
         <!-- BmsRuleset release revision; new lazer bases start at the official lazer revision. -->
-        <RulesetRevision Condition="'$(RulesetRevision)' == ''">2</RulesetRevision>
+        <RulesetRevision Condition="'$(RulesetRevision)' == ''">3</RulesetRevision>
         <!-- Version passed to osu (nuget ref / local checkout target). -->
         <OsuVersion>$(OsuBase).$(OsuRevision)</OsuVersion>
         <!-- Defaults true: $(OsuVersion) targets a local osu checkout (../osu) because that version
