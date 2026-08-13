@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Editor;
 using osu.Game.Rulesets.BmsRuleset.Mods;
@@ -25,6 +26,7 @@ using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -112,7 +114,7 @@ public class BmsRulesetTest
             config.SetValue(BmsRulesetSetting.VisualOffset, 10d);
             config.SetValue(BmsRulesetSetting.AutomaticallyAdjustVisualOffset, true);
 
-            Assert.That(BmsDrawableRuleset.AddVisualOffsetSuggestion(config, 20), Is.EqualTo(30));
+            Assert.That(BmsGameplayCompletionController.AddVisualOffsetSuggestion(config, 20), Is.EqualTo(30));
             Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.EqualTo(30));
         }
         finally

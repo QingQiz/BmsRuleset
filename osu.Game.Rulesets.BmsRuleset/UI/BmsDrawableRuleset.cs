@@ -1,8 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using HarmonyLib;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
@@ -11,17 +7,13 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Input.Handlers;
 using osu.Game.Replays;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.Replays;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -38,24 +30,21 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         : base(ruleset, beatmap, mods)
     {
         var bmsBeatmap = (BmsBeatmap)beatmap;
-        sampleStore = new BmsSampleStore(
-            bmsBeatmap.SampleDefinitions,
-            getSource(bmsBeatmap),
-            getRate(Mods),
-            getSampleUsages(bmsBeatmap)
-        );
+        audioController = new BmsGameplayAudioController(bmsBeatmap, Mods);
+        samplePlayback = audioController.SamplePlayback;
     }
 
-    private static readonly MethodInfo? frame_stable_playback_setter = AccessTools.PropertySetter(typeof(DrawableRuleset<BmsHitObject>), "FrameStablePlayback");
-    private static readonly FieldInfo? player_last_pause_action_time_field = AccessTools.Field(typeof(Player), "lastPauseActionTime");
-
     internal BmsStageHudController StageHudController => field ??= new BmsStageHudController((BmsPlayfield)Playfield);
+
+    internal BmsSamplePlayback SamplePlayback => samplePlayback;
+
+    internal BindableBool BackgroundAudioPaused => audioController.BackgroundAudioPaused;
 
     public new PassThroughInputManager KeyBindingInputManager => base.KeyBindingInputManager;
 
     public override int Variant => (int)((BmsBeatmap)Beatmap).LayoutVariant;
 
-    public string BeatmapSourceDirectory => getSource((BmsBeatmap)Beatmap);
+    public string BeatmapSourceDirectory => BmsGameplayAudioController.ResolveBeatmapSource((BmsBeatmap)Beatmap);
 
     public BindableDouble BgaDim { get; } = new(0.7)
     {
@@ -72,15 +61,13 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     [Cached(typeof(IBmsGameplayEvents))]
     private readonly BmsGameplayEvents gameplayEvents = new();
 
-    private readonly BindableBool backgroundAudioPaused = new(true);
-
-    private Bindable<bool>? unlockFrameRateLimit;
-
-    private IDisposable? frameRateUnlockLease;
-    private BmsPreviewTrack? previewTrackBeforePlay;
+    private readonly BmsGameplayAudioController audioController;
+    private BmsGameplayPauseController? pauseController;
+    private BmsGameplayCompletionController? completionController;
+    private BmsGameplaySettingsController? settingsController;
 
     [Cached]
-    private readonly BmsSampleStore sampleStore;
+    private readonly BmsSamplePlayback samplePlayback;
 
     // Resolved from Player's DI cache — available after Player.LoadComplete registers them.
     [Resolved(CanBeNull = true)]
@@ -104,12 +91,6 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     [Resolved]
     private FrameworkConfigManager frameworkConfig { get; set; } = null!;
 
-    private bool stoppedPreviewForGameplay;
-
-    private double? pendingResumeRewindFrom;
-
-    #region Disposal
-
     protected override void Dispose(bool isDisposing)
     {
         var previewRestoreTime = isDisposing ? gameplayClockContainer?.CurrentTime : null;
@@ -119,28 +100,16 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (!isDisposing)
             return;
 
-        if (gameplayClockContainer != null)
-            gameplayClockContainer.IsPaused.ValueChanged -= onGameplayPausedChanged;
-
-        backgroundAudioPaused.UnbindAll();
-        unlockFrameRateLimit?.UnbindAll();
-        frameRateUnlockLease?.Dispose();
-        frameRateUnlockLease = null;
-
-        if (previewTrackBeforePlay == null || !stoppedPreviewForGameplay)
-            return;
-
-        // Only restore if the preview track hasn't been replaced for a
-        // different beatmap since play started.
-        if (BmsWorkingBeatmap.ActivePreviewTrack == previewTrackBeforePlay)
-            BmsWorkingBeatmap.RestoreActivePreview(previewRestoreTime);
-
-        previewTrackBeforePlay = null;
+        pauseController?.Dispose();
+        pauseController = null;
+        completionController?.Dispose();
+        completionController = null;
+        settingsController?.Dispose();
+        settingsController = null;
+        audioController.Dispose(previewRestoreTime);
     }
 
-    #endregion
-
-    public static double ComputeScrollTime(double scrollSpeed) => BmsScrollController.ComputeScrollTime(scrollSpeed);
+    public static double ComputeScrollTime(double scrollSpeed) => BmsGameplayScrollController.ComputeScrollTime(scrollSpeed);
 
     public override DrawableHitObject<BmsHitObject>? CreateDrawableRepresentation(BmsHitObject h) => null;
 
@@ -158,23 +127,44 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     {
         base.LoadComplete();
 
-        if (scoreProcessor != null && healthProcessor != null && gameplayState != null)
-            scoreProcessor.HasCompleted.BindValueChanged(_ => onPlayCompleted());
-
-        gameplayClockContainer?.IsPaused.BindValueChanged(onGameplayPausedChanged);
-
         if (gameplayClockContainer != null)
-            ((IBindable<bool>)backgroundAudioPaused).BindTo(gameplayClockContainer.IsPaused);
+        {
+            audioController.BindPauseSource(gameplayClockContainer.IsPaused);
+            pauseController = new BmsGameplayPauseController(
+                this,
+                (BmsPlayfield)Playfield,
+                gameplayClockContainer,
+                gameplayState,
+                player,
+                audioController.StopPreviewForGameplay,
+                action => SchedulerAfterChildren.Add(action));
+        }
         else
-            backgroundAudioPaused.BindTo(IsPaused);
+            audioController.BindPauseSource(IsPaused);
+
+        if (scoreProcessor != null && healthProcessor != null && gameplayState != null)
+            completionController = new BmsGameplayCompletionController(
+                scoreProcessor,
+                healthProcessor,
+                gameplayState,
+                ReplayScore,
+                Config as BmsRulesetConfigManager);
     }
 
     protected override void Update()
     {
         base.Update();
 
-        if (!backgroundAudioPaused.Value && !stoppedPreviewForGameplay)
-            stopPreviewForGameplay();
+        audioController.Update();
+    }
+
+    protected override void UpdateAfterChildren()
+    {
+        base.UpdateAfterChildren();
+
+        // Columns receive input independently while the playfield updates. Submitting here preserves
+        // one mixer target for every keysound produced by the same ruleset update.
+        audioController.SubmitLivePlayBatch();
     }
 
     protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);
@@ -189,105 +179,6 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         return new BmsReplayRecorder(score);
     }
 
-    /// <summary>
-    ///     Resolve the chart directory path from the DB-backed beatmap (where the importer stored
-    ///     it), bypassing the decoder's unconditional <c>Source = "BMS"</c> override.
-    ///     <c>WorkingBeatmap.loadBeatmapAsync</c> copies <see cref="BeatmapInfo.BeatmapSet"/>
-    ///     and <see cref="BeatmapInfo.ID"/> from the database but <b>not</b>
-    ///     <see cref="BeatmapInfo.Metadata"/>, so the decoder override survives into gameplay.
-    /// </summary>
-    private static string getSource(BmsBeatmap b) =>
-        b.BeatmapInfo.BeatmapSet?.Beatmaps.FirstOrDefault(b2 => b2.ID == b.BeatmapInfo.ID)
-            ?.Metadata.Source ?? b.BeatmapInfo.Metadata.Source;
-
-    /// <summary>
-    ///     The active rate mod's SpeedChange (1.0 when no rate mod is selected). Applied as the
-    ///     tempo of every loaded sample Track so audio stays pitch-preserving and follows the
-    ///     rate-scaled chart clock.
-    /// </summary>
-    private static double getRate(IReadOnlyList<Mod>? mods)
-    {
-        var rateMod = mods?.OfType<ModRateAdjust>().FirstOrDefault();
-        return rateMod?.SpeedChange.Value ?? 1.0;
-    }
-
-    private static IEnumerable<BmsSampleUsage> getSampleUsages(BmsBeatmap beatmap)
-    {
-        foreach (var evt in beatmap.BackgroundSampleEvents)
-            yield return new BmsSampleUsage(evt.SampleKey, evt.Time);
-
-        foreach (var hitObject in beatmap.HitObjects)
-        {
-            if (hitObject.SampleKey is { } sampleKey)
-                yield return new BmsSampleUsage(sampleKey, hitObject.StartTime);
-
-            if (hitObject is BmsLongNote { TailSampleKey: { } tailSampleKey } longNote)
-                yield return new BmsSampleUsage(tailSampleKey, longNote.EndTime);
-        }
-    }
-
-    /// <summary>
-    ///     Called when all hit objects have been judged (play completed).
-    ///     If the gauge is failed (HP ever hit 0, even under NF survival) or the final
-    ///     HP is below the Normal-mode clear threshold (80 %), stamps
-    ///     <see cref="ScoreRank.F"/> on the score without triggering a gameplay fail
-    ///     (no fail animation, results screen shows normally with F rank).
-    /// </summary>
-    private void onPlayCompleted()
-    {
-        if (scoreProcessor == null || healthProcessor == null || gameplayState == null)
-            return;
-
-        if (healthProcessor is BmsHealthProcessor bmsHp)
-        {
-            var passed = bmsHp.HasPassedAtEnd();
-            scoreProcessor.PopulateScore(gameplayState.Score.ScoreInfo);
-
-            if (bmsHp.GaugeHistory.Count > 0)
-                BmsScoreGaugeHistoryStore.Set(gameplayState.Score.ScoreInfo, bmsHp.GaugeHistory);
-
-            if (!passed)
-                scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
-
-            recordVisualOffsetSuggestion();
-            return;
-        }
-
-        if (healthProcessor.Health.Value < 0.8)
-            scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);
-
-        recordVisualOffsetSuggestion();
-    }
-
-    private void recordVisualOffsetSuggestion()
-    {
-        if (ReplayScore != null || gameplayState == null || Config is not BmsRulesetConfigManager config)
-            return;
-
-        if (gameplayState.Mods.Any(mod => !mod.UserPlayable))
-            return;
-
-        var hitEvents = gameplayState.Score.ScoreInfo.HitEvents;
-
-        if (hitEvents.Count(HitEventExtensions.AffectsUnstableRate) < 50
-            || hitEvents.CalculateMedianHitError() is not double medianHitError)
-            return;
-
-        AddVisualOffsetSuggestion(config, medianHitError);
-    }
-
-    internal static double AddVisualOffsetSuggestion(BmsRulesetConfigManager config, double medianHitError)
-    {
-        var suggestion = BmsRulesetRuntime.VisualOffsetSuggestions.Add(
-            medianHitError,
-            config.Get<double>(BmsRulesetSetting.VisualOffset));
-
-        if (config.Get<bool>(BmsRulesetSetting.AutomaticallyAdjustVisualOffset))
-            config.SetValue(BmsRulesetSetting.VisualOffset, suggestion);
-
-        return suggestion;
-    }
-
     [BackgroundDependencyLoader]
     private void load()
     {
@@ -295,139 +186,18 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
         Overlays.Add(StageHudController);
 
-        // The store follows the gameplay clock to load definition Tracks before their first use.
-        FrameStableComponents.Add(sampleStore);
-
-        var events = beatmap.BackgroundSampleEvents
-            .OrderBy(e => e.Time)
-            .Where(e => beatmap.SampleDefinitions.ContainsKey(e.SampleKey))
-            .Select(e => new BmsBackgroundAudioPlayer.BgmEvent(e.Time, e.SampleKey, e.Volume))
-            .ToList();
+        // Sample playback follows the gameplay clock to load PCM samples before their first use.
+        FrameStableComponents.Add(samplePlayback);
 
         // This component also coordinates pause/seek blocking for KeySounds in the shared Track
-        // store, so it must exist even when the chart has no background sample events.
-        FrameStableComponents.Add(new BmsBackgroundAudioPlayer(events, backgroundAudioPaused));
-
-        if (Config is BmsRulesetConfigManager config)
-        {
-            config.BindWith(BmsRulesetSetting.BgaDim, BgaDim);
-            config.BindWith(BmsRulesetSetting.VisualOffset, ((BmsPlayfield)Playfield).VisualOffset);
-            ((BmsPlayfield)Playfield).ScrollController.SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
-
-            unlockFrameRateLimit = config.GetBindable<bool>(BmsRulesetSetting.UnlockFrameRateLimit);
-            unlockFrameRateLimit.BindValueChanged(onUnlockFrameRateLimitChanged, true);
-        }
-
-        ((BmsPlayfield)Playfield).ScrollController.SetPlaybackRate(getRate(Mods));
-    }
-
-    private void onUnlockFrameRateLimitChanged(ValueChangedEvent<bool> unlocked)
-    {
-        frameRateUnlockLease?.Dispose();
-        frameRateUnlockLease = unlocked.NewValue
-            ? BmsFrameRateUnlock.Acquire(
-                host,
-                frameworkConfig.GetBindable<ExecutionMode>(FrameworkSetting.ExecutionMode),
-                frameworkConfig.GetBindable<FrameSync>(FrameworkSetting.FrameSync))
-            : null;
-    }
-
-    private void onGameplayPausedChanged(ValueChangedEvent<bool> paused)
-    {
-        if (gameplayClockContainer == null)
-            return;
-
-        if (paused.NewValue)
-        {
-            pendingResumeRewindFrom = gameplayClockContainer.CurrentTime;
-            return;
-        }
-
-        if (!stoppedPreviewForGameplay)
-            stopPreviewForGameplay();
-
-        if (pendingResumeRewindFrom == null || gameplayState == null)
-            return;
-
-        var recordedPauseTime = (int)Math.Round(pendingResumeRewindFrom.Value);
-
-        if (gameplayState.Score.ScoreInfo.Pauses.Contains(recordedPauseTime))
-        {
-            BmsModPaused.ApplyToScore(gameplayState.Score.ScoreInfo);
-
-            var rewindTarget = ((BmsPlayfield)Playfield).BeginResumeRewind(
-                pendingResumeRewindFrom.Value,
-                gameplayClockContainer.StartTime);
-
-            clearPauseCooldownForResumeRewind();
-            seekImmediatelyForResume(rewindTarget);
-        }
-
-        pendingResumeRewindFrom = null;
-    }
-
-    private void clearPauseCooldownForResumeRewind()
-    {
-        if (player == null || player_last_pause_action_time_field == null)
-            return;
-
-        try
-        {
-            // The base player measures this cooldown against gameplay time, so rewinding that clock
-            // would otherwise prevent another pause until the resume lead-in has fully caught up.
-            player_last_pause_action_time_field.SetValue(player, null);
-        }
-        catch (Exception exception)
-        {
-            BmsLogger.Error(exception, "Failed to clear the pause cooldown for a BMS resume rewind.");
-        }
-    }
-
-    private void seekImmediatelyForResume(double rewindTarget)
-    {
-        if (gameplayClockContainer == null)
-            return;
-
-        if (!trySetFrameStablePlayback(false))
-        {
-            gameplayClockContainer.Seek(rewindTarget);
-            return;
-        }
-
-        // Frame stability normally replays every intermediate rewind frame, which turns a five-second
-        // resume lead-in into a multi-second stall instead of an immediate seek.
-        gameplayClockContainer.Seek(rewindTarget);
-        SchedulerAfterChildren.Add(() => trySetFrameStablePlayback(true));
-    }
-
-    private bool trySetFrameStablePlayback(bool enabled)
-    {
-        if (frame_stable_playback_setter == null)
-            return false;
-
-        try
-        {
-            frame_stable_playback_setter.Invoke(this, [enabled]);
-            return true;
-        }
-        catch (Exception exception)
-        {
-            BmsLogger.Error(exception, $"Failed to {(enabled ? "restore" : "disable")} frame-stable BMS playback for a resume rewind.");
-            return false;
-        }
-    }
-
-    private void stopPreviewForGameplay()
-    {
-        if (stoppedPreviewForGameplay)
-            return;
-
-        previewTrackBeforePlay = BmsWorkingBeatmap.ActivePreviewTrack;
-
-        if (previewTrackBeforePlay == null)
-            return;
-
-        BmsWorkingBeatmap.SwitchActivePreviewToGameplayClockOnly();
-        stoppedPreviewForGameplay = true;
+        // playback component, so it must exist even when the chart has no background sample events.
+        FrameStableComponents.Add(audioController.CreateBackgroundAudioPlayer(beatmap));
+        settingsController = new BmsGameplaySettingsController(
+            Config as BmsRulesetConfigManager,
+            (BmsPlayfield)Playfield,
+            BgaDim,
+            BmsGameplayAudioController.GetPlaybackRate(Mods),
+            host,
+            frameworkConfig);
     }
 }

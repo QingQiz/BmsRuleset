@@ -8,7 +8,7 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osuTK;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Icons;
 
 public sealed partial class BmsRulesetIcon : CompositeDrawable
 {

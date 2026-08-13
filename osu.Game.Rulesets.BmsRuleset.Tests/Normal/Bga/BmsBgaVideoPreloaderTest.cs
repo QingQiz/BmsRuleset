@@ -27,7 +27,7 @@ public class BmsBgaVideoPreloaderTest
         // Preload already started — i.e. the video was warmed during the loading screen rather than
         // lazily on the first gameplay frame, which is exactly what removes the entry hitch.
         var d = (BmsSupplementalVideoDrawable)drawable!;
-        Assert.That(waitUntil(() => d.Stats.DecodedFrames > 0, TimeSpan.FromSeconds(3)), Is.True);
+        Assert.That(waitUntil(() => BmsVideoTestAccess.GetQueuedFrameCount(BmsVideoTestAccess.GetFrameSource(d)!) > 0, TimeSpan.FromSeconds(3)), Is.True);
         d.Dispose();
     }
 

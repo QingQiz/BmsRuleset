@@ -1401,7 +1401,6 @@ internal static partial class BmsChartParser
     private const ushort CH_01 = (0 << 6) | 1;
 
     // ReSharper disable once UnusedMember.Local
-    private const ushort CH_02 = (0 << 6) | 2;
     private const ushort CH_03 = (0 << 6) | 3;
     private const ushort CH_04 = (0 << 6) | 4;
     private const ushort CH_06 = (0 << 6) | 6;

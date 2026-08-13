@@ -22,6 +22,7 @@ using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Media.Video;
 using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;

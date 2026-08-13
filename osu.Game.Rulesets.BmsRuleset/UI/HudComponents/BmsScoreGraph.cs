@@ -551,20 +551,6 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
     private static double judgementTime(BmsJudgementEvent judgementEvent) =>
         judgementEvent.TimingObservations.Max(observation => observation.ActualTime);
 
-    internal static int? JudgementCountAtTime(IReadOnlyList<JudgementSnapshot> progression, double time, HitResult result)
-    {
-        if (progression.Count == 0)
-            return null;
-
-        var resultIndex = Array.IndexOf(displayed_judgements, result);
-
-        if (resultIndex < 0)
-            return 0;
-
-        var snapshotIndex = findSnapshotIndexAtTime(progression, time);
-        return snapshotIndex < 0 ? 0 : progression[snapshotIndex].Counts[resultIndex];
-    }
-
     private static int findSnapshotIndexAtTime(IReadOnlyList<JudgementSnapshot> progression, double time)
     {
         var lower = 0;
@@ -582,9 +568,6 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
         return lower - 1;
     }
-
-    internal static int ScaleScore(int finalScore, int judgedEvents, int totalEvents) =>
-        scaleScore(finalScore, judgedEvents, totalEvents);
 
     internal static int ScoreAtProgress(
         int finalScore,

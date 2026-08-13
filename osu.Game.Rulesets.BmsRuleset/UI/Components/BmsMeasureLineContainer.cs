@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Components;
 
@@ -20,7 +21,7 @@ public sealed partial class BmsMeasureLineContainer : Container
 
     private MeasureLineInfo[] lines = [];
     private bool scrollPositionsMonotonic = true;
-    private BmsScrollController? scrollController;
+    private BmsGameplayScrollController? scrollController;
     private BmsStage? stage;
 
     public BmsMeasureLineContainer()
@@ -28,7 +29,7 @@ public sealed partial class BmsMeasureLineContainer : Container
         Masking = true;
     }
 
-    internal void SetTimingMap(BmsTimingMap? timingMap, BmsScrollController owner, BmsStage ownerStage)
+    internal void SetTimingMap(BmsTimingMap? timingMap, BmsGameplayScrollController owner, BmsStage ownerStage)
     {
         Clear(false);
         activeLines.Clear();

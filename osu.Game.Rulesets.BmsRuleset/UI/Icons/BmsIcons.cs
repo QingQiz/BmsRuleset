@@ -1,6 +1,6 @@
 using osu.Framework.Graphics.Sprites;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Icons;
 
 /// <summary>
 /// Glyphs from the ruleset-owned mod icon font.

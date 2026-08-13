@@ -5,32 +5,20 @@ using System.Threading.Tasks;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 
-internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueuedFrames = 3) : IDisposable
+internal sealed class BmsSupplementalVideoFrameSource(byte[] data) : IDisposable
 {
     private const double decode_ahead_seconds = 0.10;
     private const double stale_before_target_seconds = 0.20;
 
-    private readonly int maxQueuedFrames = Math.Max(1, maxQueuedFrames);
+    private const int max_queued_frames = 3;
     private readonly ConcurrentQueue<BmsSupplementalVideoFrame> queuedFrames = new();
     private readonly AutoResetEvent wakeSignal = new(false);
     private readonly CancellationTokenSource cancellation = new();
 
     private Task? worker;
     private long targetTimeMilliseconds;
-    private int decodedFrames;
-    private int droppedFrames;
     private int uploadedFrames;
     private int disposed;
-    private volatile bool isFaulted;
-    private string? faultMessage;
-
-    public BmsSupplementalVideoFrameSourceStats Stats => new(
-        decodedFrames,
-        droppedFrames,
-        isFaulted,
-        faultMessage);
-
-    internal bool WorkerCompleted => worker?.IsCompleted ?? true;
 
     public void Start()
     {
@@ -58,12 +46,7 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
             if (!queuedFrames.TryDequeue(out var candidate))
                 continue;
 
-            if (frame != null)
-            {
-                frame.Dispose();
-                Interlocked.Increment(ref droppedFrames);
-            }
-
+            frame?.Dispose();
             frame = candidate;
         }
 
@@ -93,7 +76,7 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
             {
                 var desired = readTargetTime() + decode_ahead_seconds;
 
-                if (lastFrameTime >= desired && queuedFrames.Count >= maxQueuedFrames)
+                if (lastFrameTime >= desired && queuedFrames.Count >= max_queued_frames)
                 {
                     wakeSignal.WaitOne(8);
                     continue;
@@ -112,7 +95,6 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
                     continue;
 
                 lastFrameTime = decoded.Time;
-                Interlocked.Increment(ref decodedFrames);
 
                 var currentTarget = readTargetTime();
                 var hasDisplayableFrame = queuedFrames.Count > 0 || Volatile.Read(ref uploadedFrames) > 0;
@@ -120,7 +102,6 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
                 if (hasDisplayableFrame && decoded.Time < currentTarget - stale_before_target_seconds)
                 {
                     decoded.Dispose();
-                    Interlocked.Increment(ref droppedFrames);
                     continue;
                 }
 
@@ -133,9 +114,7 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
 
     private void fault(string? message)
     {
-        faultMessage = message ?? "Supplemental video decoder failed.";
-        isFaulted = true;
-        BmsLogger.Log($"[BGA] Supplemental video path faulted: {faultMessage}");
+        BmsLogger.Log($"[BGA] Supplemental video path faulted: {message ?? "Supplemental video decoder failed."}");
     }
 
     public void Dispose()
@@ -164,9 +143,3 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data, int maxQueued
         cancellation.Dispose();
     }
 }
-
-internal readonly record struct BmsSupplementalVideoFrameSourceStats(
-    int DecodedFrames,
-    int DroppedFrames,
-    bool IsFaulted,
-    string? FaultMessage);

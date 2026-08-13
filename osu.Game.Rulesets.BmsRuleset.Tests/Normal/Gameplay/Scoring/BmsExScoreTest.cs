@@ -89,7 +89,7 @@ public class BmsExScoreTest
     [TestCase(1600, 2000, 1000, 1600)]
     public void TestLinearTargetProgress(int finalScore, int judgedEvents, int totalEvents, int expected)
     {
-        Assert.That(BmsScoreGraph.ScaleScore(finalScore, judgedEvents, totalEvents), Is.EqualTo(expected));
+        Assert.That(BmsScoreGraph.ScoreAtProgress(finalScore, [], judgedEvents, totalEvents), Is.EqualTo(expected));
     }
 
     [Test]
@@ -123,22 +123,24 @@ public class BmsExScoreTest
         ];
 
         var progression = BmsScoreGraph.CreateJudgementProgression(events);
+        var cursor = new BmsScoreGraph.JudgementProgressCursor();
+        cursor.SetProgression(progression);
 
         Assert.Multiple(() =>
         {
-            Assert.That(BmsScoreGraph.JudgementCountAtTime(progression, 99, HitResult.Perfect), Is.Zero);
-            Assert.That(BmsScoreGraph.JudgementCountAtTime(progression, 150, HitResult.Perfect), Is.EqualTo(1));
-            Assert.That(BmsScoreGraph.JudgementCountAtTime(progression, 150, HitResult.Miss), Is.EqualTo(1));
-            Assert.That(BmsScoreGraph.JudgementCountAtTime(progression, 299, HitResult.Good), Is.Zero);
-            Assert.That(BmsScoreGraph.JudgementCountAtTime(progression, 300, HitResult.Good), Is.EqualTo(1));
-            Assert.That(BmsScoreGraph.JudgementCountAtTime(progression, 350, HitResult.Ok), Is.EqualTo(1));
+            Assert.That(cursor.GetCountAtTime(99, HitResult.Perfect), Is.Zero);
+            Assert.That(cursor.GetCountAtTime(150, HitResult.Perfect), Is.EqualTo(1));
+            Assert.That(cursor.GetCountAtTime(150, HitResult.Miss), Is.EqualTo(1));
+            Assert.That(cursor.GetCountAtTime(299, HitResult.Good), Is.Zero);
+            Assert.That(cursor.GetCountAtTime(300, HitResult.Good), Is.EqualTo(1));
+            Assert.That(cursor.GetCountAtTime(350, HitResult.Ok), Is.EqualTo(1));
         });
     }
 
     [Test]
     public void TestMissingPersonalBestJudgementsRemainUnavailable()
     {
-        Assert.That(BmsScoreGraph.JudgementCountAtTime([], 1000, HitResult.Perfect), Is.Null);
+        Assert.That(new BmsScoreGraph.JudgementProgressCursor().GetCountAtTime(1000, HitResult.Perfect), Is.Null);
     }
 
     [Test]

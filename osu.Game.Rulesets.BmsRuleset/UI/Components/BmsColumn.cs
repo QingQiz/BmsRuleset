@@ -11,6 +11,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
@@ -78,9 +79,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     protected BmsPlayfield ParentPlayfield { get; }
 
-    private const float key_area_under_notes_depth = 1;
-    private const float key_area_over_notes_depth = -1;
-
     private BmsColumnKeySound? keySound;
     private readonly BmsHitExplosionPool normalHitExplosionPool;
     private readonly BmsHitExplosionPool longNoteHitExplosionPool;
@@ -140,9 +138,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
         var genericType = typeof(BmsColumnGeneric<>).MakeGenericType(providerType);
         return (BmsColumn)Activator.CreateInstance(genericType, index, playfield)!;
     }
-
-    internal static float DepthForKeyArea(bool keysUnderNotes) =>
-        keysUnderNotes ? key_area_under_notes_depth : key_area_over_notes_depth;
 
     protected override HitObjectContainer CreateHitObjectContainer()
         => new BmsColumnHitObjectContainer(

@@ -9,17 +9,15 @@ internal readonly record struct BmsPreviewTimelineEntry(double Time, ushort Samp
 internal sealed record BmsEventPreviewTimeline(
     IReadOnlyList<BmsPreviewTimelineEntry> Entries,
     double Length,
-    bool DeriveLengthFromTracks = false,
-    bool RetainLoadedTracks = false,
-    bool ExtendLengthFromTracks = false)
+    bool DeriveLengthFromSamples = false,
+    bool ExtendLengthFromSamples = false)
 {
     internal const double DEFAULT_LENGTH = 30000;
 
     internal static BmsEventPreviewTimeline CreateSingleFile(string samplePath) => new(
         [new BmsPreviewTimelineEntry(0, 0, samplePath, 100, true)],
         DEFAULT_LENGTH,
-        DeriveLengthFromTracks: true,
-        RetainLoadedTracks: true);
+        DeriveLengthFromSamples: true);
 
     internal static BmsEventPreviewTimeline Create(
         Func<CancellationToken, IReadOnlyList<BmsPreviewSampleEvent>> sampleEventFactory,
@@ -32,7 +30,7 @@ internal sealed record BmsEventPreviewTimeline(
         IReadOnlyDictionary<ushort, string> sampleDefinitions,
         CancellationToken cancellationToken = default)
     {
-        List<BmsPreviewTimelineEntry> entries = [];
+        var entries = new List<BmsPreviewTimelineEntry>();
 
         foreach (var (evt, resumeAfterSeek) in sampleEventFactory())
         {
@@ -54,6 +52,6 @@ internal sealed record BmsEventPreviewTimeline(
         }
 
         var length = entries.Count > 0 ? entries[^1].Time + 5000 : DEFAULT_LENGTH;
-        return new BmsEventPreviewTimeline(entries, length, ExtendLengthFromTracks: true);
+        return new BmsEventPreviewTimeline(entries, length, ExtendLengthFromSamples: true);
     }
 }

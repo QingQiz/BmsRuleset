@@ -923,29 +923,6 @@ public class BmsLegacySkinTransformerTest
     }
 
     [Test]
-    public void TestBmsKeyAreaOverflowPlacesTallImageTopAtJudgeLine()
-    {
-        Assert.Multiple(() =>
-        {
-            Assert.That(LegacyBmsKeyArea.CalculateBottomOverflow(40, 80), Is.Zero);
-            Assert.That(LegacyBmsKeyArea.CalculateBottomOverflow(80, 80), Is.Zero);
-            Assert.That(LegacyBmsKeyArea.CalculateBottomOverflow(120, 80), Is.EqualTo(40));
-        });
-    }
-
-    [Test]
-    public void TestBmsKeyAreaScalesImageToColumnWidth()
-    {
-        Assert.Multiple(() =>
-        {
-            Assert.That(LegacyBmsKeyArea.CalculateColumnWidthScale(200, 50), Is.EqualTo(0.25f));
-            Assert.That(LegacyBmsKeyArea.CalculateColumnWidthScale(25, 50), Is.EqualTo(2));
-            Assert.That(LegacyBmsKeyArea.CalculateColumnWidthScale(0, 50), Is.EqualTo(1));
-            Assert.That(LegacyBmsKeyArea.CalculateColumnWidthScale(200, 0), Is.EqualTo(1));
-        });
-    }
-
-    [Test]
     public void TestBmsSkinIniMineImageCreatesDrawable()
     {
         var skin = createConfiguredSkin("""

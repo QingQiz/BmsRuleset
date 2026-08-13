@@ -17,9 +17,9 @@ public enum BmsPreviewTrackPlaybackMode
 
 public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 {
-    internal const double RESTORE_FADE_DURATION = 2_500;
-    internal const double SEEK_FADE_OUT_DURATION = 20;
-    internal const double SEEK_FADE_IN_DURATION = 50;
+    private const double restore_fade_duration = 2_500;
+    private const double seek_fade_out_duration = 20;
+    private const double seek_fade_in_duration = 50;
 
     private readonly BindableDouble previewOutputVolume = new(1);
     private readonly BindableDouble restoreFadeVolume = new(1);
@@ -76,9 +76,10 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
         }
     }
 
-    internal double RestoreFadeVolume => restoreFadeVolume.Value;
-
-    internal double SeekFadeVolume => seekFadeVolume.Value;
+    internal double PreviewPlaybackGain => AggregateVolume.Value
+                                           * previewOutputVolume.Value
+                                           * restoreFadeVolume.Value
+                                           * seekFadeVolume.Value;
 
     protected virtual bool CanComplete => true;
 
@@ -266,8 +267,8 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
     /// </remarks>
     public new void BindAdjustments(IAggregateAudioAdjustment component)
     {
-        // Event tracks receive AudioManager adjustments through their TrackStore, while wrapper and mod
-        // adjustments must remain on the logical owner so they can be mirrored without double-applying globals.
+        // The PCM mixer follows AudioManager aggregate gain directly, while wrapper and mod adjustments
+        // must remain on the logical owner so they can be mirrored without double-applying globals.
         if (!ReferenceEquals(component, audioManagerAdjustments))
             base.BindAdjustments(component);
     }
@@ -288,13 +289,6 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 
     void IAdjustableAudioComponent.UnbindAdjustments(IAggregateAudioAdjustment component) => UnbindAdjustments(component);
 
-    internal PreviewPlaybackAdjustments BindPreviewAdjustments(IAdjustableAudioComponent component, int volume = 100)
-    {
-        var adjustments = new PreviewPlaybackAdjustments(this, Math.Max(0, volume) / 100.0);
-        component.BindAdjustments(adjustments);
-        return adjustments;
-    }
-
     private void prepareRestoreFade()
     {
         restoreFadeVolume.Value = 0;
@@ -307,7 +301,7 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
         if (!restoreFadeInProgress)
             return;
 
-        var progress = Stopwatch.GetElapsedTime(restoreFadeStart).TotalMilliseconds / RESTORE_FADE_DURATION;
+        var progress = Stopwatch.GetElapsedTime(restoreFadeStart).TotalMilliseconds / restore_fade_duration;
         restoreFadeVolume.Value = Math.Min(1, progress);
         restoreFadeInProgress = progress < 1;
     }
@@ -316,44 +310,6 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
     {
         lock (clock)
             clock.Rate = Rate;
-    }
-
-    internal sealed class PreviewPlaybackAdjustments : IAggregateAudioAdjustment
-    {
-        private readonly BmsPreviewTrack owner;
-        private readonly double eventVolume;
-
-        private readonly BindableDouble volume = new(1);
-        private readonly BindableDouble balance = new();
-        private readonly BindableDouble frequency = new(1);
-        private readonly BindableDouble tempo = new(1);
-
-        public IBindable<double> AggregateVolume => volume;
-
-        public IBindable<double> AggregateBalance => balance;
-
-        public IBindable<double> AggregateFrequency => frequency;
-
-        public IBindable<double> AggregateTempo => tempo;
-
-        internal PreviewPlaybackAdjustments(BmsPreviewTrack owner, double eventVolume)
-        {
-            this.owner = owner;
-            this.eventVolume = eventVolume;
-            Update();
-        }
-
-        internal void Update()
-        {
-            volume.Value = owner.AggregateVolume.Value
-                           * eventVolume
-                           * owner.previewOutputVolume.Value
-                           * owner.restoreFadeVolume.Value
-                           * owner.seekFadeVolume.Value;
-            balance.Value = owner.AggregateBalance.Value;
-            frequency.Value = owner.AggregateFrequency.Value;
-            tempo.Value = owner.AggregateTempo.Value;
-        }
     }
 
     private void startInternal()
@@ -418,7 +374,7 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
         {
             case SeekFadePhase.FadingOut:
             {
-                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_OUT_DURATION;
+                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / seek_fade_out_duration;
                 seekFadeVolume.Value = seekFadeStartVolume * Math.Max(0, 1 - progress);
 
                 if (progress >= 1)
@@ -429,7 +385,7 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 
             case SeekFadePhase.FadingIn:
             {
-                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_IN_DURATION;
+                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / seek_fade_in_duration;
                 seekFadeVolume.Value = Math.Min(1, progress);
 
                 if (progress >= 1)
@@ -455,7 +411,7 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 
     private void completePendingSeek()
     {
-        if (pendingSeekPosition is { })
+        if (pendingSeekPosition is not null)
             performPendingSeek();
 
         cancelSeekFade();

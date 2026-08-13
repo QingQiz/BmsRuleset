@@ -9,7 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 
 /// <summary>
-///     Schedules BMS background sample events through the shared per-definition Track store.
+///     Submits BMS background sample events to the shared PCM voice mixer.
 /// </summary>
 public partial class BmsBackgroundAudioPlayer(
     IReadOnlyList<BmsBackgroundAudioPlayer.BgmEvent> sortedEvents,
@@ -33,11 +33,11 @@ public partial class BmsBackgroundAudioPlayer(
     private bool resyncRequired;
 
     [Resolved]
-    private BmsSampleStore sampleStore { get; set; } = null!;
+    private BmsSamplePlayback samplePlayback { get; set; } = null!;
 
     protected override void Dispose(bool isDisposing)
     {
-        sampleStore.StopAll();
+        samplePlayback.StopAll();
         base.Dispose(isDisposing);
     }
 
@@ -90,11 +90,22 @@ public partial class BmsBackgroundAudioPlayer(
         {
             var evt = sortedEvents[nextIndex];
 
+            // Undefined background keys are silent, but must not hold valid events at the same
+            // timestamp behind the scheduling boundary.
+            if (!samplePlayback.HasSampleDefinition(evt.SampleKey))
+            {
+                nextIndex++;
+                continue;
+            }
+
             if (Time.Current < evt.Time)
                 break;
 
+            // Background samples and player-triggered keysounds from this ruleset update must
+            // enter one mixer batch. Pre-scheduling BGM lets it reach the output buffer before a
+            // simultaneous key press can be submitted, making the background layer sound early.
             if (Time.Current - evt.Time < allowable_late_start)
-                sampleStore.Play(evt.SampleKey, evt.Volume);
+                samplePlayback.QueueLivePlay(evt.SampleKey, evt.Volume);
 
             nextIndex++;
         }
@@ -112,17 +123,17 @@ public partial class BmsBackgroundAudioPlayer(
 
     private void handleSeek(double currentTime)
     {
-        sampleStore.StopAll();
+        samplePlayback.StopAll();
         nextIndex = findFirstEventAfter(currentTime);
 
         foreach (var seeked in SelectEventsForSeek(
                      sortedEvents,
                      nextIndex,
                      currentTime,
-                     sampleStore.MaxTrackLengthMilliseconds,
-                     sampleStore.GetTrackLength))
+                     samplePlayback.MaxSampleLengthMilliseconds,
+                     samplePlayback.GetSampleLength))
         {
-            sampleStore.Play(seeked.Event.SampleKey, seeked.Event.Volume, seeked.Offset);
+            samplePlayback.Play(seeked.Event.SampleKey, seeked.Event.Volume, seeked.Offset);
         }
     }
 
@@ -133,12 +144,12 @@ public partial class BmsBackgroundAudioPlayer(
         double maxLength,
         Func<ushort, double> getLength)
     {
-        List<SeekedBgm> result = [];
+        var result = new List<SeekedBgm>();
 
         if (maxLength <= 0)
             return result;
 
-        HashSet<ushort> seenKeys = [];
+        var seenKeys = new HashSet<ushort>();
 
         for (var i = nextEventIndex - 1; i >= 0; i--)
         {
@@ -195,11 +206,16 @@ public partial class BmsBackgroundAudioPlayer(
             return;
 
         playbackBlocked = blocked;
-        sampleStore.SetPlaybackBlocked(playbackBlocked);
+        samplePlayback.SetPlaybackBlocked(playbackBlocked);
 
         if (playbackBlocked)
         {
             playbackBlockedAt = Time.Current;
+
+            // Future mixer commands need a fresh epoch after the gameplay clock stops advancing.
+            if (samplePlayback.IsPlaybackAvailable)
+                resyncRequired = true;
+
             return;
         }
 
@@ -207,13 +223,13 @@ public partial class BmsBackgroundAudioPlayer(
             return;
 
         // Catch-up can advance the gameplay clock while samples are disabled. Reconstruct once
-        // on the next update instead of briefly resuming tracks from their stale positions.
+        // on the next update instead of briefly resuming voices from stale positions.
         if (resyncRequired || Math.Abs(Time.Current - playbackBlockedAt) >= allowable_late_start)
         {
             resyncRequired = true;
             return;
         }
 
-        sampleStore.ResumeAll();
+        samplePlayback.ResumeAll();
     }
 }

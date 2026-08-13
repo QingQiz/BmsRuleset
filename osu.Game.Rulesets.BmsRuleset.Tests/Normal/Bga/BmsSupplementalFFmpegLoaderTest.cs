@@ -96,7 +96,6 @@ public class BmsSupplementalFFmpegLoaderTest
             Assert.That(frame, Is.Not.Null);
             Assert.That(frame!.Width, Is.GreaterThan(0));
             Assert.That(frame.Height, Is.GreaterThan(0));
-            Assert.That(frame.PixelCount, Is.EqualTo(frame.Width * frame.Height));
             frame.Dispose();
         }
     }

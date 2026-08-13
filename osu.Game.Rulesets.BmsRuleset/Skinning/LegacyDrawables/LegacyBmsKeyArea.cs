@@ -63,16 +63,6 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
         };
     }
 
-    /// <summary>
-    /// Calculates how much of an image extends past the hit position line.
-    /// </summary>
-    internal static float CalculateBottomOverflow(float imageHeight, float hitPosition) => System.Math.Max(0, imageHeight - hitPosition);
-
-    /// <summary>
-    /// Calculates the scale factor to fit an image width to a target column width.
-    /// </summary>
-    internal static float CalculateColumnWidthScale(float imageWidth, float columnWidth) => imageWidth > 0 && columnWidth > 0 ? columnWidth / imageWidth : 1;
-
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
     {
         if (lookup.ColumnIndex == null || BmsKeyBindingConfiguration.ActionToColumn(e.Action, lookup.LayoutVariant) != lookup.ColumnIndex)

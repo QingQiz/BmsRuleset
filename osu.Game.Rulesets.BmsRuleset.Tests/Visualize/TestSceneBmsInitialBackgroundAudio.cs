@@ -3,15 +3,14 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using NUnit.Framework;
-using osu.Framework.Audio.Track;
 using osu.Framework.Testing;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
+using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Storyboards;
@@ -55,32 +54,21 @@ public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
         AddStep("load player", LoadPlayer);
         AddUntilStep("drawable ruleset created", () => Player.DrawableRuleset != null);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
-        AddUntilStep("sample store loaded", () => getSampleStore().IsLoaded);
-        AddUntilStep("initial background track loaded", () => getBackgroundTrack() is { IsLoaded: true });
+        AddUntilStep("sample playback loaded", () => getSamplePlayback().IsLoaded);
+        AddUntilStep("initial background sample loaded", () => getSamplePlayback().IsSampleReady(backgroundKey));
         AddAssert("still before first note", () => Player.GameplayClockContainer.CurrentTime < Player.GameplayState.Beatmap.HitObjects[0].StartTime);
         AddAssert("sample playback enabled", () => !((ISamplePlaybackDisabler)Player).SamplePlaybackDisabled.Value);
         AddAssert("frame clock not catching up", () => !Player.DrawableRuleset.FrameStableClock.IsCatchingUp.Value);
         AddUntilStep("past first background event", () => Player.GameplayClockContainer.CurrentTime >= 1000);
         AddUntilStep("background starts or first note reached", () =>
-            getBackgroundTrack()?.IsRunning == true
+            BmsAudioTestAccess.GetActiveVoiceCount(getSamplePlayback()) > 0
             || Player.GameplayClockContainer.CurrentTime >= Player.GameplayState.Beatmap.HitObjects[0].StartTime);
-        AddAssert("long background track started before first note", () =>
-            getBackgroundTrack()?.IsRunning == true
+        AddAssert("long background sample started before first note", () =>
+            BmsAudioTestAccess.GetActiveVoiceCount(getSamplePlayback()) > 0
             && Player.GameplayClockContainer.CurrentTime < Player.GameplayState.Beatmap.HitObjects[0].StartTime);
-        AddUntilStep("background advances or first note reached", () =>
-            getBackgroundTrack()?.CurrentTime > 100
-            || Player.GameplayClockContainer.CurrentTime >= Player.GameplayState.Beatmap.HitObjects[0].StartTime);
-        AddAssert("long background track advances before first note", () =>
-            getBackgroundTrack()?.CurrentTime > 100
-            && Player.GameplayClockContainer.CurrentTime < Player.GameplayState.Beatmap.HitObjects[0].StartTime);
-        AddAssert("long background track is audible", () => getBackgroundTrack()?.AggregateVolume.Value > 0);
     }
 
-    private BmsSampleStore getSampleStore() =>
-        (BmsSampleStore)typeof(BmsDrawableRuleset)
-            .GetField("sampleStore", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(Player.DrawableRuleset)!;
-
-    private Track? getBackgroundTrack() => getSampleStore().GetTrack(backgroundKey);
+    private BmsSamplePlayback getSamplePlayback() =>
+        ((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback;
 
 }

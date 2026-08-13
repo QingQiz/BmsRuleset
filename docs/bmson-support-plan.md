@@ -541,7 +541,7 @@ Update these existing models to use `BmsSampleId` and `BmsSampleDefinition`:
 - `BmsSampleUsage`
 - `BmsPreviewTimelineEntry`
 - `BmsBackgroundAudioPlayer.BgmEvent`
-- `BmsSampleStore` dictionaries and command queues
+- `BmsPcmPlaybackController` dictionaries and command queues
 
 ### Layered Hit Object Samples
 
@@ -826,7 +826,7 @@ them as each phase lands, for example:
 
 ```powershell
 dotnet test osu.Game.Rulesets.BmsRuleset.Tests --filter "FullyQualifiedName~Bmson"
-dotnet test osu.Game.Rulesets.BmsRuleset.Tests --filter "FullyQualifiedName~BmsSampleStore"
+dotnet test osu.Game.Rulesets.BmsRuleset.Tests --filter "FullyQualifiedName~BmsSamplePlayback"
 dotnet test osu.Game.Rulesets.BmsRuleset.Tests --filter "FullyQualifiedName~BmsBeatmapDecoder"
 ```
 

@@ -14,6 +14,7 @@ using NUnit.Framework;
 using osu.Framework.Graphics.Video;
 using osu.Framework.Logging;
 using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
+using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -112,20 +113,18 @@ public partial class TestSceneBmsBgaVideoProbe : OsuTestScene
             };
         });
 
-        AddUntilStep("fallback decoded a frame", () => fallback?.Stats.DecodedFrames > 0);
-        AddUntilStep("fallback uploaded a frame", () => fallback?.UploadedFrames > 0);
+        AddUntilStep("fallback decoded a frame", () =>
+            fallback != null
+            && BmsVideoTestAccess.GetFrameSource(fallback) is { } source
+            && BmsVideoTestAccess.GetQueuedFrameCount(source) > 0);
+        AddUntilStep("fallback uploaded a frame", () => fallback != null && BmsVideoTestAccess.HasTexture(fallback));
 
         AddStep("report fallback stats", () =>
         {
-            var stats = fallback!.Stats;
             var lines = File.ReadAllLines(results_file).ToList();
             lines.Add(string.Empty);
             lines.Add("MPEG fallback:");
-            lines.Add($"  UploadedFrames={fallback.UploadedFrames}");
-            lines.Add($"  DecodedFrames={stats.DecodedFrames}");
-            lines.Add($"  DroppedFrames={stats.DroppedFrames}");
-            lines.Add($"  IsFaulted={stats.IsFaulted}");
-            lines.Add($"  FaultMessage={stats.FaultMessage ?? string.Empty}");
+            lines.Add($"  TextureReady={BmsVideoTestAccess.HasTexture(fallback!)}");
             File.WriteAllLines(results_file, lines);
         });
     }
