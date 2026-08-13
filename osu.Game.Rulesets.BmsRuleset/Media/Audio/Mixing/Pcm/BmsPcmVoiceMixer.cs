@@ -126,16 +126,15 @@ internal sealed class BmsPcmVoiceMixer
             {
                 for (var segment = firstVoiceSegment; segment != null; segment = Volatile.Read(ref segment.Next))
                 {
-                    for (var voiceIndex = 0; voiceIndex < segment.Voices.Length; voiceIndex++)
+                    var voiceIndex = 0;
+
+                    while (voiceIndex < segment.ActiveCount)
                     {
                         ref var voice = ref segment.Voices[voiceIndex];
-                        if (voice.State == BmsPcmVoiceState.Free)
-                            continue;
-
                         var asset = voice.Asset!;
                         if (voice.SourceFrame >= voice.EndFrame || !asset.TryReadStereoFrame(voice.SourceFrame, out var voiceLeft, out var voiceRight))
                         {
-                            releaseVoice(ref voice);
+                            releaseVoice(segment, voiceIndex);
                             continue;
                         }
 
@@ -145,7 +144,12 @@ internal sealed class BmsPcmVoiceMixer
                         voice.SourceFrame++;
 
                         if (voice.SourceFrame >= voice.EndFrame || gain <= 0)
-                            releaseVoice(ref voice);
+                        {
+                            releaseVoice(segment, voiceIndex);
+                            continue;
+                        }
+
+                        voiceIndex++;
                     }
                 }
             }
@@ -220,10 +224,10 @@ internal sealed class BmsPcmVoiceMixer
     {
         for (var segment = firstVoiceSegment; segment != null; segment = Volatile.Read(ref segment.Next))
         {
-            for (var i = 0; i < segment.Voices.Length; i++)
+            for (var i = 0; i < segment.ActiveCount; i++)
             {
                 ref var existing = ref segment.Voices[i];
-                if (existing.State == BmsPcmVoiceState.Free || existing.Domain != play.Domain)
+                if (existing.Domain != play.Domain)
                     continue;
 
                 beginFade(ref existing, frame, retriggerFadeFrames);
@@ -231,22 +235,17 @@ internal sealed class BmsPcmVoiceMixer
         }
 
         VoiceSegment? freeSegment = null;
-        var freeIndex = -1;
 
-        for (var segment = firstVoiceSegment; segment != null && freeIndex < 0; segment = Volatile.Read(ref segment.Next))
+        for (var segment = firstVoiceSegment; segment != null; segment = Volatile.Read(ref segment.Next))
         {
-            for (var i = 0; i < segment.Voices.Length; i++)
+            if (segment.ActiveCount < segment.Voices.Length)
             {
-                if (segment.Voices[i].State != BmsPcmVoiceState.Free)
-                    continue;
-
                 freeSegment = segment;
-                freeIndex = i;
                 break;
             }
         }
 
-        if (freeIndex < 0)
+        if (freeSegment == null)
         {
             releaseVoiceReservation();
             return;
@@ -265,7 +264,7 @@ internal sealed class BmsPcmVoiceMixer
             return;
         }
 
-        freeSegment!.Voices[freeIndex] = new BmsPcmVoice
+        freeSegment.Voices[freeSegment.ActiveCount++] = new BmsPcmVoice
         {
             State = BmsPcmVoiceState.Active,
             Asset = play.Asset,
@@ -315,10 +314,9 @@ internal sealed class BmsPcmVoiceMixer
     {
         for (var segment = firstVoiceSegment; segment != null; segment = Volatile.Read(ref segment.Next))
         {
-            for (var i = 0; i < segment.Voices.Length; i++)
+            for (var i = 0; i < segment.ActiveCount; i++)
             {
-                if (segment.Voices[i].State != BmsPcmVoiceState.Free)
-                    beginFade(ref segment.Voices[i], frame, durationFrames);
+                beginFade(ref segment.Voices[i], frame, durationFrames);
             }
         }
     }
@@ -327,9 +325,9 @@ internal sealed class BmsPcmVoiceMixer
     {
         for (var segment = firstVoiceSegment; segment != null; segment = Volatile.Read(ref segment.Next))
         {
-            for (var i = 0; i < segment.Voices.Length; i++)
+            for (var i = 0; i < segment.ActiveCount; i++)
             {
-                if (segment.Voices[i].State != BmsPcmVoiceState.Free && segment.Voices[i].VoiceId == voiceId)
+                if (segment.Voices[i].VoiceId == voiceId)
                     beginFade(ref segment.Voices[i], frame, retriggerFadeFrames);
             }
         }
@@ -339,9 +337,9 @@ internal sealed class BmsPcmVoiceMixer
     {
         for (var segment = firstVoiceSegment; segment != null; segment = Volatile.Read(ref segment.Next))
         {
-            for (var i = 0; i < segment.Voices.Length; i++)
+            for (var i = 0; i < segment.ActiveCount; i++)
             {
-                if (segment.Voices[i].State != BmsPcmVoiceState.Free && segment.Voices[i].VoiceId == voiceId)
+                if (segment.Voices[i].VoiceId == voiceId)
                     segment.Voices[i].BaseGain = gain;
             }
         }
@@ -389,13 +387,16 @@ internal sealed class BmsPcmVoiceMixer
         Interlocked.Add(ref reservedVoices, count);
     }
 
-    // ReSharper disable once RedundantAssignment
-    private void releaseVoice(ref BmsPcmVoice voice)
+    private void releaseVoice(VoiceSegment segment, int index)
     {
+        ref var voice = ref segment.Voices[index];
+
         if (voice.State == BmsPcmVoiceState.Active)
             activeVoices--;
 
-        voice = default;
+        var lastIndex = --segment.ActiveCount;
+        voice = segment.Voices[lastIndex];
+        segment.Voices[lastIndex] = default;
         releaseVoiceReservation();
     }
 
@@ -442,6 +443,7 @@ internal sealed class BmsPcmVoiceMixer
     private sealed class VoiceSegment(int capacity)
     {
         internal readonly BmsPcmVoice[] Voices = new BmsPcmVoice[capacity];
+        internal int ActiveCount;
         internal VoiceSegment? Next;
     }
 }

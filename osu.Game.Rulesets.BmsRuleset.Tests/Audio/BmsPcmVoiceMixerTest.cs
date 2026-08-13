@@ -124,6 +124,31 @@ public class BmsPcmVoiceMixerTest
     }
 
     [Test]
+    public void CompletedExpandedVoicesLeaveNoHistoricalScanRange()
+    {
+        var asset = createConstantAsset(1, 0.1f);
+        var mixer = createMixer();
+        mixer.SubmitPlayBatch(createPlays(asset, 513));
+
+        BmsPcmTestHelpers.RenderFrames(mixer, 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(mixer.ActiveVoiceCount, Is.Zero);
+            Assert.That(getOccupiedVoiceSlotCount(mixer), Is.Zero);
+        });
+
+        mixer.SubmitPlayBatch([new BmsVoicePlay(asset, new BmsTerminationDomain(1), mixer.RenderedFrames)]);
+        var output = BmsPcmTestHelpers.RenderFrames(mixer, 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(output[0], Is.GreaterThan(0));
+            Assert.That(getOccupiedVoiceSlotCount(mixer), Is.Zero);
+        });
+    }
+
+    [Test]
     public void RejectedPlayReleasesVoiceReservation()
     {
         var asset = createConstantAsset(100, 0.1f);
@@ -268,4 +293,20 @@ public class BmsPcmVoiceMixerTest
     }
 
     private static BmsPcmVoiceMixer createMixer() => new();
+
+    private static int getOccupiedVoiceSlotCount(BmsPcmVoiceMixer mixer)
+    {
+        const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var segment = typeof(BmsPcmVoiceMixer).GetField("firstVoiceSegment", flags)!.GetValue(mixer);
+        var count = 0;
+
+        while (segment != null)
+        {
+            var type = segment.GetType();
+            count += (int)type.GetField("ActiveCount", flags)!.GetValue(segment)!;
+            segment = type.GetField("Next", flags)!.GetValue(segment);
+        }
+
+        return count;
+    }
 }
