@@ -1,6 +1,5 @@
 using System;
 using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
 using HarmonyLib;
 using ManagedBass;
@@ -24,10 +23,7 @@ internal sealed class BmsBassMixerBridge : IDisposable
     private Task pendingLifecycleAction = Task.CompletedTask;
     private int streamHandle;
     private int attachedMixerHandle;
-    private long callbackFailures;
     private bool disposed;
-
-    internal long CallbackFailures => Interlocked.Read(ref callbackFailures);
 
     internal BmsBassMixerBridge(AudioMixer mixer, BmsPcmVoiceMixer voiceMixer)
     {
@@ -142,7 +138,6 @@ internal sealed class BmsBassMixerBridge : IDisposable
         catch
         {
             new Span<byte>((void*)buffer, length).Clear();
-            Interlocked.Increment(ref callbackFailures);
             return length;
         }
     }

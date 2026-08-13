@@ -33,7 +33,7 @@ public class BmsBassFixedRatePcmProcessorTest
     public void FixedTempoChangesDurationWithoutChangingPitch(double rate)
     {
         var wave = createWave(44100, 44100 * 2, 440);
-        using var processor = BmsFixedRatePcmProcessor.CreateFromMemory(wave, rate, 1024);
+        using var processor = BmsFixedRatePcmProcessor.CreateFromMemory(wave, rate);
         var chunks = BmsPcmTestHelpers.ProcessChunks(processor);
         var asset = BmsPcmTestHelpers.CreateAsset(chunks);
         var samples = chunks.SelectMany(chunk => chunk.Samples).ToArray();
@@ -50,7 +50,7 @@ public class BmsBassFixedRatePcmProcessorTest
     public async Task AssetCacheDeduplicatesAndPublishesStartupBuffer()
     {
         var wave = createWave(44100, 44100, 440);
-        using var cache = new BmsPcmAssetCache((_, _) => Task.FromResult<byte[]?>(wave), 1, startupFrames: 512);
+        using var cache = new BmsPcmAssetCache((_, _) => Task.FromResult<byte[]?>(wave), 1);
         using var first = cache.Acquire("same.wav");
         using var second = cache.Acquire("same.wav");
 
@@ -59,7 +59,7 @@ public class BmsBassFixedRatePcmProcessorTest
         Assert.Multiple(() =>
         {
             Assert.That(second.Asset, Is.SameAs(first.Asset));
-            Assert.That(first.Asset.PublishedFrameCount, Is.GreaterThanOrEqualTo(512));
+            Assert.That(first.Asset.PublishedFrameCount, Is.GreaterThanOrEqualTo(BmsFixedRatePcmProcessor.DEFAULT_CHUNK_FRAMES * 2));
             Assert.That(first.Asset.State, Is.AnyOf(BmsPcmAssetState.Ready, BmsPcmAssetState.Complete));
         });
 

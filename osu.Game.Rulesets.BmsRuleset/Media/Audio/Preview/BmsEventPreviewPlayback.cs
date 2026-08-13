@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
@@ -39,18 +38,13 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
 
     public bool IsLengthFinal => !deriveLengthFromSamples || derivedLengthResolutionComplete;
 
-    internal IReadOnlyList<BmsPreviewTimelineEntry> Events => sortedEvents;
-
-    internal int ActiveVoiceCount => playbackSession?.AudioDiagnostics.ActiveVoices ?? 0;
-
-    internal double OutputGain => masterGain.Value;
+    internal int ActiveVoiceCount => playbackSession?.ActiveVoiceCount ?? 0;
 
     internal BmsEventPreviewPlayback(
         BmsPreviewTrack owner,
         BmsEventPreviewTimeline timeline,
         string? basePath,
-        AudioManager audioManager,
-        Func<CancellationToken, Task>? beforeAssetLoad = null)
+        AudioManager audioManager)
     {
         this.owner = owner;
         this.audioManager = audioManager;
@@ -84,8 +78,7 @@ internal sealed class BmsEventPreviewPlayback : IDisposable
             sampleUsages,
             audioManager,
             () => owner.CurrentTime,
-            masterGain,
-            beforeAssetLoad);
+            masterGain);
         playbackSession.Initialise(cancellation.Token, owner.CurrentTime, waitForInitialAssets: false);
     }
 

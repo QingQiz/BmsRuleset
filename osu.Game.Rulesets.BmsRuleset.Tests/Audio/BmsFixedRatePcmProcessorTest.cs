@@ -12,7 +12,7 @@ public class BmsFixedRatePcmProcessorTest
     public void Mono48KhzIsContinuouslyResampledToStereo44Khz()
     {
         var input = createSine(48000, 4800, 440, 1);
-        using var processor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 48000, 1, 37), 1, 113);
+        using var processor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 48000, 1, 37), 1);
         var chunks = BmsPcmTestHelpers.ProcessChunks(processor);
         var asset = BmsPcmTestHelpers.CreateAsset(chunks);
 
@@ -21,7 +21,7 @@ public class BmsFixedRatePcmProcessorTest
             Assert.That(asset.SampleRate, Is.EqualTo(44100));
             Assert.That(asset.Channels, Is.EqualTo(2));
             Assert.That(asset.TotalFrameCount, Is.EqualTo(4410));
-            Assert.That(chunks, Has.Length.EqualTo(40));
+            Assert.That(chunks, Has.Length.EqualTo(2));
         });
 
         var output = chunks.SelectMany(chunk => chunk.Samples).ToArray();
@@ -32,11 +32,11 @@ public class BmsFixedRatePcmProcessorTest
     }
 
     [Test]
-    public void SourceAndOutputChunkSizesDoNotChangePcm()
+    public void SourceChunkSizeDoesNotChangePcm()
     {
         var input = createSine(32000, 3200, 523.25, 2);
-        using var fineProcessor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 32000, 2, 2), 1, 17);
-        using var coarseProcessor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 32000, 2, 317), 1, 509);
+        using var fineProcessor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 32000, 2, 2), 1);
+        using var coarseProcessor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 32000, 2, 317), 1);
 
         var fine = BmsPcmTestHelpers.ProcessChunks(fineProcessor).SelectMany(chunk => chunk.Samples).ToArray();
         var coarse = BmsPcmTestHelpers.ProcessChunks(coarseProcessor).SelectMany(chunk => chunk.Samples).ToArray();

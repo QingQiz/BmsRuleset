@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -12,7 +13,7 @@ public class BmsVoiceCommandQueueTest
     [Test]
     public void RingCapacityIsReusedWhenConsumerKeepsUp()
     {
-        var queue = new BmsVoiceCommandQueue(2);
+        var queue = new BmsVoiceCommandQueue();
 
         for (var i = 0; i < 1000; i++)
         {
@@ -21,30 +22,20 @@ public class BmsVoiceCommandQueueTest
             Assert.That(dequeued.TargetFrame, Is.EqualTo(i));
         }
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(queue.Count, Is.Zero);
-            Assert.That(queue.ExpansionCount, Is.Zero);
-        });
+        Assert.That(queue.TryDequeue(out _), Is.False);
     }
 
     [Test]
     public void BatchLargerThanCurrentSegmentExpandsWithoutLosingOrder()
     {
-        var queue = new BmsVoiceCommandQueue(2);
-        var batch = new BmsVoiceCommand[7];
+        var queue = new BmsVoiceCommandQueue();
+        var batch = new BmsVoiceCommand[4097];
 
         for (var i = 0; i < batch.Length; i++)
             batch[i] = command(i + 1);
 
         queue.Enqueue(command(0));
         queue.Enqueue(batch);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(queue.Count, Is.EqualTo(8));
-            Assert.That(queue.ExpansionCount, Is.EqualTo(1));
-        });
 
         for (var expected = 0; expected <= batch.Length; expected++)
         {
@@ -58,12 +49,12 @@ public class BmsVoiceCommandQueueTest
     [Test]
     public void ConsumerDoesNotAllocateWhenCrossingSegments()
     {
-        var queue = new BmsVoiceCommandQueue(2);
+        var queue = new BmsVoiceCommandQueue();
 
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < 4097; i++)
             queue.Enqueue(command(i));
 
-        var frames = new long[6];
+        var frames = new long[4097];
         var before = GC.GetAllocatedBytesForCurrentThread();
 
         for (var i = 0; i < frames.Length; i++)
@@ -76,10 +67,9 @@ public class BmsVoiceCommandQueueTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(frames, Is.EqualTo(new long[] { 0, 1, 2, 3, 4, 5 }));
+            Assert.That(frames, Is.EqualTo(Enumerable.Range(0, frames.Length).Select(value => (long)value)));
             Assert.That(allocated, Is.Zero);
-            Assert.That(queue.Count, Is.Zero);
-            Assert.That(queue.ExpansionCount, Is.EqualTo(2));
+            Assert.That(queue.TryDequeue(out _), Is.False);
         });
     }
 
@@ -87,7 +77,7 @@ public class BmsVoiceCommandQueueTest
     public async Task ConcurrentProducerAndConsumerPreserveOrder()
     {
         const int command_count = 10_000;
-        var queue = new BmsVoiceCommandQueue(4);
+        var queue = new BmsVoiceCommandQueue();
         var producer = Task.Run(() =>
         {
             for (var i = 0; i < command_count; i++)
@@ -113,13 +103,11 @@ public class BmsVoiceCommandQueueTest
 
         await producer;
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(mismatch, Is.EqualTo(-1));
-            Assert.That(queue.Count, Is.Zero);
-        });
+        Assert.That(mismatch, Is.EqualTo(-1));
+        Assert.That(queue.TryDequeue(out _), Is.False);
     }
 
     private static BmsVoiceCommand command(long targetFrame) =>
         new(BmsVoiceCommandType.SetMasterGain, targetFrame, 0, Value: targetFrame);
+
 }

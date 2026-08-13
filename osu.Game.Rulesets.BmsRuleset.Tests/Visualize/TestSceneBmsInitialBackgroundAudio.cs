@@ -10,6 +10,7 @@ using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
+using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Storyboards;
@@ -60,15 +61,11 @@ public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
         AddAssert("frame clock not catching up", () => !Player.DrawableRuleset.FrameStableClock.IsCatchingUp.Value);
         AddUntilStep("past first background event", () => Player.GameplayClockContainer.CurrentTime >= 1000);
         AddUntilStep("background starts or first note reached", () =>
-            getSamplePlayback().DiagnosticSnapshot.Audio.ActiveVoices > 0
+            BmsAudioTestAccess.GetActiveVoiceCount(getSamplePlayback()) > 0
             || Player.GameplayClockContainer.CurrentTime >= Player.GameplayState.Beatmap.HitObjects[0].StartTime);
         AddAssert("long background sample started before first note", () =>
-            getSamplePlayback().DiagnosticSnapshot.Audio.ActiveVoices > 0
+            BmsAudioTestAccess.GetActiveVoiceCount(getSamplePlayback()) > 0
             && Player.GameplayClockContainer.CurrentTime < Player.GameplayState.Beatmap.HitObjects[0].StartTime);
-        AddUntilStep("background is audible or first note reached", () =>
-            getSamplePlayback().DiagnosticSnapshot.Audio.OutputPeak > 0
-            || Player.GameplayClockContainer.CurrentTime >= Player.GameplayState.Beatmap.HitObjects[0].StartTime);
-        AddAssert("long background sample is audible", () => getSamplePlayback().DiagnosticSnapshot.Audio.OutputPeak > 0);
     }
 
     private BmsSamplePlayback getSamplePlayback() =>

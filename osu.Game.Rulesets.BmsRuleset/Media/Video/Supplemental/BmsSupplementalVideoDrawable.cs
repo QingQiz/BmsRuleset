@@ -56,10 +56,6 @@ internal sealed partial class BmsSupplementalVideoDrawable : CompositeDrawable
     {
     }
 
-    public int UploadedFrames { get; private set; }
-
-    public BmsSupplementalVideoFrameSourceStats Stats => frameSource == null ? default : frameSource.Stats;
-
     [BackgroundDependencyLoader]
     private void load(IRenderer renderer)
     {
@@ -112,7 +108,6 @@ internal sealed partial class BmsSupplementalVideoDrawable : CompositeDrawable
             }
 
             texture.SetData(upload);
-            UploadedFrames++;
         }
     }
 

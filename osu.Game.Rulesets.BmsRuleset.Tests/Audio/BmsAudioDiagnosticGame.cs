@@ -131,7 +131,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         Console.WriteLine("BMS_AUDIO_DIAGNOSTIC limiter=true");
         Console.WriteLine("BMS_AUDIO_DIAGNOSTIC native_scheduling=true");
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC live_batch={liveBatch}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC pcm_backend={samplePlayback.DiagnosticMixer != null}");
+        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC pcm_backend={BmsAudioTestAccess.GetOutputMixer(samplePlayback) != null}");
 
         if (Bass.GetInfo(out var deviceInfo))
         {
@@ -139,8 +139,6 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
             Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC minimum_buffer={deviceInfo.MinBufferLength}ms");
         }
 
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC limiter_state={formatLimiterDiagnostics()}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC pcm_state={formatPcmDiagnostics()}");
     }
 
     protected override void LoadComplete()
@@ -159,7 +157,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
 
         if (!playbackStarted)
         {
-            if (!samplePlayback.IsLoaded || forceWasapi && !Audio.UsingGlobalMixer.Value)
+            if (!samplePlayback.IsLoaded || (forceWasapi && !Audio.UsingGlobalMixer.Value))
                 return;
 
             playbackStarted = true;
@@ -170,7 +168,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
                 var capturePair = captureGlobal
                     ? BmsAudioCaptureSession.StartGlobalPair(Audio, captureDuration, silentCapture)
                     : BmsAudioCaptureSession.StartPair(
-                        samplePlayback.DiagnosticMixer ?? throw new InvalidOperationException("The BMS diagnostic mixer is unavailable."),
+                        BmsAudioTestAccess.GetOutputMixer(samplePlayback) ?? throw new InvalidOperationException("The BMS output mixer is unavailable."),
                         captureDuration,
                         silentCapture);
                 preLimiterCaptureSession = capturePair.Before;
@@ -209,8 +207,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
                     if (traceScheduling)
                     {
                         Console.WriteLine(
-                            $"BMS_AUDIO_SCHEDULE_BLOCKED chart={evt.Time:0.###} now={chartTime:0.###} " +
-                            $"key={evt.SampleKey:X2} pcm_state={samplePlayback.DiagnosticSnapshot.Cache}");
+                            $"BMS_AUDIO_SCHEDULE_BLOCKED chart={evt.Time:0.###} now={chartTime:0.###} key={evt.SampleKey:X2}");
                     }
 
                     samplePlayback.Play(evt.SampleKey, volume);
@@ -248,8 +245,6 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         exitRequested = true;
         completeCapture();
         Console.WriteLine("BMS_AUDIO_DIAGNOSTIC complete");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC limiter_state={formatLimiterDiagnostics()}");
-        Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC pcm_state={formatPcmDiagnostics()}");
         Exit();
     }
 
@@ -361,27 +356,6 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
         captureSession = null;
         preLimiterCaptureSession = null;
         loopbackCaptureSession = null;
-    }
-
-    private string formatLimiterDiagnostics()
-    {
-        var diagnostics = samplePlayback.DiagnosticSnapshot.Audio;
-        return $"limited_frames={diagnostics.LimitedFrames} input_peak={diagnostics.InputPeak:0.###} " +
-               $"output_peak={diagnostics.OutputPeak:0.###} gain={diagnostics.LimiterGain:0.###}";
-    }
-
-    private string formatPcmDiagnostics()
-    {
-        var diagnostics = samplePlayback.DiagnosticSnapshot;
-        var audio = diagnostics.Audio;
-        var cache = diagnostics.Cache;
-        return $"rendered={audio.RenderedFrames} active={audio.ActiveVoices} draining={audio.DrainingVoices} peak_voices={audio.PeakVoices} " +
-               $"submitted_voices={audio.SubmittedVoices} folded_voices={audio.FoldedVoices} started_voices={audio.StartedVoices} " +
-               $"queued={audio.QueuedCommands} queue_high_water={audio.QueueHighWater} queue_expansions={audio.QueueExpansions} " +
-               $"voice_expansions={audio.VoicePoolExpansions} voice_overflows={audio.VoicePoolOverflows} preload_underflows={diagnostics.PreloadUnderflows} " +
-               $"playback_underflows={audio.PlaybackUnderflows} callback_failures={diagnostics.BridgeCallbackFailures} " +
-               $"assets={cache.LoadedAssets}/{cache.PreparingAssets}/{cache.FailedAssets} resident={cache.ResidentPcmBytes} " +
-               $"peak_resident={cache.PeakResidentPcmBytes} evictions={cache.EvictionCount}";
     }
 
     private static IEnumerable<ScheduledSample> collectEvents(BmsParseResult parsed)

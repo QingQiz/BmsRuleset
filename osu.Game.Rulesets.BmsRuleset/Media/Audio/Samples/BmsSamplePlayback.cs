@@ -3,17 +3,9 @@ using System.Collections.Generic;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
-using osu.Framework.Audio.Mixing;
 using osu.Framework.Graphics;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
-
-internal readonly record struct BmsSamplePlaybackDiagnostics(
-    BmsAudioDiagnostics Audio,
-    BmsPcmAssetCacheDiagnostics Cache,
-    long PreloadUnderflows,
-    long BridgeCallbackFailures);
 
 /// <summary>
 ///     Provides the gameplay-facing sample playback facade.
@@ -36,10 +28,6 @@ public partial class BmsSamplePlayback(
     private AudioManager audioManager { get; set; } = null!;
 
     public double MaxSampleLengthMilliseconds => controller?.MaxSampleLengthMilliseconds ?? 0;
-
-    internal AudioMixer? DiagnosticMixer => playbackSession?.DiagnosticMixer;
-
-    internal BmsSamplePlaybackDiagnostics DiagnosticSnapshot => playbackSession?.DiagnosticSnapshot ?? default;
 
     internal bool IsSampleReady(ushort sampleKey) => controller?.IsSampleReady(sampleKey) == true;
 

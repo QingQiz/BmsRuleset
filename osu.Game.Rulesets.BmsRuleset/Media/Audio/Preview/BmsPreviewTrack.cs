@@ -17,9 +17,9 @@ public enum BmsPreviewTrackPlaybackMode
 
 public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 {
-    internal const double RESTORE_FADE_DURATION = 2_500;
-    internal const double SEEK_FADE_OUT_DURATION = 20;
-    internal const double SEEK_FADE_IN_DURATION = 50;
+    private const double restore_fade_duration = 2_500;
+    private const double seek_fade_out_duration = 20;
+    private const double seek_fade_in_duration = 50;
 
     private readonly BindableDouble previewOutputVolume = new(1);
     private readonly BindableDouble restoreFadeVolume = new(1);
@@ -75,10 +75,6 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
             OnPlaybackModeChanged(value);
         }
     }
-
-    internal double RestoreFadeVolume => restoreFadeVolume.Value;
-
-    internal double SeekFadeVolume => seekFadeVolume.Value;
 
     internal double PreviewPlaybackGain => AggregateVolume.Value
                                            * previewOutputVolume.Value
@@ -305,7 +301,7 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
         if (!restoreFadeInProgress)
             return;
 
-        var progress = Stopwatch.GetElapsedTime(restoreFadeStart).TotalMilliseconds / RESTORE_FADE_DURATION;
+        var progress = Stopwatch.GetElapsedTime(restoreFadeStart).TotalMilliseconds / restore_fade_duration;
         restoreFadeVolume.Value = Math.Min(1, progress);
         restoreFadeInProgress = progress < 1;
     }
@@ -378,7 +374,7 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
         {
             case SeekFadePhase.FadingOut:
             {
-                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_OUT_DURATION;
+                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / seek_fade_out_duration;
                 seekFadeVolume.Value = seekFadeStartVolume * Math.Max(0, 1 - progress);
 
                 if (progress >= 1)
@@ -389,7 +385,7 @@ public abstract class BmsPreviewTrack : Track, IAdjustableAudioComponent
 
             case SeekFadePhase.FadingIn:
             {
-                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / SEEK_FADE_IN_DURATION;
+                var progress = Stopwatch.GetElapsedTime(seekFadeStart).TotalMilliseconds / seek_fade_in_duration;
                 seekFadeVolume.Value = Math.Min(1, progress);
 
                 if (progress >= 1)

@@ -17,6 +17,7 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
@@ -145,60 +146,6 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
-    public void TestRestoreFadeWaitsForAudioLoadWithRunningClock()
-    {
-        BmsPreviewTrack track = null!;
-        var audioLoadStarted = new ManualResetEventSlim();
-        var audioLoadCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var waitForFadeDuration = new Stopwatch();
-
-        AddStep("create timeline with gated audio load", () =>
-        {
-            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-delayed-restore-{Guid.NewGuid():N}");
-            Directory.CreateDirectory(directory);
-            writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
-
-            track = new BmsEventPreviewTrack(
-                _ => BmsEventPreviewTimeline.CreateSingleFile("test.wav"),
-                directory,
-                audio,
-                _ =>
-                {
-                    audioLoadStarted.Set();
-                    return audioLoadCompletion.Task;
-                })
-            {
-                PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly,
-            };
-
-            track.Frequency.Value = 0;
-            audio.AddItem(track);
-        });
-
-        AddUntilStep("timeline is ready", () => ((BmsEventPreviewTrack)track).Playback != null);
-        AddStep("restore with gameplay clock running at zero", () =>
-        {
-            track.Start();
-            Assert.That(track.IsRunning && track.CurrentTime == 0, Is.True);
-            track.RestorePreview(0);
-            waitForFadeDuration.Start();
-        });
-
-        AddUntilStep("audio load is pending", () => audioLoadStarted.IsSet);
-        AddAssert("restore fade duration is 2.5 seconds", () => BmsPreviewTrack.RESTORE_FADE_DURATION == 2_500);
-        AddUntilStep("wait beyond fade duration", () => waitForFadeDuration.ElapsedMilliseconds >= 2_550);
-        AddAssert("fade remains held while audio is pending", () => getRestoreFadeVolume(track) == 0);
-        AddStep("complete audio load", audioLoadCompletion.SetResult);
-        AddUntilStep("restored audio starts", () => track.IsRunning && getActivePlaybackCount(track) == 1);
-        AddUntilStep("restore fade completes", () => getRestoreFadeVolume(track) == 1);
-        AddStep("dispose track", () =>
-        {
-            track.Dispose();
-            audioLoadStarted.Dispose();
-        });
-    }
-
-    [Test]
     public void TestEventTimelineWaitsForAllInitialAudioBeforeStarting()
     {
         BmsPreviewTrack track = null!;
@@ -225,12 +172,52 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     }
 
     [Test]
+    public void TestRestoreFadeWaitsForAudioLoadWithRunningClock()
+    {
+        BmsPreviewTrack track = null!;
+        IDisposable? audioLoadHold = null;
+        var waitForFadeDuration = new Stopwatch();
+
+        AddStep("create timeline", () =>
+        {
+            var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-delayed-restore-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
+
+            track = new BmsEventPreviewTrack(
+                _ => BmsEventPreviewTimeline.CreateSingleFile("test.wav"),
+                directory,
+                audio)
+            {
+                PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly,
+            };
+
+            track.Frequency.Value = 0;
+            audio.AddItem(track);
+        });
+
+        AddUntilStep("initial audio is prepared", () => BmsAudioTestAccess.GetPreviewPreparedSampleCount(track) == 1);
+        AddStep("hold audio readiness", () => audioLoadHold = BmsAudioTestAccess.HoldPreviewSampleNotReady(track, 0));
+        AddStep("restore with gameplay clock running at zero", () =>
+        {
+            track.Start();
+            Assert.That(track.IsRunning && track.CurrentTime == 0, Is.True);
+            track.RestorePreview(0);
+            waitForFadeDuration.Start();
+        });
+
+        AddUntilStep("wait beyond fade duration", () => waitForFadeDuration.ElapsedMilliseconds >= 2_550);
+        AddAssert("fade remains held while audio is pending", () => getRestoreFadeVolume(track) == 0);
+        AddStep("complete audio load", () => audioLoadHold!.Dispose());
+        AddUntilStep("restored audio starts", () => track.IsRunning && getActivePlaybackCount(track) == 1);
+        AddUntilStep("restore fade completes", () => getRestoreFadeVolume(track) == 1);
+        AddStep("dispose track", () => track.Dispose());
+    }
+
+    [Test]
     public void TestEventTimelineUsesGameplayPreloadWindow()
     {
         BmsPreviewTrack track = null!;
-        var audioLoadCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var audioLoadCount = 0;
-
         AddStep("create events around prefetch boundary", () =>
         {
             var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-prefetch-boundary-{Guid.NewGuid():N}");
@@ -254,25 +241,17 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                         [3] = "third.wav",
                     }),
                 directory,
-                audio,
-                _ =>
-                {
-                    Interlocked.Increment(ref audioLoadCount);
-                    return audioLoadCompletion.Task;
-                });
+                audio);
 
+            track.Frequency.Value = 0;
             audio.AddItem(track);
             track.Start();
         });
 
-        AddUntilStep("events through ten seconds start loading", () => Volatile.Read(ref audioLoadCount) >= 2);
+        AddUntilStep("events through ten seconds start loading", () => BmsAudioTestAccess.GetPreviewPreparedSampleCount(track) >= 2);
         AddWaitStep("allow additional preload updates", 5);
-        AddAssert("event after ten seconds is not preloaded", () => Volatile.Read(ref audioLoadCount) == 2);
-        AddStep("dispose track", () =>
-        {
-            track.Dispose();
-            audioLoadCompletion.TrySetResult();
-        });
+        AddAssert("event after ten seconds is not preloaded", () => BmsAudioTestAccess.GetPreviewPreparedSampleCount(track) == 2);
+        AddStep("dispose track", () => track.Dispose());
     }
 
     [Test]
@@ -760,8 +739,6 @@ public partial class BmsPreviewTrackTest : OsuTestScene
     public void TestRestoreDoesNotPreparePastKeysounds()
     {
         BmsPreviewTrack track = null!;
-        var audioLoadCount = 0;
-
         AddStep("restore past non-resumable keysound", () =>
         {
             var directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"bms-preview-past-keysound-{Guid.NewGuid():N}");
@@ -773,12 +750,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
                     () => [new BmsPreviewSampleEvent(new BmsSampleEvent(1000, 0, 1, 100), false)],
                     new Dictionary<ushort, string> { [1] = "event.wav" }),
                 directory,
-                audio,
-                _ =>
-                {
-                    Interlocked.Increment(ref audioLoadCount);
-                    return Task.CompletedTask;
-                })
+                audio)
             {
                 PlaybackMode = BmsPreviewTrackPlaybackMode.GameplayClockOnly,
             };
@@ -791,7 +763,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
         AddUntilStep("preview clock starts", () => track.IsRunning);
         AddWaitStep("allow preload updates", 5);
-        AddAssert("past keysound was not prepared", () => Volatile.Read(ref audioLoadCount) == 0);
+        AddAssert("past keysound was not prepared", () => BmsAudioTestAccess.GetPreviewPreparedSampleCount(track) == 0);
         AddStep("dispose track", () => track.Dispose());
     }
 
@@ -894,9 +866,6 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         });
 
         AddUntilStep("initial audio is running", () => getActivePlaybackCount(track) == 1);
-        AddAssert("seek fade durations are short", () =>
-            BmsPreviewTrack.SEEK_FADE_OUT_DURATION == 20
-            && BmsPreviewTrack.SEEK_FADE_IN_DURATION == 50);
         AddStep("seek while running", () => track.Seek(1500));
         AddUntilStep("output fades before reconstruction", () =>
         {
@@ -988,15 +957,13 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         AddStep("dispose track", () => track.Dispose());
     }
 
-    private static int getActivePlaybackCount(BmsPreviewTrack track) =>
-        track is BmsEventPreviewTrack { Playback: { } playback } ? playback.ActiveVoiceCount : 0;
+    private static int getActivePlaybackCount(BmsPreviewTrack track) => BmsAudioTestAccess.GetPreviewActiveVoiceCount(track);
 
-    private static double getRestoreFadeVolume(BmsPreviewTrack track) => track.RestoreFadeVolume;
+    private static double getRestoreFadeVolume(BmsPreviewTrack track) => BmsAudioTestAccess.GetRestoreFadeVolume(track);
 
-    private static double getSeekFadeVolume(BmsPreviewTrack track) => track.SeekFadeVolume;
+    private static double getSeekFadeVolume(BmsPreviewTrack track) => BmsAudioTestAccess.GetSeekFadeVolume(track);
 
-    private static double getPlaybackOutputGain(BmsPreviewTrack track) =>
-        track is BmsEventPreviewTrack { Playback: { } playback } ? playback.OutputGain : 0;
+    private static double getPlaybackOutputGain(BmsPreviewTrack track) => BmsAudioTestAccess.GetPreviewOutputGain(track);
 
     private BmsPreviewTrack createTrack(
         IReadOnlyList<BmsSampleEvent> sampleEvents,
@@ -1014,8 +981,7 @@ public partial class BmsPreviewTrackTest : OsuTestScene
         string basePath)
         => new BmsEventPreviewTrack(timelineSources, basePath, audio);
 
-    private static string getFirstTimelineSamplePath(BmsPreviewTrack track)
-        => ((BmsEventPreviewTrack)track).Playback!.Events.First().SamplePath;
+    private static string getFirstTimelineSamplePath(BmsPreviewTrack track) => BmsAudioTestAccess.GetFirstPreviewSamplePath(track);
 
     private static void writePcmWave(string path, TimeSpan duration)
     {

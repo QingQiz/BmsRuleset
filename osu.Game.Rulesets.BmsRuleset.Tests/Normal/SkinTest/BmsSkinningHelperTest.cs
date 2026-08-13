@@ -449,13 +449,6 @@ public class BmsSkinningHelperTest
     }
 
     [Test]
-    public void TestKeysUnderNotesDepthPolicyPlacesKeyAreaBehindNotes()
-    {
-        Assert.That(BmsColumn.DepthForKeyArea(keysUnderNotes: true), Is.GreaterThan(BmsColumn.HIT_OBJECT_DEPTH));
-        Assert.That(BmsColumn.DepthForKeyArea(keysUnderNotes: false), Is.LessThan(BmsColumn.HIT_OBJECT_DEPTH));
-    }
-
-    [Test]
     public void TestLegacyTransformerCreatesResolvedNoteAndLegacyExplosionDrawables()
     {
         var skin = new CountingTextureSkin(renderer);

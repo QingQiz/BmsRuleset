@@ -7,14 +7,6 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
-internal readonly record struct BmsPcmAssetCacheDiagnostics(
-    int LoadedAssets,
-    int PreparingAssets,
-    int FailedAssets,
-    long ResidentPcmBytes,
-    long PeakResidentPcmBytes,
-    long EvictionCount);
-
 internal sealed class BmsPcmAssetCache : IDisposable
 {
     private const long default_soft_budget = 512L * 1024 * 1024;
@@ -22,39 +14,26 @@ internal sealed class BmsPcmAssetCache : IDisposable
 
     private readonly Func<string, CancellationToken, Task<byte[]?>> resourceLoader;
     private readonly double rate;
-    private readonly long softBudget;
-    private readonly int startupFrames;
     private readonly SemaphoreSlim processingSlots;
     private readonly CancellationTokenSource disposalCancellation = new();
     private readonly ConcurrentDictionary<string, CacheEntry> entries = new();
     private readonly object lifecycleLock = new();
 
     private long residentPcmBytes;
-    private long peakResidentPcmBytes;
-    private long evictionCount;
     private bool disposed;
 
     internal BmsPcmAssetCache(
         Func<string, CancellationToken, Task<byte[]?>> resourceLoader,
-        double rate,
-        int maximumConcurrentProcessors = 2,
-        long softBudget = default_soft_budget,
-        int startupFrames = default_startup_frames)
+        double rate)
     {
         ArgumentNullException.ThrowIfNull(resourceLoader);
 
         if (!double.IsFinite(rate) || rate < 0.05 || rate > 2)
             throw new ArgumentOutOfRangeException(nameof(rate));
 
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumConcurrentProcessors);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(softBudget);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(startupFrames);
-
         this.resourceLoader = resourceLoader;
         this.rate = rate;
-        this.softBudget = softBudget;
-        this.startupFrames = startupFrames;
-        processingSlots = new SemaphoreSlim(maximumConcurrentProcessors, maximumConcurrentProcessors);
+        processingSlots = new SemaphoreSlim(2, 2);
     }
 
     internal BmsPcmAssetLease Acquire(string resourceIdentity)
@@ -70,43 +49,9 @@ internal sealed class BmsPcmAssetCache : IDisposable
         }
     }
 
-    internal BmsPcmAssetCacheDiagnostics GetDiagnostics()
-    {
-        var loaded = 0;
-        var preparing = 0;
-        var failed = 0;
-
-        foreach (var entry in entries.Values)
-        {
-            switch (entry.Asset.State)
-            {
-                case BmsPcmAssetState.Ready:
-                case BmsPcmAssetState.Complete:
-                    loaded++;
-                    break;
-
-                case BmsPcmAssetState.Preparing:
-                    preparing++;
-                    break;
-
-                case BmsPcmAssetState.Failed:
-                    failed++;
-                    break;
-            }
-        }
-
-        return new BmsPcmAssetCacheDiagnostics(
-            loaded,
-            preparing,
-            failed,
-            Interlocked.Read(ref residentPcmBytes),
-            Interlocked.Read(ref peakResidentPcmBytes),
-            Interlocked.Read(ref evictionCount));
-    }
-
     internal void EvictUnused()
     {
-        if (Interlocked.Read(ref residentPcmBytes) <= softBudget)
+        if (Interlocked.Read(ref residentPcmBytes) <= default_soft_budget)
             return;
 
         var candidates = entries
@@ -116,7 +61,7 @@ internal sealed class BmsPcmAssetCache : IDisposable
 
         foreach (var candidate in candidates)
         {
-            if (Interlocked.Read(ref residentPcmBytes) <= softBudget)
+            if (Interlocked.Read(ref residentPcmBytes) <= default_soft_budget)
                 break;
 
             if (!entries.TryRemove(candidate.Key, out var removed) || removed.ReferenceCount != 0)
@@ -125,7 +70,6 @@ internal sealed class BmsPcmAssetCache : IDisposable
             var bytes = removed.Asset.ResidentBytes;
             removed.Asset.DisposePublishedChunks();
             Interlocked.Add(ref residentPcmBytes, -bytes);
-            Interlocked.Increment(ref evictionCount);
         }
     }
 
@@ -188,10 +132,9 @@ internal sealed class BmsPcmAssetCache : IDisposable
             foreach (var chunk in processor.ProcessChunks(disposalCancellation.Token))
             {
                 entry.Asset.Publish(chunk);
-                var resident = Interlocked.Add(ref residentPcmBytes, (long)chunk.Samples.Length * sizeof(float));
-                updatePeakResidentBytes(resident);
+                Interlocked.Add(ref residentPcmBytes, (long)chunk.Samples.Length * sizeof(float));
 
-                if (entry.Asset.PublishedFrameCount >= startupFrames)
+                if (entry.Asset.PublishedFrameCount >= default_startup_frames)
                 {
                     entry.MarkReady();
                     processingSlots.Release();
@@ -227,16 +170,6 @@ internal sealed class BmsPcmAssetCache : IDisposable
     {
         entry.ReleaseReference();
         EvictUnused();
-    }
-
-    private void updatePeakResidentBytes(long resident)
-    {
-        while (true)
-        {
-            var peak = Interlocked.Read(ref peakResidentPcmBytes);
-            if (resident <= peak || Interlocked.CompareExchange(ref peakResidentPcmBytes, resident, peak) == peak)
-                return;
-        }
     }
 
     private sealed class CacheEntry(BmsPcmAsset asset)

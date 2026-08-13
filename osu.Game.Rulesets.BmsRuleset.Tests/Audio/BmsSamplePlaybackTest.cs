@@ -2,11 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
-using osu.Framework;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
@@ -32,7 +30,7 @@ public partial class BmsSamplePlaybackTest : TestScene
             Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "native-mixer.wav" } }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
-        AddAssert("PCM backend initialised", () => playback.DiagnosticMixer != null);
+        AddAssert("PCM backend initialised", () => BmsAudioTestAccess.GetOutputMixer(playback) != null);
         AddAssert("PCM float mixer patch installed", () => BmsPcmMixerPatcher.IsInstalled);
         addCleanupSteps();
     }
@@ -203,8 +201,6 @@ public partial class BmsSamplePlaybackTest : TestScene
     [Test]
     public void SameFileWithDifferentKeysCreatesIndependentVoices()
     {
-        var startedVoices = 0L;
-
         AddStep("create shared sample + playback", () =>
         {
             createWav("shared.wav", 6);
@@ -215,23 +211,20 @@ public partial class BmsSamplePlaybackTest : TestScene
             }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
-        AddAssert("shared PCM is decoded once", () => playback.DiagnosticSnapshot.Cache.LoadedAssets == 1);
-        AddStep("remember voice count", () => startedVoices = playback.DiagnosticSnapshot.Audio.StartedVoices);
+        AddAssert("shared PCM is decoded once", () => BmsAudioTestAccess.GetCachedAssetCount(playback) == 1);
         AddStep("play both keys", () =>
         {
             playback.Play(1);
             playback.Play(2);
         });
         AddUntilStep("different keys overlap", () =>
-            playback.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2 && playback.DiagnosticSnapshot.Audio.ActiveVoices >= 2);
+            BmsAudioTestAccess.GetActiveVoiceCount(playback) >= 2);
         addCleanupSteps();
     }
 
     [Test]
     public void LiveKeysoundsWaitForBatchFlush()
     {
-        var startedVoices = 0L;
-
         AddStep("create live sample + playback", () =>
         {
             createWav("live.wav", 6);
@@ -242,53 +235,45 @@ public partial class BmsSamplePlaybackTest : TestScene
             }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
-        AddStep("remember voice count", () => startedVoices = playback.DiagnosticSnapshot.Audio.StartedVoices);
         AddStep("queue live chord", () =>
         {
             playback.QueueLivePlay(1);
             playback.QueueLivePlay(2);
         });
-        AddAssert("samples wait for submit", () => playback.DiagnosticSnapshot.Audio.StartedVoices == startedVoices);
+        AddAssert("samples wait for submit", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) == 0);
         AddStep("submit live chord", () => playback.SubmitLivePlayBatch());
         AddUntilStep("samples start together", () =>
-            playback.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2 && playback.DiagnosticSnapshot.Audio.ActiveVoices >= 2);
+            BmsAudioTestAccess.GetActiveVoiceCount(playback) >= 2);
         addCleanupSteps();
     }
 
     [Test]
     public void ZeroKeyIsPlayableForLandmines()
     {
-        var startedVoices = 0L;
-
         AddStep("create landmine sample + playback", () =>
         {
             createWav("landmine.wav", 1);
             Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 0, "landmine.wav" } }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
-        AddStep("remember voice count", () => startedVoices = playback.DiagnosticSnapshot.Audio.StartedVoices);
         AddStep("play key zero", () => playback.Play(0));
-        AddUntilStep("landmine sample is playing", () =>
-            playback.DiagnosticSnapshot.Audio.StartedVoices > startedVoices && playback.DiagnosticSnapshot.Audio.ActiveVoices > 0);
+        AddUntilStep("landmine sample is playing", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) > 0);
         addCleanupSteps();
     }
 
     [Test]
     public void SameKeyRetriggersWithNewVoice()
     {
-        var startedVoices = 0L;
-
         AddStep("create sample + playback", () =>
         {
             createWav("retrigger.wav", 6);
             Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "retrigger.wav" } }, tempDir));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
-        AddStep("remember voice count", () => startedVoices = playback.DiagnosticSnapshot.Audio.StartedVoices);
         AddStep("start from offset", () => playback.Play(1, offset: 1000));
-        AddUntilStep("offset voice started", () => playback.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 1);
+        AddUntilStep("offset voice started", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) == 1);
         AddStep("retrigger same key", () => playback.Play(1));
-        AddUntilStep("same key starts another logical voice", () => playback.DiagnosticSnapshot.Audio.StartedVoices >= startedVoices + 2);
+        AddUntilStep("same key remains active after retrigger", () => BmsAudioTestAccess.GetActiveVoiceCount(playback) == 1);
         addCleanupSteps();
     }
 
@@ -301,7 +286,7 @@ public partial class BmsSamplePlaybackTest : TestScene
             Add(playback = new BmsSamplePlayback(new Dictionary<ushort, string> { { 1, "rate.wav" } }, tempDir, rate: 2));
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
-        AddAssert("fixed-rate backend selected", () => playback.DiagnosticMixer != null);
+        AddAssert("fixed-rate backend selected", () => BmsAudioTestAccess.GetOutputMixer(playback) != null);
         AddAssert("sample keeps source length", () => sampleLength(1) is >= 900 and <= 1100);
         addCleanupSteps();
     }
@@ -340,7 +325,7 @@ public partial class BmsSamplePlaybackTest : TestScene
         });
         AddUntilStep("wait for playback load", () => playback.IsLoaded);
         AddStep("expire playback", () => playback.Expire());
-        AddUntilStep("owned audio is disposed", () => playback.DiagnosticSnapshot.Cache.ResidentPcmBytes == 0);
+        AddUntilStep("owned audio is disposed", () => BmsAudioTestAccess.IsSessionDisposed(playback));
         AddUntilStep("cleanup temp dir", () =>
         {
             try

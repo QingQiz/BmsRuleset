@@ -10,22 +10,20 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
 {
     private readonly string? basePath;
     private readonly AudioManager audioManager;
-    private readonly Func<CancellationToken, Task>? beforeAssetLoad;
     private readonly CancellationTokenSource timelineCancellation = new();
     private readonly IReadOnlyList<Func<CancellationToken, BmsEventPreviewTimeline>> timelineSources;
 
     private Task<BmsEventPreviewTimeline> timelineTask;
+    private BmsEventPreviewPlayback? playback;
     private double? pendingPreviewPosition;
     private bool previewStartPending;
     private int timelineSourceIndex;
 
-    protected override bool CanComplete => Playback != null;
+    protected override bool CanComplete => playback != null;
 
     protected override bool StartClockImmediately => PlaybackMode != BmsPreviewTrackPlaybackMode.Preview;
 
-    protected override bool IsLengthFinal => Playback?.IsLengthFinal == true;
-
-    internal BmsEventPreviewPlayback? Playback { get; private set; }
+    protected override bool IsLengthFinal => playback?.IsLengthFinal == true;
 
     /// <summary>
     /// Gameplay uses this track only as a clock; BMS audio is driven by chart events elsewhere.
@@ -35,13 +33,13 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         EnqueueAction(() =>
         {
             if (mode == BmsPreviewTrackPlaybackMode.Preview)
-                Playback?.EnterPreview(CurrentTime);
+                playback?.EnterPreview(CurrentTime);
             else
             {
                 var startClock = previewStartPending;
                 previewStartPending = false;
                 pendingPreviewPosition = null;
-                Playback?.ExitPreview();
+                playback?.ExitPreview();
 
                 if (startClock)
                     StartClock();
@@ -52,17 +50,15 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
     internal BmsEventPreviewTrack(
         Func<CancellationToken, BmsEventPreviewTimeline> timelineFactory,
         string? basePath,
-        AudioManager audioManager,
-        Func<CancellationToken, Task>? beforeAssetLoad = null)
-        : this([timelineFactory], basePath, audioManager, beforeAssetLoad)
+        AudioManager audioManager)
+        : this([timelineFactory], basePath, audioManager)
     {
     }
 
     internal BmsEventPreviewTrack(
         IReadOnlyList<Func<CancellationToken, BmsEventPreviewTimeline>> timelineSources,
         string? basePath,
-        AudioManager audioManager,
-        Func<CancellationToken, Task>? beforeAssetLoad = null)
+        AudioManager audioManager)
         : base(audioManager)
     {
         if (timelineSources.Count == 0)
@@ -70,7 +66,6 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
 
         this.basePath = basePath;
         this.audioManager = audioManager;
-        this.beforeAssetLoad = beforeAssetLoad;
         this.timelineSources = timelineSources;
         Length = BmsEventPreviewTimeline.DEFAULT_LENGTH;
         timelineTask = prepareTimelineSource();
@@ -86,8 +81,8 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         if (!IsRunning)
             previewStartPending = true;
 
-        if (Playback != null)
-            Playback.Start(CurrentTime);
+        if (playback != null)
+            playback.Start(CurrentTime);
         else
             pendingPreviewPosition = CurrentTime;
     }
@@ -96,13 +91,13 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
     {
         previewStartPending = false;
         pendingPreviewPosition = null;
-        Playback?.Stop();
+        playback?.Stop();
     }
 
     protected override void SeekPlayback(double seek, bool wasRunning)
     {
-        if (Playback != null)
-            Playback.Seek(seek, PlaybackMode == BmsPreviewTrackPlaybackMode.Preview);
+        if (playback != null)
+            playback.Seek(seek, PlaybackMode == BmsPreviewTrackPlaybackMode.Preview);
         else if ((wasRunning || previewStartPending) && PlaybackMode == BmsPreviewTrackPlaybackMode.Preview)
             pendingPreviewPosition = seek;
     }
@@ -111,7 +106,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
     {
         previewStartPending = false;
         pendingPreviewPosition = null;
-        Playback?.Reset();
+        playback?.Reset();
     }
 
     protected override void UpdateState()
@@ -123,18 +118,18 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         var shouldUpdatePlayback = previewMode && (IsRunning || previewStartPending);
         var requireDueAudioReady = previewStartPending || IsRestoreFadePending || IsSeekFadePending;
         var startState = shouldUpdatePlayback
-            ? Playback?.Update(CurrentTime, requireDueAudioReady) ?? BmsPreviewPlaybackStartState.Waiting
+            ? playback?.Update(CurrentTime, requireDueAudioReady) ?? BmsPreviewPlaybackStartState.Waiting
             : BmsPreviewPlaybackStartState.Waiting;
 
         if (startState == BmsPreviewPlaybackStartState.InitialAudioUnavailable && advanceToNextTimelineSource())
             return;
 
-        if (Playback != null)
+        if (playback != null)
         {
-            Length = Playback.Length;
+            Length = playback.Length;
 
             if (TryResolvePendingRestorePosition())
-                startState = Playback.Update(CurrentTime, requireDueAudioReady);
+                startState = playback.Update(CurrentTime, requireDueAudioReady);
         }
 
         if (startState != BmsPreviewPlaybackStartState.Waiting)
@@ -164,7 +159,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
                 TaskScheduler.Default);
 
             timelineCancellation.Dispose();
-            Playback?.Dispose();
+            playback?.Dispose();
         }
 
         base.Dispose(disposing);
@@ -172,7 +167,7 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
 
     private void consumeTimeline()
     {
-        if (Playback != null || !timelineTask.IsCompleted)
+        if (playback != null || !timelineTask.IsCompleted)
             return;
 
         BmsEventPreviewTimeline timeline;
@@ -199,8 +194,8 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
         if (timelineSourceIndex + 1 >= timelineSources.Count)
             return false;
 
-        Playback?.Dispose();
-        Playback = null;
+        playback?.Dispose();
+        playback = null;
         timelineSourceIndex++;
         Length = BmsEventPreviewTimeline.DEFAULT_LENGTH;
         pendingPreviewPosition = CurrentTime;
@@ -214,16 +209,16 @@ internal sealed class BmsEventPreviewTrack : BmsPreviewTrack
 
     private void activateTimeline(BmsEventPreviewTimeline timeline)
     {
-        Playback = new BmsEventPreviewPlayback(this, timeline, basePath, audioManager, beforeAssetLoad);
-        Length = Playback.Length;
+        playback = new BmsEventPreviewPlayback(this, timeline, basePath, audioManager);
+        Length = playback.Length;
         var restorePositionResolved = TryResolvePendingRestorePosition();
         var activationPosition = restorePositionResolved ? CurrentTime : pendingPreviewPosition ?? CurrentTime;
         pendingPreviewPosition = null;
 
         if (!restorePositionResolved)
-            Playback.Seek(activationPosition, PlaybackMode == BmsPreviewTrackPlaybackMode.Preview);
+            playback.Seek(activationPosition, PlaybackMode == BmsPreviewTrackPlaybackMode.Preview);
 
         if ((IsRunning || previewStartPending) && PlaybackMode == BmsPreviewTrackPlaybackMode.Preview)
-            Playback.Start(activationPosition);
+            playback.Start(activationPosition);
     }
 }

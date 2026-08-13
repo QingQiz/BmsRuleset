@@ -26,16 +26,14 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
     private const int source_buffer_frames = 4096;
 
     private readonly IBmsPcmSource source;
-    private readonly int chunkFrames;
     private bool processingStarted;
     private bool disposed;
 
     internal double? OriginalDurationMilliseconds => source.OriginalDurationMilliseconds;
 
-    internal BmsFixedRatePcmProcessor(IBmsPcmSource source, double rate, int chunkFrames = DEFAULT_CHUNK_FRAMES)
+    internal BmsFixedRatePcmProcessor(IBmsPcmSource source, double rate)
     {
         ArgumentNullException.ThrowIfNull(source);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(chunkFrames);
 
         if (!double.IsFinite(rate) || rate < 0.05 || rate > 2)
             throw new ArgumentOutOfRangeException(nameof(rate), @"BMS audio rate must be between 0.05 and 2.");
@@ -44,11 +42,10 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
             throw new ArgumentException(@"The PCM source must expose a valid sample format.", nameof(source));
 
         this.source = source;
-        this.chunkFrames = chunkFrames;
     }
 
-    internal static BmsFixedRatePcmProcessor CreateFromMemory(byte[] data, double rate, int chunkFrames = DEFAULT_CHUNK_FRAMES) =>
-        new(BmsBassPcmSource.FromMemory(data, rate), rate, chunkFrames);
+    internal static BmsFixedRatePcmProcessor CreateFromMemory(byte[] data, double rate) =>
+        new(BmsBassPcmSource.FromMemory(data, rate), rate);
 
     internal IEnumerable<BmsPcmChunk> ProcessChunks(CancellationToken cancellationToken = default)
     {
@@ -72,10 +69,10 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var samples = new float[chunkFrames * OUTPUT_CHANNELS];
+            var samples = new float[DEFAULT_CHUNK_FRAMES * OUTPUT_CHANNELS];
             var producedFrames = 0;
 
-            while (producedFrames < chunkFrames)
+            while (producedFrames < DEFAULT_CHUNK_FRAMES)
             {
                 var firstFrame = (long)Math.Floor(sourcePosition);
                 if (!ensureSourceFrame(firstFrame))
@@ -109,7 +106,7 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
             if (producedFrames == 0)
                 yield break;
 
-            if (producedFrames != chunkFrames)
+            if (producedFrames != DEFAULT_CHUNK_FRAMES)
                 Array.Resize(ref samples, producedFrames * OUTPUT_CHANNELS);
 
             yield return new BmsPcmChunk(outputFrame, producedFrames, samples);

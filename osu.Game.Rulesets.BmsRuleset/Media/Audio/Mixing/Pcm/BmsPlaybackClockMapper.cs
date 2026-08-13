@@ -6,19 +6,15 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 internal sealed class BmsPlaybackClockMapper
 {
     private readonly double rate;
-    private readonly int sampleRate;
     private double originChartTime;
     private long originOutputFrame;
 
-    internal BmsPlaybackClockMapper(double rate, int sampleRate = BmsFixedRatePcmProcessor.OUTPUT_SAMPLE_RATE)
+    internal BmsPlaybackClockMapper(double rate)
     {
         if (!double.IsFinite(rate) || rate < 0.05 || rate > 2)
             throw new ArgumentOutOfRangeException(nameof(rate));
 
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sampleRate);
-
         this.rate = rate;
-        this.sampleRate = sampleRate;
     }
 
     internal void Rebase(double chartTime, long outputFrame)
@@ -35,7 +31,7 @@ internal sealed class BmsPlaybackClockMapper
         if (!double.IsFinite(chartTime))
             return Math.Max(0, renderedFrame);
 
-        var exactFrame = originOutputFrame + (chartTime - originChartTime) * sampleRate / (1000 * rate);
+        var exactFrame = originOutputFrame + (chartTime - originChartTime) * BmsFixedRatePcmProcessor.OUTPUT_SAMPLE_RATE / (1000 * rate);
         var mappedFrame = (long)Math.Round(exactFrame, MidpointRounding.AwayFromZero);
         return Math.Max(Math.Max(0, mappedFrame), renderedFrame);
     }
@@ -45,6 +41,6 @@ internal sealed class BmsPlaybackClockMapper
         if (!double.IsFinite(chartOffsetMilliseconds) || chartOffsetMilliseconds <= 0)
             return 0;
 
-        return Math.Max(0, (long)Math.Round(chartOffsetMilliseconds * sampleRate / (1000 * rate), MidpointRounding.AwayFromZero));
+        return Math.Max(0, (long)Math.Round(chartOffsetMilliseconds * BmsFixedRatePcmProcessor.OUTPUT_SAMPLE_RATE / (1000 * rate), MidpointRounding.AwayFromZero));
     }
 }

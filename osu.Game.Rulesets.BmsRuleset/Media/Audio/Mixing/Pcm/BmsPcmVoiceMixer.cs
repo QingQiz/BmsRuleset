@@ -5,32 +5,10 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
 
-internal readonly record struct BmsAudioDiagnostics(
-    long RenderedFrames,
-    int ActiveVoices,
-    int DrainingVoices,
-    int PeakVoices,
-    int QueuedCommands,
-    int QueueHighWater,
-    long QueueExpansions,
-    long VoicePoolExpansions,
-    long VoicePoolOverflows,
-    long SubmittedVoices,
-    long FoldedVoices,
-    long StartedVoices,
-    long PlaybackUnderflows,
-    float InputPeak,
-    float OutputPeak,
-    float LimiterGain,
-    long LimitedFrames);
-
 internal sealed class BmsPcmVoiceMixer
 {
     // The initial segment absorbs normal polyphony without increasing callback traversal work.
     private const int default_voice_segment_capacity = 512;
-
-    // The initial segment absorbs normal producer bursts without growing or increasing callback work.
-    private const int default_command_segment_capacity = 4096;
 
     // Leaving a small margin avoids clipping during downstream float-to-device conversion.
     private const float limiter_ceiling = 0.98f;
@@ -63,40 +41,24 @@ internal sealed class BmsPcmVoiceMixer
     private bool paused;
     private float masterGain = 1;
     private float limiterGain = 1;
-    private int peakVoices;
-    private int queueHighWater;
     private int reservedVoices;
+    private int activeVoices;
     private int voiceCapacity;
     private VoiceSegment lastVoiceSegment;
-    private long voicePoolExpansions;
-    private long voicePoolOverflows;
-    private long submittedVoices;
-    private long foldedVoices;
-    private long startedVoices;
-    private long playbackUnderflows;
-    private float inputPeak;
-    private float outputPeak;
-    private long limitedFrames;
 
     internal long RenderedFrames { get; private set; }
 
-    internal BmsPcmVoiceMixer(
-        int voiceCapacity = default_voice_segment_capacity,
-        int commandSegmentCapacity = default_command_segment_capacity,
-        int sampleRate = BmsFixedRatePcmProcessor.OUTPUT_SAMPLE_RATE)
+    internal BmsPcmVoiceMixer()
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(voiceCapacity);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sampleRate);
-
-        voiceSegmentCapacity = voiceCapacity;
-        firstVoiceSegment = lastVoiceSegment = new VoiceSegment(voiceCapacity);
-        this.voiceCapacity = voiceCapacity;
-        commands = new BmsVoiceCommandQueue(commandSegmentCapacity);
-        attackFadeFrames = millisecondsToFrames(attack_fade_ms, sampleRate);
-        retriggerFadeFrames = millisecondsToFrames(retrigger_fade_ms, sampleRate);
-        epochReplacementFadeFrames = millisecondsToFrames(epoch_replacement_fade_ms, sampleRate);
-        tailFadeFrames = millisecondsToFrames(tail_fade_ms, sampleRate);
-        limiterRecoveryPerFrame = 1 / (sampleRate * limiter_release_ms / 1000);
+        voiceSegmentCapacity = default_voice_segment_capacity;
+        firstVoiceSegment = lastVoiceSegment = new VoiceSegment(default_voice_segment_capacity);
+        voiceCapacity = default_voice_segment_capacity;
+        commands = new BmsVoiceCommandQueue();
+        attackFadeFrames = millisecondsToFrames(attack_fade_ms);
+        retriggerFadeFrames = millisecondsToFrames(retrigger_fade_ms);
+        epochReplacementFadeFrames = millisecondsToFrames(epoch_replacement_fade_ms);
+        tailFadeFrames = millisecondsToFrames(tail_fade_ms);
+        limiterRecoveryPerFrame = 1 / (BmsFixedRatePcmProcessor.OUTPUT_SAMPLE_RATE * limiter_release_ms / 1000);
     }
 
     internal void SubmitPlayBatch(ReadOnlySpan<BmsVoicePlay> plays)
@@ -104,7 +66,6 @@ internal sealed class BmsPcmVoiceMixer
         if (plays.IsEmpty)
             return;
 
-        Interlocked.Add(ref submittedVoices, plays.Length);
         var batch = new BmsVoiceCommand[plays.Length];
         var count = 0;
 
@@ -126,15 +87,12 @@ internal sealed class BmsPcmVoiceMixer
                 batch[count++] = new BmsVoiceCommand(BmsVoiceCommandType.Play, play.TargetFrame, play.Epoch, play);
         }
 
-        Interlocked.Add(ref foldedVoices, plays.Length - count);
-
         if (count == 0)
             return;
 
         reserveVoiceCapacity(count);
 
         commands.Enqueue(batch.AsSpan(0, count));
-        queueHighWater = Math.Max(queueHighWater, commands.Count);
     }
 
     internal void SubmitControl(BmsVoiceCommandType type, long targetFrame, int epoch, float value = 0)
@@ -146,16 +104,6 @@ internal sealed class BmsPcmVoiceMixer
             throw new ArgumentOutOfRangeException(nameof(type));
 
         commands.Enqueue(new BmsVoiceCommand(type, Math.Max(targetFrame, RenderedFrames), epoch, Value: value));
-        queueHighWater = Math.Max(queueHighWater, commands.Count);
-    }
-
-    internal void SubmitVoiceControl(BmsVoiceCommandType type, long voiceId, long targetFrame, int epoch, float value = 0)
-    {
-        if (type is not (BmsVoiceCommandType.StopVoice or BmsVoiceCommandType.SetVoiceGain))
-            throw new ArgumentOutOfRangeException(nameof(type));
-
-        commands.Enqueue(new BmsVoiceCommand(type, Math.Max(targetFrame, RenderedFrames), epoch, Value: value, VoiceId: voiceId));
-        queueHighWater = Math.Max(queueHighWater, commands.Count);
     }
 
     internal void Render(Span<float> output)
@@ -187,9 +135,6 @@ internal sealed class BmsPcmVoiceMixer
                         var asset = voice.Asset!;
                         if (voice.SourceFrame >= voice.EndFrame || !asset.TryReadStereoFrame(voice.SourceFrame, out var voiceLeft, out var voiceRight))
                         {
-                            if (!asset.IsComplete || voice.SourceFrame < asset.TotalFrameCount)
-                                playbackUnderflows++;
-
                             releaseVoice(ref voice);
                             continue;
                         }
@@ -207,9 +152,7 @@ internal sealed class BmsPcmVoiceMixer
 
             left *= masterGain;
             right *= masterGain;
-            inputPeak = Math.Max(inputPeak, Math.Max(Math.Abs(left), Math.Abs(right)));
             applyLimiter(ref left, ref right);
-            outputPeak = Math.Max(outputPeak, Math.Max(Math.Abs(left), Math.Abs(right)));
 
             var outputIndex = frame * 2;
             output[outputIndex] = left;
@@ -217,44 +160,9 @@ internal sealed class BmsPcmVoiceMixer
         }
 
         RenderedFrames += frameCount;
-        updatePeakVoiceCount();
     }
 
-    internal BmsAudioDiagnostics GetDiagnostics()
-    {
-        var active = 0;
-        var draining = 0;
-
-        for (var segment = firstVoiceSegment; segment != null; segment = Volatile.Read(ref segment.Next))
-        {
-            foreach (var voice in segment.Voices)
-            {
-                if (voice.State == BmsPcmVoiceState.Active)
-                    active++;
-                else if (voice.State == BmsPcmVoiceState.Draining)
-                    draining++;
-            }
-        }
-
-        return new BmsAudioDiagnostics(
-            RenderedFrames,
-            active,
-            draining,
-            peakVoices,
-            commands.Count,
-            queueHighWater,
-            commands.ExpansionCount,
-            Interlocked.Read(ref voicePoolExpansions),
-            voicePoolOverflows,
-            Interlocked.Read(ref submittedVoices),
-            Interlocked.Read(ref foldedVoices),
-            startedVoices,
-            playbackUnderflows,
-            inputPeak,
-            outputPeak,
-            limiterGain,
-            limitedFrames);
-    }
+    internal int ActiveVoiceCount => Volatile.Read(ref activeVoices);
 
     private void consumeCommands(long frame)
     {
@@ -340,7 +248,6 @@ internal sealed class BmsPcmVoiceMixer
 
         if (freeIndex < 0)
         {
-            voicePoolOverflows++;
             releaseVoiceReservation();
             return;
         }
@@ -370,9 +277,7 @@ internal sealed class BmsPcmVoiceMixer
             StartFrame = frame,
             FadeStartGain = 1,
         };
-        startedVoices++;
-
-        updatePeakVoiceCount();
+        activeVoices++;
     }
 
     private float getEnvelopeGain(ref BmsPcmVoice voice, long frame)
@@ -396,6 +301,9 @@ internal sealed class BmsPcmVoiceMixer
 
     private void beginFade(ref BmsPcmVoice voice, long frame, int durationFrames)
     {
+        if (voice.State == BmsPcmVoiceState.Active)
+            activeVoices--;
+
         var currentGain = getEnvelopeGain(ref voice, frame);
         voice.State = BmsPcmVoiceState.Draining;
         voice.FadeStartFrame = frame;
@@ -462,24 +370,6 @@ internal sealed class BmsPcmVoiceMixer
             right = Math.Clamp(right * correction, -limiter_ceiling, limiter_ceiling);
         }
 
-        if (requiredGain < 1)
-            limitedFrames++;
-    }
-
-    private void updatePeakVoiceCount()
-    {
-        var count = 0;
-
-        for (var segment = firstVoiceSegment; segment != null; segment = Volatile.Read(ref segment.Next))
-        {
-            for (var i = 0; i < segment.Voices.Length; i++)
-            {
-                if (segment.Voices[i].State != BmsPcmVoiceState.Free)
-                    count++;
-            }
-        }
-
-        peakVoices = Math.Max(peakVoices, count);
     }
 
     private void reserveVoiceCapacity(int count)
@@ -494,7 +384,6 @@ internal sealed class BmsPcmVoiceMixer
             Volatile.Write(ref lastVoiceSegment.Next, next);
             lastVoiceSegment = next;
             voiceCapacity = checked(voiceCapacity + next.Voices.Length);
-            Interlocked.Increment(ref voicePoolExpansions);
         }
 
         Interlocked.Add(ref reservedVoices, count);
@@ -503,6 +392,9 @@ internal sealed class BmsPcmVoiceMixer
     // ReSharper disable once RedundantAssignment
     private void releaseVoice(ref BmsPcmVoice voice)
     {
+        if (voice.State == BmsPcmVoiceState.Active)
+            activeVoices--;
+
         voice = default;
         releaseVoiceReservation();
     }
@@ -522,8 +414,8 @@ internal sealed class BmsPcmVoiceMixer
 
     private static float sanitiseGain(float gain) => float.IsFinite(gain) ? Math.Max(0, gain) : 0;
 
-    private static int millisecondsToFrames(float milliseconds, int sampleRate)
-        => Math.Max(1, (int)Math.Round(milliseconds * sampleRate / 1000));
+    private static int millisecondsToFrames(float milliseconds)
+        => Math.Max(1, (int)Math.Round(milliseconds * BmsFixedRatePcmProcessor.OUTPUT_SAMPLE_RATE / 1000));
 
     private enum BmsPcmVoiceState : byte
     {

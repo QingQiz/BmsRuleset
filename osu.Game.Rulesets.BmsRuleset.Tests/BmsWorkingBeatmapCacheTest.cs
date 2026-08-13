@@ -22,6 +22,7 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
+using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Screens.Play;
@@ -754,18 +755,15 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     }
 
     private static string getFirstPreviewEventSamplePath(Track track)
-        => getEventPlayback((BmsPreviewTrack)track)?.Events.FirstOrDefault().SamplePath ?? string.Empty;
+        => BmsAudioTestAccess.GetFirstPreviewSamplePath((BmsPreviewTrack)track);
 
     private static int getActivePreviewPlaybackCount(BmsPreviewTrack track)
-        => getEventPlayback(track)?.ActiveVoiceCount ?? 0;
+        => BmsAudioTestAccess.GetPreviewActiveVoiceCount(track);
 
     private static double getPreviewPlaybackAggregateVolume(BmsPreviewTrack track) =>
-        getEventPlayback(track)?.OutputGain ?? 0;
+        BmsAudioTestAccess.GetPreviewOutputGain(track);
 
-    private static double getRestoreFadeVolume(BmsPreviewTrack track) => track.RestoreFadeVolume;
-
-    private static BmsEventPreviewPlayback? getEventPlayback(BmsPreviewTrack track)
-        => (track as BmsEventPreviewTrack)?.Playback;
+    private static double getRestoreFadeVolume(BmsPreviewTrack track) => BmsAudioTestAccess.GetRestoreFadeVolume(track);
 
     private static bool getBackgroundAudioPaused(BmsDrawableRuleset drawableRuleset) =>
         drawableRuleset.BackgroundAudioPaused.Value;

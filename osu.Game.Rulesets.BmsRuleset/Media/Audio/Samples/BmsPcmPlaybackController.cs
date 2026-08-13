@@ -21,7 +21,6 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private readonly double rate;
     private readonly IBindable<double> aggregateVolume;
     private readonly Func<double> currentTime;
-    private readonly Func<CancellationToken, System.Threading.Tasks.Task>? beforeAssetLoad;
     private readonly BmsPcmVoiceMixer mixer;
     private readonly BmsPlaybackClockMapper clockMapper;
     private readonly Dictionary<ushort, string> resolvedResources = [];
@@ -45,8 +44,6 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     internal IEnumerable<ushort> PreparedSampleKeys => leases.Keys;
 
-    internal long PreloadUnderflows { get; private set; }
-
     internal double MaxSampleLengthMilliseconds => sampleLengths.Count == 0
         ? leases.Count == 0 ? 0 : leases.Values.Max(lease => getOriginalLength(lease.Asset))
         : sampleLengths.Values.Max();
@@ -58,8 +55,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         IEnumerable<BmsSampleUsage>? sampleUsages,
         IBindable<double> aggregateVolume,
         Func<double> currentTime,
-        BmsPcmVoiceMixer mixer,
-        Func<CancellationToken, System.Threading.Tasks.Task>? beforeAssetLoad = null)
+        BmsPcmVoiceMixer mixer)
     {
         this.sampleDefinitions = sampleDefinitions
             .Where(pair => !string.IsNullOrEmpty(pair.Value))
@@ -70,7 +66,6 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         this.aggregateVolume = aggregateVolume;
         this.currentTime = currentTime;
         this.mixer = mixer;
-        this.beforeAssetLoad = beforeAssetLoad;
         clockMapper = new BmsPlaybackClockMapper(rate);
         lastMasterGain = sanitiseAggregateVolume();
     }
@@ -82,13 +77,9 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         resourceStore = new BmsAudioResourceStore(basePath, cancellationToken);
         resolveResources();
-        assetCache = new BmsPcmAssetCache(async (identity, token) =>
-        {
-            if (beforeAssetLoad != null)
-                await beforeAssetLoad(token).WaitAsync(token).ConfigureAwait(false);
-
-            return (byte[]?)await resourceStore.GetAsync(identity, token).ConfigureAwait(false);
-        }, rate);
+        assetCache = new BmsPcmAssetCache(
+            async (identity, token) => (byte[]?)await resourceStore.GetAsync(identity, token).ConfigureAwait(false),
+            rate);
         clockMapper.Rebase(chartTime, mixer.RenderedFrames);
         mixer.SubmitControl(BmsVoiceCommandType.SetMasterGain, mixer.RenderedFrames, epoch, lastMasterGain);
 
@@ -181,7 +172,6 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         {
             if (!tryGetReadyAsset(pending.SampleKey, out var asset))
             {
-                PreloadUnderflows++;
                 continue;
             }
 
@@ -304,8 +294,6 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         assetCache?.EvictUnused();
     }
-
-    internal BmsPcmAssetCacheDiagnostics GetCacheDiagnostics() => assetCache?.GetDiagnostics() ?? default;
 
     public void Dispose()
     {

@@ -24,7 +24,6 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
     private readonly AudioManager audioManager;
     private readonly Func<double> currentTime;
     private readonly IBindable<double>? aggregateVolume;
-    private readonly Func<CancellationToken, System.Threading.Tasks.Task>? beforeAssetLoad;
 
     private BmsPcmVoiceMixer? pcmMixer;
     private BmsBassMixerBridge? pcmBridge;
@@ -37,8 +36,7 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
         IEnumerable<BmsSampleUsage>? sampleUsages,
         AudioManager audioManager,
         Func<double> currentTime,
-        IBindable<double>? aggregateVolume = null,
-        Func<CancellationToken, System.Threading.Tasks.Task>? beforeAssetLoad = null)
+        IBindable<double>? aggregateVolume = null)
     {
         this.sampleDefinitions = sampleDefinitions;
         this.basePath = basePath;
@@ -47,22 +45,15 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
         this.audioManager = audioManager;
         this.currentTime = currentTime;
         this.aggregateVolume = aggregateVolume;
-        this.beforeAssetLoad = beforeAssetLoad;
     }
 
     internal bool IsInitialised => Controller?.IsInitialised == true;
 
     internal BmsPcmPlaybackController? Controller { get; private set; }
 
-    internal BmsAudioDiagnostics AudioDiagnostics => pcmMixer?.GetDiagnostics() ?? default;
+    internal int ActiveVoiceCount => pcmMixer?.ActiveVoiceCount ?? 0;
 
-    internal AudioMixer? DiagnosticMixer { get; private set; }
-
-    internal BmsSamplePlaybackDiagnostics DiagnosticSnapshot => new(
-        pcmMixer?.GetDiagnostics() ?? default,
-        Controller?.GetCacheDiagnostics() ?? default,
-        Controller?.PreloadUnderflows ?? 0,
-        pcmBridge?.CallbackFailures ?? 0);
+    private AudioMixer? outputMixer;
 
     internal void Initialise(CancellationToken cancellationToken, double chartTime, bool waitForInitialAssets = true)
     {
@@ -71,9 +62,9 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
         if (!BmsPcmMixerPatcher.IsInstalled)
             return;
 
-        DiagnosticMixer = audioManager.CreateAudioMixer(BmsPcmMixerPatcher.MIXER_IDENTIFIER);
+        outputMixer = audioManager.CreateAudioMixer(BmsPcmMixerPatcher.MIXER_IDENTIFIER);
         pcmMixer = new BmsPcmVoiceMixer();
-        pcmBridge = new BmsBassMixerBridge(DiagnosticMixer, pcmMixer);
+        pcmBridge = new BmsBassMixerBridge(outputMixer, pcmMixer);
         Controller = new BmsPcmPlaybackController(
             sampleDefinitions,
             basePath,
@@ -81,8 +72,7 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
             sampleUsages,
             aggregateVolume ?? audioManager.AggregateVolume,
             currentTime,
-            pcmMixer,
-            beforeAssetLoad);
+            pcmMixer);
         Controller.Initialise(cancellationToken, chartTime, waitForInitialAssets);
         pcmBridge.EnsureAttached();
     }
@@ -104,7 +94,7 @@ internal sealed class BmsPcmPlaybackSession : IDisposable
         pcmBridge?.Dispose();
         pcmBridge = null;
         pcmMixer = null;
-        DiagnosticMixer?.Dispose();
-        DiagnosticMixer = null;
+        outputMixer?.Dispose();
+        outputMixer = null;
     }
 }

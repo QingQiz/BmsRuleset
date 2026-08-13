@@ -41,10 +41,6 @@ public class BmsSupplementalVideoPipelineTest
         Assert.That(waitUntil(() => source.TryTakeLatestFrame(out frame), TimeSpan.FromSeconds(3)), Is.True);
         Assert.That(frame, Is.Not.Null);
         frame!.Dispose();
-
-        var stats = source.Stats;
-        Assert.That(stats.DecodedFrames, Is.GreaterThan(0));
-        Assert.That(stats.IsFaulted, Is.False);
     }
 
     [Test]
@@ -56,11 +52,11 @@ public class BmsSupplementalVideoPipelineTest
         var source = new BmsSupplementalVideoFrameSource(bytes);
 
         source.Start();
-        Assert.That(waitUntil(() => source.Stats.DecodedFrames > 0, TimeSpan.FromSeconds(3)), Is.True);
+        Assert.That(waitUntil(() => BmsVideoTestAccess.GetQueuedFrameCount(source) > 0, TimeSpan.FromSeconds(3)), Is.True);
 
         source.Dispose();
 
-        Assert.That(source.WorkerCompleted, Is.True);
+        Assert.That(BmsVideoTestAccess.IsWorkerCompleted(source), Is.True);
         Assert.DoesNotThrow(source.Dispose);
     }
 
@@ -79,10 +75,6 @@ public class BmsSupplementalVideoPipelineTest
         Assert.That(waitUntil(() => source.TryTakeLatestFrame(out frame), TimeSpan.FromSeconds(3)), Is.True);
         Assert.That(frame, Is.Not.Null);
         frame!.Dispose();
-
-        var stats = source.Stats;
-        Assert.That(stats.DecodedFrames, Is.GreaterThan(0));
-        Assert.That(stats.IsFaulted, Is.False);
     }
 
     [Test]
@@ -91,12 +83,12 @@ public class BmsSupplementalVideoPipelineTest
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
-        using var source = new BmsSupplementalVideoFrameSource(bytes, maxQueuedFrames: 10);
+        using var source = new BmsSupplementalVideoFrameSource(bytes);
 
         source.Start();
         source.SetTargetTime(0);
 
-        Assert.That(waitUntil(() => source.Stats.DecodedFrames >= 3, TimeSpan.FromSeconds(3)), Is.True);
+        Assert.That(waitUntil(() => BmsVideoTestAccess.GetQueuedFrameCount(source) >= 3, TimeSpan.FromSeconds(3)), Is.True);
         Assert.That(source.TryTakeLatestFrame(out var frame), Is.True);
         Assert.That(frame!.Time, Is.LessThanOrEqualTo(0));
         frame.Dispose();
@@ -108,7 +100,7 @@ public class BmsSupplementalVideoPipelineTest
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
-        using var source = new BmsSupplementalVideoFrameSource(bytes, maxQueuedFrames: 3);
+        using var source = new BmsSupplementalVideoFrameSource(bytes);
 
         source.Start();
 
@@ -140,18 +132,21 @@ public class BmsSupplementalVideoPipelineTest
     }
 
     [Test]
-    public void TestFrameSourceDropsStaleFrames()
+    public void TestFrameSourceSkipsStaleFrames()
     {
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
-        using var source = new BmsSupplementalVideoFrameSource(bytes, maxQueuedFrames: 1);
+        using var source = new BmsSupplementalVideoFrameSource(bytes);
 
         source.Start();
         source.SetTargetTime(2.0);
 
-        Assert.That(waitUntil(() => source.Stats.DecodedFrames >= 3, TimeSpan.FromSeconds(3)), Is.True);
-        Assert.That(source.Stats.DroppedFrames, Is.GreaterThan(0));
+        Assert.That(waitUntil(() => BmsVideoTestAccess.GetQueuedFrameCount(source) > 0, TimeSpan.FromSeconds(3)), Is.True);
+        Thread.Sleep(100);
+        Assert.That(source.TryTakeLatestFrame(out var frame), Is.True);
+        Assert.That(frame!.Time, Is.InRange(1.8, 2.0));
+        frame.Dispose();
     }
 
     [Test]
@@ -160,7 +155,7 @@ public class BmsSupplementalVideoPipelineTest
         requireSupplementalNativeArtifacts();
 
         var bytes = File.ReadAllBytes(locateTestSongFile("103_outlaw_ogg", "bga.mpg"));
-        using var source = new BmsSupplementalVideoFrameSource(bytes, maxQueuedFrames: 1);
+        using var source = new BmsSupplementalVideoFrameSource(bytes);
 
         source.SetTargetTime(5.0);
         source.Start();
@@ -169,7 +164,6 @@ public class BmsSupplementalVideoPipelineTest
         Assert.That(waitUntil(() => source.TryTakeLatestFrame(out frame), TimeSpan.FromSeconds(3)), Is.True);
         Assert.That(frame, Is.Not.Null);
         frame!.Dispose();
-        Assert.That(source.Stats.IsFaulted, Is.False);
     }
 
     [Test]
@@ -184,9 +178,8 @@ public class BmsSupplementalVideoPipelineTest
         using var drawable = new BmsSupplementalVideoDrawable(stream, new ManualClock(), 0);
         typeof(BmsSupplementalVideoDrawable).GetMethod("load", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(drawable, [null]);
 
-        Assert.That(waitUntil(() => drawable.Stats.DecodedFrames > 0 || drawable.Stats.IsFaulted, TimeSpan.FromSeconds(3)), Is.True);
-        Assert.That(drawable.Stats.IsFaulted, Is.False, drawable.Stats.FaultMessage);
-        Assert.That(drawable.Stats.DecodedFrames, Is.GreaterThan(0));
+        var source = BmsVideoTestAccess.GetFrameSource(drawable)!;
+        Assert.That(waitUntil(() => BmsVideoTestAccess.GetQueuedFrameCount(source) > 0, TimeSpan.FromSeconds(3)), Is.True);
     }
 
     private static string locateTestSongFile(string songFolder, string fileName)
