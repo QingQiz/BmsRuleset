@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
@@ -32,8 +31,6 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
     public override ModType Type => ModType.Automation;
 
-    private readonly HashSet<DrawableBmsHitObject> autoScratchLnHeads = [];
-
     private BmsPlayfield playfield = null!;
 
     public void ApplyToDrawableRuleset(DrawableRuleset<BmsHitObject> drawableRuleset)
@@ -47,13 +44,11 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
     {
         var now = playfield.Time.Current;
 
-        autoScratchLnHeads.RemoveWhere(d => d.Judged);
-
         foreach (var drawable in playfield.Stage.Columns
                      .SelectMany(c => c.HitObjectContainer.AliveObjects)
                      .OfType<DrawableBmsHitObject>())
         {
-            if (drawable.Judged || drawable.HitObject is BmsLandmine)
+            if (drawable.HitObject is BmsLandmine)
                 continue;
 
             if (!BmsLayout.IsScratchColumn(drawable.HitObject.Column, playfield.LayoutVariant))
@@ -63,16 +58,19 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
             if (drawable is ILongNoteHolder longNote)
             {
-                if (!autoScratchLnHeads.Contains(drawable))
+                if (longNote.IsAutomaticallyHeld && now < note.StartTime)
+                    longNote.IsAutomaticallyHeld = false;
+
+                if (!longNote.IsAutomaticallyHeld)
                 {
-                    if (now >= note.StartTime)
+                    if (!drawable.Judged && now >= note.StartTime)
                     {
                         var headTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, drawable.HitObject.Column, drawable.HitObject.EffectiveJudgementRate, tail: false);
                         var headResult = headTable.ResultForOffset(now - drawable.HitObject.StartTime);
                         if (headResult != HitResult.None && drawable.TryHit(headResult))
                         {
                             playfield.Stage.Columns[note.Column].PlaySample(note.SampleKey, note.SampleVolume);
-                            autoScratchLnHeads.Add(drawable);
+                            longNote.IsAutomaticallyHeld = longNote.IsHoldingLongNote;
                         }
                     }
                 }
@@ -80,12 +78,19 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                 {
                     var tailTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, note.Column, note.EffectiveJudgementRate, tail: true);
                     if (longNote.TryRelease(now - ((BmsLongNote)note).EndTime, tailTable) && note is BmsLongNote ln)
+                    {
+                        longNote.IsAutomaticallyHeld = false;
                         playfield.Stage.Columns[note.Column].PlaySample(ln.TailSampleKey, ln.TailSampleVolume);
+                    }
+                    else if (!longNote.IsHoldingLongNote)
+                    {
+                        longNote.IsAutomaticallyHeld = false;
+                    }
                 }
             }
             else
             {
-                if (now >= note.StartTime)
+                if (!drawable.Judged && now >= note.StartTime)
                 {
                     var table = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, drawable.HitObject.Column, drawable.HitObject.EffectiveJudgementRate, tail: false);
                     var result = table.ResultForOffset(now - drawable.HitObject.StartTime);

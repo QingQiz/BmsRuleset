@@ -10,11 +10,14 @@ using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects;
 using osu.Game.Rulesets.Replays;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -93,6 +96,57 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
 
         AddAssert("scratch not hidden", () => !Playfield.Stage.Columns[0].Hidden);
     }
+
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void TestAutoScratchHoldsAndCompletesScratchLongNote(BmsLongNoteMode mode)
+    {
+        this.AddSetupStep("load player with AS and LN mode", () =>
+            LoadPlayer([new BmsModAutoScratch(), createLongNoteModeMod(mode)]));
+        this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
+
+        AddUntilStep("scratch LN is automatically held", () =>
+            Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SCENARIO_START_TIME + BmsTestBeatmaps.LN_SCENARIO_DURATION / 2
+            && Playfield.GetAliveObjectAtTime(BmsTestBeatmaps.LN_SCENARIO_START_TIME) is ILongNoteHolder
+            {
+                IsAutomaticallyHeld: true,
+                IsHoldingLongNote: true,
+            });
+
+        AddUntilStep("scratch LN tail is judged", () =>
+            Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SCENARIO_START_TIME + BmsTestBeatmaps.LN_SCENARIO_DURATION + 100);
+
+        AddAssert("scratch LN has successful head and tail judgements", () =>
+        {
+            var events = ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).JudgementEvents
+                .Where(e => e.Source.Column == 0
+                            && e.TimingObservations.Any(o =>
+                                o.Kind is BmsTimingObservationKind.LongNoteHead or BmsTimingObservationKind.LongNoteTail
+                                && o.ExpectedTime >= BmsTestBeatmaps.LN_SCENARIO_START_TIME
+                                && o.ExpectedTime <= BmsTestBeatmaps.LN_SCENARIO_START_TIME + BmsTestBeatmaps.LN_SCENARIO_DURATION))
+                .ToArray();
+
+            var observations = events.SelectMany(e => e.TimingObservations).ToArray();
+            var expectedEventCount = mode == BmsLongNoteMode.LongNote ? 1 : 2;
+
+            return events.Length == expectedEventCount
+                   && observations.Select(o => o.Kind).SequenceEqual([
+                       BmsTimingObservationKind.LongNoteHead,
+                       BmsTimingObservationKind.LongNoteTail,
+                   ])
+                   && observations.All(o => o.Result.IsHit());
+        });
+    }
+
+    private static Mod createLongNoteModeMod(BmsLongNoteMode mode) => mode switch
+    {
+        BmsLongNoteMode.LongNote => new BmsModLongNote(),
+        BmsLongNoteMode.ChargeNote => new BmsModChargeNote(),
+        BmsLongNoteMode.HellChargeNote => new BmsModHellChargeNote(),
+        _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null),
+    };
 
     [Test]
     public void TestHideScratch()

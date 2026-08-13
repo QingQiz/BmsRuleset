@@ -9,6 +9,8 @@ public interface ILongNoteHolder
 {
     bool IsHoldingLongNote { get; }
 
+    bool IsAutomaticallyHeld { get; set; }
+
     bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable);
 
     void UpdateBodyGeometry(float headY, float endY);

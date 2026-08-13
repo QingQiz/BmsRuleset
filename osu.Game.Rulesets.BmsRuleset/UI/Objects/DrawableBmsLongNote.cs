@@ -23,6 +23,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 {
     public bool IsHoldingLongNote => controller.LongNoteStarted && !controller.TailJudged;
 
+    public bool IsAutomaticallyHeld { get; set; }
+
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.HoldNoteHead;
 
     protected override bool RequiresResultBeforeKindPostState => true;
@@ -158,6 +160,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     protected override void ResetKindState()
     {
+        IsAutomaticallyHeld = false;
         controller.Reset();
         visualState.Reset();
         bodyGeometryValid = false;
@@ -253,11 +256,13 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             lastHoldExplosionTime = Time.Current;
         }
 
-        controller.UpdatePostResult(Time.Current, Time.Elapsed, ParentColumn?.IsPressed == true, gameplayRate);
+        controller.UpdatePostResult(Time.Current, Time.Elapsed, isKeyHeld(), gameplayRate);
     }
 
     private bool isHoldingBody()
-        => HitObject != null && controller.ShouldShowHeldVisual(ParentColumn?.IsPressed == true);
+        => HitObject != null && controller.ShouldShowHeldVisual(isKeyHeld());
+
+    private bool isKeyHeld() => ParentColumn?.IsPressed == true || IsAutomaticallyHeld;
 
     private int bodyDirectionBeforeTailPasses(float realHeadY, float realTailY) => HitObject == null
         ? Math.Sign(realTailY - realHeadY)
