@@ -319,7 +319,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 ? BmsJudgementProfileProvider.RateForExRank(layout, exRank)
                 : BmsJudgementProfileProvider.RateForRank(layout, summary.Metadata.Rank);
 
-            return new BmsStarRatingProcessorV3()
+            return new BmsStarRatingProcessor()
                 .Compute(summary.StarRatingNoteTimings, summary.Metadata.KeyCount, summary.Metadata.Rank, layout: layout, judgementRate: judgementRate)
                 .StarRating;
         }

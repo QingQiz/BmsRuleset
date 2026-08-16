@@ -17,7 +17,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
 
 public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatmap) : DifficultyCalculator(ruleset, beatmap)
 {
-    public BmsStarRatingProcessorV3 StarRatingProcessor { get; } = new();
+    public BmsStarRatingProcessor StarRatingProcessor { get; } = new();
 
     protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills)
     {

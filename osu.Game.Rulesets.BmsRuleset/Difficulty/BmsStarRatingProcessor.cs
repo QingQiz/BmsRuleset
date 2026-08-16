@@ -1,7 +1,8 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
+using System.Numerics;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
@@ -9,6 +10,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class BmsStarRatingProcessor
 {
+    private static readonly double[] target_percentiles = [0.945, 0.935, 0.925, 0.915, 0.845, 0.835, 0.825, 0.815];
+    private static readonly EventTimeComparer event_time_comparer = new();
+
+    private readonly record struct NoteEntry(int Column, double Head, double Tail);
+
     public BmsStarRatingResult Result { get; private set; } = new();
 
     public double HitLeniencyX { get; private set; }
@@ -17,76 +23,260 @@ public class BmsStarRatingProcessor
 
     public double TotalTimeT { get; private set; }
 
-    // note_tuple: (column, head_time, tail_time)
-    private List<(int column, double head, double tail)> noteSeq = [];
-    private List<(int column, double head, double tail)>[] noteSeqByColumn = [];
-    private List<(int column, double head, double tail)> lnSeq = [];
-    private List<(int column, double head, double tail)> tailSeq = [];
+    private NoteEntry[] noteSeq = [];
+    private NoteEntry[] noteSeqByColumn = [];
+    private int[] noteSeqByColumnStarts = [];
+    private int[] noteSeqByColumnCounts = [];
+    private NoteEntry[] lnSeq = [];
+    private NoteEntry[] tailSeq = [];
 
     private double[] baseCorners = [];
     private double[] aCorners = [];
     private double[] allCorners = [];
-    private bool[][] keyUsage = [];
-    private bool[][] activeColumnMask = [];
-    private double[][] keyUsage400 = [];
-    private double[][] deltaKs = [];
-    private double[] anchor = [];
+    private double[] anchorCountsScratch = [];
+
+    // One owner per compute call keeps pooled scratch tied to the stages that share it, so new buffers do not have to replicate return logic in every helper.
+    private sealed class ComputeWorkspace : IDisposable
+    {
+        public ulong[] ActiveColumnMask { get; }
+
+        public double[] KeyUsage400 { get; }
+
+        public double[] Anchor { get; }
+
+        public double[] CumSumBuffer { get; }
+
+        public double[] CumSumBufferA { get; }
+
+        public int[] SmoothWl { get; }
+
+        public int[] SmoothWr { get; }
+
+        public int[] SmoothWlA { get; }
+
+        public int[] SmoothWrA { get; }
+
+        public double[] Jbar { get; }
+
+        public double[] Xbar { get; }
+
+        public double[] Pbar { get; }
+
+        public double[] Abar { get; }
+
+        public double[] Rbar { get; }
+
+        public double[] CArr { get; }
+
+        public double[] KsArr { get; }
+
+        public double[] DeltaKs { get; }
+
+        public int[] BaseInterpIdx { get; }
+
+        public int[] AInterpIdx { get; }
+
+        public double[] D { get; }
+
+        public double[] Jks { get; }
+
+        public double[] SmoothedJks { get; }
+
+        public double[] JbarNum { get; }
+
+        public double[] JbarDen { get; }
+
+        public double[] Xks { get; }
+
+        public double[] FastCrossCurrent { get; }
+
+        public double[] FastCrossPrevious { get; }
+
+        public double[] XBase { get; }
+
+        public double[] SqrtSums { get; }
+
+        public double[] PStep { get; }
+
+        public double[] Dks { get; }
+
+        public double[] AStep { get; }
+
+        public double[] RStep { get; }
+
+        public double[] IRelease { get; }
+
+        public double[] NoteHitTimes { get; }
+
+        public double[] EffectiveWeights { get; }
+
+        public (double time, double change)[] LnEvents { get; }
+
+        public double[] LnPointCandidates { get; }
+
+        public double[] LnCumsum { get; }
+
+        public double[] LnValues { get; }
+
+        public ComputeWorkspace(int baseCount, int aCount, int allCount, int totalColumns, int noteCount, int tailCount, int lnCount)
+        {
+            ActiveColumnMask = ArrayPool<ulong>.Shared.Rent(baseCount);
+            KeyUsage400 = ArrayPool<double>.Shared.Rent(totalColumns * baseCount);
+            Anchor = ArrayPool<double>.Shared.Rent(baseCount);
+            CumSumBuffer = ArrayPool<double>.Shared.Rent(baseCount);
+            CumSumBufferA = ArrayPool<double>.Shared.Rent(aCount);
+            SmoothWl = ArrayPool<int>.Shared.Rent(baseCount);
+            SmoothWr = ArrayPool<int>.Shared.Rent(baseCount);
+            SmoothWlA = ArrayPool<int>.Shared.Rent(aCount);
+            SmoothWrA = ArrayPool<int>.Shared.Rent(aCount);
+            Jbar = ArrayPool<double>.Shared.Rent(baseCount);
+            Xbar = ArrayPool<double>.Shared.Rent(baseCount);
+            Pbar = ArrayPool<double>.Shared.Rent(baseCount);
+            Abar = ArrayPool<double>.Shared.Rent(aCount);
+            Rbar = ArrayPool<double>.Shared.Rent(baseCount);
+            CArr = ArrayPool<double>.Shared.Rent(baseCount);
+            KsArr = ArrayPool<double>.Shared.Rent(baseCount);
+            DeltaKs = ArrayPool<double>.Shared.Rent(totalColumns * baseCount);
+            BaseInterpIdx = ArrayPool<int>.Shared.Rent(allCount);
+            AInterpIdx = ArrayPool<int>.Shared.Rent(allCount);
+            D = ArrayPool<double>.Shared.Rent(allCount);
+            Jks = ArrayPool<double>.Shared.Rent(baseCount);
+            SmoothedJks = ArrayPool<double>.Shared.Rent(baseCount);
+            JbarNum = ArrayPool<double>.Shared.Rent(baseCount);
+            JbarDen = ArrayPool<double>.Shared.Rent(baseCount);
+            Xks = ArrayPool<double>.Shared.Rent(baseCount);
+            FastCrossCurrent = ArrayPool<double>.Shared.Rent(baseCount);
+            FastCrossPrevious = ArrayPool<double>.Shared.Rent(baseCount);
+            XBase = ArrayPool<double>.Shared.Rent(baseCount);
+            SqrtSums = ArrayPool<double>.Shared.Rent(baseCount);
+            PStep = ArrayPool<double>.Shared.Rent(baseCount);
+            Dks = ArrayPool<double>.Shared.Rent(totalColumns * baseCount);
+            AStep = ArrayPool<double>.Shared.Rent(aCount);
+            RStep = ArrayPool<double>.Shared.Rent(baseCount);
+            IRelease = ArrayPool<double>.Shared.Rent(tailCount);
+            NoteHitTimes = ArrayPool<double>.Shared.Rent(noteCount);
+            EffectiveWeights = ArrayPool<double>.Shared.Rent(allCount);
+
+            var lnEventCount = lnCount * 3;
+            LnEvents = ArrayPool<(double time, double change)>.Shared.Rent(lnEventCount);
+            LnPointCandidates = ArrayPool<double>.Shared.Rent(lnEventCount + 2);
+            LnCumsum = ArrayPool<double>.Shared.Rent(lnEventCount + 2);
+            LnValues = ArrayPool<double>.Shared.Rent(lnEventCount + 1);
+        }
+
+        public void Dispose()
+        {
+            ArrayPool<double>.Shared.Return(LnValues);
+            ArrayPool<double>.Shared.Return(LnCumsum);
+            ArrayPool<double>.Shared.Return(LnPointCandidates);
+            ArrayPool<(double time, double change)>.Shared.Return(LnEvents);
+            ArrayPool<double>.Shared.Return(EffectiveWeights);
+            ArrayPool<double>.Shared.Return(NoteHitTimes);
+            ArrayPool<double>.Shared.Return(IRelease);
+            ArrayPool<double>.Shared.Return(RStep);
+            ArrayPool<double>.Shared.Return(AStep);
+            ArrayPool<double>.Shared.Return(Dks);
+            ArrayPool<double>.Shared.Return(PStep);
+            ArrayPool<double>.Shared.Return(SqrtSums);
+            ArrayPool<double>.Shared.Return(XBase);
+            ArrayPool<double>.Shared.Return(FastCrossPrevious);
+            ArrayPool<double>.Shared.Return(FastCrossCurrent);
+            ArrayPool<double>.Shared.Return(Xks);
+            ArrayPool<double>.Shared.Return(JbarDen);
+            ArrayPool<double>.Shared.Return(JbarNum);
+            ArrayPool<double>.Shared.Return(SmoothedJks);
+            ArrayPool<double>.Shared.Return(Jks);
+            ArrayPool<double>.Shared.Return(D);
+            ArrayPool<int>.Shared.Return(AInterpIdx);
+            ArrayPool<int>.Shared.Return(BaseInterpIdx);
+            ArrayPool<double>.Shared.Return(DeltaKs);
+            ArrayPool<int>.Shared.Return(SmoothWrA);
+            ArrayPool<int>.Shared.Return(SmoothWlA);
+            ArrayPool<int>.Shared.Return(SmoothWr);
+            ArrayPool<int>.Shared.Return(SmoothWl);
+            ArrayPool<double>.Shared.Return(CumSumBufferA);
+            ArrayPool<double>.Shared.Return(CumSumBuffer);
+            ArrayPool<double>.Shared.Return(Anchor);
+            ArrayPool<double>.Shared.Return(KeyUsage400);
+            ArrayPool<ulong>.Shared.Return(ActiveColumnMask);
+            ArrayPool<double>.Shared.Return(KsArr);
+            ArrayPool<double>.Shared.Return(CArr);
+            ArrayPool<double>.Shared.Return(Rbar);
+            ArrayPool<double>.Shared.Return(Abar);
+            ArrayPool<double>.Shared.Return(Pbar);
+            ArrayPool<double>.Shared.Return(Xbar);
+            ArrayPool<double>.Shared.Return(Jbar);
+        }
+    }
 
     public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null)
+        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate);
+
+    public double ComputeStarRating(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null)
+        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate).StarRating;
+
+    private BmsStarRatingResult compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate)
     {
         // === Basic Setup and Parsing ===
+        if (totalColumns > 64)
+            throw new ArgumentOutOfRangeException(nameof(totalColumns), totalColumns, "Bitmask active-column tracking supports at most 64 columns.");
+
         TotalColumns = totalColumns;
-        preprocessFile(noteTimings, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate);
+        preprocessFile(noteTimings, rank, clockRate, layout, judgementRate);
         getCorners();
 
-        // For each column, store a boolean of its usage (whether non-empty within 150 ms) over time. Example: key_usage[k][idx].
-        keyUsage = getKeyUsage();
-        // At each time in base_corners, build a list of columns that are active:
-        buildActiveColumns();
-        keyUsage400 = getKeyUsage400();
+        var baseCount = baseCorners.Length;
+        var aCount = aCorners.Length;
+        var allCount = allCorners.Length;
+        using var workspace = new ComputeWorkspace(baseCount, aCount, allCount, TotalColumns, noteSeq.Length, tailSeq.Length, lnSeq.Length);
 
-        anchor = computeAnchor();
+        getActiveColumnMaskInto(workspace.ActiveColumnMask);
+        getKeyUsage400Into(workspace.KeyUsage400);
+        computeAnchorInto(workspace.KeyUsage400, workspace.Anchor);
+        buildWindowBoundsInto(baseCorners, 500, workspace.SmoothWl, workspace.SmoothWr);
+        buildWindowBoundsInto(aCorners, 250, workspace.SmoothWlA, workspace.SmoothWrA);
 
-        var jbar = computeJbar();
-        var xbar = computeXbar();
+        computeJbarInto(workspace);
+        computeXbarInto(workspace);
+        computePbarInto(workspace);
+        computeAbarInto(workspace);
+        computeRbarInto(workspace);
+        computeCAndKsInto(workspace);
 
-        // Build the sparse representation of cumulative LN bodies.
-        var pbar = computePbar();
-        var abar = computeAbar();
-        var rbar = computeRbar();
+        buildInterpIdxInto(allCorners, baseCorners, workspace.BaseInterpIdx);
+        buildInterpIdxInto(allCorners, aCorners, workspace.AInterpIdx);
 
-        computeCAndKs(out var cArr, out var ksArr);
+        computeDifficulty(workspace);
+        var sr = computeStarRating(workspace);
 
-        jbar = interpValues(allCorners, baseCorners, jbar);
-        xbar = interpValues(allCorners, baseCorners, xbar);
-        pbar = interpValues(allCorners, baseCorners, pbar);
-        abar = interpValues(allCorners, aCorners, abar);
-        rbar = interpValues(allCorners, baseCorners, rbar);
-        cArr = stepInterp(allCorners, baseCorners, cArr);
-        ksArr = stepInterp(allCorners, baseCorners, ksArr);
-
-        // === Final Computations ===
-        var d = computeDifficulty(abar, jbar, xbar, pbar, rbar, cArr, ksArr);
-        var sr = computeStarRating(d, cArr);
+        var percentile93 = Result.Percentile93;
+        var percentile83 = Result.Percentile83;
+        var weightedMean = Result.WeightedMean;
 
         Result = new BmsStarRatingResult
         {
             StarRating = sr,
-            AllCorners = allCorners,
-            BaseCorners = baseCorners,
-            ACorners = aCorners,
-            Jbar = jbar,
-            Xbar = xbar,
-            Pbar = pbar,
-            Abar = abar,
-            Rbar = rbar,
-            DensityC = cArr,
-            ActiveColumnsKs = ksArr,
-            DifficultyD = d,
-            AnchorValues = anchor,
+            Percentile93 = percentile93,
+            Percentile83 = percentile83,
+            WeightedMean = weightedMean,
         };
 
+        clearWorkingState();
+
         return Result;
+    }
+
+    private void clearWorkingState()
+    {
+        noteSeq = [];
+        noteSeqByColumn = [];
+        noteSeqByColumnStarts = [];
+        noteSeqByColumnCounts = [];
+        lnSeq = [];
+        tailSeq = [];
+        baseCorners = [];
+        aCorners = [];
+        allCorners = [];
     }
 
     private static double[] generateCrossCoeffs(int k)
@@ -112,8 +302,6 @@ public class BmsStarRatingProcessor
             {
                 coeffs[m - i] = coeffs[m + i] = 0.15 + 0.10 * i;
             }
-
-            coeffs[0] = coeffs[k] = outer;
         }
         else
         {
@@ -122,27 +310,11 @@ public class BmsStarRatingProcessor
             {
                 coeffs[m - i] = coeffs[m + 1 + i] = 0.15 + 0.10 * i;
             }
-
-            coeffs[0] = coeffs[k] = outer;
         }
+
+        coeffs[0] = coeffs[k] = outer;
 
         return coeffs;
-    }
-
-    private static List<(int column, double head, double tail)> mergeSorted(
-        List<(int column, double head, double tail)> a,
-        List<(int column, double head, double tail)> b)
-    {
-        var result = new List<(int column, double head, double tail)>(a.Count + b.Count);
-        int i = 0, j = 0;
-        while (i < a.Count && j < b.Count)
-        {
-            result.Add(a[i].head <= b[j].head ? a[i++] : b[j++]);
-        }
-
-        while (i < a.Count) result.Add(a[i++]);
-        while (j < b.Count) result.Add(b[j++]);
-        return result;
     }
 
     private static double rescaleHigh(double sr)
@@ -152,114 +324,89 @@ public class BmsStarRatingProcessor
         return 9 + (sr - 9) * (1.0 / 1.2);
     }
 
-    // -----Start of Helper methods--------
-
-    /// <summary>
-    /// Given sorted positions x (length N) and function values f defined piecewise constant on [x[i], x[i+1]),
-    /// return an array F of cumulative integrals such that F[0]=0 and for i&gt;=1:
-    ///   F[i] = sum_{j=0}^{i-1} f[j]*(x[j+1]-x[j])
-    /// </summary>
-    private static double[] cumulativeSum(double[] x, double[] f)
+    /// <summary>Write cumulative sum into a pre-allocated buffer. Avoids allocating a new array per call.</summary>
+    private static void cumulativeSum(double[] x, double[] f, double[] F)
     {
-        var F = new double[x.Length];
+        F[0] = 0;
         for (var i = 1; i < x.Length; i++)
             F[i] = F[i - 1] + f[i - 1] * (x[i] - x[i - 1]);
-        return F;
     }
 
     /// <summary>
-    /// Given cumulative data (x, F, f) as above, return the cumulative sum at an arbitrary point q.
-    /// Here we assume that f is constant on each interval.
+    /// Precompute sliding-window bounds for smoothOnCorners using a linear walk.
+    /// leftIdx[i] = first index where x[idx] >= max(x[i]-window, x[0])
+    /// rightIdx[i] = first index where x[idx] >= min(x[i]+window, x[^1])
     /// </summary>
-    private static double queryCumSum(double q, double[] x, double[] F, double[] f)
+    private static void buildWindowBoundsInto(double[] x, double window, int[] left, int[] right)
     {
-        if (q <= x[0]) return 0;
-        if (q >= x[^1]) return F[^1];
-
-        // Find index i such that x[i] <= q < x[i+1]
-        var i = searchSortedLeft(x, q) - 1;
-        if (i < 0) i = 0;
-        return F[i] + f[i] * (q - x[i]);
+        int l = 0, r = 0;
+        for (var i = 0; i < x.Length; i++)
+        {
+            var a = Math.Max(x[i] - window, x[0]);
+            var b = Math.Min(x[i] + window, x[^1]);
+            while (l < x.Length && x[l] < a) l++;
+            while (r < x.Length && x[r] < b) r++;
+            left[i] = Math.Min(l, x.Length - 1);
+            right[i] = Math.Min(r, x.Length - 1);
+        }
     }
 
-    /// <summary>
-    /// Given positions x (a sorted 1D array) and function values f (piecewise constant on intervals defined by x),
-    /// return an array g defined at x by applying a symmetric sliding window:
-    ///   if mode=='sum': g(s) = scale * ∫[s-window, s+window] f(t) dt
-    ///   if mode=='avg': g(s) = (∫[s-window, s+window] f(t) dt) / (length of window actually used)
-    /// This is computed exactly using the cumulative–sum technique.
-    /// </summary>
-    private static double[] smoothOnCorners(double[] x, double[] f, double window, double scale, bool averageMode)
+    private static void smoothOnCornersFastInto(double[] x, double[] f, double window, double scale, bool averageMode,
+                                                int[] wl, int[] wr, double[] F, double[] g)
     {
-        var F = cumulativeSum(x, f);
-        var g = new double[f.Length];
+        cumulativeSum(x, f, F);
 
         for (var i = 0; i < x.Length; i++)
         {
-            var s = x[i];
-            var a = Math.Max(s - window, x[0]);
-            var b = Math.Min(s + window, x[^1]);
-            var val = queryCumSum(b, x, F, f) - queryCumSum(a, x, F, f);
+            var a = Math.Max(x[i] - window, x[0]);
+            var b = Math.Min(x[i] + window, x[^1]);
 
-            if (averageMode)
-                g[i] = b - a > 0 ? val / (b - a) : 0;
-            else
-                g[i] = scale * val;
-        }
+            // queryCumSum(b) - queryCumSum(a) using precomputed indices (no binary search)
+            double qa, qb;
 
-        return g;
-    }
-
-    /// <summary>Return new_vals at positions new_x using linear interpolation from old_x, old_vals.</summary>
-    private static double[] interpValues(double[] newX, double[] oldX, double[] oldVals)
-    {
-        var result = new double[newX.Length];
-        for (var i = 0; i < newX.Length; i++)
-        {
-            var x = newX[i];
-            if (x <= oldX[0])
-            {
-                result[i] = oldVals[0];
-            }
-            else if (x >= oldX[^1])
-            {
-                result[i] = oldVals[^1];
-            }
+            if (a <= x[0])
+                qa = 0;
             else
             {
-                var idx = searchSortedLeft(oldX, x);
-                var t = (x - oldX[idx - 1]) / (oldX[idx] - oldX[idx - 1]);
-                result[i] = oldVals[idx - 1] + t * (oldVals[idx] - oldVals[idx - 1]);
+                var seg = wl[i] - 1;
+                qa = F[seg] + f[seg] * (a - x[seg]);
             }
-        }
 
-        return result;
+            if (b >= x[^1])
+                qb = F[x.Length - 1];
+            else
+            {
+                var seg = wr[i] - 1;
+                qb = F[seg] + f[seg] * (b - x[seg]);
+            }
+
+            var val = qb - qa;
+            g[i] = averageMode
+                ? b - a > 0 ? val / (b - a) : 0
+                : scale * val;
+        }
     }
 
     /// <summary>
-    /// For each position in new_x, return the value of old_vals corresponding to the greatest old_x
-    /// that is less than or equal to new_x. This implements a step–function (zero–order hold)
-    /// interpolation.
+    /// Precompute a walking index: for each position in newX, the index of the greatest oldX value ≤ newX[i].
+    /// Both arrays must be sorted ascending. Uses a two-pointer walk O(newX+oldX) instead of binary search.
     /// </summary>
-    private static double[] stepInterp(double[] newX, double[] oldX, double[] oldVals)
+    private static void buildInterpIdxInto(double[] newX, double[] oldX, int[] idx)
     {
-        var result = new double[newX.Length];
+        var j = 0;
         for (var i = 0; i < newX.Length; i++)
         {
-            var idx = searchSortedRight(oldX, newX[i]) - 1;
-            if (idx < 0) idx = 0;
-            if (idx >= oldVals.Length) idx = oldVals.Length - 1;
-            result[i] = oldVals[idx];
+            while (j < oldX.Length - 1 && oldX[j + 1] <= newX[i])
+                j++;
+            idx[i] = j;
         }
-
-        return result;
     }
 
-    private static double lnSum(double a, double b, double[] points, double[] cumsum, double[] values)
+    private static double lnSum(double a, double b, double[] points, int pointCount, double[] cumsum, double[] values)
     {
         // Locate the segments that contain a and b using bisect_right semantics.
-        var i = searchSortedRight(points, a) - 1;
-        var j = searchSortedRight(points, b) - 1;
+        var i = searchSortedRight(points, pointCount, a) - 1;
+        var j = searchSortedRight(points, pointCount, b) - 1;
 
         double total;
         if (i == j)
@@ -284,12 +431,14 @@ public class BmsStarRatingProcessor
     // Pure binary search, O(log n) even with duplicate values.
     // Returns the leftmost index where array[index] >= value.
 
-    private static int searchSortedLeft(double[] array, double value)
+    private static int searchSortedLeft(double[] array, double value) => searchSortedLeft(array, array.Length, value);
+
+    private static int searchSortedLeft(double[] array, int length, double value)
     {
-        int lo = 0, hi = array.Length;
+        int lo = 0, hi = length;
         while (lo < hi)
         {
-            var mid = lo + hi >> 1;
+            var mid = (lo + hi) >> 1;
             if (array[mid] < value)
                 lo = mid + 1;
             else
@@ -299,12 +448,29 @@ public class BmsStarRatingProcessor
         return lo;
     }
 
-    private static int searchSortedRight(double[] array, double value)
+    private static int searchSortedLeft(NoteEntry[] array, int start, int count, double value)
     {
-        int lo = 0, hi = array.Length;
+        int lo = 0, hi = count;
         while (lo < hi)
         {
-            var mid = lo + hi >> 1;
+            var mid = (lo + hi) >> 1;
+            if (array[start + mid].Head < value)
+                lo = mid + 1;
+            else
+                hi = mid;
+        }
+
+        return lo;
+    }
+
+    private static int searchSortedRight(double[] array, double value) => searchSortedRight(array, array.Length, value);
+
+    private static int searchSortedRight(double[] array, int length, double value)
+    {
+        int lo = 0, hi = length;
+        while (lo < hi)
+        {
+            var mid = (lo + hi) >> 1;
             if (array[mid] <= value)
                 lo = mid + 1;
             else
@@ -314,177 +480,338 @@ public class BmsStarRatingProcessor
         return lo;
     }
 
+    private int getColumnNoteStart(int column) => noteSeqByColumnStarts[column];
+
+    private int getColumnNoteCount(int column) => noteSeqByColumnCounts[column];
+
+    private static double[] toDedupedFilteredArray(double[] sorted, int count, double maxTime)
+    {
+        var writeCount = 0;
+        for (var i = 0; i < count; i++)
+        {
+            var v = sorted[i];
+            if (v >= 0 && v <= maxTime)
+            {
+                if (writeCount == 0 || v > sorted[writeCount - 1])
+                    sorted[writeCount++] = v;
+            }
+        }
+
+        if (writeCount == 0)
+            return [];
+
+        if (writeCount == count && count == sorted.Length)
+            return sorted;
+
+        var result = new double[writeCount];
+        Array.Copy(sorted, result, writeCount);
+        return result;
+    }
+
+    private static double[] mergeSortedUnique(double[] a, double[] b)
+    {
+        // Counting first keeps the union exact-sized instead of paying for a max-length buffer and a trim copy.
+        var mergedCount = mergeSortedUniqueInto(a, b, []);
+        if (mergedCount == 0)
+            return [];
+
+        var result = new double[mergedCount];
+        mergeSortedUniqueInto(a, b, result);
+        return result;
+    }
+
+    private static int mergeSortedUniqueInto(double[] a, double[] b, double[] destination)
+    {
+        int i = 0, j = 0, k = 0;
+        double last = 0;
+        var hasLast = false;
+
+        while (i < a.Length && j < b.Length)
+        {
+            var va = a[i];
+            var vb = b[j];
+
+            if (va < vb)
+            {
+                appendUnique(va, destination, ref k, ref last, ref hasLast);
+                i++;
+            }
+            else if (vb < va)
+            {
+                appendUnique(vb, destination, ref k, ref last, ref hasLast);
+                j++;
+            }
+            else
+            {
+                appendUnique(va, destination, ref k, ref last, ref hasLast);
+                i++;
+                j++;
+            }
+        }
+
+        while (i < a.Length)
+            appendUnique(a[i++], destination, ref k, ref last, ref hasLast);
+
+        while (j < b.Length)
+            appendUnique(b[j++], destination, ref k, ref last, ref hasLast);
+
+        return k;
+    }
+
+    private static void appendUnique(double value, double[] destination, ref int writeCount, ref double last, ref bool hasLast)
+    {
+        if (hasLast && value <= last)
+            return;
+
+        if (writeCount < destination.Length)
+            destination[writeCount] = value;
+
+        last = value;
+        hasLast = true;
+        writeCount++;
+    }
+
+
+    /// <summary>Walk forward from hint to find leftmost index with array[idx] >= value.
+    /// Values must be non-decreasing between calls with the same hint variable.</summary>
+    private static int walkForward(double[] array, double value, int hint)
+    {
+        while (hint < array.Length && array[hint] < value) hint++;
+        return hint;
+    }
+
+    /// <summary>Insertion sort in descending order. Avoids delegate allocation overhead of Array.Sort with Comparison.</summary>
+    private static void sortDescending(double[] arr, int len)
+    {
+        for (var i = 1; i < len; i++)
+        {
+            var key = arr[i];
+            var j = i - 1;
+            while (j >= 0 && arr[j] < key)
+            {
+                arr[j + 1] = arr[j];
+                j--;
+            }
+
+            arr[j + 1] = key;
+        }
+    }
+
+    private sealed class EventTimeComparer : IComparer<(double time, double change)>
+    {
+        public int Compare((double time, double change) x, (double time, double change) y) => x.time.CompareTo(y.time);
+    }
+
     private void preprocessFile(IReadOnlyList<BmsNoteTiming> noteTimings, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate)
     {
         HitLeniencyX = judgementRate.HasValue ? BmsHitLeniency.FromJudgementRate(judgementRate.Value, layout) : BmsHitLeniency.FromRank(rank, layout);
 
-        // Build note_seq as a list of tuples (column, head_time, tail_time)
-        noteSeq = [];
-        foreach (var obj in noteTimings)
+        var sortedNotes = new List<(int column, double head, double tail, int order)>(noteTimings.Count);
+        for (var i = 0; i < noteTimings.Count; i++)
         {
+            var obj = noteTimings[i];
             var head = Math.Floor(obj.StartTime / clockRate);
             var tail = obj.EndTime > obj.StartTime ? Math.Floor(obj.EndTime / clockRate) : -1;
-            noteSeq.Add((obj.Column, head, tail));
+            sortedNotes.Add((obj.Column, head, tail, i));
         }
 
-        noteSeq = noteSeq.OrderBy(n => n.head).ThenBy(n => n.column).ToList();
-
-        // Group notes by column
-        var noteDict = new Dictionary<int, List<(int column, double head, double tail)>>();
-        foreach (var n in noteSeq)
+        sortedNotes.Sort(static (a, b) =>
         {
-            if (!noteDict.TryGetValue(n.column, out var list))
-                noteDict[n.column] = list = [];
-            list.Add(n);
+            var timeComparison = a.head.CompareTo(b.head);
+            if (timeComparison != 0) return timeComparison;
+
+            var columnComparison = a.column.CompareTo(b.column);
+            return columnComparison != 0 ? columnComparison : a.order.CompareTo(b.order);
+        });
+
+        var columnCounts = new int[TotalColumns];
+        var lnCount = 0;
+        foreach (var sortedNote in sortedNotes)
+        {
+            columnCounts[sortedNote.column]++;
+            if (sortedNote.tail >= 0)
+                lnCount++;
         }
 
-        noteSeqByColumn = new List<(int column, double head, double tail)>[TotalColumns];
+        noteSeq = new NoteEntry[sortedNotes.Count];
+        noteSeqByColumnStarts = new int[TotalColumns];
+        noteSeqByColumnCounts = columnCounts;
+        noteSeqByColumn = new NoteEntry[sortedNotes.Count];
+        lnSeq = new NoteEntry[lnCount];
+
+        var runningStart = 0;
         for (var k = 0; k < TotalColumns; k++)
-            noteSeqByColumn[k] = noteDict.TryGetValue(k, out var list) ? list : [];
-
-        // Long notes (LN) are those with a tail (t>=0)
-        lnSeq = noteSeq.Where(n => n.tail >= 0).ToList();
-        tailSeq = lnSeq.OrderBy(n => n.tail).ToList();
-
-        var lnDict = new Dictionary<int, List<(int column, double head, double tail)>>();
-        foreach (var n in lnSeq)
         {
-            if (!lnDict.TryGetValue(n.column, out var list))
-                lnDict[n.column] = list = [];
-            list.Add(n);
+            noteSeqByColumnStarts[k] = runningStart;
+            runningStart += columnCounts[k];
         }
+
+        var columnWriteIdx = new int[TotalColumns];
+        Array.Copy(noteSeqByColumnStarts, columnWriteIdx, TotalColumns);
+
+        var sortedTails = new List<(NoteEntry note, int lnOrder)>(lnCount);
+        var noteWriteIdx = 0;
+        var lnWriteIdx = 0;
+        foreach (var sortedNote in sortedNotes)
+        {
+            var note = new NoteEntry(sortedNote.column, sortedNote.head, sortedNote.tail);
+            noteSeq[noteWriteIdx++] = note;
+            noteSeqByColumn[columnWriteIdx[note.Column]++] = note;
+
+            if (note.Tail >= 0)
+            {
+                var lnOrder = lnWriteIdx;
+                lnSeq[lnWriteIdx++] = note;
+                sortedTails.Add((note, lnOrder));
+            }
+        }
+
+        sortedTails.Sort(static (a, b) =>
+        {
+            var tailComparison = a.note.Tail.CompareTo(b.note.Tail);
+            return tailComparison != 0 ? tailComparison : a.lnOrder.CompareTo(b.lnOrder);
+        });
+
+        tailSeq = new NoteEntry[sortedTails.Count];
+        for (var i = 0; i < sortedTails.Count; i++)
+            tailSeq[i] = sortedTails[i].note;
 
         TotalTimeT = Math.Max(
-            noteSeq.Count > 0 ? noteSeq.Max(n => n.head) : 0,
-            lnSeq.Count > 0 ? lnSeq.Max(n => n.tail) : 0
+            noteSeq.Length > 0 ? noteSeq[^1].Head : 0,
+            tailSeq.Length > 0 ? tailSeq[^1].Tail : 0
         ) + 1;
     }
 
     private void getCorners()
     {
-        var cornersBase = new HashSet<double>();
-        var cornersA = new HashSet<double>();
+        // The boundary-derived raw counts are fixed up front, so exact arrays sidestep List growth and the extra copy that follows it.
+        var boundaryCount = noteSeq.Length + lnSeq.Length;
+        var rawBase = new double[boundaryCount * 4 + 2];
+        var rawA = new double[boundaryCount * 3 + 2];
+        var seedCount = fillCornerSeeds(rawBase, rawA);
 
-        foreach (var (_, head, tail) in noteSeq)
+        var baseWrite = seedCount;
+        for (var i = 0; i < seedCount; i++)
         {
-            cornersBase.Add(head);
-            cornersA.Add(head);
-            if (tail >= 0)
+            var s = rawBase[i];
+            rawBase[baseWrite++] = s + 501;
+            rawBase[baseWrite++] = s - 499;
+            rawBase[baseWrite++] = s + 1;
+        }
+
+        rawBase[baseWrite++] = 0;
+        rawBase[baseWrite++] = TotalTimeT;
+
+        var aWrite = seedCount;
+        for (var i = 0; i < seedCount; i++)
+        {
+            var s = rawA[i];
+            rawA[aWrite++] = s + 1000;
+            rawA[aWrite++] = s - 1000;
+        }
+
+        rawA[aWrite++] = 0;
+        rawA[aWrite++] = TotalTimeT;
+
+        Array.Sort(rawBase, 0, baseWrite);
+        Array.Sort(rawA, 0, aWrite);
+
+        baseCorners = toDedupedFilteredArray(rawBase, baseWrite, TotalTimeT);
+        aCorners = toDedupedFilteredArray(rawA, aWrite, TotalTimeT);
+
+        allCorners = mergeSortedUnique(baseCorners, aCorners);
+    }
+
+    private int fillCornerSeeds(double[] rawBase, double[] rawA)
+    {
+        var writeCount = 0;
+        foreach (var note in noteSeq)
+        {
+            rawBase[writeCount] = note.Head;
+            rawA[writeCount++] = note.Head;
+            if (note.Tail >= 0)
             {
-                cornersBase.Add(tail);
-                cornersA.Add(tail);
+                rawBase[writeCount] = note.Tail;
+                rawA[writeCount++] = note.Tail;
             }
         }
 
-        foreach (var s in cornersBase.ToList())
-        {
-            cornersBase.Add(s + 501);
-            cornersBase.Add(s - 499);
-            cornersBase.Add(s + 1); // To resolve the Dirac-Delta additions exactly at notes
-        }
-
-        cornersBase.Add(0);
-        cornersBase.Add(TotalTimeT);
-
-        // For Abar, unsmoothed values (KU and A) usually change at ±500 relative to note boundaries, hence ±1000 overall.
-        foreach (var s in cornersA.ToList())
-        {
-            cornersA.Add(s + 1000);
-            cornersA.Add(s - 1000);
-        }
-
-        cornersA.Add(0);
-        cornersA.Add(TotalTimeT);
-
-        // Finally, take the union of all corners for final interpolation
-        baseCorners = cornersBase.Where(v => v >= 0 && v <= TotalTimeT).OrderBy(v => v).Select(v => v).ToArray();
-        aCorners = cornersA.Where(v => v >= 0 && v <= TotalTimeT).OrderBy(v => v).Select(v => v).ToArray();
-        allCorners = baseCorners.Union(aCorners).OrderBy(v => v).ToArray();
+        return writeCount;
     }
 
-    private bool[][] getKeyUsage()
+
+    private void getActiveColumnMaskInto(ulong[] usage)
     {
-        var usage = new bool[TotalColumns][];
-        for (var k = 0; k < TotalColumns; k++)
-            usage[k] = new bool[baseCorners.Length];
+        Array.Clear(usage, 0, baseCorners.Length);
 
-        foreach (var (k, head, tail) in noteSeq)
+        var leftHint = 0;
+        foreach (var note in noteSeq)
         {
-            var start = Math.Max(head - 150, 0);
-            var end = tail < 0 ? head + 150 : Math.Min(tail + 150, TotalTimeT - 1);
+            var start = Math.Max(note.Head - 150, 0);
+            var end = note.Tail < 0 ? note.Head + 150 : Math.Min(note.Tail + 150, TotalTimeT - 1);
 
-            var left = searchSortedLeft(baseCorners, start);
+            leftHint = walkForward(baseCorners, start, leftHint);
+            var left = leftHint;
             var right = searchSortedLeft(baseCorners, end);
+            var bit = 1UL << note.Column;
             for (var i = left; i < right; i++)
-                usage[k][i] = true;
-        }
-
-        return usage;
-    }
-
-    private void buildActiveColumns()
-    {
-        activeColumnMask = new bool[baseCorners.Length][];
-        for (var i = 0; i < baseCorners.Length; i++)
-        {
-            var mask = new bool[TotalColumns];
-            for (var k = 0; k < TotalColumns; k++)
-            {
-                if (keyUsage[k][i])
-                    mask[k] = true;
-            }
-
-            activeColumnMask[i] = mask;
+                usage[i] |= bit;
         }
     }
 
-    private double[][] getKeyUsage400()
+    private void getKeyUsage400Into(double[] usage)
     {
-        var usage = new double[TotalColumns][];
-        for (var k = 0; k < TotalColumns; k++)
-            usage[k] = new double[baseCorners.Length];
+        var nCols = TotalColumns;
+        var baseCount = baseCorners.Length;
+        Array.Clear(usage, 0, nCols * baseCount);
 
-        foreach (var (k, head, tail) in noteSeq)
+        int leftHint = 0, left400Hint = 0;
+        foreach (var note in noteSeq)
         {
-            var start = Math.Max(head, 0);
-            var end = tail < 0 ? head : Math.Min(tail, TotalTimeT - 1);
+            var start = Math.Max(note.Head, 0);
+            var end = note.Tail < 0 ? note.Head : Math.Min(note.Tail, TotalTimeT - 1);
 
-            var left400 = searchSortedLeft(baseCorners, start - 400);
-            var left = searchSortedLeft(baseCorners, start);
+            left400Hint = walkForward(baseCorners, start - 400, left400Hint);
+            leftHint = walkForward(baseCorners, start, leftHint);
+            var left400 = left400Hint;
+            var left = leftHint;
             var right = searchSortedLeft(baseCorners, end);
             var right400 = searchSortedLeft(baseCorners, end + 400);
 
             var lnBonus = 3.75 + Math.Min(end - start, 1500) / 150.0;
+            var column = note.Column;
 
-            for (var i = left; i < right; i++)
-                usage[k][i] += lnBonus;
+            for (int i = left, offset = left * nCols + column; i < right; i++, offset += nCols)
+                usage[offset] += lnBonus;
 
-            for (var i = left400; i < left && i >= 0 && i < baseCorners.Length; i++)
-                usage[k][i] += 3.75 - 3.75 / 160000.0 * Math.Pow(baseCorners[i] - start, 2);
+            for (int i = left400, offset = left400 * nCols + column; i < left && i >= 0 && i < baseCorners.Length; i++, offset += nCols)
+                usage[offset] += 3.75 - 3.75 / 160000.0 * (baseCorners[i] - start) * (baseCorners[i] - start);
 
-            for (var i = right; i < right400 && i < baseCorners.Length; i++)
-                usage[k][i] += 3.75 - 3.75 / 160000.0 * Math.Pow(Math.Abs(baseCorners[i] - end), 2);
+            for (int i = right, offset = right * nCols + column; i < right400 && i < baseCorners.Length; i++, offset += nCols)
+                usage[offset] += 3.75 - 3.75 / 160000.0 * (baseCorners[i] - end) * (baseCorners[i] - end);
         }
-
-        return usage;
     }
 
-    private double[] computeAnchor()
+    private void computeAnchorInto(double[] keyUsage400, double[] result)
     {
-        var result = new double[baseCorners.Length];
+        var nCols = TotalColumns;
+        var baseCount = baseCorners.Length;
+        if (anchorCountsScratch.Length < nCols)
+            Array.Resize(ref anchorCountsScratch, nCols);
 
-        for (var idx = 0; idx < baseCorners.Length; idx++)
+        var counts = anchorCountsScratch;
+        Array.Clear(result, 0, baseCount);
+
+        for (var idx = 0; idx < baseCount; idx++)
         {
-            // Collect the counts for each group at this base corner
-            var counts = new double[TotalColumns];
-            for (var k = 0; k < TotalColumns; k++)
-                counts[k] = keyUsage400[k][idx];
+            var offset = idx * nCols;
+            for (var k = 0; k < nCols; k++)
+                counts[k] = keyUsage400[offset + k];
 
-            Array.Sort(counts);
-            Array.Reverse(counts); // e.g.  8, 5, 2, 2, 0
+            sortDescending(counts, nCols); // avoids delegate + boxing overhead
 
             var nonZeroCount = 0;
-            for (var i = 0; i < TotalColumns && counts[i] != 0; i++)
+            for (var i = 0; i < nCols && counts[i] != 0; i++)
                 nonZeroCount++;
 
             if (nonZeroCount > 1)
@@ -494,7 +821,7 @@ public class BmsStarRatingProcessor
                 for (var i = 0; i < nonZeroCount - 1; i++)
                 {
                     var ratio = counts[i + 1] / counts[i];
-                    walk += counts[i] * (1 - 4 * Math.Pow(0.5 - ratio, 2));
+                    walk += counts[i] * (1 - 4 * (0.5 - ratio) * (0.5 - ratio));
                     maxWalk += counts[i];
                 }
 
@@ -503,114 +830,124 @@ public class BmsStarRatingProcessor
         }
 
         for (var i = 0; i < result.Length; i++)
-            result[i] = 1 + Math.Min(result[i] - 0.18, 5 * Math.Pow(result[i] - 0.22, 3));
-
-        return result;
+        {
+            var r = result[i] - 0.22;
+            result[i] = 1 + Math.Min(result[i] - 0.18, 5 * r * r * r);
+        }
     }
 
-    private double[] computeJbar()
+    private void computeJbarInto(ComputeWorkspace workspace)
     {
-        var jks = new double[TotalColumns][];
-        var dks = new double[TotalColumns][];
+        var nCols = TotalColumns;
+        var baseCount = baseCorners.Length;
+        var jbar = workspace.Jbar;
+        var deltaKs = workspace.DeltaKs;
+        var totalDeltas = nCols * baseCount;
+        Array.Fill(deltaKs, 1e9, 0, totalDeltas);
 
-        for (var k = 0; k < TotalColumns; k++)
+        double jackNerfer(double delta)
         {
-            jks[k] = new double[baseCorners.Length];
-            dks[k] = new double[baseCorners.Length];
-            Array.Fill(dks[k], 1e9);
+            var x = 0.15 + Math.Abs(delta - 0.08);
+            return 1 - 7e-5 / (x * x * x * x);
         }
 
-        double jackNerfer(double delta) => 1 - 7e-5 * Math.Pow(0.15 + Math.Abs(delta - 0.08), -4);
+        var jks = workspace.Jks;
+        var smoothedJks = workspace.SmoothedJks;
+        var jbarNum = workspace.JbarNum;
+        var jbarDen = workspace.JbarDen;
+        var smoothWl = workspace.SmoothWl;
+        var smoothWr = workspace.SmoothWr;
+        var cumSumBuffer = workspace.CumSumBuffer;
 
-        for (var k = 0; k < TotalColumns; k++)
+        Array.Clear(jbarNum, 0, baseCount);
+        Array.Clear(jbarDen, 0, baseCount);
+
+        for (var k = 0; k < nCols; k++)
         {
-            var notes = noteSeqByColumn[k];
-            for (var i = 0; i < notes.Count - 1; i++)
-            {
-                var start = notes[i].head;
-                var end = notes[i + 1].head;
+            var noteStart = getColumnNoteStart(k);
+            var noteCount = getColumnNoteCount(k);
+            var dksOffset = k * baseCount;
+            Array.Clear(jks, 0, baseCount);
 
-                // Find indices in base_corners that lie in [start, end)
-                var left = searchSortedLeft(baseCorners, start);
-                var right = searchSortedLeft(baseCorners, end);
+            var baseHint = 0;
+            for (var i = 0; i < noteCount - 1; i++)
+            {
+                var start = noteSeqByColumn[noteStart + i].Head;
+                var end = noteSeqByColumn[noteStart + i + 1].Head;
+
+                // The sliding hint keeps this O(n) across a sorted note stream instead of paying a binary search per interval.
+                baseHint = walkForward(baseCorners, start, baseHint);
+                var left = baseHint;
+                baseHint = walkForward(baseCorners, end, baseHint);
+                var right = baseHint;
                 if (left >= right) continue;
 
                 var delta = 0.001 * (end - start);
-                var val = 1.0 / delta / (delta + 0.11 * Math.Pow(HitLeniencyX, 0.25));
+                var val = 1.0 / delta / (delta + 0.11 * Math.Sqrt(Math.Sqrt(HitLeniencyX)));
                 var jVal = val * jackNerfer(delta);
 
                 for (var j = left; j < right; j++)
                 {
-                    jks[k][j] = jVal;
-                    dks[k][j] = delta;
+                    jks[j] = jVal;
+                    deltaKs[dksOffset + j] = delta;
                 }
             }
-        }
 
-        // Now smooth each column's J_ks
-        var jbarKs = new double[TotalColumns][];
-        for (var k = 0; k < TotalColumns; k++)
-            jbarKs[k] = smoothOnCorners(baseCorners, jks[k], 500, 0.001, false);
+            smoothOnCornersFastInto(baseCorners, jks, 500, 0.001, false, smoothWl, smoothWr, cumSumBuffer, smoothedJks);
 
-        // Aggregate across columns using weighted average
-        var jbar = new double[baseCorners.Length];
-        for (var i = 0; i < baseCorners.Length; i++)
-        {
-            double num = 0, den = 0;
-            for (var k = 0; k < TotalColumns; k++)
+            for (var i = 0; i < baseCount; i++)
             {
-                var v = jbarKs[k][i];
+                var v = smoothedJks[i];
                 if (v < 0) v = 0;
-                var w = 1.0 / dks[k][i];
-                num += v * v * v * v * v * w;
-                den += w;
+                var w = 1.0 / deltaKs[dksOffset + i];
+                jbarNum[i] += v * v * v * v * v * w;
+                jbarDen[i] += w;
             }
-
-            jbar[i] = Math.Pow(num / Math.Max(1e-9, den), 1.0 / 5.0);
         }
 
-        deltaKs = dks;
-        return jbar;
+        for (var i = 0; i < baseCount; i++)
+            jbar[i] = Math.Pow(jbarNum[i] / Math.Max(1e-9, jbarDen[i]), 1.0 / 5.0);
     }
 
-    private double[] computeXbar()
+    private void computeXbarInto(ComputeWorkspace workspace)
     {
-        var crossCoeff = generateCrossCoeffs(TotalColumns);
+        var nCols = TotalColumns;
+        var baseCount = baseCorners.Length;
+        var crossCoeff = generateCrossCoeffs(nCols);
+        var xbar = workspace.Xbar;
+        var xks = workspace.Xks;
+        var xBase = workspace.XBase;
+        var sqrtSums = workspace.SqrtSums;
+        var fastCrossCurrent = workspace.FastCrossCurrent;
+        var fastCrossPrevious = workspace.FastCrossPrevious;
+        var activeColumnMask = workspace.ActiveColumnMask;
+        var smoothWl = workspace.SmoothWl;
+        var smoothWr = workspace.SmoothWr;
+        var cumSumBuffer = workspace.CumSumBuffer;
 
-        var xks = new double[TotalColumns + 1][];
-        var fastCross = new double[TotalColumns + 1][];
+        Array.Clear(fastCrossPrevious, 0, baseCount);
+        Array.Clear(xBase, 0, baseCount);
+        Array.Clear(sqrtSums, 0, baseCount);
 
-        for (var k = 0; k <= TotalColumns; k++)
+        for (var k = 0; k <= nCols; k++)
         {
-            xks[k] = new double[baseCorners.Length];
-            fastCross[k] = new double[baseCorners.Length];
-        }
+            Array.Clear(xks, 0, baseCount);
+            Array.Clear(fastCrossCurrent, 0, baseCount);
 
-        for (var k = 0; k <= TotalColumns; k++)
-        {
-            List<(int column, double head, double tail)> notesInPair;
+            var baseHint = 0;
 
-            if (k == 0)
-                notesInPair = noteSeqByColumn[0];
-            else if (k == TotalColumns)
-                notesInPair = noteSeqByColumn[TotalColumns - 1];
-            else
-                notesInPair = mergeSorted(noteSeqByColumn[k - 1], noteSeqByColumn[k]);
-
-            for (var i = 1; i < notesInPair.Count; i++)
+            void processInterval(double start, double end)
             {
-                var start = notesInPair[i - 1].head;
-                var end = notesInPair[i].head;
-
-                var left = searchSortedLeft(baseCorners, start);
-                var right = searchSortedLeft(baseCorners, end);
-                if (left >= right) continue;
+                baseHint = walkForward(baseCorners, start, baseHint);
+                var left = baseHint;
+                baseHint = walkForward(baseCorners, end, baseHint);
+                var right = baseHint;
+                if (left >= right) return;
 
                 var delta = 0.001 * (end - start);
                 var val = 0.16 / (Math.Max(HitLeniencyX, delta) * Math.Max(HitLeniencyX, delta));
 
-                // Python: ((k-1) not in active_columns[idx_start] and (k-1) not in active_columns[idx_end])
-                //         or (k not in active_columns[idx_start] and k not in active_columns[idx_end])
+                // Matching the Python edge-column check keeps the fast cross term from counting gaps where one side was never actually occupied.
                 bool col1AbsentAtBoth;
                 bool col2AbsentAtBoth;
 
@@ -618,12 +955,18 @@ public class BmsStarRatingProcessor
                 var maskRight = activeColumnMask[right];
 
                 if (k - 1 >= 0)
-                    col1AbsentAtBoth = !maskLeft[k - 1] && !maskRight[k - 1];
+                {
+                    var bit = 1UL << (k - 1);
+                    col1AbsentAtBoth = (maskLeft & bit) == 0 && (maskRight & bit) == 0;
+                }
                 else
                     col1AbsentAtBoth = true;
 
                 if (k < TotalColumns)
-                    col2AbsentAtBoth = !maskLeft[k] && !maskRight[k];
+                {
+                    var bit = 1UL << k;
+                    col2AbsentAtBoth = (maskLeft & bit) == 0 && (maskRight & bit) == 0;
+                }
                 else
                     col2AbsentAtBoth = true;
 
@@ -635,32 +978,68 @@ public class BmsStarRatingProcessor
 
                 for (var j = left; j < right; j++)
                 {
-                    xks[k][j] = val;
-                    fastCross[k][j] = fastVal;
+                    xks[j] = val;
+                    fastCrossCurrent[j] = fastVal;
                 }
             }
-        }
 
-        var xBase = new double[baseCorners.Length];
-        for (var i = 0; i < baseCorners.Length; i++)
-        {
-            double sum = 0;
-            for (var k = 0; k <= TotalColumns; k++)
-                sum += xks[k][i] * crossCoeff[k];
-
-            double sqrtSum = 0;
-            for (var k = 0; k < TotalColumns; k++)
+            if (k == 0 || k == TotalColumns)
             {
-                sqrtSum += Math.Sqrt(fastCross[k][i] * crossCoeff[k] * fastCross[k + 1][i] * crossCoeff[k + 1]);
+                var column = k == 0 ? 0 : TotalColumns - 1;
+                var noteStart = getColumnNoteStart(column);
+                var noteCount = getColumnNoteCount(column);
+                for (var i = 1; i < noteCount; i++)
+                    processInterval(noteSeqByColumn[noteStart + i - 1].Head, noteSeqByColumn[noteStart + i].Head);
+            }
+            else
+            {
+                var leftStart = getColumnNoteStart(k - 1);
+                var rightStart = getColumnNoteStart(k);
+                var leftCount = getColumnNoteCount(k - 1);
+                var rightCount = getColumnNoteCount(k);
+                var leftIdx = 0;
+                var rightIdx = 0;
+
+                if (leftCount > 0 || rightCount > 0)
+                {
+                    double previous;
+                    if (rightCount == 0 || (leftIdx < leftCount && noteSeqByColumn[leftStart + leftIdx].Head <= noteSeqByColumn[rightStart + rightIdx].Head))
+                        previous = noteSeqByColumn[leftStart + leftIdx++].Head;
+                    else
+                        previous = noteSeqByColumn[rightStart + rightIdx++].Head;
+
+                    while (leftIdx < leftCount || rightIdx < rightCount)
+                    {
+                        double current;
+                        if (rightIdx >= rightCount || (leftIdx < leftCount && noteSeqByColumn[leftStart + leftIdx].Head <= noteSeqByColumn[rightStart + rightIdx].Head))
+                            current = noteSeqByColumn[leftStart + leftIdx++].Head;
+                        else
+                            current = noteSeqByColumn[rightStart + rightIdx++].Head;
+
+                        processInterval(previous, current);
+                        previous = current;
+                    }
+                }
             }
 
-            xBase[i] = sum + sqrtSum;
+            for (var i = 0; i < baseCount; i++)
+            {
+                xBase[i] += xks[i] * crossCoeff[k];
+
+                if (k > 0)
+                    sqrtSums[i] += Math.Sqrt(fastCrossPrevious[i] * crossCoeff[k - 1] * fastCrossCurrent[i] * crossCoeff[k]);
+            }
+
+            (fastCrossPrevious, fastCrossCurrent) = (fastCrossCurrent, fastCrossPrevious);
         }
 
-        return smoothOnCorners(baseCorners, xBase, 500, 0.001, false);
+        for (var i = 0; i < baseCount; i++)
+            xBase[i] += sqrtSums[i];
+
+        smoothOnCornersFastInto(baseCorners, xBase, 500, 0.001, false, smoothWl, smoothWr, cumSumBuffer, xbar);
     }
 
-    private double[] computePbar()
+    private void computePbarInto(ComputeWorkspace workspace)
     {
         double streamBooster(double delta)
         {
@@ -671,36 +1050,41 @@ public class BmsStarRatingProcessor
             return 1;
         }
 
-        var (lnPoints, lnCumsum, lnValues) = lnBodiesCountSparseRepresentation();
+        var pbar = workspace.Pbar;
+        var pStep = workspace.PStep;
+        var anchor = workspace.Anchor;
+        var smoothWl = workspace.SmoothWl;
+        var smoothWr = workspace.SmoothWr;
+        var cumSumBuffer = workspace.CumSumBuffer;
+        var (lnPoints, lnPointCount, lnCumsum, lnValues) = lnBodiesCountSparseRepresentation(workspace);
 
-        var pStep = new double[baseCorners.Length];
+        var baseCount = baseCorners.Length;
+        Array.Clear(pStep, 0, baseCount);
 
-        for (var i = 0; i < noteSeq.Count - 1; i++)
+        for (var i = 0; i < noteSeq.Length - 1; i++)
         {
-            var hl = noteSeq[i].head;
-            var hr = noteSeq[i + 1].head;
+            var hl = noteSeq[i].Head;
+            var hr = noteSeq[i + 1].Head;
             var deltaTime = hr - hl;
 
             if (deltaTime < 1e-9)
             {
-                // Dirac delta case: when notes occur at the same time.
-                // Add the spike exactly at the note head in the base grid.
-                var spike = 1000 * Math.Pow(0.02 * (4.0 / HitLeniencyX - 24), 0.25);
+                // The spike has to land on the shared head instant, otherwise simultaneous notes lose their density contribution after smoothing.
+                var spike = 1000 * Math.Sqrt(Math.Sqrt(0.02 * (4.0 / HitLeniencyX - 24)));
                 var left = searchSortedLeft(baseCorners, hl);
                 var right = searchSortedRight(baseCorners, hl);
                 for (var j = left; j < right; j++)
                     pStep[j] += spike;
-                // Continue so that we add a spike for each additional simultaneous note.
+
                 continue;
             }
 
-            // For the regular case where delta_time > 0, identify the base grid indices in [h_l, h_r)
             var lIdx = searchSortedLeft(baseCorners, hl);
             var rIdx = searchSortedLeft(baseCorners, hr);
             if (lIdx >= rIdx) continue;
 
             var delta = 0.001 * deltaTime;
-            var v = 1 + 6 * 0.001 * lnSum(hl, hr, lnPoints, lnCumsum, lnValues);
+            var v = 1 + 6 * 0.001 * lnSum(hl, hr, lnPoints, lnPointCount, lnCumsum, lnValues);
             var bVal = streamBooster(delta);
 
             double inc;
@@ -708,48 +1092,57 @@ public class BmsStarRatingProcessor
             if (delta < 2 * HitLeniencyX / 3)
             {
                 var dShift = delta - HitLeniencyX / 2;
-                inc = 1.0 / delta * Math.Pow(xf2 * (1 - 24.0 / HitLeniencyX * dShift * dShift), 0.25) * Math.Max(bVal, v);
+                inc = 1.0 / delta * Math.Sqrt(Math.Sqrt(xf2 * (1 - 24.0 / HitLeniencyX * dShift * dShift))) * Math.Max(bVal, v);
             }
             else
             {
                 var x6 = HitLeniencyX / 6;
-                inc = 1.0 / delta * Math.Pow(xf2 * (1 - 24.0 / HitLeniencyX * x6 * x6), 0.25) * Math.Max(bVal, v);
+                inc = 1.0 / delta * Math.Sqrt(Math.Sqrt(xf2 * (1 - 24.0 / HitLeniencyX * x6 * x6))) * Math.Max(bVal, v);
             }
 
             for (var j = lIdx; j < rIdx; j++)
                 pStep[j] += Math.Min(inc * anchor[j], Math.Max(inc, inc * 2 - 10));
         }
 
-        return smoothOnCorners(baseCorners, pStep, 500, 0.001, false);
+        smoothOnCornersFastInto(baseCorners, pStep, 500, 0.001, false, smoothWl, smoothWr, cumSumBuffer, pbar);
     }
 
-    private double[] computeAbar()
+    private void computeAbarInto(ComputeWorkspace workspace)
     {
-        var dks = new double[TotalColumns][];
-        for (var k = 0; k < TotalColumns; k++)
-            dks[k] = new double[baseCorners.Length];
+        var nCols = TotalColumns;
+        var baseCount = baseCorners.Length;
+        var abar = workspace.Abar;
+        var deltaKs = workspace.DeltaKs;
+        var totalDeltas = nCols * baseCount;
+        var dks = workspace.Dks;
+        var aStep = workspace.AStep;
+        var activeColumnMask = workspace.ActiveColumnMask;
+        var smoothWlA = workspace.SmoothWlA;
+        var smoothWrA = workspace.SmoothWrA;
+        var cumSumBufferA = workspace.CumSumBufferA;
 
-        for (var i = 0; i < baseCorners.Length; i++)
+        Array.Clear(dks, 0, totalDeltas);
+        Array.Fill(aStep, 1.0, 0, aCorners.Length);
+
+        for (var i = 0; i < baseCount; i++)
         {
             var mask = activeColumnMask[i];
             var prevActive = -1;
-            for (var k = 0; k < TotalColumns; k++)
+            for (var k = 0; k < nCols; k++)
             {
-                if (!mask[k]) continue;
+                if ((mask & (1UL << k)) == 0) continue;
 
                 if (prevActive >= 0)
                 {
-                    // Use the delta_ks computed before on base_corners
-                    dks[prevActive][i] = Math.Abs(deltaKs[prevActive][i] - deltaKs[k][i])
-                                         + 0.4 * Math.Max(0, Math.Max(deltaKs[prevActive][i], deltaKs[k][i]) - 0.11);
+                    var prevDelta = deltaKs[prevActive * baseCount + i];
+                    var currentDelta = deltaKs[k * baseCount + i];
+                    dks[prevActive * baseCount + i] = Math.Abs(prevDelta - currentDelta)
+                                                      + 0.4 * Math.Max(0, Math.Max(prevDelta, currentDelta) - 0.11);
                 }
 
                 prevActive = k;
             }
         }
-
-        var aStep = new double[aCorners.Length];
-        Array.Fill(aStep, 1.0);
 
         for (var i = 0; i < aCorners.Length; i++)
         {
@@ -758,194 +1151,248 @@ public class BmsStarRatingProcessor
 
             var mask = activeColumnMask[idx];
             var prevActive = -1;
-            for (var k = 0; k < TotalColumns; k++)
+            for (var k = 0; k < nCols; k++)
             {
-                if (!mask[k]) continue;
+                if ((mask & (1UL << k)) == 0) continue;
 
                 if (prevActive >= 0)
                 {
-                    var dVal = dks[prevActive][idx];
+                    var prevDelta = deltaKs[prevActive * baseCount + idx];
+                    var currentDelta = deltaKs[k * baseCount + idx];
+                    var dVal = dks[prevActive * baseCount + idx];
 
                     if (dVal < 0.02)
-                        aStep[i] *= Math.Min(0.75 + 0.5 * Math.Max(deltaKs[prevActive][idx], deltaKs[k][idx]), 1);
+                        aStep[i] *= Math.Min(0.75 + 0.5 * Math.Max(prevDelta, currentDelta), 1);
                     else if (dVal < 0.07)
-                        aStep[i] *= Math.Min(0.65 + 5 * dVal + 0.5 * Math.Max(deltaKs[prevActive][idx], deltaKs[k][idx]), 1);
-                    // Otherwise leave A_step[i] unchanged.
+                        aStep[i] *= Math.Min(0.65 + 5 * dVal + 0.5 * Math.Max(prevDelta, currentDelta), 1);
                 }
 
                 prevActive = k;
             }
         }
 
-        return smoothOnCorners(aCorners, aStep, 250, 1.0, true);
+        smoothOnCornersFastInto(aCorners, aStep, 250, 1.0, true, smoothWlA, smoothWrA, cumSumBufferA, abar);
     }
 
-    private double[] computeRbar()
+    private void computeRbarInto(ComputeWorkspace workspace)
     {
-        var rStep = new double[baseCorners.Length];
+        var baseCount = baseCorners.Length;
+        var rbar = workspace.Rbar;
+        var rStep = workspace.RStep;
+        var iList = workspace.IRelease;
+        var smoothWl = workspace.SmoothWl;
+        var smoothWr = workspace.SmoothWr;
+        var cumSumBuffer = workspace.CumSumBuffer;
 
-        var timesByColumn = new Dictionary<int, double[]>();
-        for (var k = 0; k < noteSeqByColumn.Length; k++)
-            timesByColumn[k] = noteSeqByColumn[k].Select(n => n.head).ToArray();
+        Array.Clear(rStep, 0, baseCount);
 
-        // Release Index
-        var iList = new double[tailSeq.Count];
-        for (var i = 0; i < tailSeq.Count; i++)
+        for (var i = 0; i < tailSeq.Length; i++)
         {
-            var (k, hi, ti) = tailSeq[i];
-            var colTimes = timesByColumn[k];
-            var idx = searchSortedLeft(colTimes, hi);
-            var hNext = idx + 1 < colTimes.Length ? colTimes[idx + 1] : 1e9;
+            var tail = tailSeq[i];
+            var k = tail.Column;
+            var hi = tail.Head;
+            var ti = tail.Tail;
+            var colNoteStart = getColumnNoteStart(k);
+            var colNoteCount = getColumnNoteCount(k);
+            var idx = searchSortedLeft(noteSeqByColumn, colNoteStart, colNoteCount, hi);
+            var hNext = idx + 1 < colNoteCount ? noteSeqByColumn[colNoteStart + idx + 1].Head : 1e9;
 
             var iH = 0.001 * Math.Abs(ti - hi - 80) / HitLeniencyX;
             var iT = 0.001 * Math.Abs(hNext - ti - 80) / HitLeniencyX;
             iList[i] = 2.0 / (2 + Math.Exp(-5 * (iH - 0.75)) + Math.Exp(-5 * (iT - 0.75)));
         }
 
-        // For each interval between successive tail times, assign I and R.
-        for (var i = 0; i < tailSeq.Count - 1; i++)
+        for (var i = 0; i < tailSeq.Length - 1; i++)
         {
-            var tStart = tailSeq[i].tail;
-            var tEnd = tailSeq[i + 1].tail;
+            var tStart = tailSeq[i].Tail;
+            var tEnd = tailSeq[i + 1].Tail;
 
             var left = searchSortedLeft(baseCorners, tStart);
             var right = searchSortedLeft(baseCorners, tEnd);
             if (left >= right) continue;
 
             var deltaR = 0.001 * (tEnd - tStart);
-            var rVal = 0.08 * Math.Pow(deltaR, -0.5) / HitLeniencyX * (1 + 0.8 * (iList[i] + iList[i + 1]));
+            var rVal = 0.08 / Math.Sqrt(deltaR) / HitLeniencyX * (1 + 0.8 * (iList[i] + iList[i + 1]));
 
             for (var j = left; j < right; j++)
                 rStep[j] = rVal;
         }
 
-        return smoothOnCorners(baseCorners, rStep, 500, 0.001, false);
+        smoothOnCornersFastInto(baseCorners, rStep, 500, 0.001, false, smoothWl, smoothWr, cumSumBuffer, rbar);
     }
 
-    private void computeCAndKs(out double[] cArr, out double[] ksArr)
+    private void computeCAndKsInto(ComputeWorkspace workspace)
     {
-        // C(s): count of notes within 500 ms
-        var noteHitTimes = noteSeq.Select(n => n.head).OrderBy(t => t).ToArray();
+        var cArr = workspace.CArr;
+        var ksArr = workspace.KsArr;
+        var noteHitTimes = workspace.NoteHitTimes;
+        var activeColumnMask = workspace.ActiveColumnMask;
+        for (var i = 0; i < noteSeq.Length; i++)
+            noteHitTimes[i] = noteSeq[i].Head;
 
-        cArr = new double[baseCorners.Length];
         for (var i = 0; i < baseCorners.Length; i++)
         {
             var low = baseCorners[i] - 500;
             var high = baseCorners[i] + 500;
-            // Use binary search on note_hit_times:
-            var cnt = searchSortedLeft(noteHitTimes, high) - searchSortedLeft(noteHitTimes, low);
+            var cnt = searchSortedLeft(noteHitTimes, noteSeq.Length, high) - searchSortedLeft(noteHitTimes, noteSeq.Length, low);
             cArr[i] = cnt;
         }
 
-        // Ks: local key usage count (minimum 1)
-        ksArr = new double[baseCorners.Length];
         for (var i = 0; i < baseCorners.Length; i++)
         {
-            var count = 0;
-            var mask = activeColumnMask[i];
-            for (var k = 0; k < TotalColumns; k++)
-            {
-                if (mask[k]) count++;
-            }
-
+            var count = BitOperations.PopCount(activeColumnMask[i]);
             ksArr[i] = Math.Max(count, 1);
         }
     }
 
-    private double[] computeDifficulty(double[] abar, double[] jbar, double[] xbar, double[] pbar, double[] rbar, double[] cArr, double[] ksArr)
+    private static double interpolateAt(double x, double[] oldX, int idx, double[] oldVals)
     {
-        // Compute Difficulty D on all_corners:
-        var d = new double[allCorners.Length];
+        if (x <= oldX[0])
+            return oldVals[0];
+
+        if (x >= oldX[^1])
+            return oldVals[oldX.Length - 1];
+
+        var t = (x - oldX[idx]) / (oldX[idx + 1] - oldX[idx]);
+        return oldVals[idx] + t * (oldVals[idx + 1] - oldVals[idx]);
+    }
+
+    private void computeDifficulty(ComputeWorkspace workspace)
+    {
+        var d = workspace.D;
+        var jbar = workspace.Jbar;
+        var xbar = workspace.Xbar;
+        var pbar = workspace.Pbar;
+        var abar = workspace.Abar;
+        var rbar = workspace.Rbar;
+        var cArr = workspace.CArr;
+        var ksArr = workspace.KsArr;
+        var baseInterpIdx = workspace.BaseInterpIdx;
+        var aInterpIdx = workspace.AInterpIdx;
 
         for (var i = 0; i < allCorners.Length; i++)
         {
-            var ks = ksArr[i];
-            var a = abar[i];
-            var j = jbar[i];
+            var x = allCorners[i];
+            var baseIdx = baseInterpIdx[i];
+            var aIdx = aInterpIdx[i];
+
+            var ks = ksArr[baseIdx];
+            var c = cArr[baseIdx];
+            var a = interpolateAt(x, aCorners, aIdx, abar);
+            var j = interpolateAt(x, baseCorners, baseIdx, jbar);
+            var xVal = interpolateAt(x, baseCorners, baseIdx, xbar);
+            var p = interpolateAt(x, baseCorners, baseIdx, pbar);
+            var r = interpolateAt(x, baseCorners, baseIdx, rbar);
             var jCap = Math.Min(j, 8 + 0.85 * j);
             var a3Ks = Math.Pow(a, 3.0 / ks);
 
-            var s1 = Math.Pow(a3Ks * jCap, 1.5);
-            var streamTerm = 0.8 * pbar[i] + rbar[i] * 35.0 / (cArr[i] + 8);
-            var s2 = Math.Pow(Math.Pow(a, 2.0 / 3.0) * streamTerm, 1.5);
+            var s1 = a3Ks * jCap * Math.Sqrt(a3Ks * jCap);
+            var streamTerm = 0.8 * p + r * 35.0 / (c + 8);
+            var a23 = Math.Pow(a, 2.0 / 3.0);
+            var s2Base = a23 * streamTerm;
+            var s2 = s2Base * Math.Sqrt(s2Base);
 
             var s = Math.Pow(0.4 * s1 + 0.6 * s2, 2.0 / 3.0);
-            var t = a3Ks * xbar[i] / (xbar[i] + s + 1);
-            d[i] = 2.7 * Math.Sqrt(s) * Math.Pow(t, 1.5) + s * 0.27;
+            var t = a3Ks * xVal / (xVal + s + 1);
+            d[i] = 2.7 * Math.Sqrt(s) * t * Math.Sqrt(t) + s * 0.27;
         }
-
-        return d;
     }
 
-    private double computeStarRating(double[] d, double[] cArr)
+    private static (double p93Sum, double p83Sum) computePercentileSumsFromSorted(double[] sortedDifficulty, double[] sortedWeights, int count, double totalWeight)
     {
+        var percentileIdx = target_percentiles.Length - 1;
+        var nextTarget = target_percentiles[percentileIdx] * totalWeight;
+        double cumulativeWeight = 0;
+        double p93Sum = 0;
+        double p83Sum = 0;
+
+        for (var i = 0; i < count; i++)
+        {
+            var dVal = sortedDifficulty[i];
+            cumulativeWeight += sortedWeights[i];
+
+            while (percentileIdx >= 0 && cumulativeWeight >= nextTarget)
+            {
+                if (percentileIdx < 4)
+                    p93Sum += dVal;
+                else
+                    p83Sum += dVal;
+
+                percentileIdx--;
+                if (percentileIdx >= 0)
+                    nextTarget = target_percentiles[percentileIdx] * totalWeight;
+            }
+        }
+
+        if (percentileIdx >= 0)
+        {
+            var last = sortedDifficulty[count - 1];
+            while (percentileIdx >= 0)
+            {
+                if (percentileIdx < 4)
+                    p93Sum += last;
+                else
+                    p83Sum += last;
+
+                percentileIdx--;
+            }
+        }
+
+        return (p93Sum, p83Sum);
+    }
+
+    private double computeStarRating(ComputeWorkspace workspace)
+    {
+        var d = workspace.D;
+        var cArr = workspace.CArr;
+        var baseInterpIdx = workspace.BaseInterpIdx;
+        var effectiveWeights = workspace.EffectiveWeights;
         var n = allCorners.Length;
 
-        // Compute the gaps between consecutive times in a vectorised way.
-        // For interior points, the effective gap is the average of the left and right gap.
-        var gaps = new double[n];
-        gaps[0] = (allCorners[1] - allCorners[0]) / 2.0;
-        gaps[n - 1] = (allCorners[n - 1] - allCorners[n - 2]) / 2.0;
+        effectiveWeights[0] = cArr[baseInterpIdx[0]] * (allCorners[1] - allCorners[0]) / 2.0;
+        effectiveWeights[n - 1] = cArr[baseInterpIdx[n - 1]] * (allCorners[n - 1] - allCorners[n - 2]) / 2.0;
+
+        double totalWeight = 0;
+        double weightedSum5 = 0;
+
+        var firstDifficulty = d[0];
+        var firstWeight = effectiveWeights[0];
+        totalWeight += firstWeight;
+        weightedSum5 += firstDifficulty * firstDifficulty * firstDifficulty * firstDifficulty * firstDifficulty * firstWeight;
+
         for (var i = 1; i < n - 1; i++)
-            gaps[i] = (allCorners[i + 1] - allCorners[i - 1]) / 2.0;
-
-        // The effective weight for each corner is the product of its density and its gap.
-        var effectiveWeights = new double[n];
-        for (var i = 0; i < n; i++)
-            effectiveWeights[i] = cArr[i] * gaps[i];
-
-        // Sort indices by D value
-        var indices = Enumerable.Range(0, n).ToArray();
-        Array.Sort(indices, (a, b) => d[a].CompareTo(d[b]));
-
-        // Build sorted D and weight arrays
-        var dSorted = new double[n];
-        var wSorted = new double[n];
-        for (var i = 0; i < n; i++)
         {
-            dSorted[i] = d[indices[i]];
-            wSorted[i] = effectiveWeights[indices[i]];
+            var weight = cArr[baseInterpIdx[i]] * (allCorners[i + 1] - allCorners[i - 1]) / 2.0;
+            effectiveWeights[i] = weight;
+
+            var dVal = d[i];
+            totalWeight += weight;
+            weightedSum5 += dVal * dVal * dVal * dVal * dVal * weight;
         }
 
-        // Compute the cumulative sum of the effective weights.
-        var cumWeights = new double[n];
-        cumWeights[0] = wSorted[0];
-        for (var i = 1; i < n; i++)
-            cumWeights[i] = cumWeights[i - 1] + wSorted[i];
+        var lastDifficulty = d[n - 1];
+        var lastWeight = effectiveWeights[n - 1];
+        totalWeight += lastWeight;
+        weightedSum5 += lastDifficulty * lastDifficulty * lastDifficulty * lastDifficulty * lastDifficulty * lastWeight;
 
-        var totalWeight = cumWeights[n - 1];
-        double[] targetPercentiles = [0.945, 0.935, 0.925, 0.915, 0.845, 0.835, 0.825, 0.815];
+        Array.Sort(d, effectiveWeights, 0, n);
 
-        double p93Sum = 0, p83Sum = 0;
-        for (var i = 0; i < targetPercentiles.Length; i++)
-        {
-            var target = targetPercentiles[i] * totalWeight;
-            var idx = searchSortedLeft(cumWeights, target);
-            if (idx >= n) idx = n - 1;
-            if (i < 4)
-                p93Sum += dSorted[idx];
-            else
-                p83Sum += dSorted[idx];
-        }
+        // Weighted percentile thresholds depend on the exact cumulative weights of the fully sorted sequence,
+        // so we keep the complete sort and only move the order-independent weighted-mean accumulation out of the hot scan.
+        var (p93Sum, p83Sum) = computePercentileSumsFromSorted(d, effectiveWeights, n, totalWeight);
 
         var p93 = p93Sum / 4.0;
         var p83 = p83Sum / 4.0;
+        var weightedMean = Math.Pow(weightedSum5 / totalWeight, 1.0 / 5.0);
 
-        double weightedSum5 = 0, wSum = 0;
-        for (var i = 0; i < n; i++)
-        {
-            var dVal = dSorted[i];
-            weightedSum5 += dVal * dVal * dVal * dVal * dVal * wSorted[i];
-            wSum += wSorted[i];
-        }
-
-        var weightedMean = Math.Pow(weightedSum5 / wSum, 1.0 / 5.0);
-
-        // Final SR calculation
         var sr = 0.88 * p93 * 0.25 + 0.94 * p83 * 0.2 + weightedMean * 0.55;
         sr = sr / 8.0 * 8.0;
 
-        var totalNotes = noteSeq.Count + 0.5 * lnSeq.Sum(x => Math.Min(x.tail - x.head, 1000) / 200.0);
+        double lnNoteBonus = 0;
+        foreach (var ln in lnSeq)
+            lnNoteBonus += Math.Min(ln.Tail - ln.Head, 1000) / 200.0;
+
+        var totalNotes = noteSeq.Length + 0.5 * lnNoteBonus;
         sr *= totalNotes / (totalNotes + 60);
 
         sr = rescaleHigh(sr);
@@ -960,45 +1407,58 @@ public class BmsStarRatingProcessor
 
     // -----End of Helper methods--------
 
-    // ---- LN body sparse representation ----
-    // dictionary: index -> change in LN_bodies (before transformation)
-    private (double[] points, double[] cumsum, double[] values) lnBodiesCountSparseRepresentation()
+    private (double[] points, int pointCount, double[] cumsum, double[] values) lnBodiesCountSparseRepresentation(ComputeWorkspace workspace)
     {
-        var diff = new Dictionary<double, double>();
+        var eventCount = lnSeq.Length * 3;
+        var events = workspace.LnEvents;
+        var pointCandidates = workspace.LnPointCandidates;
+        var cumsum = workspace.LnCumsum;
+        var values = workspace.LnValues;
+        var eventIdx = 0;
 
         foreach (var (_, head, tail) in lnSeq)
         {
             var t0 = Math.Min(head + 60, tail);
             var t1 = Math.Min(head + 120, tail);
-            diff[t0] = diff.GetValueOrDefault(t0, 0) + 1.3;
-            diff[t1] = diff.GetValueOrDefault(t1, 0) + (-1.3 + 1); // net change at t1: -1.3 from first part, then +1
-            diff[tail] = diff.GetValueOrDefault(tail, 0) - 1;
+            events[eventIdx++] = (t0, 1.3);
+            events[eventIdx++] = (t1, -0.3);
+            events[eventIdx++] = (tail, -1);
         }
 
-        // The breakpoints are the times where changes occur.
-        var pointsSet = new HashSet<double> { 0, TotalTimeT };
-        foreach (var p in diff.Keys) pointsSet.Add(p);
-        var points = pointsSet.OrderBy(p => p).ToArray();
+        Array.Sort(events, 0, eventCount, event_time_comparer);
 
-        // Build piecewise constant values (after transformation) and a cumulative sum.
-        var values = new List<double>();
-        var cumsum = new List<double> { 0 }; // cumulative sum at the breakpoints
-        double curr = 0;
+        pointCandidates[0] = 0;
+        pointCandidates[1] = TotalTimeT;
+        for (var i = 0; i < eventCount; i++)
+            pointCandidates[i + 2] = events[i].time;
 
-        for (var i = 0; i < points.Length - 1; i++)
+        var candidateCount = eventCount + 2;
+        Array.Sort(pointCandidates, 0, candidateCount);
+
+        var writeIdx = 0;
+        for (var i = 0; i < candidateCount; i++)
         {
-            var t = points[i];
-            // If there is a change at t, update the running value.
-            if (diff.TryGetValue(t, out var change))
-                curr += change;
+            var v = pointCandidates[i];
+            if (writeIdx == 0 || v > pointCandidates[writeIdx - 1])
+                pointCandidates[writeIdx++] = v;
+        }
+
+        double curr = 0;
+        eventIdx = 0;
+        cumsum[0] = 0;
+
+        for (var i = 0; i < writeIdx - 1; i++)
+        {
+            var t = pointCandidates[i];
+            while (eventIdx < eventCount && events[eventIdx].time <= t)
+                curr += events[eventIdx++].change;
 
             var v = Math.Min(curr, 2.5 + 0.5 * curr);
-            values.Add(v);
-            // Compute cumulative sum on the interval [points[i], points[i+1])
-            var segLength = points[i + 1] - points[i];
-            cumsum.Add(cumsum[^1] + segLength * v);
+            values[i] = v;
+            var segLength = pointCandidates[i + 1] - pointCandidates[i];
+            cumsum[i + 1] = cumsum[i] + segLength * v;
         }
 
-        return (points, [.. cumsum], [.. values]);
+        return (pointCandidates, writeIdx, cumsum, values);
     }
 }

@@ -1,16 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
-using osu.Game.Rulesets.BmsRuleset.IO.Import;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Difficulty;
@@ -52,68 +48,31 @@ public class BmsStarRatingProcessorTest
         doubleTime.SpeedChange.Value = 1.75;
 
         var attributes = (DifficultyAttributes)method!.Invoke(calculator, [beatmap, new Mod[] { doubleTime }, Array.Empty<Skill>()])!;
-        var expected = new BmsStarRatingProcessorV3().ComputeStarRating(createSimpleNoteTimings(8), 8, 2, 1.75);
+        var expected = new BmsStarRatingProcessor().ComputeStarRating(createSimpleNoteTimings(8), 8, 2, 1.75);
 
         Assert.That(attributes.StarRating, Is.EqualTo(expected).Within(1e-12));
     }
 
     [Test]
-    public void TestStarRatingProcessorV3AllocatesLessThanV2()
+    public void TestStarRatingProcessorComputesStarRatingOnly()
     {
         var noteTimings = createDenseNoteTimings();
+        var processor = new BmsStarRatingProcessor();
 
-        new BmsStarRatingProcessorV2().Compute(noteTimings, 8, 2);
-        new BmsStarRatingProcessorV3().Compute(noteTimings, 8, 2);
+        var result = processor.Compute(noteTimings, 8, 2).StarRating;
+        var direct = processor.ComputeStarRating(noteTimings, 8, 2);
 
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        var srV2 = new BmsStarRatingProcessorV2().Compute(noteTimings, 8, 2).StarRating;
-        var allocatedV2 = GC.GetAllocatedBytesForCurrentThread() - before;
-
-        before = GC.GetAllocatedBytesForCurrentThread();
-        var srV3 = new BmsStarRatingProcessorV3().Compute(noteTimings, 8, 2).StarRating;
-        var allocatedV3 = GC.GetAllocatedBytesForCurrentThread() - before;
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(srV3, Is.EqualTo(srV2).Within(1e-10));
-            Assert.That(allocatedV3, Is.LessThan(allocatedV2));
-        });
-    }
-
-    [Test]
-    public void TestStarRatingProcessorV3MatchesV2()
-    {
-        var noteTimings = createDenseNoteTimings();
-
-        var reference = new BmsStarRatingProcessorV2().Compute(noteTimings, 8, 2).StarRating;
-        var actual = new BmsStarRatingProcessorV3().Compute(noteTimings, 8, 2).StarRating;
-
-        Assert.That(actual, Is.EqualTo(reference).Within(1e-10));
-    }
-
-    [Test]
-    public void TestStarRatingProcessorV3ComputesStarRatingOnly()
-    {
-        var noteTimings = createDenseNoteTimings();
-
-        var reference = new BmsStarRatingProcessorV2().Compute(noteTimings, 8, 2).StarRating;
-        var actual = new BmsStarRatingProcessorV3().ComputeStarRating(noteTimings, 8, 2);
-
-        Assert.That(actual, Is.EqualTo(reference).Within(1e-10));
+        Assert.That(direct, Is.EqualTo(result).Within(1e-10));
     }
 
     [TestCase(BmsLayoutVariant.Bme7K, 2, 45)]
     [TestCase(BmsLayoutVariant.Bms5K, 2, 37.5)]
     [TestCase(BmsLayoutVariant.Pms9K, 2, 35)]
-    public void TestStarRatingProcessorV3HitLeniencyUsesBmsGreatWindow(BmsLayoutVariant layout, int rank, double greatWindow)
+    public void TestStarRatingProcessorHitLeniencyUsesBmsGreatWindow(BmsLayoutVariant layout, int rank, double greatWindow)
     {
         var totalColumns = BmsLayout.GetTotalColumns(layout);
         var noteTimings = createSimpleNoteTimings(totalColumns);
-        var processor = new BmsStarRatingProcessorV3();
+        var processor = new BmsStarRatingProcessor();
 
         processor.Compute(noteTimings, totalColumns, rank, 1.0, layout);
 
@@ -121,12 +80,12 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorV3HitLeniencyUsesExplicitJudgementRate()
+    public void TestStarRatingProcessorHitLeniencyUsesExplicitJudgementRate()
     {
         var layout = BmsLayoutVariant.Bme7K;
         var totalColumns = BmsLayout.GetTotalColumns(layout);
         var noteTimings = createSimpleNoteTimings(totalColumns);
-        var processor = new BmsStarRatingProcessorV3();
+        var processor = new BmsStarRatingProcessor();
         var judgementRate = BmsJudgementProfileProvider.RateForExRank(layout, 200);
 
         processor.Compute(noteTimings, totalColumns, 2, 1.0, layout, judgementRate);
@@ -135,14 +94,15 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorV3ReusesScratchAcrossDifferentChartSizes()
+    public void TestStarRatingProcessorReusesScratchAcrossDifferentChartSizes()
     {
         var denseNoteTimings = createDenseNoteTimings();
         var sparseNoteTimings = createSparseNoteTimings();
-        var processor = new BmsStarRatingProcessorV3();
+        var processor = new BmsStarRatingProcessor();
+        var freshProcessor = new BmsStarRatingProcessor();
 
-        var denseReference = new BmsStarRatingProcessorV2().Compute(denseNoteTimings, 8, 2).StarRating;
-        var sparseReference = new BmsStarRatingProcessorV2().Compute(sparseNoteTimings, 8, 2).StarRating;
+        var denseReference = freshProcessor.Compute(denseNoteTimings, 8, 2).StarRating;
+        var sparseReference = freshProcessor.Compute(sparseNoteTimings, 8, 2).StarRating;
 
         var denseActual = processor.Compute(denseNoteTimings, 8, 2).StarRating;
         var sparseActual = processor.Compute(sparseNoteTimings, 8, 2).StarRating;
@@ -155,9 +115,9 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorV3UsesArrayRangesForPreprocessedNotes()
+    public void TestStarRatingProcessorUsesArrayRangesForPreprocessedNotes()
     {
-        var processorType = typeof(BmsStarRatingProcessorV3);
+        var processorType = typeof(BmsStarRatingProcessor);
         var noteSeqField = processorType.GetField("noteSeq", BindingFlags.NonPublic | BindingFlags.Instance);
         var noteSeqByColumnField = processorType.GetField("noteSeqByColumn", BindingFlags.NonPublic | BindingFlags.Instance);
         var noteSeqByColumnStartsField = processorType.GetField("noteSeqByColumnStarts", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -197,7 +157,7 @@ public class BmsStarRatingProcessorTest
             new(1, 100, 100),
         };
 
-        var processor = new BmsStarRatingProcessorV3();
+        var processor = new BmsStarRatingProcessor();
 
         try
         {
@@ -231,9 +191,9 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorV3KeepsLnSequenceOrderForEqualTailTimes()
+    public void TestStarRatingProcessorKeepsLnSequenceOrderForEqualTailTimes()
     {
-        var processorType = typeof(BmsStarRatingProcessorV3);
+        var processorType = typeof(BmsStarRatingProcessor);
         var lnSeqField = processorType.GetField("lnSeq", BindingFlags.NonPublic | BindingFlags.Instance);
         var tailSeqField = processorType.GetField("tailSeq", BindingFlags.NonPublic | BindingFlags.Instance);
         var totalColumnsProperty = processorType.GetProperty("TotalColumns", BindingFlags.Public | BindingFlags.Instance);
@@ -257,7 +217,7 @@ public class BmsStarRatingProcessorTest
             new(1, 140, 140),
         };
 
-        var processor = new BmsStarRatingProcessorV3();
+        var processor = new BmsStarRatingProcessor();
 
         try
         {
@@ -286,11 +246,11 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorV3DoesNotKeepDiagnosticArrays()
+    public void TestStarRatingProcessorDoesNotKeepDiagnosticArrays()
     {
         var noteTimings = createDenseNoteTimings();
 
-        var result = new BmsStarRatingProcessorV3().Compute(noteTimings, 8, 2);
+        var result = new BmsStarRatingProcessor().Compute(noteTimings, 8, 2);
 
         Assert.Multiple(() =>
         {
@@ -311,10 +271,10 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorV3CornerHelpersPreserveExactSemantics()
+    public void TestStarRatingProcessorCornerHelpersPreserveExactSemantics()
     {
-        var dedupeMethod = typeof(BmsStarRatingProcessorV3).GetMethod("toDedupedFilteredArray", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(int), typeof(double)], null);
-        var mergeMethod = typeof(BmsStarRatingProcessorV3).GetMethod("mergeSortedUnique", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(double[])], null);
+        var dedupeMethod = typeof(BmsStarRatingProcessor).GetMethod("toDedupedFilteredArray", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(int), typeof(double)], null);
+        var mergeMethod = typeof(BmsStarRatingProcessor).GetMethod("mergeSortedUnique", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(double[])], null);
 
         Assert.Multiple(() =>
         {
@@ -333,9 +293,9 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorV3SortedPercentileHelperPreservesExactThresholdCrossingSemantics()
+    public void TestStarRatingProcessorSortedPercentileHelperPreservesExactThresholdCrossingSemantics()
     {
-        var helperMethod = typeof(BmsStarRatingProcessorV3).GetMethod("computePercentileSumsFromSorted", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(double[]), typeof(int), typeof(double)], null);
+        var helperMethod = typeof(BmsStarRatingProcessor).GetMethod("computePercentileSumsFromSorted", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(double[]), typeof(int), typeof(double)], null);
 
         Assert.That(helperMethod, Is.Not.Null);
 
@@ -407,9 +367,9 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorV3AnchorComputationUsesCornerMajorKeyUsageWithoutAllocations()
+    public void TestStarRatingProcessorAnchorComputationUsesCornerMajorKeyUsageWithoutAllocations()
     {
-        var processorType = typeof(BmsStarRatingProcessorV3);
+        var processorType = typeof(BmsStarRatingProcessor);
         var totalColumnsProperty = processorType.GetProperty("TotalColumns", BindingFlags.Public | BindingFlags.Instance);
         var baseCornersField = processorType.GetField("baseCorners", BindingFlags.NonPublic | BindingFlags.Instance);
         var computeAnchorMethod = processorType.GetMethod("computeAnchorInto", BindingFlags.NonPublic | BindingFlags.Instance, null, [typeof(double[]), typeof(double[])], null);
@@ -421,7 +381,7 @@ public class BmsStarRatingProcessorTest
             Assert.That(computeAnchorMethod, Is.Not.Null);
         });
 
-        var processor = new BmsStarRatingProcessorV3();
+        var processor = new BmsStarRatingProcessor();
         totalColumnsProperty!.SetValue(processor, 4);
         baseCornersField!.SetValue(processor, new[] { 0.0, 100.0, 200.0 });
 
@@ -441,7 +401,7 @@ public class BmsStarRatingProcessorTest
                 computeExpectedAnchorValue(9.0, 3.0, 1.0, 0.0),
             };
 
-        var computeAnchor = (Action<BmsStarRatingProcessorV3, double[], double[]>)computeAnchorMethod!.CreateDelegate(typeof(Action<BmsStarRatingProcessorV3, double[], double[]>));
+        var computeAnchor = (Action<BmsStarRatingProcessor, double[], double[]>)computeAnchorMethod!.CreateDelegate(typeof(Action<BmsStarRatingProcessor, double[], double[]>));
 
         computeAnchor(processor, keyUsage400, actual);
 
@@ -454,19 +414,6 @@ public class BmsStarRatingProcessorTest
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
         Assert.That(allocated, Is.EqualTo(0));
-    }
-
-    [TestCase("_sphyper.json")]
-    [TestCase("STR_debut_LN_______________________.json")]
-    public void TestStarRatingProcessorV3MatchesV2ForBenchmarkSample(string fileName)
-    {
-        var input = loadBenchmarkInput(fileName);
-        var noteTimings = toNoteTimings(input);
-
-        var reference = new BmsStarRatingProcessorV2().Compute(noteTimings, input.TotalColumns, input.Rank).StarRating;
-        var actual = new BmsStarRatingProcessorV3().Compute(noteTimings, input.TotalColumns, input.Rank).StarRating;
-
-        Assert.That(actual, Is.EqualTo(reference).Within(1e-10));
     }
 
     private static List<BmsNoteTiming> createDenseNoteTimings()
@@ -515,17 +462,6 @@ public class BmsStarRatingProcessorTest
         new BmsLongNote { Column = 2, StartTime = 360, Duration = 360 },
     ];
 
-    private static SrBenchmarkInput loadBenchmarkInput(string fileName)
-    {
-        var path = Path.GetFullPath(Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            "..", "..", "..", "benchmark_data", fileName));
-
-        var input = JsonSerializer.Deserialize<SrBenchmarkInput>(File.ReadAllText(path));
-        Assert.That(input, Is.Not.Null);
-        return input!;
-    }
-
     private static double computeExpectedAnchorValue(params double[] counts)
     {
         Array.Sort(counts);
@@ -561,20 +497,6 @@ public class BmsStarRatingProcessorTest
         return Math.Min(x, 0.6 * (x - 0.09) + 0.09);
     }
 
-    private static List<BmsNoteTiming> toNoteTimings(SrBenchmarkInput input)
-    {
-        var noteTimings = new List<BmsNoteTiming>(input.HitObjects.Count);
-        foreach (var hitObject in input.HitObjects)
-        {
-            noteTimings.Add(new BmsNoteTiming(
-                hitObject.Column,
-                hitObject.StartTime,
-                hitObject.IsLongNote ? hitObject.StartTime + hitObject.Duration : hitObject.StartTime));
-        }
-
-        return noteTimings;
-    }
-
     private static int getNoteEntryColumn(object noteEntry) => (int)noteEntry.GetType().GetProperty("Column")!.GetValue(noteEntry)!;
 
     private static double getNoteEntryHead(object noteEntry) => (double)noteEntry.GetType().GetProperty("Head")!.GetValue(noteEntry)!;
@@ -599,14 +521,4 @@ public class BmsStarRatingProcessorTest
         return false;
     }
 
-    private sealed record SrBenchmarkInput(
-        [property: JsonPropertyName("tc")] int TotalColumns,
-        [property: JsonPropertyName("rk")] int Rank,
-        [property: JsonPropertyName("ho")] List<HitObjectData> HitObjects);
-
-    private sealed record HitObjectData(
-        [property: JsonPropertyName("c")] int Column,
-        [property: JsonPropertyName("st")] double StartTime,
-        [property: JsonPropertyName("d")] double Duration,
-        [property: JsonPropertyName("ln")] bool IsLongNote);
 }

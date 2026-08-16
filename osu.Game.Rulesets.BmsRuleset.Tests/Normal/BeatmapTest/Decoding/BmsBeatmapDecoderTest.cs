@@ -323,7 +323,7 @@ public class BmsBeatmapDecoderTest
     }
 
     private static double computeStarRating(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank) =>
-        noteTimings.Count == 0 ? 0 : new BmsStarRatingProcessorV2().Compute(noteTimings, totalColumns, rank).StarRating;
+        noteTimings.Count == 0 ? 0 : new BmsStarRatingProcessor().Compute(noteTimings, totalColumns, rank).StarRating;
 
     [Test]
     public void DiagnoseLnAutoplayTimingForCautionChart()
