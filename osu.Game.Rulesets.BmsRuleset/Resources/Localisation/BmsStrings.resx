@@ -265,4 +265,22 @@
   <data name="score_graph_show_score_difference_description" xml:space="preserve"><value>Shows current, personal-best and target EX scores and their differences.</value></data>
   <data name="score_graph_show_judgement_comparison" xml:space="preserve"><value>Show judgement comparison</value></data>
   <data name="score_graph_show_judgement_comparison_description" xml:space="preserve"><value>Shows current and personal-best judgement counts.</value></data>
+  <data name="courses" xml:space="preserve"><value>Courses</value></data>
+  <data name="song_select" xml:space="preserve"><value>Song Select</value></data>
+  <data name="course_search_placeholder" xml:space="preserve"><value>Search courses, tables or songs</value></data>
+  <data name="course_details" xml:space="preserve"><value>Details</value></data>
+  <data name="course_title_summary" xml:space="preserve"><value>{0} stages · {1}</value></data>
+  <data name="no_courses_available" xml:space="preserve"><value>No courses are available.</value></data>
+  <data name="no_courses_match_search" xml:space="preserve"><value>No courses match this search.</value></data>
+  <data name="select_course_for_details" xml:space="preserve"><value>Select a course to view its details.</value></data>
+  <data name="course_rules" xml:space="preserve"><value>Rules</value></data>
+  <data name="course_gauge" xml:space="preserve"><value>Gauge: {0}</value></data>
+  <data name="course_constraints" xml:space="preserve"><value>Constraints: {0}</value></data>
+  <data name="course_constraints_none" xml:space="preserve"><value>No additional constraints</value></data>
+  <data name="course_stage_count" xml:space="preserve"><value>{0} stages</value></data>
+  <data name="course_missing_stage_count" xml:space="preserve"><value>{0} missing</value></data>
+  <data name="course_history" xml:space="preserve"><value>History</value></data>
+  <data name="no_course_history" xml:space="preserve"><value>No plays yet</value></data>
+  <data name="course_stage_missing" xml:space="preserve"><value>Missing</value></data>
+  <data name="course_stage_number" xml:space="preserve"><value>#{0}</value></data>
 </root>

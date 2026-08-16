@@ -245,6 +245,12 @@ public class BmsRulesetTest
     }
 
     [Test]
+    public void TestInitialisationInstallsCourseSongSelectPatch()
+    {
+        Assert.That(BmsCourseSongSelectPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
     public void TestEditorDisablePatchPostsNotification()
     {
         var dependencies = new DependencyContainer();

@@ -1,5 +1,6 @@
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.SongSelect;
 
 namespace osu.Game.Rulesets.BmsRuleset;
 
@@ -8,6 +9,8 @@ internal static class BmsRulesetRuntime
     internal static BmsRulesetConfigManager? ConfigManager { get; set; }
 
     internal static DifficultyTableStore? DifficultyTableStore { get; set; }
+
+    internal static BmsCourseCatalog CourseCatalog { get; } = new();
 
     internal static BmsVisualOffsetSuggestionStore VisualOffsetSuggestions { get; } = new();
 

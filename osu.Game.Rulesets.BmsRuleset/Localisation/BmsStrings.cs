@@ -256,6 +256,42 @@ public static class BmsStrings
 
     public static LocalisableString History => get("history");
 
+    public static LocalisableString Courses => get("courses");
+
+    public static LocalisableString SongSelect => get("song_select");
+
+    public static LocalisableString CourseSearchPlaceholder => get("course_search_placeholder");
+
+    public static LocalisableString CourseDetails => get("course_details");
+
+    public static LocalisableString CourseTitleSummary(int count, string gauge) => get("course_title_summary", count, gauge);
+
+    public static LocalisableString NoCoursesAvailable => get("no_courses_available");
+
+    public static LocalisableString NoCoursesMatchSearch => get("no_courses_match_search");
+
+    public static LocalisableString SelectCourseForDetails => get("select_course_for_details");
+
+    public static LocalisableString CourseRules => get("course_rules");
+
+    public static LocalisableString CourseGauge(string gauge) => get("course_gauge", gauge);
+
+    public static LocalisableString CourseConstraints(string constraints) => get("course_constraints", constraints);
+
+    public static LocalisableString CourseConstraintsNone => get("course_constraints_none");
+
+    public static LocalisableString CourseStageCount(int count) => get("course_stage_count", count);
+
+    public static LocalisableString CourseMissingStageCount(int count) => get("course_missing_stage_count", count);
+
+    public static LocalisableString CourseHistory => get("course_history");
+
+    public static LocalisableString NoCourseHistory => get("no_course_history");
+
+    public static LocalisableString CourseStageMissing => get("course_stage_missing");
+
+    public static LocalisableString CourseStageNumber(int number) => get("course_stage_number", number);
+
     public static LocalisableString Subdivide => get("subdivide");
 
     public static LocalisableString Unsubdivide => get("unsubdivide");
