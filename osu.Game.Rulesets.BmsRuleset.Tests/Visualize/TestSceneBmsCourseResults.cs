@@ -299,11 +299,11 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
             BmsGaugeType.Class);
 
         session.BeginCurrentStage();
-        session.CompleteCurrentStage(createScore(beatmaps[0], true, 765432, 0.91), 0.72);
+        session.CompleteCurrentStage(createScore(beatmaps[0], true, 765432, 0.91), [new(BmsGaugeType.Class, 0.72, false)]);
         session.RequestAdvance();
         session.Advance();
         session.BeginCurrentStage();
-        session.AbortCurrentStage(createScore(beatmaps[1], false, 321000, 0.63), 0.28);
+        session.AbortCurrentStage(createScore(beatmaps[1], false, 321000, 0.63), [new(BmsGaugeType.Class, 0.28, false)]);
 
         return session;
     }

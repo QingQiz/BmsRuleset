@@ -37,7 +37,9 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     public BmsGaugeProfile GaugeProfile { get; private set; } = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
 
-    public double CourseHealth => Health.Value;
+    public IReadOnlyList<BmsGaugeStateSnapshot> CurrentGaugeStates => gaugeStates
+        .Select(state => new BmsGaugeStateSnapshot(state.GaugeType, state.CurrentHp, state.IsHpFailed))
+        .ToArray();
 
     private readonly List<GaugeState> gaugeStates = [];
     private readonly List<BmsGaugeHistoryEvent> gaugeHistory = [];
@@ -48,12 +50,19 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     private IBeatmap? beatmap;
     private bool initialized;
-    private double? restoredCourseHealth;
+    private BmsGaugeProfileFamily layoutProfileFamily = BmsGaugeProfileFamily.SevenKeys;
+    private BmsGaugeProfileFamily? profileFamilyOverride;
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
         base.ApplyBeatmap(beatmap);
         this.beatmap = beatmap;
+
+        if (beatmap is BmsBeatmap bmsBeatmap)
+        {
+            layoutProfileFamily = BmsGaugeProfileFamilyProvider.FromLayout(bmsBeatmap.LayoutVariant);
+            refreshGaugeProfiles();
+        }
     }
 
     /// <summary>
@@ -119,7 +128,7 @@ public partial class BmsHealthProcessor : HealthProcessor
         recordGaugeHistory(eventTime ?? currentTime);
     }
 
-    public void SetGaugeType(BmsGaugeType gaugeType)
+    public void SetGaugeType(BmsGaugeType gaugeType, BmsGaugeProfileFamily? profileFamilyOverride = null)
     {
         // In multi-gauge (auto-gauge) mode, a duplicate type means replay dedup — skip.
         if (gaugeStates.Count > 1 && gaugeStates.Any(s => s.GaugeType == gaugeType))
@@ -128,15 +137,21 @@ public partial class BmsHealthProcessor : HealthProcessor
         // Single-gauge mode: replace the entire chain so that switching from
         // Hard back to Normal (and similar transitions) works correctly.
         gaugeStates.Clear();
-        SetGaugeTypes([gaugeType]);
+        SetGaugeTypes([gaugeType], profileFamilyOverride: profileFamilyOverride);
     }
 
     /// <summary>
     /// Sets multiple gauge types to track in parallel, sorted by difficulty descending.
     /// Types already present in the chain are skipped (dedup).
     /// </summary>
-    public void SetGaugeTypes(IEnumerable<BmsGaugeType> types)
+    public void SetGaugeTypes(IEnumerable<BmsGaugeType> types, bool replaceExisting = false, BmsGaugeProfileFamily? profileFamilyOverride = null)
     {
+        if (replaceExisting)
+            gaugeStates.Clear();
+
+        if (replaceExisting || gaugeStates.Count == 0)
+            this.profileFamilyOverride = profileFamilyOverride;
+
         var unique = new HashSet<BmsGaugeType>();
         var newStates = new List<GaugeState>();
 
@@ -149,7 +164,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             if (gaugeStates.Any(s => s.GaugeType == type))
                 continue;
 
-            var profile = BmsGaugeProfileFactory.Create(type);
+            var profile = BmsGaugeProfileFactory.Create(type, effectiveProfileFamily);
             newStates.Add(new GaugeState
             {
                 GaugeType = type,
@@ -176,34 +191,24 @@ public partial class BmsHealthProcessor : HealthProcessor
 
         initialized = false;
 
-        // Gauge mods are applied after the player has been loaded. Re-apply a
-        // course's carried health when a mod rebuilds the gauge chain.
-        restoreCourseHealth();
     }
 
-    public void RestoreCourseHealth(double health)
+    public void RestoreGaugeStates(IReadOnlyList<BmsGaugeStateSnapshot> states)
     {
-        restoredCourseHealth = Math.Clamp(health, 0, 1);
-        restoreCourseHealth();
-    }
-
-    private void restoreCourseHealth()
-    {
-        if (!restoredCourseHealth.HasValue)
-            return;
-
         ensureInitialized();
-
-        var restoredHealth = Math.Clamp(restoredCourseHealth.Value, 0, GaugeProfile.MaxHealth);
 
         foreach (var state in gaugeStates)
         {
-            state.CurrentHp = Math.Min(restoredHealth, state.Profile.MaxHealth);
-            state.IsHpFailed = state.CurrentHp <= 0;
+            var restored = states.FirstOrDefault(snapshot => snapshot.GaugeType == state.GaugeType);
+            if (restored is null)
+                continue;
+
+            state.CurrentHp = Math.Clamp(restored.Health, 0, state.Profile.MaxHealth);
+            state.IsHpFailed = restored.Failed || state.CurrentHp <= 0;
         }
 
         activeGaugeIndex = 0;
-        HasEverFailed = restoredHealth <= 0;
+        HasEverFailed = false;
         resolveActiveState();
     }
 
@@ -369,12 +374,33 @@ public partial class BmsHealthProcessor : HealthProcessor
             total = bmsBeatmap.Total;
 
         if (total <= 0)
-            total = BmsGaugeCalculator.CalculateDefaultTotal(noteCount);
+            total = BmsGaugeCalculator.CalculateDefaultTotal(noteCount, effectiveProfileFamily);
 
         foreach (var state in gaugeStates)
         {
-            state.Calculator = new BmsGaugeCalculator(state.Profile, total, noteCount);
+            state.Calculator = new BmsGaugeCalculator(state.Profile, total, noteCount, effectiveProfileFamily);
         }
+    }
+
+    private BmsGaugeProfileFamily effectiveProfileFamily => profileFamilyOverride ?? layoutProfileFamily;
+
+    private void refreshGaugeProfiles()
+    {
+        if (gaugeStates.Count == 0)
+            return;
+
+        foreach (var state in gaugeStates)
+        {
+            state.Profile = BmsGaugeProfileFactory.Create(state.GaugeType, effectiveProfileFamily);
+            state.Calculator = null;
+            state.CurrentHp = state.Profile.InitialHealth;
+            state.IsHpFailed = false;
+        }
+
+        activeGaugeIndex = 0;
+        endResultIndex = 0;
+        initialized = false;
+        resolveActiveState();
     }
 
     private void resolveActiveState()

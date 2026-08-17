@@ -270,12 +270,11 @@
   <data name="course_search_placeholder" xml:space="preserve"><value>搜索段位、难度表或曲目</value></data>
   <data name="course_table_group" xml:space="preserve"><value>{0} ({1})</value></data>
   <data name="course_details" xml:space="preserve"><value>详情</value></data>
-  <data name="course_title_summary" xml:space="preserve"><value>{0} 首 · {1}</value></data>
+  <data name="course_title_summary" xml:space="preserve"><value>{0} 首</value></data>
   <data name="no_courses_available" xml:space="preserve"><value>暂无可用段位。</value></data>
   <data name="no_courses_match_search" xml:space="preserve"><value>没有符合搜索条件的段位。</value></data>
   <data name="select_course_for_details" xml:space="preserve"><value>选择段位以查看详情。</value></data>
   <data name="course_rules" xml:space="preserve"><value>规则</value></data>
-  <data name="course_gauge" xml:space="preserve"><value>血条：{0}</value></data>
   <data name="course_constraints" xml:space="preserve"><value>限制：{0}</value></data>
   <data name="course_constraints_none" xml:space="preserve"><value>无额外限制</value></data>
   <data name="course_history" xml:space="preserve"><value>历史成绩</value></data>

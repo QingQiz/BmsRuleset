@@ -266,7 +266,7 @@ public static class BmsStrings
 
     public static LocalisableString CourseDetails => get("course_details");
 
-    public static LocalisableString CourseTitleSummary(int count, string gauge) => get("course_title_summary", count, gauge);
+    public static LocalisableString CourseTitleSummary(int count) => get("course_title_summary", count);
 
     public static LocalisableString NoCoursesAvailable => get("no_courses_available");
 
@@ -275,8 +275,6 @@ public static class BmsStrings
     public static LocalisableString SelectCourseForDetails => get("select_course_for_details");
 
     public static LocalisableString CourseRules => get("course_rules");
-
-    public static LocalisableString CourseGauge(string gauge) => get("course_gauge", gauge);
 
     public static LocalisableString CourseConstraints(string constraints) => get("course_constraints", constraints);
 

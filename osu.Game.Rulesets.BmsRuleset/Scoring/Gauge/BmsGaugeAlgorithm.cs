@@ -4,5 +4,6 @@ public enum BmsGaugeAlgorithm
 {
     Total,
     LimitIncrement,
+    ModifyDamage,
     Fixed,
 }

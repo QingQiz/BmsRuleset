@@ -274,8 +274,8 @@ come from the selected gauge rules: the red zone ends at 20%, Assist Easy clears
 - **Groove high health colour** is used at or above the clear threshold.
 - **Hard**, **ExHard**, and **Hazard gauge fill colour** each set the single fill colour used by that survival gauge.
 
-The Class gauge variants use their own fixed profile colours. Resizing the component changes the gauge's visible width
-and height only; it does not change health values, thresholds, or gauge behaviour.
+Class, ExClass, and ExHard Class use the Hard, ExHard, and Hazard fill colours respectively. Resizing the component
+changes the gauge's visible width and height only; it does not change health values, thresholds, or gauge behaviour.
 
 ### Song Progress
 

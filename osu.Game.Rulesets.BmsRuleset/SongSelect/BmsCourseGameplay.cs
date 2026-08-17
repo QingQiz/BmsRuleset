@@ -105,15 +105,17 @@ internal partial class BmsCoursePlayer : SoloPlayer
     protected override void StartGameplay()
     {
         if (GameplayState.HealthProcessor is Scoring.BmsHealthProcessor healthProcessor)
-            healthProcessor.RestoreCourseHealth(session.CurrentHealth);
+        {
+            healthProcessor.SetGaugeTypes(session.GaugeTypes, replaceExisting: true, profileFamilyOverride: session.GaugeProfileFamilyOverride);
+            healthProcessor.RestoreGaugeStates(session.CurrentGaugeStates);
+        }
 
         base.StartGameplay();
     }
 
     protected override ResultsScreen CreateResults(ScoreInfo score)
     {
-        var endingHealth = (GameplayState.HealthProcessor as Scoring.BmsHealthProcessor)?.CourseHealth ?? 0;
-        session.CompleteCurrentStage(score, endingHealth);
+        session.CompleteCurrentStage(score, currentGaugeStates);
 
         if (session.Status == BmsCourseStatus.InProgress)
         {
@@ -136,8 +138,8 @@ internal partial class BmsCoursePlayer : SoloPlayer
             ScoreProcessor.PopulateScore(score.ScoreInfo);
             score.ScoreInfo.Date = DateTimeOffset.Now;
             DrawableRuleset.SetRecordTarget(null);
+            var gaugeStates = currentGaugeStates;
 
-            var endingHealth = (GameplayState.HealthProcessor as Scoring.BmsHealthProcessor)?.CourseHealth ?? 0;
             try
             {
                 await ImportScore(score).ConfigureAwait(false);
@@ -146,7 +148,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
             {
                 Scheduler.Add(() =>
                 {
-                    session.FailCurrentStage(score.ScoreInfo, endingHealth);
+                    session.FailCurrentStage(score.ScoreInfo, gaugeStates);
                     Schedule(this.Exit);
                 });
             }
@@ -164,10 +166,12 @@ internal partial class BmsCoursePlayer : SoloPlayer
             ScoreProcessor.PopulateScore(Score.ScoreInfo);
             ScoreProcessor.FailScore(Score.ScoreInfo);
             Score.ScoreInfo.Date = DateTimeOffset.Now;
-            var endingHealth = (GameplayState.HealthProcessor as Scoring.BmsHealthProcessor)?.CourseHealth ?? 0;
-            session.AbortCurrentStage(Score.ScoreInfo, endingHealth);
+            session.AbortCurrentStage(Score.ScoreInfo, currentGaugeStates);
         }
 
         return base.OnExiting(e);
     }
+
+    private IReadOnlyList<Scoring.Gauge.BmsGaugeStateSnapshot> currentGaugeStates =>
+        ((Scoring.BmsHealthProcessor)GameplayState.HealthProcessor).CurrentGaugeStates;
 }

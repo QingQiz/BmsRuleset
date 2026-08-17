@@ -257,8 +257,8 @@ public partial class BmsRuleset : Ruleset
 
         yield return new RulesetBeatmapAttribute("TOTAL", "TL", (float)original.Total, (float)adjusted.Total, 300)
         {
-            Description = createTotalDescription(beatmapInfo, adjusted, mods),
-            AdditionalMetrics = createTotalMetrics(beatmapInfo, adjusted, mods),
+            Description = createTotalDescription(beatmapInfo, adjusted, mods, layout),
+            AdditionalMetrics = createTotalMetrics(beatmapInfo, adjusted, mods, layout),
         };
     }
 
@@ -288,12 +288,16 @@ public partial class BmsRuleset : Ruleset
 
     public override Drawable CreateIcon() => new BmsRulesetIcon();
 
-    private static LocalisableString createTotalDescription(IBeatmapInfo beatmapInfo, BmsDifficultyInfo difficulty, IReadOnlyCollection<Mod> mods)
+    private static LocalisableString createTotalDescription(
+        IBeatmapInfo beatmapInfo,
+        BmsDifficultyInfo difficulty,
+        IReadOnlyCollection<Mod> mods,
+        BmsLayoutVariant layout)
     {
         var gaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
-        var profile = BmsGaugeProfileFactory.Create(gaugeType);
+        var profile = BmsGaugeProfileFactory.Create(gaugeType, BmsGaugeProfileFamilyProvider.FromLayout(layout));
         var noteCount = Math.Max(1, beatmapInfo.TotalObjectCount);
-        var calculator = new BmsGaugeCalculator(profile, difficulty.Total, noteCount);
+        var calculator = new BmsGaugeCalculator(profile, difficulty.Total, noteCount, BmsGaugeProfileFamilyProvider.FromLayout(layout));
 
         var gaugeName = formatGaugeName(gaugeType);
         var total = formatTotal(difficulty, calculator);
@@ -376,12 +380,16 @@ public partial class BmsRuleset : Ruleset
         }
     }
 
-    private static RulesetBeatmapAttribute.AdditionalMetric[] createTotalMetrics(IBeatmapInfo beatmapInfo, BmsDifficultyInfo difficulty, IReadOnlyCollection<Mod> mods)
+    private static RulesetBeatmapAttribute.AdditionalMetric[] createTotalMetrics(
+        IBeatmapInfo beatmapInfo,
+        BmsDifficultyInfo difficulty,
+        IReadOnlyCollection<Mod> mods,
+        BmsLayoutVariant layout)
     {
         var gaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
-        var profile = BmsGaugeProfileFactory.Create(gaugeType);
+        var profile = BmsGaugeProfileFactory.Create(gaugeType, BmsGaugeProfileFamilyProvider.FromLayout(layout));
         var noteCount = Math.Max(1, beatmapInfo.TotalObjectCount);
-        var calculator = new BmsGaugeCalculator(profile, difficulty.Total, noteCount);
+        var calculator = new BmsGaugeCalculator(profile, difficulty.Total, noteCount, BmsGaugeProfileFamilyProvider.FromLayout(layout));
         var referenceHealth = profile.InitialHealth;
 
         return

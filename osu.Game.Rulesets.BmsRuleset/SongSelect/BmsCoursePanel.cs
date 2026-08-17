@@ -12,7 +12,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
-using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
 using osuTK;
@@ -42,7 +41,6 @@ internal partial class BmsCoursePanel : Panel
     internal BmsCourseCarousel? CourseCarousel { private get; set; }
 
     private OsuSpriteText titleText = null!;
-    private OsuSpriteText gaugeText = null!;
     private UpdateableRank courseRank = null!;
     private BmsLampDisplay courseLamp = null!;
     private SpriteIcon courseIcon = null!;
@@ -122,12 +120,6 @@ internal partial class BmsCoursePanel : Panel
                                     RelativeSizeAxes = Axes.X,
                                     Font = OsuFont.Style.Heading2.With(typeface: Typeface.Torus, weight: FontWeight.Bold, italics: false),
                                 },
-                                gaugeText = new OsuSpriteText
-                                {
-                                    RelativeSizeAxes = Axes.X,
-                                    Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold, italics: false),
-                                    Colour = colourProvider.Content2,
-                                },
                             ],
                         },
                     },
@@ -159,7 +151,6 @@ internal partial class BmsCoursePanel : Panel
         currentCourse = course;
 
         titleText.Text = course.Name;
-        gaugeText.Text = BmsStrings.CourseGauge(course.Gauge);
         updateAvailability(course);
         updateResult();
         updateLeafPanelOffset(false);

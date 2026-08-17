@@ -80,8 +80,12 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
 
     internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap)
     {
+        var profileFamily = playableBeatmap is BmsBeatmap bmsBeatmap
+            ? BmsGaugeProfileFamilyProvider.FromLayout(bmsBeatmap.LayoutVariant)
+            : BmsGaugeProfileFamily.SevenKeys;
+
         if (BmsScoreGaugeHistoryStore.TryGet(score, out var gaugeHistory) && gaugeHistory.Count > 0)
-            return createSeries(score, gaugeHistory, graphDuration(playableBeatmap, gaugeHistory.Max(e => e.Time)));
+            return createSeries(score, gaugeHistory, graphDuration(playableBeatmap, gaugeHistory.Max(e => e.Time)), profileFamily);
 
         var hitEvents = (BmsJudgementEventStore.TryGet(score, out var judgementEvents)
                 ? BmsJudgementEventProjection.CreateScoringHitEvents(judgementEvents)
@@ -95,13 +99,13 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         if (noteCount == 0)
             noteCount = 1;
 
-        var total = playableBeatmap is BmsBeatmap bmsBeatmap ? bmsBeatmap.Total : 0;
+        var total = playableBeatmap is BmsBeatmap bms ? bms.Total : 0;
         var duration = graphDuration(playableBeatmap, hitEvents.Max(e => e.HitObject.GetEndTime()));
 
         var gaugeTypes = gaugeTypesFor(score.Mods).ToArray();
         var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes);
 
-        return gaugeTypes.Select(type => createSeries(type, hitEvents, total, noteCount, duration, type == finalGaugeType)).ToArray();
+        return gaugeTypes.Select(type => createSeries(type, hitEvents, total, noteCount, duration, type == finalGaugeType, profileFamily)).ToArray();
     }
 
     private static IReadOnlyList<GaugeSeries> createCourseSeries(IReadOnlyList<(ScoreInfo Score, IBeatmap Beatmap)> stages)
@@ -139,7 +143,11 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         }).ToArray();
     }
 
-    private static IReadOnlyList<GaugeSeries> createSeries(ScoreInfo score, IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory, double duration)
+    private static IReadOnlyList<GaugeSeries> createSeries(
+        ScoreInfo score,
+        IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory,
+        double duration,
+        BmsGaugeProfileFamily profileFamily)
     {
         var ordered = gaugeHistory.ToArray();
 
@@ -150,7 +158,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             .ToArray();
 
         var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes) ?? ordered[^1].ActiveGaugeType;
-        return gaugeTypes.Select(type => createSeries(type, ordered, duration, type == finalGaugeType)).ToArray();
+        return gaugeTypes.Select(type => createSeries(type, ordered, duration, type == finalGaugeType, profileFamily)).ToArray();
     }
 
     private static double graphDuration(IBeatmap playableBeatmap, double lastEventTime)
@@ -167,9 +175,14 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
     private static float monotonicGraphTime(double eventTime, double duration, float previousTime)
         => Math.Max(previousTime, (float)Math.Clamp(eventTime / duration, 0, 1));
 
-    private static GaugeSeries createSeries(BmsGaugeType type, IReadOnlyList<BmsGaugeHistoryEvent> history, double duration, bool isFinalUsedGauge)
+    private static GaugeSeries createSeries(
+        BmsGaugeType type,
+        IReadOnlyList<BmsGaugeHistoryEvent> history,
+        double duration,
+        bool isFinalUsedGauge,
+        BmsGaugeProfileFamily profileFamily)
     {
-        var profile = BmsGaugeProfileFactory.Create(type);
+        var profile = BmsGaugeProfileFactory.Create(type, profileFamily);
         var health = profile.InitialHealth;
         GaugePoint? failurePoint = null;
         var points = new List<GaugePoint>
@@ -355,10 +368,17 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         ],
     };
 
-    private static GaugeSeries createSeries(BmsGaugeType type, IReadOnlyList<HitEvent> hitEvents, double total, int noteCount, double duration, bool isFinalUsedGauge)
+    private static GaugeSeries createSeries(
+        BmsGaugeType type,
+        IReadOnlyList<HitEvent> hitEvents,
+        double total,
+        int noteCount,
+        double duration,
+        bool isFinalUsedGauge,
+        BmsGaugeProfileFamily profileFamily)
     {
-        var profile = BmsGaugeProfileFactory.Create(type);
-        var calculator = new BmsGaugeCalculator(profile, total, noteCount);
+        var profile = BmsGaugeProfileFactory.Create(type, profileFamily);
+        var calculator = new BmsGaugeCalculator(profile, total, noteCount, profileFamily);
         var health = profile.InitialHealth;
         var failed = false;
         GaugePoint? failurePoint = null;

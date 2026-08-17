@@ -166,9 +166,9 @@ public sealed partial class BmsHealthDisplay : BmsHudComponent
 
         return bmsHealthProcessor.GaugeType switch
         {
-            BmsGaugeType.Hard => HardFillColour.Value,
-            BmsGaugeType.ExHard => ExHardFillColour.Value,
-            BmsGaugeType.Hazard => HazardFillColour.Value,
+            BmsGaugeType.Hard or BmsGaugeType.Class => HardFillColour.Value,
+            BmsGaugeType.ExHard or BmsGaugeType.ExClass => ExHardFillColour.Value,
+            BmsGaugeType.Hazard or BmsGaugeType.ExHardClass => HazardFillColour.Value,
             _ => profile.FillColour,
         };
     }

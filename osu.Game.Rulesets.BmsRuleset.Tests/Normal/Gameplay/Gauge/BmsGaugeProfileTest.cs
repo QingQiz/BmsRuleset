@@ -1,4 +1,7 @@
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osuTK.Graphics;
 
@@ -42,19 +45,26 @@ public class BmsGaugeProfileTest
     }
 
     [Test]
-    public void TestCourseProfilesUseHardGaugeDisplay()
+    public void TestCourseProfilesUseTieredGaugeDisplay()
     {
         var hardColour = BmsGaugeProfileFactory.Create(BmsGaugeType.Hard).Display.FillColour;
+        var exHardColour = BmsGaugeProfileFactory.Create(BmsGaugeType.ExHard).Display.FillColour;
+        var hazardColour = BmsGaugeProfileFactory.Create(BmsGaugeType.Hazard).Display.FillColour;
 
-        BmsGaugeType[] courseGaugeTypes = [BmsGaugeType.Class, BmsGaugeType.ExClass, BmsGaugeType.ExHardClass];
+        var expectedColours = new Dictionary<BmsGaugeType, Color4>
+        {
+            [BmsGaugeType.Class] = hardColour,
+            [BmsGaugeType.ExClass] = exHardColour,
+            [BmsGaugeType.ExHardClass] = hazardColour,
+        };
 
-        foreach (var type in courseGaugeTypes)
+        foreach (var (type, expectedColour) in expectedColours)
         {
             var profile = BmsGaugeProfileFactory.Create(type);
 
             Assert.That(profile.Algorithm, Is.EqualTo(BmsGaugeAlgorithm.Fixed));
             Assert.That(profile.Display.ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
-            Assert.That(profile.Display.FillColour, Is.EqualTo(hardColour));
+            Assert.That(profile.Display.FillColour, Is.EqualTo(expectedColour));
             Assert.That(profile.Display.ShowClearLine, Is.False);
         }
     }
@@ -68,5 +78,29 @@ public class BmsGaugeProfileTest
         Assert.That(display.FillColour, Is.EqualTo(new Color4(255, 215, 0, 255)));
         Assert.That(display.ClearThreshold, Is.Null);
         Assert.That(display.ShowClearLine, Is.False);
+    }
+
+    [Test]
+    public void TestCourseGaugeFamiliesUseBeatorajaClassValues()
+    {
+        var fiveKeyClass = BmsGaugeProfileFactory.Create(BmsGaugeType.Class, BmsGaugeProfileFamily.FiveKeys);
+        var lr2ExClass = BmsGaugeProfileFactory.Create(BmsGaugeType.ExClass, BmsGaugeProfileFamily.Lr2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fiveKeyClass.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
+            Assert.That(fiveKeyClass.BadDelta, Is.EqualTo(-0.005).Within(0.000001));
+            Assert.That(lr2ExClass.PerfectGain, Is.EqualTo(0.001).Within(0.000001));
+            Assert.That(lr2ExClass.PoorDelta, Is.EqualTo(-0.10).Within(0.000001));
+            Assert.That(lr2ExClass.GutsRules.Single().HealthThreshold, Is.EqualTo(0.30).Within(0.000001));
+        });
+    }
+
+    [TestCase(BmsLayoutVariant.Bms5K, BmsGaugeProfileFamily.FiveKeys)]
+    [TestCase(BmsLayoutVariant.Bme7K, BmsGaugeProfileFamily.SevenKeys)]
+    [TestCase(BmsLayoutVariant.Pms9K, BmsGaugeProfileFamily.Pms)]
+    public void TestLayoutSelectsGaugeProfileFamily(BmsLayoutVariant layout, BmsGaugeProfileFamily expected)
+    {
+        Assert.That(BmsGaugeProfileFamilyProvider.FromLayout(layout), Is.EqualTo(expected));
     }
 }

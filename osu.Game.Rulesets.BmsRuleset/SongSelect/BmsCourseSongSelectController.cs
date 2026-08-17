@@ -173,11 +173,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         if (!IsCourseMode || course == null || !songSelect.IsCurrentScreen())
             return false;
 
-        if (!BmsCourseSession.TryParseGauge(course.Gauge, out var gaugeType))
-        {
-            notifications?.Post(new SimpleNotification { Text = BmsStrings.CourseUnknownGauge(course.Gauge) });
-            return false;
-        }
+        var gaugeType = BmsCourseSession.ResolveCourseGaugeType(songSelect.Mods.Value);
 
         var resolvedStages = course.Stages.Select(resolveStage).ToArray();
 

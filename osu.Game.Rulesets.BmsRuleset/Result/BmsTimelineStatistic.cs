@@ -216,10 +216,13 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         if (scoringHitEvents.Count == 0) return null;
 
         var gaugeType = score.Mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType ?? BmsGaugeType.Normal;
-        var profile = BmsGaugeProfileFactory.Create(gaugeType);
+        var profileFamily = playableBeatmap is BmsBeatmap bmsBeatmap
+            ? BmsGaugeProfileFamilyProvider.FromLayout(bmsBeatmap.LayoutVariant)
+            : BmsGaugeProfileFamily.SevenKeys;
+        var profile = BmsGaugeProfileFactory.Create(gaugeType, profileFamily);
         var noteCount = Math.Max(1, playableBeatmap.HitObjects.Count(h => h is not BmsLandmine));
         var total = playableBeatmap is BmsBeatmap bms ? bms.Total : 0;
-        var calculator = new BmsGaugeCalculator(profile, total, noteCount);
+        var calculator = new BmsGaugeCalculator(profile, total, noteCount, profileFamily);
 
         var health = profile.InitialHealth;
 

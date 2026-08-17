@@ -27,7 +27,6 @@ using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
-using osu.Game.Rulesets;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.Mods;
@@ -210,7 +209,7 @@ internal partial class BmsCourseTitleWedge : VisibilityContainer
         titleText.Text = course?.Name ?? BmsStrings.Courses;
         summaryText.Text = course == null
             ? BmsStrings.SelectCourseForDetails
-            : BmsStrings.CourseTitleSummary(course.Stages.Count, course.Gauge);
+            : BmsStrings.CourseTitleSummary(course.Stages.Count);
     }
 
     private static Drawable unShear(Drawable drawable)
@@ -604,11 +603,11 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
         }
 
         var scores = resultStore.GetHistory(course.Id)
-                                .Where(result => result.Attempt != null)
-                                .Select(result => (Result: result, Session: createHistorySession(course, result.Attempt)))
-                                .Where(entry => entry.Session != null)
-                                .Select(entry => (entry.Result, Session: entry.Session!, Score: BmsCourseResultPresentation.CreateAggregateScore(entry.Session!)))
-                                .ToArray();
+            .Where(result => result.Attempt != null)
+            .Select(result => (Result: result, Session: createHistorySession(course, result.Attempt)))
+            .Where(entry => entry.Session != null)
+            .Select(entry => (entry.Result, Session: entry.Session!, Score: BmsCourseResultPresentation.CreateAggregateScore(entry.Session!)))
+            .ToArray();
 
         if (scores.Length == 0)
         {
@@ -663,7 +662,7 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
         var resolvedStages = new BmsResolvedCourseStage[attempt.Stages.Length];
         var restoredStages = new BmsRestoredCourseStage[attempt.Stages.Length];
 
-        for (int i = 0; i < attempt.Stages.Length; i++)
+        for (var i = 0; i < attempt.Stages.Length; i++)
         {
             var beatmap = BmsCourseStagePanel.QueryBeatmap(beatmaps, attempt.Stages[i].BeatmapHash);
             if (beatmap == null)

@@ -9,6 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Health;
 
@@ -17,17 +18,16 @@ public class BmsHealthProcessorTest
 {
 
     [Test]
-    public void TestCourseHealthCanBeRestored()
+    public void TestSingleGaugeStateCanBeRestored()
     {
         var processor = new BmsHealthProcessor();
         processor.SetGaugeType(BmsGaugeType.Class);
         processor.ApplyBeatmap(new BmsBeatmap());
 
-        processor.RestoreCourseHealth(0.42);
+        processor.RestoreGaugeStates([new(BmsGaugeType.Class, 0.42, false)]);
 
         Assert.Multiple(() =>
         {
-            Assert.That(processor.CourseHealth, Is.EqualTo(0.42));
             Assert.That(processor.Health.Value, Is.EqualTo(0.42));
             Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.Class));
             Assert.That(processor.HasEverFailed, Is.False);
@@ -35,27 +35,30 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
-    public void TestCourseHealthRestoreClampsToGaugeRange()
+    public void TestGaugeStateRestoreClampsToGaugeRange()
     {
         var processor = new BmsHealthProcessor();
         processor.SetGaugeType(BmsGaugeType.Class);
         processor.ApplyBeatmap(new BmsBeatmap());
 
-        processor.RestoreCourseHealth(2);
+        processor.RestoreGaugeStates([new(BmsGaugeType.Class, 2, false)]);
 
-        Assert.That(processor.CourseHealth, Is.EqualTo(1));
+        Assert.That(processor.Health.Value, Is.EqualTo(1));
     }
 
     [Test]
-    public void TestCourseHealthSurvivesGaugeModApplicationAfterRestore()
+    public void TestSingleGaugeUsesStateList()
     {
         var processor = new BmsHealthProcessor();
+        processor.SetGaugeTypes([BmsGaugeType.Class], replaceExisting: true);
         processor.ApplyBeatmap(new BmsBeatmap());
+        processor.RestoreGaugeStates([new(BmsGaugeType.Class, 0.42, false)]);
 
-        processor.RestoreCourseHealth(0.42);
-        processor.SetGaugeType(BmsGaugeType.Class);
-
-        Assert.That(processor.CourseHealth, Is.EqualTo(0.42));
+        Assert.Multiple(() =>
+        {
+            Assert.That(processor.Health.Value, Is.EqualTo(0.42));
+            Assert.That(processor.CurrentGaugeStates, Has.Count.EqualTo(1));
+        });
     }
 
     [Test]
@@ -641,5 +644,81 @@ public class BmsHealthProcessorTest
         Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.Hard));
         Assert.That(processor.Health.Value, Is.EqualTo(1).Within(0.001));
         Assert.That(processor.DisplayProfile.Value.ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
+    }
+
+    [Test]
+    public void TestCourseAutoGaugeStartsAtExHardClass()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeTypes([BmsGaugeType.Hazard, BmsGaugeType.Hard]);
+        processor.SetGaugeTypes(
+            [BmsGaugeType.ExHardClass, BmsGaugeType.ExClass, BmsGaugeType.Class],
+            replaceExisting: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExHardClass));
+            Assert.That(processor.DisplayProfile.Value.FillColour, Is.EqualTo(new Color4(255, 215, 0, 255)));
+        });
+    }
+
+    [Test]
+    public void TestCourseAutoGaugeRestoresEachLayerIndependently()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.ApplyBeatmap(new BmsBeatmap());
+        processor.SetGaugeTypes(
+            [BmsGaugeType.ExHardClass, BmsGaugeType.ExClass, BmsGaugeType.Class],
+            replaceExisting: true);
+        processor.RestoreGaugeStates(
+        [
+            new(BmsGaugeType.ExHardClass, 0, true),
+            new(BmsGaugeType.ExClass, 0.42, false),
+            new(BmsGaugeType.Class, 0.81, false),
+        ]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExClass));
+            Assert.That(processor.Health.Value, Is.EqualTo(0.42).Within(0.001));
+            Assert.That(processor.CurrentGaugeStates.Single(state => state.GaugeType == BmsGaugeType.ExHardClass).Failed, Is.True);
+            Assert.That(processor.CurrentGaugeStates.Single(state => state.GaugeType == BmsGaugeType.Class).Health, Is.EqualTo(0.81).Within(0.001));
+            Assert.That(processor.HasEverFailed, Is.False);
+        });
+    }
+
+    [Test]
+    public void TestCourseGaugeProfileFamilyAppliesToSingleGauge()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(BmsGaugeType.Class, BmsGaugeProfileFamily.FiveKeys);
+
+        Assert.That(processor.GaugeProfile.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
+    }
+
+    [TestCase(BmsLayoutVariant.Bms5K, 0.75, -0.03)]
+    [TestCase(BmsLayoutVariant.Bme7K, 0.80, -0.03)]
+    [TestCase(BmsLayoutVariant.Pms9K, 0.85, -0.02)]
+    public void TestRegularGameplayGaugeProfileFollowsLayout(BmsLayoutVariant layout, double clearThreshold, double badDelta)
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(BmsGaugeType.Normal);
+        processor.ApplyBeatmap(new BmsBeatmap { LayoutVariant = layout });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(processor.GaugeProfile.ClearThreshold, Is.EqualTo(clearThreshold).Within(0.000001));
+            Assert.That(processor.GaugeProfile.BadDelta, Is.EqualTo(badDelta).Within(0.000001));
+        });
+    }
+
+    [Test]
+    public void TestGaugeProfileOverrideTakesPriorityOverLayout()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(BmsGaugeType.Class, BmsGaugeProfileFamily.Lr2);
+        processor.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bms5K });
+
+        Assert.That(processor.GaugeProfile.BadDelta, Is.EqualTo(-0.02).Within(0.000001));
     }
 }

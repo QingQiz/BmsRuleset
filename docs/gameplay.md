@@ -55,15 +55,12 @@ Default play uses the Normal gauge. Gauge types are selected via mods:
   transitions from red (< 20%) → amber (< clear) → green (≥ clear) based on the active gauge's threshold.
 - **Survival gauges** (H1/H2/H3): start at 100%, damage-only (no recovery for H3). Gauge uses a fixed colour with no
   clear line. Pass condition is purely survival (HP never hit 0).
-- Hard (H1) has **guts protection**: damage is reduced at low HP (50% → ×0.8, 40% → ×0.7, …, 10% → ×0.4).
-- `#TOTAL` controls the maximum gain rate for TOTAL-algorithm gauges. Default formula:
-  `max(7.605 × N / (0.01 × N + 6.5), 160)` (LR2 formula, where N = total playable notes).
+- Hard (H1) has **guts protection**: below each HP threshold, damage is reduced (below 50% → ×0.8, below 40% → ×0.7,
+  …, below 10% → ×0.4).
+- `#TOTAL` controls the maximum gain rate for TOTAL-algorithm gauges. When it is omitted, 5-key, 7-key, PMS, and LR2
+  layouts use `max(7.605 × N / (0.01 × N + 6.5), 260)`. 24-key layouts use
+  `max(7.605 × (N + 100) / (0.01 × N + 6.5), 300)` (where N = total playable notes).
 - Landmine damage: base-36 value ÷ 2 percent (e.g., `ZZ` = 647.5% → instant wipe).
-- Gauge mods are mutually exclusive.
-- **Auto Gauge (AG)** is an Automation mod that chains all six gauges hardest-first
-  (Hazard → EX Hard → Hard → Normal → Easy → Assist Easy). You start on the hardest tier; when HP hits 0 the
-  active gauge drops to the next tier and play continues — the run only fails once every tier is exhausted. The
-  resulting score is attributed to the hardest tier you reached.
 
 ## Mods
 
