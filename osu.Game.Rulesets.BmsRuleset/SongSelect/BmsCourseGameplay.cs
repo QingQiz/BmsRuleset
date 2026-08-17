@@ -102,12 +102,12 @@ internal partial class BmsCoursePlayer : SoloPlayer
         Configuration.ShowLeaderboard = false;
     }
 
-    public override void OnEntering(ScreenTransitionEvent e)
+    protected override void StartGameplay()
     {
         if (GameplayState.HealthProcessor is Scoring.BmsHealthProcessor healthProcessor)
             healthProcessor.RestoreCourseHealth(session.CurrentHealth);
 
-        base.OnEntering(e);
+        base.StartGameplay();
     }
 
     protected override ResultsScreen CreateResults(ScoreInfo score)

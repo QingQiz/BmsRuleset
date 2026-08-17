@@ -32,6 +32,7 @@ using osu.Game.Screens.Ranking.Expanded;
 using osu.Game.Screens.Ranking.Expanded.Statistics;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Tests.Visual;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
@@ -239,9 +240,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddAssert("unplayed stage disabled", () => this.ChildrenOfType<OsuClickableContainer>()
                                                          .Single(row => row.Name == "Course stage 3 result").Enabled.Value, () => Is.False);
 
-        AddStep("open first stage score", () => this.ChildrenOfType<OsuClickableContainer>()
-                                                      .Single(row => row.Name == "Course stage 1 result")
-                                                      .TriggerClick());
+        AddStep("open first stage score", () => clickCourseStage("Course stage 1 result"));
         AddUntilStep("first stage selected", () => screen.SelectedStageIndex == 0);
         AddAssert("screen stack unchanged", () => Stack.CurrentScreen, () => Is.SameAs(screen));
         AddAssert("first stage score selected", () => screen.SelectedScore.Value, () => Is.SameAs(session.Stages[0].Score));
@@ -251,30 +250,31 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddAssert("score replay disabled", () => screen.AllowWatchingReplay, () => Is.False);
         AddAssert("score retry disabled", () => screen.AllowRetry, () => Is.False);
 
-        AddStep("toggle first stage back to course summary", () => this.ChildrenOfType<OsuClickableContainer>()
-                                                                          .Single(row => row.Name == "Course stage 1 result")
-                                                                          .TriggerClick());
+        AddStep("toggle first stage back to course summary", () => clickCourseStage("Course stage 1 result"));
         AddUntilStep("course summary restored from first stage", () => screen.SelectedStageIndex == null
                                                                        && screen.ChildrenOfType<BmsCourseAggregateStatistics>().Single().State.Value == Visibility.Visible);
 
-        AddStep("open second stage directly", () => this.ChildrenOfType<OsuClickableContainer>()
-                                                         .Single(row => row.Name == "Course stage 2 result")
-                                                         .TriggerClick());
+        AddStep("open second stage directly", () => clickCourseStage("Course stage 2 result"));
         AddUntilStep("second stage selected directly", () => screen.SelectedStageIndex == 1
                                                                && screen.SelectedScore.Value == session.Stages[1].Score
                                                                && screen.ChildrenOfType<StatisticsPanel>()
                                                                         .Single(panel => panel is not BmsCourseAggregateStatistics)
                                                                         .State.Value == Visibility.Visible);
 
-        AddStep("switch from second stage to first stage", () => this.ChildrenOfType<OsuClickableContainer>()
-                                                                        .Single(row => row.Name == "Course stage 1 result")
-                                                                        .TriggerClick());
+        AddStep("switch from second stage to first stage", () => clickCourseStage("Course stage 1 result"));
         AddUntilStep("first stage selected directly", () => screen.SelectedStageIndex == 0
                                                               && screen.SelectedScore.Value == session.Stages[0].Score
                                                               && screen.ChildrenOfType<StatisticsPanel>()
                                                                        .Single(panel => panel is not BmsCourseAggregateStatistics)
                                                                        .State.Value == Visibility.Visible);
 
+    }
+
+    private void clickCourseStage(string name)
+    {
+        var stage = this.ChildrenOfType<OsuClickableContainer>().Single(row => row.Name == name);
+        InputManager.MoveMouseTo(stage);
+        InputManager.Click(MouseButton.Left);
     }
 
     private static BmsCourseSession createAbortedSession()

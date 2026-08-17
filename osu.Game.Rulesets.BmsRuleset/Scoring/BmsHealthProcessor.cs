@@ -48,6 +48,7 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     private IBeatmap? beatmap;
     private bool initialized;
+    private double? restoredCourseHealth;
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
@@ -174,13 +175,26 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.Value = active.CurrentHp;
 
         initialized = false;
+
+        // Gauge mods are applied after the player has been loaded. Re-apply a
+        // course's carried health when a mod rebuilds the gauge chain.
+        restoreCourseHealth();
     }
 
     public void RestoreCourseHealth(double health)
     {
+        restoredCourseHealth = Math.Clamp(health, 0, 1);
+        restoreCourseHealth();
+    }
+
+    private void restoreCourseHealth()
+    {
+        if (!restoredCourseHealth.HasValue)
+            return;
+
         ensureInitialized();
 
-        var restoredHealth = Math.Clamp(health, 0, GaugeProfile.MaxHealth);
+        var restoredHealth = Math.Clamp(restoredCourseHealth.Value, 0, GaugeProfile.MaxHealth);
 
         foreach (var state in gaugeStates)
         {

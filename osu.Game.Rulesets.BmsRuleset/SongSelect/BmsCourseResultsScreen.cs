@@ -128,7 +128,11 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
         courseLayout.AggregateStatistics.Hide();
         Beatmap.Value = beatmaps.GetWorkingBeatmap(attempt.Stage.Beatmap, true);
         SelectedScore.Value = attempt.Score;
-        StatisticsPanel.Show();
+        // ScorePanelList is still bound to SelectedScore by ResultsScreen and
+        // may update its hidden native panel during this change. Show after
+        // those bindings have settled so the first stage click cannot toggle
+        // the statistics panel back off.
+        Schedule(() => StatisticsPanel.Show());
         Schedule(hideNativeScorePanels);
     }
 

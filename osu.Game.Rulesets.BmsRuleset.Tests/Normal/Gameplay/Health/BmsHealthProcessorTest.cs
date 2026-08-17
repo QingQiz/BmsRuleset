@@ -47,6 +47,18 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
+    public void TestCourseHealthSurvivesGaugeModApplicationAfterRestore()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.ApplyBeatmap(new BmsBeatmap());
+
+        processor.RestoreCourseHealth(0.42);
+        processor.SetGaugeType(BmsGaugeType.Class);
+
+        Assert.That(processor.CourseHealth, Is.EqualTo(0.42));
+    }
+
+    [Test]
     public void TestAutoGaugeAllLayersFailTriggersFailure()
     {
         var processor = new BmsHealthProcessor();
