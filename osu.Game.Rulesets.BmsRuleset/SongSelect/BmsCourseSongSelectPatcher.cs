@@ -102,6 +102,7 @@ public static class BmsCourseSongSelectPatcher
     {
         var controller = new BmsCourseSongSelectController(
             BmsRulesetRuntime.CourseCatalog,
+            songSelect,
             (FillFlowContainer)wedgesContainerField!.GetValue(songSelect)!,
             (BeatmapTitleWedge)titleWedgeField!.GetValue(songSelect)!,
             (BeatmapDetailsArea)detailsAreaField!.GetValue(songSelect)!,

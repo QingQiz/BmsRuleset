@@ -268,6 +268,7 @@
   <data name="courses" xml:space="preserve"><value>Courses</value></data>
   <data name="song_select" xml:space="preserve"><value>Song Select</value></data>
   <data name="course_search_placeholder" xml:space="preserve"><value>Search courses, tables or songs</value></data>
+  <data name="course_table_group" xml:space="preserve"><value>{0} ({1})</value></data>
   <data name="course_details" xml:space="preserve"><value>Details</value></data>
   <data name="course_title_summary" xml:space="preserve"><value>{0} stages · {1}</value></data>
   <data name="no_courses_available" xml:space="preserve"><value>No courses are available.</value></data>
@@ -297,12 +298,6 @@
   <data name="course_stage_failed" xml:space="preserve"><value>Failed</value></data>
   <data name="course_stage_aborted" xml:space="preserve"><value>Abandoned</value></data>
   <data name="course_stage_not_played" xml:space="preserve"><value>Not played</value></data>
-  <data name="course_mapped_by" xml:space="preserve"><value>by {0}</value></data>
-  <data name="course_accuracy_abbreviation" xml:space="preserve"><value>ACC</value></data>
-  <data name="course_accuracy_value" xml:space="preserve"><value>{0}</value></data>
-  <data name="course_ex_score" xml:space="preserve"><value>EXSCORE</value></data>
-  <data name="course_ex_score_value" xml:space="preserve"><value>{0:N0}</value></data>
-  <data name="course_ex_score_maximum" xml:space="preserve"><value>/{0:N0}</value></data>
   <data name="course_result_score" xml:space="preserve"><value>{0:N0} points</value></data>
   <data name="course_result_accuracy" xml:space="preserve"><value>{0:P2} accuracy</value></data>
   <data name="course_result_health" xml:space="preserve"><value>{0:P0} gauge</value></data>

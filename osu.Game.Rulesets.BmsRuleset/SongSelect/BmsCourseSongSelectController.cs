@@ -16,6 +16,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Scoring;
 using osu.Game.Screens.Select;
 
 namespace osu.Game.Rulesets.BmsRuleset.SongSelect;
@@ -37,6 +38,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     internal event Action<bool>? CourseModeChanged;
 
     private readonly BmsCourseCatalog catalog;
+    private readonly SoloSongSelect songSelect;
     private readonly BeatmapTitleWedge originalTitle;
     private readonly BeatmapDetailsArea originalDetails;
     private readonly FilterControl originalFilter;
@@ -50,11 +52,11 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     private readonly Bindable<BmsCourseDefinition?> selectedCourse = new();
     private readonly BmsCourseTitleWedge courseTitle;
-    private readonly BmsCourseDetailsArea courseDetails;
+    private readonly BmsCourseHistoryArea courseHistory;
     private readonly BmsCourseFilterControl courseFilter;
     private readonly BmsCourseNoResultsPlaceholder courseNoResults;
     private readonly Drawable courseTitleWrapper;
-    private readonly Drawable courseDetailsWrapper;
+    private readonly Drawable courseHistoryWrapper;
 
     private FooterButtonRandom? randomButton;
     private bool randomButtonEnabledBeforeCourseMode;
@@ -65,6 +67,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     private float originalCarouselAlpha = 1;
     private int matchedCourses = -1;
     private Sample? confirmSelectionSample;
+    private WorkingBeatmap? beatmapBeforeCourseMode;
 
     [Resolved]
     private BeatmapManager beatmaps { get; set; } = null!;
@@ -74,6 +77,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     internal BmsCourseSongSelectController(
         BmsCourseCatalog catalog,
+        SoloSongSelect songSelect,
         FillFlowContainer wedgesContainer,
         BeatmapTitleWedge originalTitle,
         BeatmapDetailsArea originalDetails,
@@ -83,6 +87,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         float topPadding)
     {
         this.catalog = catalog;
+        this.songSelect = songSelect;
         this.wedgesContainer = wedgesContainer;
         this.originalTitle = originalTitle;
         this.originalDetails = originalDetails;
@@ -103,13 +108,14 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         {
             TopPadding = topPadding,
         };
-        courseDetails = new BmsCourseDetailsArea(selectedCourse);
+        courseHistory = new BmsCourseHistoryArea(selectedCourse, presentCourseScore);
         courseFilter = new BmsCourseFilterControl(SearchTerm);
         CourseCarousel = new BmsCourseCarousel
         {
             RelativeSizeAxes = Axes.Both,
             BleedTop = FilterControl.HEIGHT_FROM_SCREEN_TOP + 5,
             BleedBottom = Screens.Footer.ScreenFooter.HEIGHT + 5,
+            Alpha = 0,
         };
         courseNoResults = new BmsCourseNoResultsPlaceholder();
 
@@ -117,12 +123,12 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         {
             BypassAutoSizeAxes = Axes.Y,
         };
-        courseDetailsWrapper = new Graphics.Containers.ShearAligningWrapper(courseDetails)
+        courseHistoryWrapper = new Graphics.Containers.ShearAligningWrapper(courseHistory)
         {
             BypassAutoSizeAxes = Axes.Y,
         };
 
-        wedgesContainer.AddRange([courseTitleWrapper, courseDetailsWrapper]);
+        wedgesContainer.AddRange([courseTitleWrapper, courseHistoryWrapper]);
         carouselHost.AddRange([CourseCarousel, courseNoResults]);
         ((Container)originalFilter.Parent!).Add(courseFilter);
 
@@ -193,13 +199,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             if (!stage.IsAvailable || string.IsNullOrEmpty(stage.BeatmapHash))
                 return null;
 
-            var hash = stage.BeatmapHash;
-            var beatmap = hash.Length switch
-            {
-                32 => beatmaps.QueryBeatmap(info => info.MD5Hash == hash),
-                64 => beatmaps.QueryBeatmap(info => info.Hash == hash),
-                _ => null,
-            };
+            var beatmap = BmsCourseStagePanel.QueryBeatmap(beatmaps, stage.BeatmapHash);
             return beatmap == null ? null : new BmsResolvedCourseStage(stage, beatmap);
         }
     }
@@ -215,11 +215,13 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         originalNoResultsState = originalNoResults.State.Value;
         originalCarouselAlpha = originalCarousel.Alpha;
         randomButtonEnabledBeforeCourseMode = randomButton?.Enabled.Value ?? false;
+        beatmapBeforeCourseMode = songSelect.Beatmap.Value;
 
         State.Value = Visibility.Visible;
         if (randomButton != null)
             randomButton.Enabled.Value = false;
         applyModeVisibility();
+        updateCoursePreview(selectedCourse.Value);
         CourseModeChanged?.Invoke(true);
     }
 
@@ -229,6 +231,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             return;
 
         State.Value = Visibility.Hidden;
+        restoreBeatmapBeforeCourseMode();
         if (randomButton != null)
             randomButton.Enabled.Value = randomButtonEnabledBeforeCourseMode;
         applyModeVisibility();
@@ -249,7 +252,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         originalCarousel.Alpha = 0;
         originalNoResults.Alpha = 0;
 
-        courseDetails.Height = Math.Max(0, wedgesContainer.ChildSize.Y - courseTitle.LayoutSize.Y - 4);
+        courseHistory.Height = Math.Max(0, wedgesContainer.ChildSize.Y - courseTitle.LayoutSize.Y - 4);
         updateCourseCarouselTopPadding();
     }
 
@@ -267,16 +270,32 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         if (IsCourseMode)
             carouselHost.Padding = originalCarouselHostPadding;
 
+        if (IsCourseMode)
+            restoreBeatmapBeforeCourseMode();
+
         base.Dispose(isDisposing);
     }
 
     public bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
     {
-        if (!IsCourseMode || e.Action != GlobalAction.Back)
+        if (!IsCourseMode)
             return false;
 
-        HideCourseMode();
-        return true;
+        switch (e.Action)
+        {
+            case GlobalAction.SelectPrevious:
+                return CourseCarousel.MoveKeyboardSelection(e, -1);
+
+            case GlobalAction.SelectNext:
+                return CourseCarousel.MoveKeyboardSelection(e, 1);
+
+            case GlobalAction.Back:
+                HideCourseMode();
+                return true;
+
+            default:
+                return false;
+        }
     }
 
     public void OnReleased(KeyBindingReleaseEvent<GlobalAction> e)
@@ -290,7 +309,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             originalTitleWrapper.BypassAutoSizeAxes |= Axes.Y;
             originalDetailsWrapper.BypassAutoSizeAxes |= Axes.Y;
             courseTitleWrapper.BypassAutoSizeAxes &= ~Axes.Y;
-            courseDetailsWrapper.BypassAutoSizeAxes &= ~Axes.Y;
+            courseHistoryWrapper.BypassAutoSizeAxes &= ~Axes.Y;
 
             originalTitle.Hide();
             originalDetails.Hide();
@@ -299,7 +318,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             originalNoResults.Hide();
 
             courseTitle.Show();
-            courseDetails.Show();
+            courseHistory.Refresh();
             courseFilter.Show();
             CourseCarousel.Show();
             updateCourseCarouselTopPadding();
@@ -311,7 +330,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             originalTitleWrapper.BypassAutoSizeAxes &= ~Axes.Y;
             originalDetailsWrapper.BypassAutoSizeAxes &= ~Axes.Y;
             courseTitleWrapper.BypassAutoSizeAxes |= Axes.Y;
-            courseDetailsWrapper.BypassAutoSizeAxes |= Axes.Y;
+            courseHistoryWrapper.BypassAutoSizeAxes |= Axes.Y;
 
             restoreVisibility(originalTitle, originalTitleState);
             restoreVisibility(originalDetails, originalDetailsState);
@@ -321,7 +340,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             carouselHost.Padding = originalCarouselHostPadding;
 
             courseTitle.Hide();
-            courseDetails.Hide();
+            courseHistory.Hide();
             courseFilter.Hide();
             CourseCarousel.Hide();
             courseNoResults.Hide();
@@ -342,7 +361,13 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         CourseCarousel.Search(change.NewValue);
     }
 
-    private void courseSelected(BmsCourseDefinition? course) => selectedCourse.Value = course;
+    private void courseSelected(BmsCourseDefinition? course)
+    {
+        selectedCourse.Value = course;
+
+        if (IsCourseMode)
+            updateCoursePreview(course);
+    }
 
     private void courseActivated() => StartRequested?.Invoke();
 
@@ -374,10 +399,56 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         CourseCarousel.BleedTop = top;
     }
 
+    private void updateCoursePreview(BmsCourseDefinition? course)
+    {
+        var candidates = course?.Stages
+                               .Where(stage => stage.IsAvailable && !string.IsNullOrEmpty(stage.BeatmapHash))
+                               .Select(stage => BmsCourseStagePanel.QueryBeatmap(beatmaps, stage.BeatmapHash!))
+                               .OfType<BeatmapInfo>()
+                               .DistinctBy(beatmap => beatmap.Hash)
+                               .ToArray() ?? [];
+
+        if (candidates.Length == 0)
+        {
+            if (beatmapBeforeCourseMode != null)
+                songSelect.Beatmap.Value = beatmapBeforeCourseMode;
+
+            return;
+        }
+
+        var previewBeatmap = candidates[Random.Shared.Next(candidates.Length)];
+        songSelect.Beatmap.Value = beatmaps.GetWorkingBeatmap(previewBeatmap);
+    }
+
+    private void presentCourseScore(ScoreInfo score, BmsCourseSession? session)
+    {
+        if (!IsCourseMode || !songSelect.IsCurrentScreen() || score.BeatmapInfo == null || session == null)
+            return;
+
+        songSelect.Beatmap.Value = beatmaps.GetWorkingBeatmap(score.BeatmapInfo);
+        songSelect.Push(new BmsCourseResultsScreen(session, recordResult: false));
+    }
+
+    private void restoreBeatmapBeforeCourseMode()
+    {
+        if (beatmapBeforeCourseMode == null)
+            return;
+
+        songSelect.Beatmap.Value = beatmapBeforeCourseMode;
+        beatmapBeforeCourseMode = null;
+    }
+
     private static void restoreVisibility(VisibilityContainer container, Visibility state)
     {
         if (state == Visibility.Visible)
+        {
+            // SongSelect may have already called Show() while returning from gameplay, after which course mode keeps the drawable transparent.
+            // Re-entering the visible state is required to restart both its position and alpha transforms.
+            if (container.State.Value == Visibility.Visible)
+                container.Hide();
+
             container.Show();
+        }
         else
             container.Hide();
     }

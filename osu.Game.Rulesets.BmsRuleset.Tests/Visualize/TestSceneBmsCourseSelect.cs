@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
@@ -6,23 +7,35 @@ using osu.Framework.Audio;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
+using osu.Framework.Graphics.Primitives;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.Drawables;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.Graphics.Carousel;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Toolbar;
 using osu.Game.Online.Leaderboards;
+using osu.Game.Rulesets;
+using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
 using osu.Game.Tests.Visual;
 using osuTK;
+using osuTK.Graphics;
 using osuTK.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -30,6 +43,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [TestFixture]
 public partial class TestSceneBmsCourseSelect : ScreenTestScene
 {
+    private static int nextTestId;
+
     private RealmRulesetStore rulesets = null!;
     private BeatmapManager beatmaps = null!;
     private ScoreManager scoreManager = null!;
@@ -121,14 +136,16 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         var originalFilterTopLeft = Vector2.Zero;
         var originalFilterTopRight = Vector2.Zero;
         var originalFilterWidth = 0f;
+        var courseActivationCount = 0;
 
         AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
 
         AddUntilStep("course controller attached", () => songSelect.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault() != null);
+        AddAssert("course carousel cannot receive input before course mode", () => !controller.CourseCarousel.IsPresent && controller.CourseCarousel.Alpha == 0);
         AddAssert("course title starts offscreen left", () => songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().X, () => Is.EqualTo(-150));
-        AddAssert("course details start offscreen left", () => songSelect.ChildrenOfType<BmsCourseDetailsArea>().Single().X, () => Is.EqualTo(-150));
+        AddAssert("course history starts offscreen left", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().X, () => Is.EqualTo(-150));
         AddAssert("course filter starts offscreen right", () => songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().X, () => Is.EqualTo(150));
         AddStep("capture song select filter bounds", () =>
         {
@@ -144,7 +161,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddStep("finish course mode transition", () =>
         {
             songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().FinishTransforms(true);
-            songSelect.ChildrenOfType<BmsCourseDetailsArea>().Single().FinishTransforms(true);
+            songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().FinishTransforms(true);
             songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().FinishTransforms(true);
         });
 
@@ -170,8 +187,8 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Count(), () => Is.EqualTo(4));
         AddAssert("stage panels removed from filter card", () =>
             songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().ChildrenOfType<BmsCourseStagePanel>(), () => Is.Empty);
-        AddAssert("stage panels removed from details tab", () =>
-            songSelect.ChildrenOfType<BmsCourseDetailsArea>().Single().ChildrenOfType<BmsCourseStagePanel>(), () => Is.Empty);
+        AddAssert("stage panels removed from history area", () =>
+            songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().ChildrenOfType<BmsCourseStagePanel>(), () => Is.Empty);
         AddAssert("stage panels removed from title wedge", () =>
             songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().ChildrenOfType<BmsCourseStagePanel>(), () => Is.Empty);
         AddAssert("only selected course stages visible", () => controller.CourseCarousel.GetCarouselItems()?
@@ -180,33 +197,75 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             .Count(item => item.Model is BmsGroupedCourseStage), () => Is.EqualTo(12));
         AddAssert("selected course is expanded", () => controller.CourseCarousel.GetCarouselItems()?
             .Single(item => item.Model is BmsGroupedCourse grouped && grouped.Course.Id == controller.SelectedCourse?.Id).IsExpanded == true);
-        AddAssert("stage panels include local ranks", () =>
-            controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>()
-                      .All(panel => panel.ChildrenOfType<PanelLocalRankDisplay>().Count() == 1));
         AddAssert("stage panel text is not italic", () =>
             controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>()
                       .SelectMany(panel => panel.ChildrenOfType<OsuSpriteText>()).All(text => !text.Font.Italics));
         AddAssert("stage panels follow selected course card", () =>
         {
-            var selectedPanel = controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
-                                          .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped
-                                                           && grouped.Course.Id == controller.SelectedCourse?.Id);
-            return controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>()
-                             .Min(panel => panel.ScreenSpaceDrawQuad.AABBFloat.Top)
-                   >= selectedPanel.ScreenSpaceDrawQuad.AABBFloat.Bottom - 0.5f;
+            var items = controller.CourseCarousel.GetCarouselItems()!;
+            var selectedCourse = items.Single(item => item.Model is BmsGroupedCourse grouped
+                                                       && grouped.Course.Id == controller.SelectedCourse?.Id);
+            var firstStage = items.First(item => item.Model is BmsGroupedCourseStage stage
+                                                 && stage.Course.Id == controller.SelectedCourse?.Id);
+            return firstStage.CarouselYPosition > selectedCourse.CarouselYPosition;
+        });
+        AddAssert("selected course overlaps first stage", () =>
+        {
+            var items = controller.CourseCarousel.GetCarouselItems()!;
+            var course = items.Single(item => item.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7");
+            var firstStage = items.Single(item => item.Model is BmsGroupedCourseStage { Course.Id: "satellite-7", StageIndex: 0 });
+            return spacingBetween(course, firstStage);
+        }, () => Is.EqualTo(-BeatmapCarousel.SPACING).Within(0.01f));
+        AddAssert("selected course stages overlap like song select cards", () =>
+        {
+            var stages = controller.CourseCarousel.GetCarouselItems()!
+                                   .Where(item => item.Model is BmsGroupedCourseStage { Course.Id: "satellite-7" })
+                                   .ToArray();
+            return stages.Zip(stages.Skip(1)).All(pair => spacingBetween(pair.First, pair.Second) == -BeatmapCarousel.SPACING);
+        });
+        AddAssert("selected course stages have song select spacing before next course", () =>
+        {
+            var items = controller.CourseCarousel.GetCarouselItems()!;
+            var lastStage = items.Single(item => item.Model is BmsGroupedCourseStage { Course.Id: "satellite-7", StageIndex: 3 });
+            var nextCourse = items.Single(item => item.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-8");
+            return spacingBetween(lastStage, nextCourse) == BeatmapCarousel.SPACING * 2;
         });
         AddAssert("table group displays mark", () => controller.CourseCarousel.GetCarouselItems()?
             .Any(item => item.Model is BmsCourseTableGroup { TableName: "Satellite", Mark: "sl" }) == true);
         AddAssert("table group renders mark", () => controller.CourseCarousel.ChildrenOfType<BmsCourseTablePanel>()
             .SelectMany(panel => panel.ChildrenOfType<OsuSpriteText>())
-            .Any(text => text.Text.ToString() == "sl  Satellite"));
+            .Any(text => text.Text.ToString() == "Satellite (sl)"));
         AddAssert("course cards include lamp state", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
             .All(panel => panel.ChildrenOfType<BmsLampDisplay>().Count() == 1));
         AddAssert("course cards include rank markers", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
             .All(panel => panel.ChildrenOfType<UpdateableRank>().Count() == 1));
+        AddAssert("course cards use compact height", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
+            .All(panel => panel.DrawHeight == PanelGroup.HEIGHT && panel.Item?.DrawHeight == PanelGroup.HEIGHT));
+        AddAssert("course card text is vertically centred", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>().All(panel =>
+        {
+            var textBounds = panel.ChildrenOfType<OsuSpriteText>()
+                                  .Select(text => text.ScreenSpaceDrawQuad.AABBFloat)
+                                  .Aggregate(RectangleF.Union);
+            var panelBounds = panel.ScreenSpaceDrawQuad.AABBFloat;
+            return Math.Abs(textBounds.Centre.Y - panelBounds.Centre.Y) < 1;
+        }));
+        AddAssert("course card marks missing stages", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
+            .Single(panel => panel.Item?.Model is BmsGroupedCourse { Course.Id: "satellite-8" })
+            .ChildrenOfType<SpriteIcon>().Any(icon => icon.Icon.Equals(FontAwesome.Solid.ExclamationTriangle)));
         AddAssert("course cards omit stage count text", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
             .SelectMany(panel => panel.ChildrenOfType<OsuSpriteText>())
             .All(text => text.Text.ToString() != "4 stages"));
+        AddAssert("history tabs removed", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<OsuSpriteText>()
+            .All(text => text.Text.ToString() is not "Details" and not "History"));
+        AddStep("record aborted course", () => BmsRulesetRuntime.CourseResults?.Record("satellite-8", BmsCourseStatus.Aborted, ScoreRank.F));
+        AddAssert("aborted course has no lamp", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
+            .Single(panel => panel.Item?.Model is BmsGroupedCourse { Course.Id: "satellite-8" })
+            .ChildrenOfType<BmsLampDisplay>().Single().Lamp, () => Is.EqualTo(BmsLamp.NoPlay));
+        AddAssert("aborted course has no rank", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
+            .Single(panel => panel.Item?.Model is BmsGroupedCourse { Course.Id: "satellite-8" })
+            .ChildrenOfType<UpdateableRank>().Single().Alpha, () => Is.Zero);
+        AddAssert("first course selected", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
         AddStep("record selected course clear", () => BmsRulesetRuntime.CourseResults?.Record("satellite-7", BmsCourseStatus.Passed, ScoreRank.S));
         AddUntilStep("selected course lamp updates", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
             .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
@@ -214,26 +273,105 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("selected course rank updates", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
             .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
             .ChildrenOfType<UpdateableRank>().Single().Rank, () => Is.EqualTo(ScoreRank.S));
+        AddStep("press down to select next course", () => InputManager.Key(Key.Down));
+        AddUntilStep("down skips expanded stages", () => controller.CourseCarousel.KeyboardSelectedCourse?.Id, () => Is.EqualTo("satellite-8"));
+        AddAssert("down does not activate course", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
+        AddStep("press down to wrap current table", () => InputManager.Key(Key.Down));
+        AddUntilStep("down wraps to first course", () => controller.CourseCarousel.KeyboardSelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
+        AddAssert("second down does not activate course", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
+        AddStep("press up to wrap current table", () => InputManager.Key(Key.Up));
+        AddUntilStep("up wraps to last course", () => controller.CourseCarousel.KeyboardSelectedCourse?.Id, () => Is.EqualTo("satellite-8"));
+        AddStep("press up to select first course", () => InputManager.Key(Key.Up));
+        AddUntilStep("up skips expanded stages", () => controller.CourseCarousel.KeyboardSelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
+        AddStep("shift right to next table", () =>
+        {
+            InputManager.PressKey(Key.ShiftLeft);
+            InputManager.Key(Key.Right);
+            InputManager.ReleaseKey(Key.ShiftLeft);
+        });
+        AddUntilStep("next table expanded", () => controller.CourseCarousel.ExpandedGroup?.TableName, () => Is.EqualTo("Stella"));
+        AddAssert("next table header has keyboard focus", () => controller.CourseCarousel.KeyboardSelectedGroup?.TableName, () => Is.EqualTo("Stella"));
+        AddAssert("group traversal does not activate course", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
+        AddStep("shift left to previous table", () =>
+        {
+            InputManager.PressKey(Key.ShiftLeft);
+            InputManager.Key(Key.Left);
+            InputManager.ReleaseKey(Key.ShiftLeft);
+        });
+        AddUntilStep("previous table expanded", () => controller.CourseCarousel.ExpandedGroup?.TableName, () => Is.EqualTo("Satellite"));
+        AddUntilStep("selected course regains keyboard focus", () => controller.CourseCarousel.KeyboardSelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
+        AddStep("shift enter to collapse current table", () =>
+        {
+            InputManager.PressKey(Key.ShiftLeft);
+            InputManager.Key(Key.Enter);
+            InputManager.ReleaseKey(Key.ShiftLeft);
+        });
+        AddUntilStep("current table collapsed", () => controller.CourseCarousel.ExpandedGroup, () => Is.Null);
+        AddAssert("shift enter does not activate course", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
+        AddStep("shift enter to expand current table", () =>
+        {
+            InputManager.PressKey(Key.ShiftLeft);
+            InputManager.Key(Key.Enter);
+            InputManager.ReleaseKey(Key.ShiftLeft);
+        });
+        AddUntilStep("current table expanded", () => controller.CourseCarousel.ExpandedGroup?.TableName, () => Is.EqualTo("Satellite"));
+        AddUntilStep("selected course focused after expanding table", () => controller.CourseCarousel.KeyboardSelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
+        AddStep("move keyboard selection to next course", () => InputManager.Key(Key.Down));
+        AddUntilStep("next course highlighted", () => controller.CourseCarousel.KeyboardSelectedCourse?.Id, () => Is.EqualTo("satellite-8"));
+        AddAssert("highlighted course is not active", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
+        AddStep("confirm highlighted course", () => InputManager.Key(Key.Enter));
+        AddUntilStep("highlighted course activated", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-8"));
+        AddStep("track course activation", () => controller.StartRequested = () => courseActivationCount++);
+        AddStep("enter activates selected course", () => InputManager.Key(Key.Enter));
+        AddAssert("selected course activated once", () => courseActivationCount, () => Is.EqualTo(1));
+        AddStep("control enter activates selected course", () =>
+        {
+            InputManager.PressKey(Key.ControlLeft);
+            InputManager.Key(Key.Enter);
+            InputManager.ReleaseKey(Key.ControlLeft);
+        });
+        AddAssert("control enter uses carousel activation", () => courseActivationCount, () => Is.EqualTo(2));
+        AddStep("restore first course", () => InputManager.Key(Key.Left));
+        AddUntilStep("first course restored", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
         AddStep("press right to select next course", () => InputManager.Key(Key.Right));
         AddUntilStep("next course selected by keyboard", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-8"));
+        AddAssert("history hidden without a result", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().State.Value, () => Is.EqualTo(Visibility.Hidden));
         AddStep("press left to select previous course", () => InputManager.Key(Key.Left));
         AddUntilStep("previous course selected by keyboard", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
+        AddAssert("history stays hidden without a score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().State.Value, () => Is.EqualTo(Visibility.Hidden));
         AddStep("activate nested stage card", () => controller.CourseCarousel.Activate(controller.CourseCarousel.GetCarouselItems()!
             .First(item => item.IsVisible && item.Model is BmsGroupedCourseStage)));
         AddAssert("nested stage cannot change selection", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
         AddStep("select second course", () => controller.CourseCarousel.Activate(controller.CourseCarousel.GetCarouselItems()!
             .Single(item => item.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-8")));
         AddUntilStep("second course selected", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-8"));
+        AddAssert("history hidden without a result", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().State.Value, () => Is.EqualTo(Visibility.Hidden));
         AddAssert("second course stages expanded", () => controller.CourseCarousel.GetCarouselItems()?
             .Where(item => item.IsVisible && item.Model is BmsGroupedCourseStage)
             .All(item => item.Model is BmsGroupedCourseStage stage && stage.Course.Id == "satellite-8") == true);
+        AddUntilStep("selected course has song select spacing above", () =>
+        {
+            var items = controller.CourseCarousel.GetCarouselItems()!;
+            var previousCourse = items.Single(item => item.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7");
+            var selectedCourse = items.Single(item => item.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-8");
+            return spacingBetween(previousCourse, selectedCourse);
+        }, () => Is.EqualTo(BeatmapCarousel.SPACING * 2).Within(0.01f));
+        AddStep("select course in second table", () => controller.CourseCarousel.Activate(controller.CourseCarousel.GetCarouselItems()!
+            .Single(item => item.Model is BmsGroupedCourse grouped && grouped.Course.Id == "stella-1")));
+        AddUntilStep("second table course selected", () => controller.SelectedCourse?.Id, () => Is.EqualTo("stella-1"));
+        AddAssert("previous table courses collapsed", () => controller.CourseCarousel.GetCarouselItems()?
+            .Where(item => item.Model is BmsGroupedCourse { Group.TableName: "Satellite" })
+            .All(item => !item.IsVisible) == true);
+        AddAssert("selected table courses expanded", () => controller.CourseCarousel.GetCarouselItems()?
+            .Where(item => item.Model is BmsGroupedCourse { Group.TableName: "Stella" })
+            .All(item => item.IsVisible) == true);
         AddAssert("course carousel starts below filter card", () =>
             controller.CourseCarousel.ScreenSpaceDrawQuad.AABBFloat.Top
             >= songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().ScreenSpaceDrawQuad.AABBFloat.Bottom - 0.5f);
         AddAssert("course title finishes at song select position", () =>
             songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().X, () => Is.Zero);
-        AddAssert("course details finish at song select position", () =>
-            songSelect.ChildrenOfType<BmsCourseDetailsArea>().Single().X, () => Is.Zero);
+        AddAssert("history stays hidden for course without result", () =>
+            songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().State.Value, () => Is.EqualTo(Visibility.Hidden));
         AddAssert("two table groups displayed", () =>
             controller.CourseCarousel.GetCarouselItems()?.Count(item => item.Model is BmsCourseTableGroup), () => Is.EqualTo(2));
         AddAssert("three courses displayed", () =>
@@ -248,13 +386,293 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddAssert("matching table remains", () =>
             controller.CourseCarousel.GetCarouselItems()?.Any(item => item.Model is BmsCourseTableGroup { TableName: "Stella" }) == true);
 
+        AddStep("simulate song select resuming after gameplay", () =>
+        {
+            songSelect.ChildrenOfType<BeatmapTitleWedge>().Single().Show();
+            songSelect.ChildrenOfType<BeatmapDetailsArea>().Single().Show();
+            songSelect.ChildrenOfType<FilterControl>().Single().Show();
+        });
+        AddUntilStep("course mode keeps resumed controls hidden", () =>
+            songSelect.ChildrenOfType<BeatmapTitleWedge>().Single().State.Value == Visibility.Visible
+            && songSelect.ChildrenOfType<BeatmapTitleWedge>().Single().Alpha == 0
+            && songSelect.ChildrenOfType<BeatmapDetailsArea>().Single().State.Value == Visibility.Visible
+            && songSelect.ChildrenOfType<BeatmapDetailsArea>().Single().Alpha == 0
+            && songSelect.ChildrenOfType<FilterControl>().Single().State.Value == Visibility.Visible
+            && songSelect.ChildrenOfType<FilterControl>().Single().Alpha == 0);
         AddStep("return to song select", () => controller.HideCourseMode());
         AddAssert("normal carousel restored", () => carousel.Alpha, () => Is.GreaterThan(0));
+        AddUntilStep("song select title restored", () => songSelect.ChildrenOfType<BeatmapTitleWedge>().Single().Alpha, () => Is.GreaterThan(0.9f));
+        AddUntilStep("song select details restored", () => songSelect.ChildrenOfType<BeatmapDetailsArea>().Single().Alpha, () => Is.GreaterThan(0.9f));
+        AddUntilStep("song select filter restored", () => songSelect.ChildrenOfType<FilterControl>().Single().Alpha, () => Is.GreaterThan(0.9f));
+        AddAssert("course carousel stops receiving input", () => !controller.CourseCarousel.IsPresent && controller.CourseCarousel.Alpha == 0);
         AddAssert("random restored in song select", () => this.ChildrenOfType<FooterButtonRandom>().Single().Enabled.Value);
         AddAssert("course mode hidden", () => !controller.IsCourseMode);
     }
 
+    [Test]
+    public void TestSelectedCourseUpdatesAndRestoresPreviewBeatmap()
+    {
+        BeatmapInfo originalBeatmap = null!;
+        BeatmapInfo[] previewBeatmaps = null!;
+
+        AddStep("import original and course preview beatmaps", () =>
+        {
+            var bmsRuleset = rulesets.AvailableRulesets.Single(ruleset => ruleset.ShortName == Constant.SHORT_NAME);
+            originalBeatmap = importBeatmap(createBeatmapSet(bmsRuleset));
+            previewBeatmaps =
+            [
+                importBeatmap(createBeatmapSet(bmsRuleset)),
+                importBeatmap(createBeatmapSet(bmsRuleset)),
+            ];
+
+            BmsRulesetRuntime.CourseCatalog.Replace(
+            [
+                new BmsCourseDefinition(
+                    "preview-test",
+                    "Preview Table",
+                    "Preview Course",
+                    previewBeatmaps.Select((beatmap, index) => new BmsCourseStage($"Preview {index}", "1", BeatmapHash: beatmap.Hash)).ToArray(),
+                    "Class",
+                    []),
+            ]);
+        });
+        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
+        AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
+        AddStep("select original beatmap", () => songSelect.Beatmap.Value = beatmaps.GetWorkingBeatmap(originalBeatmap));
+        AddUntilStep("original beatmap selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(originalBeatmap.Hash));
+        AddStep("show course mode", () => controller.ShowCourseMode());
+        AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
+                                                        && !controller.CourseCarousel.IsFiltering);
+        AddUntilStep("course preview selected", () => previewBeatmaps.Any(beatmap => beatmap.Hash == songSelect.Beatmap.Value.BeatmapInfo.Hash));
+        AddStep("hide course mode", () => controller.HideCourseMode());
+        AddUntilStep("original beatmap restored", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(originalBeatmap.Hash));
+
+        BeatmapInfo importBeatmap(BeatmapSetInfo set)
+        {
+            var imported = beatmaps.Import(set);
+            Assert.That(imported, Is.Not.Null);
+            return imported!.Value.Beatmaps.Single().Detach();
+        }
+    }
+
+    [Test]
+    public void TestCourseStageCardsDisplayHistoricalLampAndRank()
+    {
+        BeatmapInfo beatmap = null!;
+        ScoreInfo historicalScore = null!;
+        ScoreInfo alternateScore = null!;
+
+        AddStep("import course stage beatmap and scores", () =>
+        {
+            var bmsRuleset = rulesets.AvailableRulesets.Single(ruleset => ruleset.ShortName == Constant.SHORT_NAME);
+            var imported = beatmaps.Import(createBeatmapSet(bmsRuleset));
+
+            Assert.That(imported, Is.Not.Null);
+            beatmap = imported!.Value.Beatmaps.Single().Detach();
+
+            historicalScore = createScore(beatmap, ScoreRank.S, 900_000,
+                new Dictionary<HitResult, int>
+                {
+                    [HitResult.Perfect] = 1,
+                    [HitResult.Ok] = 1,
+                }, []);
+            historicalScore.Accuracy = 0.9;
+            alternateScore = createScore(beatmap, ScoreRank.A, 800_000,
+                new Dictionary<HitResult, int>
+                {
+                    [HitResult.Perfect] = 2,
+                    [HitResult.Ok] = 1,
+                }, [new BmsModMirror(), new BmsModHardGauge()]);
+            Assert.That(scoreManager.Import(createScore(beatmap, ScoreRank.D, 100_000,
+                new Dictionary<HitResult, int>
+                {
+                    [HitResult.Perfect] = 1,
+                    [HitResult.Ok] = 1,
+                }, [new BmsModHardGauge()])), Is.Not.Null);
+            historicalScore = scoreManager.Import(historicalScore)!.Value.DeepClone();
+            alternateScore = scoreManager.Import(alternateScore)!.Value.DeepClone();
+
+            var course = new BmsCourseDefinition(
+                "history-test",
+                "History Test",
+                "History Test Course",
+                [new BmsCourseStage("History Test Song", "1", BeatmapHash: beatmap.Hash)],
+                "Class",
+                []);
+            BmsRulesetRuntime.CourseCatalog.Replace([course]);
+            BmsRulesetRuntime.CourseResults?.Record("history-test", BmsCourseStatus.Passed, historicalScore.Rank, historicalScore,
+                createCourseAttempt(historicalScore, beatmap, [new BmsModClassGauge()]));
+            BmsRulesetRuntime.CourseResults?.Record("history-test", BmsCourseStatus.Passed, alternateScore.Rank, alternateScore,
+                createCourseAttempt(alternateScore, beatmap, [new BmsModMirror(), new BmsModClassGauge()]));
+            config.SetValue(OsuSetting.BeatmapLeaderboardSortMode, LeaderboardSortMode.Score);
+            config.SetValue(OsuSetting.BeatmapDetailModsFilter, false);
+        });
+        AddUntilStep("wait for course stage scores", () => Realm.Run(r =>
+            r.All<ScoreInfo>().AsEnumerable().Count(score => score.BeatmapHash == beatmap.Hash && !score.DeletePending)), () => Is.EqualTo(3));
+        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
+        AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
+        AddStep("show course mode", () => controller.ShowCourseMode());
+        AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
+                                                        && !controller.CourseCarousel.IsFiltering);
+        AddUntilStep("stage card realised", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().SingleOrDefault() != null);
+        AddAssert("stage card hides BMS ruleset icon but keeps its slot", () =>
+        {
+            var icon = controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
+                                 .ChildrenOfType<ConstrainedIconContainer>().First();
+            return icon.Alpha == 0 && icon.IsPresent && icon.DrawWidth == 12;
+        });
+        AddAssert("stage card uses song select rating layout", () =>
+        {
+            var panel = controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single();
+            return panel.ChildrenOfType<StarRatingDisplay>().Count() == 1
+                   && panel.ChildrenOfType<PanelBeatmapStandalone.SpreadDisplay>().Count() == 1;
+        });
+        AddUntilStep("current difficulty marker uses rating colour", () =>
+        {
+            var panel = controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single();
+            var rating = panel.ChildrenOfType<StarRatingDisplay>().Single();
+            var spread = panel.ChildrenOfType<PanelBeatmapStandalone.SpreadDisplay>().Single();
+            return ((Color4)spread.Current.Colour).Equals(rating.DisplayedDifficultyColour);
+        });
+        AddAssert("stage card uses song select metadata order", () =>
+        {
+            var texts = controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
+                                  .ChildrenOfType<OsuSpriteText>()
+                                  .Where(text => text.Alpha > 0)
+                                  .Select(text => text.Text.ToString())
+                                  .ToArray();
+            return texts.Contains("Course Test Song")
+                   && texts.Contains("Course Test Artist")
+                   && texts.Contains("Course Test Difficulty")
+                   && texts.All(text => !text.Contains("Course Test Author"))
+                   && texts.All(text => text != "#1");
+        });
+        AddAssert("complete course keeps trophy icon", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>().Single()
+            .ChildrenOfType<SpriteIcon>().Any(icon => icon.Icon.Equals(FontAwesome.Solid.Trophy)));
+        AddUntilStep("stage card uses best historical lamp", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
+            .ChildrenOfType<BmsLampDisplay>().Single(display => display.Alpha > 0).Lamp, () => Is.EqualTo(BmsLamp.HardClear));
+        AddUntilStep("stage card uses highest historical rank", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
+            .ChildrenOfType<UpdateableRank>().Single(rank => rank.Alpha > 0).Rank, () => Is.EqualTo(ScoreRank.S));
+        AddUntilStep("course history keeps every aggregate score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(2));
+        AddAssert("course history has song select controls without tabs", () =>
+        {
+            var history = songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single();
+            var header = history.ChildrenOfType<BmsCourseHistoryHeader>().Single();
+            return header.Scope.Value == Screens.Play.Leaderboards.BeatmapLeaderboardScope.Local
+                   && !header.FilterBySelectedMods.Value
+                   && !history.ChildrenOfType<BeatmapDetailsArea.WedgeSelector<BeatmapDetailsArea.Header.Selection>>().Any();
+        });
+        AddAssert("course history sorts by score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().OrderBy(score => score.Rank).First().Score.TotalScore, () => Is.EqualTo(900_000));
+        AddStep("sort course history by accuracy", () => config.SetValue(OsuSetting.BeatmapLeaderboardSortMode, LeaderboardSortMode.Accuracy));
+        AddUntilStep("course history applies sorting", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().OrderBy(score => score.Rank).First().Score.TotalScore, () => Is.EqualTo(800_000));
+        AddStep("filter course history by selected mods", () => config.SetValue(OsuSetting.BeatmapDetailModsFilter, true));
+        AddUntilStep("no-mod history remains", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(900_000));
+        AddStep("select mirror", () => songSelect.Mods.Value = [new BmsModMirror()]);
+        AddUntilStep("selected mods filter ignores course gauge", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(800_000));
+        AddAssert("course history preserves judgement statistics", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.Statistics.GetValueOrDefault(HitResult.Perfect), () => Is.EqualTo(2));
+        AddAssert("course history card remains sheared", () =>
+        {
+            var quad = songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+                                 .ChildrenOfType<BeatmapLeaderboardScore>().Single().ScreenSpaceDrawQuad;
+            return Math.Abs(quad.TopLeft.X - quad.BottomLeft.X) > 1;
+        });
+        AddAssert("course history text is not sheared", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Single()
+            .ChildrenOfType<OsuSpriteText>()
+            .Where(text => text.IsPresent)
+            .All(text => Math.Abs(text.ScreenSpaceDrawQuad.TopLeft.X - text.ScreenSpaceDrawQuad.BottomLeft.X) < 0.5f));
+        AddStep("open course history score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Single().TriggerClick());
+        AddUntilStep("course score details opened", () => Stack.CurrentScreen, () => Is.TypeOf<BmsCourseResultsScreen>());
+        AddUntilStep("course summary is displayed", () => ((BmsCourseResultsScreen)Stack.CurrentScreen).ChildrenOfType<BmsCourseSummaryCard>().SingleOrDefault(), () => Is.Not.Null);
+        AddAssert("course score details match selected history", () => ((BmsCourseResultsScreen)Stack.CurrentScreen).Score?.TotalScore,
+            () => Is.EqualTo(800_000));
+    }
+
     private BmsCourseSongSelectController controller => songSelect.ChildrenOfType<BmsCourseSongSelectController>().Single();
+
+    private static double spacingBetween(CarouselItem top, CarouselItem bottom) =>
+        bottom.CarouselYPosition - top.CarouselYPosition - top.DrawHeight;
+
+    private ScoreInfo createScore(BeatmapInfo beatmap, ScoreRank rank, long totalScore, Dictionary<HitResult, int> statistics, Mod[] mods) => new()
+    {
+        User = API.LocalUser.Value,
+        BeatmapInfo = beatmap,
+        BeatmapHash = beatmap.Hash,
+        Ruleset = beatmap.Ruleset,
+        Rank = rank,
+        Mods = mods,
+        TotalScore = totalScore,
+        Date = DateTimeOffset.Now,
+        Accuracy = 1,
+        MaxCombo = 1,
+        Statistics = statistics,
+    };
+
+    private static BmsCourseAttemptData createCourseAttempt(ScoreInfo score, BeatmapInfo beatmap, Mod[] mods) => new()
+    {
+        Status = BmsCourseStatus.Passed,
+        GaugeType = BmsGaugeType.Class,
+        ModAcronyms = mods.Select(mod => mod.Acronym).ToArray(),
+        Stages =
+        [
+            new BmsCourseStageAttemptData
+            {
+                BeatmapHash = beatmap.Hash,
+                Status = BmsCourseStageStatus.Passed,
+                ScoreId = score.ID,
+                EndingHealth = 0.8,
+            },
+        ],
+    };
+
+    private static BeatmapSetInfo createBeatmapSet(RulesetInfo ruleset)
+    {
+        var id = nextTestId++;
+        var hash = Guid.NewGuid().ToString("N");
+        var metadata = new BeatmapMetadata
+        {
+            Artist = "Course Test Artist",
+            Title = "Course Test Song",
+            Author =
+            {
+                Username = "Course Test Author",
+            },
+        };
+        var set = new BeatmapSetInfo
+        {
+            OnlineID = id + 1,
+            Hash = Guid.NewGuid().ToString(),
+            DateAdded = DateTimeOffset.UtcNow,
+        };
+
+        set.Beatmaps.Add(new BeatmapInfo(ruleset)
+        {
+            OnlineID = (id + 1) * 1000,
+            BeatmapSet = set,
+            DifficultyName = "Course Test Difficulty",
+            StarRating = 1,
+            Length = 30_000,
+            BPM = 150,
+            Hash = hash,
+            MD5Hash = hash,
+            Metadata = metadata,
+            Difficulty = new BeatmapDifficulty
+            {
+                OverallDifficulty = 8,
+            },
+        });
+
+        return set;
+    }
 
     private static BmsCourseDefinition[] createCourses() =>
     [

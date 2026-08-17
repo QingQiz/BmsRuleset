@@ -3,16 +3,13 @@ using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
 
@@ -23,6 +20,7 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
     internal int? SelectedStageIndex => selectedStage.Value;
 
     private readonly BmsCourseSession session;
+    private readonly bool recordResult;
     private readonly Bindable<int?> selectedStage = new();
 
     private BmsCourseResultsLayout courseLayout = null!;
@@ -31,10 +29,11 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
     [Resolved]
     private BeatmapManager beatmaps { get; set; } = null!;
 
-    internal BmsCourseResultsScreen(BmsCourseSession session)
+    internal BmsCourseResultsScreen(BmsCourseSession session, bool recordResult = true)
         : base(createBackingScore(session))
     {
         this.session = session;
+        this.recordResult = recordResult;
         BackButtonVisibility.Value = false;
         AllowWatchingReplay = false;
         AllowRetry = false;
@@ -45,7 +44,8 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
         base.LoadComplete();
 
         var aggregateScore = BmsCourseResultPresentation.CreateAggregateScore(session);
-        BmsRulesetRuntime.CourseResults?.Record(session.Course.Id, session.Status, aggregateScore.Rank);
+        if (recordResult)
+            BmsRulesetRuntime.CourseResults?.Record(session.Course.Id, session.Status, aggregateScore.Rank, aggregateScore, BmsCourseAttemptData.From(session));
 
         summaryBeatmap = Beatmap.Value;
 

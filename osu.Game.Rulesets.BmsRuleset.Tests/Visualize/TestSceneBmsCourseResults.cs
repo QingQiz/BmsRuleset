@@ -3,8 +3,10 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Platform;
@@ -139,7 +141,6 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
 
         assertText("Visual Course");
         assertText("Course abandoned");
-        assertText("Not played");
         assertText("Gauge History");
         assertText("Timeline");
         assertText("Hit Scatter");
@@ -171,6 +172,44 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddAssert("all cards show the song artist", () => this.ChildrenOfType<OsuSpriteText>()
                                                                .Count(text => text.Text.ToString() == "course artist"),
             () => Is.EqualTo(4));
+        AddAssert("song metadata is separated from the cover", () => this.ChildrenOfType<BmsCourseStageCard>().All(card =>
+        {
+            var cover = card.ChildrenOfType<Container>().Single(container => container.Name == "Stage cover");
+            var metadata = card.ChildrenOfType<Container>().Single(container => container.Name == "Stage metadata");
+            var title = metadata.ChildrenOfType<TruncatingSpriteText>().First();
+            return title.ScreenSpaceDrawQuad.AABBFloat.Left - cover.ScreenSpaceDrawQuad.AABBFloat.Right >= 7.5f;
+        }));
+        AddAssert("score details are separated from the cover", () => this.ChildrenOfType<BmsCourseStageCard>()
+                                                                         .Where(card => card.Enabled.Value)
+                                                                         .All(card =>
+                                                                         {
+                                                                             var statistics = card.ChildrenOfType<Container>()
+                                                                                                  .Single(container => container.Name == "Stage score statistics");
+                                                                             return statistics.Padding.Left == 18;
+                                                                         }));
+        AddAssert("stage cards omit empty result overlays", () => this.ChildrenOfType<OsuSpriteText>()
+                                                                        .Any(text => text.Text.ToString() == "Not played"),
+            () => Is.False);
+        AddAssert("unplayed stage remains opaque", () => this.ChildrenOfType<BmsCourseStageCard>()
+                                                               .Single(card => card.Name == "Course stage 3 result").Alpha,
+            () => Is.EqualTo(1));
+        AddAssert("unplayed stage uses gray status colour", () =>
+        {
+            var colour = BmsCourseResultPresentation.StageStatusColour(BmsCourseStageStatus.NotPlayed);
+            return colour.R < 0.9f
+                   && System.MathF.Abs(colour.R - colour.G) < 0.001f
+                   && System.MathF.Abs(colour.G - colour.B) < 0.001f;
+        });
+        AddAssert("played stages use requested status colours", () =>
+        {
+            var passed = BmsCourseResultPresentation.StageStatusColour(BmsCourseStageStatus.Passed);
+            var failed = BmsCourseResultPresentation.StageStatusColour(BmsCourseStageStatus.Failed);
+            var aborted = BmsCourseResultPresentation.StageStatusColour(BmsCourseStageStatus.Aborted);
+            return passed.R > 0.99f && passed.G > 0.99f && passed.B > 0.99f
+                   && failed.R > 0.99f && failed.G < 0.01f && failed.B < 0.01f
+                   && aborted.R > 0.9f && aborted.G > 0.4f && aborted.G < 0.6f
+                   && System.MathF.Abs(aborted.G - aborted.B) < 0.001f;
+        });
         AddAssert("course title is separated from cards", () => this.ChildrenOfType<BmsCourseStageCardList>().Single().Margin.Top,
             () => Is.EqualTo(6));
         AddAssert("status colour fills each card background", () => this.ChildrenOfType<Box>()
@@ -193,6 +232,9 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddAssert("course played time shown", () => this.ChildrenOfType<PlayedOnText>()
                                                          .Count(text => text.Name == "Course played time"), () => Is.EqualTo(1));
         AddAssert("aggregate statistics use native panel", () => this.ChildrenOfType<BmsCourseAggregateStatistics>().Count(), () => Is.EqualTo(1));
+        AddAssert("aggregate statistics have popover container", () => this.ChildrenOfType<BmsCourseAggregateStatistics>().Single()
+                                                                           .FindClosestParent<PopoverContainer>(),
+            () => Is.Not.Null);
         AddAssert("return button shown", () => button(this, "Return to course select"), () => Is.Not.Null);
         AddAssert("unplayed stage disabled", () => this.ChildrenOfType<OsuClickableContainer>()
                                                          .Single(row => row.Name == "Course stage 3 result").Enabled.Value, () => Is.False);
@@ -209,24 +251,29 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddAssert("score replay disabled", () => screen.AllowWatchingReplay, () => Is.False);
         AddAssert("score retry disabled", () => screen.AllowRetry, () => Is.False);
 
-        AddStep("return to course summary", () => this.ChildrenOfType<OsuClickableContainer>()
-                                                        .Single(row => row.Name == "Course summary result")
-                                                        .TriggerClick());
-        AddUntilStep("course summary restored", () => screen.SelectedStageIndex == null
-                                                       && screen.ChildrenOfType<BmsCourseAggregateStatistics>().Single().State.Value == Visibility.Visible);
+        AddStep("toggle first stage back to course summary", () => this.ChildrenOfType<OsuClickableContainer>()
+                                                                          .Single(row => row.Name == "Course stage 1 result")
+                                                                          .TriggerClick());
+        AddUntilStep("course summary restored from first stage", () => screen.SelectedStageIndex == null
+                                                                       && screen.ChildrenOfType<BmsCourseAggregateStatistics>().Single().State.Value == Visibility.Visible);
 
-        AddStep("open second stage score", () => this.ChildrenOfType<OsuClickableContainer>()
-                                                       .Single(row => row.Name == "Course stage 2 result")
-                                                       .TriggerClick());
-        AddUntilStep("second stage selected", () => screen.SelectedStageIndex == 1
-                                                     && screen.SelectedScore.Value == session.Stages[1].Score);
-        AddUntilStep("second stage statistics shown", () => screen.ChildrenOfType<StatisticsPanel>()
-                                                                    .Single(panel => panel is not BmsCourseAggregateStatistics).State.Value == Visibility.Visible);
-        AddStep("restore course summary", () => this.ChildrenOfType<OsuClickableContainer>()
-                                                    .Single(row => row.Name == "Course summary result")
-                                                    .TriggerClick());
-        AddUntilStep("course summary visible", () => screen.SelectedStageIndex == null
-                                                      && screen.ChildrenOfType<BmsCourseAggregateStatistics>().Single().State.Value == Visibility.Visible);
+        AddStep("open second stage directly", () => this.ChildrenOfType<OsuClickableContainer>()
+                                                         .Single(row => row.Name == "Course stage 2 result")
+                                                         .TriggerClick());
+        AddUntilStep("second stage selected directly", () => screen.SelectedStageIndex == 1
+                                                               && screen.SelectedScore.Value == session.Stages[1].Score
+                                                               && screen.ChildrenOfType<StatisticsPanel>()
+                                                                        .Single(panel => panel is not BmsCourseAggregateStatistics)
+                                                                        .State.Value == Visibility.Visible);
+
+        AddStep("switch from second stage to first stage", () => this.ChildrenOfType<OsuClickableContainer>()
+                                                                        .Single(row => row.Name == "Course stage 1 result")
+                                                                        .TriggerClick());
+        AddUntilStep("first stage selected directly", () => screen.SelectedStageIndex == 0
+                                                              && screen.SelectedScore.Value == session.Stages[0].Score
+                                                              && screen.ChildrenOfType<StatisticsPanel>()
+                                                                       .Single(panel => panel is not BmsCourseAggregateStatistics)
+                                                                       .State.Value == Visibility.Visible);
 
     }
 

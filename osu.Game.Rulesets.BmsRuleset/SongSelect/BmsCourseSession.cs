@@ -28,6 +28,8 @@ internal enum BmsCourseStageStatus
 
 internal sealed record BmsResolvedCourseStage(BmsCourseStage Definition, BeatmapInfo Beatmap);
 
+internal sealed record BmsRestoredCourseStage(BmsCourseStageStatus Status, ScoreInfo? Score, double? EndingHealth);
+
 internal sealed class BmsCourseStageAttempt(BmsResolvedCourseStage stage)
 {
     internal BmsResolvedCourseStage Stage { get; } = stage;
@@ -72,6 +74,37 @@ internal sealed class BmsCourseSession
 
         if (this.stages.Length == 0)
             throw new ArgumentException(@"A BMS course must contain at least one stage.", nameof(stages));
+    }
+
+    internal static BmsCourseSession Restore(
+        BmsCourseDefinition course,
+        IReadOnlyList<BmsResolvedCourseStage> stages,
+        IEnumerable<Mod> mods,
+        BmsGaugeType gaugeType,
+        BmsCourseStatus status,
+        IReadOnlyList<BmsRestoredCourseStage> attempts)
+    {
+        if (stages.Count != attempts.Count)
+            throw new ArgumentException(@"The restored BMS course stages and attempts must have the same length.", nameof(attempts));
+
+        var session = new BmsCourseSession(course, stages, mods, gaugeType)
+        {
+            Status = status,
+            SummaryShown = true,
+        };
+
+        for (int i = 0; i < attempts.Count; i++)
+        {
+            session.stages[i].Status = attempts[i].Status;
+            session.stages[i].Score = attempts[i].Score?.DeepClone();
+            session.stages[i].EndingHealth = attempts[i].EndingHealth;
+        }
+
+        session.CurrentStageIndex = Math.Max(0, attempts.TakeWhile(attempt => attempt.Status != BmsCourseStageStatus.NotPlayed).Count() - 1);
+        session.CurrentHealth = attempts.Take(session.CurrentStageIndex + 1)
+                                        .Select(attempt => attempt.EndingHealth)
+                                        .LastOrDefault(health => health.HasValue) ?? 1;
+        return session;
     }
 
     internal void BeginCurrentStage()

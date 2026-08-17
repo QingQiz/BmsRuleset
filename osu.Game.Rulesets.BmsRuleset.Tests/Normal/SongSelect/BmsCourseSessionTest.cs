@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
@@ -181,6 +183,76 @@ public class BmsCourseSessionTest
 
         store = new BmsCourseResultStore(config);
         Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
+    }
+
+    [Test]
+    public void TestAbortedCourseDoesNotCreateResult()
+    {
+        var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
+        var store = new BmsCourseResultStore(config);
+
+        store.Record("aborted-course", BmsCourseStatus.Aborted, ScoreRank.F, createScore(false, 1000));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(store.TryGet("aborted-course", out _), Is.False);
+            Assert.That(store.GetLamp("aborted-course"), Is.EqualTo(BmsLamp.NoPlay));
+            Assert.That(store.GetRank("aborted-course"), Is.Null);
+        });
+    }
+
+    [Test]
+    public void TestCourseScoreHistoryPersists()
+    {
+        var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
+        var store = new BmsCourseResultStore(config);
+        var firstScore = createScore(true, 900_000);
+        firstScore.Rank = ScoreRank.S;
+        var firstAttempt = new BmsCourseAttemptData
+        {
+            Status = BmsCourseStatus.Passed,
+            GaugeType = BmsGaugeType.Class,
+            Stages =
+            [
+                new BmsCourseStageAttemptData
+                {
+                    BeatmapHash = "first-stage",
+                    Status = BmsCourseStageStatus.Passed,
+                    ScoreId = firstScore.ID,
+                    EndingHealth = 0.75,
+                },
+            ],
+        };
+        var secondScore = createScore(true, 800_000);
+        secondScore.Rank = ScoreRank.A;
+
+        store.Record("course", BmsCourseStatus.Passed, firstScore.Rank, firstScore, firstAttempt);
+        store.Record("course", BmsCourseStatus.Passed, secondScore.Rank, secondScore);
+
+        store = new BmsCourseResultStore(config);
+        Assert.That(store.TryGet("course", out var result), Is.True);
+        Assert.That(result.Score?.TotalScore, Is.EqualTo(900_000));
+        Assert.That(result.Rank, Is.EqualTo(ScoreRank.S));
+        Assert.That(store.GetHistory("course").Select(history => history.Score?.TotalScore),
+            Is.EqualTo(new long?[] { 900_000, 800_000 }));
+        Assert.That(store.GetHistory("course")[0].Attempt?.Stages.Single().ScoreId, Is.EqualTo(firstScore.ID));
+    }
+
+    [Test]
+    public void TestSingleResultStorageMigratesToHistory()
+    {
+        var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
+        var score = createScore(true, 700_000);
+        score.Rank = ScoreRank.A;
+        config.SetValue(BmsRulesetSetting.CourseResults, JsonSerializer.Serialize(new Dictionary<string, BmsCourseResult>
+        {
+            ["course"] = new(BmsLamp.Clear, ScoreRank.A, BmsCourseScoreData.From(score)),
+        }));
+
+        var store = new BmsCourseResultStore(config);
+
+        Assert.That(store.GetHistory("course").Single().Score?.TotalScore, Is.EqualTo(700_000));
+        Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.A));
     }
 
     private static BmsCourseSession createSession(int stageCount = 3)

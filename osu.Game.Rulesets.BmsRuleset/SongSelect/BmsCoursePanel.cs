@@ -1,3 +1,4 @@
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
@@ -6,6 +7,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
+using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
@@ -14,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.SongSelect;
 
@@ -32,6 +35,8 @@ internal partial class BmsCourseTablePanel : PanelGroup
 
 internal partial class BmsCoursePanel : Panel
 {
+    internal const float HEIGHT = PanelGroup.HEIGHT;
+
     private const float leaf_panel_active_x_offset = 25;
 
     internal BmsCourseCarousel? CourseCarousel { private get; set; }
@@ -40,8 +45,13 @@ internal partial class BmsCoursePanel : Panel
     private OsuSpriteText gaugeText = null!;
     private UpdateableRank courseRank = null!;
     private BmsLampDisplay courseLamp = null!;
+    private SpriteIcon courseIcon = null!;
     private BmsCourseDefinition? currentCourse;
     private BmsCourseResultStore? resultStore;
+    private Color4 availableIconColour;
+
+    [Resolved]
+    private BeatmapManager beatmaps { get; set; } = null!;
 
     public BmsCoursePanel()
     {
@@ -51,15 +61,16 @@ internal partial class BmsCoursePanel : Panel
     [BackgroundDependencyLoader]
     private void load(OverlayColourProvider colourProvider)
     {
-        Height = PanelBeatmapStandalone.HEIGHT;
+        Height = HEIGHT;
         AccentColour = colourProvider.Highlight1;
 
-        Icon = new SpriteIcon
+        availableIconColour = colourProvider.Background5;
+        Icon = courseIcon = new SpriteIcon
         {
             Icon = FontAwesome.Solid.Trophy,
             Size = new Vector2(12),
             Margin = new MarginPadding { Left = 4, Right = 3 },
-            Colour = colourProvider.Background5,
+            Colour = availableIconColour,
         };
 
         Background = courseLamp = new BmsLampDisplay(BmsLamp.NoPlay)
@@ -78,7 +89,7 @@ internal partial class BmsCoursePanel : Panel
             new GridContainer
             {
                 RelativeSizeAxes = Axes.Both,
-                Padding = new MarginPadding { Left = 14, Right = 30, Vertical = 8 },
+                Padding = new MarginPadding { Left = 14, Right = 30 },
                 ColumnDimensions =
                 [
                     new Dimension(GridSizeMode.AutoSize),
@@ -99,7 +110,10 @@ internal partial class BmsCoursePanel : Panel
                         },
                         new FillFlowContainer
                         {
-                            RelativeSizeAxes = Axes.Both,
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
                             Direction = FillDirection.Vertical,
                             Children =
                             [
@@ -146,6 +160,7 @@ internal partial class BmsCoursePanel : Panel
 
         titleText.Text = course.Name;
         gaugeText.Text = BmsStrings.CourseGauge(course.Gauge);
+        updateAvailability(course);
         updateResult();
         updateLeafPanelOffset(false);
     }
@@ -189,6 +204,16 @@ internal partial class BmsCoursePanel : Panel
         ScoreRank? rank = resultStore?.GetRank(currentCourse.Id);
         courseRank.Rank = rank;
         courseRank.Alpha = rank.HasValue ? 1 : 0;
+    }
+
+    private void updateAvailability(BmsCourseDefinition course)
+    {
+        var hasMissingStage = course.Stages.Any(stage => !stage.IsAvailable
+                                                         || string.IsNullOrEmpty(stage.BeatmapHash)
+                                                         || BmsCourseStagePanel.QueryBeatmap(beatmaps, stage.BeatmapHash) == null);
+
+        courseIcon.Icon = hasMissingStage ? FontAwesome.Solid.ExclamationTriangle : FontAwesome.Solid.Trophy;
+        courseIcon.Colour = hasMissingStage ? Color4.OrangeRed : availableIconColour;
     }
 
     private void updateLeafPanelOffset(bool animated = true)

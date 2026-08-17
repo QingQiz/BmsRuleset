@@ -127,7 +127,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
         return new BmsCourseResultsScreen(session);
     }
 
-    protected override void ConcludeFailedScore(Score score)
+    protected override async void ConcludeFailedScore(Score score)
     {
         base.ConcludeFailedScore(score);
 
@@ -135,8 +135,23 @@ internal partial class BmsCoursePlayer : SoloPlayer
         {
             ScoreProcessor.PopulateScore(score.ScoreInfo);
             score.ScoreInfo.Date = DateTimeOffset.Now;
+            DrawableRuleset.SetRecordTarget(null);
+
             var endingHealth = (GameplayState.HealthProcessor as Scoring.BmsHealthProcessor)?.CourseHealth ?? 0;
-            session.FailCurrentStage(score.ScoreInfo, endingHealth);
+            try
+            {
+                await ImportScore(score).ConfigureAwait(false);
+            }
+            finally
+            {
+                Scheduler.Add(() =>
+                {
+                    session.FailCurrentStage(score.ScoreInfo, endingHealth);
+                    Schedule(this.Exit);
+                });
+            }
+
+            return;
         }
 
         Schedule(this.Exit);

@@ -8,6 +8,7 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
@@ -56,9 +57,13 @@ internal partial class BmsCourseResultsLayout : CompositeDrawable
                 X = StatisticsPanel.SIDE_PADDING,
                 Y = -25,
             },
-            AggregateStatistics = new BmsCourseAggregateStatistics(session)
+            new PopoverContainer
             {
                 RelativeSizeAxes = Axes.Both,
+                Child = AggregateStatistics = new BmsCourseAggregateStatistics(session)
+                {
+                    RelativeSizeAxes = Axes.Both,
+                },
             },
         ];
     }
@@ -404,26 +409,21 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
                 Masking = true,
                 Children =
                 [
-                    new BufferedContainer(cachedFrameBuffer: true)
+                    new BmsCourseBeatmapBackground(attempt.Stage.Beatmap)
                     {
-                        RelativeSizeAxes = Axes.Both,
-                        BlurSigma = new Vector2(4),
-                        Child = new BmsCourseBeatmapBackground(attempt.Stage.Beatmap)
-                        {
-                            RelativeSizeAxes = Axes.Y,
-                            Width = ScorePanel.EXPANDED_WIDTH - 20,
-                            X = -62,
-                        },
+                        RelativeSizeAxes = Axes.Y,
+                        Width = ScorePanel.EXPANDED_WIDTH - 20,
+                        X = -62,
                     },
                     new Box
                     {
                         RelativeSizeAxes = Axes.Both,
                         Colour = ColourInfo.GradientVertical(
-                            Color4Extensions.FromHex("#4b565d").Opacity(0.76f),
-                            Color4Extensions.FromHex("#30383d").Opacity(0.86f)),
+                            Color4Extensions.FromHex("#4b565d").Opacity(0.64f),
+                            Color4Extensions.FromHex("#30383d").Opacity(0.74f)),
                     },
                     createMetadata(metadata),
-                    attempt.Score == null ? createEmptyResult(attempt.Status) : createScoreStatistics(attempt.Score),
+                    attempt.Score == null ? Empty() : createScoreStatistics(attempt.Score),
                 ],
             },
         ];
@@ -431,9 +431,10 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
 
     private static Drawable createMetadata(IBeatmapMetadataInfo metadata) => new Container
     {
+        Name = "Stage metadata",
         RelativeSizeAxes = Axes.X,
         Height = 32,
-        Padding = new MarginPadding { Left = 10, Right = 8, Top = 5 },
+        Padding = new MarginPadding { Left = 18, Right = 8, Top = 5 },
         Child = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.X,
@@ -474,11 +475,12 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
 
         return new Container
         {
+            Name = "Stage score statistics",
             Anchor = Anchor.BottomLeft,
             Origin = Anchor.BottomLeft,
             RelativeSizeAxes = Axes.X,
             Height = 40,
-            Padding = new MarginPadding { Horizontal = 8, Bottom = 3 },
+            Padding = new MarginPadding { Left = 18, Right = 8, Bottom = 3 },
             Child = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
@@ -507,16 +509,6 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
             },
         };
     }
-
-    private static Drawable createEmptyResult(BmsCourseStageStatus status) => new OsuSpriteText
-    {
-        Anchor = Anchor.BottomCentre,
-        Origin = Anchor.BottomCentre,
-        Y = -13,
-        Font = OsuFont.Torus.With(size: 12, weight: FontWeight.SemiBold),
-        Text = BmsCourseResultPresentation.StageStatusText(status),
-        Colour = BmsCourseResultPresentation.StageStatusColour(status),
-    };
 
     [BackgroundDependencyLoader]
     private void load()
@@ -550,7 +542,6 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
         var selected = selectedStage.Value == stageIndex;
         background.Colour = selected ? colours.Background1 : colours.Background2;
         background.Alpha = selected ? 0.35f : IsHovered ? 0.18f : 0;
-        Alpha = Enabled.Value ? 1 : 0.55f;
     }
 }
 
@@ -559,7 +550,7 @@ internal partial class BmsCourseAccuracyStatistic : StatisticDisplay
     private readonly double accuracy;
 
     internal BmsCourseAccuracyStatistic(double accuracy)
-        : base(BmsStrings.CourseAccuracyAbbreviation)
+        : base("ACC")
     {
         this.accuracy = accuracy;
     }
@@ -568,7 +559,7 @@ internal partial class BmsCourseAccuracyStatistic : StatisticDisplay
     {
         Font = OsuFont.Torus.With(size: 20, fixedWidth: true),
         Spacing = new Vector2(-2, 0),
-        Text = BmsStrings.CourseAccuracyValue(accuracy.FormatAccuracy()),
+        Text = accuracy.FormatAccuracy(),
     };
 }
 
@@ -578,7 +569,7 @@ internal partial class BmsCourseExScoreStatistic : StatisticDisplay
     private readonly int maximumExScore;
 
     internal BmsCourseExScoreStatistic(ScoreInfo score)
-        : base(BmsStrings.CourseExScore)
+        : base("EXSCORE")
     {
         maximumExScore = BmsExScore.Calculate(score.MaximumStatistics);
         exScore = BmsExScore.Calculate(score, maximumExScore);
@@ -603,7 +594,7 @@ internal partial class BmsCourseExScoreStatistic : StatisticDisplay
                     Origin = Anchor.BottomCentre,
                     Font = OsuFont.Torus.With(size: 20, fixedWidth: true),
                     Spacing = new Vector2(-2, 0),
-                    Text = BmsStrings.CourseExScoreValue(exScore),
+                    Text = $"{exScore:N0}",
                 },
                 new OsuSpriteText
                 {
@@ -611,7 +602,7 @@ internal partial class BmsCourseExScoreStatistic : StatisticDisplay
                     Origin = Anchor.BottomCentre,
                     Font = OsuFont.Torus.With(size: 12, fixedWidth: true),
                     Spacing = new Vector2(-2, 0),
-                    Text = BmsStrings.CourseExScoreMaximum(maximumExScore),
+                    Text = $"/{maximumExScore:N0}",
                 },
             ],
         };
@@ -743,15 +734,6 @@ internal static class BmsCourseResultPresentation
         _ => BmsStrings.Courses,
     };
 
-    internal static LocalisableString StageStatusText(BmsCourseStageStatus status) => status switch
-    {
-        BmsCourseStageStatus.Passed => BmsStrings.CourseStagePassed,
-        BmsCourseStageStatus.Failed => BmsStrings.CourseStageFailed,
-        BmsCourseStageStatus.Aborted => BmsStrings.CourseStageAborted,
-        BmsCourseStageStatus.Playing => BmsStrings.CourseStageAborted,
-        _ => BmsStrings.CourseStageNotPlayed,
-    };
-
     internal static Colour4 StatusColour(BmsCourseStatus status) => status switch
     {
         BmsCourseStatus.Passed => Colour4.LimeGreen,
@@ -762,9 +744,9 @@ internal static class BmsCourseResultPresentation
 
     internal static Colour4 StageStatusColour(BmsCourseStageStatus status) => status switch
     {
-        BmsCourseStageStatus.Passed => Colour4.LimeGreen,
-        BmsCourseStageStatus.Failed => Colour4.OrangeRed,
-        BmsCourseStageStatus.Aborted => Colour4.Gold,
-        _ => Colour4.White,
+        BmsCourseStageStatus.Passed => Colour4.White,
+        BmsCourseStageStatus.Failed => Colour4.Red,
+        BmsCourseStageStatus.Aborted => Colour4.LightCoral,
+        _ => Colour4.Gray,
     };
 }

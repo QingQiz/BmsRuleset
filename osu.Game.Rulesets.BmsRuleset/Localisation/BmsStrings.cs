@@ -262,6 +262,8 @@ public static class BmsStrings
 
     public static LocalisableString CourseSearchPlaceholder => get("course_search_placeholder");
 
+    public static LocalisableString CourseTableGroup(string tableName, string mark) => get("course_table_group", tableName, mark);
+
     public static LocalisableString CourseDetails => get("course_details");
 
     public static LocalisableString CourseTitleSummary(int count, string gauge) => get("course_title_summary", count, gauge);
@@ -319,18 +321,6 @@ public static class BmsStrings
     public static LocalisableString CourseStageAborted => get("course_stage_aborted");
 
     public static LocalisableString CourseStageNotPlayed => get("course_stage_not_played");
-
-    public static LocalisableString CourseMappedBy(string mapper) => get("course_mapped_by", mapper);
-
-    public static LocalisableString CourseAccuracyAbbreviation => get("course_accuracy_abbreviation");
-
-    public static LocalisableString CourseAccuracyValue(LocalisableString accuracy) => get("course_accuracy_value", accuracy);
-
-    public static LocalisableString CourseExScore => get("course_ex_score");
-
-    public static LocalisableString CourseExScoreValue(int score) => get("course_ex_score_value", score);
-
-    public static LocalisableString CourseExScoreMaximum(int maximum) => get("course_ex_score_maximum", maximum);
 
     public static LocalisableString CourseResultScore(long score) => get("course_result_score", score);
 
