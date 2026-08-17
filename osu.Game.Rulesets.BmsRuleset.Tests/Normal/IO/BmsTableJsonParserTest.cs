@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 
@@ -30,6 +31,31 @@ public class BmsTableJsonParserTest
   ""level_order"": [""★1""],
   ""charts"": [
     { ""level"": ""★1"", ""md5"": ""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"", ""title"": ""Combined Song"" }
+  ]
+}";
+
+    private const string course_header = @"
+{
+  ""name"": ""Course Table"",
+  ""symbol"": ""ct"",
+  ""course"": [
+    [
+      {
+        ""name"": ""Course One"",
+        ""constraint"": [""grade_mirror"", ""gauge_lr2""],
+        ""md5"": [
+          ""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"",
+          ""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""
+        ]
+      },
+      {
+        ""name"": ""Course Two"",
+        ""gauge"": ""ExClass"",
+        ""sha256"": [
+          ""cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc""
+        ]
+      }
+    ]
   ]
 }";
 
@@ -193,6 +219,36 @@ public class BmsTableJsonParserTest
         Assert.That(result.Header!.Name, Is.EqualTo("Combined"));
         Assert.That(result.Header.Symbol, Is.EqualTo("CB"));
         Assert.That(result.Header.LevelOrder, Is.EquivalentTo(["★1"]));
+    }
+
+    [Test]
+    public void TestParseNestedCoursesFromHeader()
+    {
+        var result = BmsTableJsonParser.Parse(course_header);
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Header?.Courses, Has.Count.EqualTo(2));
+        Assert.That(result.Header!.Courses![0].Name, Is.EqualTo("Course One"));
+        Assert.That(result.Header.Courses[0].Hashes, Is.EqualTo(new[]
+        {
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        }));
+        Assert.That(result.Header.Courses[0].Constraints, Is.EqualTo(new[] { "grade_mirror", "gauge_lr2" }));
+        Assert.That(result.Header.Courses[1].Hashes.Single(), Has.Length.EqualTo(64));
+        Assert.That(result.Header.Courses[1].Gauge, Is.EqualTo("ExClass"));
+    }
+
+    [Test]
+    public void TestMergeCourseOnlyHeader()
+    {
+        var result = BmsTableJsonParser.Parse(course_header);
+        var table = BmsTableJsonParser.Merge("course-table", TableSource.LocalFile, result!.Header, null);
+
+        Assert.That(table, Is.Not.Null);
+        Assert.That(table!.Courses, Has.Count.EqualTo(2));
+        Assert.That(table.Courses[0].Hashes, Has.Length.EqualTo(2));
+        Assert.That(table.Entries, Is.Empty);
     }
 
     [Test]

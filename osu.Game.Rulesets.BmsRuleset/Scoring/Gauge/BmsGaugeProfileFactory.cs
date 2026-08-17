@@ -32,9 +32,9 @@ public static class BmsGaugeProfileFactory
         BmsGaugeType.Hard => survival(type, BmsGaugeAlgorithm.LimitIncrement, red(220, 55, 50), 0.0015, 0.0012, 0.0003, -0.05, -0.10, -0.05, hard_guts),
         BmsGaugeType.ExHard => survival(type, BmsGaugeAlgorithm.LimitIncrement, purple(195, 55, 210), 0.0015, 0.0006, 0, -0.08, -0.16, -0.08, []),
         BmsGaugeType.Hazard => survival(type, BmsGaugeAlgorithm.Fixed, gold(255, 215, 0), 0.0015, 0.0006, 0, -1, -1, -0.10, []),
-        BmsGaugeType.Class => survival(type, BmsGaugeAlgorithm.Fixed, orange(230, 95, 55), 0.0015, 0.0012, 0.0006, -0.015, -0.03, -0.015, class_guts),
-        BmsGaugeType.ExClass => survival(type, BmsGaugeAlgorithm.Fixed, orange(230, 95, 55), 0.0015, 0.0012, 0.0003, -0.03, -0.06, -0.03, class_guts),
-        BmsGaugeType.ExHardClass => survival(type, BmsGaugeAlgorithm.Fixed, purple(195, 55, 210), 0.0015, 0.0006, 0, -0.05, -0.10, -0.05, []),
+        BmsGaugeType.Class => survival(type, BmsGaugeAlgorithm.Fixed, red(220, 55, 50), 0.0015, 0.0012, 0.0006, -0.015, -0.03, -0.015, class_guts),
+        BmsGaugeType.ExClass => survival(type, BmsGaugeAlgorithm.Fixed, red(220, 55, 50), 0.0015, 0.0012, 0.0003, -0.03, -0.06, -0.03, class_guts),
+        BmsGaugeType.ExHardClass => survival(type, BmsGaugeAlgorithm.Fixed, red(220, 55, 50), 0.0015, 0.0006, 0, -0.05, -0.10, -0.05, []),
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
     };
 
@@ -95,8 +95,6 @@ public static class BmsGaugeProfileFactory
     private static Color4 purple(byte r, byte g, byte b) => new(r, g, b, 255);
 
     private static Color4 gold(byte r, byte g, byte b) => new(r, g, b, 255);
-
-    private static Color4 orange(byte r, byte g, byte b) => new(r, g, b, 255);
 
     private static Color4 green(byte r, byte g, byte b) => new(r, g, b, 255);
 }

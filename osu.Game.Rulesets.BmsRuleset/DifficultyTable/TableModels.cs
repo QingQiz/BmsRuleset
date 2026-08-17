@@ -21,6 +21,8 @@ public class DifficultyTable
     public string? SourcePath { get; init; }
 
     public List<TableEntry> Entries { get; init; } = [];
+
+    public List<TableCourse> Courses { get; init; } = [];
 }
 
 public class TableEntry
@@ -31,9 +33,22 @@ public class TableEntry
 
     public string Md5Hash { get; init; } = string.Empty;
 
+    public string? Sha256Hash { get; init; }
+
     public string? Title { get; init; }
 
     public string? Artist { get; init; }
+}
+
+public class TableCourse
+{
+    public string Name { get; init; } = string.Empty;
+
+    public string[] Hashes { get; init; } = [];
+
+    public string[] Constraints { get; init; } = [];
+
+    public string? Gauge { get; init; }
 }
 
 /// <summary>
@@ -48,6 +63,19 @@ public class RawTableData
     public string? DataUrl { get; init; }
 
     public string[]? LevelOrder { get; init; }
+
+    public List<RawCourse>? Courses { get; init; }
+}
+
+public class RawCourse
+{
+    public string? Name { get; init; }
+
+    public string[] Hashes { get; init; } = [];
+
+    public string[] Constraints { get; init; } = [];
+
+    public string? Gauge { get; init; }
 }
 
 public class RawChartItem

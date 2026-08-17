@@ -65,12 +65,13 @@ public static class BmsTableJsonParser
         if (string.IsNullOrEmpty(symbol))
             symbol = string.Empty;
 
-        if (string.IsNullOrEmpty(name) || charts == null || charts.Count == 0)
+        if (string.IsNullOrEmpty(name)
+            || (charts is not { Count: > 0 } && header?.Courses is not { Count: > 0 }))
             return null;
 
         var validCharts = new List<(RawChartItem chart, string hash, string level)>();
 
-        foreach (var chart in charts)
+        foreach (var chart in charts ?? [])
         {
             var hash = PickHash(chart.Md5, chart.Sha256);
             if (hash != null)
@@ -102,6 +103,7 @@ public static class BmsTableJsonParser
                 Level = level,
                 LevelIndex = levelIndex,
                 Md5Hash = hash,
+                Sha256Hash = IsValidSha256(chart.Sha256) ? chart.Sha256!.ToLowerInvariant() : null,
                 Title = chart.Title,
                 Artist = chart.Artist,
             });
@@ -115,6 +117,16 @@ public static class BmsTableJsonParser
             Source = source,
             SourcePath = sourcePath,
             Entries = entries,
+            Courses = header?.Courses?
+                .Where(course => !string.IsNullOrWhiteSpace(course.Name) && course.Hashes.Length > 0)
+                .Select(course => new TableCourse
+                {
+                    Name = course.Name!,
+                    Hashes = course.Hashes,
+                    Constraints = course.Constraints,
+                    Gauge = course.Gauge,
+                })
+                .ToList() ?? [],
         };
     }
 
@@ -182,7 +194,83 @@ public static class BmsTableJsonParser
             Symbol = symbol,
             DataUrl = dataUrl,
             LevelOrder = levelOrder,
+            Courses = parseCourses(root),
         };
+    }
+
+    private static List<RawCourse>? parseCourses(JsonElement root)
+    {
+        if (!root.TryGetProperty("course", out var courseElement))
+            return null;
+
+        var courses = new List<RawCourse>();
+        collectCourses(courseElement, courses);
+        return courses.Count > 0 ? courses : null;
+    }
+
+    private static void collectCourses(JsonElement element, List<RawCourse> courses)
+    {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in element.EnumerateArray())
+                collectCourses(child, courses);
+
+            return;
+        }
+
+        if (element.ValueKind != JsonValueKind.Object
+            || !element.TryGetProperty("name", out var nameElement)
+            || nameElement.ValueKind != JsonValueKind.String)
+            return;
+
+        var md5 = readStringArray(element, "md5");
+        var sha256 = readStringArray(element, "sha256");
+        var genericHashes = readStringArray(element, "hash");
+        var hashes = new List<string>();
+
+        for (var i = 0; i < Math.Max(md5.Length, sha256.Length); i++)
+        {
+            var hash = PickHash(i < md5.Length ? md5[i] : null, i < sha256.Length ? sha256[i] : null);
+            if (hash != null)
+                hashes.Add(hash);
+        }
+
+        if (hashes.Count == 0)
+        {
+            hashes.AddRange(genericHashes
+                .Where(hash => IsValidMd5(hash) || IsValidSha256(hash))
+                .Select(hash => hash.ToLowerInvariant()));
+        }
+
+        if (hashes.Count == 0)
+            return;
+
+        courses.Add(new RawCourse
+        {
+            Name = nameElement.GetString(),
+            Hashes = hashes.ToArray(),
+            Constraints = readStringArray(element, "constraint"),
+            Gauge = element.TryGetProperty("gauge", out var gaugeElement) && gaugeElement.ValueKind == JsonValueKind.String
+                ? gaugeElement.GetString()
+                : null,
+        });
+    }
+
+    private static string[] readStringArray(JsonElement parent, string propertyName)
+    {
+        if (!parent.TryGetProperty(propertyName, out var property))
+            return [];
+
+        if (property.ValueKind == JsonValueKind.String)
+            return property.GetString() is { } value ? [value] : [];
+
+        if (property.ValueKind != JsonValueKind.Array)
+            return [];
+
+        return property.EnumerateArray()
+            .Where(item => item.ValueKind == JsonValueKind.String)
+            .Select(item => item.GetString()!)
+            .ToArray();
     }
 
     private static List<RawChartItem>? parseData(JsonElement root)

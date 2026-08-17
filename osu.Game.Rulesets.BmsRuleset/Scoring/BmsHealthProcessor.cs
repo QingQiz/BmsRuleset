@@ -37,6 +37,8 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     public BmsGaugeProfile GaugeProfile { get; private set; } = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
 
+    public double CourseHealth => Health.Value;
+
     private readonly List<GaugeState> gaugeStates = [];
     private readonly List<BmsGaugeHistoryEvent> gaugeHistory = [];
 
@@ -172,6 +174,23 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.Value = active.CurrentHp;
 
         initialized = false;
+    }
+
+    public void RestoreCourseHealth(double health)
+    {
+        ensureInitialized();
+
+        var restoredHealth = Math.Clamp(health, 0, GaugeProfile.MaxHealth);
+
+        foreach (var state in gaugeStates)
+        {
+            state.CurrentHp = Math.Min(restoredHealth, state.Profile.MaxHealth);
+            state.IsHpFailed = state.CurrentHp <= 0;
+        }
+
+        activeGaugeIndex = 0;
+        HasEverFailed = restoredHealth <= 0;
+        resolveActiveState();
     }
 
     public bool HasPassedAtEnd()

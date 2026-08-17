@@ -25,6 +25,7 @@ public sealed partial class BmsLampDisplay : CompositeDrawable
 
     public BmsLamp Lamp
     {
+        get => lamp;
         set
         {
             if (lamp == value)

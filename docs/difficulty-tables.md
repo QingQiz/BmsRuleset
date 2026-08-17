@@ -33,6 +33,11 @@ The importer supports three JSON formats:
 - **Combined file** — a single JSON with both header fields (name, symbol, level_order) and `"charts": [...]`
 - **HTML page** — a web page with `<meta name="bmstable" content="URL">` pointing to the JSON
 
+If the table header contains a bmstable `course` array, its courses are also added to BMS course mode. Course stages
+retain their declared order and are matched to installed charts by MD5 or SHA-256. Song titles, artists, and table
+levels are filled from the table's chart data. Trophy definitions are intentionally ignored because course results use
+osu!'s existing score, mod, and pass/fail data.
+
 ## How Markers Work
 
 After import, every beatmap whose MD5 matches a table entry gets a **marker** appended to its difficulty name:

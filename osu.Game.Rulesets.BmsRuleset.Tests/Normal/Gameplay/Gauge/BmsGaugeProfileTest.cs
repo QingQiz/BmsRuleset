@@ -42,11 +42,21 @@ public class BmsGaugeProfileTest
     }
 
     [Test]
-    public void TestCourseProfilesExistButAreNotMods()
+    public void TestCourseProfilesUseHardGaugeDisplay()
     {
-        Assert.That(BmsGaugeProfileFactory.Create(BmsGaugeType.Class).Algorithm, Is.EqualTo(BmsGaugeAlgorithm.Fixed));
-        Assert.That(BmsGaugeProfileFactory.Create(BmsGaugeType.ExClass).Algorithm, Is.EqualTo(BmsGaugeAlgorithm.Fixed));
-        Assert.That(BmsGaugeProfileFactory.Create(BmsGaugeType.ExHardClass).Algorithm, Is.EqualTo(BmsGaugeAlgorithm.Fixed));
+        var hardColour = BmsGaugeProfileFactory.Create(BmsGaugeType.Hard).Display.FillColour;
+
+        BmsGaugeType[] courseGaugeTypes = [BmsGaugeType.Class, BmsGaugeType.ExClass, BmsGaugeType.ExHardClass];
+
+        foreach (var type in courseGaugeTypes)
+        {
+            var profile = BmsGaugeProfileFactory.Create(type);
+
+            Assert.That(profile.Algorithm, Is.EqualTo(BmsGaugeAlgorithm.Fixed));
+            Assert.That(profile.Display.ColourMode, Is.EqualTo(BmsGaugeColourMode.Fixed));
+            Assert.That(profile.Display.FillColour, Is.EqualTo(hardColour));
+            Assert.That(profile.Display.ShowClearLine, Is.False);
+        }
     }
 
     [Test]

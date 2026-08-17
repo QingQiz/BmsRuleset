@@ -184,7 +184,14 @@ public partial class BmsRuleset : Ruleset
             new BmsModHellChargeNote(),
             new BmsModBackgroundKeysound(),
         ],
-        ModType.System => [new BmsModBranchReplay(), new BmsModPaused()],
+        ModType.System =>
+        [
+            new BmsModBranchReplay(),
+            new BmsModPaused(),
+            new BmsModClassGauge(),
+            new BmsModExClassGauge(),
+            new BmsModExHardClassGauge(),
+        ],
         _ => [],
     };
 

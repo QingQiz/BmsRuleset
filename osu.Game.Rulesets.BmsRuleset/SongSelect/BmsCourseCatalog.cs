@@ -16,6 +16,7 @@ internal sealed class BmsCourseCatalog
     {
         courses.Clear();
         courses.AddRange(newCourses.OrderBy(course => course.TableName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(course => course.Order)
             .ThenBy(course => course.Name, StringComparer.OrdinalIgnoreCase));
         Changed?.Invoke();
     }

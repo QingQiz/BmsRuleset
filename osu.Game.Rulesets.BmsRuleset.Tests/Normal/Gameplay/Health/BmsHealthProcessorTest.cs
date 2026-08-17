@@ -17,6 +17,36 @@ public class BmsHealthProcessorTest
 {
 
     [Test]
+    public void TestCourseHealthCanBeRestored()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(BmsGaugeType.Class);
+        processor.ApplyBeatmap(new BmsBeatmap());
+
+        processor.RestoreCourseHealth(0.42);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(processor.CourseHealth, Is.EqualTo(0.42));
+            Assert.That(processor.Health.Value, Is.EqualTo(0.42));
+            Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.Class));
+            Assert.That(processor.HasEverFailed, Is.False);
+        });
+    }
+
+    [Test]
+    public void TestCourseHealthRestoreClampsToGaugeRange()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(BmsGaugeType.Class);
+        processor.ApplyBeatmap(new BmsBeatmap());
+
+        processor.RestoreCourseHealth(2);
+
+        Assert.That(processor.CourseHealth, Is.EqualTo(1));
+    }
+
+    [Test]
     public void TestAutoGaugeAllLayersFailTriggersFailure()
     {
         var processor = new BmsHealthProcessor();

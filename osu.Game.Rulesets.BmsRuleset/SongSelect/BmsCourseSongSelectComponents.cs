@@ -1,3 +1,4 @@
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -5,8 +6,14 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.Drawables;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -37,6 +44,7 @@ internal partial class BmsCourseFilterControl : VisibilityContainer
         AutoSizeAxes = Axes.Y;
         Shear = OsuGame.SHEAR;
         Margin = new MarginPadding { Top = -Panel.CORNER_RADIUS, Right = -40 };
+        X = 150;
 
         InternalChildren =
         [
@@ -59,9 +67,9 @@ internal partial class BmsCourseFilterControl : VisibilityContainer
                 Child = new Container
                 {
                     RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
+                    Height = 40,
                     Shear = -OsuGame.SHEAR,
-                    Child = new ShearedSearchTextBox
+                    Child = new BmsCourseSearchTextBox
                     {
                         RelativeSizeAxes = Axes.X,
                         Current = searchTerm,
@@ -75,6 +83,16 @@ internal partial class BmsCourseFilterControl : VisibilityContainer
 
     protected override bool StartHidden => true;
 
+    private partial class BmsCourseSearchTextBox : ShearedSearchTextBox
+    {
+        protected override InnerSearchTextBox CreateInnerTextBox() => new CourseInnerSearchTextBox();
+
+        private partial class CourseInnerSearchTextBox : InnerSearchTextBox
+        {
+            public override bool HandleLeftRightArrows => false;
+        }
+    }
+
     protected override void PopIn()
     {
         this.MoveToX(0, osu.Game.Screens.Select.SongSelect.ENTER_DURATION, Easing.OutQuint)
@@ -86,6 +104,7 @@ internal partial class BmsCourseFilterControl : VisibilityContainer
         this.MoveToX(150, osu.Game.Screens.Select.SongSelect.ENTER_DURATION, Easing.OutQuint)
             .FadeOut(osu.Game.Screens.Select.SongSelect.ENTER_DURATION / 3, Easing.In);
     }
+
 }
 
 internal partial class BmsCourseTitleWedge : VisibilityContainer
@@ -102,6 +121,7 @@ internal partial class BmsCourseTitleWedge : VisibilityContainer
         this.selectedCourse = selectedCourse;
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
+        X = -150;
     }
 
     protected override bool StartHidden => true;
@@ -132,17 +152,17 @@ internal partial class BmsCourseTitleWedge : VisibilityContainer
                 [
                     unShear(tableText = new OsuSpriteText
                     {
-                        Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
+                        Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold, italics: false),
                     }),
                     unShear(titleText = new OsuSpriteText
                     {
                         RelativeSizeAxes = Axes.X,
-                        Font = OsuFont.Style.Title,
+                        Font = OsuFont.Style.Title.With(italics: false),
                     }),
                     unShear(summaryText = new OsuSpriteText
                     {
                         RelativeSizeAxes = Axes.X,
-                        Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
+                        Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold, italics: false),
                     }),
                 ],
             },
@@ -181,6 +201,131 @@ internal partial class BmsCourseTitleWedge : VisibilityContainer
     }
 }
 
+internal partial class BmsCourseStagePanel : Panel
+{
+    private readonly int index;
+    private readonly BmsCourseStage stage;
+
+    internal BeatmapInfo? ResolvedBeatmap { get; private set; }
+
+    internal BmsCourseStagePanel(int index, BmsCourseStage stage)
+    {
+        this.index = index;
+        this.stage = stage;
+        Name = $"Course stage {index} song panel";
+        PanelXOffset = 40;
+    }
+
+    [BackgroundDependencyLoader]
+    private void load(BeatmapManager beatmaps, OverlayColourProvider colourProvider)
+    {
+        Height = PanelBeatmapStandalone.HEIGHT;
+        AccentColour = colourProvider.Highlight1;
+
+        if (stage.IsAvailable && !string.IsNullOrEmpty(stage.BeatmapHash))
+        {
+            var hash = stage.BeatmapHash;
+            ResolvedBeatmap = queryBeatmap(beatmaps, hash);
+        }
+
+        var icon = ResolvedBeatmap != null
+            ? ResolvedBeatmap.Ruleset.CreateInstance().CreateIcon()
+            : new SpriteIcon { Icon = FontAwesome.Solid.ExclamationTriangle };
+        icon.Size = new Vector2(12);
+        icon.Margin = new MarginPadding { Left = 4, Right = 3 };
+        icon.Colour = stage.IsAvailable ? colourProvider.Background5 : Color4.OrangeRed;
+        Icon = icon;
+
+        Background = new Box
+        {
+            RelativeSizeAxes = Axes.Both,
+            Colour = colourProvider.Highlight1,
+        };
+
+        var metadata = ResolvedBeatmap?.BeatmapSet?.Metadata ?? ResolvedBeatmap?.Metadata;
+        var panelBackground = new PanelSetBackground();
+
+        if (ResolvedBeatmap != null)
+            panelBackground.Beatmap = beatmaps.GetWorkingBeatmap(ResolvedBeatmap);
+
+        Content.Children =
+        [
+            panelBackground,
+            new GridContainer
+            {
+                RelativeSizeAxes = Axes.Both,
+                Padding = new MarginPadding { Left = 7, Right = 24, Vertical = 6 },
+                ColumnDimensions =
+                [
+                    new Dimension(GridSizeMode.Absolute, 38),
+                    new Dimension(),
+                    new Dimension(GridSizeMode.Absolute, 42),
+                ],
+                Content = new[]
+                {
+                    new Drawable[]
+                    {
+                        new PanelLocalRankDisplay(ResolvedBeatmap)
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Scale = new Vector2(0.8f),
+                        },
+                        new FillFlowContainer
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Direction = FillDirection.Vertical,
+                            Children =
+                            [
+                                new TruncatingSpriteText
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Font = OsuFont.Style.Heading2.With(typeface: Typeface.Torus, weight: FontWeight.Bold, italics: false),
+                                    Text = metadata?.Title ?? stage.Title,
+                                },
+                                new TruncatingSpriteText
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Font = OsuFont.Style.Caption2.With(weight: FontWeight.SemiBold, italics: false),
+                                    Colour = colourProvider.Content2,
+                                    Text = metadata?.Artist ?? stage.Artist ?? string.Empty,
+                                },
+                                new OsuSpriteText
+                                {
+                                    Font = OsuFont.Style.Caption2.With(weight: FontWeight.SemiBold, italics: false),
+                                    Colour = stage.IsAvailable ? Color4.White : Color4.OrangeRed,
+                                    Text = stage.IsAvailable ? stage.Difficulty : BmsStrings.CourseStageMissing,
+                                },
+                            ],
+                        },
+                        new OsuSpriteText
+                        {
+                            Anchor = Anchor.CentreRight,
+                            Origin = Anchor.CentreRight,
+                            Font = OsuFont.Style.Body.With(weight: FontWeight.Bold, italics: false),
+                            Text = BmsStrings.CourseStageNumber(index),
+                        },
+                    },
+                },
+            },
+        ];
+    }
+
+    public override MenuItem[] ContextMenuItems => [];
+
+    protected override bool OnClick(ClickEvent e) => true;
+
+    private static BeatmapInfo? queryBeatmap(BeatmapManager beatmaps, string hash) => hash.Length switch
+    {
+        32 => beatmaps.QueryBeatmap(info => info.MD5Hash == hash),
+        64 => beatmaps.QueryBeatmap(info => info.Hash == hash),
+        _ => null,
+    };
+}
+
 internal partial class BmsCourseDetailsArea : VisibilityContainer
 {
     private readonly IBindable<BmsCourseDefinition?> selectedCourse;
@@ -191,6 +336,7 @@ internal partial class BmsCourseDetailsArea : VisibilityContainer
     {
         this.selectedCourse = selectedCourse;
         RelativeSizeAxes = Axes.X;
+        X = -150;
     }
 
     protected override bool StartHidden => true;
@@ -277,9 +423,6 @@ internal partial class BmsCourseDetailsArea : VisibilityContainer
         }
 
         content.Add(createRulesCard(course));
-
-        for (var i = 0; i < course.Stages.Count; i++)
-            content.Add(createStageCard(i + 1, course.Stages[i]));
     }
 
     private static Drawable createRulesCard(BmsCourseDefinition course) => createCard(78, new FillFlowContainer
@@ -292,18 +435,18 @@ internal partial class BmsCourseDetailsArea : VisibilityContainer
         [
             new OsuSpriteText
             {
-                Font = OsuFont.Style.Heading2.With(weight: FontWeight.SemiBold),
+                Font = OsuFont.Style.Heading2.With(weight: FontWeight.SemiBold, italics: false),
                 Text = BmsStrings.CourseRules,
             },
             new OsuSpriteText
             {
-                Font = OsuFont.Style.Body,
+                Font = OsuFont.Style.Body.With(italics: false),
                 Text = BmsStrings.CourseGauge(course.Gauge),
             },
             new OsuSpriteText
             {
                 RelativeSizeAxes = Axes.X,
-                Font = OsuFont.Style.Body,
+                Font = OsuFont.Style.Body.With(italics: false),
                 Text = course.Constraints.Count > 0
                     ? BmsStrings.CourseConstraints(string.Join(" · ", course.Constraints))
                     : BmsStrings.CourseConstraintsNone,
@@ -311,56 +454,12 @@ internal partial class BmsCourseDetailsArea : VisibilityContainer
         ],
     });
 
-    private static Drawable createStageCard(int index, BmsCourseStage stage)
-    {
-        return createCard(58, new GridContainer
-        {
-            RelativeSizeAxes = Axes.X,
-            Height = 34,
-            ColumnDimensions =
-            [
-                new Dimension(GridSizeMode.Absolute, 42),
-                new Dimension(),
-                new Dimension(GridSizeMode.AutoSize),
-            ],
-            Content = new[]
-            {
-                new Drawable[]
-                {
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                        Font = OsuFont.Style.Heading2.With(weight: FontWeight.Bold),
-                        Text = BmsStrings.CourseStageNumber(index),
-                    },
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                        RelativeSizeAxes = Axes.X,
-                        Font = OsuFont.Style.Body,
-                        Text = stage.Title,
-                    },
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.CentreRight,
-                        Origin = Anchor.CentreRight,
-                        Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
-                        Colour = stage.IsAvailable ? Color4.White.Opacity(0.75f) : Color4.OrangeRed,
-                        Text = stage.IsAvailable ? stage.Difficulty : BmsStrings.CourseStageMissing,
-                    },
-                },
-            },
-        });
-    }
-
     private static Drawable createTextCard(LocalisableString text, float height, Color4 colour) => createCard(height, new OsuSpriteText
     {
         Anchor = Anchor.CentreLeft,
         Origin = Anchor.CentreLeft,
         RelativeSizeAxes = Axes.X,
-        Font = OsuFont.Style.Body,
+        Font = OsuFont.Style.Body.With(italics: false),
         Colour = colour,
         Text = text,
     });

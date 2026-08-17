@@ -277,10 +277,43 @@
   <data name="course_gauge" xml:space="preserve"><value>Gauge: {0}</value></data>
   <data name="course_constraints" xml:space="preserve"><value>Constraints: {0}</value></data>
   <data name="course_constraints_none" xml:space="preserve"><value>No additional constraints</value></data>
-  <data name="course_stage_count" xml:space="preserve"><value>{0} stages</value></data>
-  <data name="course_missing_stage_count" xml:space="preserve"><value>{0} missing</value></data>
   <data name="course_history" xml:space="preserve"><value>History</value></data>
   <data name="no_course_history" xml:space="preserve"><value>No plays yet</value></data>
   <data name="course_stage_missing" xml:space="preserve"><value>Missing</value></data>
   <data name="course_stage_number" xml:space="preserve"><value>#{0}</value></data>
+  <data name="course_cannot_start_missing_stages" xml:space="preserve"><value>This course cannot start because one or more stages are unavailable.</value></data>
+  <data name="course_unknown_gauge" xml:space="preserve"><value>This course uses an unsupported gauge: {0}.</value></data>
+  <data name="abandon_course" xml:space="preserve"><value>Abandon course</value></data>
+  <data name="start_next_course_stage" xml:space="preserve"><value>Start next stage</value></data>
+  <data name="course_next_stage_countdown" xml:space="preserve"><value>Next stage in {0}s</value></data>
+  <data name="abandon_course_confirmation" xml:space="preserve"><value>Abandon this course? Completed stage scores will be kept and remaining stages will be left empty.</value></data>
+  <data name="abandon_course_confirm" xml:space="preserve"><value>Abandon</value></data>
+  <data name="cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="return_to_course_select" xml:space="preserve"><value>Return to course select</value></data>
+  <data name="course_passed" xml:space="preserve"><value>Course passed</value></data>
+  <data name="course_failed" xml:space="preserve"><value>Course failed</value></data>
+  <data name="course_aborted" xml:space="preserve"><value>Course abandoned</value></data>
+  <data name="course_stage_passed" xml:space="preserve"><value>Passed</value></data>
+  <data name="course_stage_failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="course_stage_aborted" xml:space="preserve"><value>Abandoned</value></data>
+  <data name="course_stage_not_played" xml:space="preserve"><value>Not played</value></data>
+  <data name="course_mapped_by" xml:space="preserve"><value>by {0}</value></data>
+  <data name="course_accuracy_abbreviation" xml:space="preserve"><value>ACC</value></data>
+  <data name="course_accuracy_value" xml:space="preserve"><value>{0}</value></data>
+  <data name="course_ex_score" xml:space="preserve"><value>EXSCORE</value></data>
+  <data name="course_ex_score_value" xml:space="preserve"><value>{0:N0}</value></data>
+  <data name="course_ex_score_maximum" xml:space="preserve"><value>/{0:N0}</value></data>
+  <data name="course_result_score" xml:space="preserve"><value>{0:N0} points</value></data>
+  <data name="course_result_accuracy" xml:space="preserve"><value>{0:P2} accuracy</value></data>
+  <data name="course_result_health" xml:space="preserve"><value>{0:P0} gauge</value></data>
+  <data name="course_summary" xml:space="preserve"><value>Course summary</value></data>
+  <data name="course_total_score" xml:space="preserve"><value>Total score</value></data>
+  <data name="course_overall_accuracy" xml:space="preserve"><value>Overall accuracy</value></data>
+  <data name="course_cleared_stages" xml:space="preserve"><value>Cleared stages</value></data>
+  <data name="course_played_stages" xml:space="preserve"><value>Played stages</value></data>
+  <data name="course_final_gauge" xml:space="preserve"><value>Final gauge</value></data>
+  <data name="course_mods" xml:space="preserve"><value>Mods</value></data>
+  <data name="course_result_stage_fraction" xml:space="preserve"><value>{0} / {1}</value></data>
+  <data name="course_result_mods" xml:space="preserve"><value>{0}</value></data>
+  <data name="course_result_score_compact" xml:space="preserve"><value>{0:N0}</value></data>
 </root>

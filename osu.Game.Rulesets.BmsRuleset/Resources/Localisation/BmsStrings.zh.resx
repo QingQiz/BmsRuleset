@@ -277,10 +277,43 @@
   <data name="course_gauge" xml:space="preserve"><value>血条：{0}</value></data>
   <data name="course_constraints" xml:space="preserve"><value>限制：{0}</value></data>
   <data name="course_constraints_none" xml:space="preserve"><value>无额外限制</value></data>
-  <data name="course_stage_count" xml:space="preserve"><value>{0} 首</value></data>
-  <data name="course_missing_stage_count" xml:space="preserve"><value>缺少 {0} 首</value></data>
   <data name="course_history" xml:space="preserve"><value>历史成绩</value></data>
   <data name="no_course_history" xml:space="preserve"><value>暂无成绩</value></data>
   <data name="course_stage_missing" xml:space="preserve"><value>缺失</value></data>
   <data name="course_stage_number" xml:space="preserve"><value>#{0}</value></data>
+  <data name="course_cannot_start_missing_stages" xml:space="preserve"><value>该段位存在缺失谱面，无法开始。</value></data>
+  <data name="course_unknown_gauge" xml:space="preserve"><value>该段位使用了不支持的血条：{0}。</value></data>
+  <data name="abandon_course" xml:space="preserve"><value>放弃段位</value></data>
+  <data name="start_next_course_stage" xml:space="preserve"><value>开始下一首</value></data>
+  <data name="course_next_stage_countdown" xml:space="preserve"><value>{0} 秒后开始下一首</value></data>
+  <data name="abandon_course_confirmation" xml:space="preserve"><value>确定放弃该段位吗？已完成曲目的成绩会保留，尚未游玩的曲目将留空。</value></data>
+  <data name="abandon_course_confirm" xml:space="preserve"><value>放弃</value></data>
+  <data name="cancel" xml:space="preserve"><value>取消</value></data>
+  <data name="return_to_course_select" xml:space="preserve"><value>返回段位选择</value></data>
+  <data name="course_passed" xml:space="preserve"><value>段位通过</value></data>
+  <data name="course_failed" xml:space="preserve"><value>段位失败</value></data>
+  <data name="course_aborted" xml:space="preserve"><value>已放弃段位</value></data>
+  <data name="course_stage_passed" xml:space="preserve"><value>通过</value></data>
+  <data name="course_stage_failed" xml:space="preserve"><value>失败</value></data>
+  <data name="course_stage_aborted" xml:space="preserve"><value>已放弃</value></data>
+  <data name="course_stage_not_played" xml:space="preserve"><value>未游玩</value></data>
+  <data name="course_mapped_by" xml:space="preserve"><value>由 {0} 制谱</value></data>
+  <data name="course_accuracy_abbreviation" xml:space="preserve"><value>ACC</value></data>
+  <data name="course_accuracy_value" xml:space="preserve"><value>{0}</value></data>
+  <data name="course_ex_score" xml:space="preserve"><value>EXSCORE</value></data>
+  <data name="course_ex_score_value" xml:space="preserve"><value>{0:N0}</value></data>
+  <data name="course_ex_score_maximum" xml:space="preserve"><value>/{0:N0}</value></data>
+  <data name="course_result_score" xml:space="preserve"><value>{0:N0} 分</value></data>
+  <data name="course_result_accuracy" xml:space="preserve"><value>准确率 {0:P2}</value></data>
+  <data name="course_result_health" xml:space="preserve"><value>血量 {0:P0}</value></data>
+  <data name="course_summary" xml:space="preserve"><value>段位汇总</value></data>
+  <data name="course_total_score" xml:space="preserve"><value>总分</value></data>
+  <data name="course_overall_accuracy" xml:space="preserve"><value>综合准确率</value></data>
+  <data name="course_cleared_stages" xml:space="preserve"><value>通过曲目</value></data>
+  <data name="course_played_stages" xml:space="preserve"><value>已玩曲目</value></data>
+  <data name="course_final_gauge" xml:space="preserve"><value>最终血量</value></data>
+  <data name="course_mods" xml:space="preserve"><value>模组</value></data>
+  <data name="course_result_stage_fraction" xml:space="preserve"><value>{0} / {1}</value></data>
+  <data name="course_result_mods" xml:space="preserve"><value>{0}</value></data>
+  <data name="course_result_score_compact" xml:space="preserve"><value>{0:N0}</value></data>
 </root>

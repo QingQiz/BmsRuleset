@@ -280,10 +280,6 @@ public static class BmsStrings
 
     public static LocalisableString CourseConstraintsNone => get("course_constraints_none");
 
-    public static LocalisableString CourseStageCount(int count) => get("course_stage_count", count);
-
-    public static LocalisableString CourseMissingStageCount(int count) => get("course_missing_stage_count", count);
-
     public static LocalisableString CourseHistory => get("course_history");
 
     public static LocalisableString NoCourseHistory => get("no_course_history");
@@ -291,6 +287,76 @@ public static class BmsStrings
     public static LocalisableString CourseStageMissing => get("course_stage_missing");
 
     public static LocalisableString CourseStageNumber(int number) => get("course_stage_number", number);
+
+    public static LocalisableString CourseCannotStartMissingStages => get("course_cannot_start_missing_stages");
+
+    public static LocalisableString CourseUnknownGauge(string gauge) => get("course_unknown_gauge", gauge);
+
+    public static LocalisableString AbandonCourse => get("abandon_course");
+
+    public static LocalisableString StartNextCourseStage => get("start_next_course_stage");
+
+    public static LocalisableString CourseNextStageCountdown(int seconds) => get("course_next_stage_countdown", seconds);
+
+    public static LocalisableString AbandonCourseConfirmation => get("abandon_course_confirmation");
+
+    public static LocalisableString AbandonCourseConfirm => get("abandon_course_confirm");
+
+    public static LocalisableString Cancel => get("cancel");
+
+    public static LocalisableString ReturnToCourseSelect => get("return_to_course_select");
+
+    public static LocalisableString CoursePassed => get("course_passed");
+
+    public static LocalisableString CourseFailed => get("course_failed");
+
+    public static LocalisableString CourseAborted => get("course_aborted");
+
+    public static LocalisableString CourseStagePassed => get("course_stage_passed");
+
+    public static LocalisableString CourseStageFailed => get("course_stage_failed");
+
+    public static LocalisableString CourseStageAborted => get("course_stage_aborted");
+
+    public static LocalisableString CourseStageNotPlayed => get("course_stage_not_played");
+
+    public static LocalisableString CourseMappedBy(string mapper) => get("course_mapped_by", mapper);
+
+    public static LocalisableString CourseAccuracyAbbreviation => get("course_accuracy_abbreviation");
+
+    public static LocalisableString CourseAccuracyValue(LocalisableString accuracy) => get("course_accuracy_value", accuracy);
+
+    public static LocalisableString CourseExScore => get("course_ex_score");
+
+    public static LocalisableString CourseExScoreValue(int score) => get("course_ex_score_value", score);
+
+    public static LocalisableString CourseExScoreMaximum(int maximum) => get("course_ex_score_maximum", maximum);
+
+    public static LocalisableString CourseResultScore(long score) => get("course_result_score", score);
+
+    public static LocalisableString CourseResultAccuracy(double accuracy) => get("course_result_accuracy", accuracy);
+
+    public static LocalisableString CourseResultHealth(double health) => get("course_result_health", health);
+
+    public static LocalisableString CourseSummary => get("course_summary");
+
+    public static LocalisableString CourseTotalScore => get("course_total_score");
+
+    public static LocalisableString CourseOverallAccuracy => get("course_overall_accuracy");
+
+    public static LocalisableString CourseClearedStages => get("course_cleared_stages");
+
+    public static LocalisableString CoursePlayedStages => get("course_played_stages");
+
+    public static LocalisableString CourseFinalGauge => get("course_final_gauge");
+
+    public static LocalisableString CourseMods => get("course_mods");
+
+    public static LocalisableString CourseResultStageFraction(int count, int total) => get("course_result_stage_fraction", count, total);
+
+    public static LocalisableString CourseResultMods(string mods) => get("course_result_mods", mods);
+
+    public static LocalisableString CourseResultScoreCompact(long score) => get("course_result_score_compact", score);
 
     public static LocalisableString Subdivide => get("subdivide");
 

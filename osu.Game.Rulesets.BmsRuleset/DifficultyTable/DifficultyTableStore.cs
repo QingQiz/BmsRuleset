@@ -22,6 +22,8 @@ public partial class DifficultyTableStore
 {
     public IReadOnlyList<DifficultyTable> Tables => tables;
 
+    internal event Action? TablesChanged;
+
     internal CollectionSyncManager? CollectionSyncManager { get; }
 
     /// <summary>
@@ -67,7 +69,11 @@ public partial class DifficultyTableStore
         md5Index.Clear();
 
         var sources = config?.Get<string>(BmsRulesetSetting.DifficultyTableSources) ?? string.Empty;
-        if (string.IsNullOrEmpty(sources)) return;
+        if (string.IsNullOrEmpty(sources))
+        {
+            TablesChanged?.Invoke();
+            return;
+        }
 
         foreach (var source in sources.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -90,6 +96,8 @@ public partial class DifficultyTableStore
             if (table != null)
                 RestoreTable(table);
         }
+
+        TablesChanged?.Invoke();
     }
 
     /// <summary>
@@ -233,6 +241,7 @@ public partial class DifficultyTableStore
     public void AddTable(DifficultyTable table, ProgressNotification? notification = null)
     {
         tables.Add(table);
+        TablesChanged?.Invoke();
         NotifyToRebuildTableList(null);
         addToIndex(table);
         NotifyToRefreshAllDiffNames(notification);
@@ -240,7 +249,7 @@ public partial class DifficultyTableStore
     }
 
     /// <summary>
-    /// Restore a table at startup. No events fired — markers and collections are in Realm already.
+    /// Restore a table at startup. UI, marker, and collection events are not fired because those values are already persisted.
     /// </summary>
     public void RestoreTable(DifficultyTable table)
     {
@@ -259,6 +268,7 @@ public partial class DifficultyTableStore
         //     tables.Add(dt);
         tables.Add(table);
         addToIndex(table);
+        TablesChanged?.Invoke();
     }
 
     /// <summary>
@@ -267,6 +277,7 @@ public partial class DifficultyTableStore
     public void RemoveTable(DifficultyTable table, ProgressNotification? notification = null)
     {
         tables.Remove(table);
+        TablesChanged?.Invoke();
         NotifyToRebuildTableList(table);
         removeFromIndex(table);
         NotifyToRefreshAllDiffNames(notification);
@@ -307,6 +318,7 @@ public partial class DifficultyTableStore
             addToIndex(newTable);
         }
 
+        TablesChanged?.Invoke();
         NotifyToRebuildTableList(null);
         NotifyToRefreshAllDiffNames(notification);
         persistTableList();

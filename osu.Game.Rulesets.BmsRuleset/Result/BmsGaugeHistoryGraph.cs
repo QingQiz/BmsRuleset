@@ -53,6 +53,14 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         series = CreateSeries(score, playableBeatmap);
     }
 
+    internal BmsGaugeHistoryGraph(IReadOnlyList<(ScoreInfo Score, IBeatmap Beatmap)> stages)
+    {
+        RelativeSizeAxes = Axes.X;
+        AutoSizeAxes = Axes.Y;
+
+        series = createCourseSeries(stages);
+    }
+
     [BackgroundDependencyLoader]
     private void load()
     {
@@ -94,6 +102,41 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         var finalGaugeType = finalGaugeTypeFor(score.Mods, gaugeTypes);
 
         return gaugeTypes.Select(type => createSeries(type, hitEvents, total, noteCount, duration, type == finalGaugeType)).ToArray();
+    }
+
+    private static IReadOnlyList<GaugeSeries> createCourseSeries(IReadOnlyList<(ScoreInfo Score, IBeatmap Beatmap)> stages)
+    {
+        if (stages.Count == 0)
+            return [];
+
+        var stageSeries = stages.Select(stage => CreateSeries(stage.Score, stage.Beatmap)).ToArray();
+        var names = stageSeries.SelectMany(stage => stage.Select(gauge => gauge.Name)).Distinct().ToArray();
+
+        return names.Select(name =>
+        {
+            var matching = stageSeries.Select(stage => stage.FirstOrDefault(gauge => gauge.Name == name)).ToArray();
+            var template = matching.Last(gauge => gauge != null)!;
+            var points = new List<GaugePoint>();
+            GaugePoint? failurePoint = null;
+
+            for (var i = 0; i < matching.Length; i++)
+            {
+                var gauge = matching[i];
+                if (gauge == null)
+                    continue;
+
+                points.AddRange(gauge.Points.Select(point => point with { Time = (i + point.Time) / stages.Count }));
+
+                if (failurePoint == null && gauge.FailurePoint is { } stageFailure)
+                    failurePoint = stageFailure with { Time = (i + stageFailure.Time) / stages.Count };
+            }
+
+            return template with
+            {
+                Points = points,
+                FailurePoint = failurePoint,
+            };
+        }).ToArray();
     }
 
     private static IReadOnlyList<GaugeSeries> createSeries(ScoreInfo score, IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory, double duration)

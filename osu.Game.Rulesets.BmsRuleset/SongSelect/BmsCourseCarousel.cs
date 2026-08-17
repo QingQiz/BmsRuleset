@@ -16,6 +16,8 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
 {
     internal event Action<BmsCourseDefinition?>? CourseSelected;
 
+    internal event Action? CourseActivated;
+
     internal event Action<int>? MatchesChanged;
 
     internal BmsCourseDefinition? SelectedCourse => (CurrentSelection as BmsGroupedCourse)?.Course;
@@ -61,7 +63,8 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
         if (top.Model is BmsCourseTableGroup ^ bottom.Model is BmsCourseTableGroup)
             return BeatmapCarousel.SPACING * 2;
 
-        if (top.Model is BmsGroupedCourse || bottom.Model is BmsGroupedCourse)
+        if (top.Model is BmsGroupedCourse or BmsGroupedCourseStage
+            || bottom.Model is BmsGroupedCourse or BmsGroupedCourseStage)
             return BeatmapCarousel.SPACING;
 
         return -BeatmapCarousel.SPACING;
@@ -81,6 +84,9 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
                 coursePanel.CourseCarousel = this;
                 return coursePanel;
 
+            case BmsGroupedCourseStage stage:
+                return new BmsCourseStagePanel(stage.StageIndex + 1, stage.Stage);
+
             default:
                 throw new InvalidOperationException($"Unsupported BMS course carousel model {item.Model.GetType().Name}.");
         }
@@ -97,6 +103,11 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
             case BmsGroupedCourse groupedCourse:
                 if (SelectedCourse?.Id != groupedCourse.Course.Id)
                     CurrentSelection = groupedCourse;
+                else
+                    CourseActivated?.Invoke();
+                break;
+
+            case BmsGroupedCourseStage:
                 break;
         }
     }
@@ -104,7 +115,9 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
     protected override void HandleItemSelected(object? model)
     {
         base.HandleItemSelected(model);
-        CourseSelected?.Invoke((model as BmsGroupedCourse)?.Course);
+        var course = (model as BmsGroupedCourse)?.Course;
+        updateExpandedCourse(course?.Id);
+        CourseSelected?.Invoke(course);
     }
 
     protected override void HandleFilterCompleted()
@@ -122,6 +135,7 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
                             ?? visibleCourses.FirstOrDefault();
 
         CurrentSelection = nextSelection;
+        updateExpandedCourse(nextSelection?.Course.Id);
         MatchesChanged?.Invoke(filter.BeatmapItemsCount);
     }
 
@@ -149,22 +163,63 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
 
         groupItem.IsExpanded = !collapsed;
 
-        if (filter.GroupItems.TryGetValue(group, out var children))
+        if (filter.GroupItems.TryGetValue(group, out var courses))
         {
-            foreach (var child in children)
-                child.IsVisible = !collapsed;
+            foreach (var course in courses)
+            {
+                course.CourseItem.IsVisible = !collapsed;
+                course.CourseItem.IsExpanded = false;
+
+                foreach (var stage in course.StageItems)
+                    stage.IsVisible = false;
+            }
+        }
+
+        updateExpandedCourse(SelectedCourse?.Id);
+    }
+
+    private void updateExpandedCourse(string? selectedCourseId)
+    {
+        foreach (var (group, courses) in filter.GroupItems)
+        {
+            var groupVisible = !isTableCollapsed(group.TableName);
+
+            foreach (var course in courses)
+            {
+                var expanded = groupVisible
+                               && course.CourseItem.IsVisible
+                               && course.Course.Course.Id == selectedCourseId;
+
+                course.CourseItem.IsExpanded = expanded;
+
+                foreach (var stage in course.StageItems)
+                    stage.IsVisible = expanded;
+            }
         }
     }
 
 }
 
-internal sealed record BmsCourseTableGroup(int Order, string TableName) : GroupDefinition(Order, TableName);
+internal sealed record BmsCourseTableGroup(int Order, string TableName, string Mark)
+    : GroupDefinition(Order, string.IsNullOrEmpty(Mark) ? TableName : $"{Mark}  {TableName}");
 
 internal sealed record BmsGroupedCourse(BmsCourseTableGroup Group, BmsCourseDefinition Course);
 
+internal sealed record BmsGroupedCourseStage(
+    BmsCourseTableGroup Group,
+    BmsCourseDefinition Course,
+    int StageIndex,
+    BmsCourseStage Stage);
+
+internal sealed record BmsCourseCarouselItems(
+    BmsGroupedCourse Course,
+    CarouselItem CourseItem,
+    IReadOnlyList<CarouselItem> StageItems);
+
 internal sealed class BmsCourseCarouselFilter(Func<string> getSearchTerm, Func<string, bool> isTableCollapsed) : ICarouselFilter
 {
-    internal IReadOnlyDictionary<BmsCourseTableGroup, IReadOnlyList<CarouselItem>> GroupItems { get; private set; } = new Dictionary<BmsCourseTableGroup, IReadOnlyList<CarouselItem>>();
+    internal IReadOnlyDictionary<BmsCourseTableGroup, IReadOnlyList<BmsCourseCarouselItems>> GroupItems { get; private set; }
+        = new Dictionary<BmsCourseTableGroup, IReadOnlyList<BmsCourseCarouselItems>>();
 
     public int BeatmapItemsCount { get; private set; }
 
@@ -174,14 +229,14 @@ internal sealed class BmsCourseCarouselFilter(Func<string> getSearchTerm, Func<s
             .Where(course => course.Matches(getSearchTerm()))
             .ToArray();
         var result = new List<CarouselItem>();
-        var newGroupItems = new Dictionary<BmsCourseTableGroup, IReadOnlyList<CarouselItem>>();
+        var newGroupItems = new Dictionary<BmsCourseTableGroup, IReadOnlyList<BmsCourseCarouselItems>>();
         var order = 0;
 
         foreach (var table in matchingCourses.GroupBy(course => course.TableName, StringComparer.OrdinalIgnoreCase))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var group = new BmsCourseTableGroup(order++, table.Key);
+            var group = new BmsCourseTableGroup(order++, table.Key, table.First().TableMark);
             var collapsed = isTableCollapsed(table.Key);
             var groupItem = new CarouselItem(group)
             {
@@ -190,15 +245,35 @@ internal sealed class BmsCourseCarouselFilter(Func<string> getSearchTerm, Func<s
                 IsExpanded = !collapsed,
                 NestedItemCount = table.Count(),
             };
-            var children = table.Select(course => new CarouselItem(new BmsGroupedCourse(group, course))
+            var courses = table.Select(course =>
             {
-                DrawHeight = PanelBeatmapStandalone.HEIGHT,
-                IsVisible = !collapsed,
+                var groupedCourse = new BmsGroupedCourse(group, course);
+                var courseItem = new CarouselItem(groupedCourse)
+                {
+                    DrawHeight = PanelBeatmapStandalone.HEIGHT,
+                    DepthLayer = -1,
+                    IsVisible = !collapsed,
+                    NestedItemCount = course.Stages.Count,
+                };
+                var stageItems = course.Stages.Select((stage, stageIndex) => new CarouselItem(
+                    new BmsGroupedCourseStage(group, course, stageIndex, stage))
+                {
+                    DrawHeight = PanelBeatmapStandalone.HEIGHT,
+                    IsVisible = false,
+                }).ToArray();
+
+                return new BmsCourseCarouselItems(groupedCourse, courseItem, stageItems);
             }).ToArray();
 
             result.Add(groupItem);
-            result.AddRange(children);
-            newGroupItems[group] = children;
+
+            foreach (var course in courses)
+            {
+                result.Add(course.CourseItem);
+                result.AddRange(course.StageItems);
+            }
+
+            newGroupItems[group] = courses;
         }
 
         GroupItems = newGroupItems;

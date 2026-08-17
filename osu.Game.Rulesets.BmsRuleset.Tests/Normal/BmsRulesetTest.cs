@@ -330,6 +330,9 @@ public class BmsRulesetTest
         Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModEasyGauge)));
         Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModExHardGauge)));
         Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModHazardGauge)));
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModClassGauge)));
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModExClassGauge)));
+        Assert.That(hard.IncompatibleMods, Does.Contain(typeof(BmsModExHardClassGauge)));
     }
 
     [Test]
@@ -337,12 +340,16 @@ public class BmsRulesetTest
     {
         var reduction = ruleset.GetModsFor(ModType.DifficultyReduction).ToArray();
         var increase = ruleset.GetModsFor(ModType.DifficultyIncrease).ToArray();
+        var system = ruleset.GetModsFor(ModType.System).ToArray();
 
         Assert.That(reduction.OfType<BmsModAssistEasyGauge>().Single().Acronym, Is.EqualTo("E2"));
         Assert.That(reduction.OfType<BmsModEasyGauge>().Single().Acronym, Is.EqualTo("E1"));
         Assert.That(increase.OfType<BmsModHardGauge>().Single().Acronym, Is.EqualTo("H1"));
         Assert.That(increase.OfType<BmsModExHardGauge>().Single().Acronym, Is.EqualTo("H2"));
         Assert.That(increase.OfType<BmsModHazardGauge>().Single().Acronym, Is.EqualTo("H3"));
+        Assert.That(system.OfType<BmsModClassGauge>().Single().Acronym, Is.EqualTo("C1"));
+        Assert.That(system.OfType<BmsModExClassGauge>().Single().Acronym, Is.EqualTo("C2"));
+        Assert.That(system.OfType<BmsModExHardClassGauge>().Single().Acronym, Is.EqualTo("C3"));
     }
 
     [Test]

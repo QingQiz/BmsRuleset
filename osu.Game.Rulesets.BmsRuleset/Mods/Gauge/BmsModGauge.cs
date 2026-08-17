@@ -19,6 +19,9 @@ public abstract class BmsModGauge : Mod, IApplicableToHealthProcessor
         typeof(BmsModHardGauge),
         typeof(BmsModExHardGauge),
         typeof(BmsModHazardGauge),
+        typeof(BmsModClassGauge),
+        typeof(BmsModExClassGauge),
+        typeof(BmsModExHardClassGauge),
     ];
 
     private static readonly Dictionary<BmsGaugeType, Type> gauge_mod_by_type = buildGaugeModByType();

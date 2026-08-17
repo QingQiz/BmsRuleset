@@ -1,10 +1,20 @@
 using System;
+using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Audio;
+using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Framework.Platform;
+using osu.Framework.Screens;
+using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.Input.Bindings;
+using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Screens.Select;
 
@@ -20,6 +30,10 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     internal BmsCourseCarousel CourseCarousel { get; }
 
+    internal BmsCourseDefinition? SelectedCourse => selectedCourse.Value;
+
+    internal Action? StartRequested { get; set; }
+
     internal event Action<bool>? CourseModeChanged;
 
     private readonly BmsCourseCatalog catalog;
@@ -28,6 +42,8 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     private readonly FilterControl originalFilter;
     private readonly BeatmapCarousel originalCarousel;
     private readonly NoResultsPlaceholder originalNoResults;
+    private readonly Container carouselHost;
+    private readonly MarginPadding originalCarouselHostPadding;
     private readonly Drawable originalTitleWrapper;
     private readonly Drawable originalDetailsWrapper;
     private readonly FillFlowContainer wedgesContainer;
@@ -48,6 +64,13 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     private Visibility originalNoResultsState;
     private float originalCarouselAlpha = 1;
     private int matchedCourses = -1;
+    private Sample? confirmSelectionSample;
+
+    [Resolved]
+    private BeatmapManager beatmaps { get; set; } = null!;
+
+    [Resolved(canBeNull: true)]
+    private INotificationOverlay? notifications { get; set; }
 
     internal BmsCourseSongSelectController(
         BmsCourseCatalog catalog,
@@ -66,6 +89,8 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         this.originalFilter = originalFilter;
         this.originalCarousel = originalCarousel;
         this.originalNoResults = originalNoResults;
+        carouselHost = (Container)originalCarousel.Parent!;
+        originalCarouselHostPadding = carouselHost.Padding;
 
         originalTitleWrapper = originalTitle.Parent!;
         originalDetailsWrapper = originalDetails.Parent!;
@@ -98,14 +123,22 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         };
 
         wedgesContainer.AddRange([courseTitleWrapper, courseDetailsWrapper]);
-        ((Container)originalCarousel.Parent!).AddRange([CourseCarousel, courseNoResults]);
+        carouselHost.AddRange([CourseCarousel, courseNoResults]);
         ((Container)originalFilter.Parent!).Add(courseFilter);
 
         CourseCarousel.CourseSelected += courseSelected;
+        CourseCarousel.CourseActivated += courseActivated;
         CourseCarousel.MatchesChanged += matchesChanged;
         SearchTerm.BindValueChanged(searchChanged);
         catalog.Changed += catalogChanged;
         CourseCarousel.SetCourses(catalog.Courses);
+    }
+
+    [BackgroundDependencyLoader]
+    private void load(AudioManager audio, GameHost host, RealmAccess realm)
+    {
+        confirmSelectionSample = audio.Samples.Get(@"SongSelect/confirm-selection");
+        BmsRulesetRuntime.EnsureDifficultyTableStore(host, realm);
     }
 
     internal void AttachRandomButton(FooterButtonRandom? button)
@@ -125,6 +158,50 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             HideCourseMode();
         else
             ShowCourseMode();
+    }
+
+    internal bool TryStartCourse(SoloSongSelect songSelect)
+    {
+        var course = SelectedCourse;
+
+        if (!IsCourseMode || course == null || !songSelect.IsCurrentScreen())
+            return false;
+
+        if (!BmsCourseSession.TryParseGauge(course.Gauge, out var gaugeType))
+        {
+            notifications?.Post(new SimpleNotification { Text = BmsStrings.CourseUnknownGauge(course.Gauge) });
+            return false;
+        }
+
+        var resolvedStages = course.Stages.Select(resolveStage).ToArray();
+
+        if (resolvedStages.Any(stage => stage == null))
+        {
+            notifications?.Post(new SimpleNotification { Text = BmsStrings.CourseCannotStartMissingStages });
+            return false;
+        }
+
+        var mods = BmsCourseSession.CreateCourseMods(songSelect.Mods.Value, gaugeType);
+        var session = new BmsCourseSession(course, resolvedStages.Cast<BmsResolvedCourseStage>(), mods, gaugeType);
+
+        confirmSelectionSample?.Play();
+        songSelect.Push(new BmsCourseSessionScreen(session, songSelect.Beatmap.Value, songSelect.Mods.Value));
+        return true;
+
+        BmsResolvedCourseStage? resolveStage(BmsCourseStage stage)
+        {
+            if (!stage.IsAvailable || string.IsNullOrEmpty(stage.BeatmapHash))
+                return null;
+
+            var hash = stage.BeatmapHash;
+            var beatmap = hash.Length switch
+            {
+                32 => beatmaps.QueryBeatmap(info => info.MD5Hash == hash),
+                64 => beatmaps.QueryBeatmap(info => info.Hash == hash),
+                _ => null,
+            };
+            return beatmap == null ? null : new BmsResolvedCourseStage(stage, beatmap);
+        }
     }
 
     internal void ShowCourseMode()
@@ -173,6 +250,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         originalNoResults.Alpha = 0;
 
         courseDetails.Height = Math.Max(0, wedgesContainer.ChildSize.Y - courseTitle.LayoutSize.Y - 4);
+        updateCourseCarouselTopPadding();
     }
 
     protected override void Dispose(bool isDisposing)
@@ -180,10 +258,14 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         catalog.Changed -= catalogChanged;
         SearchTerm.ValueChanged -= searchChanged;
         CourseCarousel.CourseSelected -= courseSelected;
+        CourseCarousel.CourseActivated -= courseActivated;
         CourseCarousel.MatchesChanged -= matchesChanged;
 
         if (IsCourseMode && randomButton != null)
             randomButton.Enabled.Value = randomButtonEnabledBeforeCourseMode;
+
+        if (IsCourseMode)
+            carouselHost.Padding = originalCarouselHostPadding;
 
         base.Dispose(isDisposing);
     }
@@ -220,6 +302,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             courseDetails.Show();
             courseFilter.Show();
             CourseCarousel.Show();
+            updateCourseCarouselTopPadding();
             CourseCarousel.Refresh();
             updateNoResultsVisibility();
         }
@@ -235,6 +318,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             restoreVisibility(originalFilter, originalFilterState);
             originalCarousel.FadeTo(originalCarouselAlpha, 200, Easing.OutQuint);
             restoreVisibility(originalNoResults, originalNoResultsState);
+            carouselHost.Padding = originalCarouselHostPadding;
 
             courseTitle.Hide();
             courseDetails.Hide();
@@ -260,6 +344,8 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     private void courseSelected(BmsCourseDefinition? course) => selectedCourse.Value = course;
 
+    private void courseActivated() => StartRequested?.Invoke();
+
     private void matchesChanged(int count)
     {
         matchedCourses = count;
@@ -278,6 +364,14 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             ? BmsStrings.NoCoursesAvailable
             : BmsStrings.NoCoursesMatchSearch;
         courseNoResults.Show();
+    }
+
+    private void updateCourseCarouselTopPadding()
+    {
+        var top = Math.Max(originalCarouselHostPadding.Top, courseFilter.DrawHeight + 5);
+
+        carouselHost.Padding = originalCarouselHostPadding with { Top = top };
+        CourseCarousel.BleedTop = top;
     }
 
     private static void restoreVisibility(VisibilityContainer container, Visibility state)

@@ -48,6 +48,14 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         statistics = CreateStatistics(playableBeatmap, hitEvents);
     }
 
+    internal BmsHitScatterStatistic(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
+    {
+        RelativeSizeAxes = Axes.X;
+        AutoSizeAxes = Axes.Y;
+
+        statistics = createCourseStatistics(stages);
+    }
+
     public override bool HandlePositionalInput => true;
 
     [BackgroundDependencyLoader]
@@ -82,6 +90,44 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             .ToArray();
 
         return new HitScatterStatistics(CreateData(scatterHits), keyGroups);
+    }
+
+    private static HitScatterStatistics createCourseStatistics(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
+    {
+        var stageStatistics = stages.Select(stage => CreateStatistics(stage.Beatmap, stage.HitEvents)).ToArray();
+        var durations = stageStatistics.Select(stage => stage.Overall.Duration).ToArray();
+        var keyCount = stageStatistics.Select(stage => stage.Keys.Count).DefaultIfEmpty(0).Max();
+
+        return new HitScatterStatistics(
+            combineData(stageStatistics.Select((stage, index) => (Data: (ScatterData?)stage.Overall, Duration: durations[index])).ToArray()),
+            Enumerable.Range(0, keyCount).Select(keyIndex => new KeyHitScatterStatistics(
+                stageStatistics.First(stage => stage.Keys.Count > keyIndex).Keys[keyIndex].Label,
+                combineData(stageStatistics.Select((stage, index) =>
+                    (Data: stage.Keys.ElementAtOrDefault(keyIndex)?.Data, Duration: durations[index])).ToArray()))).ToArray());
+    }
+
+    private static ScatterData combineData(IReadOnlyList<(ScatterData? Data, double Duration)> stages)
+    {
+        var duration = Math.Max(1, stages.Sum(stage => stage.Duration));
+        var offsetRange = stages.Select(stage => stage.Data?.OffsetRange ?? minimum_offset_range).DefaultIfEmpty(minimum_offset_range).Max();
+        var points = new List<ScatterPoint>();
+        double elapsed = 0;
+
+        foreach (var stage in stages)
+        {
+            if (stage.Data != null)
+            {
+                points.AddRange(stage.Data.Points.Select(point => point with
+                {
+                    Time = elapsed + point.Time,
+                    Offset = displayedOffsetFor(point, offsetRange),
+                }));
+            }
+
+            elapsed += stage.Duration;
+        }
+
+        return new ScatterData(points, duration, offsetRange, [-offsetRange, -offsetRange / 2, 0, offsetRange / 2, offsetRange]);
     }
 
     private static string labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)

@@ -26,6 +26,7 @@ public static class BmsCourseSongSelectPatcher
     private static FieldInfo? carouselField;
     private static FieldInfo? noResultsPlaceholderField;
     private static MethodInfo? filterControlGetter;
+    private static MethodInfo? soloOnStartMethod;
     private static bool disabled;
 
     public static bool IsInstalled { get; private set; }
@@ -39,6 +40,8 @@ public static class BmsCourseSongSelectPatcher
         {
             var target = AccessTools.Method(typeof(OsuSongSelect), nameof(OsuSongSelect.CreateFooterButtons));
             var postfixMethod = AccessTools.Method(typeof(BmsCourseSongSelectPatcher), nameof(postfix));
+            soloOnStartMethod = AccessTools.Method(typeof(SoloSongSelect), "OnStart");
+            var startPrefixMethod = AccessTools.Method(typeof(BmsCourseSongSelectPatcher), nameof(startPrefix));
             addInternalMethod = AccessTools.Method(typeof(CompositeDrawable), "AddInternal", [typeof(Drawable)]);
             wedgesContainerField = AccessTools.Field(typeof(OsuSongSelect), "wedgesContainer");
             titleWedgeField = AccessTools.Field(typeof(OsuSongSelect), "titleWedge");
@@ -47,7 +50,7 @@ public static class BmsCourseSongSelectPatcher
             noResultsPlaceholderField = AccessTools.Field(typeof(OsuSongSelect), "noResultsPlaceholder");
             filterControlGetter = AccessTools.PropertyGetter(typeof(OsuSongSelect), "FilterControl");
 
-            if (target == null || postfixMethod == null || addInternalMethod == null || wedgesContainerField == null
+            if (target == null || postfixMethod == null || soloOnStartMethod == null || startPrefixMethod == null || addInternalMethod == null || wedgesContainerField == null
                 || titleWedgeField == null || detailsAreaField == null || carouselField == null
                 || noResultsPlaceholderField == null || filterControlGetter == null)
             {
@@ -56,6 +59,7 @@ public static class BmsCourseSongSelectPatcher
             }
 
             new Harmony(harmony_id).Patch(target, postfix: new HarmonyMethod(postfixMethod));
+            new Harmony(harmony_id).Patch(soloOnStartMethod, prefix: new HarmonyMethod(startPrefixMethod));
             IsInstalled = true;
         }
         catch (Exception e)
@@ -73,6 +77,7 @@ public static class BmsCourseSongSelectPatcher
         try
         {
             var controller = controllers.GetValue(soloSongSelect, createController);
+            controller.StartRequested = () => controller.TryStartCourse(soloSongSelect);
             var randomButton = __result.OfType<FooterButtonRandom>().SingleOrDefault();
             controller.AttachRandomButton(randomButton);
             __result = [.. __result, new BmsCourseFooterButton(controller)];
@@ -81,6 +86,15 @@ public static class BmsCourseSongSelectPatcher
         {
             disable("Failed to attach the BMS course selector to song select.", e);
         }
+    }
+
+    private static bool startPrefix(SoloSongSelect __instance)
+    {
+        if (disabled || !controllers.TryGetValue(__instance, out var controller) || !controller.IsCourseMode)
+            return true;
+
+        controller.TryStartCourse(__instance);
+        return false;
     }
     // ReSharper restore InconsistentNaming
 

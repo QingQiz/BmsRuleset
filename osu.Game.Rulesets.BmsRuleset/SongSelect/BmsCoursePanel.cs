@@ -1,4 +1,3 @@
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
@@ -9,11 +8,12 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Scoring;
 using osu.Game.Screens.Select;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.SongSelect;
 
@@ -38,7 +38,10 @@ internal partial class BmsCoursePanel : Panel
 
     private OsuSpriteText titleText = null!;
     private OsuSpriteText gaugeText = null!;
-    private OsuSpriteText stageText = null!;
+    private UpdateableRank courseRank = null!;
+    private BmsLampDisplay courseLamp = null!;
+    private BmsCourseDefinition? currentCourse;
+    private BmsCourseResultStore? resultStore;
 
     public BmsCoursePanel()
     {
@@ -59,10 +62,10 @@ internal partial class BmsCoursePanel : Panel
             Colour = colourProvider.Background5,
         };
 
-        Background = new Box
+        Background = courseLamp = new BmsLampDisplay(BmsLamp.NoPlay)
         {
             RelativeSizeAxes = Axes.Both,
-            Colour = colourProvider.Highlight1,
+            Size = Vector2.One,
         };
 
         Content.Children =
@@ -78,13 +81,22 @@ internal partial class BmsCoursePanel : Panel
                 Padding = new MarginPadding { Left = 14, Right = 30, Vertical = 8 },
                 ColumnDimensions =
                 [
-                    new Dimension(),
                     new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(),
                 ],
                 Content = new[]
                 {
                     new Drawable[]
                     {
+                        courseRank = new UpdateableRank(animate: false)
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Size = new Vector2(40, 20),
+                            Scale = new Vector2(0.8f),
+                            Alpha = 0,
+                            Margin = new MarginPadding { Right = 5 },
+                        },
                         new FillFlowContainer
                         {
                             RelativeSizeAxes = Axes.Both,
@@ -94,21 +106,15 @@ internal partial class BmsCoursePanel : Panel
                                 titleText = new OsuSpriteText
                                 {
                                     RelativeSizeAxes = Axes.X,
-                                    Font = OsuFont.Style.Heading2.With(typeface: Typeface.TorusAlternate, weight: FontWeight.Bold),
+                                    Font = OsuFont.Style.Heading2.With(typeface: Typeface.Torus, weight: FontWeight.Bold, italics: false),
                                 },
                                 gaugeText = new OsuSpriteText
                                 {
                                     RelativeSizeAxes = Axes.X,
-                                    Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
+                                    Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold, italics: false),
                                     Colour = colourProvider.Content2,
                                 },
                             ],
-                        },
-                        stageText = new OsuSpriteText
-                        {
-                            Anchor = Anchor.CentreRight,
-                            Origin = Anchor.CentreRight,
-                            Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
                         },
                     },
                 },
@@ -124,6 +130,10 @@ internal partial class BmsCoursePanel : Panel
         Expanded.BindValueChanged(_ => updateLeafPanelOffset());
         Selected.BindValueChanged(_ => updateLeafPanelOffset());
         KeyboardSelected.BindValueChanged(_ => updateLeafPanelOffset());
+        resultStore = BmsRulesetRuntime.CourseResults;
+        if (resultStore != null)
+            resultStore.Changed += courseResultChanged;
+        updateResult();
         updateLeafPanelOffset(false);
     }
 
@@ -132,15 +142,26 @@ internal partial class BmsCoursePanel : Panel
         base.PrepareForUse();
 
         var course = ((BmsGroupedCourse)Item!.Model).Course;
-        var missingCount = course.Stages.Count(stage => !stage.IsAvailable);
+        currentCourse = course;
 
         titleText.Text = course.Name;
         gaugeText.Text = BmsStrings.CourseGauge(course.Gauge);
-        stageText.Text = missingCount == 0
-            ? BmsStrings.CourseStageCount(course.Stages.Count)
-            : BmsStrings.CourseMissingStageCount(missingCount);
-        stageText.Colour = missingCount == 0 ? Color4.White : Color4.OrangeRed;
+        updateResult();
         updateLeafPanelOffset(false);
+    }
+
+    protected override void FreeAfterUse()
+    {
+        currentCourse = null;
+        base.FreeAfterUse();
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        if (resultStore != null)
+            resultStore.Changed -= courseResultChanged;
+
+        base.Dispose(isDisposing);
     }
 
     protected override bool OnClick(ClickEvent e)
@@ -152,6 +173,23 @@ internal partial class BmsCoursePanel : Panel
     }
 
     public override MenuItem[] ContextMenuItems => [];
+
+    private void courseResultChanged(string courseId)
+    {
+        if (currentCourse?.Id == courseId)
+            Scheduler.Add(updateResult);
+    }
+
+    private void updateResult()
+    {
+        if (currentCourse == null)
+            return;
+
+        courseLamp.Lamp = resultStore?.GetLamp(currentCourse.Id) ?? BmsLamp.NoPlay;
+        ScoreRank? rank = resultStore?.GetRank(currentCourse.Id);
+        courseRank.Rank = rank;
+        courseRank.Alpha = rank.HasValue ? 1 : 0;
+    }
 
     private void updateLeafPanelOffset(bool animated = true)
     {
