@@ -49,12 +49,12 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         data = CreateData(score, playableBeatmap);
     }
 
-    internal BmsTimelineStatistic(IReadOnlyList<(ScoreInfo Score, IBeatmap Beatmap)> stages)
+    internal BmsTimelineStatistic(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
     {
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        data = createCourseData(stages);
+        data = CreateCourseData(stages);
     }
 
     [BackgroundDependencyLoader]
@@ -68,9 +68,9 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
             Spacing = new Vector2(0, 8),
             Children =
             [
-                createSubplot(BmsStrings.Notes, data.Notes, null),
-                createSubplot(BmsStrings.Judgement, data.Judgements, data.FailureFraction),
-                createSubplot(BmsStrings.FastSlow, data.FastSlow, data.FailureFraction),
+                createSubplot(BmsStrings.Notes, data.Notes, null, data.StageBoundaries),
+                createSubplot(BmsStrings.Judgement, data.Judgements, data.FailureFraction, data.StageBoundaries),
+                createSubplot(BmsStrings.FastSlow, data.FastSlow, data.FailureFraction, data.StageBoundaries),
             ],
         };
     }
@@ -92,25 +92,40 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         var fastSlow = createFastSlowSubplot(timingHitEvents, duration);
         var failure = score.Passed ? null : findFailureFraction(score, playableBeatmap, scoringHitEvents, duration);
 
-        return new TimelineData(notes, judgements, fastSlow, failure);
+        return new TimelineData(notes, judgements, fastSlow, failure, []);
     }
 
-    private static TimelineData createCourseData(IReadOnlyList<(ScoreInfo Score, IBeatmap Beatmap)> stages)
+    internal static TimelineData CreateCourseData(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
     {
         if (stages.Count == 0)
-            return new TimelineData(new SubplotData([]), new SubplotData([]), new SubplotData([]), null);
+            return new TimelineData(new SubplotData([]), new SubplotData([]), new SubplotData([]), null, []);
 
-        var stageData = stages.Select(stage => CreateData(stage.Score, stage.Beatmap)).ToArray();
+        var stageData = stages.Select(stage => stage.Score != null
+            ? CreateData(stage.Score, stage.Beatmap)
+            : createUnplayedData(stage.Beatmap)).ToArray();
         var failure = stageData.Select((stage, index) => stage.FailureFraction is { } fraction
-                                      ? (double?)((index + fraction) / stageData.Length)
-                                      : null)
-                               .FirstOrDefault(value => value.HasValue);
+                ? (double?)((index + fraction) / stageData.Length)
+                : null)
+            .FirstOrDefault(value => value.HasValue);
 
         return new TimelineData(
             combineSubplots(stageData.Select(stage => stage.Notes).ToArray()),
             combineSubplots(stageData.Select(stage => stage.Judgements).ToArray()),
             combineSubplots(stageData.Select(stage => stage.FastSlow).ToArray()),
-            failure);
+            failure,
+            Enumerable.Range(1, stages.Count - 1).Select(index => (float)index / stages.Count).ToArray());
+    }
+
+    private static TimelineData createUnplayedData(IBeatmap playableBeatmap)
+    {
+        var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
+        var duration = Math.Max(1, playableBeatmap.HitObjects.Select(h => h.GetEndTime()).DefaultIfEmpty(0).Max());
+
+        return new TimelineData(
+            createNotesSubplot(playableBeatmap, variant, duration),
+            createJudgementSubplot([], duration),
+            createFastSlowSubplot([], duration),
+            null, []);
     }
 
     private static SubplotData combineSubplots(IReadOnlyList<SubplotData> stages)
@@ -262,7 +277,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         return NoteKind.Note;
     }
 
-    private static Drawable createSubplot(LocalisableString title, SubplotData subplot, double? failureFraction) => new FillFlowContainer
+    private static Drawable createSubplot(LocalisableString title, SubplotData subplot, double? failureFraction, IReadOnlyList<float> stageBoundaries) => new FillFlowContainer
     {
         RelativeSizeAxes = Axes.X,
         AutoSizeAxes = Axes.Y,
@@ -271,7 +286,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         Children =
         [
             createLegend(title, subplot),
-            createPlot(subplot, failureFraction),
+            createPlot(subplot, failureFraction, stageBoundaries),
         ],
     };
 
@@ -343,7 +358,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         _ => category,
     };
 
-    private static Drawable createPlot(SubplotData subplot, double? failureFraction)
+    private static Drawable createPlot(SubplotData subplot, double? failureFraction, IReadOnlyList<float> stageBoundaries)
     {
         var bucketCount = subplot.Categories.Select(category => category.Buckets.Length).DefaultIfEmpty(bucket_count).Min();
         var maxTotal = Math.Max(1, Enumerable.Range(0, bucketCount)
@@ -361,6 +376,8 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
                 Content = new[] { Enumerable.Range(0, bucketCount).Select(b => createBar(subplot, b, maxTotal)).ToArray() },
             },
         };
+
+        children.AddRange(stageBoundaries.Select(createStageBoundary));
 
         if (failureFraction is { } frac && frac < 1)
         {
@@ -383,6 +400,16 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
             Children = children,
         };
     }
+
+    private static Drawable createStageBoundary(float fraction) => new Box
+    {
+        RelativeSizeAxes = Axes.Y,
+        RelativePositionAxes = Axes.X,
+        X = fraction,
+        Width = 1,
+        Colour = Color4.White,
+        Alpha = 0.18f,
+    };
 
     private static Drawable createBar(SubplotData subplot, int bucket, int maxTotal)
     {
@@ -424,7 +451,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         Scratch
     }
 
-    internal sealed record TimelineData(SubplotData Notes, SubplotData Judgements, SubplotData FastSlow, double? FailureFraction);
+    internal sealed record TimelineData(SubplotData Notes, SubplotData Judgements, SubplotData FastSlow, double? FailureFraction, IReadOnlyList<float> StageBoundaries);
 
     internal sealed record SubplotData(IReadOnlyList<CategoryData> Categories);
 

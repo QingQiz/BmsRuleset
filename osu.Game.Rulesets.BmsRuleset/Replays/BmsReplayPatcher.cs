@@ -232,6 +232,21 @@ public static class BmsReplayPatcher
 
         try
         {
+            RestoreScoreData(scoreManager, scoreInfo);
+        }
+        catch (Exception e)
+        {
+            BmsLogger.Error(e, "BMS replay patch failed to restore hit events for the statistics panel.");
+        }
+    }
+
+    internal static void RestoreScoreData(ScoreManager scoreManager, ScoreInfo scoreInfo)
+    {
+        if (!isBmsScore(scoreInfo))
+            return;
+
+        try
+        {
             var scoreWithReplay = scoreManager.GetScore(scoreInfo);
 
             if (scoreWithReplay?.ScoreInfo.HitEvents.Count > 0)
@@ -253,7 +268,7 @@ public static class BmsReplayPatcher
         }
         catch (Exception e)
         {
-            BmsLogger.Error(e, "BMS replay patch failed to restore hit events for the statistics panel.");
+            BmsLogger.Error(e, "BMS replay patch failed to restore score data.");
         }
     }
 

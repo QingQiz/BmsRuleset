@@ -23,6 +23,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Result;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.Scoring;
@@ -32,7 +33,6 @@ using osu.Game.Screens.Ranking.Expanded;
 using osu.Game.Screens.Ranking.Expanded.Statistics;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Users;
-using osu.Game.Users.Drawables;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Utils;
 using osuTK;
@@ -161,13 +161,13 @@ internal partial class BmsCourseScoreMiddleContent : CompositeDrawable
         {
             new BmsCourseAccuracyStatistic(aggregate.Accuracy),
             new BmsCourseExScoreStatistic(aggregate),
-            new ComboStatistic(aggregate.MaxCombo, aggregate.GetMaximumAchievableCombo()),
+            new ComboStatistic(aggregate.MaxCombo, null),
         };
         statistics.AddRange(topStatistics);
 
         var hitStatistics = aggregate.GetStatisticsForDisplay()
-                                     .Select(result => (StatisticDisplay)new HitResultStatistic(result))
-                                     .ToArray();
+            .Select(result => (StatisticDisplay)new HitResultStatistic(result))
+            .ToArray();
         statistics.AddRange(hitStatistics);
 
         InternalChild = new OsuScrollContainer
@@ -468,8 +468,8 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
             new ComboStatistic(score.MaxCombo, score.GetMaximumAchievableCombo()),
         ];
         var hitStatistics = score.GetStatisticsForDisplay()
-                                 .Select(result => (StatisticDisplay)new HitResultStatistic(result))
-                                 .ToArray();
+            .Select(result => (StatisticDisplay)new HitResultStatistic(result))
+            .ToArray();
         statistics.AddRange(topStatistics);
         statistics.AddRange(hitStatistics);
 
@@ -622,15 +622,24 @@ internal partial class BmsCourseAggregateStatistics : StatisticsPanel
     }
 
     [BackgroundDependencyLoader]
-    private void load(BeatmapManager beatmapManager)
+    private void load(BeatmapManager beatmapManager, ScoreManager scoreManager)
     {
-        var stages = session.Stages.Where(stage => stage.Score != null)
-                            .Select(stage => (Score: stage.Score!, WorkingBeatmap: beatmapManager.GetWorkingBeatmap(stage.Stage.Beatmap, true)))
-                            .ToArray();
+        var aggregateScore = BmsCourseResultPresentation.CreateAggregateScore(session);
+        var stages = session.Stages
+            .Select(stage => (Score: stage.Score, WorkingBeatmap: beatmapManager.GetWorkingBeatmap(stage.Stage.Beatmap, true)))
+            .ToArray();
+
+        foreach (var stage in stages)
+        {
+            if (stage.Score != null)
+                BmsReplayPatcher.RestoreScoreData(scoreManager, stage.Score);
+        }
 
         courseData = Task.Run(() => stages.Select(stage => new BmsCourseStageStatisticData(
             stage.Score,
-            stage.WorkingBeatmap.GetPlayableBeatmap(stage.Score.Ruleset, stage.Score.Mods))).ToArray());
+            stage.WorkingBeatmap.GetPlayableBeatmap(
+                (stage.Score ?? aggregateScore).Ruleset,
+                (stage.Score ?? aggregateScore).Mods))).ToArray());
 
         Score.Value = BmsCourseResultPresentation.CreateAggregateScore(session);
     }
@@ -642,16 +651,18 @@ internal partial class BmsCourseAggregateStatistics : StatisticsPanel
         yield return createItem(BmsStrings.Timeline, data => new BmsTimelineStatistic(
             data.Select(stage => (stage.Score, stage.Beatmap)).ToArray()));
         yield return createItem(BmsStrings.HitScatter, data => new BmsHitScatterStatistic(
-            data.Select(stage => (stage.Beatmap, (IReadOnlyList<HitEvent>)stage.Score.HitEvents)).ToArray()));
+            data.Where(stage => stage.Score != null)
+                .Select(stage => (stage.Beatmap, (IReadOnlyList<HitEvent>)stage.Score!.HitEvents)).ToArray()));
         yield return createItem(BmsStrings.HitOffset, data => new BmsHitOffsetStatistic(
-            data.Select(stage => (stage.Beatmap, (IReadOnlyList<HitEvent>)stage.Score.HitEvents)).ToArray()));
+            data.Where(stage => stage.Score != null)
+                .Select(stage => (stage.Beatmap, (IReadOnlyList<HitEvent>)stage.Score!.HitEvents)).ToArray()));
     }
 
     private StatisticItem createItem(LocalisableString name, Func<BmsCourseStageStatisticData[], Drawable> createContent) =>
         new(name, () => new BmsCourseDeferredStatistic(courseData, createContent), requiresHitEvents: false);
 }
 
-internal sealed record BmsCourseStageStatisticData(ScoreInfo Score, IBeatmap Beatmap);
+internal sealed record BmsCourseStageStatisticData(ScoreInfo? Score, IBeatmap Beatmap);
 
 internal partial class BmsCourseDeferredStatistic : CompositeDrawable
 {
@@ -717,8 +728,8 @@ internal static class BmsCourseResultPresentation
 
     private static Dictionary<HitResult, int> sumStatistics(IEnumerable<IReadOnlyDictionary<HitResult, int>> statistics) =>
         statistics.SelectMany(values => values)
-                  .GroupBy(value => value.Key)
-                  .ToDictionary(group => group.Key, group => group.Sum(value => value.Value));
+            .GroupBy(value => value.Key)
+            .ToDictionary(group => group.Key, group => group.Sum(value => value.Value));
 
     private static int scoreWeight(ScoreInfo score)
     {

@@ -281,7 +281,7 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestAbortedCourseDoesNotCreateResult()
+    public void TestAbortedCourseCreatesResultWhenScoreIsAvailable()
     {
         var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
         var store = new BmsCourseResultStore(config);
@@ -290,10 +290,22 @@ public class BmsCourseSessionTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(store.TryGet("aborted-course", out _), Is.False);
-            Assert.That(store.GetLamp("aborted-course"), Is.EqualTo(BmsLamp.NoPlay));
-            Assert.That(store.GetRank("aborted-course"), Is.Null);
+            Assert.That(store.TryGet("aborted-course", out var result), Is.True);
+            Assert.That(result.Lamp, Is.EqualTo(BmsLamp.Failed));
+            Assert.That(result.Rank, Is.EqualTo(ScoreRank.F));
+            Assert.That(result.Score?.TotalScore, Is.EqualTo(1000));
         });
+    }
+
+    [Test]
+    public void TestEmptyAbortedCourseDoesNotCreateResult()
+    {
+        var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
+        var store = new BmsCourseResultStore(config);
+
+        store.Record("empty-aborted-course", BmsCourseStatus.Aborted);
+
+        Assert.That(store.TryGet("empty-aborted-course", out _), Is.False);
     }
 
     [Test]

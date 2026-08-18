@@ -43,7 +43,8 @@ internal sealed class BmsCourseResultStore
 
     internal void Record(string courseId, BmsCourseStatus status, ScoreRank? rank = null, ScoreInfo? score = null, BmsCourseAttemptData? attempt = null)
     {
-        if (status is BmsCourseStatus.InProgress or BmsCourseStatus.Aborted)
+        if (status == BmsCourseStatus.InProgress
+            || (status == BmsCourseStatus.Aborted && score == null && attempt == null))
             return;
 
         var result = status == BmsCourseStatus.Passed

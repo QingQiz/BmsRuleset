@@ -1,5 +1,6 @@
 using System.Linq;
 using NUnit.Framework;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -64,6 +65,30 @@ public class BmsGaugeHistoryGraphTest
             "Class",
         }));
         Assert.That(series.Single(s => s.Name == "ExClass").IsFinalUsedGauge, Is.True);
+    }
+
+    [Test]
+    public void TestCourseGaugeStartsEachStageAtPreviousEndingHealth()
+    {
+        var firstScore = new ScoreInfo
+        {
+            Mods = [new BmsModHardGauge()],
+            HitEvents = [new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 1000 }, null, null)],
+        };
+        var secondScore = new ScoreInfo
+        {
+            Mods = [new BmsModHardGauge()],
+            HitEvents = [new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 1000 }, null, null)],
+        };
+
+        var series = BmsGaugeHistoryGraph.CreateCourseSeries(
+        [
+            (firstScore, (IBeatmap)createBeatmap()),
+            (secondScore, (IBeatmap)createBeatmap()),
+        ]).Single();
+
+        Assert.That(series.Segments, Has.Count.EqualTo(2));
+        Assert.That(series.Segments[1][0].Health, Is.EqualTo(series.Segments[0][^1].Health));
     }
 
     [Test]

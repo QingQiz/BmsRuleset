@@ -34,6 +34,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
     private readonly IReadOnlyList<GaugeSeries> series;
+    private readonly IReadOnlyList<float> stageBoundaries;
 
     public BmsGaugeHistoryGraph(ScoreInfo score, IBeatmap playableBeatmap)
     {
@@ -41,14 +42,16 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         AutoSizeAxes = Axes.Y;
 
         series = CreateSeries(score, playableBeatmap);
+        stageBoundaries = [];
     }
 
-    internal BmsGaugeHistoryGraph(IReadOnlyList<(ScoreInfo Score, IBeatmap Beatmap)> stages)
+    internal BmsGaugeHistoryGraph(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
     {
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        series = createCourseSeries(stages);
+        series = CreateCourseSeries(stages);
+        stageBoundaries = Enumerable.Range(1, stages.Count - 1).Select(index => (float)index / stages.Count).ToArray();
     }
 
     [BackgroundDependencyLoader]
@@ -98,12 +101,12 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         return gaugeTypes.Select(type => createSeries(type, hitEvents, total, noteCount, duration, type == finalGaugeType, profileFamily)).ToArray();
     }
 
-    private static IReadOnlyList<GaugeSeries> createCourseSeries(IReadOnlyList<(ScoreInfo Score, IBeatmap Beatmap)> stages)
+    internal static IReadOnlyList<GaugeSeries> CreateCourseSeries(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
     {
         if (stages.Count == 0)
             return [];
 
-        var stageSeries = stages.Select(stage => CreateSeries(stage.Score, stage.Beatmap)).ToArray();
+        var stageSeries = stages.Select(stage => stage.Score != null ? CreateSeries(stage.Score, stage.Beatmap) : []).ToArray();
         var names = stageSeries.SelectMany(stage => stage.Select(gauge => gauge.Name)).Distinct().ToArray();
 
         return names.Select(name =>
@@ -111,6 +114,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             var matching = stageSeries.Select(stage => stage.FirstOrDefault(gauge => gauge.Name == name)).ToArray();
             var template = matching.Last(gauge => gauge != null)!;
             var points = new List<GaugePoint>();
+            var segments = new List<IReadOnlyList<GaugePoint>>();
             GaugePoint? failurePoint = null;
 
             for (var i = 0; i < matching.Length; i++)
@@ -119,7 +123,14 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
                 if (gauge == null)
                     continue;
 
-                points.AddRange(gauge.Points.Select(point => point with { Time = (i + point.Time) / stages.Count }));
+                var segment = gauge.Points.Select(point => point with { Time = (i + point.Time) / stages.Count }).ToArray();
+
+                // Course gauge state is restored after the stage starts. Use the previous stage's
+                // ending value at the boundary so the graph does not show a fake initial-gauge kink.
+                if (i > 0 && matching[i - 1] is { Points.Count: > 0 } previousGauge && segment.Length > 0)
+                    segment[0] = segment[0] with { Health = previousGauge.Points[^1].Health };
+                points.AddRange(segment);
+                segments.Add(segment);
 
                 if (failurePoint == null && gauge.FailurePoint is { } stageFailure)
                     failurePoint = stageFailure with { Time = (i + stageFailure.Time) / stages.Count };
@@ -128,6 +139,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             return template with
             {
                 Points = points,
+                Segments = segments,
                 FailurePoint = failurePoint,
             };
         }).ToArray();
@@ -209,7 +221,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             failurePoint,
             isFinalUsedGauge,
             isFinalUsedGauge ? final_line_radius : secondary_line_radius,
-            isFinalUsedGauge ? 1 : secondary_line_alpha);
+            isFinalUsedGauge ? 1 : secondary_line_alpha,
+            [points]);
     }
 
     private Drawable createGraph()
@@ -235,33 +248,49 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
 
         foreach (var gauge in series)
         {
-            graph.Add(new GaugePath(pointsForPath(gauge), 0)
+            foreach (var segment in gauge.Segments)
             {
-                PathRadius = gauge.LineRadius,
-                Colour = gauge.Colour,
-                Alpha = gauge.LineAlpha,
-                Name = $"{gauge.Name} gauge history",
-            });
+                graph.Add(new GaugePath(pointsForPath(segment, gauge.FailurePoint), 0)
+                {
+                    PathRadius = gauge.LineRadius,
+                    Colour = gauge.Colour,
+                    Alpha = gauge.LineAlpha,
+                    Name = $"{gauge.Name} gauge history",
+                });
+            }
 
             if (gauge.FailurePoint is { } failurePoint)
                 graph.Add(createFailureMarker(gauge, failurePoint));
         }
 
+        foreach (var boundary in stageBoundaries)
+            graph.Add(createStageBoundary(boundary));
+
         return graph;
     }
 
-    private static IReadOnlyList<GaugePoint> pointsForPath(GaugeSeries gauge)
+    private static Drawable createStageBoundary(float fraction) => new Box
     {
-        if (gauge.FailurePoint is not { } failurePoint)
-            return gauge.Points;
+        RelativeSizeAxes = Axes.Y,
+        RelativePositionAxes = Axes.X,
+        X = fraction,
+        Width = 1,
+        Colour = Color4.White,
+        Alpha = 0.18f,
+    };
+
+    private static IReadOnlyList<GaugePoint> pointsForPath(IReadOnlyList<GaugePoint> source, GaugePoint? failurePoint)
+    {
+        if (failurePoint is not { } pointAtFailure)
+            return source;
 
         var points = new List<GaugePoint>();
 
-        foreach (var point in gauge.Points)
+        foreach (var point in source)
         {
             points.Add(point);
 
-            if (samePoint(point, failurePoint))
+            if (samePoint(point, pointAtFailure))
                 break;
         }
 
@@ -408,7 +437,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             failurePoint,
             isFinalUsedGauge,
             isFinalUsedGauge ? final_line_radius : secondary_line_radius,
-            isFinalUsedGauge ? 1 : secondary_line_alpha);
+            isFinalUsedGauge ? 1 : secondary_line_alpha,
+            [points]);
     }
 
     private static double applyHitEvent(HitEvent hitEvent, BmsGaugeCalculator calculator, double health)
@@ -483,7 +513,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         GaugePoint? FailurePoint,
         bool IsFinalUsedGauge,
         float LineRadius,
-        float LineAlpha);
+        float LineAlpha,
+        IReadOnlyList<IReadOnlyList<GaugePoint>> Segments);
 
     internal readonly record struct GaugePoint(float Time, float Health);
 

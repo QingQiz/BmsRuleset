@@ -111,10 +111,12 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         var duration = Math.Max(1, stages.Sum(stage => stage.Duration));
         var offsetRange = stages.Select(stage => stage.Data?.OffsetRange ?? minimum_offset_range).DefaultIfEmpty(minimum_offset_range).Max();
         var points = new List<ScatterPoint>();
+        var boundaries = new List<float>();
         double elapsed = 0;
 
-        foreach (var stage in stages)
+        for (var i = 0; i < stages.Count; i++)
         {
+            var stage = stages[i];
             if (stage.Data != null)
             {
                 points.AddRange(stage.Data.Points.Select(point => point with
@@ -125,9 +127,11 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             }
 
             elapsed += stage.Duration;
+            if (i < stages.Count - 1)
+                boundaries.Add((float)(elapsed / duration));
         }
 
-        return new ScatterData(points, duration, offsetRange, [-offsetRange, -offsetRange / 2, 0, offsetRange / 2, offsetRange]);
+        return new ScatterData(points, duration, offsetRange, [-offsetRange, -offsetRange / 2, 0, offsetRange / 2, offsetRange], boundaries);
     }
 
     private static string labelFor(int column, BmsLayoutVariant variant, ref int keyIndex)
@@ -177,7 +181,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         var ticks = new[] { -offsetRange, -offsetRange / 2, 0, offsetRange / 2, offsetRange };
         points = points.Select(p => p with { Offset = displayedOffsetFor(p, offsetRange) }).ToArray();
 
-        return new ScatterData(points, duration, offsetRange, ticks);
+        return new ScatterData(points, duration, offsetRange, ticks, []);
     }
 
     private static double displayedOffsetFor(ScatterPoint point, double offsetRange) => point.Result switch
@@ -401,7 +405,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
                 new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Children = dataAreaChildren,
+                    Children = dataAreaChildren.Concat(data.StageBoundaries.Select(createStageBoundary)).ToArray(),
                 },
             ],
         };
@@ -423,6 +427,16 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             Alpha = tick == 0 ? 0.32f : 0.1f,
         };
     }
+
+    private static Drawable createStageBoundary(float fraction) => new Box
+    {
+        RelativeSizeAxes = Axes.Y,
+        RelativePositionAxes = Axes.X,
+        X = fraction,
+        Width = 1,
+        Colour = Color4.White,
+        Alpha = 0.18f,
+    };
 
     private static Drawable createTimingDirectionLabel(LocalisableString text, Color4 colour, Anchor anchor) => new OsuSpriteText
     {
@@ -495,7 +509,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
 
     internal sealed record KeyHitScatterStatistics(string Label, ScatterData Data);
 
-    internal sealed record ScatterData(IReadOnlyList<ScatterPoint> Points, double Duration, double OffsetRange, IReadOnlyList<double> OffsetTicks);
+    internal sealed record ScatterData(IReadOnlyList<ScatterPoint> Points, double Duration, double OffsetRange, IReadOnlyList<double> OffsetTicks, IReadOnlyList<float> StageBoundaries);
 
     internal readonly record struct ScatterPoint(double Time, double Offset, HitResult Result);
 }

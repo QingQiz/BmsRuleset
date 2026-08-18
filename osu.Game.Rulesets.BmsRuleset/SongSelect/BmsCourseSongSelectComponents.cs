@@ -33,6 +33,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Play.Leaderboards;
+using Realms;
 using osuTK;
 using osuTK.Graphics;
 using osuTK.Input;
@@ -491,6 +492,7 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
     private readonly IBindable<BmsCourseDefinition?> selectedCourse;
     private readonly Action<ScoreInfo, BmsCourseSession?> presentScore;
     private BmsCourseResultStore? resultStore;
+    private IDisposable? scoreSubscription;
     private BmsCourseHistoryHeader header = null!;
     private FillFlowContainer content = null!;
 
@@ -557,6 +559,7 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
         selectedCourse.BindValueChanged(_ => Refresh());
         header.Sorting.BindValueChanged(_ => Refresh());
         header.FilterBySelectedMods.BindValueChanged(_ => Refresh());
+        scoreSubscription = realm.RegisterForNotifications(r => r.All<ScoreInfo>(), scoresChanged);
     }
 
     protected override void LoadComplete()
@@ -574,6 +577,8 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
     {
         if (resultStore != null)
             resultStore.Changed -= courseResultChanged;
+
+        scoreSubscription?.Dispose();
 
         base.Dispose(isDisposing);
     }
@@ -651,6 +656,15 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
     private void courseResultChanged(string courseId)
     {
         if (selectedCourse.Value?.Id == courseId)
+            Scheduler.Add(Refresh);
+    }
+
+    private void scoresChanged(IRealmCollection<ScoreInfo> sender, ChangeSet? changes)
+    {
+        if (changes?.HasCollectionChanges() == false)
+            return;
+
+        if (selectedCourse.Value != null)
             Scheduler.Add(Refresh);
     }
 
