@@ -118,6 +118,39 @@ public class BmsModAutoGaugeTest
         Assert.That(score.Mods, Has.One.TypeOf<BmsModExHardGauge>());
     }
 
+    [Test]
+    public void TestAutoGaugeUsesConfiguredCourseGaugeContext()
+    {
+        var hp = new BmsHealthProcessor();
+        hp.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K });
+        hp.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: BmsGaugeProfileFamily.FiveKeys);
+
+        new BmsModAutoGauge().ApplyToHealthProcessor(hp);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hp.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(new[]
+            {
+                BmsGaugeType.ExHardClass,
+                BmsGaugeType.ExClass,
+                BmsGaugeType.Class,
+            }));
+            Assert.That(hp.GaugeProfile.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
+        });
+    }
+
+    [Test]
+    public void TestCourseGaugeUsesConfiguredProfileFamily()
+    {
+        var hp = new BmsHealthProcessor();
+        hp.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K });
+        hp.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: BmsGaugeProfileFamily.FiveKeys);
+
+        new BmsModClassGauge().ApplyToHealthProcessor(hp);
+
+        Assert.That(hp.GaugeProfile.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
+    }
+
     /// <summary>
     /// Builds an Auto Gauge whose resolved worst gauge is ExHard: the six-tier chain is
     /// installed via <see cref="BmsModAutoGauge.ApplyToHealthProcessor"/>, then a single

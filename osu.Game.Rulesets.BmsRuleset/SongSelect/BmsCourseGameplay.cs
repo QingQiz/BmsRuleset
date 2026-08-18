@@ -102,13 +102,17 @@ internal partial class BmsCoursePlayer : SoloPlayer
         Configuration.ShowLeaderboard = false;
     }
 
+    [BackgroundDependencyLoader]
+    private void loadCourseGaugeContext()
+    {
+        if (GameplayState.HealthProcessor is Scoring.BmsHealthProcessor healthProcessor)
+            healthProcessor.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: session.GaugeProfileFamilyOverride);
+    }
+
     protected override void StartGameplay()
     {
         if (GameplayState.HealthProcessor is Scoring.BmsHealthProcessor healthProcessor)
-        {
-            healthProcessor.SetGaugeTypes(session.GaugeTypes, replaceExisting: true, profileFamilyOverride: session.GaugeProfileFamilyOverride);
             healthProcessor.RestoreGaugeStates(session.CurrentGaugeStates);
-        }
 
         base.StartGameplay();
     }

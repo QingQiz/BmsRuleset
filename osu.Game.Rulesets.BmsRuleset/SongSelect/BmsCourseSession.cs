@@ -53,8 +53,6 @@ internal sealed class BmsCourseSession
 
     internal BmsGaugeProfileFamily? GaugeProfileFamilyOverride { get; }
 
-    internal IReadOnlyList<BmsGaugeType> GaugeTypes { get; }
-
     internal BmsCourseStatus Status { get; private set; } = BmsCourseStatus.InProgress;
 
     internal int CurrentStageIndex { get; private set; }
@@ -78,10 +76,7 @@ internal sealed class BmsCourseSession
         Mods = mods.Select(mod => mod.DeepClone()).ToArray();
         GaugeType = gaugeType;
         GaugeProfileFamilyOverride = ResolveCourseGaugeProfileFamily(course.Constraints);
-        GaugeTypes = Mods.Any(mod => mod is BmsModAutoGauge)
-            ? [BmsGaugeType.ExHardClass, BmsGaugeType.ExClass, BmsGaugeType.Class]
-            : [gaugeType];
-        CurrentGaugeStates = GaugeTypes.Select(type => new BmsGaugeStateSnapshot(type, 1, false)).ToArray();
+        CurrentGaugeStates = [];
 
         if (this.stages.Length == 0)
             throw new ArgumentException(@"A BMS course must contain at least one stage.", nameof(stages));
@@ -267,7 +262,7 @@ internal sealed class BmsCourseSession
     {
         CurrentGaugeStates = gaugeStates.Select(state => state with { }).ToArray();
         CurrentHealth = CurrentGaugeStates.FirstOrDefault(state => !state.Failed)?.Health ?? 0;
-        CurrentStage.Score = score.DeepClone();
+        CurrentStage.Score = BmsScoreGaugeHistoryStore.Clone(score);
         CurrentStage.EndingHealth = CurrentHealth;
         CurrentStage.Status = stageStatus;
     }

@@ -41,6 +41,10 @@ public partial class BmsHealthProcessor : HealthProcessor
         .Select(state => new BmsGaugeStateSnapshot(state.GaugeType, state.CurrentHp, state.IsHpFailed))
         .ToArray();
 
+    internal bool IsCourseGaugeMode { get; private set; }
+
+    internal BmsGaugeProfileFamily? ConfiguredProfileFamily { get; private set; }
+
     private readonly List<GaugeState> gaugeStates = [];
     private readonly List<BmsGaugeHistoryEvent> gaugeHistory = [];
 
@@ -51,7 +55,6 @@ public partial class BmsHealthProcessor : HealthProcessor
     private IBeatmap? beatmap;
     private bool initialized;
     private BmsGaugeProfileFamily layoutProfileFamily = BmsGaugeProfileFamily.SevenKeys;
-    private BmsGaugeProfileFamily? profileFamilyOverride;
 
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
@@ -140,6 +143,12 @@ public partial class BmsHealthProcessor : HealthProcessor
         SetGaugeTypes([gaugeType], profileFamilyOverride: profileFamilyOverride);
     }
 
+    internal void ConfigureGaugeContext(bool isCourseGaugeMode, BmsGaugeProfileFamily? familyOverride)
+    {
+        IsCourseGaugeMode = isCourseGaugeMode;
+        ConfiguredProfileFamily = familyOverride;
+    }
+
     /// <summary>
     /// Sets multiple gauge types to track in parallel, sorted by difficulty descending.
     /// Types already present in the chain are skipped (dedup).
@@ -150,7 +159,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             gaugeStates.Clear();
 
         if (replaceExisting || gaugeStates.Count == 0)
-            this.profileFamilyOverride = profileFamilyOverride;
+            ConfiguredProfileFamily = profileFamilyOverride;
 
         var unique = new HashSet<BmsGaugeType>();
         var newStates = new List<GaugeState>();
@@ -382,7 +391,7 @@ public partial class BmsHealthProcessor : HealthProcessor
         }
     }
 
-    private BmsGaugeProfileFamily effectiveProfileFamily => profileFamilyOverride ?? layoutProfileFamily;
+    private BmsGaugeProfileFamily effectiveProfileFamily => ConfiguredProfileFamily ?? layoutProfileFamily;
 
     private void refreshGaugeProfiles()
     {

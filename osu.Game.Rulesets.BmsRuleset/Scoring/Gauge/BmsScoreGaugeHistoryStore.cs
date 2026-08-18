@@ -22,6 +22,19 @@ public static class BmsScoreGaugeHistoryStore
         }
     }
 
+    internal static void Copy(ScoreInfo source, ScoreInfo target)
+    {
+        if (TryGet(source, out var history) && history.Count > 0)
+            Set(target, history);
+    }
+
+    internal static ScoreInfo Clone(ScoreInfo score)
+    {
+        var clone = score.DeepClone();
+        Copy(score, clone);
+        return clone;
+    }
+
     public static bool TryGet(ScoreInfo score, out IReadOnlyList<BmsGaugeHistoryEvent> history)
     {
         lock (histories)

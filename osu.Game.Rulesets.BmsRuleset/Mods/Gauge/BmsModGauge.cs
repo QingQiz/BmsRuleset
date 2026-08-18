@@ -33,7 +33,7 @@ public abstract class BmsModGauge : Mod, IApplicableToHealthProcessor
     public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
     {
         if (healthProcessor is BmsHealthProcessor bmsHealthProcessor)
-            bmsHealthProcessor.SetGaugeType(GaugeType);
+            bmsHealthProcessor.SetGaugeType(GaugeType, bmsHealthProcessor.ConfiguredProfileFamily);
     }
 
     public static BmsModGauge? CreateForType(BmsGaugeType type) =>

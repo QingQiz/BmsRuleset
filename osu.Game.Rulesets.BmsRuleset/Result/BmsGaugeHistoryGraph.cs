@@ -33,16 +33,6 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
     internal const float FAILURE_MARKER_SIZE = 13;
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
-    private static readonly BmsGaugeType[] auto_gauge_chain =
-    [
-        BmsGaugeType.Hazard,
-        BmsGaugeType.ExHard,
-        BmsGaugeType.Hard,
-        BmsGaugeType.Normal,
-        BmsGaugeType.Easy,
-        BmsGaugeType.AssistEasy,
-    ];
-
     private readonly IReadOnlyList<GaugeSeries> series;
 
     public BmsGaugeHistoryGraph(ScoreInfo score, IBeatmap playableBeatmap)
@@ -439,7 +429,13 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
     private static IEnumerable<BmsGaugeType> gaugeTypesFor(IReadOnlyList<Mod> mods)
     {
         if (mods.OfType<BmsModAutoGauge>().Any())
-            return auto_gauge_chain;
+        {
+            var resolvedGaugeType = mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType;
+            if (resolvedGaugeType is BmsGaugeType.Class or BmsGaugeType.ExClass or BmsGaugeType.ExHardClass)
+                return BmsModAutoGauge.COURSE_AUTO_GAUGE_CHAIN;
+
+            return BmsModAutoGauge.AUTO_GAUGE_CHAIN;
+        }
 
         return
         [

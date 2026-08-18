@@ -15,10 +15,9 @@ namespace osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToScorePopulation
 {
     /// <summary>
-    /// The chain of gauge types used by Auto Gauge, hardest first.
-    /// Gauge mods normally set a single type; Auto Gauge sets all six.
+    /// The regular gameplay chain used by Auto Gauge, hardest first.
     /// </summary>
-    private static readonly BmsGaugeType[] auto_gauge_chain =
+    internal static readonly BmsGaugeType[] AUTO_GAUGE_CHAIN =
     [
         BmsGaugeType.Hazard,
         BmsGaugeType.ExHard,
@@ -26,6 +25,13 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
         BmsGaugeType.Normal,
         BmsGaugeType.Easy,
         BmsGaugeType.AssistEasy,
+    ];
+
+    internal static readonly BmsGaugeType[] COURSE_AUTO_GAUGE_CHAIN =
+    [
+        BmsGaugeType.ExHardClass,
+        BmsGaugeType.ExClass,
+        BmsGaugeType.Class,
     ];
 
     private BmsHealthProcessor? resolvedHealthProcessor;
@@ -50,7 +56,9 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
         if (healthProcessor is BmsHealthProcessor bmsHp)
         {
             resolvedHealthProcessor = bmsHp;
-            bmsHp.SetGaugeTypes(auto_gauge_chain);
+            bmsHp.SetGaugeTypes(
+                bmsHp.IsCourseGaugeMode ? COURSE_AUTO_GAUGE_CHAIN : AUTO_GAUGE_CHAIN,
+                profileFamilyOverride: bmsHp.ConfiguredProfileFamily);
         }
     }
 

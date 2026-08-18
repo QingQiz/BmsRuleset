@@ -47,6 +47,26 @@ public class BmsGaugeHistoryGraphTest
     }
 
     [Test]
+    public void TestCourseAutoGaugeFallbackCreatesOnlyCourseGaugeSeries()
+    {
+        var series = BmsGaugeHistoryGraph.CreateSeries(
+            new ScoreInfo
+            {
+                Mods = [new BmsModAutoGauge(), new BmsModExClassGauge()],
+                HitEvents = [new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 1000 }, null, null)],
+            },
+            createBeatmap());
+
+        Assert.That(series.Select(s => s.Name), Is.EqualTo(new[]
+        {
+            "ExHard Class",
+            "ExClass",
+            "Class",
+        }));
+        Assert.That(series.Single(s => s.Name == "ExClass").IsFinalUsedGauge, Is.True);
+    }
+
+    [Test]
     public void TestAutoGaugeUsesPersistedGaugeHistoryWhenHitEventsUnderReportDamage()
     {
         var score = new ScoreInfo

@@ -10,6 +10,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
 
@@ -149,7 +150,7 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
     {
         var playedScore = session.Stages.Select(stage => stage.Score).FirstOrDefault(score => score != null);
         if (playedScore != null)
-            return playedScore.DeepClone();
+            return BmsScoreGaugeHistoryStore.Clone(playedScore);
 
         var beatmap = session.Stages[0].Stage.Beatmap;
         return new ScoreInfo
