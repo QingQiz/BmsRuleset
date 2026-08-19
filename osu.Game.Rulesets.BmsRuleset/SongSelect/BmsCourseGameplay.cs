@@ -106,15 +106,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
     private void loadCourseGaugeContext()
     {
         if (GameplayState.HealthProcessor is Scoring.BmsHealthProcessor healthProcessor)
-            healthProcessor.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: session.GaugeProfileFamilyOverride);
-    }
-
-    protected override void StartGameplay()
-    {
-        if (GameplayState.HealthProcessor is Scoring.BmsHealthProcessor healthProcessor)
-            healthProcessor.RestoreGaugeStates(session.CurrentGaugeStates);
-
-        base.StartGameplay();
+            session.ConfigureHealthProcessor(healthProcessor);
     }
 
     protected override ResultsScreen CreateResults(ScoreInfo score)

@@ -56,8 +56,14 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
         if (healthProcessor is BmsHealthProcessor bmsHp)
         {
             resolvedHealthProcessor = bmsHp;
+            var gaugeTypes = bmsHp.IsCourseGaugeMode && bmsHp.CurrentGaugeStates.Count > 0
+                ? bmsHp.CurrentGaugeStates.Select(state => state.GaugeType)
+                : bmsHp.IsCourseGaugeMode
+                    ? COURSE_AUTO_GAUGE_CHAIN
+                    : AUTO_GAUGE_CHAIN;
+
             bmsHp.SetGaugeTypes(
-                bmsHp.IsCourseGaugeMode ? COURSE_AUTO_GAUGE_CHAIN : AUTO_GAUGE_CHAIN,
+                gaugeTypes,
                 profileFamilyOverride: bmsHp.ConfiguredProfileFamily);
         }
     }

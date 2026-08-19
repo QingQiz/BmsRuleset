@@ -7,6 +7,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.Mods;
@@ -254,6 +255,101 @@ public class BmsCourseSessionTest
         var mods = BmsCourseSession.CreateCourseMods([new BmsModHardGauge()], BmsGaugeType.ExClass);
 
         Assert.That(mods.Single(), Is.TypeOf<BmsModExClassGauge>());
+    }
+
+    [Test]
+    public void TestCourseAutoGaugeReplacesRegularGaugeChain()
+    {
+        var healthProcessor = new BmsHealthProcessor();
+        new BmsModAutoGauge().ApplyToHealthProcessor(healthProcessor);
+        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
+
+        session.ConfigureHealthProcessor(healthProcessor);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(healthProcessor.IsCourseGaugeMode, Is.True);
+            Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(new[]
+            {
+                BmsGaugeType.ExHardClass,
+                BmsGaugeType.ExClass,
+                BmsGaugeType.Class,
+            }));
+            Assert.That(healthProcessor.CurrentGaugeStates, Has.None.Matches<BmsGaugeStateSnapshot>(state => state.GaugeType == BmsGaugeType.Normal));
+        });
+    }
+
+    [Test]
+    public void TestCourseAutoGaugeOmitsFailedGaugesFromNextStage()
+    {
+        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(true),
+        [
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
+            new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
+        ]);
+        session.RequestAdvance();
+        session.Advance();
+
+        var healthProcessor = new BmsHealthProcessor();
+        session.ConfigureHealthProcessor(healthProcessor);
+
+        Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(new[]
+        {
+            BmsGaugeType.ExClass,
+            BmsGaugeType.Class,
+        }));
+    }
+
+    [Test]
+    public void TestCourseAutoGaugeDoesNotRestoreFailedGaugesWhenModIsAppliedAfterSessionConfiguration()
+    {
+        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(true),
+        [
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
+            new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
+        ]);
+        session.RequestAdvance();
+        session.Advance();
+
+        var healthProcessor = new BmsHealthProcessor();
+        session.ConfigureHealthProcessor(healthProcessor);
+        new BmsModAutoGauge().ApplyToHealthProcessor(healthProcessor);
+
+        Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(new[]
+        {
+            BmsGaugeType.ExClass,
+            BmsGaugeType.Class,
+        }));
+    }
+
+    [Test]
+    public void TestCourseGaugeConfigurationInitializesWithCarriedHealth()
+    {
+        var healthProcessor = new BmsHealthProcessor();
+        var session = createSession();
+        var observedHealth = new List<double>();
+        healthProcessor.Health.ValueChanged += change => observedHealth.Add(change.NewValue);
+
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(true), gaugeStates(0.42));
+        session.ConfigureHealthProcessor(healthProcessor);
+
+        Assert.That(healthProcessor.Health.Value, Is.EqualTo(0.42).Within(0.001));
+
+        new BmsModClassGauge().ApplyToHealthProcessor(healthProcessor);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(healthProcessor.Health.Value, Is.EqualTo(0.42).Within(0.001));
+            Assert.That(healthProcessor.CurrentGaugeStates.Single().Health, Is.EqualTo(0.42).Within(0.001));
+            Assert.That(observedHealth, Is.EqualTo(new[] { 0.42 }).Within(0.001));
+        });
     }
 
     [Test]

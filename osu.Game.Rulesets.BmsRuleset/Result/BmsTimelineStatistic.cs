@@ -79,7 +79,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
     {
         var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
 
-        var beatmapMax = playableBeatmap.HitObjects.Count == 0 ? 0 : playableBeatmap.HitObjects.Max(h => h.StartTime);
+        var beatmapMax = playableBeatmap.HitObjects.Select(h => h.GetEndTime()).DefaultIfEmpty(0).Max();
         var timingHitEvents = score.HitEvents.ToArray();
         var scoringHitEvents = BmsJudgementEventStore.TryGet(score, out var judgementEvents)
             ? BmsJudgementEventProjection.CreateScoringHitEvents(judgementEvents).ToArray()
@@ -92,28 +92,41 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         var fastSlow = createFastSlowSubplot(timingHitEvents, duration);
         var failure = score.Passed ? null : findFailureFraction(score, playableBeatmap, scoringHitEvents, duration);
 
-        return new TimelineData(notes, judgements, fastSlow, failure, []);
+        return new TimelineData(notes, judgements, fastSlow, failure, [], duration);
     }
 
     internal static TimelineData CreateCourseData(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
     {
         if (stages.Count == 0)
-            return new TimelineData(new SubplotData([]), new SubplotData([]), new SubplotData([]), null, []);
+            return new TimelineData(new SubplotData([], []), new SubplotData([], []), new SubplotData([], []), null, [], 1);
 
         var stageData = stages.Select(stage => stage.Score != null
             ? CreateData(stage.Score, stage.Beatmap)
             : createUnplayedData(stage.Beatmap)).ToArray();
-        var failure = stageData.Select((stage, index) => stage.FailureFraction is { } fraction
-                ? (double?)((index + fraction) / stageData.Length)
-                : null)
-            .FirstOrDefault(value => value.HasValue);
+        var totalDuration = stageData.Sum(stage => stage.Duration);
+        var boundaries = new float[stages.Count - 1];
+        double? failure = null;
+        double elapsed = 0;
+
+        for (var i = 0; i < stageData.Length; i++)
+        {
+            var stage = stageData[i];
+
+            if (failure == null && stage.FailureFraction is { } fraction)
+                failure = (elapsed + fraction * stage.Duration) / totalDuration;
+
+            elapsed += stage.Duration;
+            if (i < boundaries.Length)
+                boundaries[i] = (float)(elapsed / totalDuration);
+        }
 
         return new TimelineData(
             combineSubplots(stageData.Select(stage => stage.Notes).ToArray()),
             combineSubplots(stageData.Select(stage => stage.Judgements).ToArray()),
             combineSubplots(stageData.Select(stage => stage.FastSlow).ToArray()),
             failure,
-            Enumerable.Range(1, stages.Count - 1).Select(index => (float)index / stages.Count).ToArray());
+            boundaries,
+            totalDuration);
     }
 
     private static TimelineData createUnplayedData(IBeatmap playableBeatmap)
@@ -125,19 +138,21 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
             createNotesSubplot(playableBeatmap, variant, duration),
             createJudgementSubplot([], duration),
             createFastSlowSubplot([], duration),
-            null, []);
+            null, [], duration);
     }
 
     private static SubplotData combineSubplots(IReadOnlyList<SubplotData> stages)
     {
         var categories = stages.SelectMany(stage => stage.Categories.Select(category => category.Label)).Distinct().ToArray();
 
-        return new SubplotData(categories.Select(label =>
-        {
-            var template = stages.SelectMany(stage => stage.Categories).First(category => category.Label == label);
-            var buckets = stages.SelectMany(stage => stage.Categories.FirstOrDefault(category => category.Label == label)?.Buckets ?? new int[bucket_count]).ToArray();
-            return new CategoryData(label, template.Colour, buckets);
-        }).ToArray());
+        return new SubplotData(
+            categories.Select(label =>
+            {
+                var template = stages.SelectMany(stage => stage.Categories).First(category => category.Label == label);
+                var buckets = stages.SelectMany(stage => stage.Categories.FirstOrDefault(category => category.Label == label)?.Buckets ?? new int[bucket_count]).ToArray();
+                return new CategoryData(label, template.Colour, buckets);
+            }).ToArray(),
+            stages.SelectMany(stage => stage.BucketWeights).ToArray());
     }
 
     private static SubplotData createNotesSubplot(IBeatmap playableBeatmap, BmsLayoutVariant variant, double duration)
@@ -163,11 +178,12 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
             }
         }
 
-        return new SubplotData([
+        return new SubplotData(
+        [
             new CategoryData("Scratch", scratch_colour, scratch),
             new CategoryData("ln", ln_colour, ln),
             new CategoryData("note", note_colour, note),
-        ]);
+        ], uniformBucketWeights(duration));
     }
 
     private static SubplotData createJudgementSubplot(IReadOnlyList<HitEvent> hitEvents, double duration)
@@ -193,17 +209,18 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
                 case HitResult.Ok: ok[b]++; break;
 
                 case HitResult.Meh: meh[b]++; break;
-                // Miss (E-Poor) excluded — IsHit() filters it out.
+                    // Miss (E-Poor) excluded — IsHit() filters it out.
             }
         }
 
-        return new SubplotData([
+        return new SubplotData(
+        [
             new CategoryData("Poor", BmsHitResultColours.ForHitResult(HitResult.Meh), meh),
             new CategoryData("Bad", BmsHitResultColours.ForHitResult(HitResult.Ok), ok),
             new CategoryData("Good", BmsHitResultColours.ForHitResult(HitResult.Good), good),
             new CategoryData("Great", BmsHitResultColours.ForHitResult(HitResult.Great), great),
             new CategoryData("Perfect", BmsHitResultColours.ForHitResult(HitResult.Perfect), perfect),
-        ]);
+        ], uniformBucketWeights(duration));
     }
 
     private static SubplotData createFastSlowSubplot(IReadOnlyList<HitEvent> hitEvents, double duration)
@@ -219,11 +236,15 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
             else if (e.TimeOffset > 0) slow[b]++;
         }
 
-        return new SubplotData([
+        return new SubplotData(
+        [
             new CategoryData("fast", fast_colour, fast),
             new CategoryData("slow", slow_colour, slow),
-        ]);
+        ], uniformBucketWeights(duration));
     }
+
+    private static float[] uniformBucketWeights(double duration) =>
+        Enumerable.Repeat((float)(duration / bucket_count), bucket_count).ToArray();
 
     // Returns the time fraction at which the player's gauge first hit 0 (game over), or null if it never did.
     private static double? findFailureFraction(ScoreInfo score, IBeatmap playableBeatmap, IReadOnlyList<HitEvent> scoringHitEvents, double duration)
@@ -361,6 +382,7 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
     private static Drawable createPlot(SubplotData subplot, double? failureFraction, IReadOnlyList<float> stageBoundaries)
     {
         var bucketCount = subplot.Categories.Select(category => category.Buckets.Length).DefaultIfEmpty(bucket_count).Min();
+        var columnWidths = CreateColumnWidths(subplot);
         var maxTotal = Math.Max(1, Enumerable.Range(0, bucketCount)
             .Select(b => subplot.Categories.Sum(c => c.Buckets[b]))
             .DefaultIfEmpty(0)
@@ -372,7 +394,9 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
             new GridContainer
             {
                 RelativeSizeAxes = Axes.Both,
-                ColumnDimensions = Enumerable.Range(0, bucketCount).Select(_ => new Dimension()).ToArray(),
+                ColumnDimensions = columnWidths.Count == bucketCount
+                    ? columnWidths.Select(width => new Dimension(GridSizeMode.Relative, width)).ToArray()
+                    : Enumerable.Range(0, bucketCount).Select(_ => new Dimension()).ToArray(),
                 Content = new[] { Enumerable.Range(0, bucketCount).Select(b => createBar(subplot, b, maxTotal)).ToArray() },
             },
         };
@@ -399,6 +423,15 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
             Height = subplot_height,
             Children = children,
         };
+    }
+
+    internal static IReadOnlyList<float> CreateColumnWidths(SubplotData subplot)
+    {
+        var totalWeight = subplot.BucketWeights.Sum();
+        if (totalWeight <= 0)
+            return [];
+
+        return subplot.BucketWeights.Select(weight => weight / totalWeight).ToArray();
     }
 
     private static Drawable createStageBoundary(float fraction) => new Box
@@ -451,9 +484,15 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         Scratch
     }
 
-    internal sealed record TimelineData(SubplotData Notes, SubplotData Judgements, SubplotData FastSlow, double? FailureFraction, IReadOnlyList<float> StageBoundaries);
+    internal sealed record TimelineData(
+        SubplotData Notes,
+        SubplotData Judgements,
+        SubplotData FastSlow,
+        double? FailureFraction,
+        IReadOnlyList<float> StageBoundaries,
+        double Duration);
 
-    internal sealed record SubplotData(IReadOnlyList<CategoryData> Categories);
+    internal sealed record SubplotData(IReadOnlyList<CategoryData> Categories, IReadOnlyList<float> BucketWeights);
 
     internal sealed record CategoryData(string Label, Color4 Colour, int[] Buckets);
 }

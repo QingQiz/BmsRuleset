@@ -35,6 +35,20 @@ public class BmsTimelineStatisticTest
     }
 
     [Test]
+    public void TestDurationIncludesLongNoteEndTime()
+    {
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            HitObjects = { new BmsLongNote { StartTime = 1000, Duration = 2000, Column = 1 } },
+        };
+
+        var data = BmsTimelineStatistic.CreateData(new ScoreInfo { Passed = true }, beatmap);
+
+        Assert.That(data.Duration, Is.EqualTo(3000));
+    }
+
+    [Test]
     public void TestCourseDataKeepsNotesForUnplayedStages()
     {
         var playedBeatmap = new BmsBeatmap
@@ -67,6 +81,35 @@ public class BmsTimelineStatisticTest
             Assert.That(data.Notes.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(2));
             Assert.That(data.Judgements.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(1));
             Assert.That(data.FastSlow.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(0));
+        });
+    }
+
+    [Test]
+    public void TestCourseDataUsesStageDurationProportions()
+    {
+        var firstBeatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            HitObjects = { new BmsNote { StartTime = 1000, Column = 1 } },
+        };
+        var secondBeatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            HitObjects = { new BmsNote { StartTime = 3000, Column = 2 } },
+        };
+        var data = BmsTimelineStatistic.CreateCourseData(
+        [
+            (new ScoreInfo { Passed = true }, (IBeatmap)firstBeatmap),
+            (new ScoreInfo { Passed = true }, (IBeatmap)secondBeatmap),
+        ]);
+
+        var columnWidths = BmsTimelineStatistic.CreateColumnWidths(data.Notes);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(columnWidths.Sum(), Is.EqualTo(1).Within(0.001));
+            Assert.That(columnWidths.Take(300).Sum(), Is.EqualTo(0.25f).Within(0.001));
+            Assert.That(data.StageBoundaries, Is.EqualTo([0.25f]).Within(0.001));
         });
     }
 }

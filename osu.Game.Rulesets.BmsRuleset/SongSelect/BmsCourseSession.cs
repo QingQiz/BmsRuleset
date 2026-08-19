@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -256,6 +257,27 @@ internal sealed class BmsCourseSession
 
         mods.Add(usesAutoGauge ? new BmsModAutoGauge() : CreateGaugeMod(gaugeType));
         return mods;
+    }
+
+    internal void ConfigureHealthProcessor(BmsHealthProcessor healthProcessor)
+    {
+        healthProcessor.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: GaugeProfileFamilyOverride);
+
+        var usesAutoGauge = Mods.Any(mod => mod is BmsModAutoGauge);
+        var initialStates = CurrentGaugeStates.Where(state => !state.Failed).ToArray();
+        var gaugeTypes = usesAutoGauge && CurrentGaugeStates.Count > 0
+            ? initialStates.Select(state => state.GaugeType).ToArray()
+            : usesAutoGauge
+                ? BmsModAutoGauge.COURSE_AUTO_GAUGE_CHAIN
+                : [GaugeType];
+
+        // The processor may already contain the regular AG chain if its load completed before
+        // the course player. Replace it so course gameplay never retains regular gauge states.
+        healthProcessor.SetGaugeTypes(
+            gaugeTypes,
+            replaceExisting: true,
+            profileFamilyOverride: GaugeProfileFamilyOverride,
+            initialStates: initialStates);
     }
 
     private void storeResult(ScoreInfo score, IReadOnlyList<BmsGaugeStateSnapshot> gaugeStates, BmsCourseStageStatus stageStatus)

@@ -51,7 +51,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         AutoSizeAxes = Axes.Y;
 
         series = CreateCourseSeries(stages);
-        stageBoundaries = Enumerable.Range(1, stages.Count - 1).Select(index => (float)index / stages.Count).ToArray();
+        stageBoundaries = CreateCourseStageBoundaries(stages);
     }
 
     [BackgroundDependencyLoader]
@@ -107,6 +107,13 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             return [];
 
         var stageSeries = stages.Select(stage => stage.Score != null ? CreateSeries(stage.Score, stage.Beatmap) : []).ToArray();
+        var durations = stages.Select(courseStageDuration).ToArray();
+        var totalDuration = durations.Sum();
+        var stageOffsets = new double[stages.Count];
+
+        for (var i = 1; i < stageOffsets.Length; i++)
+            stageOffsets[i] = stageOffsets[i - 1] + durations[i - 1];
+
         var names = stageSeries.SelectMany(stage => stage.Select(gauge => gauge.Name)).Distinct().ToArray();
 
         return names.Select(name =>
@@ -123,17 +130,21 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
                 if (gauge == null)
                     continue;
 
-                var segment = gauge.Points.Select(point => point with { Time = (i + point.Time) / stages.Count }).ToArray();
+                var segment = gauge.Points.Select(point => point with
+                {
+                    Time = (float)((stageOffsets[i] + point.Time * durations[i]) / totalDuration),
+                }).ToArray();
 
-                // Course gauge state is restored after the stage starts. Use the previous stage's
-                // ending value at the boundary so the graph does not show a fake initial-gauge kink.
-                if (i > 0 && matching[i - 1] is { Points.Count: > 0 } previousGauge && segment.Length > 0)
-                    segment[0] = segment[0] with { Health = previousGauge.Points[^1].Health };
                 points.AddRange(segment);
                 segments.Add(segment);
 
                 if (failurePoint == null && gauge.FailurePoint is { } stageFailure)
-                    failurePoint = stageFailure with { Time = (i + stageFailure.Time) / stages.Count };
+                {
+                    failurePoint = stageFailure with
+                    {
+                        Time = (float)((stageOffsets[i] + stageFailure.Time * durations[i]) / totalDuration),
+                    };
+                }
             }
 
             return template with
@@ -143,6 +154,41 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
                 FailurePoint = failurePoint,
             };
         }).ToArray();
+    }
+
+    internal static IReadOnlyList<float> CreateCourseStageBoundaries(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
+    {
+        if (stages.Count < 2)
+            return [];
+
+        var durations = stages.Select(courseStageDuration).ToArray();
+        var totalDuration = durations.Sum();
+        var boundaries = new float[stages.Count - 1];
+        double elapsed = 0;
+
+        for (var i = 0; i < boundaries.Length; i++)
+        {
+            elapsed += durations[i];
+            boundaries[i] = (float)(elapsed / totalDuration);
+        }
+
+        return boundaries;
+    }
+
+    private static double courseStageDuration((ScoreInfo? Score, IBeatmap Beatmap) stage)
+    {
+        if (stage.Score == null)
+            return graphDuration(stage.Beatmap, 0);
+
+        if (BmsScoreGaugeHistoryStore.TryGet(stage.Score, out var gaugeHistory) && gaugeHistory.Count > 0)
+            return graphDuration(stage.Beatmap, gaugeHistory.Max(e => e.Time));
+
+        var hitEvents = BmsJudgementEventStore.TryGet(stage.Score, out var judgementEvents)
+            ? BmsJudgementEventProjection.CreateScoringHitEvents(judgementEvents)
+            : stage.Score.HitEvents;
+        var lastEventTime = hitEvents.Select(e => e.HitObject.GetEndTime()).DefaultIfEmpty(0).Max();
+
+        return graphDuration(stage.Beatmap, lastEventTime);
     }
 
     private static IReadOnlyList<GaugeSeries> createSeries(
@@ -185,7 +231,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         BmsGaugeProfileFamily profileFamily)
     {
         var profile = BmsGaugeProfileFactory.Create(type, profileFamily);
-        var health = profile.InitialHealth;
+        var initialState = history.FirstOrDefault(e => e.Time <= 0)?.States.FirstOrDefault(state => state.GaugeType == type);
+        var health = initialState?.Health ?? profile.InitialHealth;
         GaugePoint? failurePoint = null;
         var points = new List<GaugePoint>
         {

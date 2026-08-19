@@ -92,6 +92,92 @@ public class BmsGaugeHistoryGraphTest
     }
 
     [Test]
+    public void TestGaugeFailedByEventAtStageStartIsDisplayed()
+    {
+        var score = new ScoreInfo { Mods = [new BmsModHardGauge()] };
+        BmsScoreGaugeHistoryStore.Set(score,
+        [
+            new BmsGaugeHistoryEvent(0, BmsGaugeType.Hard,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
+            ]),
+        ]);
+
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap());
+
+        Assert.That(series.Select(gauge => gauge.Name), Is.EqualTo(["Hard"]));
+    }
+
+    [Test]
+    public void TestCourseGaugeDoesNotContinueAfterPreviousStageFailure()
+    {
+        var firstScore = new ScoreInfo { Mods = [new BmsModAutoGauge()] };
+        BmsScoreGaugeHistoryStore.Set(firstScore,
+        [
+            new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
+                new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.5, false),
+            ]),
+        ]);
+        var secondScore = new ScoreInfo { Mods = [new BmsModAutoGauge()] };
+        BmsScoreGaugeHistoryStore.Set(secondScore,
+        [
+            new BmsGaugeHistoryEvent(0, BmsGaugeType.Normal,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.5, false),
+            ]),
+            new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.6, false),
+            ]),
+        ]);
+
+        var series = BmsGaugeHistoryGraph.CreateCourseSeries(
+        [
+            (firstScore, (IBeatmap)createBeatmap()),
+            (secondScore, (IBeatmap)createBeatmap()),
+        ]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(series.Single(gauge => gauge.Name == "Hard").Segments, Has.Count.EqualTo(1));
+            var normal = series.Single(gauge => gauge.Name == "Normal");
+            Assert.That(normal.Segments[1][0].Health, Is.EqualTo(normal.Segments[0][^1].Health));
+        });
+    }
+
+    [Test]
+    public void TestCourseGaugeUsesStageDurationProportions()
+    {
+        var firstScore = new ScoreInfo
+        {
+            Mods = [new BmsModHardGauge()],
+            HitEvents = [new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 1000 }, null, null)],
+        };
+        var secondScore = new ScoreInfo
+        {
+            Mods = [new BmsModHardGauge()],
+            HitEvents = [new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 3000 }, null, null)],
+        };
+        (ScoreInfo Score, IBeatmap Beatmap)[] stages =
+        [
+            (firstScore, createBeatmap(1000)),
+            (secondScore, createBeatmap(3000)),
+        ];
+
+        var series = BmsGaugeHistoryGraph.CreateCourseSeries(stages).Single();
+        var boundaries = BmsGaugeHistoryGraph.CreateCourseStageBoundaries(stages);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(series.Segments[0][^1].Time, Is.EqualTo(0.25f).Within(0.001));
+            Assert.That(series.Segments[1][0].Time, Is.EqualTo(0.25f).Within(0.001));
+            Assert.That(boundaries, Is.EqualTo([0.25f]).Within(0.001));
+        });
+    }
+
+    [Test]
     public void TestAutoGaugeUsesPersistedGaugeHistoryWhenHitEventsUnderReportDamage()
     {
         var score = new ScoreInfo
@@ -378,15 +464,15 @@ public class BmsGaugeHistoryGraphTest
         Assert.That(position.Y, Is.EqualTo(graphSize.Y * 0.6f).Within(0.001));
     }
 
-    private static BmsBeatmap createBeatmap() => new()
+    private static BmsBeatmap createBeatmap(double duration = 2000) => new()
     {
         LayoutVariant = BmsLayoutVariant.Bme7K,
         TotalColumns = 8,
         Total = 200,
         HitObjects =
         {
-            new BmsNote { StartTime = 1000 },
-            new BmsNote { StartTime = 2000 },
+            new BmsNote { StartTime = duration / 2 },
+            new BmsNote { StartTime = duration },
         },
     };
 }

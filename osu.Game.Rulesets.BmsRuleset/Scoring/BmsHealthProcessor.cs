@@ -133,6 +133,11 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     public void SetGaugeType(BmsGaugeType gaugeType, BmsGaugeProfileFamily? profileFamilyOverride = null)
     {
+        if (gaugeStates.Count == 1
+            && gaugeStates[0].GaugeType == gaugeType
+            && ConfiguredProfileFamily == profileFamilyOverride)
+            return;
+
         // In multi-gauge (auto-gauge) mode, a duplicate type means replay dedup — skip.
         if (gaugeStates.Count > 1 && gaugeStates.Any(s => s.GaugeType == gaugeType))
             return;
@@ -153,7 +158,11 @@ public partial class BmsHealthProcessor : HealthProcessor
     /// Sets multiple gauge types to track in parallel, sorted by difficulty descending.
     /// Types already present in the chain are skipped (dedup).
     /// </summary>
-    public void SetGaugeTypes(IEnumerable<BmsGaugeType> types, bool replaceExisting = false, BmsGaugeProfileFamily? profileFamilyOverride = null)
+    public void SetGaugeTypes(
+        IEnumerable<BmsGaugeType> types,
+        bool replaceExisting = false,
+        BmsGaugeProfileFamily? profileFamilyOverride = null,
+        IReadOnlyList<BmsGaugeStateSnapshot>? initialStates = null)
     {
         if (replaceExisting)
             gaugeStates.Clear();
@@ -174,11 +183,13 @@ public partial class BmsHealthProcessor : HealthProcessor
                 continue;
 
             var profile = BmsGaugeProfileFactory.Create(type, effectiveProfileFamily);
+            var initialState = initialStates?.FirstOrDefault(state => state.GaugeType == type);
             newStates.Add(new GaugeState
             {
                 GaugeType = type,
                 Profile = profile,
-                CurrentHp = profile.InitialHealth,
+                CurrentHp = Math.Clamp(initialState?.Health ?? profile.InitialHealth, 0, profile.MaxHealth),
+                IsHpFailed = initialState?.Failed == true || initialState?.Health <= 0,
             });
         }
 
@@ -191,15 +202,12 @@ public partial class BmsHealthProcessor : HealthProcessor
         // Sync to active state (first = hardest).
         activeGaugeIndex = 0;
         endResultIndex = 0;
-        var active = gaugeStates[0];
-        GaugeType = active.GaugeType;
-        GaugeProfile = active.Profile;
-        DisplayProfile.Value = active.Profile.Display;
-        Health.MaxValue = active.Profile.MaxHealth;
-        Health.Value = active.CurrentHp;
+        resolveActiveState();
 
         initialized = false;
 
+        if (initialStates?.Count > 0)
+            recordGaugeHistory(0);
     }
 
     public void RestoreGaugeStates(IReadOnlyList<BmsGaugeStateSnapshot> states)

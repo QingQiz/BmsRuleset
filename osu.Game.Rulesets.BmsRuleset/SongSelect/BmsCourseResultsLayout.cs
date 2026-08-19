@@ -717,7 +717,7 @@ internal static class BmsCourseResultPresentation
             TotalScore = played.Sum(score => score.TotalScore),
             TotalScoreWithoutMods = played.Sum(score => score.TotalScoreWithoutMods),
             Accuracy = accuracy,
-            MaxCombo = played.Sum(score => score.MaxCombo),
+            MaxCombo = played.Select(score => score.MaxCombo).DefaultIfEmpty().Max(),
             PP = played.All(score => score.PP.HasValue) ? played.Sum(score => score.PP!.Value) : null,
             Mods = session.Mods.Select(mod => mod.DeepClone()).ToArray(),
             Statistics = statistics,
