@@ -20,9 +20,9 @@ namespace osu.Game.Rulesets.BmsRuleset.SongSelect;
 
 internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
 {
-    private readonly BeatmapInfo beatmap;
     private readonly BmsLampDisplay lamp;
     private readonly IBindable<APIUser> localUser = new Bindable<APIUser>();
+    private BeatmapInfo? beatmap;
 
     [Resolved]
     private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -38,9 +38,23 @@ internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
 
     internal bool HasRank => rank.Rank != null;
 
-    internal BmsCourseStageScoreDisplay(BeatmapInfo beatmap, BmsLampDisplay lamp)
+    internal BeatmapInfo? Beatmap
     {
-        this.beatmap = beatmap;
+        get => beatmap;
+        set
+        {
+            if (Equals(beatmap, value))
+                return;
+
+            beatmap = value;
+
+            if (IsLoaded)
+                updateSubscription();
+        }
+    }
+
+    internal BmsCourseStageScoreDisplay(BmsLampDisplay lamp)
+    {
         this.lamp = lamp;
         AutoSizeAxes = Axes.Both;
 
@@ -69,23 +83,31 @@ internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
     private void updateSubscription()
     {
         scoreSubscription?.Dispose();
+        scoreSubscription = null;
         updateScores([]);
 
+        if (beatmap == null)
+            return;
+
+        var targetBeatmap = beatmap;
         scoreSubscription = realm.RegisterForNotifications(
-            r => r.All<ScoreInfo>().Where(score => score.BeatmapHash == beatmap.Hash && !score.DeletePending),
-            localScoresChanged);
+            r => r.All<ScoreInfo>().Where(score => score.BeatmapHash == targetBeatmap.Hash && !score.DeletePending),
+            (scores, changes) => localScoresChanged(targetBeatmap, scores, changes));
     }
 
-    private void localScoresChanged(IRealmCollection<ScoreInfo> sender, ChangeSet? changes)
+    private void localScoresChanged(BeatmapInfo targetBeatmap, IRealmCollection<ScoreInfo> sender, ChangeSet? changes)
     {
+        if (!Equals(beatmap, targetBeatmap))
+            return;
+
         // Linked beatmap updates do not change the result and can produce notification-only refreshes.
         if (changes?.HasCollectionChanges() == false)
             return;
 
         var localScores = sender
-                          .Where(score => score.UserID == localUser.Value.Id || score.UserID <= 1)
-                          .Where(score => ruleset.Value.Equals(score.Ruleset))
-                          .ToArray();
+            .Where(score => score.UserID == localUser.Value.Id || score.UserID <= 1)
+            .Where(score => ruleset.Value.Equals(score.Ruleset))
+            .ToArray();
 
         updateScores(localScores);
     }

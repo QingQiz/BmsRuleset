@@ -1,4 +1,3 @@
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
@@ -7,7 +6,6 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
-using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
@@ -47,9 +45,6 @@ internal partial class BmsCoursePanel : Panel
     private BmsCourseDefinition? currentCourse;
     private BmsCourseResultStore? resultStore;
     private Color4 availableIconColour;
-
-    [Resolved]
-    private BeatmapManager beatmaps { get; set; } = null!;
 
     public BmsCoursePanel()
     {
@@ -136,9 +131,8 @@ internal partial class BmsCoursePanel : Panel
         Expanded.BindValueChanged(_ => updateLeafPanelOffset());
         Selected.BindValueChanged(_ => updateLeafPanelOffset());
         KeyboardSelected.BindValueChanged(_ => updateLeafPanelOffset());
-        resultStore = BmsRulesetRuntime.CourseResults;
-        if (resultStore != null)
-            resultStore.Changed += courseResultChanged;
+        BmsRulesetRuntime.CourseResultsChanged += resultStoreChanged;
+        updateResultStore();
         updateResult();
         updateLeafPanelOffset(false);
     }
@@ -147,11 +141,13 @@ internal partial class BmsCoursePanel : Panel
     {
         base.PrepareForUse();
 
-        var course = ((BmsGroupedCourse)Item!.Model).Course;
+        var groupedCourse = (BmsGroupedCourse)Item!.Model;
+        var course = groupedCourse.Course;
         currentCourse = course;
 
+        updateResultStore();
         titleText.Text = course.Name;
-        updateAvailability(course);
+        updateAvailability(groupedCourse.HasMissingStage);
         updateResult();
         updateLeafPanelOffset(false);
     }
@@ -164,6 +160,7 @@ internal partial class BmsCoursePanel : Panel
 
     protected override void Dispose(bool isDisposing)
     {
+        BmsRulesetRuntime.CourseResultsChanged -= resultStoreChanged;
         if (resultStore != null)
             resultStore.Changed -= courseResultChanged;
 
@@ -186,6 +183,26 @@ internal partial class BmsCoursePanel : Panel
             Scheduler.Add(updateResult);
     }
 
+    private void resultStoreChanged() => Scheduler.Add(() =>
+    {
+        updateResultStore();
+        updateResult();
+    });
+
+    private void updateResultStore()
+    {
+        var current = BmsRulesetRuntime.CourseResults;
+        if (ReferenceEquals(resultStore, current))
+            return;
+
+        if (resultStore != null)
+            resultStore.Changed -= courseResultChanged;
+
+        resultStore = current;
+        if (resultStore != null)
+            resultStore.Changed += courseResultChanged;
+    }
+
     private void updateResult()
     {
         if (currentCourse == null)
@@ -197,12 +214,8 @@ internal partial class BmsCoursePanel : Panel
         courseRank.Alpha = rank.HasValue ? 1 : 0;
     }
 
-    private void updateAvailability(BmsCourseDefinition course)
+    private void updateAvailability(bool hasMissingStage)
     {
-        var hasMissingStage = course.Stages.Any(stage => !stage.IsAvailable
-                                                         || string.IsNullOrEmpty(stage.BeatmapHash)
-                                                         || BmsCourseStagePanel.QueryBeatmap(beatmaps, stage.BeatmapHash) == null);
-
         courseIcon.Icon = hasMissingStage ? FontAwesome.Solid.ExclamationTriangle : FontAwesome.Solid.Trophy;
         courseIcon.Colour = hasMissingStage ? Color4.OrangeRed : availableIconColour;
     }

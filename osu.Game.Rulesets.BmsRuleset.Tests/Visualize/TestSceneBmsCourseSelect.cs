@@ -10,7 +10,10 @@ using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Platform;
+using osu.Framework.Screens;
+using osu.Framework.Statistics;
 using osu.Framework.Testing;
+using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Configuration;
@@ -144,6 +147,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
 
         AddUntilStep("course controller attached", () => songSelect.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault() != null);
         AddAssert("course carousel cannot receive input before course mode", () => !controller.CourseCarousel.IsPresent && controller.CourseCarousel.Alpha == 0);
+        AddAssert("normal carousel host is not always present before course mode", () => controller.OriginalCarouselHostAlwaysPresent, () => Is.False);
         AddAssert("course title starts offscreen left", () => songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().X, () => Is.EqualTo(-150));
         AddAssert("course history starts offscreen left", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().X, () => Is.EqualTo(-150));
         AddAssert("course filter starts offscreen right", () => songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().X, () => Is.EqualTo(150));
@@ -166,7 +170,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         });
 
         AddAssert("random disabled in course mode", () => !this.ChildrenOfType<FooterButtonRandom>().Single().Enabled.Value);
-        AddAssert("course carousel uses beatmap carousel host", () => controller.CourseCarousel.Parent == carousel.Parent);
+        AddAssert("course carousel shares the beatmap carousel outer host", () => controller.CourseCarousel.Parent == carousel.Parent?.Parent);
         AddAssert("course carousel matches song select width", () =>
             Math.Abs(controller.CourseCarousel.ScreenSpaceDrawQuad.Width - carousel.ScreenSpaceDrawQuad.Width), () => Is.LessThan(0.5f));
         AddAssert("course carousel matches song select position", () =>
@@ -378,7 +382,10 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             controller.CourseCarousel.GetCarouselItems()?.Count(item => item.Model is BmsGroupedCourse), () => Is.EqualTo(3));
         AddAssert("three course models retained", () => controller.CourseCarousel.GetCarouselItems()?
             .Count(item => item.Model is BmsGroupedCourse), () => Is.EqualTo(3));
-        AddAssert("normal carousel hidden", () => carousel.Alpha, () => Is.Zero);
+        AddAssert("normal carousel is visually hidden by its host", () => controller.OriginalCarouselHostAlpha, () => Is.Zero);
+        AddAssert("normal carousel is not present while course mode is visible", () => carousel.IsPresent, () => Is.False);
+        AddAssert("normal carousel input is blocked while course mode is visible", () => controller.OriginalCarouselAcceptsInput, () => Is.False);
+        AddAssert("normal carousel host is not present in course mode", () => controller.OriginalCarouselHostAlwaysPresent, () => Is.False);
 
         AddStep("search second table", () => controller.SearchTerm.Value = "stella");
         AddUntilStep("search filtered", () => !controller.CourseCarousel.IsFiltering
@@ -405,8 +412,14 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("song select details restored", () => songSelect.ChildrenOfType<BeatmapDetailsArea>().Single().Alpha, () => Is.GreaterThan(0.9f));
         AddUntilStep("song select filter restored", () => songSelect.ChildrenOfType<FilterControl>().Single().Alpha, () => Is.GreaterThan(0.9f));
         AddAssert("course carousel stops receiving input", () => !controller.CourseCarousel.IsPresent && controller.CourseCarousel.Alpha == 0);
+        AddAssert("normal carousel input is restored", () => controller.OriginalCarouselAcceptsInput, () => Is.True);
+        AddAssert("normal carousel host is no longer always present", () => controller.OriginalCarouselHostAlwaysPresent, () => Is.False);
         AddAssert("random restored in song select", () => this.ChildrenOfType<FooterButtonRandom>().Single().Enabled.Value);
         AddAssert("course mode hidden", () => !controller.IsCourseMode);
+        AddStep("show course mode again", () => controller.ShowCourseMode());
+        AddWaitStep("allow re-entry scheduling", 2);
+        AddAssert("reopening course mode does not refresh carousel", () => controller.CourseCarousel.IsFiltering, () => Is.False);
+        AddAssert("course selection retained on re-entry", () => controller.SelectedCourse?.Id, () => Is.EqualTo("stella-1"));
     }
 
     [Test]
@@ -423,18 +436,17 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             [
                 importBeatmap(createBeatmapSet(bmsRuleset)),
                 importBeatmap(createBeatmapSet(bmsRuleset)),
+                importBeatmap(createBeatmapSet(bmsRuleset)),
             ];
 
             BmsRulesetRuntime.CourseCatalog.Replace(
-            [
-                new BmsCourseDefinition(
-                    "preview-test",
+                previewBeatmaps.Select((beatmap, index) => new BmsCourseDefinition(
+                    $"preview-test-{index}",
                     "Preview Table",
-                    "Preview Course",
-                    previewBeatmaps.Select((beatmap, index) => new BmsCourseStage($"Preview {index}", "1", BeatmapHash: beatmap.Hash)).ToArray(),
+                    $"Preview Course {index}",
+                    [new BmsCourseStage($"Preview {index}", "1", BeatmapHash: beatmap.Hash)],
                     "Class",
-                    []),
-            ]);
+                    [])));
         });
         AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
@@ -444,7 +456,21 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddStep("show course mode", () => controller.ShowCourseMode());
         AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
                                                         && !controller.CourseCarousel.IsFiltering);
-        AddUntilStep("course preview selected", () => previewBeatmaps.Any(beatmap => beatmap.Hash == songSelect.Beatmap.Value.BeatmapInfo.Hash));
+        AddUntilStep("first course preview selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(previewBeatmaps[0].Hash));
+        AddUntilStep("stage panel materialised", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().SingleOrDefault(), () => Is.Not.Null);
+        AddAssert("stage panel is pooled", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single().IsInPool);
+        AddStep("rapidly select two courses", () =>
+        {
+            var courses = controller.CourseCarousel.GetCarouselItems()!
+                                    .Where(item => item.Model is BmsGroupedCourse)
+                                    .ToArray();
+            controller.CourseCarousel.Activate(courses[1]);
+            controller.CourseCarousel.Activate(courses[2]);
+            Assert.That(songSelect.Beatmap.Value.BeatmapInfo.Hash, Is.EqualTo(previewBeatmaps[0].Hash));
+        });
+        AddUntilStep("only final course preview selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(previewBeatmaps[2].Hash));
+        AddUntilStep("stage panel reset to final course", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>()
+            .SingleOrDefault()?.ResolvedBeatmap?.Hash, () => Is.EqualTo(previewBeatmaps[2].Hash));
         AddStep("hide course mode", () => controller.HideCourseMode());
         AddUntilStep("original beatmap restored", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(originalBeatmap.Hash));
 
@@ -457,14 +483,76 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
     }
 
     [Test]
+    public void TestSwitchingDistantCoursePreviewsDoesNotPopulateIntermediateWorkingBeatmaps()
+    {
+        const int beatmap_count = 120;
+
+        BeatmapInfo[] importedBeatmaps = null!;
+        GlobalStatistic<int> cachedWorkingBeatmaps = null!;
+        ScheduledDelegate cacheTracker = null!;
+        var baselineCacheCount = 0;
+        var peakCacheCount = 0;
+
+        AddStep("import distant course preview beatmaps", () =>
+        {
+            var bmsRuleset = rulesets.AvailableRulesets.Single(ruleset => ruleset.ShortName == Constant.SHORT_NAME);
+            importedBeatmaps = Enumerable.Range(0, beatmap_count).Select(index =>
+            {
+                var set = createBeatmapSet(bmsRuleset);
+                ((BeatmapMetadata)set.Beatmaps.Single().Metadata).Title = $"Course Preview {index:D3}";
+                var imported = beatmaps.Import(set);
+                Assert.That(imported, Is.Not.Null);
+                return imported!.Value.Beatmaps.Single().Detach();
+            }).ToArray();
+
+            BmsRulesetRuntime.CourseCatalog.Replace(
+            [
+                new BmsCourseDefinition(
+                    "preview-first",
+                    "Preview Table",
+                    "First Preview",
+                    [new BmsCourseStage("First", "1", BeatmapHash: importedBeatmaps[0].Hash)],
+                    "Class",
+                    []),
+                new BmsCourseDefinition(
+                    "preview-last",
+                    "Preview Table",
+                    "Last Preview",
+                    [new BmsCourseStage("Last", "1", BeatmapHash: importedBeatmaps[^1].Hash)],
+                    "Class",
+                    []),
+            ]);
+        });
+        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
+        AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
+        AddStep("show course mode", () => controller.ShowCourseMode());
+        AddUntilStep("first course preview selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(importedBeatmaps[0].Hash));
+        AddStep("start cache tracking", () =>
+        {
+            cachedWorkingBeatmaps = GlobalStatistics.Get<int>("Beatmaps", $"Cached {nameof(WorkingBeatmap)}s");
+            baselineCacheCount = peakCacheCount = cachedWorkingBeatmaps.Value;
+            cacheTracker = Scheduler.AddDelayed(() => peakCacheCount = Math.Max(peakCacheCount, cachedWorkingBeatmaps.Value), 0, true);
+        });
+        AddStep("select distant course", () => controller.CourseCarousel.Activate(controller.CourseCarousel.GetCarouselItems()!
+            .Single(item => item.Model is BmsGroupedCourse { Course.Id: "preview-last" })));
+        AddUntilStep("distant course preview selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(importedBeatmaps[^1].Hash));
+        AddWaitStep("allow hidden carousel to settle", 120);
+        AddStep("stop cache tracking", () => cacheTracker.Cancel());
+        AddAssert("intermediate beatmaps were not cached", () => peakCacheCount - baselineCacheCount, () => Is.LessThanOrEqualTo(8));
+    }
+
+    [Test]
     public void TestCourseStageCardsDisplayHistoricalLampAndRank()
     {
         BeatmapInfo beatmap = null!;
         ScoreInfo historicalScore = null!;
         ScoreInfo alternateScore = null!;
+        BeatmapLeaderboardScore historyPanel = null!;
 
         AddStep("import course stage beatmap and scores", () =>
         {
+            BmsRulesetRuntime.EnsureDifficultyTableStore(Dependencies.Get<GameHost>(), Realm);
             var bmsRuleset = rulesets.AvailableRulesets.Single(ruleset => ruleset.ShortName == Constant.SHORT_NAME);
             var imported = beatmaps.Import(createBeatmapSet(bmsRuleset));
 
@@ -516,7 +604,13 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddStep("show course mode", () => controller.ShowCourseMode());
         AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
                                                         && !controller.CourseCarousel.IsFiltering);
+        AddAssert("stage beatmap resolved before panel materialisation", () => controller.CourseCarousel.GetCarouselItems()!
+            .Select(item => item.Model)
+            .OfType<BmsGroupedCourseStage>()
+            .Single().Beatmap?.Hash, () => Is.EqualTo(beatmap.Hash));
         AddUntilStep("stage card realised", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().SingleOrDefault() != null);
+        AddAssert("stage background retrieval is deferred", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
+            .ChildrenOfType<PanelSetBackground>().Single().Beatmap, () => Is.Null);
         AddAssert("stage card hides BMS ruleset icon but keeps its slot", () =>
         {
             var icon = controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
@@ -571,10 +665,14 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("course history applies sorting", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
             .ChildrenOfType<BeatmapLeaderboardScore>().OrderBy(score => score.Rank).First().Score.TotalScore, () => Is.EqualTo(800_000));
         AddStep("filter course history by selected mods", () => config.SetValue(OsuSetting.BeatmapDetailModsFilter, true));
-        AddUntilStep("no-mod history remains", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+        AddUntilStep("only no-mod history remains", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(1));
+        AddAssert("no-mod history score is retained", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
             .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(900_000));
         AddStep("select mirror", () => songSelect.Mods.Value = [new BmsModMirror()]);
-        AddUntilStep("selected mods filter ignores course gauge", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+        AddUntilStep("selected mods history is replaced", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(800_000));
+        AddAssert("selected mods filter ignores course gauge", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
             .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(800_000));
         AddAssert("course history preserves judgement statistics", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
             .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.Statistics.GetValueOrDefault(HitResult.Perfect), () => Is.EqualTo(2));
@@ -589,12 +687,44 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             .ChildrenOfType<OsuSpriteText>()
             .Where(text => text.IsPresent)
             .All(text => Math.Abs(text.ScreenSpaceDrawQuad.TopLeft.X - text.ScreenSpaceDrawQuad.BottomLeft.X) < 0.5f));
+        AddStep("disable history mods filter", () => config.SetValue(OsuSetting.BeatmapDetailModsFilter, false));
+        AddUntilStep("all history restored", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(2));
+        AddStep("capture existing history panel", () => historyPanel = songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().First());
+        AddStep("import unrelated score", () => Assert.That(scoreManager.Import(createScore(beatmap, ScoreRank.B, 200_000,
+            new Dictionary<HitResult, int> { [HitResult.Perfect] = 1 }, [])), Is.Not.Null));
+        AddUntilStep("unrelated score imported", () => Realm.Run(r =>
+            r.All<ScoreInfo>().AsEnumerable().Count(score => score.BeatmapHash == beatmap.Hash && !score.DeletePending)), () => Is.EqualTo(4));
+        AddWaitStep("allow realm notifications", 5);
+        AddAssert("unrelated score does not rebuild course history", () => ReferenceEquals(historyPanel,
+            songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().ChildrenOfType<BeatmapLeaderboardScore>().First()));
+        AddStep("hide course mode", () => controller.HideCourseMode());
+        AddStep("record course while hidden", () => BmsRulesetRuntime.CourseResults?.Record(
+            "history-test", BmsCourseStatus.Passed, alternateScore.Rank, alternateScore,
+            createCourseAttempt(alternateScore, beatmap, [new BmsModMirror(), new BmsModClassGauge()])));
+        AddWaitStep("allow result notification", 5);
+        AddAssert("hidden history is not rebuilt", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(2));
+        AddStep("show course mode again", () => controller.ShowCourseMode());
+        AddUntilStep("new history appears on demand", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(3));
         AddStep("open course history score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Single().TriggerClick());
+            .ChildrenOfType<BeatmapLeaderboardScore>().First(score => score.Score.TotalScore == 800_000).TriggerClick());
         AddUntilStep("course score details opened", () => Stack.CurrentScreen, () => Is.TypeOf<BmsCourseResultsScreen>());
         AddUntilStep("course summary is displayed", () => ((BmsCourseResultsScreen)Stack.CurrentScreen).ChildrenOfType<BmsCourseSummaryCard>().SingleOrDefault(), () => Is.Not.Null);
         AddAssert("course score details match selected history", () => ((BmsCourseResultsScreen)Stack.CurrentScreen).Score?.TotalScore,
             () => Is.EqualTo(800_000));
+        AddStep("record course while song select is suspended", () => BmsRulesetRuntime.CourseResults?.Record(
+            "history-test", BmsCourseStatus.Passed, alternateScore.Rank, alternateScore,
+            createCourseAttempt(alternateScore, beatmap, [new BmsModMirror(), new BmsModClassGauge()])));
+        AddWaitStep("allow suspended result notification", 5);
+        AddAssert("suspended history is not rebuilt", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(3));
+        AddStep("close course score details", () => Stack.CurrentScreen.Exit());
+        AddUntilStep("song select resumed", () => Stack.CurrentScreen, () => Is.SameAs(songSelect));
+        AddUntilStep("suspended result appears after resume", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(4));
     }
 
     private BmsCourseSongSelectController controller => songSelect.ChildrenOfType<BmsCourseSongSelectController>().Single();

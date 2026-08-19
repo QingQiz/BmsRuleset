@@ -34,7 +34,6 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
         SetDefault(BmsRulesetSetting.DifficultyTableSources, string.Empty);
         SetDefault(BmsRulesetSetting.DifficultyTableHistory, string.Empty);
         SetDefault(BmsRulesetSetting.DifficultyTableSubdividedTables, string.Empty);
-        SetDefault(BmsRulesetSetting.CourseResults, string.Empty);
     }
 }
 
@@ -55,7 +54,6 @@ public enum BmsRulesetSetting
     DifficultyTableSources,
     DifficultyTableHistory,
     DifficultyTableSubdividedTables,
-    CourseResults,
     UseDedicatedPreviewAudio,
     UnlockFrameRateLimit,
 }

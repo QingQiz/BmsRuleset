@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
@@ -18,6 +19,22 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;
 [TestFixture]
 public class BmsCourseSessionTest
 {
+    private string courseResultsDirectory = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        courseResultsDirectory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"course-results-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(courseResultsDirectory);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(courseResultsDirectory))
+            Directory.Delete(courseResultsDirectory, true);
+    }
+
     [Test]
     public void TestPassedStageCarriesHealthAndAdvances()
     {
@@ -355,14 +372,13 @@ public class BmsCourseSessionTest
     [Test]
     public void TestCourseLampPersistsAndDoesNotDowngradeClear()
     {
-        var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
-        var store = new BmsCourseResultStore(config);
+        var store = new BmsCourseResultStore(courseResultsDirectory);
 
         store.Record("course", BmsCourseStatus.Failed);
         Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Failed));
         Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.F));
 
-        store = new BmsCourseResultStore(config);
+        store = new BmsCourseResultStore(courseResultsDirectory);
         Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Failed));
         Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.F));
 
@@ -372,15 +388,14 @@ public class BmsCourseSessionTest
         Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
         Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
 
-        store = new BmsCourseResultStore(config);
+        store = new BmsCourseResultStore(courseResultsDirectory);
         Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
     }
 
     [Test]
     public void TestAbortedCourseCreatesResultWhenScoreIsAvailable()
     {
-        var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
-        var store = new BmsCourseResultStore(config);
+        var store = new BmsCourseResultStore(courseResultsDirectory);
 
         store.Record("aborted-course", BmsCourseStatus.Aborted, ScoreRank.F, createScore(false, 1000));
 
@@ -396,8 +411,7 @@ public class BmsCourseSessionTest
     [Test]
     public void TestEmptyAbortedCourseDoesNotCreateResult()
     {
-        var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
-        var store = new BmsCourseResultStore(config);
+        var store = new BmsCourseResultStore(courseResultsDirectory);
 
         store.Record("empty-aborted-course", BmsCourseStatus.Aborted);
 
@@ -407,8 +421,7 @@ public class BmsCourseSessionTest
     [Test]
     public void TestCourseScoreHistoryPersists()
     {
-        var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
-        var store = new BmsCourseResultStore(config);
+        var store = new BmsCourseResultStore(courseResultsDirectory);
         var firstScore = createScore(true, 900_000);
         firstScore.Rank = ScoreRank.S;
         var firstAttempt = new BmsCourseAttemptData
@@ -432,7 +445,7 @@ public class BmsCourseSessionTest
         store.Record("course", BmsCourseStatus.Passed, firstScore.Rank, firstScore, firstAttempt);
         store.Record("course", BmsCourseStatus.Passed, secondScore.Rank, secondScore);
 
-        store = new BmsCourseResultStore(config);
+        store = new BmsCourseResultStore(courseResultsDirectory);
         Assert.That(store.TryGet("course", out var result), Is.True);
         Assert.That(result.Score?.TotalScore, Is.EqualTo(900_000));
         Assert.That(result.Rank, Is.EqualTo(ScoreRank.S));
@@ -442,20 +455,64 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestSingleResultStorageMigratesToHistory()
+    public async Task TestCourseScoreHistoryLoadsAsynchronouslyAndSupportsCancellation()
     {
-        var config = new BmsRulesetConfigManager(null, new BmsRuleset().RulesetInfo);
-        var score = createScore(true, 700_000);
-        score.Rank = ScoreRank.A;
-        config.SetValue(BmsRulesetSetting.CourseResults, JsonSerializer.Serialize(new Dictionary<string, BmsCourseResult>
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
+        store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 500_000));
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+        var history = await store.GetHistoryAsync("course", CancellationToken.None);
+
+        Assert.That(history.Select(result => result.Score?.TotalScore), Is.EqualTo(new long?[] { 900_000, 500_000 }));
+
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        Assert.That(async () => await store.GetHistoryAsync("other", cancelled.Token), Throws.InstanceOf<OperationCanceledException>());
+    }
+
+    [Test]
+    public void TestCourseResultsPersistAsIndividualFilesAndNotify()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+        var changed = new List<string>();
+        store.Changed += changed.Add;
+
+        store.Record("course/with unsafe characters", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
+        store.Record("course/with unsafe characters", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 500_000));
+        store.Record("other", BmsCourseStatus.Passed, ScoreRank.A, createScore(true, 700_000));
+
+        Assert.Multiple(() =>
         {
-            ["course"] = new(BmsLamp.Clear, ScoreRank.A, BmsCourseScoreData.From(score)),
-        }));
+            Assert.That(Directory.EnumerateFiles(courseResultsDirectory, "*.json").Count(), Is.EqualTo(3));
+            Assert.That(changed, Is.EqualTo(new[] { "course/with unsafe characters", "course/with unsafe characters", "other" }));
+        });
 
-        var store = new BmsCourseResultStore(config);
+        store = new BmsCourseResultStore(courseResultsDirectory);
 
-        Assert.That(store.GetHistory("course").Single().Score?.TotalScore, Is.EqualTo(700_000));
-        Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.A));
+        Assert.Multiple(() =>
+        {
+            Assert.That(store.GetHistory("course/with unsafe characters").Select(result => result.Score?.TotalScore),
+                Is.EqualTo(new long?[] { 900_000, 500_000 }));
+            Assert.That(store.GetHistory("other").Single().Score?.TotalScore, Is.EqualTo(700_000));
+        });
+    }
+
+    [Test]
+    public void TestCourseResultJsonIsLoadedOnDemand()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+        File.Delete(Directory.EnumerateFiles(courseResultsDirectory, "*.json").Single());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
+            Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
+            Assert.That(store.GetHistory("course"), Is.Empty);
+        });
     }
 
     private static BmsCourseSession createSession(int stageCount = 3, IReadOnlyList<Mod> mods = null, BmsGaugeType gaugeType = BmsGaugeType.Class)

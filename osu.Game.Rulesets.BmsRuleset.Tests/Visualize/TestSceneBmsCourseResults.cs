@@ -21,8 +21,10 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Models;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Result;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.Scoring;
@@ -32,6 +34,7 @@ using osu.Game.Screens.Ranking.Expanded;
 using osu.Game.Screens.Ranking.Expanded.Statistics;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Tests.Visual;
+using osuTK.Graphics;
 using osuTK.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -270,6 +273,35 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
 
     }
 
+    [Test]
+    public void TestAbortedStageDoesNotShadeCourseTimelineAsFailed()
+    {
+        var session = createAbortedSession(includeFailureEvent: true);
+        BmsCourseResultsScreen screen = null!;
+
+        AddStep("show aborted course summary", () => Stack.Push(screen = new BmsCourseResultsScreen(session)));
+        AddUntilStep("course timeline loaded", () => screen.ChildrenOfType<BmsTimelineStatistic>().SingleOrDefault(), () => Is.Not.Null);
+        AddAssert("course timeline has no failure shade", () => hasFailureShade(screen), () => Is.False);
+        AddStep("open aborted stage", () => clickCourseStage("Course stage 2 result"));
+        AddUntilStep("aborted stage statistics shown", () => screen.SelectedStageIndex == 1
+                                                               && screen.ChildrenOfType<StatisticsPanel>()
+                                                                        .Single(panel => panel is not BmsCourseAggregateStatistics)
+                                                                        .State.Value == Visibility.Visible);
+        AddUntilStep("aborted stage timeline loaded", () => screen.ChildrenOfType<BmsTimelineStatistic>().Count(), () => Is.EqualTo(2));
+        AddAssert("aborted stage timeline has no failure shade", () => hasFailureShade(screen), () => Is.False);
+    }
+
+    [Test]
+    public void TestFailedStageDoesNotShadeCourseTimeline()
+    {
+        var session = createFailedSession();
+        BmsCourseResultsScreen screen = null!;
+
+        AddStep("show failed course summary", () => Stack.Push(screen = new BmsCourseResultsScreen(session)));
+        AddUntilStep("course timeline loaded", () => screen.ChildrenOfType<BmsTimelineStatistic>().SingleOrDefault(), () => Is.Not.Null);
+        AddAssert("course timeline has no failure shade", () => hasFailureShade(screen), () => Is.False);
+    }
+
     private void clickCourseStage(string name)
     {
         var stage = this.ChildrenOfType<OsuClickableContainer>().Single(row => row.Name == name);
@@ -277,7 +309,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         InputManager.Click(MouseButton.Left);
     }
 
-    private static BmsCourseSession createAbortedSession()
+    private static BmsCourseSession createAbortedSession(bool includeFailureEvent = false)
     {
         BeatmapInfo[] beatmaps =
         [
@@ -303,10 +335,50 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         session.RequestAdvance();
         session.Advance();
         session.BeginCurrentStage();
-        session.AbortCurrentStage(createScore(beatmaps[1], false, 321000, 0.63), [new(BmsGaugeType.Class, 0.28, false)]);
+        var abortedScore = createScore(beatmaps[1], false, 321000, 0.63);
+
+        if (includeFailureEvent)
+            addFailureHitEvent(abortedScore);
+
+        session.AbortCurrentStage(abortedScore, [new(BmsGaugeType.Class, 0.28, false)]);
 
         return session;
     }
+
+    private static BmsCourseSession createFailedSession()
+    {
+        var beatmap = createBeatmap("failed-stage", "Failed Stage");
+        var definition = new BmsCourseStage("Failed Stage", "sl7", BeatmapHash: beatmap.Hash);
+        var session = new BmsCourseSession(
+            new BmsCourseDefinition("failed-course", "Visual Table", "Failed Course", [definition], "Class", []),
+            [new BmsResolvedCourseStage(definition, beatmap)],
+            [new BmsModClassGauge()],
+            BmsGaugeType.Class);
+        var score = createScore(beatmap, false, 123000, 0.25);
+        addFailureHitEvent(score);
+
+        session.BeginCurrentStage();
+        session.FailCurrentStage(score, [new(BmsGaugeType.Class, 0, true)]);
+        return session;
+    }
+
+    private static void addFailureHitEvent(ScoreInfo score)
+    {
+        var mine = new BmsLandmine
+        {
+            StartTime = 250,
+            LandmineDamagePercent = 647.5,
+        };
+        score.HitEvents =
+        [
+            new HitEvent(0, 1, HitResult.Meh, mine, null, null),
+            new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 1000 }, null, null),
+        ];
+    }
+
+    private static bool hasFailureShade(Drawable root) => root.ChildrenOfType<BmsTimelineStatistic>()
+        .SelectMany(timeline => timeline.ChildrenOfType<Box>())
+        .Any(box => box.Alpha == 0.6f && ((Color4)box.Colour).Equals(new Color4(70, 70, 70, 255)));
 
     private static BeatmapInfo createBeatmap(string hash, string title) => new()
     {

@@ -7,6 +7,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Pooling;
 using osu.Framework.Input.Events;
+using osu.Game.Beatmaps;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Input.Bindings;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -34,10 +35,14 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
     private readonly BmsCourseCarouselFilter filter;
     private readonly DrawablePool<BmsCoursePanel> coursePanelPool = new(100);
     private readonly DrawablePool<BmsCourseTablePanel> tablePanelPool = new(20);
+    private readonly DrawablePool<BmsCourseStagePanel> stagePanelPool = new(20);
 
     private object? keyboardSelectedModel;
     private BmsGroupedCourse? pendingKeyboardSelection;
     private string searchTerm = string.Empty;
+
+    [Resolved]
+    private BeatmapManager beatmaps { get; set; } = null!;
 
     internal BmsCourseCarousel()
     {
@@ -47,11 +52,12 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
 
         Filters =
         [
-            filter = new BmsCourseCarouselFilter(() => searchTerm),
+            filter = new BmsCourseCarouselFilter(() => searchTerm, resolveStageBeatmap),
         ];
 
         AddInternal(tablePanelPool);
         AddInternal(coursePanelPool);
+        AddInternal(stagePanelPool);
     }
 
     internal void SetCourses(IEnumerable<BmsCourseDefinition> courses) => Items.ReplaceRange(0, Items.Count, courses);
@@ -67,6 +73,15 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
 
     internal void Refresh() => Schedule(() => FilterAsync());
 
+    internal IReadOnlyList<BeatmapInfo> GetResolvedBeatmaps(string courseId) => filter.GroupItems
+        .SelectMany(pair => pair.Value)
+        .Where(items => items.Course.Course.Id == courseId)
+        .SelectMany(items => items.StageItems)
+        .Select(item => ((BmsGroupedCourseStage)item.Model).Beatmap)
+        .OfType<BeatmapInfo>()
+        .DistinctBy(beatmap => beatmap.Hash)
+        .ToArray();
+
     internal bool MoveKeyboardSelection(KeyBindingPressEvent<GlobalAction> e, int direction)
     {
         var courses = GetCarouselItems()?
@@ -78,7 +93,7 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
 
         var currentId = KeyboardSelectedCourse?.Id ?? SelectedCourse?.Id;
         var currentIndex = Array.FindIndex(courses, item => item.Model is BmsGroupedCourse grouped
-                                                           && grouped.Course.Id == currentId);
+                                                            && grouped.Course.Id == currentId);
         var nextIndex = currentIndex < 0
             ? (direction > 0 ? 0 : courses.Length - 1)
             : (currentIndex + direction + courses.Length) % courses.Length;
@@ -121,8 +136,8 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
                 coursePanel.CourseCarousel = this;
                 return coursePanel;
 
-            case BmsGroupedCourseStage stage:
-                return new BmsCourseStagePanel(stage.StageIndex + 1, stage.Stage);
+            case BmsGroupedCourseStage:
+                return stagePanelPool.Get();
 
             default:
                 throw new InvalidOperationException($"Unsupported BMS course carousel model {item.Model.GetType().Name}.");
@@ -258,25 +273,36 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
         }
     }
 
+    private BeatmapInfo? resolveStageBeatmap(BmsCourseStage stage)
+    {
+        if (!stage.IsAvailable || string.IsNullOrEmpty(stage.BeatmapHash))
+            return null;
+
+        return BmsCourseStagePanel.QueryBeatmap(beatmaps, stage.BeatmapHash);
+    }
+
 }
 
 internal sealed record BmsCourseTableGroup(int Order, string TableName, string Mark)
     : GroupDefinition(Order, string.IsNullOrEmpty(Mark) ? TableName : BmsStrings.CourseTableGroup(TableName, Mark));
 
-internal sealed record BmsGroupedCourse(BmsCourseTableGroup Group, BmsCourseDefinition Course);
+internal sealed record BmsGroupedCourse(BmsCourseTableGroup Group, BmsCourseDefinition Course, bool HasMissingStage);
 
 internal sealed record BmsGroupedCourseStage(
     BmsCourseTableGroup Group,
     BmsCourseDefinition Course,
     int StageIndex,
-    BmsCourseStage Stage);
+    BmsCourseStage Stage,
+    BeatmapInfo? Beatmap);
 
 internal sealed record BmsCourseCarouselItems(
     BmsGroupedCourse Course,
     CarouselItem CourseItem,
     IReadOnlyList<CarouselItem> StageItems);
 
-internal sealed class BmsCourseCarouselFilter(Func<string> getSearchTerm) : ICarouselFilter
+internal sealed class BmsCourseCarouselFilter(
+    Func<string> getSearchTerm,
+    Func<BmsCourseStage, BeatmapInfo?> resolveStageBeatmap) : ICarouselFilter
 {
     internal IReadOnlyDictionary<BmsCourseTableGroup, IReadOnlyList<BmsCourseCarouselItems>> GroupItems { get; private set; }
         = new Dictionary<BmsCourseTableGroup, IReadOnlyList<BmsCourseCarouselItems>>();
@@ -305,7 +331,12 @@ internal sealed class BmsCourseCarouselFilter(Func<string> getSearchTerm) : ICar
             };
             var courses = table.Select(course =>
             {
-                var groupedCourse = new BmsGroupedCourse(group, course);
+                var resolvedStages = course.Stages.Select((stage, stageIndex) =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return new BmsGroupedCourseStage(group, course, stageIndex, stage, resolveStageBeatmap(stage));
+                }).ToArray();
+                var groupedCourse = new BmsGroupedCourse(group, course, resolvedStages.Any(stage => stage.Beatmap == null));
                 var courseItem = new CarouselItem(groupedCourse)
                 {
                     DrawHeight = BmsCoursePanel.HEIGHT,
@@ -313,8 +344,7 @@ internal sealed class BmsCourseCarouselFilter(Func<string> getSearchTerm) : ICar
                     IsVisible = false,
                     NestedItemCount = course.Stages.Count,
                 };
-                var stageItems = course.Stages.Select((stage, stageIndex) => new CarouselItem(
-                    new BmsGroupedCourseStage(group, course, stageIndex, stage))
+                var stageItems = resolvedStages.Select(stage => new CarouselItem(stage)
                 {
                     DrawHeight = PanelBeatmapStandalone.HEIGHT,
                     IsVisible = false,

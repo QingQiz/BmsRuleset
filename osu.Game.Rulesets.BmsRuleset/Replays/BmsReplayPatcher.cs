@@ -120,9 +120,8 @@ public static class BmsReplayPatcher
         if (playerScoreManagerProperty?.GetValue(player) is not ScoreManager scoreManager)
             return;
 
-        using var archive = BmsReplayArchive.Create(score);
+        using var archive = BmsReplayArchive.Create(score, out var hash);
         using var stream = new MemoryStream(archive.Get(BmsReplayArchive.FILENAME));
-        var hash = BmsReplayArchive.ComputeHash(score);
 
         scoreManager.AddFile(score.ScoreInfo, stream, BmsReplayArchive.FILENAME);
         applyHash(scoreManager, score.ScoreInfo, hash);

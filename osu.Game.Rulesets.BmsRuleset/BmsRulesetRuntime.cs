@@ -10,19 +10,35 @@ namespace osu.Game.Rulesets.BmsRuleset;
 
 internal static class BmsRulesetRuntime
 {
+    internal static event Action? CourseResultsChanged;
+
     internal static BmsRulesetConfigManager? ConfigManager
     {
         get => configManager;
         set
         {
             configManager = value;
-            CourseResults = value == null ? null : new BmsCourseResultStore(value);
+            if (value == null)
+                CourseResults = null;
         }
     }
 
     private static BmsRulesetConfigManager? configManager;
 
-    internal static BmsCourseResultStore? CourseResults { get; private set; }
+    internal static BmsCourseResultStore? CourseResults
+    {
+        get => courseResults;
+        private set
+        {
+            if (ReferenceEquals(courseResults, value))
+                return;
+
+            courseResults = value;
+            CourseResultsChanged?.Invoke();
+        }
+    }
+
+    private static BmsCourseResultStore? courseResults;
 
     internal static DifficultyTableStore? DifficultyTableStore
     {
@@ -58,6 +74,13 @@ internal static class BmsRulesetRuntime
 
     internal static DifficultyTableStore? EnsureDifficultyTableStore(GameHost host, RealmAccess realm)
     {
+        if (ConfigManager != null)
+        {
+            var courseResultsDirectory = Path.Combine(host.Storage.GetFullPath(string.Empty), "bms-course-results");
+            if (CourseResults == null || !string.Equals(CourseResults.StorageDirectory, courseResultsDirectory, StringComparison.OrdinalIgnoreCase))
+                CourseResults = new BmsCourseResultStore(courseResultsDirectory);
+        }
+
         if (DifficultyTableStore != null || ConfigManager == null || CourseCatalog.Courses.Count > 0)
             return DifficultyTableStore;
 

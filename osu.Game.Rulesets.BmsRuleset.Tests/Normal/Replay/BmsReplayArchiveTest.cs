@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using NUnit.Framework;
 using osu.Game.Extensions;
@@ -333,6 +334,16 @@ public class BmsReplayArchiveTest
         ((BmsReplayFrame)second.Replay.Frames.Single()).Actions.Add(BmsAction.Key2);
 
         Assert.That(BmsReplayArchive.ComputeHash(second), Is.Not.EqualTo(BmsReplayArchive.ComputeHash(first)));
+    }
+
+    [Test]
+    public void TestCreatedArchiveReturnsHashOfItsContent()
+    {
+        using var archive = BmsReplayArchive.Create(createScore(), out var hash);
+        byte[] bytes = archive.Get(BmsReplayArchive.FILENAME);
+        var expectedHash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+        Assert.That(hash, Is.EqualTo(expectedHash));
     }
 
     private static Score createScore() => new()

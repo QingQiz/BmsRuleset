@@ -30,9 +30,18 @@ public static class BmsReplayArchive
     public static ArchiveReader Create(Score score)
         => new ByteArrayArchiveReader(createReplayData(score), FILENAME);
 
-    public static string ComputeHash(Score score)
+    public static ArchiveReader Create(Score score, out string hash)
     {
-        using var stream = new MemoryStream(createReplayData(score));
+        var replayData = createReplayData(score);
+        hash = computeHash(replayData);
+        return new ByteArrayArchiveReader(replayData, FILENAME);
+    }
+
+    public static string ComputeHash(Score score) => computeHash(createReplayData(score));
+
+    private static string computeHash(byte[] replayData)
+    {
+        using var stream = new MemoryStream(replayData);
         return stream.ComputeSHA2Hash();
     }
 
