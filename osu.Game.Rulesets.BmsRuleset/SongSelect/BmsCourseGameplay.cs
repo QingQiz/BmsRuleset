@@ -93,6 +93,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
     internal BmsCoursePlayer(BmsCourseSession session)
         : base(new PlayerConfiguration
         {
+            AllowPause = false,
             AllowRestart = false,
             ShowLeaderboard = false,
         })
