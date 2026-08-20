@@ -16,7 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
-using osu.Game.Rulesets.BmsRuleset.Result;
+using osu.Game.Rulesets.BmsRuleset.Result.Statistic;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.Scoring;

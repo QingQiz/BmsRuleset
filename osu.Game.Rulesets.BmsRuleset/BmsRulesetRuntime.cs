@@ -3,8 +3,8 @@ using System.IO;
 using osu.Framework.Platform;
 using osu.Game.Database;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
 
 namespace osu.Game.Rulesets.BmsRuleset;
 
