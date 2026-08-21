@@ -10,29 +10,29 @@ public class BmsCourseCountdownTest
     [Test]
     public void TestCountdownUsesAbsoluteElapsedTime()
     {
-        var now = DateTimeOffset.UnixEpoch;
-        var countdown = new BmsCourseCountdown(() => now);
+        var clock = new TestClock { Current = DateTimeOffset.UnixEpoch };
+        var countdown = new BmsCourseCountdown(() => clock.Current);
 
         countdown.Start();
         Assert.That(countdown.Update().SecondsRemaining, Is.EqualTo(99));
 
-        now = now.AddSeconds(54.25);
+        clock.Current = clock.Current.AddSeconds(54.25);
         Assert.That(countdown.Update().SecondsRemaining, Is.EqualTo(45));
 
-        now = now.AddSeconds(44.75);
+        clock.Current = clock.Current.AddSeconds(44.75);
         Assert.That(countdown.Update().HasExpired, Is.True);
     }
 
     [Test]
     public void TestCueSecondsPlayOnlyOnce()
     {
-        var now = DateTimeOffset.UnixEpoch;
-        var countdown = new BmsCourseCountdown(() => now);
+        var clock = new TestClock { Current = DateTimeOffset.UnixEpoch };
+        var countdown = new BmsCourseCountdown(() => clock.Current);
         countdown.Start();
 
         foreach (var cueSecond in BmsCourseCountdown.CUE_SECONDS)
         {
-            now = DateTimeOffset.UnixEpoch.AddSeconds(BmsCourseCountdown.DURATION_SECONDS - cueSecond);
+            clock.Current = DateTimeOffset.UnixEpoch.AddSeconds(BmsCourseCountdown.DURATION_SECONDS - cueSecond);
 
             Assert.That(countdown.Update().PlayCue, Is.True, $"Expected a cue at {cueSecond} seconds.");
             Assert.That(countdown.Update().PlayCue, Is.False, $"Cue at {cueSecond} seconds should only play once.");
@@ -44,5 +44,10 @@ public class BmsCourseCountdownTest
     {
         var countdown = new BmsCourseCountdown();
         Assert.Throws<InvalidOperationException>(() => countdown.Update());
+    }
+
+    private sealed class TestClock
+    {
+        internal DateTimeOffset Current { get; set; }
     }
 }

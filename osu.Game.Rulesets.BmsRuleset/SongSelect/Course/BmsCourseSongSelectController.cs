@@ -189,12 +189,12 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             ShowCourseMode();
     }
 
-    internal bool TryStartCourse(SoloSongSelect songSelect)
+    internal void StartCourse(SoloSongSelect songSelect)
     {
         var course = SelectedCourse;
 
         if (!IsCourseMode || course == null || !songSelect.IsCurrentScreen())
-            return false;
+            return;
 
         var gaugeType = BmsCourseSession.ResolveCourseGaugeType(songSelect.Mods.Value);
 
@@ -203,7 +203,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         if (resolvedStages.Any(stage => stage == null))
         {
             notifications?.Post(new SimpleNotification { Text = BmsStrings.CourseCannotStartMissingStages });
-            return false;
+            return;
         }
 
         var mods = BmsCourseSession.CreateCourseMods(songSelect.Mods.Value, gaugeType);
@@ -211,7 +211,6 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
         confirmSelectionSample?.Play();
         songSelect.Push(new BmsCourseSessionScreen(session, songSelect.Beatmap.Value, songSelect.Mods.Value));
-        return true;
 
         BmsResolvedCourseStage? resolveStage(BmsCourseStage stage)
         {
@@ -237,8 +236,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         beatmapBeforeCourseMode = songSelect.Beatmap.Value;
 
         State.Value = Visibility.Visible;
-        if (randomButton != null)
-            randomButton.Enabled.Value = false;
+        randomButton?.Enabled.Value = false;
         applyModeVisibility();
         queueCoursePreview(selectedCourse.Value);
         CourseModeChanged?.Invoke(true);
@@ -254,8 +252,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         courseHistory.CancelPendingRefresh();
         State.Value = Visibility.Hidden;
         restoreBeatmapBeforeCourseMode();
-        if (randomButton != null)
-            randomButton.Enabled.Value = randomButtonEnabledBeforeCourseMode;
+        randomButton?.Enabled.Value = randomButtonEnabledBeforeCourseMode;
         applyModeVisibility();
         CourseModeChanged?.Invoke(false);
     }

@@ -123,7 +123,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
                 }
 
                 hits.AddRange(displayed.Where(e => e.HitObject is BmsHitObject hitObject && hitObject.Column == column)
-                                       .Select(e => (e.TimeOffset, e.Result)));
+                    .Select(e => (e.TimeOffset, e.Result)));
             }
         }
 

@@ -1,8 +1,6 @@
-using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics.Audio;
 using osu.Framework.Testing;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
@@ -125,13 +123,8 @@ public partial class BmsAudioVolumeRoutingTest : TestScene
         Assert.That(adjustments.AggregateTempo.Value, Is.EqualTo(tempo).Within(0.0000001));
     }
 
-    private sealed class TestPreviewTrack : BmsPreviewTrack
+    private sealed class TestPreviewTrack(IAggregateAudioAdjustment audioManagerAdjustments) : BmsPreviewTrack(audioManagerAdjustments)
     {
-        public TestPreviewTrack(IAggregateAudioAdjustment audioManagerAdjustments)
-            : base(audioManagerAdjustments)
-        {
-        }
-
         protected override void StartPlayback()
         {
         }
@@ -148,5 +141,4 @@ public partial class BmsAudioVolumeRoutingTest : TestScene
         {
         }
     }
-
 }

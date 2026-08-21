@@ -33,7 +33,6 @@ using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Result.Course;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
@@ -941,11 +940,8 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
 
 internal partial class BmsCourseHistoryHeader : CompositeDrawable
 {
-    private ShearedDropdown<BeatmapLeaderboardScope> scopeDropdown = null!;
     private ShearedDropdown<LeaderboardSortMode> sortDropdown = null!;
     private ShearedToggleButton selectedModsToggle = null!;
-
-    internal IBindable<BeatmapLeaderboardScope> Scope => scopeDropdown.Current;
 
     internal IBindable<LeaderboardSortMode> Sorting => sortDropdown.Current;
 
@@ -986,7 +982,7 @@ internal partial class BmsCourseHistoryHeader : CompositeDrawable
                         Width = 0.4f,
                         Items = Enum.GetValues<LeaderboardSortMode>(),
                     },
-                    scopeDropdown = new CourseScopeDropdown
+                    new CourseScopeDropdown
                     {
                         Anchor = Anchor.TopRight,
                         Origin = Anchor.TopRight,
@@ -1018,7 +1014,6 @@ internal partial class BmsCourseNoResultsPlaceholder : VisibilityContainer
 {
     internal LocalisableString Message
     {
-        get => message.Text;
         set => message.Text = value;
     }
 

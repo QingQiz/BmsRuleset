@@ -40,6 +40,19 @@ public partial class TestSceneBmsAutoGaugeScoreAttribution : BmsPlayerTestScene
         return beatmap;
     }
 
+    private static IList<ReplayFrame> createBadReplayFrames(BmsBeatmap beatmap)
+    {
+        var action = BmsKeyBindingConfiguration.ActionForColumn(beatmap.LayoutVariant, 1)!.Value;
+        const double hit_time = note_time + 150;
+
+        return
+        [
+            new BmsReplayFrame(0),
+            new BmsReplayFrame(hit_time, action),
+            new BmsReplayFrame(hit_time + BmsTestReplays.RELEASE_PADDING_MS),
+        ];
+    }
+
     [Test]
     public void TestAutoGaugeFinalScoreAttributionUsesResolvedGauge()
     {
@@ -57,18 +70,5 @@ public partial class TestSceneBmsAutoGaugeScoreAttribution : BmsPlayerTestScene
             Player.Score.ScoreInfo.Mods.Any(m => m is BmsModAutoGauge)
             && Player.Score.ScoreInfo.Mods.Any(m => m is BmsModExHardGauge)
             && Player.Score.ScoreInfo.Mods.All(m => m is not BmsModHazardGauge));
-    }
-
-    private static IList<ReplayFrame> createBadReplayFrames(BmsBeatmap beatmap)
-    {
-        var action = BmsKeyBindingConfiguration.ActionForColumn(beatmap.LayoutVariant, 1)!.Value;
-        var hitTime = note_time + 150;
-
-        return
-        [
-            new BmsReplayFrame(0),
-            new BmsReplayFrame(hitTime, action),
-            new BmsReplayFrame(hitTime + BmsTestReplays.RELEASE_PADDING_MS),
-        ];
     }
 }

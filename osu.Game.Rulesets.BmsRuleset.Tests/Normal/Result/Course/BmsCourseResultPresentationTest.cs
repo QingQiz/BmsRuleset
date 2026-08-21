@@ -11,19 +11,32 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result.Course;
 [TestFixture]
 public class BmsCourseResultPresentationTest
 {
+
+    private static ScoreInfo createScore(BeatmapInfo beatmap, int maxCombo) => new()
+    {
+        User = new APIUser(),
+        BeatmapInfo = beatmap,
+        BeatmapHash = beatmap.Hash,
+        Ruleset = beatmap.Ruleset,
+        Passed = true,
+        MaxCombo = maxCombo,
+    };
+
     [Test]
     public void TestAggregateMaxComboUsesHighestStageCombo()
     {
         var ruleset = new BmsRuleset().RulesetInfo;
         BeatmapInfo[] beatmaps =
         [
-            new BeatmapInfo { Hash = "stage-1", Ruleset = ruleset },
-            new BeatmapInfo { Hash = "stage-2", Ruleset = ruleset },
+            new()
+                { Hash = "stage-1", Ruleset = ruleset },
+            new()
+                { Hash = "stage-2", Ruleset = ruleset },
         ];
         BmsCourseStage[] definitions =
         [
-            new BmsCourseStage("Stage 1", "Normal", BeatmapHash: beatmaps[0].Hash),
-            new BmsCourseStage("Stage 2", "Normal", BeatmapHash: beatmaps[1].Hash),
+            new("Stage 1", "Normal", BeatmapHash: beatmaps[0].Hash),
+            new("Stage 2", "Normal", BeatmapHash: beatmaps[1].Hash),
         ];
         var session = new BmsCourseSession(
             new BmsCourseDefinition("course", "Table", "Course", definitions, "Class", []),
@@ -45,14 +58,4 @@ public class BmsCourseResultPresentationTest
 
         Assert.That(aggregate.MaxCombo, Is.EqualTo(360));
     }
-
-    private static ScoreInfo createScore(BeatmapInfo beatmap, int maxCombo) => new()
-    {
-        User = new APIUser(),
-        BeatmapInfo = beatmap,
-        BeatmapHash = beatmap.Hash,
-        Ruleset = beatmap.Ruleset,
-        Passed = true,
-        MaxCombo = maxCombo,
-    };
 }

@@ -4,7 +4,6 @@ using System.Linq;
 using osu.Framework.Graphics.Rendering;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
 using osu.Game.Skinning;

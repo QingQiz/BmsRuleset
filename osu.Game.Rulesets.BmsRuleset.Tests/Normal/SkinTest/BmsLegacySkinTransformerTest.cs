@@ -35,7 +35,6 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
-using osuTK;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 using Skin = osu.Game.Skinning.Skin;
@@ -260,7 +259,7 @@ public class BmsLegacySkinTransformerTest
     {
         foreach (var configuredCase in imageFallbackCases())
         {
-            var testCase = (ImageFallbackCase)configuredCase.Arguments[0];
+            var testCase = (ImageFallbackCase)configuredCase.Arguments[0]!;
 
             yield return new TestCaseData(testCase, true)
                 .SetName($"{testCase.Configuration} unconfigured default resource exists");
@@ -406,7 +405,7 @@ public class BmsLegacySkinTransformerTest
                                         ColumnLineWidth: 1,2,3,4,5,6,7,8,9
                                         """);
         var background = (LegacyBmsColumnBackground)skin.GetDrawableComponent(
-            new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, BmsLayoutVariant.Bme7K, 1));
+            new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, BmsLayoutVariant.Bme7K, 1))!;
 
         Assert.Multiple(() =>
         {
@@ -429,7 +428,7 @@ public class BmsLegacySkinTransformerTest
                                         ColumnLineWidth: 1,1,1,1,1,1,1,1,1
                                         """);
         var background = (LegacyBmsColumnBackground)skin.GetDrawableComponent(
-            new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, BmsLayoutVariant.Bme7K, 7));
+            new BmsSkinComponentLookup(BmsSkinComponents.ColumnBackground, BmsLayoutVariant.Bme7K, 7))!;
 
         Assert.That(background.RightSeparator.X, Is.EqualTo(-0.16f));
     }

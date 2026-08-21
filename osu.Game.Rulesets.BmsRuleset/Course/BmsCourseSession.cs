@@ -191,15 +191,6 @@ internal sealed class BmsCourseSession
         CurrentStageIndex++;
     }
 
-    internal static bool TryParseGauge(string gauge, out BmsGaugeType gaugeType)
-    {
-        var normalized = gauge.Replace(" ", string.Empty, StringComparison.Ordinal)
-            .Replace("-", string.Empty, StringComparison.Ordinal);
-
-        return Enum.TryParse(normalized, true, out gaugeType)
-               && gaugeType is BmsGaugeType.Class or BmsGaugeType.ExClass or BmsGaugeType.ExHardClass;
-    }
-
     internal static BmsModGauge CreateGaugeMod(BmsGaugeType gaugeType) => gaugeType switch
     {
         BmsGaugeType.Class => new BmsModClassGauge(),

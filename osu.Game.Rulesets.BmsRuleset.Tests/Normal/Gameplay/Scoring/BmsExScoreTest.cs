@@ -12,59 +12,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Scoring;
 [TestFixture]
 public class BmsExScoreTest
 {
-    [Test]
-    public void TestCalculateFromStatistics()
-    {
-        Dictionary<HitResult, int> statistics = new()
-        {
-            [HitResult.Perfect] = 10,
-            [HitResult.Great] = 3,
-            [HitResult.Good] = 20,
-        };
-
-        Assert.That(BmsExScore.Calculate(statistics), Is.EqualTo(23));
-    }
-
-    [Test]
-    public void TestMissingStatisticsFallsBackToAccuracy()
-    {
-        var score = new ScoreInfo { Accuracy = 0.75 };
-
-        Assert.That(BmsExScore.Calculate(score, 2000), Is.EqualTo(1500));
-    }
-
-    [Test]
-    public void TestCanonicalProgressionCountsLongNoteResultOnce()
-    {
-        BmsJudgementEvent[] events =
-        [
-            new BmsJudgementEvent(
-                BmsJudgementSource.From(new BmsLongNote()),
-                HitResult.Great,
-                [
-                    new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 1000, 990, 1, HitResult.Perfect),
-                    new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 1500, 1510, 1, HitResult.Great),
-                ]),
-            new BmsJudgementEvent(
-                BmsJudgementSource.From(new BmsNote()),
-                HitResult.Perfect,
-                [new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 2000, 2000, 1, HitResult.Perfect)]),
-            new BmsJudgementEvent(
-                BmsJudgementSource.From(new BmsNote()),
-                HitResult.Great,
-                [new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 2500, 2500, 1, HitResult.Great)]),
-            new BmsJudgementEvent(
-                BmsJudgementSource.From(new HitObject()),
-                HitResult.Miss,
-                [new BmsTimingObservation(BmsTimingObservationKind.Note, 3000, 3000, 1, HitResult.Miss)]),
-        ];
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(BmsExScore.CountScoringEvents(events), Is.EqualTo(3));
-            Assert.That(BmsExScore.CreateProgression(events), Is.EqualTo(new[] { 0, 1, 3, 4 }));
-        });
-    }
 
     [TestCase(0, 1800, ScoreRank.C, 1000)]
     [TestCase(1000, 1800, ScoreRank.B, 1200)]
@@ -92,10 +39,61 @@ public class BmsExScoreTest
         Assert.That(BmsScoreGraph.ScoreAtProgress(finalScore, [], judgedEvents, totalEvents), Is.EqualTo(expected));
     }
 
+    private static BmsJudgementEvent createEvent(BmsJudgementSource source, HitResult result, double? actualTime = null) => new(
+        source,
+        result,
+        [new BmsTimingObservation(BmsTimingObservationKind.Note, source.EndTime, actualTime ?? source.EndTime, 1, result)]);
+
     [Test]
-    public void TestPersistedProgressionTakesPriorityOverLinearEstimate()
+    public void TestCalculateFromStatistics()
     {
-        Assert.That(BmsScoreGraph.ScoreAtProgress(6, [0, 2, 2, 3], 2, 3), Is.EqualTo(2));
+        Dictionary<HitResult, int> statistics = new()
+        {
+            [HitResult.Perfect] = 10,
+            [HitResult.Great] = 3,
+            [HitResult.Good] = 20,
+        };
+
+        Assert.That(BmsExScore.Calculate(statistics), Is.EqualTo(23));
+    }
+
+    [Test]
+    public void TestCanonicalProgressionCountsLongNoteResultOnce()
+    {
+        BmsJudgementEvent[] events =
+        [
+            new(
+                BmsJudgementSource.From(new BmsLongNote()),
+                HitResult.Great,
+                [
+                    new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 1000, 990, 1, HitResult.Perfect),
+                    new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 1500, 1510, 1, HitResult.Great),
+                ]),
+            new(
+                BmsJudgementSource.From(new BmsNote()),
+                HitResult.Perfect,
+                [new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 2000, 2000, 1, HitResult.Perfect)]),
+            new(
+                BmsJudgementSource.From(new BmsNote()),
+                HitResult.Great,
+                [new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 2500, 2500, 1, HitResult.Great)]),
+            new(
+                BmsJudgementSource.From(new HitObject()),
+                HitResult.Miss,
+                [new BmsTimingObservation(BmsTimingObservationKind.Note, 3000, 3000, 1, HitResult.Miss)]),
+        ];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(BmsExScore.CountScoringEvents(events), Is.EqualTo(3));
+            Assert.That(BmsExScore.CreateProgression(events), Is.EqualTo([0, 1, 3, 4]));
+        });
+    }
+
+    [Test]
+    public void TestMissingPersonalBestJudgementsRemainUnavailable()
+    {
+        Assert.That(new BmsScoreGraph.JudgementProgressCursor().GetCountAtTime(1000, HitResult.Perfect), Is.Null);
     }
 
     [Test]
@@ -105,42 +103,23 @@ public class BmsExScoreTest
     }
 
     [Test]
+    public void TestMissingStatisticsFallsBackToAccuracy()
+    {
+        var score = new ScoreInfo { Accuracy = 0.75 };
+
+        Assert.That(BmsExScore.Calculate(score, 2000), Is.EqualTo(1500));
+    }
+
+    [Test]
     public void TestPersistedProgressionClampsToAvailableEvents()
     {
         Assert.That(BmsScoreGraph.ScoreAtProgress(6, [0, 2, 3], 5, 5), Is.EqualTo(3));
     }
 
     [Test]
-    public void TestPersonalBestJudgementsUseCurrentPlaybackTime()
+    public void TestPersistedProgressionTakesPriorityOverLinearEstimate()
     {
-        BmsJudgementEvent[] events =
-        [
-            createEvent(new BmsJudgementSource(200, 0, BmsJudgementSourceKind.Note), HitResult.Great),
-            createEvent(new BmsJudgementSource(100, 0, BmsJudgementSourceKind.Note), HitResult.Perfect),
-            createEvent(new BmsJudgementSource(150, 0, BmsJudgementSourceKind.EmptyPoor), HitResult.Miss),
-            createEvent(new BmsJudgementSource(100, 0, BmsJudgementSourceKind.LongNote, 200), HitResult.Good),
-            createEvent(new BmsJudgementSource(400, 0, BmsJudgementSourceKind.Note), HitResult.Ok, actualTime: 350),
-        ];
-
-        var progression = BmsScoreGraph.CreateJudgementProgression(events);
-        var cursor = new BmsScoreGraph.JudgementProgressCursor();
-        cursor.SetProgression(progression);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(cursor.GetCountAtTime(99, HitResult.Perfect), Is.Zero);
-            Assert.That(cursor.GetCountAtTime(150, HitResult.Perfect), Is.EqualTo(1));
-            Assert.That(cursor.GetCountAtTime(150, HitResult.Miss), Is.EqualTo(1));
-            Assert.That(cursor.GetCountAtTime(299, HitResult.Good), Is.Zero);
-            Assert.That(cursor.GetCountAtTime(300, HitResult.Good), Is.EqualTo(1));
-            Assert.That(cursor.GetCountAtTime(350, HitResult.Ok), Is.EqualTo(1));
-        });
-    }
-
-    [Test]
-    public void TestMissingPersonalBestJudgementsRemainUnavailable()
-    {
-        Assert.That(new BmsScoreGraph.JudgementProgressCursor().GetCountAtTime(1000, HitResult.Perfect), Is.Null);
+        Assert.That(BmsScoreGraph.ScoreAtProgress(6, [0, 2, 2, 3], 2, 3), Is.EqualTo(2));
     }
 
     [Test]
@@ -189,8 +168,30 @@ public class BmsExScoreTest
         });
     }
 
-    private static BmsJudgementEvent createEvent(BmsJudgementSource source, HitResult result, double? actualTime = null) => new(
-        source,
-        result,
-        [new BmsTimingObservation(BmsTimingObservationKind.Note, source.EndTime, actualTime ?? source.EndTime, 1, result)]);
+    [Test]
+    public void TestPersonalBestJudgementsUseCurrentPlaybackTime()
+    {
+        BmsJudgementEvent[] events =
+        [
+            createEvent(new BmsJudgementSource(200, 0, BmsJudgementSourceKind.Note), HitResult.Great),
+            createEvent(new BmsJudgementSource(100, 0, BmsJudgementSourceKind.Note), HitResult.Perfect),
+            createEvent(new BmsJudgementSource(150, 0, BmsJudgementSourceKind.EmptyPoor), HitResult.Miss),
+            createEvent(new BmsJudgementSource(100, 0, BmsJudgementSourceKind.LongNote, 200), HitResult.Good),
+            createEvent(new BmsJudgementSource(400, 0, BmsJudgementSourceKind.Note), HitResult.Ok, 350),
+        ];
+
+        var progression = BmsScoreGraph.CreateJudgementProgression(events);
+        var cursor = new BmsScoreGraph.JudgementProgressCursor();
+        cursor.SetProgression(progression);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cursor.GetCountAtTime(99, HitResult.Perfect), Is.Zero);
+            Assert.That(cursor.GetCountAtTime(150, HitResult.Perfect), Is.EqualTo(1));
+            Assert.That(cursor.GetCountAtTime(150, HitResult.Miss), Is.EqualTo(1));
+            Assert.That(cursor.GetCountAtTime(299, HitResult.Good), Is.Zero);
+            Assert.That(cursor.GetCountAtTime(300, HitResult.Good), Is.EqualTo(1));
+            Assert.That(cursor.GetCountAtTime(350, HitResult.Ok), Is.EqualTo(1));
+        });
+    }
 }

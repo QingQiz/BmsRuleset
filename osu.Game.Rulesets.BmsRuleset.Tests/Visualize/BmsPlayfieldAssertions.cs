@@ -30,7 +30,7 @@ public static class BmsPlayfieldAssertions
         // instances, not in the playfield's default (empty) HitObjectContainer.
         foreach (var column in playfield.Stage.Columns)
         {
-            foreach (var (entry, d) in column.HitObjectContainer.AliveEntries)
+            foreach (var (_, d) in column.HitObjectContainer.AliveEntries)
             {
                 if (d is DrawableBmsHitObject note &&
                     note.HitObject.StartTime == startTime &&

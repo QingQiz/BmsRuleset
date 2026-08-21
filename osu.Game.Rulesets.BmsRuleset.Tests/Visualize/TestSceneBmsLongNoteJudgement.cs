@@ -647,10 +647,8 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
             if (releaseBeforeTail == null)
                 return [headResult];
 
-            var judgeOffset = firstPress.Value;
-
             var releaseOffsetFromTail = releaseBeforeTail.Value - long_note_duration;
-            judgeOffset = Math.Abs(firstPress.Value) > Math.Abs(releaseOffsetFromTail)
+            var judgeOffset = Math.Abs(firstPress.Value) > Math.Abs(releaseOffsetFromTail)
                 ? firstPress.Value
                 : releaseOffsetFromTail;
 

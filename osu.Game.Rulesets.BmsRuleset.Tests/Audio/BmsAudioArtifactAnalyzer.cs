@@ -13,9 +13,6 @@ internal readonly record struct BmsAudioArtifact(
     float Magnitude);
 
 internal sealed record BmsAudioArtifactReport(
-    int SampleRate,
-    int Channels,
-    double Duration,
     float Peak,
     IReadOnlyList<BmsAudioArtifact> Artifacts)
 {
@@ -114,9 +111,6 @@ internal static class BmsAudioArtifactAnalyzer
             });
 
         return new BmsAudioArtifactReport(
-            sampleRate,
-            channels,
-            (double)frameCount / sampleRate,
             peak,
             grouped);
     }

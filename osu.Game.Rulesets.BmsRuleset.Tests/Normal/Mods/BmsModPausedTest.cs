@@ -15,31 +15,26 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods;
 [TestFixture]
 public class BmsModPausedTest
 {
-    [Test]
-    public void TestPausedModIsRegisteredAsUnplayableSystemMod()
-    {
-        var ruleset = new BmsRuleset();
-        var mod = ruleset.GetModsFor(ModType.System).OfType<BmsModPaused>().Single();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(mod.Acronym, Is.EqualTo("PA"));
-            Assert.That(mod.UserPlayable, Is.False);
-            Assert.That(mod.HasImplementation, Is.True);
-            Assert.That(mod.UsesDefaultConfiguration, Is.True);
-        });
+    [TestCase(10000, -10000, 5000)]
+    [TestCase(2000, -10000, -3000)]
+    [TestCase(2000, 0, 0)]
+    public void TestResumeRewindTarget(double pauseTime, double minimumTime, double expected)
+    {
+        Assert.That(BmsPlayfield.ComputeResumeRewindTarget(pauseTime, minimumTime), Is.EqualTo(expected));
     }
 
     [Test]
-    public void TestPausedModIsAddedToScore()
+    public void TestPauseAfterExistingRewindStartsNewWindow()
     {
-        var score = new ScoreInfo { Mods = [] };
-        score.Pauses.Add(1000);
-        score.Pauses.Add(2000);
+        var playfield = new BmsPlayfield(new BmsBeatmap { TotalColumns = 1 });
 
-        BmsModPaused.ApplyToScore(score);
+        playfield.BeginResumeRewind(10000, 0);
+        var nextTarget = playfield.BeginResumeRewind(11000, 0);
 
-        Assert.That(score.Mods, Has.One.TypeOf<BmsModPaused>());
+        Assert.That(nextTarget, Is.EqualTo(6000));
+        Assert.That(playfield.ResumeRewindStartTime, Is.EqualTo(6000));
+        Assert.That(playfield.ResumeRewindEndTime, Is.EqualTo(11000));
     }
 
     [Test]
@@ -56,15 +51,30 @@ public class BmsModPausedTest
     }
 
     [Test]
-    public void TestScorePopulationAttributesPauses()
+    public void TestPausedModIsAddedToScore()
     {
-        var processor = new BmsScoreProcessor();
         var score = new ScoreInfo { Mods = [] };
         score.Pauses.Add(1000);
+        score.Pauses.Add(2000);
 
-        processor.PopulateScore(score);
+        BmsModPaused.ApplyToScore(score);
 
         Assert.That(score.Mods, Has.One.TypeOf<BmsModPaused>());
+    }
+
+    [Test]
+    public void TestPausedModIsRegisteredAsUnplayableSystemMod()
+    {
+        var ruleset = new BmsRuleset();
+        var mod = ruleset.GetModsFor(ModType.System).OfType<BmsModPaused>().Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(mod.Acronym, Is.EqualTo("PA"));
+            Assert.That(mod.UserPlayable, Is.False);
+            Assert.That(mod.HasImplementation, Is.True);
+            Assert.That(mod.UsesDefaultConfiguration, Is.True);
+        });
     }
 
     [Test]
@@ -76,14 +86,6 @@ public class BmsModPausedTest
         var converted = apiMod.ToMod(ruleset);
 
         Assert.That(converted, Is.TypeOf<BmsModPaused>());
-    }
-
-    [TestCase(10000, -10000, 5000)]
-    [TestCase(2000, -10000, -3000)]
-    [TestCase(2000, 0, 0)]
-    public void TestResumeRewindTarget(double pauseTime, double minimumTime, double expected)
-    {
-        Assert.That(BmsPlayfield.ComputeResumeRewindTarget(pauseTime, minimumTime), Is.EqualTo(expected));
     }
 
     [Test]
@@ -101,16 +103,15 @@ public class BmsModPausedTest
     }
 
     [Test]
-    public void TestPauseAfterExistingRewindStartsNewWindow()
+    public void TestScorePopulationAttributesPauses()
     {
-        var playfield = new BmsPlayfield(new BmsBeatmap { TotalColumns = 1 });
+        var processor = new BmsScoreProcessor();
+        var score = new ScoreInfo { Mods = [] };
+        score.Pauses.Add(1000);
 
-        playfield.BeginResumeRewind(10000, 0);
-        var nextTarget = playfield.BeginResumeRewind(11000, 0);
+        processor.PopulateScore(score);
 
-        Assert.That(nextTarget, Is.EqualTo(6000));
-        Assert.That(playfield.ResumeRewindStartTime, Is.EqualTo(6000));
-        Assert.That(playfield.ResumeRewindEndTime, Is.EqualTo(11000));
+        Assert.That(score.Mods, Has.One.TypeOf<BmsModPaused>());
     }
 
     [Test]
@@ -130,6 +131,6 @@ public class BmsModPausedTest
             [],
             LeaderboardSortMode.Score);
 
-        Assert.That(selected, Is.EqualTo(new[] { pausedScore }));
+        Assert.That(selected, Is.EqualTo([pausedScore]));
     }
 }

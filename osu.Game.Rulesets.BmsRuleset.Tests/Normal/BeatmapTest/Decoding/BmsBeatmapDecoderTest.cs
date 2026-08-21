@@ -71,80 +71,6 @@ public class BmsBeatmapDecoderTest
             : string.Empty;
     }
 
-    [Test]
-    public void TestMinimumLeadInShiftsChartTimelineAndIsPreservedDuringConversion()
-    {
-        var decoded = decode("""
-                             #BPM 120
-                             #WAV01 kick.wav
-                             #WAV02 tail.wav
-                             #BMP01 background.png
-                             #TEXT01 ready
-                             #00001:01
-                             #00004:01
-                             #0000B:FF
-                             #00099:01
-                             #00051:0102
-                             """);
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
-        var decodedBms = (IBmsBeatmap)decoded;
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(decoded.HitObjects.Single().StartTime, Is.Zero);
-            Assert.That(decodedBms.BackgroundSampleEvents.Single().Time, Is.Zero);
-            Assert.That(converted.HitObjects.Single().StartTime, Is.EqualTo(2000));
-            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(2000));
-            Assert.That(converted.TimingMap.BpmEvents[0].Time, Is.EqualTo(2000));
-            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(2000));
-            Assert.That(converted.LongNoteTailSampleEvents.Single().Time, Is.EqualTo(3000));
-            Assert.That(converted.TextEvents.TextEvents.Single().Time, Is.EqualTo(2000));
-            Assert.That(converted.Bga.Events.Single().Time, Is.EqualTo(2000));
-            Assert.That(converted.Bga.OpacityEvents.Single().Time, Is.EqualTo(2000));
-        });
-    }
-
-    [Test]
-    public void TestPartialLeadIn()
-    {
-        var lines = """
-                    #BPM 120
-                    #WAV01 kick.wav
-                    #00001:01
-                    #00011:00010100
-                    """.Split('\n');
-        var decoded = decode(string.Join('\n', lines));
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(decoded.HitObjects.Select(h => h.StartTime), Is.EqualTo([500, 1000]));
-            Assert.That(converted.HitObjects.Select(h => h.StartTime), Is.EqualTo([2000, 2500]));
-            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(1500));
-            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(1500));
-        });
-    }
-
-    [Test]
-    public void TestExistingLeadInIsNotExtended()
-    {
-        var decoded = decode("""
-                             #BPM 120
-                             #WAV01 kick.wav
-                             #00001:01
-                             #00111:01
-                             """);
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(decoded.HitObjects.Single().StartTime, Is.EqualTo(2000));
-            Assert.That(((IBmsBeatmap)decoded).BackgroundSampleEvents.Single().Time, Is.Zero);
-            Assert.That(converted.HitObjects.Single().StartTime, Is.EqualTo(2000));
-            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.Zero);
-        });
-    }
-
     [TestCase("Aleph-0 (by LeaF)", "_7NORMAL.bms")]
     [TestCase("Aleph-0 (by LeaF)", "_14ANOTHER.bms")]
     [TestCase("Destr0yer (by 削除 feat. Nikki Simmons)", "destr0yer_starnother.bms")]
@@ -175,93 +101,6 @@ public class BmsBeatmapDecoderTest
         });
     }
 
-    [Test]
-    public void TestImportSummaryMatchesFullParserForSharedHeaderCommands()
-    {
-        const string path = "shared-header.bms";
-        var lines = """
-                    #TITLE Shared Title
-                    #ARTIST Shared Artist
-                    #SUBTITLE [AAA] BBB [CCC]
-                    #PLAYLEVEL 12.5
-                    #RANK 3
-                    #TOTAL 240
-                    #LNMODE 2
-                    #BPM 150
-                    #00111:01
-                    """.Split('\n');
-
-        var parsed = BmsChartParser.Parse(lines, path, _ => 1);
-        var summary = BmsChartParser.ParseImportSummary(lines, path, _ => 1);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(summary.Metadata, Is.EqualTo(extractImportMetadata(parsed, path)));
-            Assert.That(summary.Metadata.DifficultyName, Is.EqualTo("[AAA] BBB [CCC]"));
-        });
-    }
-
-    [Test]
-    public void TestDecoderStoresScratchObjectCount()
-    {
-        var decoded = decode("""
-                             #BPM 120
-                             #00111:01
-                             #00116:0101
-                             """);
-
-        Assert.That(BmsBeatmapStatistics.TryGetScratchObjectCount(decoded.Difficulty, out var scratchObjectCount), Is.True);
-        Assert.That(scratchObjectCount, Is.EqualTo(2));
-    }
-
-    [Test]
-    public void TestVolwavAppliesToChartSamples()
-    {
-        var parsed = BmsChartParser.Parse("""
-                                          #VOLWAV 25
-                                          #WAV01 hit.wav
-                                          #WAV02 tail.wav
-                                          #00001:01
-                                          #00011:01
-                                          #00151:0102
-                                          """.Split('\n'));
-
-        var note = parsed.HitObjects.Single(h => !h.IsLongNote);
-        var longNote = parsed.HitObjects.Single(h => h.IsLongNote);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(note.SampleVolume, Is.EqualTo(25));
-            Assert.That(longNote.SampleVolume, Is.EqualTo(25));
-            Assert.That(longNote.TailSampleVolume, Is.EqualTo(25));
-            Assert.That(parsed.BackgroundSampleEvents.Single().Volume, Is.EqualTo(25));
-            Assert.That(parsed.LongNoteTailSampleEvents.Single().Volume, Is.EqualTo(25));
-        });
-    }
-
-    [Test]
-    public void TestVolwavDefaultsToFullVolume()
-    {
-        var parsed = BmsChartParser.Parse("""
-                                          #WAV01 hit.wav
-                                          #00111:01
-                                          """.Split('\n'));
-
-        Assert.That(parsed.HitObjects.Single().SampleVolume, Is.EqualTo(100));
-    }
-
-    [Test]
-    public void TestVolwavAllowsAmplification()
-    {
-        var parsed = BmsChartParser.Parse("""
-                                          #VOLWAV 150
-                                          #WAV01 hit.wav
-                                          #00111:01
-                                          """.Split('\n'));
-
-        Assert.That(parsed.HitObjects.Single().SampleVolume, Is.EqualTo(150));
-    }
-
     private static BmsChartMetadata extractImportMetadata(BmsParseResult parsed, string path)
     {
         var title = parsed.Title ?? Path.GetFileNameWithoutExtension(path);
@@ -274,14 +113,14 @@ public class BmsBeatmapDecoderTest
             : BmsChartParser.StripDifficultyDelimiters(parsed.Subtitle);
 
         return new BmsChartMetadata(
-            Artist: parsed.Artist ?? string.Empty,
-            DifficultyName: diffName,
-            KeyCount: parsed.TotalColumns,
-            RawTitle: title,
-            Rank: parsed.Rank,
-            Total: parsed.Total,
-            PlayLevel: parsed.PlayLevel,
-            LockedLongNoteMode: parsed.LockedLongNoteMode);
+            parsed.Artist ?? string.Empty,
+            diffName,
+            parsed.TotalColumns,
+            title,
+            parsed.Rank,
+            parsed.Total,
+            parsed.PlayLevel,
+            parsed.LockedLongNoteMode);
     }
 
     private static double computeImportedBpm(BmsParseResult parsed)
@@ -342,7 +181,7 @@ public class BmsBeatmapDecoderTest
         var hitObjects = beatmap.HitObjects;
 
         var lns = hitObjects.OfType<BmsLongNote>().ToList();
-        var table = BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, column: 1, beatmap.Rank, tail: false);
+        var table = BmsJudgementProfileProvider.GetTable(beatmap.LayoutVariant, 1, beatmap.Rank, false);
         var pgreat = table.FrameworkWindowFor(HitResult.Perfect);
         var great = table.FrameworkWindowFor(HitResult.Great);
         var good = table.FrameworkWindowFor(HitResult.Good);
@@ -442,6 +281,21 @@ public class BmsBeatmapDecoderTest
 
         Assert.That(score.ScoreInfo.Mods.OfType<BmsModBranchReplay>().Single().Decisions.Value, Is.EqualTo("2:2"));
         Assert.That(replayData.Replay.Frames.OfType<BmsReplayFrame>().First().BranchDecisions, Is.EqualTo("2:2"));
+    }
+
+    [Test]
+    public void TestBareExRankSetsInitialJudgementRate()
+    {
+        var beatmap = decode("""
+                             #EXRANK 150
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(1.125).Within(0.0001));
     }
 
     [Test]
@@ -641,6 +495,21 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestBaseBpmOverridesReferenceBpmMode()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #BASEBPM 200
+                             #BPM01 240
+                             #00108:01
+                             #00211:01
+                             """, BmsReferenceBpmMode.MaxBpm);
+        var converted = convert(beatmap, BmsReferenceBpmMode.MaxBpm);
+
+        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(200).Within(0.000001));
+    }
+
+    [Test]
     public void TestBaseBpmOverridesScrollReference()
     {
         // #BASEBPM should override the scroll reference BPM without affecting note timing.
@@ -711,68 +580,76 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestReferenceBpmModeUsesMaxBpmWhenBaseBpmIsMissing()
+    public void TestBgaDataSurvivesConversion()
     {
-        var beatmap = decode("""
+        var decoded = decode("""
                              #BPM 120
-                             #BPM01 240
-                             #BPM02 90
-                             #00108:01
-                             #00208:02
-                             #00311:01
-                             """, referenceBpmMode: BmsReferenceBpmMode.MaxBpm);
-        var converted = convert(beatmap, BmsReferenceBpmMode.MaxBpm);
+                             #BMPaa lower.png
+                             #BMPAA upper.png
+                             #00104:aaAA
+                             #00111:01
+                             """);
 
-        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(240).Within(0.000001));
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+
+        Assert.That(converted.Bga.BitmapDefinitions[BmsChartParser.Enc("AA")], Is.EqualTo("upper.png"));
+        Assert.That(converted.Bga.Events.Select(e => e.DefinitionKey), Is.EqualTo([
+            BmsChartParser.Enc("AA"),
+            BmsChartParser.Enc("AA"),
+        ]));
     }
 
     [Test]
-    public void TestReferenceBpmModeUsesMinBpmWhenBaseBpmIsMissing()
+    public void TestBgaDefinitionsAndEventsAreParsed()
     {
-        var beatmap = decode("""
-                             #BPM 120
-                             #BPM01 240
-                             #BPM02 90
-                             #00108:01
-                             #00208:02
-                             #00311:01
-                             """, referenceBpmMode: BmsReferenceBpmMode.MinBpm);
-        var converted = convert(beatmap, BmsReferenceBpmMode.MinBpm);
+        var beatmap = (IBmsBeatmap)decode("""
+                                          #BPM 120
+                                          #BMP01 back.png
+                                          #BGA02 01 4 8 68 72 12 16
+                                          #00104:0200
+                                          #00107:0001
+                                          #0010A:0002
+                                          #00111:01
+                                          """);
 
-        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(90).Within(0.000001));
+        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("back.png"));
+
+        var definition = beatmap.Bga.BgaDefinitions[BmsChartParser.Enc("02")];
+        Assert.That(definition.BitmapKey, Is.EqualTo(BmsChartParser.Enc("01")));
+        Assert.That(definition.SourceX, Is.EqualTo(4));
+        Assert.That(definition.SourceY, Is.EqualTo(8));
+        Assert.That(definition.SourceWidth, Is.EqualTo(64));
+        Assert.That(definition.SourceHeight, Is.EqualTo(64));
+        Assert.That(definition.DestinationX, Is.EqualTo(12));
+        Assert.That(definition.DestinationY, Is.EqualTo(16));
+
+        Assert.That(beatmap.Bga.Events.Select(e => (e.Layer, e.DefinitionKey, e.Tick)), Is.EqualTo([
+            (BmsBgaLayer.Base, BmsChartParser.Enc("02"), 192L),
+            (BmsBgaLayer.Layer1, BmsChartParser.Enc("01"), 288L),
+            (BmsBgaLayer.Layer2, BmsChartParser.Enc("02"), 288L),
+        ]));
     }
 
     [Test]
-    public void TestReferenceBpmModeUsesMainBpmWhenBaseBpmIsMissing()
+    public void TestBgaOpacityChannelsAreParsedSeparatelyFromBitmapEvents()
     {
-        var beatmap = decode("""
-                             #BPM 120
-                             #BPM01 180
-                             #BPM02 90
-                             #00111:01010101
-                             #00208:01
-                             #00211:0101
-                             #00308:02
-                             #00311:010101010101
-                             """, referenceBpmMode: BmsReferenceBpmMode.MainBpm);
-        var converted = convert(beatmap, BmsReferenceBpmMode.MainBpm);
+        var beatmap = (IBmsBeatmap)decode("""
+                                          #BPM 120
+                                          #BMP01 back.png
+                                          #0010B:FF
+                                          #0010C:80
+                                          #0010D:40
+                                          #0010E:20
+                                          #00111:01
+                                          """);
 
-        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(90).Within(0.000001));
-    }
-
-    [Test]
-    public void TestBaseBpmOverridesReferenceBpmMode()
-    {
-        var beatmap = decode("""
-                             #BPM 120
-                             #BASEBPM 200
-                             #BPM01 240
-                             #00108:01
-                             #00211:01
-                             """, referenceBpmMode: BmsReferenceBpmMode.MaxBpm);
-        var converted = convert(beatmap, BmsReferenceBpmMode.MaxBpm);
-
-        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(200).Within(0.000001));
+        Assert.That(beatmap.Bga.Events, Is.Empty);
+        Assert.That(beatmap.Bga.OpacityEvents.Select(e => (e.Layer, e.Opacity, e.Tick)), Is.EqualTo([
+            (BmsBgaLayer.Base, 1f, 192L),
+            (BmsBgaLayer.Layer1, 128 / 255f, 192L),
+            (BmsBgaLayer.Layer2, 64 / 255f, 192L),
+            (BmsBgaLayer.Poor, 32 / 255f, 192L),
+        ]));
     }
 
     [Test]
@@ -877,6 +754,39 @@ public class BmsBeatmapDecoderTest
         mod.ApplyToBeatmapConverter(converter);
 
         Assert.That(converter.BranchReplayDecisions, Is.EqualTo("2:1"));
+    }
+
+    [Test]
+    public void TestChannelA0ChangesJudgementRateForFollowingNotes()
+    {
+        var beatmap = decode("""
+                             #RANK 2
+                             #EXRANKAA 200
+                             #EXRANKBB 50
+                             #BPM 120
+                             #001A0:AA00BB00
+                             #00111:01010101
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.HitObjects.Select(h => h.JudgementRate), Is.EqualTo([1.5, 1.5, 0.375, 0.375]).Within(0.0001));
+    }
+
+    [Test]
+    public void TestChannelA0UndefinedReferenceDoesNotChangeJudgementRate()
+    {
+        var beatmap = decode("""
+                             #RANK 2
+                             #EXRANKAA 200
+                             #BPM 120
+                             #001A0:AA00CC00
+                             #00111:01010101
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+
+        Assert.That(converted.HitObjects.Select(h => h.JudgementRate), Is.EqualTo([1.5, 1.5, 1.5, 1.5]).Within(0.0001));
     }
 
     [Test]
@@ -1035,21 +945,6 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestLandmineWithoutWav00KeepsReservedSampleKey()
-    {
-        var beatmap = decode("""
-                             #BPM 120
-                             #001D3:0000001E
-                             """);
-
-        var mine = (BmsLandmine)beatmap.HitObjects.Single();
-
-        Assert.That(mine.SampleKey, Is.Zero);
-        Assert.That(getSamplePath(mine), Is.Empty);
-        Assert.That(mine.LandmineDamagePercent, Is.EqualTo(25));
-    }
-
-    [Test]
     public void TestDecoderParsesSecondPlayerLandmineChannels()
     {
         var beatmap = decode("""
@@ -1101,6 +996,70 @@ public class BmsBeatmapDecoderTest
         // Nested subdirectories.
         Assert.That(getSamplePath(hitObjects[3]), Is.EqualTo("a/b/c.wav"));
         Assert.That(converted.SampleDefinitions[BmsChartParser.Enc("04")], Is.EqualTo("a/b/c.wav"));
+    }
+
+    [Test]
+    public void TestDecoderStoresScratchObjectCount()
+    {
+        var decoded = decode("""
+                             #BPM 120
+                             #00111:01
+                             #00116:0101
+                             """);
+
+        Assert.That(BmsBeatmapStatistics.TryGetScratchObjectCount(decoded.Difficulty, out var scratchObjectCount), Is.True);
+        Assert.That(scratchObjectCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void TestDefExRank100EqualsNormalRank()
+    {
+        // spec: "Value 100 corresponds to #RANK 2 (NORMAL)". DEFEXRANK anchors to NORMAL,
+        // not to the chart's #RANK — so #RANK 3 + #DEFEXRANK 100 must yield the NORMAL
+        // rate (0.75), not the RANK 3 rate (1.0).
+        var beatmap = decode("""
+                             #RANK 3
+                             #DEFEXRANK 100
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
+    }
+
+    [Test]
+    public void TestDefExRankAcceptsDecimalValue()
+    {
+        // spec: "Decimal fractions allowed". 87.5 → 0.75 * 87.5 / 100 = 0.65625.
+        var beatmap = decode("""
+                             #DEFEXRANK 87.5
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(0.65625).Within(0.0001));
+    }
+
+    [Test]
+    public void TestDefExRankSetsInitialJudgementRate()
+    {
+        var beatmap = decode("""
+                             #RANK 0
+                             #DEFEXRANK 200
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(1.5).Within(0.0001));
     }
 
     [Test]
@@ -1213,6 +1172,44 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestExRankWithIndexDoesNotSetDefaultExRank()
+    {
+        // #EXRANKAA (8 chars) is a per-index definition for #xxxA0, NOT the bare #EXRANK
+        // default (iBMSC 3.0 alias of #DEFEXRANK). Unreferenced here and with no bare
+        // #EXRANK/#DEFEXRANK/#RANK, the initial rate stays at the RANK 2 default (0.75).
+        var beatmap = decode("""
+                             #EXRANKAA 200
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
+    }
+
+    [Test]
+    public void TestExistingLeadInIsNotExtended()
+    {
+        var decoded = decode("""
+                             #BPM 120
+                             #WAV01 kick.wav
+                             #00001:01
+                             #00111:01
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(decoded.HitObjects.Single().StartTime, Is.EqualTo(2000));
+            Assert.That(((IBmsBeatmap)decoded).BackgroundSampleEvents.Single().Time, Is.Zero);
+            Assert.That(converted.HitObjects.Single().StartTime, Is.EqualTo(2000));
+            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.Zero);
+        });
+    }
+
+    [Test]
     public void TestExtendedBpmChangesProjectTimes()
     {
         var beatmap = decode("""
@@ -1272,6 +1269,32 @@ public class BmsBeatmapDecoderTest
             $"Discontinuity before boundary: before={justBefore:F3}, at={atBoundary:F3}");
         Assert.That(justAfter, Is.EqualTo(atBoundary).Within(0.1),
             $"Discontinuity after boundary: at={atBoundary:F3}, after={justAfter:F3}");
+    }
+
+    [Test]
+    public void TestImportSummaryMatchesFullParserForSharedHeaderCommands()
+    {
+        const string path = "shared-header.bms";
+        var lines = """
+                    #TITLE Shared Title
+                    #ARTIST Shared Artist
+                    #SUBTITLE [AAA] BBB [CCC]
+                    #PLAYLEVEL 12.5
+                    #RANK 3
+                    #TOTAL 240
+                    #LNMODE 2
+                    #BPM 150
+                    #00111:01
+                    """.Split('\n');
+
+        var parsed = BmsChartParser.Parse(lines, path, _ => 1);
+        var summary = BmsChartParser.ParseImportSummary(lines, path, _ => 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(summary.Metadata, Is.EqualTo(extractImportMetadata(parsed, path)));
+            Assert.That(summary.Metadata.DifficultyName, Is.EqualTo("[AAA] BBB [CCC]"));
+        });
     }
 
     [Test]
@@ -1462,6 +1485,21 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestLandmineWithoutWav00KeepsReservedSampleKey()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #001D3:0000001E
+                             """);
+
+        var mine = (BmsLandmine)beatmap.HitObjects.Single();
+
+        Assert.That(mine.SampleKey, Is.Zero);
+        Assert.That(getSamplePath(mine), Is.Empty);
+        Assert.That(mine.LandmineDamagePercent, Is.EqualTo(25));
+    }
+
+    [Test]
     public void TestLnMode1ParsesAsLongNote()
     {
         var beatmap = decode("""
@@ -1538,7 +1576,6 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsLongNote)beatmap.HitObjects.Single();
 
-        Assert.That(note is BmsLongNote, Is.True);
         Assert.That(note.SampleKey, Is.EqualTo(BmsChartParser.Enc("22")));
         Assert.That(note.Duration, Is.EqualTo(3000).Within(0.001));
     }
@@ -1554,7 +1591,6 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsLongNote)beatmap.HitObjects.Single();
 
-        Assert.That(note is BmsLongNote, Is.True);
         Assert.That(note.Column, Is.EqualTo(1));
         Assert.That(note.Duration, Is.EqualTo(1000).Within(0.001));
     }
@@ -1570,8 +1606,27 @@ public class BmsBeatmapDecoderTest
 
         var note = (BmsLongNote)beatmap.HitObjects.Single();
 
-        Assert.That(note is BmsLongNote, Is.True);
         Assert.That(note.Duration, Is.EqualTo(1000).Within(0.001));
+    }
+
+    [Test]
+    public void TestLongNoteTailKeyWithNoSampleDefinition()
+    {
+        var beatmap = decode("""
+                             #BPM 120
+                             #WAV01 head.wav
+                             #LNTYPE 1
+                             #00151:0103
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note is BmsLongNote, Is.True);
+        // Terminating value "03" has no #WAV definition.
+        Assert.That((note as BmsLongNote)?.TailSampleKey ?? 0, Is.EqualTo(BmsChartParser.Enc("03")));
+        Assert.That(getSamplePath(note, ((BmsLongNote)note).TailSampleKey), Is.Empty);
+        // No tail sample event either since the sample can't be resolved
+        Assert.That(converted.LongNoteTailSampleEvents, Is.Empty);
     }
 
     [Test]
@@ -1645,26 +1700,6 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestLongNoteTailKeyWithNoSampleDefinition()
-    {
-        var beatmap = decode("""
-                             #BPM 120
-                             #WAV01 head.wav
-                             #LNTYPE 1
-                             #00151:0103
-                             """);
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        var note = converted.HitObjects.Single();
-
-        Assert.That(note is BmsLongNote, Is.True);
-        // Terminating value "03" has no #WAV definition.
-        Assert.That((note as BmsLongNote)?.TailSampleKey ?? 0, Is.EqualTo(BmsChartParser.Enc("03")));
-        Assert.That(getSamplePath(note, ((BmsLongNote)note).TailSampleKey), Is.Empty);
-        // No tail sample event either since the sample can't be resolved
-        Assert.That(converted.LongNoteTailSampleEvents, Is.Empty);
-    }
-
-    [Test]
     public void TestLongNoteWithoutLnModeGetsUndefined()
     {
         // Non-long notes should not be affected
@@ -1707,6 +1742,65 @@ public class BmsBeatmapDecoderTest
         Assert.That(first.StartTime, Is.EqualTo(0).Within(0.001));
         Assert.That(second.StartTime, Is.EqualTo(2000).Within(0.001));
         Assert.That(second.StartTime - first.StartTime, Is.EqualTo(2000).Within(0.001));
+    }
+
+    [Test]
+    public void TestMidiFileHeaderCreatesBackgroundSampleEventAtStart()
+    {
+        var beatmap = decode("""
+                             #TITLE Midi File Header
+                             #ARTIST Tester
+                             #MIDIFILE "audio/midi-bgm.ogg"
+                             #WAV01 kick.wav
+                             #00111:01
+                             """);
+
+        var bmsBeatmap = (IBmsBeatmap)beatmap;
+        var midiEvent = bmsBeatmap.BackgroundSampleEvents.Single(e => e.Time == 0 && e.Tick == 0);
+
+        Assert.That(bmsBeatmap.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        midiEvent = converted.BackgroundSampleEvents.Single(e => e.Tick == 0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(midiEvent.Time, Is.EqualTo(converted.TimingMap!.ProjectTickToTime(0)));
+            Assert.That(converted.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
+        });
+    }
+
+    [Test]
+    public void TestMinimumLeadInShiftsChartTimelineAndIsPreservedDuringConversion()
+    {
+        var decoded = decode("""
+                             #BPM 120
+                             #WAV01 kick.wav
+                             #WAV02 tail.wav
+                             #BMP01 background.png
+                             #TEXT01 ready
+                             #00001:01
+                             #00004:01
+                             #0000B:FF
+                             #00099:01
+                             #00051:0102
+                             """);
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+        var decodedBms = (IBmsBeatmap)decoded;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(decoded.HitObjects.Single().StartTime, Is.Zero);
+            Assert.That(decodedBms.BackgroundSampleEvents.Single().Time, Is.Zero);
+            Assert.That(converted.HitObjects.Single().StartTime, Is.EqualTo(2000));
+            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(2000));
+            Assert.That(converted.TimingMap.BpmEvents[0].Time, Is.EqualTo(2000));
+            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(2000));
+            Assert.That(converted.LongNoteTailSampleEvents.Single().Time, Is.EqualTo(3000));
+            Assert.That(converted.TextEvents.TextEvents.Single().Time, Is.EqualTo(2000));
+            Assert.That(converted.Bga.Events.Single().Time, Is.EqualTo(2000));
+            Assert.That(converted.Bga.OpacityEvents.Single().Time, Is.EqualTo(2000));
+        });
     }
 
     [Test]
@@ -1919,6 +2013,42 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestOmittedRankAndDefExRankDefaultsToNormal()
+    {
+        // spec: "When both omitted, #RANK 2 applies" → NORMAL rate 0.75 for BME 7K.
+        var beatmap = decode("""
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
+    }
+
+    [Test]
+    public void TestPartialLeadIn()
+    {
+        var lines = """
+                    #BPM 120
+                    #WAV01 kick.wav
+                    #00001:01
+                    #00011:00010100
+                    """.Split('\n');
+        var decoded = decode(string.Join('\n', lines));
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(decoded.HitObjects.Select(h => h.StartTime), Is.EqualTo([500, 1000]));
+            Assert.That(converted.HitObjects.Select(h => h.StartTime), Is.EqualTo([2000, 2500]));
+            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(1500));
+            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(1500));
+        });
+    }
+
+    [Test]
     public void TestPmsDoublePlayerMetadataUsesEighteenKeys()
     {
         var beatmap = new Beatmap
@@ -1965,6 +2095,22 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestPoorBgaHeadersAreParsed()
+    {
+        var beatmap = (IBmsBeatmap)decode("""
+                                          #BPM 120
+                                          #POORBGA 1
+                                          #BMP00 poor.png
+                                          #BMP01 base.png
+                                          #00104:01
+                                          #00111:01
+                                          """);
+
+        Assert.That(beatmap.Bga.PoorMode, Is.EqualTo(BmsPoorBgaMode.Add));
+        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("00")], Is.EqualTo("poor.png"));
+    }
+
+    [Test]
     public void TestPreviewHeaderIsPreservedInBmsData()
     {
         var beatmap = decode("""
@@ -1995,32 +2141,6 @@ public class BmsBeatmapDecoderTest
                              """);
 
         Assert.That(((IBmsBeatmap)beatmap).PreviewFile, Is.EqualTo("audio/preview.ogg"));
-    }
-
-    [Test]
-    public void TestMidiFileHeaderCreatesBackgroundSampleEventAtStart()
-    {
-        var beatmap = decode("""
-                             #TITLE Midi File Header
-                             #ARTIST Tester
-                             #MIDIFILE "audio/midi-bgm.ogg"
-                             #WAV01 kick.wav
-                             #00111:01
-                             """);
-
-        var bmsBeatmap = (IBmsBeatmap)beatmap;
-        var midiEvent = bmsBeatmap.BackgroundSampleEvents.Single(e => e.Time == 0 && e.Tick == 0);
-
-        Assert.That(bmsBeatmap.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
-
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        midiEvent = converted.BackgroundSampleEvents.Single(e => e.Tick == 0);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(midiEvent.Time, Is.EqualTo(converted.TimingMap!.ProjectTickToTime(0)));
-            Assert.That(converted.SampleDefinitions[midiEvent.SampleKey], Is.EqualTo("audio/midi-bgm.ogg"));
-        });
     }
 
     [Test]
@@ -2098,6 +2218,22 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestRankAfterDefExRankRestoresRankJudgementRate()
+    {
+        var beatmap = decode("""
+                             #DEFEXRANK 200
+                             #RANK 0
+                             #BPM 120
+                             #00111:01
+                             """);
+
+        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
+        var note = converted.HitObjects.Single();
+
+        Assert.That(note.JudgementRate, Is.EqualTo(0.25).Within(0.0001));
+    }
+
+    [Test]
     public void TestRankDefaultsToNormalWhenAbsent()
     {
         var beatmap = decode("""
@@ -2140,151 +2276,53 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestDefExRankSetsInitialJudgementRate()
+    public void TestReferenceBpmModeUsesMainBpmWhenBaseBpmIsMissing()
     {
         var beatmap = decode("""
-                             #RANK 0
-                             #DEFEXRANK 200
                              #BPM 120
-                             #00111:01
-                             """);
-
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        var note = converted.HitObjects.Single();
-
-        Assert.That(note.JudgementRate, Is.EqualTo(1.5).Within(0.0001));
-    }
-
-    [Test]
-    public void TestBareExRankSetsInitialJudgementRate()
-    {
-        var beatmap = decode("""
-                             #EXRANK 150
-                             #BPM 120
-                             #00111:01
-                             """);
-
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        var note = converted.HitObjects.Single();
-
-        Assert.That(note.JudgementRate, Is.EqualTo(1.125).Within(0.0001));
-    }
-
-    [Test]
-    public void TestRankAfterDefExRankRestoresRankJudgementRate()
-    {
-        var beatmap = decode("""
-                             #DEFEXRANK 200
-                             #RANK 0
-                             #BPM 120
-                             #00111:01
-                             """);
-
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        var note = converted.HitObjects.Single();
-
-        Assert.That(note.JudgementRate, Is.EqualTo(0.25).Within(0.0001));
-    }
-
-    [Test]
-    public void TestChannelA0ChangesJudgementRateForFollowingNotes()
-    {
-        var beatmap = decode("""
-                             #RANK 2
-                             #EXRANKAA 200
-                             #EXRANKBB 50
-                             #BPM 120
-                             #001A0:AA00BB00
+                             #BPM01 180
+                             #BPM02 90
                              #00111:01010101
-                             """);
+                             #00208:01
+                             #00211:0101
+                             #00308:02
+                             #00311:010101010101
+                             """, BmsReferenceBpmMode.MainBpm);
+        var converted = convert(beatmap, BmsReferenceBpmMode.MainBpm);
 
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-
-        Assert.That(converted.HitObjects.Select(h => h.JudgementRate), Is.EqualTo([1.5, 1.5, 0.375, 0.375]).Within(0.0001));
+        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(90).Within(0.000001));
     }
 
     [Test]
-    public void TestChannelA0UndefinedReferenceDoesNotChangeJudgementRate()
+    public void TestReferenceBpmModeUsesMaxBpmWhenBaseBpmIsMissing()
     {
         var beatmap = decode("""
-                             #RANK 2
-                             #EXRANKAA 200
                              #BPM 120
-                             #001A0:AA00CC00
-                             #00111:01010101
-                             """);
+                             #BPM01 240
+                             #BPM02 90
+                             #00108:01
+                             #00208:02
+                             #00311:01
+                             """, BmsReferenceBpmMode.MaxBpm);
+        var converted = convert(beatmap, BmsReferenceBpmMode.MaxBpm);
 
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-
-        Assert.That(converted.HitObjects.Select(h => h.JudgementRate), Is.EqualTo([1.5, 1.5, 1.5, 1.5]).Within(0.0001));
+        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(240).Within(0.000001));
     }
 
     [Test]
-    public void TestDefExRank100EqualsNormalRank()
+    public void TestReferenceBpmModeUsesMinBpmWhenBaseBpmIsMissing()
     {
-        // spec: "Value 100 corresponds to #RANK 2 (NORMAL)". DEFEXRANK anchors to NORMAL,
-        // not to the chart's #RANK — so #RANK 3 + #DEFEXRANK 100 must yield the NORMAL
-        // rate (0.75), not the RANK 3 rate (1.0).
-        var beatmap = decode("""
-                             #RANK 3
-                             #DEFEXRANK 100
-                             #BPM 120
-                             #00111:01
-                             """);
-
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        var note = converted.HitObjects.Single();
-
-        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
-    }
-
-    [Test]
-    public void TestOmittedRankAndDefExRankDefaultsToNormal()
-    {
-        // spec: "When both omitted, #RANK 2 applies" → NORMAL rate 0.75 for BME 7K.
         var beatmap = decode("""
                              #BPM 120
-                             #00111:01
-                             """);
+                             #BPM01 240
+                             #BPM02 90
+                             #00108:01
+                             #00208:02
+                             #00311:01
+                             """, BmsReferenceBpmMode.MinBpm);
+        var converted = convert(beatmap, BmsReferenceBpmMode.MinBpm);
 
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        var note = converted.HitObjects.Single();
-
-        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
-    }
-
-    [Test]
-    public void TestDefExRankAcceptsDecimalValue()
-    {
-        // spec: "Decimal fractions allowed". 87.5 → 0.75 * 87.5 / 100 = 0.65625.
-        var beatmap = decode("""
-                             #DEFEXRANK 87.5
-                             #BPM 120
-                             #00111:01
-                             """);
-
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        var note = converted.HitObjects.Single();
-
-        Assert.That(note.JudgementRate, Is.EqualTo(0.65625).Within(0.0001));
-    }
-
-    [Test]
-    public void TestExRankWithIndexDoesNotSetDefaultExRank()
-    {
-        // #EXRANKAA (8 chars) is a per-index definition for #xxxA0, NOT the bare #EXRANK
-        // default (iBMSC 3.0 alias of #DEFEXRANK). Unreferenced here and with no bare
-        // #EXRANK/#DEFEXRANK/#RANK, the initial rate stays at the RANK 2 default (0.75).
-        var beatmap = decode("""
-                             #EXRANKAA 200
-                             #BPM 120
-                             #00111:01
-                             """);
-
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
-        var note = converted.HitObjects.Single();
-
-        Assert.That(note.JudgementRate, Is.EqualTo(0.75).Within(0.0001));
+        Assert.That(converted.TimingMap!.ScrollReferenceBpm, Is.EqualTo(90).Within(0.000001));
     }
 
     [Test]
@@ -2443,22 +2481,22 @@ public class BmsBeatmapDecoderTest
     public void TestSongSelectBackgroundFallsBackToBackBmpThenBanner()
     {
         var withBackBmp = (IBmsBeatmap)decode("""
-                                             #TITLE Background Header
-                                             #BACKBMP back.bmp
-                                             #BANNER banner.png
-                                             #WAV01 kick.wav
-                                             #00111:01
-                                             """);
+                                              #TITLE Background Header
+                                              #BACKBMP back.bmp
+                                              #BANNER banner.png
+                                              #WAV01 kick.wav
+                                              #00111:01
+                                              """);
 
         Assert.That(((Beatmap)withBackBmp).Metadata.BackgroundFile, Is.EqualTo("back.bmp"));
         Assert.That(withBackBmp.GetSongSelectBackgroundCandidates(), Is.EqualTo(["back.bmp", "banner.png"]));
 
         var bannerOnly = (IBmsBeatmap)decode("""
-                                            #TITLE Background Header
-                                            #BANNER banner.png
-                                            #WAV01 kick.wav
-                                            #00111:01
-                                            """);
+                                             #TITLE Background Header
+                                             #BANNER banner.png
+                                             #WAV01 kick.wav
+                                             #00111:01
+                                             """);
 
         Assert.That(((Beatmap)bannerOnly).Metadata.BackgroundFile, Is.EqualTo("banner.png"));
         Assert.That(bannerOnly.GetSongSelectBackgroundCandidates(), Is.EqualTo(["banner.png"]));
@@ -2488,115 +2526,6 @@ public class BmsBeatmapDecoderTest
 
         var converted = (BmsBeatmap)new BmsBeatmapConverter(beatmap, new BmsRuleset()).Convert();
         Assert.That(converted.GetSongSelectBackgroundCandidates(), Is.EqualTo(["stage.jpg", "back.bmp", "banner.png"]));
-    }
-
-    [Test]
-    public void TestBgaDefinitionsAndEventsAreParsed()
-    {
-        var beatmap = (IBmsBeatmap)decode("""
-                                          #BPM 120
-                                          #BMP01 back.png
-                                          #BGA02 01 4 8 68 72 12 16
-                                          #00104:0200
-                                          #00107:0001
-                                          #0010A:0002
-                                          #00111:01
-                                          """);
-
-        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("back.png"));
-
-        var definition = beatmap.Bga.BgaDefinitions[BmsChartParser.Enc("02")];
-        Assert.That(definition.BitmapKey, Is.EqualTo(BmsChartParser.Enc("01")));
-        Assert.That(definition.SourceX, Is.EqualTo(4));
-        Assert.That(definition.SourceY, Is.EqualTo(8));
-        Assert.That(definition.SourceWidth, Is.EqualTo(64));
-        Assert.That(definition.SourceHeight, Is.EqualTo(64));
-        Assert.That(definition.DestinationX, Is.EqualTo(12));
-        Assert.That(definition.DestinationY, Is.EqualTo(16));
-
-        Assert.That(beatmap.Bga.Events.Select(e => (e.Layer, e.DefinitionKey, e.Tick)), Is.EqualTo([
-            (BmsBgaLayer.Base, BmsChartParser.Enc("02"), 192L),
-            (BmsBgaLayer.Layer1, BmsChartParser.Enc("01"), 288L),
-            (BmsBgaLayer.Layer2, BmsChartParser.Enc("02"), 288L),
-        ]));
-    }
-
-    [Test]
-    public void TestVideoBgaAndPoorBgaEventsAreParsed()
-    {
-        var beatmap = (IBmsBeatmap)decode("""
-                                          #BPM 180
-                                          #BMP01 _aragami_bga.mpg
-                                          #BMP02 _miss.bmp
-                                          #00104:0000000000010000
-                                          #00106:0000000000020000
-                                          #00111:01
-                                          """);
-
-        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("_aragami_bga.mpg"));
-        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("_miss.bmp"));
-        Assert.That(beatmap.Bga.Events.Select(e => (e.Layer, e.DefinitionKey, e.Tick)), Is.EqualTo([
-            (BmsBgaLayer.Base, BmsChartParser.Enc("01"), 312L),
-            (BmsBgaLayer.Poor, BmsChartParser.Enc("02"), 312L),
-        ]));
-    }
-
-    [Test]
-    public void TestBgaOpacityChannelsAreParsedSeparatelyFromBitmapEvents()
-    {
-        var beatmap = (IBmsBeatmap)decode("""
-                                          #BPM 120
-                                          #BMP01 back.png
-                                          #0010B:FF
-                                          #0010C:80
-                                          #0010D:40
-                                          #0010E:20
-                                          #00111:01
-                                          """);
-
-        Assert.That(beatmap.Bga.Events, Is.Empty);
-        Assert.That(beatmap.Bga.OpacityEvents.Select(e => (e.Layer, e.Opacity, e.Tick)), Is.EqualTo([
-            (BmsBgaLayer.Base, 1f, 192L),
-            (BmsBgaLayer.Layer1, 128 / 255f, 192L),
-            (BmsBgaLayer.Layer2, 64 / 255f, 192L),
-            (BmsBgaLayer.Poor, 32 / 255f, 192L),
-        ]));
-    }
-
-    [Test]
-    public void TestPoorBgaHeadersAreParsed()
-    {
-        var beatmap = (IBmsBeatmap)decode("""
-                                          #BPM 120
-                                          #POORBGA 1
-                                          #BMP00 poor.png
-                                          #BMP01 base.png
-                                          #00104:01
-                                          #00111:01
-                                          """);
-
-        Assert.That(beatmap.Bga.PoorMode, Is.EqualTo(BmsPoorBgaMode.Add));
-        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("00")], Is.EqualTo("poor.png"));
-    }
-
-    [Test]
-    public void TestBgaDataSurvivesConversion()
-    {
-        var decoded = decode("""
-                             #BPM 120
-                             #BMPaa lower.png
-                             #BMPAA upper.png
-                             #00104:aaAA
-                             #00111:01
-                             """);
-
-        var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
-
-        Assert.That(converted.Bga.BitmapDefinitions[BmsChartParser.Enc("AA")], Is.EqualTo("upper.png"));
-        Assert.That(converted.Bga.Events.Select(e => e.DefinitionKey), Is.EqualTo([
-            BmsChartParser.Enc("AA"),
-            BmsChartParser.Enc("AA"),
-        ]));
     }
 
     [Test]
@@ -2828,6 +2757,26 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
+    public void TestVideoBgaAndPoorBgaEventsAreParsed()
+    {
+        var beatmap = (IBmsBeatmap)decode("""
+                                          #BPM 180
+                                          #BMP01 _aragami_bga.mpg
+                                          #BMP02 _miss.bmp
+                                          #00104:0000000000010000
+                                          #00106:0000000000020000
+                                          #00111:01
+                                          """);
+
+        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("01")], Is.EqualTo("_aragami_bga.mpg"));
+        Assert.That(beatmap.Bga.BitmapDefinitions[BmsChartParser.Enc("02")], Is.EqualTo("_miss.bmp"));
+        Assert.That(beatmap.Bga.Events.Select(e => (e.Layer, e.DefinitionKey, e.Tick)), Is.EqualTo([
+            (BmsBgaLayer.Base, BmsChartParser.Enc("01"), 312L),
+            (BmsBgaLayer.Poor, BmsChartParser.Enc("02"), 312L),
+        ]));
+    }
+
+    [Test]
     public void TestVisibleNotesDecodeToNativeObjects()
     {
         var beatmap = decode("""
@@ -2852,5 +2801,53 @@ public class BmsBeatmapDecoderTest
         Assert.That(second.Column, Is.EqualTo(0));
         Assert.That(second.SampleKey, Is.EqualTo(BmsChartParser.Enc("02")));
         Assert.That(second.StartTime, Is.EqualTo(3000).Within(0.001));
+    }
+
+    [Test]
+    public void TestVolwavAllowsAmplification()
+    {
+        var parsed = BmsChartParser.Parse("""
+                                          #VOLWAV 150
+                                          #WAV01 hit.wav
+                                          #00111:01
+                                          """.Split('\n'));
+
+        Assert.That(parsed.HitObjects.Single().SampleVolume, Is.EqualTo(150));
+    }
+
+    [Test]
+    public void TestVolwavAppliesToChartSamples()
+    {
+        var parsed = BmsChartParser.Parse("""
+                                          #VOLWAV 25
+                                          #WAV01 hit.wav
+                                          #WAV02 tail.wav
+                                          #00001:01
+                                          #00011:01
+                                          #00151:0102
+                                          """.Split('\n'));
+
+        var note = parsed.HitObjects.Single(h => !h.IsLongNote);
+        var longNote = parsed.HitObjects.Single(h => h.IsLongNote);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(note.SampleVolume, Is.EqualTo(25));
+            Assert.That(longNote.SampleVolume, Is.EqualTo(25));
+            Assert.That(longNote.TailSampleVolume, Is.EqualTo(25));
+            Assert.That(parsed.BackgroundSampleEvents.Single().Volume, Is.EqualTo(25));
+            Assert.That(parsed.LongNoteTailSampleEvents.Single().Volume, Is.EqualTo(25));
+        });
+    }
+
+    [Test]
+    public void TestVolwavDefaultsToFullVolume()
+    {
+        var parsed = BmsChartParser.Parse("""
+                                          #WAV01 hit.wav
+                                          #00111:01
+                                          """.Split('\n'));
+
+        Assert.That(parsed.HitObjects.Single().SampleVolume, Is.EqualTo(100));
     }
 }

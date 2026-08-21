@@ -9,8 +9,8 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using FFmpeg.AutoGen;
-using osu.Framework.Graphics;
 using NUnit.Framework;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Video;
 using osu.Framework.Logging;
 using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 /// <summary>
 ///     Empirically probes whether the framework's bundled FFmpeg can decode the MPEG-1 BGA video
-///     shipped with the Aleph-0 test song. The framework loads FFmpeg lazily when a <see cref="Video"/>
+///     shipped with the Aleph-0 test song. The framework loads FFmpeg lazily when a <see cref="Video" />
 ///     decoder is constructed, so we create one first (which reproduces the real BGA code path and the
 ///     fault seen in-game), then query FFmpeg.AutoGen directly to see which demuxers are registered.
 /// </summary>
@@ -30,7 +30,7 @@ public partial class TestSceneBmsBgaVideoProbe : OsuTestScene
 {
     // Demuxers of interest for MPEG-1 system multiplex (.mpg), plus known-present ones as sanity checks.
     private static readonly string[] demuxer_names =
-    {
+    [
         "mpeg",
         "mpegts",
         "mpegtsraw",
@@ -40,7 +40,7 @@ public partial class TestSceneBmsBgaVideoProbe : OsuTestScene
         "asf",
         "mov",
         "matroska",
-    };
+    ];
 
     // Written from the game thread; read back by the test host. Temp path keeps it location-independent.
     private static readonly string results_file = Path.Combine(Path.GetTempPath(), "bms_bga_probe.txt");
@@ -49,11 +49,36 @@ public partial class TestSceneBmsBgaVideoProbe : OsuTestScene
     private Video? video;
     private BmsSupplementalVideoDrawable? fallback;
 
+    private static string? locateBga()
+    {
+        const string rel = "bms_test_songs/Aleph-0 (by LeaF)/_bga.mpg";
+
+        if (File.Exists(rel))
+            return Path.GetFullPath(rel);
+
+        var baseDir = AppContext.BaseDirectory;
+        if (File.Exists(Path.Combine(baseDir, rel)))
+            return Path.GetFullPath(Path.Combine(baseDir, rel));
+
+        // Walk up from the test assembly's directory until the test-song tree is found.
+        var dir = new DirectoryInfo(baseDir);
+        while (dir != null)
+        {
+            var candidate = Path.Combine(dir.FullName, rel.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(candidate))
+                return candidate;
+
+            dir = dir.Parent;
+        }
+
+        return null;
+    }
+
     [Test]
     public void TestProbeBgaVideo()
     {
         AddStep("locate _bga.mpg", () => bgaPath = locateBga() ?? throw new FileNotFoundException("_bga.mpg not found from " + AppContext.BaseDirectory));
-        AddStep("create Video from file", () => Child = video = new Video(bgaPath!, startAtCurrentTime: false));
+        AddStep("create Video from file", () => Child = video = new Video(bgaPath!, false));
         // The decoder runs on a background thread; wait until it reaches a terminal/running state so that
         // FFmpeg.AutoGen's avformat has been loaded via the framework's GetOrLoadLibrary hook.
         AddUntilStep("decoder settled", () =>
@@ -77,7 +102,7 @@ public partial class TestSceneBmsBgaVideoProbe : OsuTestScene
                 foreach (var name in demuxer_names)
                 {
                     var fmt = ffmpeg.av_find_input_format(name);
-                    string extra = string.Empty;
+                    var extra = string.Empty;
 
                     if (fmt != null)
                     {
@@ -127,30 +152,5 @@ public partial class TestSceneBmsBgaVideoProbe : OsuTestScene
             lines.Add($"  TextureReady={BmsVideoTestAccess.HasTexture(fallback!)}");
             File.WriteAllLines(results_file, lines);
         });
-    }
-
-    private static string? locateBga()
-    {
-        const string rel = "bms_test_songs/Aleph-0 (by LeaF)/_bga.mpg";
-
-        if (File.Exists(rel))
-            return Path.GetFullPath(rel);
-
-        string baseDir = AppContext.BaseDirectory;
-        if (File.Exists(Path.Combine(baseDir, rel)))
-            return Path.GetFullPath(Path.Combine(baseDir, rel));
-
-        // Walk up from the test assembly's directory until the test-song tree is found.
-        var dir = new DirectoryInfo(baseDir);
-        while (dir != null)
-        {
-            string candidate = Path.Combine(dir.FullName, rel.Replace('/', Path.DirectorySeparatorChar));
-            if (File.Exists(candidate))
-                return candidate;
-
-            dir = dir.Parent;
-        }
-
-        return null;
     }
 }

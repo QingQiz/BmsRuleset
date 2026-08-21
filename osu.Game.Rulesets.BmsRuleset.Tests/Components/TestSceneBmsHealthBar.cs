@@ -60,12 +60,12 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestAssistEasyGaugeGrooveDisplay()
     {
-        AddStep("set Assist Easy gauge", () => ((BmsHealthProcessor)healthProcessor).SetGaugeType(BmsGaugeType.AssistEasy));
+        AddStep("set Assist Easy gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.AssistEasy));
         AddAssert("display is GrooveDynamic", () =>
-            ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value.ColourMode == BmsGaugeColourMode.GrooveDynamic);
+            healthProcessor.DisplayProfile.Value.ColourMode == BmsGaugeColourMode.GrooveDynamic);
         AddAssert("has clear line at 60%", () =>
         {
-            var dp = ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value;
+            var dp = healthProcessor.DisplayProfile.Value;
             return dp.ShowClearLine && dp.ClearThreshold == 0.6;
         });
         AddStep("set health above clear", () => healthProcessor.Health.Value = 0.65);
@@ -88,12 +88,12 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestEasyGaugeGrooveDisplay()
     {
-        AddStep("set Easy gauge", () => ((BmsHealthProcessor)healthProcessor).SetGaugeType(BmsGaugeType.Easy));
+        AddStep("set Easy gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.Easy));
         AddAssert("display is GrooveDynamic", () =>
-            ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value.ColourMode == BmsGaugeColourMode.GrooveDynamic);
+            healthProcessor.DisplayProfile.Value.ColourMode == BmsGaugeColourMode.GrooveDynamic);
         AddAssert("has clear line at 80%", () =>
         {
-            var dp = ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value;
+            var dp = healthProcessor.DisplayProfile.Value;
             return dp.ShowClearLine && dp.ClearThreshold == 0.8;
         });
     }
@@ -115,13 +115,13 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestExHardGaugeDisplay()
     {
-        AddStep("set EX Hard gauge", () => ((BmsHealthProcessor)healthProcessor).SetGaugeType(BmsGaugeType.ExHard));
+        AddStep("set EX Hard gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.ExHard));
         AddAssert("display is Fixed purple", () =>
         {
-            var dp = ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value;
+            var dp = healthProcessor.DisplayProfile.Value;
             return dp.ColourMode == BmsGaugeColourMode.Fixed && dp.FillColour == new Color4(195, 55, 210, 255);
         });
-        AddAssert("no clear line", () => !((BmsHealthProcessor)healthProcessor).DisplayProfile.Value.ShowClearLine);
+        AddAssert("no clear line", () => !healthProcessor.DisplayProfile.Value.ShowClearLine);
         AddStep("set health to 100%", () => healthProcessor.Health.Value = 1.0);
     }
 
@@ -134,42 +134,42 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestHardGaugeDisplay()
     {
-        AddStep("set Hard gauge", () => ((BmsHealthProcessor)healthProcessor).SetGaugeType(BmsGaugeType.Hard));
+        AddStep("set Hard gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.Hard));
         AddAssert("display is Fixed red", () =>
         {
-            var dp = ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value;
+            var dp = healthProcessor.DisplayProfile.Value;
             return dp.ColourMode == BmsGaugeColourMode.Fixed && dp.FillColour == new Color4(220, 55, 50, 255);
         });
-        AddAssert("no clear line", () => !((BmsHealthProcessor)healthProcessor).DisplayProfile.Value.ShowClearLine);
+        AddAssert("no clear line", () => !healthProcessor.DisplayProfile.Value.ShowClearLine);
         AddStep("set health to 100%", () => healthProcessor.Health.Value = 1.0);
     }
 
     [Test]
     public void TestHazardGaugeDisplay()
     {
-        AddStep("set Hazard gauge", () => ((BmsHealthProcessor)healthProcessor).SetGaugeType(BmsGaugeType.Hazard));
+        AddStep("set Hazard gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.Hazard));
         AddAssert("display is Fixed gold", () =>
         {
-            var dp = ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value;
+            var dp = healthProcessor.DisplayProfile.Value;
             return dp.ColourMode == BmsGaugeColourMode.Fixed && dp.FillColour == new Color4(255, 215, 0, 255);
         });
-        AddAssert("no clear line", () => !((BmsHealthProcessor)healthProcessor).DisplayProfile.Value.ShowClearLine);
+        AddAssert("no clear line", () => !healthProcessor.DisplayProfile.Value.ShowClearLine);
         AddStep("set health to 100%", () => healthProcessor.Health.Value = 1.0);
     }
 
     [Test]
     public void TestHazardGaugeHealthLevels()
     {
-        AddStep("set Hazard gauge", () => ((BmsHealthProcessor)healthProcessor).SetGaugeType(BmsGaugeType.Hazard));
+        AddStep("set Hazard gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.Hazard));
         AddStep("set health to 50%", () => healthProcessor.Health.Value = 0.50);
         AddAssert("display still Fixed gold", () =>
         {
-            var dp = ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value;
+            var dp = healthProcessor.DisplayProfile.Value;
             return dp.ColourMode == BmsGaugeColourMode.Fixed && dp.FillColour == new Color4(255, 215, 0, 255);
         });
         AddStep("drop health to 5%", () => healthProcessor.Health.Value = 0.05);
         AddAssert("display colour unchanged (Fixed)", () =>
-            ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value.ColourMode == BmsGaugeColourMode.Fixed);
+            healthProcessor.DisplayProfile.Value.ColourMode == BmsGaugeColourMode.Fixed);
     }
 
     [Test]
@@ -198,15 +198,15 @@ public partial class TestSceneBmsHealthBar : OsuTestScene
     [Test]
     public void TestSwitchFromHardToNormalRestoresGroove()
     {
-        AddStep("set Hard gauge", () => ((BmsHealthProcessor)healthProcessor).SetGaugeType(BmsGaugeType.Hard));
+        AddStep("set Hard gauge", () => healthProcessor.SetGaugeType(BmsGaugeType.Hard));
         AddAssert("display is Fixed", () =>
-            ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value.ColourMode == BmsGaugeColourMode.Fixed);
-        AddStep("switch back to Normal", () => ((BmsHealthProcessor)healthProcessor).SetGaugeType(BmsGaugeType.Normal));
+            healthProcessor.DisplayProfile.Value.ColourMode == BmsGaugeColourMode.Fixed);
+        AddStep("switch back to Normal", () => healthProcessor.SetGaugeType(BmsGaugeType.Normal));
         AddAssert("display is GrooveDynamic", () =>
-            ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value.ColourMode == BmsGaugeColourMode.GrooveDynamic);
+            healthProcessor.DisplayProfile.Value.ColourMode == BmsGaugeColourMode.GrooveDynamic);
         AddAssert("clear line restored at 80%", () =>
         {
-            var dp = ((BmsHealthProcessor)healthProcessor).DisplayProfile.Value;
+            var dp = healthProcessor.DisplayProfile.Value;
             return dp.ShowClearLine && dp.ClearThreshold == 0.8;
         });
     }

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Testing;
@@ -21,30 +22,10 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
 
     private DrawableBmsHitObject judgedNote = null!;
 
-    protected override TestPlayer CreatePlayer(Ruleset ruleset) => new(allowPause: true, showResults: false);
-
-    protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
-    {
-        var beatmap = new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
-            HitObjects =
-            {
-                new BmsNote { StartTime = judged_note_time, Column = 1 },
-                new BmsNote { StartTime = pause_boundary_note_time, Column = 2 },
-                new BmsNote { StartTime = 30000, Column = 1 },
-            },
-        };
-
-        BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset, endPadding: 3000, bpm: 120);
-        return beatmap;
-    }
-
     [Test]
     public void TestResumeRewindsImmediatelyWithoutResettingJudgement()
     {
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Playfield.Stage.IsLoaded);
 
         AddStep("seek to judged note", () =>
@@ -71,8 +52,8 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
             var expected = expectedRewindTime();
             var frameTime = Player.DrawableRuleset.FrameStableClock.CurrentTime;
 
-            return System.Math.Abs(Player.GameplayClockContainer.CurrentTime - expected) <= 250
-                   && System.Math.Abs(frameTime - expected) <= 250
+            return Math.Abs(Player.GameplayClockContainer.CurrentTime - expected) <= 250
+                   && Math.Abs(frameTime - expected) <= 250
                    && Playfield.DisplayTime - frameTime > 1000
                    && Player.ScoreProcessor.JudgedHits == 1;
         });
@@ -93,7 +74,7 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
     {
         var judgedHitsBeforePress = 0;
 
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Playfield.Stage.IsLoaded);
         AddStep("seek to pause boundary", () =>
         {
@@ -116,7 +97,7 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
     [Test]
     public void TestTapVisibilityRestoresAfterResultRevert()
     {
-        AddStep("load player", () => LoadPlayer());
+        AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Playfield.Stage.IsLoaded);
         AddStep("seek to judged note", () =>
         {
@@ -139,6 +120,26 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
             return judgedNote is { Judged: false, Alpha: 1 };
         });
         AddStep("stop after restore", () => Player.GameplayClockContainer.Stop());
+    }
+
+    protected override TestPlayer CreatePlayer(Ruleset ruleset) => new(true, false);
+
+    protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
+    {
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = BmsLayout.BME7_KEY_COLUMNS,
+            HitObjects =
+            {
+                new BmsNote { StartTime = judged_note_time, Column = 1 },
+                new BmsNote { StartTime = pause_boundary_note_time, Column = 2 },
+                new BmsNote { StartTime = 30000, Column = 1 },
+            },
+        };
+
+        BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset, 3000, 120);
+        return beatmap;
     }
 
     private double expectedRewindTime() => Player.Score.ScoreInfo.Pauses.Single() - BmsPlayfield.RESUME_REWIND_DURATION;

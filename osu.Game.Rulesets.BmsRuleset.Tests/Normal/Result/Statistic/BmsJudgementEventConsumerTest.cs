@@ -13,18 +13,37 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result.Statistic;
 [TestFixture]
 public class BmsJudgementEventConsumerTest
 {
-    [Test]
-    public void TestTimelineUsesCanonicalResultAndBothTimingObservations()
-    {
-        var score = createStandardLongNoteScore(HitResult.Great);
-        var data = BmsTimelineStatistic.CreateData(score, createBeatmap());
 
-        Assert.Multiple(() =>
+    private static ScoreInfo createStandardLongNoteScore(HitResult result)
+    {
+        var longNote = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
+        BmsJudgementEvent[] events =
+        [
+            new(BmsJudgementSource.From(longNote), result,
+            [
+                new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 1000, 988, 1, HitResult.Perfect),
+                new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 1500, 1519, 1, result),
+            ]),
+        ];
+        var score = new ScoreInfo
         {
-            Assert.That(data.Judgements.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(1));
-            Assert.That(data.FastSlow.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(2));
-        });
+            Passed = true, HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents(events)
+        };
+        BmsJudgementEventStore.Set(score, events);
+        return score;
     }
+
+    private static BmsBeatmap createBeatmap() => new()
+    {
+        LayoutVariant = BmsLayoutVariant.Bme7K,
+        TotalColumns = 8,
+        Total = 200,
+        HitObjects =
+        {
+            new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 },
+            new BmsNote { StartTime = 2000, Column = 2 },
+        },
+    };
 
     [Test]
     public void TestGaugeFallbackAppliesCanonicalResultOnce()
@@ -41,32 +60,16 @@ public class BmsJudgementEventConsumerTest
         Assert.That(canonicalSeries.Points.Last().Health, Is.EqualTo(singleEventSeries.Points.Last().Health));
     }
 
-    private static ScoreInfo createStandardLongNoteScore(HitResult result)
+    [Test]
+    public void TestTimelineUsesCanonicalResultAndBothTimingObservations()
     {
-        var longNote = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
-        BmsJudgementEvent[] events =
-        [
-            new BmsJudgementEvent(BmsJudgementSource.From(longNote), result,
-            [
-                new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 1000, 988, 1, HitResult.Perfect),
-                new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 1500, 1519, 1, result),
-            ]),
-        ];
-        var score = new ScoreInfo { Passed = true };
-        score.HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents(events);
-        BmsJudgementEventStore.Set(score, events);
-        return score;
-    }
+        var score = createStandardLongNoteScore(HitResult.Great);
+        var data = BmsTimelineStatistic.CreateData(score, createBeatmap());
 
-    private static BmsBeatmap createBeatmap() => new()
-    {
-        LayoutVariant = BmsLayoutVariant.Bme7K,
-        TotalColumns = 8,
-        Total = 200,
-        HitObjects =
+        Assert.Multiple(() =>
         {
-            new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 },
-            new BmsNote { StartTime = 2000, Column = 2 },
-        },
-    };
+            Assert.That(data.Judgements.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(1));
+            Assert.That(data.FastSlow.Categories.Sum(category => category.Buckets.Sum()), Is.EqualTo(2));
+        });
+    }
 }

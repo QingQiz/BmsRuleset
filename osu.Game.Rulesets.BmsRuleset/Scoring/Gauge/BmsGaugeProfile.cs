@@ -3,7 +3,6 @@ using System.Collections.Generic;
 namespace osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 
 public sealed record BmsGaugeProfile(
-    BmsGaugeType Type,
     BmsGaugeAlgorithm Algorithm,
     double InitialHealth,
     double MaxHealth,

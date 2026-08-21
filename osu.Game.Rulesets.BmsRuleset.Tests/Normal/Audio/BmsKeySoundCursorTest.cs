@@ -25,7 +25,7 @@ public class BmsKeySoundCursorTest
     [Test]
     public void NextAdvancesCursorForwardAcrossNotes()
     {
-        var cursor = new BmsKeySoundCursor(new[] { note(1000), note(2000) });
+        var cursor = new BmsKeySoundCursor([note(1000), note(2000)]);
 
         Assert.That(cursor.Next(500, _ => false)?.StartTime, Is.EqualTo(1000));
         // note@1000 finished at t=1100 (still within BAD window, so isFinished drives the skip)
@@ -35,7 +35,7 @@ public class BmsKeySoundCursorTest
     [Test]
     public void NextAdvancesToLaterNoteAfterForwardJump()
     {
-        var cursor = new BmsKeySoundCursor(new[] { note(1000), note(100000) });
+        var cursor = new BmsKeySoundCursor([note(1000), note(100000)]);
 
         Assert.That(cursor.Next(500, _ => false)?.StartTime, Is.EqualTo(1000));
         // Forward jump to t=6000: note@1000 is past its BAD window (6000 > 1280), so the linear
@@ -46,7 +46,7 @@ public class BmsKeySoundCursorTest
     [Test]
     public void NextResetsCursorOnBackwardSeek()
     {
-        var cursor = new BmsKeySoundCursor(new[] { note(1000) });
+        var cursor = new BmsKeySoundCursor([note(1000)]);
 
         // t=2000: past BAD window -> null, cursor advances past the note.
         Assert.That(cursor.Next(2000, _ => false), Is.Null);
@@ -57,7 +57,7 @@ public class BmsKeySoundCursorTest
     [Test]
     public void NextReturnsFirstPendingNoteBeforeItIsPastBadWindow()
     {
-        var cursor = new BmsKeySoundCursor(new[] { note(1000) });
+        var cursor = new BmsKeySoundCursor([note(1000)]);
 
         // t=500: note@1000 not past BAD window (1000+280=1280), not finished -> returned.
         Assert.That(cursor.Next(500, _ => false)?.StartTime, Is.EqualTo(1000));
@@ -74,7 +74,7 @@ public class BmsKeySoundCursorTest
     [Test]
     public void NextReturnsNullWhenAllNotesFinished()
     {
-        var cursor = new BmsKeySoundCursor(new[] { note(1000) });
+        var cursor = new BmsKeySoundCursor([note(1000)]);
 
         Assert.That(cursor.Next(500, _ => true), Is.Null);
     }
@@ -82,7 +82,7 @@ public class BmsKeySoundCursorTest
     [Test]
     public void NextSkipsLandmines()
     {
-        var cursor = new BmsKeySoundCursor(new BmsHitObject[] { mine(1000), note(2000) });
+        var cursor = new BmsKeySoundCursor([mine(1000), note(2000)]);
 
         Assert.That(cursor.Next(500, _ => false)?.StartTime, Is.EqualTo(2000));
     }
@@ -90,7 +90,7 @@ public class BmsKeySoundCursorTest
     [Test]
     public void NextSkipsNotesPastBadWindow()
     {
-        var cursor = new BmsKeySoundCursor(new[] { note(1000) });
+        var cursor = new BmsKeySoundCursor([note(1000)]);
 
         // t=2000: note@1000 past BAD window (2000 > 1280) -> skipped -> null.
         Assert.That(cursor.Next(2000, _ => false), Is.Null);

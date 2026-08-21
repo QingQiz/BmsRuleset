@@ -282,7 +282,7 @@ public partial class BmsEmbeddedSongDecoderTest
     [GeneratedRegex(@"^#([A-Z0-9]+)\s+(.*)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex commandLineRegex();
 
-    static internal string TestSongsRoot => Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", "bms_test_songs"));
+    internal static string TestSongsRoot => Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", "bms_test_songs"));
 
     private sealed record ChartExpectation(
         IReadOnlyList<ExpectedNote> Notes,

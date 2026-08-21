@@ -77,7 +77,7 @@ public static class BmsCourseSongSelectPatcher
         try
         {
             var controller = controllers.GetValue(soloSongSelect, createController);
-            controller.StartRequested = () => controller.TryStartCourse(soloSongSelect);
+            controller.StartRequested = () => controller.StartCourse(soloSongSelect);
             var randomButton = __result.OfType<FooterButtonRandom>().SingleOrDefault();
             controller.AttachRandomButton(randomButton);
             __result = [.. __result, new BmsCourseFooterButton(controller)];
@@ -93,7 +93,7 @@ public static class BmsCourseSongSelectPatcher
         if (disabled || !controllers.TryGetValue(__instance, out var controller) || !controller.IsCourseMode)
             return true;
 
-        controller.TryStartCourse(__instance);
+        controller.StartCourse(__instance);
         return false;
     }
     // ReSharper restore InconsistentNaming

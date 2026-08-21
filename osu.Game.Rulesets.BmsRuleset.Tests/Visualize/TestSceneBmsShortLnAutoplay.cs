@@ -1,8 +1,6 @@
 #nullable enable
-using System;
 using System.Linq;
 using NUnit.Framework;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Pooling;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
@@ -11,7 +9,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
@@ -29,12 +26,12 @@ public partial class TestSceneBmsShortLnAutoplay : BmsPlayerTestScene
     private const double start = 3000;
     private const double ln_spacing = 103.45;
     private const double ln_dur = 34.48; // matches the caution chart's short LN run
-    private static readonly int[] ln_cols = { 7, 5, 4, 3, 1, 2, 6, 0, 7, 5, 4, 3, 1, 2, 6, 0 };
+    private static readonly int[] ln_cols = [7, 5, 4, 3, 1, 2, 6, 0, 7, 5, 4, 3, 1, 2, 6, 0];
 
     protected override bool HasCustomSteps => true;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
-        => CreateBmsPlayer(b => new BmsAutoGenerator(b).Generate().Frames.ToList());
+        => CreateBmsPlayer(b => [.. new BmsAutoGenerator(b).Generate().Frames]);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -66,14 +63,14 @@ public partial class TestSceneBmsShortLnAutoplay : BmsPlayerTestScene
             });
         }
 
-        BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset, endPadding: 3000, bpm: 145);
+        BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset, 3000, 145);
         return beatmap;
     }
 
     [Test]
     public void AutoplayJudgesShortLnsAndFollowingNotesPerfectly()
     {
-        AddStep("load player", () => LoadPlayer(Array.Empty<Mod>()));
+        AddStep("load player", () => LoadPlayer([]));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
 
@@ -82,22 +79,22 @@ public partial class TestSceneBmsShortLnAutoplay : BmsPlayerTestScene
 
         AddAssert("all judgements are Perfect", () =>
         {
-            int nonPerfect = Player.ScoreProcessor.Statistics.Where(kv => kv.Key != HitResult.Perfect).Sum(kv => kv.Value);
+            var nonPerfect = Player.ScoreProcessor.Statistics.Where(kv => kv.Key != HitResult.Perfect).Sum(kv => kv.Value);
             return nonPerfect == 0;
         });
 
         AddAssert("short LN hit explosions stay within preloaded pools", () =>
         {
             var poolSizes = Playfield.Stage.Columns
-                                     .Cast<BmsColumn>()
-                                     .SelectMany(column => column.ChildrenOfType<DrawablePool<BmsHitExplosion>>())
-                                     .Select(pool => pool.CurrentPoolSize)
-                                     .Order()
-                                     .ToArray();
+                .Cast<BmsColumn>()
+                .SelectMany(column => column.ChildrenOfType<DrawablePool<BmsHitExplosion>>())
+                .Select(pool => pool.CurrentPoolSize)
+                .Order()
+                .ToArray();
 
             return poolSizes.SequenceEqual(Enumerable.Repeat(2, Playfield.TotalColumns)
-                                                      .Concat(Enumerable.Repeat(3, Playfield.TotalColumns))
-                                                      .Order());
+                .Concat(Enumerable.Repeat(3, Playfield.TotalColumns))
+                .Order());
         });
     }
 }

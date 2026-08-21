@@ -219,7 +219,7 @@ public class BmsStarRatingProcessor
     {
         // === Basic Setup and Parsing ===
         if (totalColumns > 64)
-            throw new ArgumentOutOfRangeException(nameof(totalColumns), totalColumns, "Bitmask active-column tracking supports at most 64 columns.");
+            throw new ArgumentOutOfRangeException(nameof(totalColumns), totalColumns, @"Bitmask active-column tracking supports at most 64 columns.");
 
         TotalColumns = totalColumns;
         preprocessFile(noteTimings, rank, clockRate, layout, judgementRate);

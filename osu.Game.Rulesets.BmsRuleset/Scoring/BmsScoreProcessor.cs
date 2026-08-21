@@ -87,6 +87,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     /// </summary>
     public void RegisterEmptyPoor()
     {
+        // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
         RegisterEmptyPoor(Clock?.CurrentTime ?? 0);
     }
 
@@ -318,7 +319,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         catch (Exception ex)
         {
             BmsLogger.Error(ex, "BMS ScoreProcessor: Failed to bind ComboAfterJudgement setter via reflection. "
-                             + "BAD/POOR combo-break revert will not function correctly.");
+                                + "BAD/POOR combo-break revert will not function correctly.");
             return (_, _) => { };
         }
     }

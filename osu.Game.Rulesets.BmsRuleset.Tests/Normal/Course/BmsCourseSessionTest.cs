@@ -20,7 +20,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Course;
 [TestFixture]
 public class BmsCourseSessionTest
 {
-    private string courseResultsDirectory = null!;
 
     [SetUp]
     public void SetUp()
@@ -36,66 +35,45 @@ public class BmsCourseSessionTest
             Directory.Delete(courseResultsDirectory, true);
     }
 
-    [Test]
-    public void TestPassedStageCarriesHealthAndAdvances()
+    private string courseResultsDirectory = null!;
+
+    [TestCase(BmsGaugeType.Class, typeof(BmsModClassGauge))]
+    [TestCase(BmsGaugeType.ExClass, typeof(BmsModExClassGauge))]
+    [TestCase(BmsGaugeType.ExHardClass, typeof(BmsModExHardClassGauge))]
+    public void TestCourseGaugeModCreation(BmsGaugeType gaugeType, Type expectedModType)
     {
-        var session = createSession();
-        var score = createScore(true, 123456);
-
-        session.BeginCurrentStage();
-        session.CompleteCurrentStage(score, gaugeStates(0.42));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.InProgress));
-            Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Passed));
-            Assert.That(session.CurrentHealth, Is.EqualTo(0.42));
-            Assert.That(session.CurrentStage.Score, Is.Not.SameAs(score));
-        });
-
-        session.RequestAdvance();
-        session.Advance();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(session.CurrentStageIndex, Is.EqualTo(1));
-            Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.NotPlayed));
-            Assert.That(session.AdvanceRequested, Is.False);
-            Assert.That(session.CurrentHealth, Is.EqualTo(0.42));
-        });
+        Assert.That(BmsCourseSession.CreateGaugeMod(gaugeType), Is.TypeOf(expectedModType));
     }
 
-    [Test]
-    public void TestFinalPassCompletesCourse()
+    [TestCase("gauge_5k", BmsGaugeProfileFamily.FiveKeys)]
+    [TestCase("gauge_7k", BmsGaugeProfileFamily.SevenKeys)]
+    [TestCase("gauge_9k", BmsGaugeProfileFamily.Pms)]
+    [TestCase("gauge_24k", BmsGaugeProfileFamily.Keyboard)]
+    [TestCase("gauge_lr2", BmsGaugeProfileFamily.Lr2)]
+    public void TestCourseGaugeProfileFamilySelection(string constraint, BmsGaugeProfileFamily expected)
     {
-        var session = createSession(1);
-
-        session.BeginCurrentStage();
-        session.CompleteCurrentStage(createScore(true), gaugeStates(0.75));
-
-        Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Passed));
-        Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Passed));
-        Assert.Throws<InvalidOperationException>(session.RequestAdvance);
+        Assert.That(BmsCourseSession.ResolveCourseGaugeProfileFamily([constraint]), Is.EqualTo(expected));
     }
 
-    [Test]
-    public void TestFailureStoresPartialScoreAndEndsCourse()
+    private static BmsCourseSession createSession(int stageCount = 3, IReadOnlyList<Mod> mods = null, BmsGaugeType gaugeType = BmsGaugeType.Class)
     {
-        var session = createSession();
-
-        session.BeginCurrentStage();
-        session.FailCurrentStage(createScore(false, 654321), gaugeStates(0, failed: true));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Failed));
-            Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Failed));
-            Assert.That(session.CurrentStage.Score?.TotalScore, Is.EqualTo(654321));
-            Assert.That(session.CurrentHealth, Is.Zero);
-            Assert.That(session.Stages[1].Status, Is.EqualTo(BmsCourseStageStatus.NotPlayed));
-            Assert.That(session.Stages[1].Score, Is.Null);
-        });
+        var stages = Enumerable.Range(1, stageCount)
+            .Select(index => new BmsResolvedCourseStage(
+                new BmsCourseStage($"Stage {index}", $"Level {index}", BeatmapHash: $"hash-{index}"),
+                new BeatmapInfo { Hash = $"hash-{index}" }))
+            .ToArray();
+        var course = new BmsCourseDefinition("course", "Table", "Course", stages.Select(stage => stage.Definition).ToArray(), "Class", []);
+        return new BmsCourseSession(course, stages, mods ?? [], gaugeType);
     }
+
+    private static BmsGaugeStateSnapshot[] gaugeStates(double health, bool failed = false) =>
+        [new(BmsGaugeType.Class, health, failed)];
+
+    private static ScoreInfo createScore(bool passed, long totalScore = 0) => new()
+    {
+        Passed = passed,
+        TotalScore = totalScore,
+    };
 
     [Test]
     public void TestAbortDuringStageStoresPartialScore()
@@ -132,6 +110,93 @@ public class BmsCourseSessionTest
     }
 
     [Test]
+    public void TestAbortedCourseCreatesResultWhenScoreIsAvailable()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+
+        store.Record("aborted-course", BmsCourseStatus.Aborted, ScoreRank.F, createScore(false, 1000));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(store.TryGet("aborted-course", out var result), Is.True);
+            Assert.That(result.Lamp, Is.EqualTo(BmsLamp.Failed));
+            Assert.That(result.Rank, Is.EqualTo(ScoreRank.F));
+            Assert.That(result.Score?.TotalScore, Is.EqualTo(1000));
+        });
+    }
+
+    [Test]
+    public void TestCourseAutoGaugeDoesNotRestoreFailedGaugesWhenModIsAppliedAfterSessionConfiguration()
+    {
+        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(true),
+        [
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
+            new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
+        ]);
+        session.RequestAdvance();
+        session.Advance();
+
+        var healthProcessor = new BmsHealthProcessor();
+        session.ConfigureHealthProcessor(healthProcessor);
+        new BmsModAutoGauge().ApplyToHealthProcessor(healthProcessor);
+
+        Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(
+        [
+            BmsGaugeType.ExClass,
+            BmsGaugeType.Class,
+        ]));
+    }
+
+    [Test]
+    public void TestCourseAutoGaugeOmitsFailedGaugesFromNextStage()
+    {
+        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(true),
+        [
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
+            new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
+        ]);
+        session.RequestAdvance();
+        session.Advance();
+
+        var healthProcessor = new BmsHealthProcessor();
+        session.ConfigureHealthProcessor(healthProcessor);
+
+        Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(
+        [
+            BmsGaugeType.ExClass,
+            BmsGaugeType.Class,
+        ]));
+    }
+
+    [Test]
+    public void TestCourseAutoGaugeReplacesRegularGaugeChain()
+    {
+        var healthProcessor = new BmsHealthProcessor();
+        new BmsModAutoGauge().ApplyToHealthProcessor(healthProcessor);
+        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
+
+        session.ConfigureHealthProcessor(healthProcessor);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(healthProcessor.IsCourseGaugeMode, Is.True);
+            Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(
+            [
+                BmsGaugeType.ExHardClass,
+                BmsGaugeType.ExClass,
+                BmsGaugeType.Class,
+            ]));
+            Assert.That(healthProcessor.CurrentGaugeStates, Has.None.Matches<BmsGaugeStateSnapshot>(state => state.GaugeType == BmsGaugeType.Normal));
+        });
+    }
+
+    [Test]
     public void TestCourseCannotAdvanceAfterEnding()
     {
         var session = createSession();
@@ -143,60 +208,6 @@ public class BmsCourseSessionTest
 
         Assert.Throws<InvalidOperationException>(session.Advance);
         Assert.That(session.CurrentStageIndex, Is.Zero);
-    }
-
-    [TestCase("Class", BmsGaugeType.Class, typeof(BmsModClassGauge))]
-    [TestCase("EX Class", BmsGaugeType.ExClass, typeof(BmsModExClassGauge))]
-    [TestCase("ex-hard-class", BmsGaugeType.ExHardClass, typeof(BmsModExHardClassGauge))]
-    public void TestCourseGaugeParsingAndModCreation(string text, BmsGaugeType expectedType, Type expectedModType)
-    {
-        Assert.That(BmsCourseSession.TryParseGauge(text, out var gaugeType), Is.True);
-        Assert.That(gaugeType, Is.EqualTo(expectedType));
-        Assert.That(BmsCourseSession.CreateGaugeMod(gaugeType), Is.TypeOf(expectedModType));
-    }
-
-    [TestCase("Normal")]
-    [TestCase("Hard")]
-    [TestCase("Unknown")]
-    public void TestNonCourseGaugeIsRejected(string text)
-    {
-        Assert.That(BmsCourseSession.TryParseGauge(text, out _), Is.False);
-    }
-
-    [Test]
-    public void TestCourseGaugeSelectionMapsToClassTiers()
-    {
-        Assert.Multiple(() =>
-        {
-            Assert.That(BmsCourseSession.ResolveCourseGaugeType([]), Is.EqualTo(BmsGaugeType.Class));
-            Assert.That(BmsCourseSession.ResolveCourseGaugeType([new BmsModEasyGauge()]), Is.EqualTo(BmsGaugeType.Class));
-            Assert.That(BmsCourseSession.ResolveCourseGaugeType([new BmsModHardGauge()]), Is.EqualTo(BmsGaugeType.ExClass));
-            Assert.That(BmsCourseSession.ResolveCourseGaugeType([new BmsModHazardGauge()]), Is.EqualTo(BmsGaugeType.ExHardClass));
-            Assert.That(BmsCourseSession.ResolveCourseGaugeType([new BmsModAutoGauge()]), Is.EqualTo(BmsGaugeType.ExHardClass));
-        });
-    }
-
-    [TestCase("gauge_5k", BmsGaugeProfileFamily.FiveKeys)]
-    [TestCase("gauge_7k", BmsGaugeProfileFamily.SevenKeys)]
-    [TestCase("gauge_9k", BmsGaugeProfileFamily.Pms)]
-    [TestCase("gauge_24k", BmsGaugeProfileFamily.Keyboard)]
-    [TestCase("gauge_lr2", BmsGaugeProfileFamily.Lr2)]
-    public void TestCourseGaugeProfileFamilySelection(string constraint, BmsGaugeProfileFamily expected)
-    {
-        Assert.That(BmsCourseSession.ResolveCourseGaugeProfileFamily([constraint]), Is.EqualTo(expected));
-    }
-
-    [Test]
-    public void TestCourseStartsWithoutGaugeStateToRestore()
-    {
-        var singleGauge = createSession(mods: [new BmsModExClassGauge()], gaugeType: BmsGaugeType.ExClass);
-        var autoGauge = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(singleGauge.CurrentGaugeStates, Is.Empty);
-            Assert.That(autoGauge.CurrentGaugeStates, Is.Empty);
-        });
     }
 
     [Test]
@@ -221,132 +232,6 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestCourseScoreCloneRetainsGaugeHistory()
-    {
-        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
-        var score = createScore(true);
-        BmsScoreGaugeHistoryStore.Set(score,
-        [
-            new BmsGaugeHistoryEvent(1000, BmsGaugeType.ExClass,
-            [
-                new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
-                new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
-                new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
-            ]),
-        ]);
-
-        session.BeginCurrentStage();
-        session.CompleteCurrentStage(score,
-        [
-            new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
-            new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
-            new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
-        ]);
-
-        Assert.That(BmsScoreGaugeHistoryStore.TryGet(session.CurrentStage.Score!, out var history), Is.True);
-        Assert.That(history.Single().States.Select(state => state.GaugeType), Is.EqualTo(new[]
-        {
-            BmsGaugeType.ExHardClass,
-            BmsGaugeType.ExClass,
-            BmsGaugeType.Class,
-        }));
-    }
-
-    [Test]
-    public void TestCourseModsKeepAutoGaugeAndReplaceSelectedGauge()
-    {
-        var mirror = new BmsModMirror();
-        var mods = BmsCourseSession.CreateCourseMods([mirror, new BmsModHardGauge(), new BmsModAutoGauge()], BmsGaugeType.ExHardClass);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(mods, Has.Count.EqualTo(2));
-            Assert.That(mods.Single(mod => mod is BmsModMirror), Is.Not.SameAs(mirror));
-            Assert.That(mods, Has.One.TypeOf<BmsModAutoGauge>());
-            Assert.That(mods, Has.None.TypeOf<BmsModGauge>());
-        });
-    }
-
-    [Test]
-    public void TestCourseModsUseResolvedClassGauge()
-    {
-        var mods = BmsCourseSession.CreateCourseMods([new BmsModHardGauge()], BmsGaugeType.ExClass);
-
-        Assert.That(mods.Single(), Is.TypeOf<BmsModExClassGauge>());
-    }
-
-    [Test]
-    public void TestCourseAutoGaugeReplacesRegularGaugeChain()
-    {
-        var healthProcessor = new BmsHealthProcessor();
-        new BmsModAutoGauge().ApplyToHealthProcessor(healthProcessor);
-        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
-
-        session.ConfigureHealthProcessor(healthProcessor);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(healthProcessor.IsCourseGaugeMode, Is.True);
-            Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(new[]
-            {
-                BmsGaugeType.ExHardClass,
-                BmsGaugeType.ExClass,
-                BmsGaugeType.Class,
-            }));
-            Assert.That(healthProcessor.CurrentGaugeStates, Has.None.Matches<BmsGaugeStateSnapshot>(state => state.GaugeType == BmsGaugeType.Normal));
-        });
-    }
-
-    [Test]
-    public void TestCourseAutoGaugeOmitsFailedGaugesFromNextStage()
-    {
-        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
-        session.BeginCurrentStage();
-        session.CompleteCurrentStage(createScore(true),
-        [
-            new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
-            new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
-            new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
-        ]);
-        session.RequestAdvance();
-        session.Advance();
-
-        var healthProcessor = new BmsHealthProcessor();
-        session.ConfigureHealthProcessor(healthProcessor);
-
-        Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(new[]
-        {
-            BmsGaugeType.ExClass,
-            BmsGaugeType.Class,
-        }));
-    }
-
-    [Test]
-    public void TestCourseAutoGaugeDoesNotRestoreFailedGaugesWhenModIsAppliedAfterSessionConfiguration()
-    {
-        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
-        session.BeginCurrentStage();
-        session.CompleteCurrentStage(createScore(true),
-        [
-            new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
-            new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
-            new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
-        ]);
-        session.RequestAdvance();
-        session.Advance();
-
-        var healthProcessor = new BmsHealthProcessor();
-        session.ConfigureHealthProcessor(healthProcessor);
-        new BmsModAutoGauge().ApplyToHealthProcessor(healthProcessor);
-
-        Assert.That(healthProcessor.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(new[]
-        {
-            BmsGaugeType.ExClass,
-            BmsGaugeType.Class,
-        }));
-    }
-
-    [Test]
     public void TestCourseGaugeConfigurationInitializesWithCarriedHealth()
     {
         var healthProcessor = new BmsHealthProcessor();
@@ -366,7 +251,20 @@ public class BmsCourseSessionTest
         {
             Assert.That(healthProcessor.Health.Value, Is.EqualTo(0.42).Within(0.001));
             Assert.That(healthProcessor.CurrentGaugeStates.Single().Health, Is.EqualTo(0.42).Within(0.001));
-            Assert.That(observedHealth, Is.EqualTo(new[] { 0.42 }).Within(0.001));
+            Assert.That(observedHealth, Is.EqualTo([0.42]).Within(0.001));
+        });
+    }
+
+    [Test]
+    public void TestCourseGaugeSelectionMapsToClassTiers()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(BmsCourseSession.ResolveCourseGaugeType([]), Is.EqualTo(BmsGaugeType.Class));
+            Assert.That(BmsCourseSession.ResolveCourseGaugeType([new BmsModEasyGauge()]), Is.EqualTo(BmsGaugeType.Class));
+            Assert.That(BmsCourseSession.ResolveCourseGaugeType([new BmsModHardGauge()]), Is.EqualTo(BmsGaugeType.ExClass));
+            Assert.That(BmsCourseSession.ResolveCourseGaugeType([new BmsModHazardGauge()]), Is.EqualTo(BmsGaugeType.ExHardClass));
+            Assert.That(BmsCourseSession.ResolveCourseGaugeType([new BmsModAutoGauge()]), Is.EqualTo(BmsGaugeType.ExHardClass));
         });
     }
 
@@ -394,29 +292,120 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestAbortedCourseCreatesResultWhenScoreIsAvailable()
+    public void TestCourseModsKeepAutoGaugeAndReplaceSelectedGauge()
     {
-        var store = new BmsCourseResultStore(courseResultsDirectory);
-
-        store.Record("aborted-course", BmsCourseStatus.Aborted, ScoreRank.F, createScore(false, 1000));
+        var mirror = new BmsModMirror();
+        var mods = BmsCourseSession.CreateCourseMods([mirror, new BmsModHardGauge(), new BmsModAutoGauge()], BmsGaugeType.ExHardClass);
 
         Assert.Multiple(() =>
         {
-            Assert.That(store.TryGet("aborted-course", out var result), Is.True);
-            Assert.That(result.Lamp, Is.EqualTo(BmsLamp.Failed));
-            Assert.That(result.Rank, Is.EqualTo(ScoreRank.F));
-            Assert.That(result.Score?.TotalScore, Is.EqualTo(1000));
+            Assert.That(mods, Has.Count.EqualTo(2));
+            Assert.That(mods.Single(mod => mod is BmsModMirror), Is.Not.SameAs(mirror));
+            Assert.That(mods, Has.One.TypeOf<BmsModAutoGauge>());
+            Assert.That(mods, Has.None.TypeOf<BmsModGauge>());
         });
     }
 
     [Test]
-    public void TestEmptyAbortedCourseDoesNotCreateResult()
+    public void TestCourseModsUseResolvedClassGauge()
+    {
+        var mods = BmsCourseSession.CreateCourseMods([new BmsModHardGauge()], BmsGaugeType.ExClass);
+
+        Assert.That(mods.Single(), Is.TypeOf<BmsModExClassGauge>());
+    }
+
+    [Test]
+    public void TestCourseResultJsonIsLoadedOnDemand()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
 
-        store.Record("empty-aborted-course", BmsCourseStatus.Aborted);
+        store = new BmsCourseResultStore(courseResultsDirectory);
+        File.Delete(Directory.EnumerateFiles(courseResultsDirectory, "*.json").Single());
 
-        Assert.That(store.TryGet("empty-aborted-course", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
+            Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
+            Assert.That(store.GetHistory("course"), Is.Empty);
+        });
+    }
+
+    [Test]
+    public void TestCourseResultsPersistAsIndividualFilesAndNotify()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+        var changed = new List<string>();
+        store.Changed += changed.Add;
+
+        store.Record("course/with unsafe characters", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
+        store.Record("course/with unsafe characters", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 500_000));
+        store.Record("other", BmsCourseStatus.Passed, ScoreRank.A, createScore(true, 700_000));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Directory.EnumerateFiles(courseResultsDirectory, "*.json").Count(), Is.EqualTo(3));
+            Assert.That(changed, Is.EqualTo(["course/with unsafe characters", "course/with unsafe characters", "other"]));
+        });
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(store.GetHistory("course/with unsafe characters").Select(result => result.Score?.TotalScore),
+                Is.EqualTo(new long?[] { 900_000, 500_000 }));
+            Assert.That(store.GetHistory("other").Single().Score?.TotalScore, Is.EqualTo(700_000));
+        });
+    }
+
+    [Test]
+    public void TestCourseScoreCloneRetainsGaugeHistory()
+    {
+        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
+        var score = createScore(true);
+        BmsScoreGaugeHistoryStore.Set(score,
+        [
+            new BmsGaugeHistoryEvent(1000, BmsGaugeType.ExClass,
+            [
+                new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
+                new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
+                new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
+            ]),
+        ]);
+
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(score,
+        [
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
+            new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
+        ]);
+
+        Assert.That(BmsScoreGaugeHistoryStore.TryGet(session.CurrentStage.Score!, out var history), Is.True);
+        Assert.That(history.Single().States.Select(state => state.GaugeType), Is.EqualTo(
+        [
+            BmsGaugeType.ExHardClass,
+            BmsGaugeType.ExClass,
+            BmsGaugeType.Class,
+        ]));
+    }
+
+    [Test]
+    public async Task TestCourseScoreHistoryLoadsAsynchronouslyAndSupportsCancellation()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
+        store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 500_000));
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+        var history = await store.GetHistoryAsync("course", CancellationToken.None);
+
+        Assert.That(history.Select(result => result.Score?.TotalScore), Is.EqualTo(new long?[] { 900_000, 500_000 }));
+
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+        var cancellationToken = cancelled.Token;
+        Assert.ThrowsAsync<OperationCanceledException>(async () => await store.GetHistoryAsync("other", cancellationToken));
     }
 
     [Test]
@@ -456,83 +445,86 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public async Task TestCourseScoreHistoryLoadsAsynchronouslyAndSupportsCancellation()
+    public void TestCourseStartsWithoutGaugeStateToRestore()
     {
-        var store = new BmsCourseResultStore(courseResultsDirectory);
-        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
-        store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 500_000));
-
-        store = new BmsCourseResultStore(courseResultsDirectory);
-        var history = await store.GetHistoryAsync("course", CancellationToken.None);
-
-        Assert.That(history.Select(result => result.Score?.TotalScore), Is.EqualTo(new long?[] { 900_000, 500_000 }));
-
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
-        Assert.That(async () => await store.GetHistoryAsync("other", cancelled.Token), Throws.InstanceOf<OperationCanceledException>());
-    }
-
-    [Test]
-    public void TestCourseResultsPersistAsIndividualFilesAndNotify()
-    {
-        var store = new BmsCourseResultStore(courseResultsDirectory);
-        var changed = new List<string>();
-        store.Changed += changed.Add;
-
-        store.Record("course/with unsafe characters", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
-        store.Record("course/with unsafe characters", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 500_000));
-        store.Record("other", BmsCourseStatus.Passed, ScoreRank.A, createScore(true, 700_000));
+        var singleGauge = createSession(mods: [new BmsModExClassGauge()], gaugeType: BmsGaugeType.ExClass);
+        var autoGauge = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
 
         Assert.Multiple(() =>
         {
-            Assert.That(Directory.EnumerateFiles(courseResultsDirectory, "*.json").Count(), Is.EqualTo(3));
-            Assert.That(changed, Is.EqualTo(new[] { "course/with unsafe characters", "course/with unsafe characters", "other" }));
-        });
-
-        store = new BmsCourseResultStore(courseResultsDirectory);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(store.GetHistory("course/with unsafe characters").Select(result => result.Score?.TotalScore),
-                Is.EqualTo(new long?[] { 900_000, 500_000 }));
-            Assert.That(store.GetHistory("other").Single().Score?.TotalScore, Is.EqualTo(700_000));
+            Assert.That(singleGauge.CurrentGaugeStates, Is.Empty);
+            Assert.That(autoGauge.CurrentGaugeStates, Is.Empty);
         });
     }
 
     [Test]
-    public void TestCourseResultJsonIsLoadedOnDemand()
+    public void TestEmptyAbortedCourseDoesNotCreateResult()
     {
         var store = new BmsCourseResultStore(courseResultsDirectory);
-        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
 
-        store = new BmsCourseResultStore(courseResultsDirectory);
-        File.Delete(Directory.EnumerateFiles(courseResultsDirectory, "*.json").Single());
+        store.Record("empty-aborted-course", BmsCourseStatus.Aborted);
+
+        Assert.That(store.TryGet("empty-aborted-course", out _), Is.False);
+    }
+
+    [Test]
+    public void TestFailureStoresPartialScoreAndEndsCourse()
+    {
+        var session = createSession();
+
+        session.BeginCurrentStage();
+        session.FailCurrentStage(createScore(false, 654321), gaugeStates(0, true));
 
         Assert.Multiple(() =>
         {
-            Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
-            Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
-            Assert.That(store.GetHistory("course"), Is.Empty);
+            Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Failed));
+            Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Failed));
+            Assert.That(session.CurrentStage.Score?.TotalScore, Is.EqualTo(654321));
+            Assert.That(session.CurrentHealth, Is.Zero);
+            Assert.That(session.Stages[1].Status, Is.EqualTo(BmsCourseStageStatus.NotPlayed));
+            Assert.That(session.Stages[1].Score, Is.Null);
         });
     }
 
-    private static BmsCourseSession createSession(int stageCount = 3, IReadOnlyList<Mod> mods = null, BmsGaugeType gaugeType = BmsGaugeType.Class)
+    [Test]
+    public void TestFinalPassCompletesCourse()
     {
-        var stages = Enumerable.Range(1, stageCount)
-            .Select(index => new BmsResolvedCourseStage(
-                new BmsCourseStage($"Stage {index}", $"Level {index}", BeatmapHash: $"hash-{index}"),
-                new BeatmapInfo { Hash = $"hash-{index}" }))
-            .ToArray();
-        var course = new BmsCourseDefinition("course", "Table", "Course", stages.Select(stage => stage.Definition).ToArray(), "Class", []);
-        return new BmsCourseSession(course, stages, mods ?? [], gaugeType);
+        var session = createSession(1);
+
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(true), gaugeStates(0.75));
+
+        Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Passed));
+        Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Passed));
+        Assert.Throws<InvalidOperationException>(session.RequestAdvance);
     }
 
-    private static BmsGaugeStateSnapshot[] gaugeStates(double health, bool failed = false) =>
-        [new(BmsGaugeType.Class, health, failed)];
-
-    private static ScoreInfo createScore(bool passed, long totalScore = 0) => new()
+    [Test]
+    public void TestPassedStageCarriesHealthAndAdvances()
     {
-        Passed = passed,
-        TotalScore = totalScore,
-    };
+        var session = createSession();
+        var score = createScore(true, 123456);
+
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(score, gaugeStates(0.42));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.InProgress));
+            Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Passed));
+            Assert.That(session.CurrentHealth, Is.EqualTo(0.42));
+            Assert.That(session.CurrentStage.Score, Is.Not.SameAs(score));
+        });
+
+        session.RequestAdvance();
+        session.Advance();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.CurrentStageIndex, Is.EqualTo(1));
+            Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.NotPlayed));
+            Assert.That(session.AdvanceRequested, Is.False);
+            Assert.That(session.CurrentHealth, Is.EqualTo(0.42));
+        });
+    }
 }

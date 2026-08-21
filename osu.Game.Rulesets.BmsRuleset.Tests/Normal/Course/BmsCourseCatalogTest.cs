@@ -1,28 +1,14 @@
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Course;
+using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Course;
 
 [TestFixture]
 public class BmsCourseCatalogTest
 {
-    [Test]
-    public void TestCatalogSortsByTableThenCourse()
-    {
-        var catalog = new BmsCourseCatalog();
-
-        catalog.Replace
-        ([
-            createCourse("b-2", "Table B", "Second"),
-            createCourse("a-2", "Table A", "Second"),
-            createCourse("a-1", "Table A", "First"),
-        ]);
-
-        Assert.That(catalog.Courses.Select(course => course.Id), Is.EqualTo(new[] { "a-1", "a-2", "b-2" }));
-    }
 
     [TestCase("first", true)]
     [TestCase("table a", true)]
@@ -36,10 +22,33 @@ public class BmsCourseCatalogTest
         Assert.That(course.Matches(search), Is.EqualTo(expected));
     }
 
+    private static BmsCourseDefinition createCourse(string id, string table, string name) => new(
+        id,
+        table,
+        name,
+        [new BmsCourseStage("Stage Song", "★1")],
+        "Class",
+        ["Mirror"]);
+
+    [Test]
+    public void TestCatalogSortsByTableThenCourse()
+    {
+        var catalog = new BmsCourseCatalog();
+
+        catalog.Replace
+        ([
+            createCourse("b-2", "Table B", "Second"),
+            createCourse("a-2", "Table A", "Second"),
+            createCourse("a-1", "Table A", "First"),
+        ]);
+
+        Assert.That(catalog.Courses.Select(course => course.Id), Is.EqualTo(["a-1", "a-2", "b-2"]));
+    }
+
     [Test]
     public void TestDifficultyTableCoursesAreConvertedWithChartMetadata()
     {
-        var table = new global::osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+        var table = new Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
         {
             Name = "Satellite",
             Symbol = "sl",
@@ -87,7 +96,7 @@ public class BmsCourseCatalogTest
             Assert.That(courses[0].TableName, Is.EqualTo("Satellite"));
             Assert.That(courses[0].Name, Is.EqualTo("Satellite sl7"));
             Assert.That(courses[0].Gauge, Is.EqualTo("Class"));
-            Assert.That(courses[0].Constraints, Is.EqualTo(new[] { "grade_mirror", "gauge_lr2" }));
+            Assert.That(courses[0].Constraints, Is.EqualTo(["grade_mirror", "gauge_lr2"]));
             Assert.That(courses[0].Stages[0].Title, Is.EqualTo("First Song"));
             Assert.That(courses[0].Stages[0].Artist, Is.EqualTo("First Artist"));
             Assert.That(courses[0].Stages[0].Difficulty, Is.EqualTo("sl7"));
@@ -110,7 +119,7 @@ public class BmsCourseCatalogTest
             createCourse("sl-8", "Satellite", "sl8") with { Order = 0 },
         ]);
 
-        Assert.That(catalog.Courses.Select(course => course.Name), Is.EqualTo(new[] { "sl8", "sl9", "sl10" }));
+        Assert.That(catalog.Courses.Select(course => course.Name), Is.EqualTo(["sl8", "sl9", "sl10"]));
     }
 
     [Test]
@@ -118,7 +127,7 @@ public class BmsCourseCatalogTest
     {
         var previousStore = BmsRulesetRuntime.DifficultyTableStore;
         var store = new DifficultyTableStore(null, Path.Combine(TestContext.CurrentContext.WorkDirectory, "course-store"));
-        var table = new global::osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+        var table = new Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
         {
             Name = "Runtime Table",
             SourcePath = "runtime-table",
@@ -136,7 +145,7 @@ public class BmsCourseCatalogTest
         {
             BmsRulesetRuntime.DifficultyTableStore = store;
             store.AddTable(table);
-            Assert.That(BmsRulesetRuntime.CourseCatalog.Courses.Select(course => course.Name), Is.EqualTo(new[] { "Runtime Course" }));
+            Assert.That(BmsRulesetRuntime.CourseCatalog.Courses.Select(course => course.Name), Is.EqualTo(["Runtime Course"]));
 
             store.RemoveTable(table);
             Assert.That(BmsRulesetRuntime.CourseCatalog.Courses, Is.Empty);
@@ -146,12 +155,4 @@ public class BmsCourseCatalogTest
             BmsRulesetRuntime.DifficultyTableStore = previousStore;
         }
     }
-
-    private static BmsCourseDefinition createCourse(string id, string table, string name) => new(
-        id,
-        table,
-        name,
-        [new BmsCourseStage("Stage Song", "★1")],
-        "Class",
-        ["Mirror"]);
 }

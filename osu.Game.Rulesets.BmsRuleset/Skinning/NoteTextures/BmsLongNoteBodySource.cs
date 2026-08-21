@@ -48,6 +48,7 @@ public static class BmsLongNoteBodySource
     private const float max_source_slice_height = 1024;
 
     private static readonly FieldInfo? skin_store_field = typeof(Skin).GetField("store", BindingFlags.Instance | BindingFlags.NonPublic);
+
     internal static BmsLongNoteBodyTextureSet? Resolve(
         ISkinSource skin,
         BmsSkinComponentLookup lookup,

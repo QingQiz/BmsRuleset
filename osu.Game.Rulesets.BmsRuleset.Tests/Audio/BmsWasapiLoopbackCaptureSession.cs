@@ -106,7 +106,7 @@ internal sealed class BmsWasapiLoopbackCaptureSession : IDisposable
 
         disposed = true;
         BassWasapi.CurrentDevice = deviceIndex;
-        BassWasapi.Stop(true);
+        BassWasapi.Stop();
         BassWasapi.Free();
 
         if (state.Handle.IsAllocated)

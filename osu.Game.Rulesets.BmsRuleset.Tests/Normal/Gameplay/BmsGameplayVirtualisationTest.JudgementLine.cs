@@ -121,6 +121,6 @@ public partial class BmsGameplayVirtualisationTest
     {
         var hud = new BmsStageHud();
 
-        Assert.DoesNotThrow(() => hud.CreateSettingsControls().ToArray());
+        Assert.DoesNotThrow(() => _ = hud.CreateSettingsControls().ToArray());
     }
 }

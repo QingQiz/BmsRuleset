@@ -129,32 +129,39 @@ internal partial class BmsCoursePlayer : SoloPlayer
 
     protected override async void ConcludeFailedScore(Score score)
     {
-        base.ConcludeFailedScore(score);
-
-        if (session.Status == BmsCourseStatus.InProgress && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
+        try
         {
-            ScoreProcessor.PopulateScore(score.ScoreInfo);
-            score.ScoreInfo.Date = DateTimeOffset.Now;
-            DrawableRuleset.SetRecordTarget(null);
-            var gaugeStates = currentGaugeStates;
+            base.ConcludeFailedScore(score);
 
-            try
+            if (session.Status == BmsCourseStatus.InProgress && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
             {
-                await ImportScore(score).ConfigureAwait(false);
-            }
-            finally
-            {
-                Scheduler.Add(() =>
+                ScoreProcessor.PopulateScore(score.ScoreInfo);
+                score.ScoreInfo.Date = DateTimeOffset.Now;
+                DrawableRuleset.SetRecordTarget(null);
+                var gaugeStates = currentGaugeStates;
+
+                try
                 {
-                    session.FailCurrentStage(score.ScoreInfo, gaugeStates);
-                    Schedule(this.Exit);
-                });
+                    await ImportScore(score).ConfigureAwait(false);
+                }
+                finally
+                {
+                    Scheduler.Add(() =>
+                    {
+                        session.FailCurrentStage(score.ScoreInfo, gaugeStates);
+                        Schedule(this.Exit);
+                    });
+                }
+
+                return;
             }
 
-            return;
+            Schedule(this.Exit);
         }
-
-        Schedule(this.Exit);
+        catch (Exception exception)
+        {
+            BmsLogger.Error(exception, "Failed to conclude a failed BMS course score.");
+        }
     }
 
     public override bool OnExiting(ScreenExitEvent e)

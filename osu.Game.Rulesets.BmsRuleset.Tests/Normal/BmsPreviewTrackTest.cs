@@ -9,14 +9,13 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
-using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Testing;
 using osu.Game.IO;
-using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Tests.Visual;
 
@@ -158,8 +157,8 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writePcmWave(Path.Combine(directory, "test.wav"), TimeSpan.FromSeconds(1));
 
             var events = Enumerable.Range(1, 18)
-                                   .Select(key => new BmsSampleEvent(0, 0, (ushort)key, 100))
-                                   .ToArray();
+                .Select(key => new BmsSampleEvent(0, 0, (ushort)key, 100))
+                .ToArray();
             var definitions = Enumerable.Range(1, 18).ToDictionary(key => (ushort)key, _ => "test.wav");
 
             track = createTrack(events, definitions, directory);
@@ -965,22 +964,6 @@ public partial class BmsPreviewTrackTest : OsuTestScene
 
     private static double getPlaybackOutputGain(BmsPreviewTrack track) => BmsAudioTestAccess.GetPreviewOutputGain(track);
 
-    private BmsPreviewTrack createTrack(
-        IReadOnlyList<BmsSampleEvent> sampleEvents,
-        IReadOnlyDictionary<ushort, string> sampleDefinitions,
-        string? basePath)
-        => new BmsEventPreviewTrack(
-            _ => BmsEventPreviewTimeline.Create(
-                () => [.. sampleEvents.Select(evt => new BmsPreviewSampleEvent(evt, true))],
-                sampleDefinitions),
-            basePath,
-            audio);
-
-    private BmsPreviewTrack createTrack(
-        IReadOnlyList<Func<CancellationToken, BmsEventPreviewTimeline>> timelineSources,
-        string basePath)
-        => new BmsEventPreviewTrack(timelineSources, basePath, audio);
-
     private static string getFirstTimelineSamplePath(BmsPreviewTrack track) => BmsAudioTestAccess.GetFirstPreviewSamplePath(track);
 
     private static void writePcmWave(string path, TimeSpan duration)
@@ -1015,6 +998,22 @@ public partial class BmsPreviewTrackTest : OsuTestScene
             writer.Write(value);
         }
     }
+
+    private BmsPreviewTrack createTrack(
+        IReadOnlyList<BmsSampleEvent> sampleEvents,
+        IReadOnlyDictionary<ushort, string> sampleDefinitions,
+        string? basePath)
+        => new BmsEventPreviewTrack(
+            _ => BmsEventPreviewTimeline.Create(
+                () => [.. sampleEvents.Select(evt => new BmsPreviewSampleEvent(evt, true))],
+                sampleDefinitions),
+            basePath,
+            audio);
+
+    private BmsPreviewTrack createTrack(
+        IReadOnlyList<Func<CancellationToken, BmsEventPreviewTimeline>> timelineSources,
+        string basePath)
+        => new BmsEventPreviewTrack(timelineSources, basePath, audio);
 
     [BackgroundDependencyLoader]
     private void load(AudioManager audio)

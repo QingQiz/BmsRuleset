@@ -457,6 +457,7 @@ public partial class BmsHealthProcessor : HealthProcessor
                 state.IsHpFailed)).ToArray()));
     }
 
+    // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
     private double currentTime => Clock?.CurrentTime ?? 0;
 
     private sealed class GaugeState

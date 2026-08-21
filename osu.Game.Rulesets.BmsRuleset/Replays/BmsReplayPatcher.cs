@@ -229,14 +229,7 @@ public static class BmsReplayPatcher
         if (dependencies == null || !dependencies.TryGet<ScoreManager>(out var scoreManager))
             return;
 
-        try
-        {
-            RestoreScoreData(scoreManager, scoreInfo);
-        }
-        catch (Exception e)
-        {
-            BmsLogger.Error(e, "BMS replay patch failed to restore hit events for the statistics panel.");
-        }
+        RestoreScoreData(scoreManager, scoreInfo);
     }
 
     internal static void RestoreScoreData(ScoreManager scoreManager, ScoreInfo scoreInfo)

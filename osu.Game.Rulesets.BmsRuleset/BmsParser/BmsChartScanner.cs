@@ -281,7 +281,7 @@ internal static partial class BmsChartParser
         }
 
         if (trimmed[0] is '-' or '~' && trimmed[^1] == trimmed[0]
-            && trimmed.AsSpan(1, trimmed.Length - 2).IndexOf(trimmed[0]) < 0)
+                                     && trimmed.AsSpan(1, trimmed.Length - 2).IndexOf(trimmed[0]) < 0)
             return trimmed[1..^1].Trim();
 
         return trimmed;

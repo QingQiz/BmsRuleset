@@ -107,7 +107,7 @@ public static class BmsJudgementSelector
 
         return currentResult is HitResult.Ok or HitResult.Meh
                && nextResult is HitResult.Ok or HitResult.Meh
-               && System.Math.Abs(nextOffset) < System.Math.Abs(inputTime - current.StartTime);
+               && Math.Abs(nextOffset) < Math.Abs(inputTime - current.StartTime);
     }
 
     private sealed class CandidateComparer : IComparer<BmsJudgementCandidate>

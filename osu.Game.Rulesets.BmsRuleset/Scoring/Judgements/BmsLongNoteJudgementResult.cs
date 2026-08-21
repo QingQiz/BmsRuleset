@@ -39,15 +39,15 @@ public sealed class BmsLongNoteJudgementResult : JudgementResult
         var endpoints = endpointResults.ToArray();
 
         if (endpoints.Length == 0)
-            throw new ArgumentException("At least one long-note endpoint is required.", nameof(endpointResults));
+            throw new ArgumentException(@"At least one long-note endpoint is required.", nameof(endpointResults));
 
         var source = endpoints[0].Source;
 
         if (endpoints.Any(e => !ReferenceEquals(e.Source, source)))
-            throw new ArgumentException("All endpoints must belong to the same long note.", nameof(endpointResults));
+            throw new ArgumentException(@"All endpoints must belong to the same long note.", nameof(endpointResults));
 
         if (endpoints.Select(e => e.Kind).Distinct().Count() != endpoints.Length)
-            throw new ArgumentException("Endpoint kinds cannot be duplicated.", nameof(endpointResults));
+            throw new ArgumentException(@"Endpoint kinds cannot be duplicated.", nameof(endpointResults));
 
         EndpointResults = endpoints;
     }

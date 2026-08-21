@@ -14,8 +14,24 @@ namespace osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 
 public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToScorePopulation
 {
+
+    public override string Name => "Auto Gauge";
+
+    public override string Acronym => "AG";
+
+    public override IconUsage? Icon => BmsIcons.AutoGauge;
+
+    public override LocalisableString Description => BmsStrings.ModAutoGauge;
+
+    public override ModType Type => ModType.Automation;
+
     /// <summary>
-    /// The regular gameplay chain used by Auto Gauge, hardest first.
+    ///     Incompatible with all other gauge mods (same mutual-exclusion set as <see cref="BmsModGauge" />).
+    /// </summary>
+    public override Type[] IncompatibleMods { get; } = [];
+
+    /// <summary>
+    ///     The regular gameplay chain used by Auto Gauge, hardest first.
     /// </summary>
     internal static readonly BmsGaugeType[] AUTO_GAUGE_CHAIN =
     [
@@ -35,21 +51,6 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
     ];
 
     private BmsHealthProcessor? resolvedHealthProcessor;
-
-    public override string Name => "Auto Gauge";
-
-    public override string Acronym => "AG";
-
-    public override IconUsage? Icon => BmsIcons.AutoGauge;
-
-    public override LocalisableString Description => BmsStrings.ModAutoGauge;
-
-    public override ModType Type => ModType.Automation;
-
-    /// <summary>
-    /// Incompatible with all other gauge mods (same mutual-exclusion set as <see cref="BmsModGauge"/>).
-    /// </summary>
-    public override Type[] IncompatibleMods { get; } = [];
 
     public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
     {
@@ -73,7 +74,7 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
         if (resolvedHealthProcessor is null)
             return;
 
-        score.Mods = score.Mods.Where(m => m is not BmsModGauge).ToArray();
+        score.Mods = [.. score.Mods.Where(m => m is not BmsModGauge)];
 
         if (resolvedHealthProcessor.GaugeHistory.Count > 0)
             BmsScoreGaugeHistoryStore.Set(score, resolvedHealthProcessor.GaugeHistory);
@@ -83,6 +84,6 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
         if (mod is null)
             return;
 
-        score.Mods = score.Mods.Append(mod).ToArray();
+        score.Mods = [.. score.Mods, mod];
     }
 }

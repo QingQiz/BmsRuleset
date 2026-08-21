@@ -13,40 +13,16 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;
 [TestFixture]
 public class BmsLocalLeaderboardScoreSelectorTest
 {
-    [Test]
-    public void TestSelectsScoreByBeatmapHashWhenBeatmapInfoPointsToOldBeatmap()
+
+    private static ScoreInfo score(string beatmapHash, string rulesetShortName, long totalScore, BeatmapInfo beatmapInfo = null, params Mod[] mods) => new()
     {
-        var oldBeatmap = new BeatmapInfo { Hash = "target-hash" };
-        var scoreWithOldBeatmapLink = score("target-hash", Constant.SHORT_NAME, 900_000, oldBeatmap);
-
-        var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
-            [scoreWithOldBeatmapLink],
-            "target-hash",
-            Constant.SHORT_NAME,
-            null,
-            LeaderboardSortMode.Score);
-
-        Assert.That(selected.Single(), Is.SameAs(scoreWithOldBeatmapLink));
-    }
-
-    [Test]
-    public void TestExcludesOtherHashesRulesetsAndDeletedScores()
-    {
-        var matching = score("target-hash", Constant.SHORT_NAME, 900_000);
-        var otherHash = score("other-hash", Constant.SHORT_NAME, 1_000_000);
-        var otherRuleset = score("target-hash", "mania", 1_000_000);
-        var deleted = score("target-hash", Constant.SHORT_NAME, 1_000_000);
-        deleted.DeletePending = true;
-
-        var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
-            [otherHash, otherRuleset, deleted, matching],
-            "target-hash",
-            Constant.SHORT_NAME,
-            null,
-            LeaderboardSortMode.Score);
-
-        Assert.That(selected, Is.EqualTo(new[] { matching }));
-    }
+        BeatmapInfo = beatmapInfo ?? new BeatmapInfo { Hash = beatmapHash },
+        BeatmapHash = beatmapHash,
+        Ruleset = new RulesetInfo { ShortName = rulesetShortName },
+        TotalScore = totalScore,
+        Date = DateTimeOffset.UtcNow,
+        Mods = mods,
+    };
 
     [Test]
     public void TestAttachesFallbackBeatmapForScoresWithoutBeatmapInfo()
@@ -87,8 +63,43 @@ public class BmsLocalLeaderboardScoreSelectorTest
             [new BmsModNoFail()],
             LeaderboardSortMode.Score);
 
-        Assert.That(noModSelected, Is.EqualTo(new[] { noModScore }));
-        Assert.That(noFailSelected, Is.EqualTo(new[] { noFailScore }));
+        Assert.That(noModSelected, Is.EqualTo([noModScore]));
+        Assert.That(noFailSelected, Is.EqualTo([noFailScore]));
+    }
+
+    [Test]
+    public void TestExcludesOtherHashesRulesetsAndDeletedScores()
+    {
+        var matching = score("target-hash", Constant.SHORT_NAME, 900_000);
+        var otherHash = score("other-hash", Constant.SHORT_NAME, 1_000_000);
+        var otherRuleset = score("target-hash", "mania", 1_000_000);
+        var deleted = score("target-hash", Constant.SHORT_NAME, 1_000_000);
+        deleted.DeletePending = true;
+
+        var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
+            [otherHash, otherRuleset, deleted, matching],
+            "target-hash",
+            Constant.SHORT_NAME,
+            null,
+            LeaderboardSortMode.Score);
+
+        Assert.That(selected, Is.EqualTo([matching]));
+    }
+
+    [Test]
+    public void TestSelectsScoreByBeatmapHashWhenBeatmapInfoPointsToOldBeatmap()
+    {
+        var oldBeatmap = new BeatmapInfo { Hash = "target-hash" };
+        var scoreWithOldBeatmapLink = score("target-hash", Constant.SHORT_NAME, 900_000, oldBeatmap);
+
+        var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
+            [scoreWithOldBeatmapLink],
+            "target-hash",
+            Constant.SHORT_NAME,
+            null,
+            LeaderboardSortMode.Score);
+
+        Assert.That(selected.Single(), Is.SameAs(scoreWithOldBeatmapLink));
     }
 
     [Test]
@@ -107,16 +118,6 @@ public class BmsLocalLeaderboardScoreSelectorTest
             null,
             LeaderboardSortMode.Accuracy);
 
-        Assert.That(selected, Is.EqualTo(new[] { higherAccuracy, lowerAccuracy }));
+        Assert.That(selected, Is.EqualTo([higherAccuracy, lowerAccuracy]));
     }
-
-    private static ScoreInfo score(string beatmapHash, string rulesetShortName, long totalScore, BeatmapInfo beatmapInfo = null, params Mod[] mods) => new()
-    {
-        BeatmapInfo = beatmapInfo ?? new BeatmapInfo { Hash = beatmapHash },
-        BeatmapHash = beatmapHash,
-        Ruleset = new RulesetInfo { ShortName = rulesetShortName },
-        TotalScore = totalScore,
-        Date = DateTimeOffset.UtcNow,
-        Mods = mods,
-    };
 }

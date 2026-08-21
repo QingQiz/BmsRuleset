@@ -15,8 +15,8 @@ using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects;
-using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
@@ -50,52 +50,6 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         => Playfield.HitObjectContainer.AliveObjects
             .OfType<DrawableBmsHitObject>()
             .FirstOrDefault(d => BmsLayout.IsScratchColumn(d.HitObject.Column, Playfield.LayoutVariant));
-
-    [Test]
-    public void TestAutoGauge()
-    {
-        // Autoplay raises the groove gauges past their clear threshold, then the replay stops pressing so the
-        // remaining notes miss and the survival tiers fail one by one — the cascade the AG
-        // mod exists to demonstrate. The 0.2 groove-tier start would otherwise drain them
-        // dead before the survival tiers fail, so the pre-fill is what makes Normal reachable.
-        const double auto_play_until = 13250;
-
-        this.AddSetupStep("load player with AG mod + autoplay-then-idle replay", () =>
-        {
-            replay = b => BmsTestReplays.CreateAutoPlayThenIdleFrames(b, auto_play_until);
-            LoadPlayer([new BmsModAutoGauge()]);
-        });
-        this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
-        this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
-
-        AddAssert("gauge starts at hardest tier (Hazard)", () =>
-            Player.GameplayState.HealthProcessor is BmsHealthProcessor hp && hp.GaugeType == BmsGaugeType.Hazard);
-
-        // Let the autoplay phase build a groove-gauge buffer (the replay hits every note before the idle
-        // boundary, so no tier has failed yet).
-        AddUntilStep("autoplay phase complete", () =>
-            Player.GameplayClockContainer.CurrentTime >= auto_play_until);
-
-        // Idle: missed notes drain the survival tiers in order (Hazard, ExHard, Hard) and the
-        // active gauge steps down Hazard → ExHard → Hard → Normal. Recording Normal is also the
-        // proof that the pre-fill worked — from the 0.2 groove start Normal would be dead long
-        // before Hard fails, so the cascade could never land on it without the autoplay buffer.
-        AddUntilStep("gauge downgraded through Normal", () =>
-            Player.GameplayState.HealthProcessor is BmsHealthProcessor hp
-            && hp.GaugeHistory.Any(e => e.ActiveGaugeType == BmsGaugeType.Normal));
-    }
-
-    [Test]
-    public void TestAutoScratch()
-    {
-        this.AddSetupStep("load player with AS mod", () => LoadPlayer([new BmsModAutoScratch()]));
-        this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
-        this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
-
-        AddAssert("scratch not hidden", () => !Playfield.Stage.Columns[0].Hidden);
-    }
 
     [TestCase(BmsLongNoteMode.LongNote)]
     [TestCase(BmsLongNoteMode.ChargeNote)]
@@ -149,6 +103,52 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
     };
 
     [Test]
+    public void TestAutoGauge()
+    {
+        // Autoplay raises the groove gauges past their clear threshold, then the replay stops pressing so the
+        // remaining notes miss and the survival tiers fail one by one — the cascade the AG
+        // mod exists to demonstrate. The 0.2 groove-tier start would otherwise drain them
+        // dead before the survival tiers fail, so the pre-fill is what makes Normal reachable.
+        const double auto_play_until = 13250;
+
+        this.AddSetupStep("load player with AG mod + autoplay-then-idle replay", () =>
+        {
+            replay = b => BmsTestReplays.CreateAutoPlayThenIdleFrames(b, auto_play_until);
+            LoadPlayer([new BmsModAutoGauge()]);
+        });
+        this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
+        this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
+
+        AddAssert("gauge starts at hardest tier (Hazard)", () =>
+            Player.GameplayState.HealthProcessor is BmsHealthProcessor hp && hp.GaugeType == BmsGaugeType.Hazard);
+
+        // Let the autoplay phase build a groove-gauge buffer (the replay hits every note before the idle
+        // boundary, so no tier has failed yet).
+        AddUntilStep("autoplay phase complete", () =>
+            Player.GameplayClockContainer.CurrentTime >= auto_play_until);
+
+        // Idle: missed notes drain the survival tiers in order (Hazard, ExHard, Hard) and the
+        // active gauge steps down Hazard → ExHard → Hard → Normal. Recording Normal is also the
+        // proof that the pre-fill worked — from the 0.2 groove start Normal would be dead long
+        // before Hard fails, so the cascade could never land on it without the autoplay buffer.
+        AddUntilStep("gauge downgraded through Normal", () =>
+            Player.GameplayState.HealthProcessor is BmsHealthProcessor hp
+            && hp.GaugeHistory.Any(e => e.ActiveGaugeType == BmsGaugeType.Normal));
+    }
+
+    [Test]
+    public void TestAutoScratch()
+    {
+        this.AddSetupStep("load player with AS mod", () => LoadPlayer([new BmsModAutoScratch()]));
+        this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
+        this.AddSetupAssert("loaded bms playfield", () => Player.DrawableRuleset.Playfield, Is.TypeOf<BmsPlayfield>());
+
+        AddAssert("scratch not hidden", () => !Playfield.Stage.Columns[0].Hidden);
+    }
+
+    [Test]
     public void TestHideScratch()
     {
         var mod = new BmsModHideScratch();
@@ -200,9 +200,9 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
             if (normalNotes.Count < originalPattern.Length)
                 return false;
 
-            for (int i = 0; i < originalPattern.Length; i++)
+            for (var i = 0; i < originalPattern.Length; i++)
             {
-                int expected = laneOrderMap[originalPattern[i]];
+                var expected = laneOrderMap[originalPattern[i]];
                 if (normalNotes[i].Column != expected)
                     return false;
             }
@@ -234,7 +234,7 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
             if (normalNotes.Count < 8) return false;
 
             var nonScratch = normalNotes.Skip(1).Take(7).Select(n => n.Column).OrderBy(c => c).ToArray();
-            return nonScratch.SequenceEqual(new[] { 1, 2, 3, 4, 5, 6, 7 });
+            return nonScratch.SequenceEqual([1, 2, 3, 4, 5, 6, 7]);
         });
     }
 
@@ -285,9 +285,9 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
                 .ToList();
 
             // IncludeScratch=false keeps original scratch notes at column 0.
-            bool hasScratchNotes = normalNotes.Any(n => n.Column == 0);
+            var hasScratchNotes = normalNotes.Any(n => n.Column == 0);
             // Non-scratch notes are shuffled among columns 1-7.
-            bool hasNonScratchNotes = normalNotes.Any(n => n.Column > 0);
+            var hasNonScratchNotes = normalNotes.Any(n => n.Column > 0);
             return hasScratchNotes && hasNonScratchNotes;
         });
     }

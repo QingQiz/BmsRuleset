@@ -19,6 +19,125 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Difficulty;
 [TestFixture]
 public class BmsStarRatingProcessorTest
 {
+
+    [TestCase(BmsLayoutVariant.Bme7K, 2, 45)]
+    [TestCase(BmsLayoutVariant.Bms5K, 2, 37.5)]
+    [TestCase(BmsLayoutVariant.Pms9K, 2, 35)]
+    public void TestStarRatingProcessorHitLeniencyUsesBmsGreatWindow(BmsLayoutVariant layout, int rank, double greatWindow)
+    {
+        var totalColumns = BmsLayout.GetTotalColumns(layout);
+        var noteTimings = createSimpleNoteTimings(totalColumns);
+        var processor = new BmsStarRatingProcessor();
+
+        processor.Compute(noteTimings, totalColumns, rank, 1.0, layout);
+
+        Assert.That(processor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(greatWindow)).Within(1e-12));
+    }
+
+    private static List<BmsNoteTiming> createDenseNoteTimings()
+    {
+        var noteTimings = new List<BmsNoteTiming>(2500);
+
+        for (var i = 0; i < 2500; i++)
+        {
+            var startTime = i * 37;
+            var column = i % 8;
+
+            noteTimings.Add(i % 11 == 0 ? new BmsNoteTiming(column, startTime, startTime + 420) : new BmsNoteTiming(column, startTime, startTime));
+        }
+
+        return noteTimings;
+    }
+
+    private static List<BmsNoteTiming> createSparseNoteTimings() =>
+    [
+        new(0, 0, 0),
+        new(3, 180, 180),
+        new(5, 360, 720),
+        new(1, 1080, 1080),
+        new(6, 1320, 1320),
+        new(2, 1680, 2100),
+        new(7, 2460, 2460),
+    ];
+
+    private static List<BmsNoteTiming> createSimpleNoteTimings(int totalColumns) =>
+    [
+        new(0, 0, 0),
+        new(Math.Min(1, totalColumns - 1), 180, 180),
+        new(Math.Min(2, totalColumns - 1), 360, 720),
+    ];
+
+    private static IEnumerable<BmsHitObject> createSimpleHitObjects() =>
+    [
+        new BmsNote { Column = 0, StartTime = 0 },
+        new BmsNote { Column = 1, StartTime = 180 },
+        new BmsLongNote { Column = 2, StartTime = 360, Duration = 360 },
+    ];
+
+    private static double computeExpectedAnchorValue(params double[] counts)
+    {
+        Array.Sort(counts);
+        Array.Reverse(counts);
+
+        var nonZeroCount = 0;
+        while (nonZeroCount < counts.Length && counts[nonZeroCount] != 0)
+            nonZeroCount++;
+
+        var result = 0.0;
+
+        if (nonZeroCount > 1)
+        {
+            double walk = 0;
+            double maxWalk = 0;
+            for (var i = 0; i < nonZeroCount - 1; i++)
+            {
+                var ratio = counts[i + 1] / counts[i];
+                walk += counts[i] * (1 - 4 * (0.5 - ratio) * (0.5 - ratio));
+                maxWalk += counts[i];
+            }
+
+            result = walk / maxWalk;
+        }
+
+        var r = result - 0.22;
+        return 1 + Math.Min(result - 0.18, 5 * r * r * r);
+    }
+
+    private static double computeExpectedHitLeniency(double greatWindowMs)
+    {
+        var x = 0.3 * Math.Sqrt(greatWindowMs / 500.0);
+        return Math.Min(x, 0.6 * (x - 0.09) + 0.09);
+    }
+
+    private static int getNoteEntryColumn(object noteEntry) => (int)noteEntry.GetType().GetProperty("Column")!.GetValue(noteEntry)!;
+
+    private static double getNoteEntryHead(object noteEntry) => (double)noteEntry.GetType().GetProperty("Head")!.GetValue(noteEntry)!;
+
+    private static double getNoteEntryTail(object noteEntry) => (double)noteEntry.GetType().GetProperty("Tail")!.GetValue(noteEntry)!;
+
+    [Test]
+    public void TestDifficultyCalculatorUsesModRate()
+    {
+        var beatmap = new Beatmap();
+        new BmsDifficultyInfo { Rank = 2, KeyCount = 8 }.WriteToOsuDifficulty(beatmap);
+        beatmap.HitObjects.AddRange(createSimpleHitObjects());
+
+        var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
+        var method = typeof(BmsDifficultyCalculator).GetMethod("CreateDifficultyAttributes", BindingFlags.NonPublic | BindingFlags.Instance);
+        var doubleTime = new BmsModDoubleTime
+        {
+            SpeedChange =
+            {
+                Value = 1.75,
+            },
+        };
+
+        var attributes = (DifficultyAttributes)method!.Invoke(calculator, [beatmap, new Mod[] { doubleTime }, Array.Empty<Skill>()])!;
+        var expected = new BmsStarRatingProcessor().ComputeStarRating(createSimpleNoteTimings(8), 8, 2, 1.75);
+
+        Assert.That(attributes.StarRating, Is.EqualTo(expected).Within(1e-12));
+    }
+
     [Test]
     public void TestDifficultyCalculatorWrapperPathUsesEncodedExRank()
     {
@@ -36,21 +155,53 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestDifficultyCalculatorUsesModRate()
+    public void TestStarRatingProcessorAnchorComputationUsesCornerMajorKeyUsageWithoutAllocations()
     {
-        var beatmap = new Beatmap();
-        new BmsDifficultyInfo { Rank = 2, KeyCount = 8 }.WriteToOsuDifficulty(beatmap);
-        beatmap.HitObjects.AddRange(createSimpleHitObjects());
+        var processorType = typeof(BmsStarRatingProcessor);
+        var totalColumnsProperty = processorType.GetProperty("TotalColumns", BindingFlags.Public | BindingFlags.Instance);
+        var baseCornersField = processorType.GetField("baseCorners", BindingFlags.NonPublic | BindingFlags.Instance);
+        var computeAnchorMethod = processorType.GetMethod("computeAnchorInto", BindingFlags.NonPublic | BindingFlags.Instance, null, [typeof(double[]), typeof(double[])], null);
 
-        var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new TestWorkingBeatmap(beatmap));
-        var method = typeof(BmsDifficultyCalculator).GetMethod("CreateDifficultyAttributes", BindingFlags.NonPublic | BindingFlags.Instance);
-        var doubleTime = new BmsModDoubleTime();
-        doubleTime.SpeedChange.Value = 1.75;
+        Assert.Multiple(() =>
+        {
+            Assert.That(totalColumnsProperty, Is.Not.Null);
+            Assert.That(baseCornersField, Is.Not.Null);
+            Assert.That(computeAnchorMethod, Is.Not.Null);
+        });
 
-        var attributes = (DifficultyAttributes)method!.Invoke(calculator, [beatmap, new Mod[] { doubleTime }, Array.Empty<Skill>()])!;
-        var expected = new BmsStarRatingProcessor().ComputeStarRating(createSimpleNoteTimings(8), 8, 2, 1.75);
+        var processor = new BmsStarRatingProcessor();
+        totalColumnsProperty!.SetValue(processor, 4);
+        baseCornersField!.SetValue(processor, new[] { 0.0, 100.0, 200.0 });
 
-        Assert.That(attributes.StarRating, Is.EqualTo(expected).Within(1e-12));
+        var keyUsage400 =
+            new[]
+            {
+                10.0, 5.0, 0.0, 0.0,
+                8.0, 4.0, 2.0, 0.0,
+                9.0, 3.0, 1.0, 0.0,
+            };
+        var actual = new double[3];
+        var expected =
+            new[]
+            {
+                computeExpectedAnchorValue(10.0, 5.0, 0.0, 0.0),
+                computeExpectedAnchorValue(8.0, 4.0, 2.0, 0.0),
+                computeExpectedAnchorValue(9.0, 3.0, 1.0, 0.0),
+            };
+
+        var computeAnchor = (Action<BmsStarRatingProcessor, double[], double[]>)computeAnchorMethod!.CreateDelegate(typeof(Action<BmsStarRatingProcessor, double[], double[]>));
+
+        computeAnchor(processor, keyUsage400, actual);
+
+        Assert.That(actual, Is.EqualTo(expected).Within(1e-10));
+
+        computeAnchor(processor, keyUsage400, actual);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        computeAnchor(processor, keyUsage400, actual);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.That(allocated, Is.EqualTo(0));
     }
 
     [Test]
@@ -65,24 +216,57 @@ public class BmsStarRatingProcessorTest
         Assert.That(direct, Is.EqualTo(result).Within(1e-10));
     }
 
-    [TestCase(BmsLayoutVariant.Bme7K, 2, 45)]
-    [TestCase(BmsLayoutVariant.Bms5K, 2, 37.5)]
-    [TestCase(BmsLayoutVariant.Pms9K, 2, 35)]
-    public void TestStarRatingProcessorHitLeniencyUsesBmsGreatWindow(BmsLayoutVariant layout, int rank, double greatWindow)
+    [Test]
+    public void TestStarRatingProcessorCornerHelpersPreserveExactSemantics()
     {
-        var totalColumns = BmsLayout.GetTotalColumns(layout);
-        var noteTimings = createSimpleNoteTimings(totalColumns);
-        var processor = new BmsStarRatingProcessor();
+        var dedupeMethod = typeof(BmsStarRatingProcessor).GetMethod("toDedupedFilteredArray", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(int), typeof(double)], null);
+        var mergeMethod = typeof(BmsStarRatingProcessor).GetMethod("mergeSortedUnique", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(double[])], null);
 
-        processor.Compute(noteTimings, totalColumns, rank, 1.0, layout);
+        Assert.Multiple(() =>
+        {
+            Assert.That(dedupeMethod, Is.Not.Null);
+            Assert.That(mergeMethod, Is.Not.Null);
+        });
 
-        Assert.That(processor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(greatWindow)).Within(1e-12));
+        var filtered = (double[])dedupeMethod!.Invoke(null, [new double[] { -10, 0, 0, 1, 3, 3, 4, 8, 9, 12 }, 10, 10.0])!;
+        var merged = (double[])mergeMethod!.Invoke(null, [new double[] { 0, 1, 4, 8, 10 }, new double[] { 0, 2, 4, 9, 10 }])!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(filtered, Is.EqualTo([0.0, 1.0, 3.0, 4.0, 8.0, 9.0]));
+            Assert.That(merged, Is.EqualTo([0.0, 1.0, 2.0, 4.0, 8.0, 9.0, 10.0]));
+        });
+    }
+
+    [Test]
+    public void TestStarRatingProcessorDoesNotKeepDiagnosticArrays()
+    {
+        var noteTimings = createDenseNoteTimings();
+
+        var result = new BmsStarRatingProcessor().Compute(noteTimings, 8, 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.StarRating, Is.GreaterThan(0));
+            Assert.That(result.AllCorners, Is.Empty);
+            Assert.That(result.BaseCorners, Is.Empty);
+            Assert.That(result.ACorners, Is.Empty);
+            Assert.That(result.Jbar, Is.Empty);
+            Assert.That(result.Xbar, Is.Empty);
+            Assert.That(result.Pbar, Is.Empty);
+            Assert.That(result.Abar, Is.Empty);
+            Assert.That(result.Rbar, Is.Empty);
+            Assert.That(result.DensityC, Is.Empty);
+            Assert.That(result.ActiveColumnsKs, Is.Empty);
+            Assert.That(result.DifficultyD, Is.Empty);
+            Assert.That(result.AnchorValues, Is.Empty);
+        });
     }
 
     [Test]
     public void TestStarRatingProcessorHitLeniencyUsesExplicitJudgementRate()
     {
-        var layout = BmsLayoutVariant.Bme7K;
+        const BmsLayoutVariant layout = BmsLayoutVariant.Bme7K;
         var totalColumns = BmsLayout.GetTotalColumns(layout);
         var noteTimings = createSimpleNoteTimings(totalColumns);
         var processor = new BmsStarRatingProcessor();
@@ -91,103 +275,6 @@ public class BmsStarRatingProcessorTest
         processor.Compute(noteTimings, totalColumns, 2, 1.0, layout, judgementRate);
 
         Assert.That(processor.HitLeniencyX, Is.EqualTo(computeExpectedHitLeniency(90)).Within(1e-12));
-    }
-
-    [Test]
-    public void TestStarRatingProcessorReusesScratchAcrossDifferentChartSizes()
-    {
-        var denseNoteTimings = createDenseNoteTimings();
-        var sparseNoteTimings = createSparseNoteTimings();
-        var processor = new BmsStarRatingProcessor();
-        var freshProcessor = new BmsStarRatingProcessor();
-
-        var denseReference = freshProcessor.Compute(denseNoteTimings, 8, 2).StarRating;
-        var sparseReference = freshProcessor.Compute(sparseNoteTimings, 8, 2).StarRating;
-
-        var denseActual = processor.Compute(denseNoteTimings, 8, 2).StarRating;
-        var sparseActual = processor.Compute(sparseNoteTimings, 8, 2).StarRating;
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(denseActual, Is.EqualTo(denseReference).Within(1e-10));
-            Assert.That(sparseActual, Is.EqualTo(sparseReference).Within(1e-10));
-        });
-    }
-
-    [Test]
-    public void TestStarRatingProcessorUsesArrayRangesForPreprocessedNotes()
-    {
-        var processorType = typeof(BmsStarRatingProcessor);
-        var noteSeqField = processorType.GetField("noteSeq", BindingFlags.NonPublic | BindingFlags.Instance);
-        var noteSeqByColumnField = processorType.GetField("noteSeqByColumn", BindingFlags.NonPublic | BindingFlags.Instance);
-        var noteSeqByColumnStartsField = processorType.GetField("noteSeqByColumnStarts", BindingFlags.NonPublic | BindingFlags.Instance);
-        var noteSeqByColumnCountsField = processorType.GetField("noteSeqByColumnCounts", BindingFlags.NonPublic | BindingFlags.Instance);
-        var lnSeqField = processorType.GetField("lnSeq", BindingFlags.NonPublic | BindingFlags.Instance);
-        var tailSeqField = processorType.GetField("tailSeq", BindingFlags.NonPublic | BindingFlags.Instance);
-        var totalColumnsProperty = processorType.GetProperty("TotalColumns", BindingFlags.Public | BindingFlags.Instance);
-        var preprocessMethod = processorType.GetMethod("preprocessFile", BindingFlags.NonPublic | BindingFlags.Instance, null,
-            [typeof(IReadOnlyList<BmsNoteTiming>), typeof(int), typeof(double), typeof(BmsLayoutVariant), typeof(double?)], null);
-        var clearMethod = processorType.GetMethod("clearWorkingState", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(noteSeqField, Is.Not.Null);
-            Assert.That(noteSeqByColumnField, Is.Not.Null);
-            Assert.That(noteSeqByColumnStartsField, Is.Not.Null);
-            Assert.That(noteSeqByColumnCountsField, Is.Not.Null);
-            Assert.That(lnSeqField, Is.Not.Null);
-            Assert.That(tailSeqField, Is.Not.Null);
-            Assert.That(totalColumnsProperty, Is.Not.Null);
-            Assert.That(preprocessMethod, Is.Not.Null);
-            Assert.That(clearMethod, Is.Not.Null);
-            Assert.That(noteSeqField!.FieldType.IsArray, Is.True);
-            Assert.That(noteSeqByColumnField!.FieldType.IsArray, Is.True);
-            Assert.That(noteSeqByColumnStartsField!.FieldType, Is.EqualTo(typeof(int[])));
-            Assert.That(noteSeqByColumnCountsField!.FieldType, Is.EqualTo(typeof(int[])));
-            Assert.That(lnSeqField!.FieldType.IsArray, Is.True);
-            Assert.That(tailSeqField!.FieldType.IsArray, Is.True);
-        });
-
-        var noteTimings = new List<BmsNoteTiming>
-        {
-            new(1, 100, 100),
-            new(1, 100, 160),
-            new(0, 100, 160),
-            new(1, 90, 140),
-            new(1, 100, 100),
-        };
-
-        var processor = new BmsStarRatingProcessor();
-
-        try
-        {
-            totalColumnsProperty!.SetValue(processor, 2);
-            preprocessMethod!.Invoke(processor, [noteTimings, 2, 1.0, BmsLayoutVariant.Bme7K, null]);
-
-            var noteSeq = (Array)noteSeqField!.GetValue(processor)!;
-            var noteSeqByColumn = (Array)noteSeqByColumnField!.GetValue(processor)!;
-            var noteSeqByColumnStarts = (int[])noteSeqByColumnStartsField!.GetValue(processor)!;
-            var noteSeqByColumnCounts = (int[])noteSeqByColumnCountsField!.GetValue(processor)!;
-            var tailSeq = (Array)tailSeqField!.GetValue(processor)!;
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(noteSeq.Length, Is.EqualTo(5));
-                Assert.That(noteSeqByColumn.Length, Is.EqualTo(5));
-                Assert.That(noteSeqByColumnStarts, Is.EqualTo(new[] { 0, 1 }));
-                Assert.That(noteSeqByColumnCounts, Is.EqualTo(new[] { 1, 4 }));
-                Assert.That(getNoteEntryHead(noteSeq.GetValue(0)!), Is.EqualTo(90));
-                Assert.That(getNoteEntryColumn(noteSeq.GetValue(1)!), Is.EqualTo(0));
-                Assert.That(getNoteEntryColumn(noteSeq.GetValue(2)!), Is.EqualTo(1));
-                Assert.That(getNoteEntryTail(tailSeq.GetValue(0)!), Is.EqualTo(140));
-                Assert.That(getNoteEntryColumn(tailSeq.GetValue(1)!), Is.EqualTo(0));
-                Assert.That(getNoteEntryColumn(tailSeq.GetValue(2)!), Is.EqualTo(1));
-            });
-        }
-        finally
-        {
-            clearMethod!.Invoke(processor, []);
-        }
     }
 
     [Test]
@@ -246,49 +333,23 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorDoesNotKeepDiagnosticArrays()
+    public void TestStarRatingProcessorReusesScratchAcrossDifferentChartSizes()
     {
-        var noteTimings = createDenseNoteTimings();
+        var denseNoteTimings = createDenseNoteTimings();
+        var sparseNoteTimings = createSparseNoteTimings();
+        var processor = new BmsStarRatingProcessor();
+        var freshProcessor = new BmsStarRatingProcessor();
 
-        var result = new BmsStarRatingProcessor().Compute(noteTimings, 8, 2);
+        var denseReference = freshProcessor.Compute(denseNoteTimings, 8, 2).StarRating;
+        var sparseReference = freshProcessor.Compute(sparseNoteTimings, 8, 2).StarRating;
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.StarRating, Is.GreaterThan(0));
-            Assert.That(result.AllCorners, Is.Empty);
-            Assert.That(result.BaseCorners, Is.Empty);
-            Assert.That(result.ACorners, Is.Empty);
-            Assert.That(result.Jbar, Is.Empty);
-            Assert.That(result.Xbar, Is.Empty);
-            Assert.That(result.Pbar, Is.Empty);
-            Assert.That(result.Abar, Is.Empty);
-            Assert.That(result.Rbar, Is.Empty);
-            Assert.That(result.DensityC, Is.Empty);
-            Assert.That(result.ActiveColumnsKs, Is.Empty);
-            Assert.That(result.DifficultyD, Is.Empty);
-            Assert.That(result.AnchorValues, Is.Empty);
-        });
-    }
-
-    [Test]
-    public void TestStarRatingProcessorCornerHelpersPreserveExactSemantics()
-    {
-        var dedupeMethod = typeof(BmsStarRatingProcessor).GetMethod("toDedupedFilteredArray", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(int), typeof(double)], null);
-        var mergeMethod = typeof(BmsStarRatingProcessor).GetMethod("mergeSortedUnique", BindingFlags.NonPublic | BindingFlags.Static, null, [typeof(double[]), typeof(double[])], null);
+        var denseActual = processor.Compute(denseNoteTimings, 8, 2).StarRating;
+        var sparseActual = processor.Compute(sparseNoteTimings, 8, 2).StarRating;
 
         Assert.Multiple(() =>
         {
-            Assert.That(dedupeMethod, Is.Not.Null);
-            Assert.That(mergeMethod, Is.Not.Null);
-        });
-
-        var filtered = (double[])dedupeMethod!.Invoke(null, [new double[] { -10, 0, 0, 1, 3, 3, 4, 8, 9, 12 }, 10, 10.0])!;
-        var merged = (double[])mergeMethod!.Invoke(null, [new double[] { 0, 1, 4, 8, 10 }, new double[] { 0, 2, 4, 9, 10 }])!;
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(filtered, Is.EqualTo(new[] { 0.0, 1.0, 3.0, 4.0, 8.0, 9.0 }));
-            Assert.That(merged, Is.EqualTo(new[] { 0.0, 1.0, 2.0, 4.0, 8.0, 9.0, 10.0 }));
+            Assert.That(denseActual, Is.EqualTo(denseReference).Within(1e-10));
+            Assert.That(sparseActual, Is.EqualTo(sparseReference).Within(1e-10));
         });
     }
 
@@ -367,158 +428,78 @@ public class BmsStarRatingProcessorTest
     }
 
     [Test]
-    public void TestStarRatingProcessorAnchorComputationUsesCornerMajorKeyUsageWithoutAllocations()
+    public void TestStarRatingProcessorUsesArrayRangesForPreprocessedNotes()
     {
         var processorType = typeof(BmsStarRatingProcessor);
+        var noteSeqField = processorType.GetField("noteSeq", BindingFlags.NonPublic | BindingFlags.Instance);
+        var noteSeqByColumnField = processorType.GetField("noteSeqByColumn", BindingFlags.NonPublic | BindingFlags.Instance);
+        var noteSeqByColumnStartsField = processorType.GetField("noteSeqByColumnStarts", BindingFlags.NonPublic | BindingFlags.Instance);
+        var noteSeqByColumnCountsField = processorType.GetField("noteSeqByColumnCounts", BindingFlags.NonPublic | BindingFlags.Instance);
+        var lnSeqField = processorType.GetField("lnSeq", BindingFlags.NonPublic | BindingFlags.Instance);
+        var tailSeqField = processorType.GetField("tailSeq", BindingFlags.NonPublic | BindingFlags.Instance);
         var totalColumnsProperty = processorType.GetProperty("TotalColumns", BindingFlags.Public | BindingFlags.Instance);
-        var baseCornersField = processorType.GetField("baseCorners", BindingFlags.NonPublic | BindingFlags.Instance);
-        var computeAnchorMethod = processorType.GetMethod("computeAnchorInto", BindingFlags.NonPublic | BindingFlags.Instance, null, [typeof(double[]), typeof(double[])], null);
+        var preprocessMethod = processorType.GetMethod("preprocessFile", BindingFlags.NonPublic | BindingFlags.Instance, null,
+            [typeof(IReadOnlyList<BmsNoteTiming>), typeof(int), typeof(double), typeof(BmsLayoutVariant), typeof(double?)], null);
+        var clearMethod = processorType.GetMethod("clearWorkingState", BindingFlags.NonPublic | BindingFlags.Instance);
 
         Assert.Multiple(() =>
         {
+            Assert.That(noteSeqField, Is.Not.Null);
+            Assert.That(noteSeqByColumnField, Is.Not.Null);
+            Assert.That(noteSeqByColumnStartsField, Is.Not.Null);
+            Assert.That(noteSeqByColumnCountsField, Is.Not.Null);
+            Assert.That(lnSeqField, Is.Not.Null);
+            Assert.That(tailSeqField, Is.Not.Null);
             Assert.That(totalColumnsProperty, Is.Not.Null);
-            Assert.That(baseCornersField, Is.Not.Null);
-            Assert.That(computeAnchorMethod, Is.Not.Null);
+            Assert.That(preprocessMethod, Is.Not.Null);
+            Assert.That(clearMethod, Is.Not.Null);
+            Assert.That(noteSeqField!.FieldType.IsArray, Is.True);
+            Assert.That(noteSeqByColumnField!.FieldType.IsArray, Is.True);
+            Assert.That(noteSeqByColumnStartsField!.FieldType, Is.EqualTo(typeof(int[])));
+            Assert.That(noteSeqByColumnCountsField!.FieldType, Is.EqualTo(typeof(int[])));
+            Assert.That(lnSeqField!.FieldType.IsArray, Is.True);
+            Assert.That(tailSeqField!.FieldType.IsArray, Is.True);
         });
 
+        var noteTimings = new List<BmsNoteTiming>
+        {
+            new(1, 100, 100),
+            new(1, 100, 160),
+            new(0, 100, 160),
+            new(1, 90, 140),
+            new(1, 100, 100),
+        };
+
         var processor = new BmsStarRatingProcessor();
-        totalColumnsProperty!.SetValue(processor, 4);
-        baseCornersField!.SetValue(processor, new[] { 0.0, 100.0, 200.0 });
 
-        var keyUsage400 =
-            new[]
-            {
-                10.0, 5.0, 0.0, 0.0,
-                8.0, 4.0, 2.0, 0.0,
-                9.0, 3.0, 1.0, 0.0,
-            };
-        var actual = new double[3];
-        var expected =
-            new[]
-            {
-                computeExpectedAnchorValue(10.0, 5.0, 0.0, 0.0),
-                computeExpectedAnchorValue(8.0, 4.0, 2.0, 0.0),
-                computeExpectedAnchorValue(9.0, 3.0, 1.0, 0.0),
-            };
-
-        var computeAnchor = (Action<BmsStarRatingProcessor, double[], double[]>)computeAnchorMethod!.CreateDelegate(typeof(Action<BmsStarRatingProcessor, double[], double[]>));
-
-        computeAnchor(processor, keyUsage400, actual);
-
-        Assert.That(actual, Is.EqualTo(expected).Within(1e-10));
-
-        computeAnchor(processor, keyUsage400, actual);
-
-        var before = GC.GetAllocatedBytesForCurrentThread();
-        computeAnchor(processor, keyUsage400, actual);
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-
-        Assert.That(allocated, Is.EqualTo(0));
-    }
-
-    private static List<BmsNoteTiming> createDenseNoteTimings()
-    {
-        var noteTimings = new List<BmsNoteTiming>(2500);
-
-        for (var i = 0; i < 2500; i++)
+        try
         {
-            var startTime = i * 37;
-            var column = i % 8;
+            totalColumnsProperty!.SetValue(processor, 2);
+            preprocessMethod!.Invoke(processor, [noteTimings, 2, 1.0, BmsLayoutVariant.Bme7K, null]);
 
-            if (i % 11 == 0)
-                noteTimings.Add(new BmsNoteTiming(column, startTime, startTime + 420));
-            else
-                noteTimings.Add(new BmsNoteTiming(column, startTime, startTime));
-        }
+            var noteSeq = (Array)noteSeqField!.GetValue(processor)!;
+            var noteSeqByColumn = (Array)noteSeqByColumnField!.GetValue(processor)!;
+            var noteSeqByColumnStarts = (int[])noteSeqByColumnStartsField!.GetValue(processor)!;
+            var noteSeqByColumnCounts = (int[])noteSeqByColumnCountsField!.GetValue(processor)!;
+            var tailSeq = (Array)tailSeqField!.GetValue(processor)!;
 
-        return noteTimings;
-    }
-
-    private static List<BmsNoteTiming> createSparseNoteTimings()
-    {
-        return
-        [
-            new BmsNoteTiming(0, 0, 0),
-            new BmsNoteTiming(3, 180, 180),
-            new BmsNoteTiming(5, 360, 720),
-            new BmsNoteTiming(1, 1080, 1080),
-            new BmsNoteTiming(6, 1320, 1320),
-            new BmsNoteTiming(2, 1680, 2100),
-            new BmsNoteTiming(7, 2460, 2460),
-        ];
-    }
-
-    private static List<BmsNoteTiming> createSimpleNoteTimings(int totalColumns) =>
-    [
-        new BmsNoteTiming(0, 0, 0),
-        new BmsNoteTiming(Math.Min(1, totalColumns - 1), 180, 180),
-        new BmsNoteTiming(Math.Min(2, totalColumns - 1), 360, 720),
-    ];
-
-    private static IEnumerable<BmsHitObject> createSimpleHitObjects() =>
-    [
-        new BmsNote { Column = 0, StartTime = 0 },
-        new BmsNote { Column = 1, StartTime = 180 },
-        new BmsLongNote { Column = 2, StartTime = 360, Duration = 360 },
-    ];
-
-    private static double computeExpectedAnchorValue(params double[] counts)
-    {
-        Array.Sort(counts);
-        Array.Reverse(counts);
-
-        var nonZeroCount = 0;
-        while (nonZeroCount < counts.Length && counts[nonZeroCount] != 0)
-            nonZeroCount++;
-
-        var result = 0.0;
-
-        if (nonZeroCount > 1)
-        {
-            double walk = 0;
-            double maxWalk = 0;
-            for (var i = 0; i < nonZeroCount - 1; i++)
+            Assert.Multiple(() =>
             {
-                var ratio = counts[i + 1] / counts[i];
-                walk += counts[i] * (1 - 4 * (0.5 - ratio) * (0.5 - ratio));
-                maxWalk += counts[i];
-            }
-
-            result = walk / maxWalk;
+                Assert.That(noteSeq.Length, Is.EqualTo(5));
+                Assert.That(noteSeqByColumn.Length, Is.EqualTo(5));
+                Assert.That(noteSeqByColumnStarts, Is.EqualTo([0, 1]));
+                Assert.That(noteSeqByColumnCounts, Is.EqualTo([1, 4]));
+                Assert.That(getNoteEntryHead(noteSeq.GetValue(0)!), Is.EqualTo(90));
+                Assert.That(getNoteEntryColumn(noteSeq.GetValue(1)!), Is.EqualTo(0));
+                Assert.That(getNoteEntryColumn(noteSeq.GetValue(2)!), Is.EqualTo(1));
+                Assert.That(getNoteEntryTail(tailSeq.GetValue(0)!), Is.EqualTo(140));
+                Assert.That(getNoteEntryColumn(tailSeq.GetValue(1)!), Is.EqualTo(0));
+                Assert.That(getNoteEntryColumn(tailSeq.GetValue(2)!), Is.EqualTo(1));
+            });
         }
-
-        var r = result - 0.22;
-        return 1 + Math.Min(result - 0.18, 5 * r * r * r);
-    }
-
-    private static double computeExpectedHitLeniency(double greatWindowMs)
-    {
-        var x = 0.3 * Math.Sqrt(greatWindowMs / 500.0);
-        return Math.Min(x, 0.6 * (x - 0.09) + 0.09);
-    }
-
-    private static int getNoteEntryColumn(object noteEntry) => (int)noteEntry.GetType().GetProperty("Column")!.GetValue(noteEntry)!;
-
-    private static double getNoteEntryHead(object noteEntry) => (double)noteEntry.GetType().GetProperty("Head")!.GetValue(noteEntry)!;
-
-    private static double getNoteEntryTail(object noteEntry) => (double)noteEntry.GetType().GetProperty("Tail")!.GetValue(noteEntry)!;
-
-    private static bool methodConstructs(MethodInfo method, Type constructedType)
-    {
-        var body = method.GetMethodBody()?.GetILAsByteArray();
-        var constructor = constructedType.GetConstructor(Type.EmptyTypes);
-
-        Assert.That(body, Is.Not.Null);
-        Assert.That(constructor, Is.Not.Null);
-
-        var token = constructor!.MetadataToken;
-        for (var i = 0; i <= body!.Length - 5; i++)
+        finally
         {
-            if (body[i] == 0x73 && BitConverter.ToInt32(body, i + 1) == token)
-                return true;
+            clearMethod!.Invoke(processor, []);
         }
-
-        return false;
     }
-
 }

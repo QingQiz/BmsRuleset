@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.UI.Objects.LnHelper;
@@ -7,58 +9,6 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 [TestFixture]
 public class BmsLongNoteSegmentComposerTest
 {
-
-    [Test]
-    public void TestMultiSliceAlwaysIncludesZeroOnce()
-    {
-        var parts = BmsLongNoteSegmentComposer.Compose([10, 20, 30], 5, false);
-
-        Assert.That(parts.Select(p => p.SegmentIndex), Is.EqualTo(new[] { 0 }));
-    }
-
-    [Test]
-    public void TestMultiSliceRepeatsOnlyNonZeroSlices()
-    {
-        var parts = BmsLongNoteSegmentComposer.Compose([10, 20, 30], 95, false);
-
-        Assert.That(parts.Select(p => p.SegmentIndex), Is.EqualTo(new[] { 0, 1, 2, 1, 2 }));
-    }
-
-    [Test]
-    public void TestMultiSliceSelectsMinimumSequentialSlices()
-    {
-        var parts = BmsLongNoteSegmentComposer.Compose([10, 20, 30], 25, false);
-
-        Assert.That(parts.Select(p => p.SegmentIndex), Is.EqualTo(new[] { 0, 1 }));
-    }
-
-    [Test]
-    public void TestSingleSliceRepeatsZeroWhenInsufficient()
-    {
-        var parts = BmsLongNoteSegmentComposer.Compose([10], 25, false);
-
-        Assert.That(parts.Select(p => p.SegmentIndex), Is.EqualTo(new[] { 0, 0, 0 }));
-        Assert.That(parts.Select(p => p.Height), Is.EqualTo(new[] { 10, 10, 10 }));
-    }
-
-    [Test]
-    public void TestTailAtBottomPositionsFromBottomAndFlipsAllParts()
-    {
-        var parts = BmsLongNoteSegmentComposer.Compose([10, 20], 25, false);
-
-        Assert.That(parts.Select(p => p.Y), Is.EqualTo(new[] { 25, 15 }));
-        Assert.That(parts[0].FlipY, Is.True);
-        Assert.That(parts[1].FlipY, Is.True);
-    }
-
-    [Test]
-    public void TestTailAtTopPositionsFromTop()
-    {
-        var parts = BmsLongNoteSegmentComposer.Compose([10, 20], 25, true);
-
-        Assert.That(parts.Select(p => p.Y), Is.EqualTo(new[] { 0, 10 }));
-        Assert.That(parts.Any(p => p.FlipY), Is.False);
-    }
 
     [TestCase(false)]
     [TestCase(true)]
@@ -75,15 +25,69 @@ public class BmsLongNoteSegmentComposerTest
     }
 
     private static (int SegmentIndex, float Top, float Bottom, bool FlipY)[] visibleGeometry(
-        System.Collections.Generic.IReadOnlyList<BmsLongNoteSegmentComposer.Part> parts, float contentOffset, float maskHeight)
+        IReadOnlyList<BmsLongNoteSegmentComposer.Part> parts, float contentOffset, float maskHeight)
     {
-        return parts.Select(part =>
-            {
-                var partTop = contentOffset + (part.FlipY ? part.Y - part.Height : part.Y);
-                var partBottom = contentOffset + (part.FlipY ? part.Y : part.Y + part.Height);
-                return (part.SegmentIndex, Top: System.Math.Max(0, partTop), Bottom: System.Math.Min(maskHeight, partBottom), part.FlipY);
-            })
-            .Where(part => part.Bottom > part.Top)
-            .ToArray();
+        return
+        [
+            .. parts.Select(part =>
+                {
+                    var partTop = contentOffset + (part.FlipY ? part.Y - part.Height : part.Y);
+                    var partBottom = contentOffset + (part.FlipY ? part.Y : part.Y + part.Height);
+                    return (part.SegmentIndex, Top: Math.Max(0, partTop), Bottom: Math.Min(maskHeight, partBottom), part.FlipY);
+                })
+                .Where(part => part.Bottom > part.Top)
+        ];
+    }
+
+    [Test]
+    public void TestMultiSliceAlwaysIncludesZeroOnce()
+    {
+        var parts = BmsLongNoteSegmentComposer.Compose([10, 20, 30], 5, false);
+
+        Assert.That(parts.Select(p => p.SegmentIndex), Is.EqualTo([0]));
+    }
+
+    [Test]
+    public void TestMultiSliceRepeatsOnlyNonZeroSlices()
+    {
+        var parts = BmsLongNoteSegmentComposer.Compose([10, 20, 30], 95, false);
+
+        Assert.That(parts.Select(p => p.SegmentIndex), Is.EqualTo([0, 1, 2, 1, 2]));
+    }
+
+    [Test]
+    public void TestMultiSliceSelectsMinimumSequentialSlices()
+    {
+        var parts = BmsLongNoteSegmentComposer.Compose([10, 20, 30], 25, false);
+
+        Assert.That(parts.Select(p => p.SegmentIndex), Is.EqualTo([0, 1]));
+    }
+
+    [Test]
+    public void TestSingleSliceRepeatsZeroWhenInsufficient()
+    {
+        var parts = BmsLongNoteSegmentComposer.Compose([10], 25, false);
+
+        Assert.That(parts.Select(p => p.SegmentIndex), Is.EqualTo([0, 0, 0]));
+        Assert.That(parts.Select(p => p.Height), Is.EqualTo([10, 10, 10]));
+    }
+
+    [Test]
+    public void TestTailAtBottomPositionsFromBottomAndFlipsAllParts()
+    {
+        var parts = BmsLongNoteSegmentComposer.Compose([10, 20], 25, false);
+
+        Assert.That(parts.Select(p => p.Y), Is.EqualTo([25, 15]));
+        Assert.That(parts[0].FlipY, Is.True);
+        Assert.That(parts[1].FlipY, Is.True);
+    }
+
+    [Test]
+    public void TestTailAtTopPositionsFromTop()
+    {
+        var parts = BmsLongNoteSegmentComposer.Compose([10, 20], 25, true);
+
+        Assert.That(parts.Select(p => p.Y), Is.EqualTo([0, 10]));
+        Assert.That(parts.Any(p => p.FlipY), Is.False);
     }
 }

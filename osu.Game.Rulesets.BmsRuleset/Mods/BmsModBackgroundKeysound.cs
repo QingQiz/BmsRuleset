@@ -1,12 +1,12 @@
 ﻿using System.Linq;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
@@ -38,7 +38,7 @@ public class BmsModBackgroundKeysound : Mod, IApplicableAfterBeatmapConversion
             .Where(x => x.TailSampleKey.HasValue)
             .Select(x => new BmsSampleEvent(x.EndTime, 0, x.TailSampleKey!.Value, x.TailSampleVolume));
 
-        b.BackgroundSampleEvents = b.BackgroundSampleEvents.Concat(starts).Concat(tails).ToArray();
+        b.BackgroundSampleEvents = [.. b.BackgroundSampleEvents, .. starts, .. tails];
 
         foreach (var n in notes)
             n.SampleKey = null;

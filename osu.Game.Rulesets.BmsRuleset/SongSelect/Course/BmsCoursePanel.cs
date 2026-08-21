@@ -11,7 +11,6 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Course;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
 using osuTK;

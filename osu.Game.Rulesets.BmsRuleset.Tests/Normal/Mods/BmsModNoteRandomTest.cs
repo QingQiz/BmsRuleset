@@ -39,11 +39,11 @@ public class BmsModNoteRandomTest
     }
 
     /// <summary>
-    /// Creates a simple beatmap with a known pattern for threshold testing.
+    ///     Creates a simple beatmap with a known pattern for threshold testing.
     /// </summary>
     private BmsBeatmap createPatternBeatmap()
     {
-        double t = 1000;
+        const double t = 1000;
         // A single column repeated at short intervals → should produce jacks without random.
         // After random, identical-source columns get spread.
         return createBeatmap(
@@ -183,7 +183,7 @@ public class BmsModNoteRandomTest
 
         beatmap.HitObjects.Add(new BmsLongNote { StartTime = 1000, Column = 0, Duration = 200 });
         // After the LN ends, add enough notes to force using every column.
-        for (int i = 0; i < 8; i++)
+        for (var i = 0; i < 8; i++)
             beatmap.HitObjects.Add(new BmsHitObject { StartTime = 1300, Column = 1 });
 
         var mod = new BmsModNoteRandom { IncludeScratch = { Value = true }, Seed = { Value = 42 } };
@@ -217,6 +217,18 @@ public class BmsModNoteRandomTest
 
         foreach (var note in beatmap.HitObjects)
             Assert.That(note.Column, Is.Not.EqualTo(0), $"Non-scratch note landed on scratch at time {note.StartTime}");
+    }
+
+    [Test]
+    public void TestSRandomMode()
+    {
+        var beatmap = createPatternBeatmap();
+        var mod = new BmsModNoteRandom { Mode = { Value = BmsNoteRandomMode.S_Random }, Seed = { Value = 42 } };
+
+        applyMod(mod, beatmap);
+
+        // S_Random should have shuffled columns (not all at column 1 anymore).
+        Assert.That(beatmap.HitObjects.Select(h => h.Column).Distinct().Count(), Is.GreaterThan(1));
     }
 
     [Test]
@@ -288,17 +300,5 @@ public class BmsModNoteRandomTest
 
         Assert.That(beatmap1.HitObjects.Select(h => (h.StartTime, h.Column)),
             Is.EqualTo(beatmap2.HitObjects.Select(h => (h.StartTime, h.Column))));
-    }
-
-    [Test]
-    public void TestSRandomMode()
-    {
-        var beatmap = createPatternBeatmap();
-        var mod = new BmsModNoteRandom { Mode = { Value = BmsNoteRandomMode.S_Random }, Seed = { Value = 42 } };
-
-        applyMod(mod, beatmap);
-
-        // S_Random should have shuffled columns (not all at column 1 anymore).
-        Assert.That(beatmap.HitObjects.Select(h => h.Column).Distinct().Count(), Is.GreaterThan(1));
     }
 }

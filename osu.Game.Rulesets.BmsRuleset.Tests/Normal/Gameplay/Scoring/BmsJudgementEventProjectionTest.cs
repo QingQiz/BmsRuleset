@@ -9,33 +9,24 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Scoring;
 [TestFixture]
 public class BmsJudgementEventProjectionTest
 {
-    [Test]
-    public void TestStandardLongNoteHasOneScoringEventAndTwoTimingEvents()
-    {
-        var longNote = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 2 };
-        BmsJudgementEvent[] events =
-        [
-            new BmsJudgementEvent(BmsJudgementSource.From(longNote), HitResult.Great,
-            [
-                new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 1000, 988, 1, HitResult.Perfect),
-                new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 1500, 1519, 1, HitResult.Great),
-            ]),
-        ];
 
-        var scoring = BmsJudgementEventProjection.CreateScoringHitEvents(events);
-        var timing = BmsJudgementEventProjection.CreateTimingHitEvents(events);
+    [Test]
+    public void TestEmptyPoorProjectionKeepsPressTimeAndNextNoteOffset()
+    {
+        var judgementEvent = new BmsJudgementEvent(
+            new BmsJudgementSource(600, 2, BmsJudgementSourceKind.EmptyPoor),
+            HitResult.Miss,
+            [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 600, 1, HitResult.Miss)]);
+
+        var scoring = BmsJudgementEventProjection.CreateScoringHitEvents([judgementEvent]).Single();
+        var timing = BmsJudgementEventProjection.CreateTimingHitEvents([judgementEvent]).Single();
 
         Assert.Multiple(() =>
         {
-            Assert.That(scoring, Has.Count.EqualTo(1));
-            Assert.That(scoring.Single().Result, Is.EqualTo(HitResult.Great));
-            Assert.That(scoring.Single().HitObject, Is.TypeOf<BmsLongNote>());
-            Assert.That(scoring.Single().HitObject.StartTime, Is.EqualTo(1000));
-            Assert.That(((BmsLongNote)scoring.Single().HitObject).Duration, Is.EqualTo(500));
-            Assert.That(scoring.Single().TimeOffset, Is.EqualTo(19));
-            Assert.That(timing, Has.Count.EqualTo(2));
-            Assert.That(timing.Select(e => e.TimeOffset), Is.EqualTo(new[] { -12, 19 }));
-            Assert.That(timing.Select(e => e.HitObject.StartTime), Is.EqualTo(new[] { 1000, 1500 }));
+            Assert.That(scoring.HitObject.StartTime, Is.EqualTo(600));
+            Assert.That(scoring.TimeOffset, Is.EqualTo(-400));
+            Assert.That(timing.HitObject.StartTime, Is.EqualTo(600));
+            Assert.That(timing.TimeOffset, Is.EqualTo(-400));
         });
     }
 
@@ -44,14 +35,14 @@ public class BmsJudgementEventProjectionTest
     {
         BmsJudgementEvent[] events =
         [
-            new BmsJudgementEvent(BmsJudgementSource.From(new BmsLongNote()), HitResult.Great,
+            new(BmsJudgementSource.From(new BmsLongNote()), HitResult.Great,
             [
                 new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 1000, 988, 1, HitResult.Perfect),
                 new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 1500, 1519, 1, HitResult.Great),
             ]),
         ];
 
-        Assert.That(BmsExScore.CreateProgression(events), Is.EqualTo(new[] { 0, 1 }));
+        Assert.That(BmsExScore.CreateProgression(events), Is.EqualTo([0, 1]));
     }
 
     [Test]
@@ -60,7 +51,7 @@ public class BmsJudgementEventProjectionTest
         var longNote = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 2 };
         BmsJudgementEvent[] events =
         [
-            new BmsJudgementEvent(BmsJudgementSource.From(longNote), HitResult.Meh,
+            new(BmsJudgementSource.From(longNote), HitResult.Meh,
             [
                 new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 1000, 1200, 1, HitResult.Meh),
             ]),
@@ -81,11 +72,11 @@ public class BmsJudgementEventProjectionTest
     {
         BmsJudgementEvent[] events =
         [
-            new BmsJudgementEvent(
+            new(
                 BmsJudgementSource.From(new BmsNote { StartTime = 2000 }),
                 HitResult.Perfect,
                 [new BmsTimingObservation(BmsTimingObservationKind.Note, 2000, 2100, 1, HitResult.Perfect)]),
-            new BmsJudgementEvent(
+            new(
                 BmsJudgementSource.From(new BmsNote { StartTime = 1000 }),
                 HitResult.Meh,
                 [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 2200, 1, HitResult.Meh)]),
@@ -97,22 +88,32 @@ public class BmsJudgementEventProjectionTest
     }
 
     [Test]
-    public void TestEmptyPoorProjectionKeepsPressTimeAndNextNoteOffset()
+    public void TestStandardLongNoteHasOneScoringEventAndTwoTimingEvents()
     {
-        var judgementEvent = new BmsJudgementEvent(
-            new BmsJudgementSource(600, 2, BmsJudgementSourceKind.EmptyPoor),
-            HitResult.Miss,
-            [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 600, 1, HitResult.Miss)]);
+        var longNote = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 2 };
+        BmsJudgementEvent[] events =
+        [
+            new(BmsJudgementSource.From(longNote), HitResult.Great,
+            [
+                new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 1000, 988, 1, HitResult.Perfect),
+                new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 1500, 1519, 1, HitResult.Great),
+            ]),
+        ];
 
-        var scoring = BmsJudgementEventProjection.CreateScoringHitEvents([judgementEvent]).Single();
-        var timing = BmsJudgementEventProjection.CreateTimingHitEvents([judgementEvent]).Single();
+        var scoring = BmsJudgementEventProjection.CreateScoringHitEvents(events);
+        var timing = BmsJudgementEventProjection.CreateTimingHitEvents(events);
 
         Assert.Multiple(() =>
         {
-            Assert.That(scoring.HitObject.StartTime, Is.EqualTo(600));
-            Assert.That(scoring.TimeOffset, Is.EqualTo(-400));
-            Assert.That(timing.HitObject.StartTime, Is.EqualTo(600));
-            Assert.That(timing.TimeOffset, Is.EqualTo(-400));
+            Assert.That(scoring, Has.Count.EqualTo(1));
+            Assert.That(scoring.Single().Result, Is.EqualTo(HitResult.Great));
+            Assert.That(scoring.Single().HitObject, Is.TypeOf<BmsLongNote>());
+            Assert.That(scoring.Single().HitObject.StartTime, Is.EqualTo(1000));
+            Assert.That(((BmsLongNote)scoring.Single().HitObject).Duration, Is.EqualTo(500));
+            Assert.That(scoring.Single().TimeOffset, Is.EqualTo(19));
+            Assert.That(timing, Has.Count.EqualTo(2));
+            Assert.That(timing.Select(e => e.TimeOffset), Is.EqualTo([-12, 19]));
+            Assert.That(timing.Select(e => e.HitObject.StartTime), Is.EqualTo([1000, 1500]));
         });
     }
 }

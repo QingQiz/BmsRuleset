@@ -103,7 +103,7 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
         keyboardSelectedModel = pendingKeyboardSelection;
 
         // Let the base carousel retain its traversal sound, scrolling and deferred input behaviour.
-        return base.OnPressed(e);
+        return OnPressed(e);
     }
 
     protected override float GetSpacingBetweenPanels(CarouselItem top, CarouselItem bottom)
@@ -236,8 +236,7 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
     private void setExpansionStateOfGroup(BmsCourseTableGroup group, bool expanded)
     {
         var groupItem = GetCarouselItems()?.FirstOrDefault(item => item.Model.Equals(group));
-        if (groupItem != null)
-            groupItem.IsExpanded = expanded;
+        groupItem?.IsExpanded = expanded;
 
         if (filter.GroupItems.TryGetValue(group, out var courses))
         {
@@ -290,7 +289,6 @@ internal sealed record BmsCourseTableGroup(int Order, string TableName, string M
 internal sealed record BmsGroupedCourse(BmsCourseTableGroup Group, BmsCourseDefinition Course, bool HasMissingStage);
 
 internal sealed record BmsGroupedCourseStage(
-    BmsCourseTableGroup Group,
     BmsCourseDefinition Course,
     int StageIndex,
     BmsCourseStage Stage,
@@ -335,7 +333,7 @@ internal sealed class BmsCourseCarouselFilter(
                 var resolvedStages = course.Stages.Select((stage, stageIndex) =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    return new BmsGroupedCourseStage(group, course, stageIndex, stage, resolveStageBeatmap(stage));
+                    return new BmsGroupedCourseStage(course, stageIndex, stage, resolveStageBeatmap(stage));
                 }).ToArray();
                 var groupedCourse = new BmsGroupedCourse(group, course, resolvedStages.Any(stage => stage.Beatmap == null));
                 var courseItem = new CarouselItem(groupedCourse)

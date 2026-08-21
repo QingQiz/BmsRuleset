@@ -6,8 +6,8 @@ using System.Text;
 using FFmpeg.AutoGen;
 using osu.Framework.Allocation;
 using osu.Framework.Platform;
-using SixLabors.ImageSharp.PixelFormats;
 using osu.Game.Rulesets.BmsRuleset.Media.FFmpeg;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 
@@ -16,7 +16,7 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
     private readonly BmsSupplementalFFmpegFuncs ffmpeg;
     private readonly ArrayPool<Rgba32> framePool;
     private readonly MemoryStream dataStream;
-    private readonly ObjectHandle<BmsSupplementalVideoDecoder> handle;
+    private ObjectHandle<BmsSupplementalVideoDecoder> handle;
 
     private readonly avio_alloc_context_read_packet readPacketCallback;
     private readonly avio_alloc_context_seek seekCallback;
@@ -39,11 +39,66 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
     {
         this.ffmpeg = ffmpeg;
         this.framePool = framePool ?? ArrayPool<Rgba32>.Shared;
-        dataStream = new MemoryStream(data, writable: false);
+        dataStream = new MemoryStream(data, false);
         handle = new ObjectHandle<BmsSupplementalVideoDecoder>(this, GCHandleType.Normal);
         readPacketCallback = readPacket;
         seekCallback = streamSeekCallbacks;
     }
+
+    #region Disposal
+
+    public void Dispose()
+    {
+        if (disposed)
+            return;
+
+        disposed = true;
+
+        if (codecContext != null)
+        {
+            var codecContextPtr = codecContext;
+            ffmpeg.avcodec_free_context(&codecContextPtr);
+            codecContext = null;
+        }
+
+        if (packet != null)
+        {
+            var packetPtr = packet;
+            ffmpeg.av_packet_free(&packetPtr);
+            packet = null;
+        }
+
+        if (swsContext != null)
+        {
+            ffmpeg.sws_freeContext(swsContext);
+            swsContext = null;
+        }
+
+        if (formatContext != null && inputOpened)
+        {
+            var formatContextPtr = formatContext;
+            ffmpeg.avformat_close_input(&formatContextPtr);
+            formatContext = null;
+        }
+        else if (formatContext != null)
+        {
+            ffmpeg.avformat_free_context(formatContext);
+            formatContext = null;
+        }
+
+        if (ioContext != null)
+        {
+            ffmpeg.av_freep(&ioContext->buffer);
+            var ioContextPtr = ioContext;
+            ffmpeg.avio_context_free(&ioContextPtr);
+            ioContext = null;
+        }
+
+        handle.Dispose();
+        dataStream.Dispose();
+    }
+
+    #endregion
 
     public static bool TryCreate(byte[] data, out BmsSupplementalVideoDecoder? decoder, out string? error)
     {
@@ -173,6 +228,49 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
         {
             releaseFrames(decodedFrame, rgbaFrame);
         }
+    }
+
+    [MonoPInvokeCallback(typeof(avio_alloc_context_read_packet))]
+    private static int readPacket(void* opaque, byte* bufferPtr, int bufferSize)
+    {
+        var handle = new ObjectHandle<BmsSupplementalVideoDecoder>((IntPtr)opaque);
+        if (!handle.GetTarget(out var decoder))
+            return 0;
+
+        var span = new Span<byte>(bufferPtr, bufferSize);
+        var bytesRead = decoder.dataStream.Read(span);
+        return bytesRead != 0 ? bytesRead : BmsSupplementalFFmpegFuncs.AVERROR_EOF;
+    }
+
+    [MonoPInvokeCallback(typeof(avio_alloc_context_seek))]
+    private static long streamSeekCallbacks(void* opaque, long offset, int whence)
+    {
+        var handle = new ObjectHandle<BmsSupplementalVideoDecoder>((IntPtr)opaque);
+        if (!handle.GetTarget(out var decoder))
+            return -1;
+
+        switch (whence)
+        {
+            case 0:
+                decoder.dataStream.Seek(offset, SeekOrigin.Begin);
+                break;
+
+            case 1:
+                decoder.dataStream.Seek(offset, SeekOrigin.Current);
+                break;
+
+            case 2:
+                decoder.dataStream.Seek(offset, SeekOrigin.End);
+                break;
+
+            case BmsSupplementalFFmpegFuncs.AVSEEK_SIZE:
+                return decoder.dataStream.Length;
+
+            default:
+                return -1;
+        }
+
+        return decoder.dataStream.Position;
     }
 
     private bool trySendPendingPacket(AVFrame* decodedFrame, AVFrame* rgbaFrame, out BmsSupplementalVideoFrame? frame, out string? error)
@@ -309,49 +407,6 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
         return new BmsSupplementalVideoFrame(framePool, pixels, width, height, frameTime);
     }
 
-    [MonoPInvokeCallback(typeof(avio_alloc_context_read_packet))]
-    private static int readPacket(void* opaque, byte* bufferPtr, int bufferSize)
-    {
-        var handle = new ObjectHandle<BmsSupplementalVideoDecoder>((IntPtr)opaque);
-        if (!handle.GetTarget(out var decoder))
-            return 0;
-
-        var span = new Span<byte>(bufferPtr, bufferSize);
-        var bytesRead = decoder.dataStream.Read(span);
-        return bytesRead != 0 ? bytesRead : BmsSupplementalFFmpegFuncs.AVERROR_EOF;
-    }
-
-    [MonoPInvokeCallback(typeof(avio_alloc_context_seek))]
-    private static long streamSeekCallbacks(void* opaque, long offset, int whence)
-    {
-        var handle = new ObjectHandle<BmsSupplementalVideoDecoder>((IntPtr)opaque);
-        if (!handle.GetTarget(out var decoder))
-            return -1;
-
-        switch (whence)
-        {
-            case 0:
-                decoder.dataStream.Seek(offset, SeekOrigin.Begin);
-                break;
-
-            case 1:
-                decoder.dataStream.Seek(offset, SeekOrigin.Current);
-                break;
-
-            case 2:
-                decoder.dataStream.Seek(offset, SeekOrigin.End);
-                break;
-
-            case BmsSupplementalFFmpegFuncs.AVSEEK_SIZE:
-                return decoder.dataStream.Length;
-
-            default:
-                return -1;
-        }
-
-        return decoder.dataStream.Position;
-    }
-
     private void prepareDecoding()
     {
         const int context_buffer_size = 4096;
@@ -467,56 +522,5 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
             var framePtr = rgbaFrame;
             ffmpeg.av_frame_free(&framePtr);
         }
-    }
-
-    public void Dispose()
-    {
-        if (disposed)
-            return;
-
-        disposed = true;
-
-        if (codecContext != null)
-        {
-            var codecContextPtr = codecContext;
-            ffmpeg.avcodec_free_context(&codecContextPtr);
-            codecContext = null;
-        }
-
-        if (packet != null)
-        {
-            var packetPtr = packet;
-            ffmpeg.av_packet_free(&packetPtr);
-            packet = null;
-        }
-
-        if (swsContext != null)
-        {
-            ffmpeg.sws_freeContext(swsContext);
-            swsContext = null;
-        }
-
-        if (formatContext != null && inputOpened)
-        {
-            var formatContextPtr = formatContext;
-            ffmpeg.avformat_close_input(&formatContextPtr);
-            formatContext = null;
-        }
-        else if (formatContext != null)
-        {
-            ffmpeg.avformat_free_context(formatContext);
-            formatContext = null;
-        }
-
-        if (ioContext != null)
-        {
-            ffmpeg.av_freep(&ioContext->buffer);
-            var ioContextPtr = ioContext;
-            ffmpeg.avio_context_free(&ioContextPtr);
-            ioContext = null;
-        }
-
-        handle.Dispose();
-        dataStream.Dispose();
     }
 }

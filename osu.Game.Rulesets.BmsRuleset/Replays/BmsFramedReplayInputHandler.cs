@@ -6,13 +6,8 @@ using osu.Game.Rulesets.Replays;
 
 namespace osu.Game.Rulesets.BmsRuleset.Replays;
 
-public class BmsFramedReplayInputHandler : FramedReplayInputHandler<BmsReplayFrame>
+public class BmsFramedReplayInputHandler(Replay replay) : FramedReplayInputHandler<BmsReplayFrame>(replay)
 {
-    public BmsFramedReplayInputHandler(Replay replay)
-        : base(replay)
-    {
-    }
-
     protected override bool IsImportant(BmsReplayFrame frame) => true;
 
     protected override void CollectReplayInputs(List<IInput> inputs)

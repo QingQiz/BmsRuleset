@@ -14,14 +14,13 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.Drawables;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Overlays;
-using osu.Game.Beatmaps.Drawables;
-using osu.Game.Beatmaps;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Replays;
@@ -29,12 +28,12 @@ using osu.Game.Rulesets.BmsRuleset.Result.Statistic;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Ranking.Expanded;
 using osu.Game.Screens.Ranking.Expanded.Statistics;
-using osu.Game.Screens.Play.HUD;
-using osu.Game.Users;
 using osu.Game.Screens.Ranking.Statistics;
+using osu.Game.Users;
 using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
@@ -351,7 +350,7 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
     private readonly int stageIndex;
     private readonly Bindable<int?> selectedStage;
     private readonly List<StatisticDisplay> statistics = new();
-    private Box background = null!;
+    private readonly Box background;
 
     [Resolved]
     private OverlayColourProvider colours { get; set; } = null!;
@@ -428,6 +427,28 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
                 ],
             },
         ];
+    }
+
+    #region Disposal
+
+    protected override void Dispose(bool isDisposing)
+    {
+        selectedStage.ValueChanged -= selectionChanged;
+        base.Dispose(isDisposing);
+    }
+
+    #endregion
+
+    protected override bool OnHover(HoverEvent e)
+    {
+        updateColours();
+        return base.OnHover(e);
+    }
+
+    protected override void OnHoverLost(HoverLostEvent e)
+    {
+        updateColours();
+        base.OnHoverLost(e);
     }
 
     private static Drawable createMetadata(IBeatmapMetadataInfo metadata) => new Container
@@ -518,24 +539,6 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
         ScheduleAfterChildren(() => statistics.ForEach(statistic => statistic.Appear()));
     }
 
-    protected override bool OnHover(HoverEvent e)
-    {
-        updateColours();
-        return base.OnHover(e);
-    }
-
-    protected override void OnHoverLost(HoverLostEvent e)
-    {
-        updateColours();
-        base.OnHoverLost(e);
-    }
-
-    protected override void Dispose(bool isDisposing)
-    {
-        selectedStage.ValueChanged -= selectionChanged;
-        base.Dispose(isDisposing);
-    }
-
     private void selectionChanged(ValueChangedEvent<int?> _) => updateColours();
 
     private void updateColours()
@@ -622,12 +625,26 @@ internal partial class BmsCourseAggregateStatistics : StatisticsPanel
         this.session = session;
     }
 
+    protected override IEnumerable<StatisticItem> CreateStatisticItems(ScoreInfo newScore, IBeatmap playableBeatmap)
+    {
+        yield return createItem(BmsStrings.GaugeHistory, data => new BmsGaugeHistoryGraph(
+            data.Select(stage => (stage.Score, stage.Beatmap)).ToArray()));
+        yield return createItem(BmsStrings.Timeline, data => new BmsTimelineStatistic(
+            data.Select(stage => (stage.Score, stage.Beatmap)).ToArray()));
+        yield return createItem(BmsStrings.HitScatter, data => new BmsHitScatterStatistic(
+            data.Where(stage => stage.Score != null)
+                .Select(stage => (stage.Beatmap, (IReadOnlyList<HitEvent>)stage.Score!.HitEvents)).ToArray()));
+        yield return createItem(BmsStrings.HitOffset, data => new BmsHitOffsetStatistic(
+            data.Where(stage => stage.Score != null)
+                .Select(stage => (stage.Beatmap, (IReadOnlyList<HitEvent>)stage.Score!.HitEvents)).ToArray()));
+    }
+
     [BackgroundDependencyLoader]
     private void load(BeatmapManager beatmapManager, ScoreManager scoreManager)
     {
         var aggregateScore = BmsCourseResultPresentation.CreateAggregateScore(session);
         var stages = session.Stages
-            .Select(stage => (Score: stage.Score, WorkingBeatmap: beatmapManager.GetWorkingBeatmap(stage.Stage.Beatmap, true)))
+            .Select(stage => (stage.Score, WorkingBeatmap: beatmapManager.GetWorkingBeatmap(stage.Stage.Beatmap, true)))
             .ToArray();
 
         foreach (var stage in stages)
@@ -645,22 +662,8 @@ internal partial class BmsCourseAggregateStatistics : StatisticsPanel
         Score.Value = BmsCourseResultPresentation.CreateAggregateScore(session);
     }
 
-    protected override IEnumerable<StatisticItem> CreateStatisticItems(ScoreInfo newScore, IBeatmap playableBeatmap)
-    {
-        yield return createItem(BmsStrings.GaugeHistory, data => new BmsGaugeHistoryGraph(
-            data.Select(stage => (stage.Score, stage.Beatmap)).ToArray()));
-        yield return createItem(BmsStrings.Timeline, data => new BmsTimelineStatistic(
-            data.Select(stage => (stage.Score, stage.Beatmap)).ToArray()));
-        yield return createItem(BmsStrings.HitScatter, data => new BmsHitScatterStatistic(
-            data.Where(stage => stage.Score != null)
-                .Select(stage => (stage.Beatmap, (IReadOnlyList<HitEvent>)stage.Score!.HitEvents)).ToArray()));
-        yield return createItem(BmsStrings.HitOffset, data => new BmsHitOffsetStatistic(
-            data.Where(stage => stage.Score != null)
-                .Select(stage => (stage.Beatmap, (IReadOnlyList<HitEvent>)stage.Score!.HitEvents)).ToArray()));
-    }
-
     private StatisticItem createItem(LocalisableString name, Func<BmsCourseStageStatisticData[], Drawable> createContent) =>
-        new(name, () => new BmsCourseDeferredStatistic(courseData, createContent), requiresHitEvents: false);
+        new(name, () => new BmsCourseDeferredStatistic(courseData, createContent));
 }
 
 internal sealed record BmsCourseStageStatisticData(ScoreInfo? Score, IBeatmap Beatmap);
@@ -727,17 +730,6 @@ internal static class BmsCourseResultPresentation
         };
     }
 
-    private static Dictionary<HitResult, int> sumStatistics(IEnumerable<IReadOnlyDictionary<HitResult, int>> statistics) =>
-        statistics.SelectMany(values => values)
-            .GroupBy(value => value.Key)
-            .ToDictionary(group => group.Key, group => group.Sum(value => value.Value));
-
-    private static int scoreWeight(ScoreInfo score)
-    {
-        var maximum = score.MaximumStatistics.Values.Sum();
-        return maximum > 0 ? maximum : score.Statistics.Values.Sum();
-    }
-
     internal static LocalisableString StatusText(BmsCourseStatus status) => status switch
     {
         BmsCourseStatus.Passed => BmsStrings.CoursePassed,
@@ -761,4 +753,15 @@ internal static class BmsCourseResultPresentation
         BmsCourseStageStatus.Aborted => Colour4.LightCoral,
         _ => Colour4.Gray,
     };
+
+    private static Dictionary<HitResult, int> sumStatistics(IEnumerable<IReadOnlyDictionary<HitResult, int>> statistics) =>
+        statistics.SelectMany(values => values)
+            .GroupBy(value => value.Key)
+            .ToDictionary(group => group.Key, group => group.Sum(value => value.Value));
+
+    private static int scoreWeight(ScoreInfo score)
+    {
+        var maximum = score.MaximumStatistics.Values.Sum();
+        return maximum > 0 ? maximum : score.Statistics.Values.Sum();
+    }
 }

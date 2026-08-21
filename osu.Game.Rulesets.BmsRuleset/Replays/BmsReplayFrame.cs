@@ -14,7 +14,7 @@ public class BmsReplayFrame : ReplayFrame
     // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
     public List<BmsAction> Actions { get; set; } = [];
 
-    public string BranchDecisions { get; set; } = string.Empty;
+    public string BranchDecisions { get; init; } = string.Empty;
 
     // deserialization requires a default ctor
     // ReSharper disable once UnusedMember.Global

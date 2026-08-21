@@ -67,8 +67,8 @@ public class BmsDefaultHudTest
         var progress = new BmsSongProgress();
         var blurred = progress.ChildrenOfType<BufferedContainer>().Single();
         var indicatorLayers = progress.ChildrenOfType<Container>()
-                                      .Where(container => container.Masking && container.Size == new Vector2(8, 24))
-                                      .ToArray();
+            .Where(container => container.Masking && container.Size == new Vector2(8, 24))
+            .ToArray();
 
         Assert.Multiple(() =>
         {

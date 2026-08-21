@@ -101,7 +101,7 @@ public class BmsHealthProcessorTest
 
         // Hazard BAD (Ok) = -1 (instant kill on Fixed algorithm).
         processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
-        { Type = HitResult.Ok });
+            { Type = HitResult.Ok });
 
         Assert.That(processor.HasFailed, Is.True);
         Assert.That(processor.HasEverFailed, Is.True);
@@ -132,7 +132,7 @@ public class BmsHealthProcessorTest
 
         // Hazard starts at 1.0 (survival gauge). Apply a BAD (Ok) which is -1 for Hazard.
         processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
-        { Type = HitResult.Ok });
+            { Type = HitResult.Ok });
 
         // Hazard should be failed, now active should be ExHard. Framework failure NOT triggered.
         Assert.That(processor.HasFailed, Is.False);
@@ -273,7 +273,7 @@ public class BmsHealthProcessorTest
         // PGREAT gain = Total/100/NoteCount * 1 = 200/100/1 = 2.0
         // Normal HP = 0.2 + 2.0 = 2.2 → clamped to 1.0 (≥0.8 pass)
         processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
-        { Type = HitResult.Perfect });
+            { Type = HitResult.Perfect });
 
         Assert.That(processor.HasPassedAtEnd(), Is.True);
         Assert.That(processor.WorstGaugeType, Is.EqualTo(BmsGaugeType.Normal));
@@ -393,7 +393,7 @@ public class BmsHealthProcessorTest
         processor.ApplyBeatmap(beatmap);
 
         processor.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
-        { Type = HitResult.Perfect });
+            { Type = HitResult.Perfect });
 
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.Health.Value, Is.GreaterThanOrEqualTo(0.8));

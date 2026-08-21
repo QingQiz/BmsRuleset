@@ -4,7 +4,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
 
 public class BmsStarRatingResult
 {
-    public double StarRating { get; set; }
+    public double StarRating { get; init; }
 
     public double Percentile93 { get; set; }
 

@@ -18,6 +18,6 @@ internal static class BmsBranchReplayState
             Decisions = { Value = BmsChartParser.SerialiseBranchDecisions(branchDecisions) },
         };
 
-        score.ScoreInfo.Mods = score.ScoreInfo.Mods.Append(branchReplayMod).ToArray();
+        score.ScoreInfo.Mods = [.. score.ScoreInfo.Mods, branchReplayMod];
     }
 }

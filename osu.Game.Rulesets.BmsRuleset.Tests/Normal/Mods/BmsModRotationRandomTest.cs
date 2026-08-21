@@ -37,20 +37,74 @@ public class BmsModRotationRandomTest
         return beatmap;
     }
 
-    [Test]
-    public void TestSeedDeterminism()
+    /// <summary>
+    ///     Checks that <paramref name="values" /> is a cyclic shift of an ascending
+    ///     or descending sequence.
+    /// </summary>
+    private static bool isContinuousRotation(int[] values)
     {
-        var beatmap1 = createBeatmap(0, 1, 2, 3, 4, 5, 6, 7);
-        var beatmap2 = createBeatmap(0, 1, 2, 3, 4, 5, 6, 7);
+        if (values.Length < 2) return true;
 
-        var mod1 = new BmsModRotationRandom { Seed = { Value = 42 } };
-        var mod2 = new BmsModRotationRandom { Seed = { Value = 42 } };
+        // Check ascending rotation: each step is +1, wrapping max→min.
+        var ascending = true;
+        for (var i = 0; i < values.Length; i++)
+        {
+            var cur = values[i];
+            var next = values[(i + 1) % values.Length];
+            var diff = next - cur;
+            if (!(diff == 1 || (cur == values.Max() && next == values.Min())))
+            {
+                ascending = false;
+                break;
+            }
+        }
 
-        applyMod(mod1, beatmap1);
-        applyMod(mod2, beatmap2);
+        if (ascending) return true;
 
-        Assert.That(beatmap1.HitObjects.Select(h => h.Column),
-            Is.EqualTo(beatmap2.HitObjects.Select(h => h.Column)));
+        // Check descending rotation: each step is -1, wrapping min→max.
+        var descending = true;
+        for (var i = 0; i < values.Length; i++)
+        {
+            var cur = values[i];
+            var next = values[(i + 1) % values.Length];
+            var diff = next - cur;
+            if (!(diff == -1 || (cur == values.Min() && next == values.Max())))
+            {
+                descending = false;
+                break;
+            }
+        }
+
+        return descending;
+    }
+
+    [Test]
+    public void TestIncompatibleWithOtherMods()
+    {
+        var mod = new BmsModRotationRandom();
+        Assert.That(mod.IncompatibleMods, Does.Contain(typeof(BmsModLaneRandom)));
+        Assert.That(mod.IncompatibleMods, Does.Contain(typeof(BmsModNoteRandom)));
+        Assert.That(mod.IncompatibleMods, Does.Contain(typeof(BmsModMirror)));
+    }
+
+    [Test]
+    public void TestModAcronym()
+    {
+        Assert.That(new BmsModRotationRandom().Acronym, Is.EqualTo("RR"));
+    }
+
+    [Test]
+    public void TestNeverIdentity([Random(1, 100, 20)] int seed)
+    {
+        var beatmap = createBeatmap(0, 1, 2, 3, 4, 5, 6, 7);
+        var mod = new BmsModRotationRandom { IncludeScratch = { Value = true }, Seed = { Value = seed } };
+
+        applyMod(mod, beatmap);
+
+        var output = beatmap.HitObjects.Select(h => h.Column).ToArray();
+        Assert.That(output, Is.Not.EqualTo(new[] { 0, 1, 2, 3, 4, 5, 6, 7 }));
+        Assert.That(isContinuousRotation(output), Is.True,
+            $"Mapping must be a continuous rotation for seed {seed}");
     }
 
     [Test]
@@ -86,60 +140,6 @@ public class BmsModRotationRandomTest
             "Non-scratch mapping must be a continuous rotation (ascending or descending)");
     }
 
-    /// <summary>Checks that <paramref name="values"/> is a cyclic shift of an ascending
-    /// or descending sequence.</summary>
-    private static bool isContinuousRotation(int[] values)
-    {
-        if (values.Length < 2) return true;
-
-        // Check ascending rotation: each step is +1, wrapping max→min.
-        bool ascending = true;
-        for (int i = 0; i < values.Length; i++)
-        {
-            int cur = values[i];
-            int next = values[(i + 1) % values.Length];
-            int diff = next - cur;
-            if (!(diff == 1 || (cur == values.Max() && next == values.Min())))
-            {
-                ascending = false;
-                break;
-            }
-        }
-
-        if (ascending) return true;
-
-        // Check descending rotation: each step is -1, wrapping min→max.
-        bool descending = true;
-        for (int i = 0; i < values.Length; i++)
-        {
-            int cur = values[i];
-            int next = values[(i + 1) % values.Length];
-            int diff = next - cur;
-            if (!(diff == -1 || (cur == values.Min() && next == values.Max())))
-            {
-                descending = false;
-                break;
-            }
-        }
-
-        return descending;
-    }
-
-    [Test]
-    public void TestModAcronym()
-    {
-        Assert.That(new BmsModRotationRandom().Acronym, Is.EqualTo("RR"));
-    }
-
-    [Test]
-    public void TestIncompatibleWithOtherMods()
-    {
-        var mod = new BmsModRotationRandom();
-        Assert.That(mod.IncompatibleMods, Does.Contain(typeof(BmsModLaneRandom)));
-        Assert.That(mod.IncompatibleMods, Does.Contain(typeof(BmsModNoteRandom)));
-        Assert.That(mod.IncompatibleMods, Does.Contain(typeof(BmsModMirror)));
-    }
-
     [Test]
     public void TestSeedAutoGenerated()
     {
@@ -152,16 +152,18 @@ public class BmsModRotationRandomTest
     }
 
     [Test]
-    public void TestNeverIdentity([Random(1, 100, 20)] int seed)
+    public void TestSeedDeterminism()
     {
-        var beatmap = createBeatmap(0, 1, 2, 3, 4, 5, 6, 7);
-        var mod = new BmsModRotationRandom { IncludeScratch = { Value = true }, Seed = { Value = seed } };
+        var beatmap1 = createBeatmap(0, 1, 2, 3, 4, 5, 6, 7);
+        var beatmap2 = createBeatmap(0, 1, 2, 3, 4, 5, 6, 7);
 
-        applyMod(mod, beatmap);
+        var mod1 = new BmsModRotationRandom { Seed = { Value = 42 } };
+        var mod2 = new BmsModRotationRandom { Seed = { Value = 42 } };
 
-        var output = beatmap.HitObjects.Select(h => h.Column).ToArray();
-        Assert.That(output, Is.Not.EqualTo(new[] { 0, 1, 2, 3, 4, 5, 6, 7 }));
-        Assert.That(isContinuousRotation(output), Is.True,
-            $"Mapping must be a continuous rotation for seed {seed}");
+        applyMod(mod1, beatmap1);
+        applyMod(mod2, beatmap2);
+
+        Assert.That(beatmap1.HitObjects.Select(h => h.Column),
+            Is.EqualTo(beatmap2.HitObjects.Select(h => h.Column)));
     }
 }

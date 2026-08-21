@@ -64,7 +64,7 @@ public class BmsHitWindowsTest
     public void TestHitWindowUsesLayoutAndColumnProfile()
     {
         var fiveKey = new BmsHitWindows(rank: 3, BmsLayoutVariant.Bms5K, column: 1);
-        var scratch = new BmsHitWindows(rank: 3, BmsLayoutVariant.Bme7K, column: 0);
+        var scratch = new BmsHitWindows(rank: 3, column: 0);
 
         fiveKey.SetDifficulty(5);
         scratch.SetDifficulty(5);

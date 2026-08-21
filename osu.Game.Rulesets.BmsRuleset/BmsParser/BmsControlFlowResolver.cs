@@ -210,7 +210,7 @@ internal static partial class BmsChartParser
         var value = randomValueSelector(max);
 
         if (value < 1 || value > max)
-            throw new ArgumentOutOfRangeException(nameof(randomValueSelector), value, $"BMS random selector must return a value in the range 1..{max}.");
+            throw new ArgumentOutOfRangeException(nameof(randomValueSelector), value, $@"BMS random selector must return a value in the range 1..{max}.");
 
         decisions.Add(new BmsBranchDecision(max, value));
         return value;

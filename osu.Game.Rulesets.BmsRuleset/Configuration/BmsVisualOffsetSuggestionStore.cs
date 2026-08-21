@@ -21,11 +21,11 @@ internal sealed class BmsVisualOffsetSuggestionStore
             BmsRulesetConfigManager.MIN_VISUAL_OFFSET,
             BmsRulesetConfigManager.MAX_VISUAL_OFFSET);
 
-        history.Add(new DataPoint(medianHitError, visualOffset, suggestion));
+        history.Add(new DataPoint(suggestion));
         return suggestion;
     }
 
     public void Clear() => history.Clear();
 
-    public readonly record struct DataPoint(double MedianHitError, double VisualOffset, double SuggestedVisualOffset);
+    public readonly record struct DataPoint(double SuggestedVisualOffset);
 }

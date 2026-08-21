@@ -1,3 +1,5 @@
+#nullable enable annotations
+
 using System;
 using System.IO;
 using System.Linq;
@@ -10,12 +12,27 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Bga;
 [TestFixture]
 public class BmsSupplementalVideoDecoderSmokeTest
 {
-    [Test]
-    public void TestMalformedDataIsRejected()
+
+    private static void requireNativeArtifacts()
     {
-        Assert.That(BmsSupplementalVideoDecoder.TryCreate([1, 2, 3, 4], out var decoder, out var error), Is.False);
-        Assert.That(decoder, Is.Null);
-        Assert.That(error, Is.Not.Empty);
+        if (!BmsSupplementalFFmpegFuncs.TryCreate(out var _, out var error))
+            Assert.Ignore(error ?? "Supplemental FFmpeg native backend is unavailable.");
+    }
+
+    private static string locateTestSongFile(string songFolder, string fileName)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (dir != null)
+        {
+            var candidate = Path.Combine(dir.FullName, "bms_test_songs", songFolder, fileName);
+            if (File.Exists(candidate))
+                return candidate;
+
+            dir = dir.Parent;
+        }
+
+        throw new FileNotFoundException($"{songFolder}/{fileName} was not found from {AppContext.BaseDirectory}");
     }
 
     [Test]
@@ -27,7 +44,7 @@ public class BmsSupplementalVideoDecoderSmokeTest
         Assert.That(BmsSupplementalVideoDecoder.TryCreate(bytes, out var decoder, out var error), Is.True, error);
 
         using var activeDecoder = decoder!;
-        for (int i = 0; i < 30; i++)
+        for (var i = 0; i < 30; i++)
         {
             Assert.That(activeDecoder.TryDecodeNextFrame(out var frame, out error), Is.True, error);
             Assert.That(frame, Is.Not.Null);
@@ -40,25 +57,11 @@ public class BmsSupplementalVideoDecoderSmokeTest
         Assert.Fail("The supplemental FFmpeg decoder did not produce a non-black frame in the first 30 frames.");
     }
 
-    private static void requireNativeArtifacts()
+    [Test]
+    public void TestMalformedDataIsRejected()
     {
-        if (!BmsSupplementalFFmpegFuncs.TryCreate(out _, out var error))
-            Assert.Ignore(error);
-    }
-
-    private static string locateTestSongFile(string songFolder, string fileName)
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (dir != null)
-        {
-            string candidate = Path.Combine(dir.FullName, "bms_test_songs", songFolder, fileName);
-            if (File.Exists(candidate))
-                return candidate;
-
-            dir = dir.Parent;
-        }
-
-        throw new FileNotFoundException($"{songFolder}/{fileName} was not found from {AppContext.BaseDirectory}");
+        Assert.That(BmsSupplementalVideoDecoder.TryCreate([1, 2, 3, 4], out var decoder, out var error), Is.False);
+        Assert.That(decoder, Is.Null);
+        Assert.That(error, Is.Not.Empty);
     }
 }

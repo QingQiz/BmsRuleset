@@ -57,8 +57,9 @@ public class BmsFrameRateUnlockTest
     {
         using var host = new HeadlessGameHost();
         setInputThread(host, new InputThread { ActiveHz = 1000 });
+        var inputThread = host.InputThread;
 
-        using (BmsFrameRateUnlock.Acquire(host, updateFrameSyncMode: () => host.InputThread.ActiveHz = 1000))
+        using (BmsFrameRateUnlock.Acquire(host, updateFrameSyncMode: () => inputThread.ActiveHz = 1000))
             Assert.That(host.InputThread.ActiveHz, Is.Zero);
 
         Assert.That(host.InputThread.ActiveHz, Is.EqualTo(1000));
@@ -94,7 +95,7 @@ public class BmsFrameRateUnlockTest
     {
         using var host = new HeadlessGameHost();
         setInputThread(host, new InputThread { ActiveHz = host.MaximumUpdateHz });
-        var executionMode = new Bindable<ExecutionMode>(ExecutionMode.SingleThread);
+        var executionMode = new Bindable<ExecutionMode>();
 
         using (BmsFrameRateUnlock.Acquire(host, executionMode))
         {
@@ -135,7 +136,7 @@ public class BmsFrameRateUnlockTest
     {
         using var host = new HeadlessGameHost();
         setInputThread(host, new InputThread { ActiveHz = host.MaximumUpdateHz });
-        var executionMode = new Bindable<ExecutionMode>(ExecutionMode.SingleThread);
+        var executionMode = new Bindable<ExecutionMode>();
         var lease = BmsFrameRateUnlock.Acquire(host, executionMode);
 
         setMaximumUpdateHz(host, 480);

@@ -9,7 +9,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
@@ -37,12 +36,12 @@ public partial class TestSceneBmsCautionAutoplay : BmsPlayerTestScene
     protected override bool HasCustomSteps => true;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
-        => CreateBmsPlayer(beatmap => new BmsAutoGenerator(beatmap).Generate().Frames.Cast<ReplayFrame>().ToList());
+        => CreateBmsPlayer(beatmap => new BmsAutoGenerator(beatmap).Generate().Frames.ToList());
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
         var beatmap = loadCautionBeatmap();
-        BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset, endPadding: 3000, bpm: 145);
+        BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset, 3000, 145);
         return beatmap;
     }
 
@@ -96,7 +95,7 @@ public partial class TestSceneBmsCautionAutoplay : BmsPlayerTestScene
         AddAssert("all judgements are Perfect", () =>
         {
             var stats = Player.ScoreProcessor.Statistics;
-            int nonPerfect = stats.Where(kv => kv.Key != HitResult.Perfect).Sum(kv => kv.Value);
+            var nonPerfect = stats.Where(kv => kv.Key != HitResult.Perfect).Sum(kv => kv.Value);
             return nonPerfect == 0;
         });
     }

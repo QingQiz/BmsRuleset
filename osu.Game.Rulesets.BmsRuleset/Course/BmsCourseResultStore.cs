@@ -28,7 +28,7 @@ internal sealed class BmsCourseResultStore
 
     internal BmsCourseResultStore(string storageDirectory)
     {
-        this.StorageDirectory = storageDirectory;
+        StorageDirectory = storageDirectory;
         Directory.CreateDirectory(storageDirectory);
         indexPersistedFiles();
     }
@@ -65,8 +65,7 @@ internal sealed class BmsCourseResultStore
                     try
                     {
                         var result = JsonSerializer.Deserialize<BmsCourseResult>(File.ReadAllText(entry.Path));
-                        if (result is { } value)
-                            history.Add(value);
+                        history.Add(result);
                     }
                     catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
                     {
@@ -117,8 +116,7 @@ internal sealed class BmsCourseResultStore
                 {
                     var json = await File.ReadAllTextAsync(entry.Path, cancellationToken).ConfigureAwait(false);
                     var result = JsonSerializer.Deserialize<BmsCourseResult>(json);
-                    if (result is { } value)
-                        loadedByPath[entry.Path] = value;
+                    loadedByPath[entry.Path] = result;
                 }
                 catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
                 {
@@ -138,11 +136,11 @@ internal sealed class BmsCourseResultStore
             ? new BmsCourseResult(BmsLamp.Clear, rank is null or ScoreRank.F ? ScoreRank.A : rank, BmsCourseScoreData.From(score), attempt)
             : new BmsCourseResult(BmsLamp.Failed, ScoreRank.F, BmsCourseScoreData.From(score), attempt);
 
+        var file = fileFor(courseId, result);
+        writeAtomically(file, result);
+
         lock (sync)
         {
-            var file = fileFor(courseId, result);
-            writeAtomically(file, result);
-
             var courseKey = courseKeyFor(courseId);
             if (!indexByCourseKey.TryGetValue(courseKey, out var entries))
                 indexByCourseKey[courseKey] = entries = [];
@@ -157,35 +155,41 @@ internal sealed class BmsCourseResultStore
 
     private void indexPersistedFiles()
     {
-        foreach (var file in Directory.EnumerateFiles(StorageDirectory, $"*{file_extension}", SearchOption.TopDirectoryOnly))
+        lock (sync)
         {
-            var name = Path.GetFileNameWithoutExtension(file);
-            var parts = name.Split('_');
-            if (parts.Length < 6)
-                continue;
+            foreach (var file in Directory.EnumerateFiles(StorageDirectory, $"*{file_extension}", SearchOption.TopDirectoryOnly))
+            {
+                var name = Path.GetFileNameWithoutExtension(file);
+                var parts = name.Split('_');
+                if (parts.Length < 6)
+                    continue;
 
-            var courseKey = parts[0];
-            if (courseKey.Length != 64 || !courseKey.All(Uri.IsHexDigit))
-                continue;
+                var courseKey = parts[0];
+                if (courseKey.Length != 64 || !courseKey.All(Uri.IsHexDigit))
+                    continue;
 
-            if (!int.TryParse(parts[^3], out var lampValue)
-                || !Enum.IsDefined(typeof(BmsLamp), lampValue)
-                || !tryParseRank(parts[^2], out var rank)
-                || !long.TryParse(parts[^1], out var score))
-                continue;
+                if (!int.TryParse(parts[^3], out var lampValue)
+                    || !Enum.IsDefined(typeof(BmsLamp), lampValue)
+                    || !tryParseRank(parts[^2], out var rank)
+                    || !long.TryParse(parts[^1], out var score))
+                    continue;
 
-            if (!indexByCourseKey.TryGetValue(courseKey, out var entries))
-                indexByCourseKey[courseKey] = entries = [];
-            entries.Add(new IndexedCourseResult(file, (BmsLamp)lampValue, rank, score));
+                if (!indexByCourseKey.TryGetValue(courseKey, out var entries))
+                    indexByCourseKey[courseKey] = entries = [];
+                entries.Add(new IndexedCourseResult(file, (BmsLamp)lampValue, rank, score));
+            }
         }
     }
 
     private string fileFor(string courseId, BmsCourseResult result)
     {
-        var timestamp = Math.Max(DateTime.UtcNow.Ticks, lastFileTimestamp + 1);
-        lastFileTimestamp = timestamp;
-        var courseKey = courseKeyFor(courseId);
-        return Path.Combine(StorageDirectory, fileName(courseKey, timestamp, Guid.NewGuid().ToString("N"), result));
+        lock (sync)
+        {
+            var timestamp = Math.Max(DateTime.UtcNow.Ticks, lastFileTimestamp + 1);
+            lastFileTimestamp = timestamp;
+            var courseKey = courseKeyFor(courseId);
+            return Path.Combine(StorageDirectory, fileName(courseKey, timestamp, Guid.NewGuid().ToString("N"), result));
+        }
     }
 
     private static string fileName(string courseKey, long timestamp, string id, BmsCourseResult result) =>
@@ -196,14 +200,17 @@ internal sealed class BmsCourseResultStore
 
     private bool tryGetSummary(string courseId, out IndexedCourseResult result)
     {
-        if (indexByCourseKey.TryGetValue(courseKeyFor(courseId), out var entries) && entries.Count > 0)
+        lock (sync)
         {
-            result = entries.MaxBy(indexedResultPriority);
-            return true;
-        }
+            if (indexByCourseKey.TryGetValue(courseKeyFor(courseId), out var entries) && entries.Count > 0)
+            {
+                result = entries.MaxBy(indexedResultPriority);
+                return true;
+            }
 
-        result = default;
-        return false;
+            result = default;
+            return false;
+        }
     }
 
     private static bool tryParseRank(string value, out ScoreRank? rank)

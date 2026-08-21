@@ -391,8 +391,8 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         {
             var stageQuad = Playfield.Stage.ScreenSpaceDrawQuad;
             var targetQuad = Playfield.ChildrenOfType<LegacyBmsHitTarget>()
-                                      .Single(c => c.IsAlive && c.IsLoaded && c.DrawWidth > 0)
-                                      .Target.ScreenSpaceDrawQuad;
+                .Single(c => c.IsAlive && c.IsLoaded && c.DrawWidth > 0)
+                .Target.ScreenSpaceDrawQuad;
 
             return new[]
             {

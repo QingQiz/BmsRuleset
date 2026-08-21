@@ -11,7 +11,6 @@ using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Platform;
@@ -512,12 +511,13 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             using var start = new ManualResetEventSlim();
             using var ready = new CountdownEvent(request_count);
             var requests = Enumerable.Range(0, request_count)
-                .Select(_ => Task.Factory.StartNew(() =>
+                .Select(_ => Task.Factory.StartNew(static state =>
                 {
-                    ready.Signal();
-                    start.Wait();
-                    working.GetBackground();
-                }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default))
+                    var (workingBeatmap, startSignal, readySignal) = ((BmsWorkingBeatmap, ManualResetEventSlim, CountdownEvent))state!;
+                    readySignal.Signal();
+                    startSignal.Wait();
+                    workingBeatmap.GetBackground();
+                }, (working, start, ready), CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default))
                 .ToArray();
 
             ready.Wait();

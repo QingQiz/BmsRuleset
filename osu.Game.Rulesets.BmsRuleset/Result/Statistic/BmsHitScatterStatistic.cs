@@ -24,6 +24,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Result.Statistic;
 
 public sealed partial class BmsHitScatterStatistic : CompositeDrawable
 {
+
+    public override bool HandlePositionalInput => true;
+
+    internal readonly record struct ScatterPoint(double Time, double Offset, HitResult Result);
+
     private const float graph_height = 200;
     private const float key_graph_height = 140;
     private const float axis_width = 52;
@@ -56,22 +61,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         statistics = createCourseStatistics(stages);
     }
 
-    public override bool HandlePositionalInput => true;
-
-    [BackgroundDependencyLoader]
-    private void load()
-    {
-        InternalChild = content = new FillFlowContainer
-        {
-            RelativeSizeAxes = Axes.X,
-            AutoSizeAxes = Axes.Y,
-            Direction = FillDirection.Vertical,
-            Spacing = new Vector2(0, 8),
-        };
-
-        rebuild();
-    }
-
     internal static HitScatterStatistics CreateStatistics(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents)
     {
         var scatterHits = hitEvents.Where(isScatterHit).ToArray();
@@ -92,6 +81,34 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         return new HitScatterStatistics(CreateData(scatterHits), keyGroups);
     }
 
+    internal static ScatterData CreateData(IReadOnlyList<HitEvent> hitEvents)
+    {
+        var points = hitEvents
+            .Where(isScatterHit)
+            .Select(e => new ScatterPoint(e.HitObject.StartTime, e.TimeOffset, e.Result))
+            .OrderBy(p => p.Time)
+            .ToArray();
+
+        var duration = Math.Max(1, points.Select(p => p.Time).DefaultIfEmpty(0).Max());
+        var maxMagnitude = Math.Clamp(
+            points.Where(p => p.Result is not (HitResult.Meh or HitResult.Miss)).Select(p => Math.Abs(p.Offset)).DefaultIfEmpty(0).Max(),
+            minimum_offset_range,
+            maximum_offset_range);
+        var offsetRange = Math.Ceiling(maxMagnitude / 50) * 50;
+        var ticks = new[] { -offsetRange, -offsetRange / 2, 0, offsetRange / 2, offsetRange };
+        points = [.. points.Select(p => p with { Offset = displayedOffsetFor(p, offsetRange) })];
+
+        return new ScatterData(points, duration, offsetRange, ticks, []);
+    }
+
+    protected override bool OnClick(ClickEvent e)
+    {
+        expanded = !expanded;
+        rebuild();
+
+        return true;
+    }
+
     private static HitScatterStatistics createCourseStatistics(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
     {
         var stageStatistics = stages.Select(stage => CreateStatistics(stage.Beatmap, stage.HitEvents)).ToArray();
@@ -103,7 +120,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             Enumerable.Range(0, keyCount).Select(keyIndex => new KeyHitScatterStatistics(
                 stageStatistics.First(stage => stage.Keys.Count > keyIndex).Keys[keyIndex].Label,
                 combineData(stageStatistics.Select((stage, index) =>
-                    (Data: stage.Keys.ElementAtOrDefault(keyIndex)?.Data, Duration: durations[index])).ToArray()))).ToArray());
+                    (stage.Keys.ElementAtOrDefault(keyIndex)?.Data, Duration: durations[index])).ToArray()))).ToArray());
     }
 
     private static ScatterData combineData(IReadOnlyList<(ScatterData? Data, double Duration)> stages)
@@ -140,48 +157,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             return "Scratch";
 
         return $"Key {++keyIndex}";
-    }
-
-    private void rebuild()
-    {
-        content.Clear();
-
-        content.Add(createLegend(statistics.Overall));
-        content.Add(createRow(BmsStrings.Overall, statistics.Overall, graph_height));
-
-        if (expanded)
-        {
-            foreach (var key in statistics.Keys)
-                content.Add(createRow(localiseLabel(key.Label), key.Data, key_graph_height));
-        }
-    }
-
-    protected override bool OnClick(ClickEvent e)
-    {
-        expanded = !expanded;
-        rebuild();
-
-        return true;
-    }
-
-    internal static ScatterData CreateData(IReadOnlyList<HitEvent> hitEvents)
-    {
-        var points = hitEvents
-            .Where(isScatterHit)
-            .Select(e => new ScatterPoint(e.HitObject.StartTime, e.TimeOffset, e.Result))
-            .OrderBy(p => p.Time)
-            .ToArray();
-
-        var duration = Math.Max(1, points.Select(p => p.Time).DefaultIfEmpty(0).Max());
-        var maxMagnitude = Math.Clamp(
-            points.Where(p => p.Result is not (HitResult.Meh or HitResult.Miss)).Select(p => Math.Abs(p.Offset)).DefaultIfEmpty(0).Max(),
-            minimum_offset_range,
-            maximum_offset_range);
-        var offsetRange = Math.Ceiling(maxMagnitude / 50) * 50;
-        var ticks = new[] { -offsetRange, -offsetRange / 2, 0, offsetRange / 2, offsetRange };
-        points = points.Select(p => p with { Offset = displayedOffsetFor(p, offsetRange) }).ToArray();
-
-        return new ScatterData(points, duration, offsetRange, ticks, []);
     }
 
     private static double displayedOffsetFor(ScatterPoint point, double offsetRange) => point.Result switch
@@ -326,7 +301,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
                 Content = new[]
                 {
                     new[] { createPlot(data) },
-                    new[] { createXAxis(data) },
+                    [createXAxis(data)],
                 },
             },
             new Container
@@ -505,11 +480,37 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         return seconds < 60 ? $"{seconds:0}s" : $"{Math.Floor(seconds / 60):0}:{seconds % 60:00}";
     }
 
+    [BackgroundDependencyLoader]
+    private void load()
+    {
+        InternalChild = content = new FillFlowContainer
+        {
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y,
+            Direction = FillDirection.Vertical,
+            Spacing = new Vector2(0, 8),
+        };
+
+        rebuild();
+    }
+
+    private void rebuild()
+    {
+        content.Clear();
+
+        content.Add(createLegend(statistics.Overall));
+        content.Add(createRow(BmsStrings.Overall, statistics.Overall, graph_height));
+
+        if (expanded)
+        {
+            foreach (var key in statistics.Keys)
+                content.Add(createRow(localiseLabel(key.Label), key.Data, key_graph_height));
+        }
+    }
+
     internal sealed record HitScatterStatistics(ScatterData Overall, IReadOnlyList<KeyHitScatterStatistics> Keys);
 
     internal sealed record KeyHitScatterStatistics(string Label, ScatterData Data);
 
     internal sealed record ScatterData(IReadOnlyList<ScatterPoint> Points, double Duration, double OffsetRange, IReadOnlyList<double> OffsetTicks, IReadOnlyList<float> StageBoundaries);
-
-    internal readonly record struct ScatterPoint(double Time, double Offset, HitResult Result);
 }

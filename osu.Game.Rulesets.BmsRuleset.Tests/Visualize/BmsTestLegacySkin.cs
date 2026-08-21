@@ -325,6 +325,7 @@ public static class BmsTestLegacySkin
             dict[$"{LIGHT_IMAGE}-0"] = solidPng(255, 255, 0, 16, 120);
             dict[$"{LIGHT_IMAGE}-1"] = solidPng(255, 160, 0, 16, 120);
         }
+
         dict[JUDGEMENT_PGREAT_IMAGE] = solidPng(255, 255, 0);
         dict[JUDGEMENT_GREAT_IMAGE] = solidPng(255, 200, 0);
         dict[JUDGEMENT_GOOD_IMAGE] = solidPng(0, 255, 0);

@@ -16,6 +16,34 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Mods;
 [TestFixture]
 public class BmsModAutoGaugeTest
 {
+
+    /// <summary>
+    ///     Builds an Auto Gauge whose resolved worst gauge is ExHard: the six-tier chain is
+    ///     installed via <see cref="BmsModAutoGauge.ApplyToHealthProcessor" />, then a single
+    ///     BAD (Ok) fails Hazard (survival gauge, −1) so the first non-failed survival tier
+    ///     (ExHard) becomes the resolved worst once <see cref="BmsHealthProcessor.HasPassedAtEnd" /> runs.
+    /// </summary>
+    private static (BmsModAutoGauge autoGauge, BmsHealthProcessor hp) createAutoGaugeResolvedToExHard()
+    {
+        var hp = new BmsHealthProcessor();
+        var autoGauge = new BmsModAutoGauge();
+        autoGauge.ApplyToHealthProcessor(hp);
+
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
+        };
+        hp.ApplyBeatmap(beatmap);
+
+        hp.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
+            { Type = HitResult.Ok });
+        hp.HasPassedAtEnd();
+
+        return (autoGauge, hp);
+    }
+
     [Test]
     public void TestAutoGaugeAllowsResolvedGaugeAttribution()
     {
@@ -26,20 +54,12 @@ public class BmsModAutoGaugeTest
     }
 
     [Test]
-    public void TestAutoGaugeIsAutomationType()
-    {
-        var mod = new BmsModAutoGauge();
-
-        Assert.That(mod.Type, Is.EqualTo(ModType.Automation));
-    }
-
-    [Test]
     public void TestAutoGaugeAppendsResolvedGaugeModOnApplyToScore()
     {
         var (autoGauge, hp) = createAutoGaugeResolvedToExHard();
         Assert.That(hp.WorstGaugeType, Is.EqualTo(BmsGaugeType.ExHard));
 
-        var score = new ScoreInfo { Mods = new Mod[] { autoGauge } };
+        var score = new ScoreInfo { Mods = [autoGauge] };
 
         autoGauge.ApplyToScore(score);
 
@@ -62,10 +82,24 @@ public class BmsModAutoGaugeTest
     }
 
     [Test]
+    public void TestAutoGaugeAttributionDispatchedFromPopulateScore()
+    {
+        var (autoGauge, _) = createAutoGaugeResolvedToExHard();
+
+        var scoreProcessor = new BmsScoreProcessor();
+        scoreProcessor.Mods.Value = new Mod[] { autoGauge };
+        var score = new ScoreInfo { Mods = [autoGauge] };
+
+        scoreProcessor.PopulateScore(score);
+
+        Assert.That(score.Mods, Has.One.TypeOf<BmsModExHardGauge>());
+    }
+
+    [Test]
     public void TestAutoGaugeAttributionIsIdempotent()
     {
         var (autoGauge, _) = createAutoGaugeResolvedToExHard();
-        var score = new ScoreInfo { Mods = new Mod[] { autoGauge } };
+        var score = new ScoreInfo { Mods = [autoGauge] };
 
         autoGauge.ApplyToScore(score);
         autoGauge.ApplyToScore(score);
@@ -88,7 +122,7 @@ public class BmsModAutoGaugeTest
         };
         hp.ApplyBeatmap(beatmap);
 
-        var score = new ScoreInfo { Mods = new Mod[] { autoGauge } };
+        var score = new ScoreInfo { Mods = [autoGauge] };
 
         autoGauge.ApplyToScore(score);
         Assert.That(score.Mods, Has.One.TypeOf<BmsModHazardGauge>());
@@ -105,17 +139,11 @@ public class BmsModAutoGaugeTest
     }
 
     [Test]
-    public void TestAutoGaugeAttributionDispatchedFromPopulateScore()
+    public void TestAutoGaugeIsAutomationType()
     {
-        var (autoGauge, _) = createAutoGaugeResolvedToExHard();
+        var mod = new BmsModAutoGauge();
 
-        var scoreProcessor = new BmsScoreProcessor();
-        scoreProcessor.Mods.Value = new Mod[] { autoGauge };
-        var score = new ScoreInfo { Mods = new Mod[] { autoGauge } };
-
-        scoreProcessor.PopulateScore(score);
-
-        Assert.That(score.Mods, Has.One.TypeOf<BmsModExHardGauge>());
+        Assert.That(mod.Type, Is.EqualTo(ModType.Automation));
     }
 
     [Test]
@@ -123,18 +151,18 @@ public class BmsModAutoGaugeTest
     {
         var hp = new BmsHealthProcessor();
         hp.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K });
-        hp.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: BmsGaugeProfileFamily.FiveKeys);
+        hp.ConfigureGaugeContext(true, BmsGaugeProfileFamily.FiveKeys);
 
         new BmsModAutoGauge().ApplyToHealthProcessor(hp);
 
         Assert.Multiple(() =>
         {
-            Assert.That(hp.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(new[]
-            {
+            Assert.That(hp.CurrentGaugeStates.Select(state => state.GaugeType), Is.EqualTo(
+            [
                 BmsGaugeType.ExHardClass,
                 BmsGaugeType.ExClass,
                 BmsGaugeType.Class,
-            }));
+            ]));
             Assert.That(hp.GaugeProfile.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
         });
     }
@@ -144,37 +172,10 @@ public class BmsModAutoGaugeTest
     {
         var hp = new BmsHealthProcessor();
         hp.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K });
-        hp.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: BmsGaugeProfileFamily.FiveKeys);
+        hp.ConfigureGaugeContext(true, BmsGaugeProfileFamily.FiveKeys);
 
         new BmsModClassGauge().ApplyToHealthProcessor(hp);
 
         Assert.That(hp.GaugeProfile.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
-    }
-
-    /// <summary>
-    /// Builds an Auto Gauge whose resolved worst gauge is ExHard: the six-tier chain is
-    /// installed via <see cref="BmsModAutoGauge.ApplyToHealthProcessor"/>, then a single
-    /// BAD (Ok) fails Hazard (survival gauge, −1) so the first non-failed survival tier
-    /// (ExHard) becomes the resolved worst once <see cref="BmsHealthProcessor.HasPassedAtEnd"/> runs.
-    /// </summary>
-    private static (BmsModAutoGauge autoGauge, BmsHealthProcessor hp) createAutoGaugeResolvedToExHard()
-    {
-        var hp = new BmsHealthProcessor();
-        var autoGauge = new BmsModAutoGauge();
-        autoGauge.ApplyToHealthProcessor(hp);
-
-        var beatmap = new BmsBeatmap
-        {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-            HitObjects = { new BmsHitObject { StartTime = 1000, Column = 1 } },
-        };
-        hp.ApplyBeatmap(beatmap);
-
-        hp.ApplyResult(new JudgementResult(beatmap.HitObjects[0], beatmap.HitObjects[0].CreateJudgement())
-            { Type = HitResult.Ok });
-        hp.HasPassedAtEnd();
-
-        return (autoGauge, hp);
     }
 }

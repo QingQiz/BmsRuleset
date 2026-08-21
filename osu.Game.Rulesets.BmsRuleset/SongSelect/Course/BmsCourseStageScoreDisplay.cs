@@ -10,14 +10,12 @@ using osu.Game.Database;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Leaderboards;
-using osu.Game.Rulesets;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osuTK;
 using Realms;
 
-namespace osu.Game.Rulesets.BmsRuleset.Result.Course;
+namespace osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
 
 internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
 {
@@ -41,7 +39,6 @@ internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
 
     internal BeatmapInfo? Beatmap
     {
-        get => beatmap;
         set
         {
             if (Equals(beatmap, value))

@@ -81,4 +81,15 @@ public class BmsGaugeCalculatorTest
             Assert.That(calculator.GetDeltaFor(HitResult.Ok, 1), Is.EqualTo(-0.20).Within(0.0001));
         });
     }
+
+    [TestCase(130, -0.3333)]
+    [TestCase(149, -0.3333)]
+    [TestCase(150, -0.25)]
+    public void TestModifyDamageTotalScaleBoundaries(double total, double expectedDamage)
+    {
+        var profile = BmsGaugeProfileFactory.Create(BmsGaugeType.ExHard, BmsGaugeProfileFamily.FiveKeys);
+        var calculator = new BmsGaugeCalculator(profile, total, noteCount: 1000);
+
+        Assert.That(calculator.GetDeltaFor(HitResult.Ok, 1), Is.EqualTo(expectedDamage).Within(0.0001));
+    }
 }

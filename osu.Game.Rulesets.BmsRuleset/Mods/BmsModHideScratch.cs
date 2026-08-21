@@ -2,11 +2,11 @@ using System;
 using System.Linq;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.Mods;
@@ -58,6 +58,6 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
             .Select(x => new BmsSampleEvent(x.EndTime, 0, x.TailSampleKey!.Value, x.TailSampleVolume));
 
         b.BackgroundSampleEvents = b.BackgroundSampleEvents.Concat(scratchStartSamples).Concat(scratchEndSamples).ToArray();
-        b.HitObjects = b.HitObjects.Where(x => !BmsLayout.IsScratchColumn(x.Column, b.LayoutVariant)).ToList();
+        b.HitObjects = [.. b.HitObjects.Where(x => !BmsLayout.IsScratchColumn(x.Column, b.LayoutVariant))];
     }
 }

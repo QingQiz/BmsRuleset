@@ -65,7 +65,7 @@ public class BmsTableJsonParserTest
         Assert.That(BmsTableJsonParser.IsValidMd5("6940ad2ab7812fcbc1a26b83035b49f6"), Is.True);
         Assert.That(BmsTableJsonParser.IsValidMd5("ABCDEFabcdef0123456789abcdef0123"), Is.True);
         Assert.That(BmsTableJsonParser.IsValidMd5("#N/A"), Is.False);
-        Assert.That(BmsTableJsonParser.IsValidMd5(""), Is.False);
+        Assert.That(BmsTableJsonParser.IsValidMd5(string.Empty), Is.False);
         Assert.That(BmsTableJsonParser.IsValidMd5(null), Is.False);
         Assert.That(BmsTableJsonParser.IsValidMd5("too-short"), Is.False);
         Assert.That(BmsTableJsonParser.IsValidMd5("not-a-valid-md5-hash-at-all-12345678"), Is.False);
@@ -80,19 +80,15 @@ public class BmsTableJsonParserTest
     }
 
     [Test]
-    public void TestMergeWithChartsWrapper()
+    public void TestMergeCourseOnlyHeader()
     {
-        var result = BmsTableJsonParser.Parse(combined_json);
-
-        Assert.That(result, Is.Not.Null);
-        var table = BmsTableJsonParser.Merge("combined", TableSource.LocalFile, result!.Header, result.Charts);
+        var result = BmsTableJsonParser.Parse(course_header);
+        var table = BmsTableJsonParser.Merge("course-table", TableSource.LocalFile, result!.Header, null);
 
         Assert.That(table, Is.Not.Null);
-        Assert.That(table!.Name, Is.EqualTo("Combined"));
-        Assert.That(table.Entries, Has.Count.EqualTo(1));
-        Assert.That(table.Entries[0].Md5Hash, Is.EqualTo("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
-        string[] expectedOrder = ["★1"];
-        Assert.That(table.LevelOrder, Is.EqualTo(expectedOrder));
+        Assert.That(table!.Courses, Has.Count.EqualTo(2));
+        Assert.That(table.Courses[0].Hashes, Has.Length.EqualTo(2));
+        Assert.That(table.Entries, Is.Empty);
     }
 
     [Test]
@@ -118,6 +114,22 @@ public class BmsTableJsonParserTest
         Assert.That(table, Is.Not.Null);
         string[] expectedOrder = ["st-2", "st.5", "1", "st1.25", "1.5", "2", "st2", "st10", "alpha", "beta"];
         Assert.That(table!.LevelOrder, Is.EqualTo(expectedOrder));
+    }
+
+    [Test]
+    public void TestMergeWithChartsWrapper()
+    {
+        var result = BmsTableJsonParser.Parse(combined_json);
+
+        Assert.That(result, Is.Not.Null);
+        var table = BmsTableJsonParser.Merge("combined", TableSource.LocalFile, result!.Header, result.Charts);
+
+        Assert.That(table, Is.Not.Null);
+        Assert.That(table!.Name, Is.EqualTo("Combined"));
+        Assert.That(table.Entries, Has.Count.EqualTo(1));
+        Assert.That(table.Entries[0].Md5Hash, Is.EqualTo("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+        string[] expectedOrder = ["★1"];
+        Assert.That(table.LevelOrder, Is.EqualTo(expectedOrder));
     }
 
     [Test]
@@ -222,6 +234,13 @@ public class BmsTableJsonParserTest
     }
 
     [Test]
+    public void TestParseInvalidJsonReturnsNull()
+    {
+        var result = BmsTableJsonParser.Parse("not json");
+        Assert.That(result, Is.Null);
+    }
+
+    [Test]
     public void TestParseNestedCoursesFromHeader()
     {
         var result = BmsTableJsonParser.Parse(course_header);
@@ -229,33 +248,14 @@ public class BmsTableJsonParserTest
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Header?.Courses, Has.Count.EqualTo(2));
         Assert.That(result.Header!.Courses![0].Name, Is.EqualTo("Course One"));
-        Assert.That(result.Header.Courses[0].Hashes, Is.EqualTo(new[]
-        {
+        Assert.That(result.Header.Courses[0].Hashes, Is.EqualTo(
+        [
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        }));
-        Assert.That(result.Header.Courses[0].Constraints, Is.EqualTo(new[] { "grade_mirror", "gauge_lr2" }));
+        ]));
+        Assert.That(result.Header.Courses[0].Constraints, Is.EqualTo(["grade_mirror", "gauge_lr2"]));
         Assert.That(result.Header.Courses[1].Hashes.Single(), Has.Length.EqualTo(64));
         Assert.That(result.Header.Courses[1].Gauge, Is.EqualTo("ExClass"));
-    }
-
-    [Test]
-    public void TestMergeCourseOnlyHeader()
-    {
-        var result = BmsTableJsonParser.Parse(course_header);
-        var table = BmsTableJsonParser.Merge("course-table", TableSource.LocalFile, result!.Header, null);
-
-        Assert.That(table, Is.Not.Null);
-        Assert.That(table!.Courses, Has.Count.EqualTo(2));
-        Assert.That(table.Courses[0].Hashes, Has.Length.EqualTo(2));
-        Assert.That(table.Entries, Is.Empty);
-    }
-
-    [Test]
-    public void TestParseInvalidJsonReturnsNull()
-    {
-        var result = BmsTableJsonParser.Parse("not json");
-        Assert.That(result, Is.Null);
     }
 
     [Test]
@@ -316,6 +316,6 @@ public class BmsTableJsonParserTest
     public void TestPickHashReturnsNullWhenBothInvalid()
     {
         Assert.That(BmsTableJsonParser.PickHash(null, null), Is.Null);
-        Assert.That(BmsTableJsonParser.PickHash("#N/A", ""), Is.Null);
+        Assert.That(BmsTableJsonParser.PickHash("#N/A", string.Empty), Is.Null);
     }
 }

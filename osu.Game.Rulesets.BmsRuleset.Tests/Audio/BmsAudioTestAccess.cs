@@ -79,10 +79,17 @@ internal static class BmsAudioTestAccess
         var events = getRequiredFieldValue<System.Collections.IEnumerable>(playback, "sortedEvents");
         var enumerator = events.GetEnumerator();
 
-        if (!enumerator.MoveNext())
-            throw new InvalidOperationException("Preview playback contains no sample events.");
+        try
+        {
+            if (!enumerator.MoveNext())
+                throw new InvalidOperationException("Preview playback contains no sample events.");
 
-        return getRequiredPropertyValue<string>(enumerator.Current!, "SamplePath");
+            return getRequiredPropertyValue<string>(enumerator.Current!, "SamplePath");
+        }
+        finally
+        {
+            (enumerator as IDisposable)?.Dispose();
+        }
     }
 
     internal static int GetPreviewPreparedSampleCount(BmsPreviewTrack track)

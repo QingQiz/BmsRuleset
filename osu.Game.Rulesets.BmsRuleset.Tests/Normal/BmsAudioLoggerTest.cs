@@ -1,7 +1,6 @@
 using System;
 using NUnit.Framework;
 using osu.Framework.Logging;
-using osu.Game.Rulesets.BmsRuleset;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 

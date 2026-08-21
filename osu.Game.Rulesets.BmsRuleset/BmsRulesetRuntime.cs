@@ -14,31 +14,27 @@ internal static class BmsRulesetRuntime
 
     internal static BmsRulesetConfigManager? ConfigManager
     {
-        get => configManager;
+        get;
         set
         {
-            configManager = value;
+            field = value;
             if (value == null)
                 CourseResults = null;
         }
     }
 
-    private static BmsRulesetConfigManager? configManager;
-
     internal static BmsCourseResultStore? CourseResults
     {
-        get => courseResults;
+        get;
         private set
         {
-            if (ReferenceEquals(courseResults, value))
+            if (ReferenceEquals(field, value))
                 return;
 
-            courseResults = value;
+            field = value;
             CourseResultsChanged?.Invoke();
         }
     }
-
-    private static BmsCourseResultStore? courseResults;
 
     internal static DifficultyTableStore? DifficultyTableStore
     {
@@ -72,7 +68,7 @@ internal static class BmsRulesetRuntime
     internal static bool UseDedicatedPreviewAudio =>
         ConfigManager?.Get<bool>(BmsRulesetSetting.UseDedicatedPreviewAudio) ?? true;
 
-    internal static DifficultyTableStore? EnsureDifficultyTableStore(GameHost host, RealmAccess realm)
+    internal static void EnsureDifficultyTableStore(GameHost host, RealmAccess realm)
     {
         if (ConfigManager != null)
         {
@@ -82,7 +78,7 @@ internal static class BmsRulesetRuntime
         }
 
         if (DifficultyTableStore != null || ConfigManager == null || CourseCatalog.Courses.Count > 0)
-            return DifficultyTableStore;
+            return;
 
         var cacheDirectory = Path.Combine(host.Storage.GetFullPath(string.Empty), "difficulty-tables");
         var collectionSyncManager = new CollectionSyncManager(ConfigManager);
@@ -90,7 +86,6 @@ internal static class BmsRulesetRuntime
         store.DifficultyNameUpdater = new DifficultyNameUpdater(realm, store);
         DifficultyTableStore = store;
         store.LoadPersistedTables();
-        return store;
     }
 
     private static void syncCourses() => CourseCatalog.Replace(

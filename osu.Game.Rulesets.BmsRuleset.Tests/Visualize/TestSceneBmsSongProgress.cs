@@ -52,6 +52,49 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
     }
 
     [Test]
+    public void TestEmptyPoorLineUsesNextNoteOffset()
+    {
+        const double input_time = BmsTestBeatmaps.FIRST_NOTE_TIME - 400;
+
+        Box emptyPoorWindow() => Player.HUDOverlay.ChildrenOfType<Box>().Single(child => child.Name == "empty poor window");
+
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddStep("hide EPOOR", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().ShowEmptyPoor.Value = false);
+        AddUntilStep("EPOOR window hidden", () => emptyPoorWindow().Alpha == 0);
+        AddStep("register hidden EPOOR", () =>
+            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(input_time, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
+        AddWaitStep("wait for scheduled update", 1);
+        AddAssert("hidden EPOOR adds no line", () => !Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Any());
+        AddStep("show EPOOR", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().ShowEmptyPoor.Value = true);
+        AddUntilStep("EPOOR window shown", () => emptyPoorWindow().Alpha == 1);
+        AddStep("register EPOOR timing", () =>
+            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(input_time, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
+        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 1);
+        AddAssert("EPOOR line is on fast side", () =>
+            Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Single().ScreenSpaceDrawQuad.Centre.X
+            < Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().ScreenSpaceDrawQuad.Centre.X);
+    }
+
+    [Test]
+    public void TestHitErrorMeterCapsConcurrentLines()
+    {
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddStep("register judgement barrage", () =>
+        {
+            var processor = (BmsScoreProcessor)Player.GameplayState.ScoreProcessor;
+
+            for (var i = 0; i < 100; i++)
+                processor.RegisterEmptyPoor(BmsTestBeatmaps.FIRST_NOTE_TIME - i, BmsTestBeatmaps.FIRST_NOTE_TIME, 0);
+        });
+        AddUntilStep("scheduled judgements processed", () =>
+            Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 50);
+        AddAssert("judgement lines remain capped", () =>
+            Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() <= 50);
+    }
+
+    [Test]
     public void TestHitErrorMeterLayout()
     {
         BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
@@ -74,8 +117,8 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddAssert("centre marker is white", () =>
         {
             var markers = meter().ChildrenOfType<Drawable>()
-                                 .Where(child => child.Name is "middle marker behind" or "middle marker in front")
-                                 .ToArray();
+                .Where(child => child.Name is "middle marker behind" or "middle marker in front")
+                .ToArray();
             return markers.Length == 2 && markers.All(child => child.Colour == Colour4.White);
         });
         AddAssert("EPOOR window is an added fast segment", () =>
@@ -93,6 +136,19 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             label("slow label").ScreenSpaceDrawQuad.Centre.X - label("fast label").ScreenSpaceDrawQuad.Centre.X > originalLabelDistance);
         AddStep("stretch vertically", () => meter().Height = 52);
         AddAssert("vertical stretch widens judgement lines", () => judgements().ScreenSpaceDrawQuad.AABBFloat.Height > originalJudgementHeight);
+    }
+
+    [Test]
+    public void TestJudgementFadeDuration()
+    {
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddStep("set short fade", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().JudgementFadeDuration.Value = 0.1f);
+        AddStep("register EPOOR timing", () =>
+            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(
+                BmsTestBeatmaps.FIRST_NOTE_TIME - 400, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
+        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 1);
+        AddUntilStep("error line expires", () => !Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Any());
     }
 
     [Test]
@@ -117,61 +173,5 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddAssert("POOR line uses BMS colour", () => poorLine().Colour == BmsHitResultColours.ForHitResult(HitResult.Meh));
         AddAssert("POOR line is at BAD window end", () =>
             Math.Abs(poorLine().ScreenSpaceDrawQuad.Centre.X - badWindow().ScreenSpaceDrawQuad.AABBFloat.Right) < 0.5f);
-    }
-
-    [Test]
-    public void TestEmptyPoorLineUsesNextNoteOffset()
-    {
-        const double input_time = BmsTestBeatmaps.FIRST_NOTE_TIME - 400;
-
-        Box emptyPoorWindow() => Player.HUDOverlay.ChildrenOfType<Box>().Single(child => child.Name == "empty poor window");
-
-        AddStep("load player", LoadPlayer);
-        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        AddStep("hide EPOOR", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().ShowEmptyPoor.Value = false);
-        AddUntilStep("EPOOR window hidden", () => emptyPoorWindow().Alpha == 0);
-        AddStep("register hidden EPOOR", () =>
-            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(input_time, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
-        AddWaitStep("wait for scheduled update", 1);
-        AddAssert("hidden EPOOR adds no line", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 0);
-        AddStep("show EPOOR", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().ShowEmptyPoor.Value = true);
-        AddUntilStep("EPOOR window shown", () => emptyPoorWindow().Alpha == 1);
-        AddStep("register EPOOR timing", () =>
-            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(input_time, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
-        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 1);
-        AddAssert("EPOOR line is on fast side", () =>
-            Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Single().ScreenSpaceDrawQuad.Centre.X
-            < Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().ScreenSpaceDrawQuad.Centre.X);
-    }
-
-    [Test]
-    public void TestJudgementFadeDuration()
-    {
-        AddStep("load player", LoadPlayer);
-        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        AddStep("set short fade", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().JudgementFadeDuration.Value = 0.1f);
-        AddStep("register EPOOR timing", () =>
-            ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(
-                BmsTestBeatmaps.FIRST_NOTE_TIME - 400, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
-        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 1);
-        AddUntilStep("error line expires", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 0);
-    }
-
-    [Test]
-    public void TestHitErrorMeterCapsConcurrentLines()
-    {
-        AddStep("load player", LoadPlayer);
-        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        AddStep("register judgement barrage", () =>
-        {
-            var processor = (BmsScoreProcessor)Player.GameplayState.ScoreProcessor;
-
-            for (var i = 0; i < 100; i++)
-                processor.RegisterEmptyPoor(BmsTestBeatmaps.FIRST_NOTE_TIME - i, BmsTestBeatmaps.FIRST_NOTE_TIME, 0);
-        });
-        AddUntilStep("scheduled judgements processed", () =>
-            Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 50);
-        AddAssert("judgement lines remain capped", () =>
-            Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() <= 50);
     }
 }

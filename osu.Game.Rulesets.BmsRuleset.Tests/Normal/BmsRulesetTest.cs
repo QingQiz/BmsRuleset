@@ -13,7 +13,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Editor;
 using osu.Game.Rulesets.BmsRuleset.Mods;
@@ -27,6 +26,7 @@ using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
 using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -49,59 +49,19 @@ public class BmsRulesetTest
 
     private BmsRuleset ruleset = null!;
 
-    [Test]
-    public void TestAutomationModsIncludeAutoplay()
+    private class TestNotificationOverlay : INotificationOverlay
     {
-        var mods = ruleset.GetModsFor(ModType.Automation).ToArray();
+        public List<Notification> PostedNotifications { get; } = new();
 
-        Assert.That(mods.OfType<BmsModAutoplay>().SingleOrDefault(), Is.Not.Null);
-    }
+        public IBindable<int> UnreadCount { get; } = new Bindable<int>();
 
-    [Test]
-    public void TestCreateBeatmapConverter()
-    {
-        var converter = ruleset.CreateBeatmapConverter(new Beatmap());
+        public IEnumerable<Notification> AllNotifications => PostedNotifications;
 
-        Assert.That(converter, Is.TypeOf<BmsBeatmapConverter>());
-    }
+        public void Post(Notification notification) => PostedNotifications.Add(notification);
 
-    [Test]
-    public void TestCreateConfig()
-    {
-        var config = ruleset.CreateConfig(null);
-
-        Assert.That(config, Is.TypeOf<BmsRulesetConfigManager>());
-    }
-
-    [Test]
-    public void TestDedicatedPreviewAudioIsEnabledByDefault()
-    {
-        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
-
-        Assert.That(config.Get<bool>(BmsRulesetSetting.UseDedicatedPreviewAudio), Is.True);
-    }
-
-    [Test]
-    public void TestFrameRateUnlockIsDisabledByDefault()
-    {
-        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
-
-        Assert.That(config.Get<bool>(BmsRulesetSetting.UnlockFrameRateLimit), Is.False);
-    }
-
-    [Test]
-    public void TestVisualOffsetDefaultsAndRange()
-    {
-        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
-
-        Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.Zero);
-        Assert.That(config.Get<bool>(BmsRulesetSetting.AutomaticallyAdjustVisualOffset), Is.False);
-
-        config.SetValue(BmsRulesetSetting.VisualOffset, 1000d);
-        Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.EqualTo(BmsRulesetConfigManager.MAX_VISUAL_OFFSET));
-
-        config.SetValue(BmsRulesetSetting.VisualOffset, -1000d);
-        Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.EqualTo(BmsRulesetConfigManager.MIN_VISUAL_OFFSET));
+        public void Hide()
+        {
+        }
     }
 
     [Test]
@@ -125,19 +85,38 @@ public class BmsRulesetTest
     }
 
     [Test]
-    public void TestDedicatedPreviewAudioSettingUpdatesCurrentValue()
+    public void TestAutomationModsIncludeAutoplay()
     {
-        using var config = (BmsRulesetConfigManager)ruleset.CreateConfig(null);
+        var mods = ruleset.GetModsFor(ModType.Automation).ToArray();
 
-        try
-        {
-            config.SetValue(BmsRulesetSetting.UseDedicatedPreviewAudio, false);
-            Assert.That(BmsRulesetRuntime.UseDedicatedPreviewAudio, Is.False);
-        }
-        finally
-        {
-            config.SetValue(BmsRulesetSetting.UseDedicatedPreviewAudio, true);
-        }
+        Assert.That(mods.OfType<BmsModAutoplay>().SingleOrDefault(), Is.Not.Null);
+    }
+
+    [Test]
+    public void TestBmsHitResultColoursUseBmsJudgementSemantics()
+    {
+        var colours = new OsuColour();
+
+        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Good), Is.EqualTo(colours.Green));
+        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Ok), Is.EqualTo(colours.Yellow));
+        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Meh), Is.EqualTo(colours.Red));
+        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Miss), Is.EqualTo(Color4.Gray));
+    }
+
+    [Test]
+    public void TestCreateBeatmapConverter()
+    {
+        var converter = ruleset.CreateBeatmapConverter(new Beatmap());
+
+        Assert.That(converter, Is.TypeOf<BmsBeatmapConverter>());
+    }
+
+    [Test]
+    public void TestCreateConfig()
+    {
+        var config = ruleset.CreateConfig(null);
+
+        Assert.That(config, Is.TypeOf<BmsRulesetConfigManager>());
     }
 
     [Test]
@@ -208,47 +187,27 @@ public class BmsRulesetTest
     }
 
     [Test]
-    public void TestInitialisationInstallsEditorDisablePatch()
+    public void TestDedicatedPreviewAudioIsEnabledByDefault()
     {
-        Assert.That(BmsEditorPatcher.IsInstalled, Is.True);
+        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
+
+        Assert.That(config.Get<bool>(BmsRulesetSetting.UseDedicatedPreviewAudio), Is.True);
     }
 
     [Test]
-    public void TestInitialisationInstallsReplayPatch()
+    public void TestDedicatedPreviewAudioSettingUpdatesCurrentValue()
     {
-        Assert.That(BmsReplayPatcher.IsInstalled, Is.True);
-    }
+        using var config = (BmsRulesetConfigManager)ruleset.CreateConfig(null);
 
-    [Test]
-    public void TestReplayPatchAllowsUnloadedFailIndicatorDisposal()
-    {
-        var indicator = new ReplayFailIndicator(new GameplayClockContainer(new TrackVirtual(60000), false, false));
-
-        Assert.DoesNotThrow(() => indicator.Dispose());
-    }
-
-    [Test]
-    public void TestInitialisationInstallsRankingHitResultColourPatch()
-    {
-        Assert.That(BmsRankingHitResultColourPatcher.IsInstalled, Is.True);
-    }
-
-    [Test]
-    public void TestInitialisationInstallsLocalLeaderboardPatch()
-    {
-        Assert.That(BmsLocalLeaderboardPatcher.IsInstalled, Is.True);
-    }
-
-    [Test]
-    public void TestInitialisationInstallsConvertedBeatmapFilterPatch()
-    {
-        Assert.That(BmsConvertedBeatmapFilterPatcher.IsInstalled, Is.True);
-    }
-
-    [Test]
-    public void TestInitialisationInstallsCourseSongSelectPatch()
-    {
-        Assert.That(BmsCourseSongSelectPatcher.IsInstalled, Is.True);
+        try
+        {
+            config.SetValue(BmsRulesetSetting.UseDedicatedPreviewAudio, false);
+            Assert.That(BmsRulesetRuntime.UseDedicatedPreviewAudio, Is.False);
+        }
+        finally
+        {
+            config.SetValue(BmsRulesetSetting.UseDedicatedPreviewAudio, true);
+        }
     }
 
     [Test]
@@ -271,6 +230,47 @@ public class BmsRulesetTest
     }
 
     [Test]
+    public void TestExRankDisplayAttributeShowsPercentageHeadlineAndScaledWindows()
+    {
+        var beatmapInfo = new BeatmapInfo();
+        new BmsDifficultyInfo { Rank = 2, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+
+        var attributes = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>());
+        var exRankAttr = attributes.SingleOrDefault(a => a.Acronym == "EX");
+
+        Assert.That(exRankAttr, Is.Not.Null, "EXRANK attribute should be shown when ExRank is set");
+        Assert.That(attributes.SingleOrDefault(a => a.Acronym == "RK"), Is.Null, "RANK attribute should be hidden in EXRANK mode");
+        Assert.That(exRankAttr.AdjustedValue, Is.EqualTo(200f));
+        Assert.That(exRankAttr.MaxValue, Is.EqualTo(200f));
+
+        // EXRANK 200 -> rate 1.5 -> 7K head PGREAT 20 * 1.5 = +/-30ms.
+        var metrics = exRankAttr.AdditionalMetrics.ToDictionary(m => m.Name.ToString(), m => m.Value.ToString());
+        Assert.That(metrics["Normal note PGREAT"], Is.EqualTo("-30 to +30 ms"));
+    }
+
+    [Test]
+    public void TestExRankRoundTripsThroughOverallDifficulty()
+    {
+        // EXRANK encodes into OD as sentinel + pct (>= 100), kept distinct from RANK OD (0-4).
+        var beatmapInfo = new BeatmapInfo();
+        new BmsDifficultyInfo { Rank = 2, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+
+        Assert.That(beatmapInfo.Difficulty.OverallDifficulty, Is.EqualTo(300f).Within(0.001));
+
+        var decoded = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
+        Assert.That(decoded.ExRank, Is.EqualTo(200).Within(0.001));
+        Assert.That(decoded.Rank, Is.EqualTo(2)); // normalised to NORMAL while EXRANK is the source of truth
+    }
+
+    [Test]
+    public void TestFrameRateUnlockIsDisabledByDefault()
+    {
+        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
+
+        Assert.That(config.Get<bool>(BmsRulesetSetting.UnlockFrameRateLimit), Is.False);
+    }
+
+    [Test]
     public void TestFrameworkHitResultColoursRemainOsuDefaults()
     {
         var colours = new OsuColour();
@@ -279,26 +279,6 @@ public class BmsRulesetTest
         Assert.That(colours.ForHitResult(HitResult.Ok), Is.EqualTo(colours.Green));
         Assert.That(colours.ForHitResult(HitResult.Meh), Is.EqualTo(colours.Yellow));
         Assert.That(colours.ForHitResult(HitResult.Miss), Is.EqualTo(colours.Red));
-    }
-
-    [Test]
-    public void TestBmsHitResultColoursUseBmsJudgementSemantics()
-    {
-        var colours = new OsuColour();
-
-        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Good), Is.EqualTo(colours.Green));
-        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Ok), Is.EqualTo(colours.Yellow));
-        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Meh), Is.EqualTo(colours.Red));
-        Assert.That(BmsHitResultColours.ForHitResult(HitResult.Miss), Is.EqualTo(Color4.Gray));
-    }
-
-    [Test]
-    public void TestScoreResultColoursUseBmsSemanticsOnlyForBmsScores()
-    {
-        var colours = new OsuColour();
-
-        Assert.That(BmsHitResultColours.ForScore(new ScoreInfo { Ruleset = new RulesetInfo { ShortName = Constant.SHORT_NAME } }, HitResult.Meh), Is.EqualTo(colours.Red));
-        Assert.That(BmsHitResultColours.ForScore(new ScoreInfo { Ruleset = new RulesetInfo { ShortName = "mania" } }, HitResult.Meh), Is.EqualTo(colours.Yellow));
     }
 
     [Test]
@@ -351,6 +331,42 @@ public class BmsRulesetTest
         Assert.That(system.OfType<BmsModClassGauge>().Single().Acronym, Is.EqualTo("C1"));
         Assert.That(system.OfType<BmsModExClassGauge>().Single().Acronym, Is.EqualTo("C2"));
         Assert.That(system.OfType<BmsModExHardClassGauge>().Single().Acronym, Is.EqualTo("C3"));
+    }
+
+    [Test]
+    public void TestInitialisationInstallsConvertedBeatmapFilterPatch()
+    {
+        Assert.That(BmsConvertedBeatmapFilterPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
+    public void TestInitialisationInstallsCourseSongSelectPatch()
+    {
+        Assert.That(BmsCourseSongSelectPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
+    public void TestInitialisationInstallsEditorDisablePatch()
+    {
+        Assert.That(BmsEditorPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
+    public void TestInitialisationInstallsLocalLeaderboardPatch()
+    {
+        Assert.That(BmsLocalLeaderboardPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
+    public void TestInitialisationInstallsRankingHitResultColourPatch()
+    {
+        Assert.That(BmsRankingHitResultColourPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
+    public void TestInitialisationInstallsReplayPatch()
+    {
+        Assert.That(BmsReplayPatcher.IsInstalled, Is.True);
     }
 
     [Test]
@@ -443,20 +459,6 @@ public class BmsRulesetTest
     }
 
     [Test]
-    public void TestExRankRoundTripsThroughOverallDifficulty()
-    {
-        // EXRANK encodes into OD as sentinel + pct (>= 100), kept distinct from RANK OD (0-4).
-        var beatmapInfo = new BeatmapInfo();
-        new BmsDifficultyInfo { Rank = 2, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
-
-        Assert.That(beatmapInfo.Difficulty.OverallDifficulty, Is.EqualTo(300f).Within(0.001));
-
-        var decoded = BmsDifficultyInfo.FromOsuDifficulty(beatmapInfo.Difficulty);
-        Assert.That(decoded.ExRank, Is.EqualTo(200).Within(0.001));
-        Assert.That(decoded.Rank, Is.EqualTo(2)); // normalised to NORMAL while EXRANK is the source of truth
-    }
-
-    [Test]
     public void TestRankRoundTripsUnchangedThroughOverallDifficulty()
     {
         var beatmapInfo = new BeatmapInfo();
@@ -469,36 +471,34 @@ public class BmsRulesetTest
     }
 
     [Test]
-    public void TestExRankDisplayAttributeShowsPercentageHeadlineAndScaledWindows()
+    public void TestReplayPatchAllowsUnloadedFailIndicatorDisposal()
     {
-        var beatmapInfo = new BeatmapInfo();
-        new BmsDifficultyInfo { Rank = 2, ExRank = 200, KeyCount = 8 }.WriteToOsuDifficulty(beatmapInfo);
+        var indicator = new ReplayFailIndicator(new GameplayClockContainer(new TrackVirtual(60000), false, false));
 
-        var attributes = ruleset.GetBeatmapAttributesForDisplay(beatmapInfo, Array.Empty<Mod>());
-        var exRankAttr = attributes.SingleOrDefault(a => a.Acronym == "EX");
-
-        Assert.That(exRankAttr, Is.Not.Null, "EXRANK attribute should be shown when ExRank is set");
-        Assert.That(attributes.SingleOrDefault(a => a.Acronym == "RK"), Is.Null, "RANK attribute should be hidden in EXRANK mode");
-        Assert.That(exRankAttr.AdjustedValue, Is.EqualTo(200f));
-        Assert.That(exRankAttr.MaxValue, Is.EqualTo(200f));
-
-        // EXRANK 200 -> rate 1.5 -> 7K head PGREAT 20 * 1.5 = +/-30ms.
-        var metrics = exRankAttr.AdditionalMetrics.ToDictionary(m => m.Name.ToString(), m => m.Value.ToString());
-        Assert.That(metrics["Normal note PGREAT"], Is.EqualTo("-30 to +30 ms"));
+        Assert.DoesNotThrow(indicator.Dispose);
     }
 
-    private class TestNotificationOverlay : INotificationOverlay
+    [Test]
+    public void TestScoreResultColoursUseBmsSemanticsOnlyForBmsScores()
     {
-        public List<Notification> PostedNotifications { get; } = new();
+        var colours = new OsuColour();
 
-        public void Post(Notification notification) => PostedNotifications.Add(notification);
+        Assert.That(BmsHitResultColours.ForScore(new ScoreInfo { Ruleset = new RulesetInfo { ShortName = Constant.SHORT_NAME } }, HitResult.Meh), Is.EqualTo(colours.Red));
+        Assert.That(BmsHitResultColours.ForScore(new ScoreInfo { Ruleset = new RulesetInfo { ShortName = "mania" } }, HitResult.Meh), Is.EqualTo(colours.Yellow));
+    }
 
-        public void Hide()
-        {
-        }
+    [Test]
+    public void TestVisualOffsetDefaultsAndRange()
+    {
+        using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
 
-        public IBindable<int> UnreadCount { get; } = new Bindable<int>();
+        Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.Zero);
+        Assert.That(config.Get<bool>(BmsRulesetSetting.AutomaticallyAdjustVisualOffset), Is.False);
 
-        public IEnumerable<Notification> AllNotifications => PostedNotifications;
+        config.SetValue(BmsRulesetSetting.VisualOffset, 1000d);
+        Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.EqualTo(BmsRulesetConfigManager.MAX_VISUAL_OFFSET));
+
+        config.SetValue(BmsRulesetSetting.VisualOffset, -1000d);
+        Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.EqualTo(BmsRulesetConfigManager.MIN_VISUAL_OFFSET));
     }
 }

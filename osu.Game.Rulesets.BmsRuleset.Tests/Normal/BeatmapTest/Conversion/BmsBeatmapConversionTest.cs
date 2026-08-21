@@ -16,6 +16,59 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Conversion;
 [TestFixture]
 public class BmsBeatmapConversionTest
 {
+
+    [TestCase(1)]
+    [TestCase(4)]
+    [TestCase(6)]
+    [TestCase(8)]
+    [TestCase(9)]
+    public void TestBeatmapConverterRejectsNon7KMania(int keyCount)
+    {
+        var converter = new BmsRuleset().CreateBeatmapConverter(createManiaBeatmap(keyCount, new TestManiaNote()));
+
+        Assert.That(converter.CanConvert(), Is.False);
+    }
+
+    private static Beatmap createManiaBeatmap(int keyCount, params HitObject[] hitObjects)
+    {
+        var difficulty = new BeatmapDifficulty { CircleSize = keyCount };
+
+        return new Beatmap
+        {
+            BeatmapInfo = new BeatmapInfo(
+                new RulesetInfo { OnlineID = 3, ShortName = "mania" },
+                difficulty),
+            HitObjects = [.. hitObjects],
+        };
+    }
+
+    private class TestManiaNote : HitObject, IHasColumn, IHasXPosition
+    {
+        public int Column { get; init; }
+
+        public float X { get; set; }
+    }
+
+    private sealed class TestManiaHold : TestManiaNote, IHasDuration
+    {
+        public double EndTime => StartTime + Duration;
+
+        public double Duration { get; set; }
+    }
+
+    private sealed class TestLegacyManiaNote : HitObject, IHasXPosition
+    {
+        public float X { get; set; }
+    }
+
+    [Test]
+    public void TestBeatmapConverterCanConvert7KMania()
+    {
+        var converter = new BmsRuleset().CreateBeatmapConverter(createManiaBeatmap(7, new TestManiaNote()));
+
+        Assert.That(converter.CanConvert(), Is.True);
+    }
+
     [Test]
     public void TestBeatmapConverterCanConvertBmsHitObjects()
     {
@@ -41,6 +94,34 @@ public class BmsBeatmapConversionTest
     }
 
     [Test]
+    public void TestBeatmapConverterConvert()
+    {
+        var beatmap = new Beatmap
+        {
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 2 },
+                new BmsLongNote { StartTime = 2000, Column = 5, Duration = 800 },
+            },
+        };
+        var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
+        var converted = converter.Convert();
+
+        Assert.That(converted.HitObjects.Count, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void TestBeatmapConverterRejects7KFromOtherRuleset()
+    {
+        var beatmap = createManiaBeatmap(7, new TestManiaNote());
+        beatmap.BeatmapInfo.Ruleset = new RulesetInfo { OnlineID = 0, ShortName = "osu" };
+
+        var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
+
+        Assert.That(converter.CanConvert(), Is.False);
+    }
+
+    [Test]
     public void TestBeatmapConverterRejectsForeignHitObjects()
     {
         var beatmap = new Beatmap
@@ -50,37 +131,6 @@ public class BmsBeatmapConversionTest
                 new HitObject { StartTime = 1000 },
             },
         };
-        var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
-
-        Assert.That(converter.CanConvert(), Is.False);
-    }
-
-    [TestCase(1)]
-    [TestCase(4)]
-    [TestCase(6)]
-    [TestCase(8)]
-    [TestCase(9)]
-    public void TestBeatmapConverterRejectsNon7KMania(int keyCount)
-    {
-        var converter = new BmsRuleset().CreateBeatmapConverter(createManiaBeatmap(keyCount, new TestManiaNote()));
-
-        Assert.That(converter.CanConvert(), Is.False);
-    }
-
-    [Test]
-    public void TestBeatmapConverterCanConvert7KMania()
-    {
-        var converter = new BmsRuleset().CreateBeatmapConverter(createManiaBeatmap(7, new TestManiaNote()));
-
-        Assert.That(converter.CanConvert(), Is.True);
-    }
-
-    [Test]
-    public void TestBeatmapConverterRejects7KFromOtherRuleset()
-    {
-        var beatmap = createManiaBeatmap(7, new TestManiaNote());
-        beatmap.BeatmapInfo.Ruleset = new RulesetInfo { OnlineID = 0, ShortName = "osu" };
-
         var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
 
         Assert.That(converter.CanConvert(), Is.False);
@@ -106,7 +156,7 @@ public class BmsBeatmapConversionTest
             Samples = [new HitSampleInfo(HitSampleInfo.HIT_NORMAL)],
         });
 
-        var converter = new BmsRuleset().CreateBeatmapConverter(createManiaBeatmap(7, hitObjects.ToArray()));
+        var converter = new BmsRuleset().CreateBeatmapConverter(createManiaBeatmap(7, [.. hitObjects]));
         var converted = (BmsBeatmap)converter.Convert();
 
         Assert.Multiple(() =>
@@ -124,8 +174,8 @@ public class BmsBeatmapConversionTest
             Assert.That(converted.BeatmapInfo.Difficulty.DrainRate, Is.EqualTo(2));
             Assert.That(converted.HitObjects.Take(7).Select(h => h.Column), Is.EqualTo(Enumerable.Range(1, 7)));
             Assert.That(converted.HitObjects, Has.None.Matches<BmsHitObject>(h => h.Column == 0));
-            Assert.That(converted.HitObjects.Take(7).Select(h => h.SourceChannel), Is.EqualTo(new[]
-            {
+            Assert.That(converted.HitObjects.Take(7).Select(h => h.SourceChannel), Is.EqualTo(
+            [
                 BmsChartParser.Enc("11"),
                 BmsChartParser.Enc("12"),
                 BmsChartParser.Enc("13"),
@@ -133,7 +183,7 @@ public class BmsBeatmapConversionTest
                 BmsChartParser.Enc("15"),
                 BmsChartParser.Enc("18"),
                 BmsChartParser.Enc("19"),
-            }));
+            ]));
 
             var hold = converted.HitObjects.OfType<BmsLongNote>().Single();
             Assert.That(hold.Column, Is.EqualTo(4));
@@ -171,47 +221,16 @@ public class BmsBeatmapConversionTest
         Assert.Multiple(() =>
         {
             Assert.That(timingMap.ScrollReferenceBpm, Is.EqualTo(120).Within(0.000001));
-            Assert.That(timingMap.BpmEvents.Select(e => (e.Tick, e.Bpm)), Is.EqualTo(new[]
-            {
+            Assert.That(timingMap.BpmEvents.Select(e => (e.Tick, e.Bpm)), Is.EqualTo(
+            [
                 (0L, 120d),
-                ((long)timingMap.TickResolution, 240d),
-            }));
+                (timingMap.TickResolution, 240d),
+            ]));
             Assert.That(timingMap.ProjectTickToTime(timingMap.TickResolution), Is.EqualTo(2000).Within(0.000001));
             Assert.That(timingMap.GetScrollPositionAtTime(2000), Is.EqualTo(2000).Within(0.000001));
             Assert.That(timingMap.GetScrollPositionAtTime(3000), Is.EqualTo(4000).Within(0.000001));
             Assert.That(timingMap.GetScrollPositionAtTime(3500), Is.EqualTo(4500).Within(0.000001));
             Assert.That(timingMap.GetScrollFactorAtTime(3500), Is.EqualTo(0.5).Within(0.000001));
-        });
-    }
-
-    [Test]
-    public void TestConvertManiaTimeSignatureResetsMeasureAtTimingPoint()
-    {
-        var beatmap = createManiaBeatmap(7,
-            new TestManiaNote { StartTime = 0 },
-            new TestManiaNote { StartTime = 5000 });
-        beatmap.ControlPointInfo.Add(0, new TimingControlPoint
-        {
-            BeatLength = 500,
-            TimeSignature = TimeSignature.SimpleQuadruple,
-        });
-        beatmap.ControlPointInfo.Add(1500, new TimingControlPoint
-        {
-            BeatLength = 500,
-            TimeSignature = TimeSignature.SimpleTriple,
-        });
-
-        var converted = (BmsBeatmap)new BmsRuleset().CreateBeatmapConverter(beatmap).Convert();
-        var measures = converted.TimingMap!.Measures;
-        var threeQuarterMeasure = converted.TimingMap.TickResolution * 3L / 4;
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(measures[0].StartTick, Is.Zero);
-            Assert.That(measures[0].LengthTicks, Is.EqualTo(threeQuarterMeasure));
-            Assert.That(measures[1].StartTick, Is.EqualTo(threeQuarterMeasure));
-            Assert.That(measures[1].LengthTicks, Is.EqualTo(threeQuarterMeasure));
-            Assert.That(measures[1].LengthRatio, Is.EqualTo(0.75).Within(0.000001));
         });
     }
 
@@ -255,40 +274,34 @@ public class BmsBeatmapConversionTest
     }
 
     [Test]
-    public void TestBeatmapConverterConvert()
+    public void TestConvertManiaTimeSignatureResetsMeasureAtTimingPoint()
     {
-        var beatmap = new Beatmap
+        var beatmap = createManiaBeatmap(7,
+            new TestManiaNote { StartTime = 0 },
+            new TestManiaNote { StartTime = 5000 });
+        beatmap.ControlPointInfo.Add(0, new TimingControlPoint
         {
-            HitObjects =
-            {
-                new BmsHitObject { StartTime = 1000, Column = 2 },
-                new BmsLongNote { StartTime = 2000, Column = 5, Duration = 800 },
-            },
-        };
-        var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
-        var converted = converter.Convert();
-
-        Assert.That(converted.HitObjects.Count, Is.EqualTo(2));
-    }
-
-    [Test]
-    public void TestJudgementContextStampedOnHitObject()
-    {
-        var beatmap = new BmsBeatmap
+            BeatLength = 500,
+            TimeSignature = TimeSignature.SimpleQuadruple,
+        });
+        beatmap.ControlPointInfo.Add(1500, new TimingControlPoint
         {
-            LayoutVariant = BmsLayoutVariant.Bme7K,
-            TotalColumns = 8,
-            Rank = 1,
-            HitObjects =
-            {
-                new BmsHitObject { StartTime = 1000, Column = 1 },
-            },
-        };
-        var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
-        var converted = (BmsBeatmap)converter.Convert();
+            BeatLength = 500,
+            TimeSignature = TimeSignature.SimpleTriple,
+        });
 
-        Assert.That(converted.HitObjects[0].Beatmap.Rank, Is.EqualTo(1));
-        Assert.That(converted.HitObjects[0].Beatmap.LayoutVariant, Is.EqualTo(BmsLayoutVariant.Bme7K));
+        var converted = (BmsBeatmap)new BmsRuleset().CreateBeatmapConverter(beatmap).Convert();
+        var measures = converted.TimingMap!.Measures;
+        var threeQuarterMeasure = converted.TimingMap.TickResolution * 3L / 4;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(measures[0].StartTick, Is.Zero);
+            Assert.That(measures[0].LengthTicks, Is.EqualTo(threeQuarterMeasure));
+            Assert.That(measures[1].StartTick, Is.EqualTo(threeQuarterMeasure));
+            Assert.That(measures[1].LengthTicks, Is.EqualTo(threeQuarterMeasure));
+            Assert.That(measures[1].LengthRatio, Is.EqualTo(0.75).Within(0.000001));
+        });
     }
 
     [Test]
@@ -313,35 +326,23 @@ public class BmsBeatmapConversionTest
         Assert.That(longNote.ScrollPositionAtEndTime, Is.GreaterThan(longNote.ScrollPositionAtStartTime));
     }
 
-    private static Beatmap createManiaBeatmap(int keyCount, params HitObject[] hitObjects)
+    [Test]
+    public void TestJudgementContextStampedOnHitObject()
     {
-        var difficulty = new BeatmapDifficulty { CircleSize = keyCount };
-
-        return new Beatmap
+        var beatmap = new BmsBeatmap
         {
-            BeatmapInfo = new BeatmapInfo(
-                new RulesetInfo { OnlineID = 3, ShortName = "mania" },
-                difficulty),
-            HitObjects = hitObjects.ToList(),
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            Rank = 1,
+            HitObjects =
+            {
+                new BmsHitObject { StartTime = 1000, Column = 1 },
+            },
         };
-    }
+        var converter = new BmsRuleset().CreateBeatmapConverter(beatmap);
+        var converted = (BmsBeatmap)converter.Convert();
 
-    private class TestManiaNote : HitObject, IHasColumn, IHasXPosition
-    {
-        public int Column { get; set; }
-
-        public float X { get; set; }
-    }
-
-    private sealed class TestManiaHold : TestManiaNote, IHasDuration
-    {
-        public double EndTime => StartTime + Duration;
-
-        public double Duration { get; set; }
-    }
-
-    private sealed class TestLegacyManiaNote : HitObject, IHasXPosition
-    {
-        public float X { get; set; }
+        Assert.That(converted.HitObjects[0].Beatmap.Rank, Is.EqualTo(1));
+        Assert.That(converted.HitObjects[0].Beatmap.LayoutVariant, Is.EqualTo(BmsLayoutVariant.Bme7K));
     }
 }
