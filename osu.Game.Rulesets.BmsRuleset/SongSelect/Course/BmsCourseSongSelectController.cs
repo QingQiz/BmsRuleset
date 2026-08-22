@@ -208,9 +208,13 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
         var mods = BmsCourseSession.CreateCourseMods(songSelect.Mods.Value, gaugeType);
         var session = new BmsCourseSession(course, resolvedStages.Cast<BmsResolvedCourseStage>(), mods, gaugeType);
+        var originalBeatmap = beatmapBeforeCourseMode ?? songSelect.Beatmap.Value;
 
         confirmSelectionSample?.Play();
-        songSelect.Push(new BmsCourseSessionScreen(session, songSelect.Beatmap.Value, songSelect.Mods.Value));
+        // The current global beatmap is the course preview while course mode is visible. Restore the
+        // beatmap captured before entering course mode so SongSelect does not refetch a course stage
+        // before returning to the normal carousel.
+        songSelect.Push(new BmsCourseSessionScreen(session, originalBeatmap, songSelect.Mods.Value));
 
         BmsResolvedCourseStage? resolveStage(BmsCourseStage stage)
         {
