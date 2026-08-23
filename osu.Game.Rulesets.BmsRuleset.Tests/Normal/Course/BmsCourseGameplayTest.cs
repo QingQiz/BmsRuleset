@@ -26,7 +26,7 @@ public class BmsCourseGameplayTest
         var stage = new BmsResolvedCourseStage(
             new BmsCourseStage("Stage", "Level", BeatmapHash: "hash"),
             new BeatmapInfo { Hash = "hash" });
-        var course = new BmsCourseDefinition("course", "Table", "Course", [stage.Definition], "Class", []);
+        var course = new BmsCourseDefinition("course", "Table", "Course", [stage.Definition], []);
         return new BmsCourseSession(course, [stage], [], BmsGaugeType.Class);
     }
 }

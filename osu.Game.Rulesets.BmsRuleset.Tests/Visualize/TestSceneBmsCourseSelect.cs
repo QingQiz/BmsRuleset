@@ -226,7 +226,6 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                 new BmsCourseStage("Afterimage", "sl8"),
                 new BmsCourseStage("Terminal", "sl9"),
             ],
-            "Class",
             [],
             TableMark: "sl"),
         new(
@@ -239,7 +238,6 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                 new BmsCourseStage("Glass Engine", "sl10", false),
                 new BmsCourseStage("Eventide", "sl10"),
             ],
-            "Class",
             ["MIRROR"],
             TableMark: "sl"),
         new(
@@ -252,7 +250,6 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                 new BmsCourseStage("Resonance", "st1"),
                 new BmsCourseStage("Asterism", "st1"),
             ],
-            "ExClass",
             ["RANDOM"],
             TableMark: "st"),
     ];
@@ -589,7 +586,6 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                 "History Test",
                 "History Test Course",
                 [new BmsCourseStage("History Test Song", "1", BeatmapHash: beatmap.Hash)],
-                "Class",
                 []);
             BmsRulesetRuntime.CourseCatalog.Replace([course]);
             BmsRulesetRuntime.CourseResults?.Record("history-test", BmsCourseStatus.Passed, historicalScore.Rank, historicalScore,
@@ -754,7 +750,6 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                     "Preview Table",
                     $"Preview Course {index}",
                     [new BmsCourseStage($"Preview {index}", "1", BeatmapHash: beatmap.Hash)],
-                    "Class",
                     [])));
         });
         AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
@@ -823,14 +818,12 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                     "Preview Table",
                     "First Preview",
                     [new BmsCourseStage("First", "1", BeatmapHash: importedBeatmaps[0].Hash)],
-                    "Class",
                     []),
                 new BmsCourseDefinition(
                     "preview-last",
                     "Preview Table",
                     "Last Preview",
                     [new BmsCourseStage("Last", "1", BeatmapHash: importedBeatmaps[^1].Hash)],
-                    "Class",
                     []),
             ]);
         });

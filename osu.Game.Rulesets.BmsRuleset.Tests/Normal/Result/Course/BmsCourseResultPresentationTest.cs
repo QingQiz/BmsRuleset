@@ -39,7 +39,7 @@ public class BmsCourseResultPresentationTest
             new("Stage 2", "Normal", BeatmapHash: beatmaps[1].Hash),
         ];
         var session = new BmsCourseSession(
-            new BmsCourseDefinition("course", "Table", "Course", definitions, "Class", []),
+            new BmsCourseDefinition("course", "Table", "Course", definitions, []),
             [
                 new BmsResolvedCourseStage(definitions[0], beatmaps[0]),
                 new BmsResolvedCourseStage(definitions[1], beatmaps[1]),

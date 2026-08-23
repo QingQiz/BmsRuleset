@@ -50,7 +50,6 @@ public class BmsTableJsonParserTest
       },
       {
         ""name"": ""Course Two"",
-        ""gauge"": ""ExClass"",
         ""sha256"": [
           ""cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc""
         ]
@@ -255,7 +254,6 @@ public class BmsTableJsonParserTest
         ]));
         Assert.That(result.Header.Courses[0].Constraints, Is.EqualTo(["grade_mirror", "gauge_lr2"]));
         Assert.That(result.Header.Courses[1].Hashes.Single(), Has.Length.EqualTo(64));
-        Assert.That(result.Header.Courses[1].Gauge, Is.EqualTo("ExClass"));
     }
 
     [Test]

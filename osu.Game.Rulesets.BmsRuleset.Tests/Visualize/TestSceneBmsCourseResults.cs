@@ -82,7 +82,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
             $"sl{index + 7}",
             BeatmapHash: beatmap.Hash)).ToArray();
         var resolvedStages = definitions.Zip(beatmaps, (definition, beatmap) => new BmsResolvedCourseStage(definition, beatmap)).ToArray();
-        var course = new BmsCourseDefinition("visual-course", "Visual Table", "Visual Course", definitions, "Class", []);
+        var course = new BmsCourseDefinition("visual-course", "Visual Table", "Visual Course", definitions, []);
         var session = new BmsCourseSession(
             course,
             resolvedStages,
@@ -109,7 +109,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         var beatmap = createBeatmap("failed-stage", "Failed Stage");
         var definition = new BmsCourseStage("Failed Stage", "sl7", BeatmapHash: beatmap.Hash);
         var session = new BmsCourseSession(
-            new BmsCourseDefinition("failed-course", "Visual Table", "Failed Course", [definition], "Class", []),
+            new BmsCourseDefinition("failed-course", "Visual Table", "Failed Course", [definition], []),
             [new BmsResolvedCourseStage(definition, beatmap)],
             [new BmsModClassGauge()],
             BmsGaugeType.Class);

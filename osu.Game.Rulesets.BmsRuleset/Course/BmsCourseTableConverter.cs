@@ -38,7 +38,6 @@ internal static class BmsCourseTableConverter
                 table.Name,
                 course.Name,
                 stages,
-                parseGauge(course),
                 course.Constraints,
                 courseIndex,
                 table.Symbol);
@@ -63,23 +62,5 @@ internal static class BmsCourseTableConverter
             entry == null ? string.Empty : $"{table.Symbol}{entry.Level}",
             BeatmapHash: hash,
             Artist: entry?.Artist);
-    }
-
-    private static string parseGauge(TableCourse course)
-    {
-        if (!string.IsNullOrWhiteSpace(course.Gauge))
-            return course.Gauge;
-
-        if (course.Constraints.Any(constraint =>
-                constraint.Equals("gauge_exhard", StringComparison.OrdinalIgnoreCase)
-                || constraint.Equals("gauge_exhard_class", StringComparison.OrdinalIgnoreCase)))
-            return "ExHardClass";
-
-        if (course.Constraints.Any(constraint =>
-                constraint.Equals("gauge_ex", StringComparison.OrdinalIgnoreCase)
-                || constraint.Equals("gauge_ex_class", StringComparison.OrdinalIgnoreCase)))
-            return "ExClass";
-
-        return "Class";
     }
 }

@@ -9,7 +9,6 @@ public sealed record BmsCourseDefinition(
     string TableName,
     string Name,
     IReadOnlyList<BmsCourseStage> Stages,
-    string Gauge,
     IReadOnlyList<string> Constraints,
     int Order = int.MaxValue,
     string TableMark = "")
@@ -24,7 +23,6 @@ public sealed record BmsCourseDefinition(
         return Name.Contains(searchTerm, comparison)
                || TableName.Contains(searchTerm, comparison)
                || TableMark.Contains(searchTerm, comparison)
-               || Gauge.Contains(searchTerm, comparison)
                || Constraints.Any(constraint => constraint.Contains(searchTerm, comparison))
                || Stages.Any(stage => stage.Title.Contains(searchTerm, comparison)
                                       || stage.Difficulty.Contains(searchTerm, comparison)

@@ -12,7 +12,6 @@ public class BmsCourseCatalogTest
 
     [TestCase("first", true)]
     [TestCase("table a", true)]
-    [TestCase("class", true)]
     [TestCase("mirror", true)]
     [TestCase("stage song", true)]
     [TestCase("another", false)]
@@ -27,7 +26,6 @@ public class BmsCourseCatalogTest
         table,
         name,
         [new BmsCourseStage("Stage Song", "★1")],
-        "Class",
         ["Mirror"]);
 
     [Test]
@@ -83,7 +81,6 @@ public class BmsCourseCatalogTest
                 {
                     Name = "Satellite EX",
                     Hashes = ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
-                    Gauge = "ExClass",
                 },
             ],
         };
@@ -95,13 +92,11 @@ public class BmsCourseCatalogTest
         {
             Assert.That(courses[0].TableName, Is.EqualTo("Satellite"));
             Assert.That(courses[0].Name, Is.EqualTo("Satellite sl7"));
-            Assert.That(courses[0].Gauge, Is.EqualTo("Class"));
             Assert.That(courses[0].Constraints, Is.EqualTo(["grade_mirror", "gauge_lr2"]));
             Assert.That(courses[0].Stages[0].Title, Is.EqualTo("First Song"));
             Assert.That(courses[0].Stages[0].Artist, Is.EqualTo("First Artist"));
             Assert.That(courses[0].Stages[0].Difficulty, Is.EqualTo("sl7"));
             Assert.That(courses[0].Stages[0].BeatmapHash, Is.EqualTo("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
-            Assert.That(courses[1].Gauge, Is.EqualTo("ExClass"));
             Assert.That(courses[1].Stages[0].Title, Is.EqualTo("Second Song"));
             Assert.That(courses[1].Stages[0].Artist, Is.EqualTo("Second Artist"));
         });

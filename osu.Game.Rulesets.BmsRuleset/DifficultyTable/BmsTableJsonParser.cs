@@ -124,7 +124,6 @@ public static class BmsTableJsonParser
                     Name = course.Name!,
                     Hashes = course.Hashes,
                     Constraints = course.Constraints,
-                    Gauge = course.Gauge,
                 })
                 .ToList() ?? [],
         };
@@ -250,9 +249,6 @@ public static class BmsTableJsonParser
             Name = nameElement.GetString(),
             Hashes = hashes.ToArray(),
             Constraints = readStringArray(element, "constraint"),
-            Gauge = element.TryGetProperty("gauge", out var gaugeElement) && gaugeElement.ValueKind == JsonValueKind.String
-                ? gaugeElement.GetString()
-                : null,
         });
     }
 

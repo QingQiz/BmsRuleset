@@ -47,8 +47,6 @@ public class TableCourse
     public string[] Hashes { get; init; } = [];
 
     public string[] Constraints { get; init; } = [];
-
-    public string? Gauge { get; init; }
 }
 
 /// <summary>
@@ -74,8 +72,6 @@ public class RawCourse
     public string[] Hashes { get; init; } = [];
 
     public string[] Constraints { get; init; } = [];
-
-    public string? Gauge { get; init; }
 }
 
 public class RawChartItem
