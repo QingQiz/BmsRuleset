@@ -36,7 +36,7 @@ public static class BmsLampCalculator
 
         return score.Mods.OfType<BmsModGauge>().FirstOrDefault()?.GaugeType switch
         {
-            BmsGaugeType.AssistEasy => BmsLamp.AssistClear,
+            BmsGaugeType.AssistEasy => BmsLamp.LightAssistClear,
             BmsGaugeType.Easy => BmsLamp.EasyClear,
             BmsGaugeType.Hard => BmsLamp.HardClear,
             BmsGaugeType.ExHard => BmsLamp.ExHardClear,

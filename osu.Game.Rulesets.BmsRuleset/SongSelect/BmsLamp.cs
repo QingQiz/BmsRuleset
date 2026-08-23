@@ -5,6 +5,7 @@ public enum BmsLamp
     NoPlay,
     Failed,
     AssistClear,
+    LightAssistClear,
     EasyClear,
     Clear,
     HardClear,

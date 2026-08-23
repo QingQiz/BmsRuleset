@@ -75,6 +75,13 @@ public class BmsCourseSessionTest
         TotalScore = totalScore,
     };
 
+    private static BmsCourseAttemptData attempt(BmsGaugeType gaugeType) => new()
+    {
+        Status = BmsCourseStatus.Passed,
+        GaugeType = gaugeType,
+        Stages = [],
+    };
+
     [Test]
     public void TestAbortDuringStageStoresPartialScore()
     {
@@ -286,6 +293,89 @@ public class BmsCourseSessionTest
         store.Record("course", BmsCourseStatus.Aborted);
         Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
         Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+        Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
+    }
+
+    [TestCase(BmsGaugeType.Class, BmsLamp.Clear)]
+    [TestCase(BmsGaugeType.ExClass, BmsLamp.HardClear)]
+    [TestCase(BmsGaugeType.ExHardClass, BmsLamp.ExHardClear)]
+    public void TestCourseLampReflectsClassTierOnPass(BmsGaugeType gaugeType, BmsLamp expectedLamp)
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(gaugeType));
+
+        Assert.That(store.GetLamp("course"), Is.EqualTo(expectedLamp));
+    }
+
+    [Test]
+    public void TestCourseLampDefaultsToClearWithoutAttemptData()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A);
+
+        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
+    }
+
+    [TestCase(BmsGaugeType.Class)]
+    [TestCase(BmsGaugeType.ExClass)]
+    [TestCase(BmsGaugeType.ExHardClass)]
+    public void TestCourseLampIgnoresTierOnFail(BmsGaugeType gaugeType)
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+
+        store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, attempt: attempt(gaugeType));
+
+        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Failed));
+    }
+
+    [Test]
+    public void TestCourseLampDoesNotDowngradeHardOrExHardClear()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.ExHardClass));
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.Class));
+
+        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.ExHardClear));
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.ExHardClear));
+    }
+
+    [Test]
+    public void TestCourseLampSurvivesAbortedResultsAndDoesNotDowngradeHardClear()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.ExClass));
+        store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 300_000), attempt(BmsGaugeType.ExClass));
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, attempt: attempt(BmsGaugeType.ExClass));
+        store.Record("course", BmsCourseStatus.Aborted, ScoreRank.F, createScore(false, 100_000));
+
+        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.HardClear));
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.HardClear));
+    }
+
+    [Test]
+    public void TestCourseRankDoesNotFollowLampHierarchy()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, createScore(true, 900_000), attempt(BmsGaugeType.ExHardClass));
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 800_000), attempt(BmsGaugeType.Class));
+        store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 700_000), attempt(BmsGaugeType.Class));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.ExHardClear));
+            Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
+        });
 
         store = new BmsCourseResultStore(courseResultsDirectory);
         Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));

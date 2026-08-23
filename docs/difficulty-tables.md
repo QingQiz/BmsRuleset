@@ -33,10 +33,35 @@ The importer supports three JSON formats:
 - **Combined file** — a single JSON with both header fields (name, symbol, level_order) and `"charts": [...]`
 - **HTML page** — a web page with `<meta name="bmstable" content="URL">` pointing to the JSON
 
-If the table header contains a bmstable `course` array, its courses are also added to BMS course mode. Course stages
-retain their declared order and are matched to installed charts by MD5 or SHA-256. Song titles, artists, and table
-levels are filled from the table's chart data. Trophy definitions are intentionally ignored because course results use
-osu!'s existing score, mod, and pass/fail data.
+## Courses
+
+If the table header contains a bmstable `course` array, its courses are also added to BMS course mode. Each course
+object requires a `name` and a list of stage hashes. Stages retain their declared order and are matched to installed
+charts by MD5 or SHA-256. Song titles, artists, and table levels are filled from the table's chart data; stages whose
+charts are not installed remain unavailable until the matching chart is imported.
+
+The optional `gauge` field records the course's declared gauge (`Class`, `ExClass`, or `ExHardClass`). If omitted, the
+declared tier can be inferred from `gauge_ex`/`gauge_ex_class` or `gauge_exhard`/`gauge_exhard_class` constraints;
+otherwise it defaults to `Class`. During play, the selected Gauge Mod is mapped to the corresponding course tier.
+Gauge-family constraints such as `gauge_lr2`, `gauge_5k`, `gauge_7k`, `gauge_9k`, and `gauge_24k` select the
+corresponding gauge profile.
+
+Minimal example:
+
+```json
+{
+  "name": "Example Table",
+  "symbol": "ex",
+  "course": [
+    {
+      "name": "Example Class",
+      "md5": ["0123456789abcdef0123456789abcdef"],
+      "gauge": "Class",
+      "constraint": ["gauge_7k"]
+    }
+  ]
+}
+```
 
 ## How Markers Work
 

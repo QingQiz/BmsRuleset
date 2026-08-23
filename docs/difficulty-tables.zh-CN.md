@@ -33,9 +33,33 @@
 - **合并文件** — 单个 JSON，同时包含 header 字段（名称、符号、level_order）和 `"charts": [...]`
 - **HTML 页面** — 包含 `<meta name="bmstable" content="URL">` 指向 JSON 的网页
 
-如果难度表表头包含 bmstable `course` 数组，其中的段位也会加入 BMS 段位模式。段位会保留声明顺序，
-并通过 MD5 或 SHA-256 匹配本地谱面；歌曲标题、作曲家和难度等级从难度表的谱面数据中补齐。
-段位的 trophy 定义不会导入，因为段位成绩沿用 osu! 现有的成绩、Mod 和通过/失败状态。
+## 段位
+
+如果难度表表头包含 bmstable `course` 数组，其中的段位也会加入 BMS 段位模式。每个段位对象需要提供 `name`
+和 stage 哈希列表。段位会保留声明顺序，并通过 MD5 或 SHA-256 匹配本地谱面；歌曲标题、作曲家和难度等级从
+难度表的谱面数据中补齐。尚未导入对应谱面的 stage 会显示为不可用，导入匹配谱面后即可游玩。
+
+可选的 `gauge` 字段用于选择段位血条（`Class`、`ExClass` 或 `ExHardClass`）。省略时，可以根据
+`gauge_ex`/`gauge_ex_class` 或 `gauge_exhard`/`gauge_exhard_class` 约束推断；否则默认使用 `Class`。
+`gauge_lr2`、`gauge_5k`、`gauge_7k`、`gauge_9k` 和 `gauge_24k` 等血条系列约束会选择对应的血条配置，
+其它约束会随段位保留并交由规则集处理。
+
+最小示例：
+
+```json
+{
+  "name": "Example Table",
+  "symbol": "ex",
+  "course": [
+    {
+      "name": "Example Class",
+      "md5": ["0123456789abcdef0123456789abcdef"],
+      "gauge": "Class",
+      "constraint": ["gauge_7k"]
+    }
+  ]
+}
+```
 
 ## 标记
 

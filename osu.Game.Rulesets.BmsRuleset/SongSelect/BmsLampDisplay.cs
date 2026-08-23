@@ -86,18 +86,14 @@ public sealed partial class BmsLampDisplay : CompositeDrawable
 
         switch (lamp)
         {
+            // beatoraja default skin cycles two-frame lamp atlas cells every 60 ms (cycle=50 for failed,
+            // cycle=100 for the other flashing lamps; two frames each, so the period is 2 × cycle).
+            case BmsLamp.Failed:
             case BmsLamp.ExHardClear:
-                flashFill.Alpha = syncedPulse(0.15f, 0.65f, 210);
-                break;
-
             case BmsLamp.Max:
             case BmsLamp.Perfect:
             case BmsLamp.FullCombo:
-                flashFill.Alpha = syncedPulse(0.25f, 0.75f, 180);
-                break;
-
-            case BmsLamp.Failed:
-                flashFill.Alpha = irregularPulse();
+                flashFill.Alpha = syncedPulse(0.15f, 0.65f, 60);
                 break;
 
             default:
@@ -119,33 +115,29 @@ public sealed partial class BmsLampDisplay : CompositeDrawable
         return min + (max - min) * wave;
     }
 
-    private float irregularPulse()
-    {
-        var first = (1 + Math.Sin(Time.Current / 73)) / 2;
-        var second = (1 + Math.Sin(Time.Current / 191 + 0.8)) / 2;
-        return (float)(0.15 + 0.65 * first * second);
-    }
-
     private static Color4 baseColourFor(BmsLamp lamp) => lamp switch
     {
-        BmsLamp.NoPlay => new Color4(92, 96, 104, 255),
-        BmsLamp.Failed => new Color4(160, 20, 28, 255),
-        BmsLamp.AssistClear => new Color4(150, 72, 220, 255),
-        BmsLamp.EasyClear => new Color4(65, 185, 80, 255),
-        BmsLamp.Clear => new Color4(45, 120, 230, 255),
-        BmsLamp.HardClear => new Color4(235, 235, 235, 255),
-        BmsLamp.ExHardClear => new Color4(245, 210, 40, 255),
+        BmsLamp.NoPlay => new Color4(40, 44, 48, 255),
+        BmsLamp.Failed => new Color4(233, 47, 10, 255),
+        BmsLamp.AssistClear => new Color4(206, 1, 214, 255),
+        BmsLamp.LightAssistClear => new Color4(221, 162, 223, 255),
+        BmsLamp.EasyClear => new Color4(86, 202, 67, 255),
+        BmsLamp.Clear => new Color4(245, 199, 88, 255),
+        BmsLamp.HardClear => new Color4(248, 247, 245, 255),
+        BmsLamp.ExHardClear => new Color4(239, 253, 9, 255),
         BmsLamp.Max or BmsLamp.Perfect or BmsLamp.FullCombo
-            => new Color4(40, 135, 255, 255),
+            => new Color4(255, 255, 255, 255),
         _ => Color4.White,
     };
 
     private static Color4 flashColourFor(BmsLamp lamp) => lamp switch
     {
-        BmsLamp.Failed => new Color4(255, 40, 40, 255),
-        BmsLamp.ExHardClear => new Color4(220, 35, 20, 255),
-        BmsLamp.Max or BmsLamp.Perfect or BmsLamp.FullCombo
-            => Color4.White,
+        // beatoraja default skin lamp.png atlas, second frame of the two-frame flashing cells.
+        BmsLamp.Failed => new Color4(15, 3, 0, 255),
+        BmsLamp.ExHardClear => new Color4(253, 9, 9, 255),
+        BmsLamp.FullCombo => new Color4(9, 250, 253, 255),
+        BmsLamp.Perfect => new Color4(63, 255, 77, 255),
+        BmsLamp.Max => new Color4(255, 235, 66, 255),
         _ => Color4.Transparent,
     };
 }

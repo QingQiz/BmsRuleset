@@ -57,7 +57,7 @@ public class BmsLampCalculatorTest
     [Test]
     public void TestGaugeLampMapping()
     {
-        Assert.That(BmsLampCalculator.Calculate(score(ScoreRank.D, stats((HitResult.Perfect, 1), (HitResult.Ok, 1)), new BmsModAssistEasyGauge())), Is.EqualTo(BmsLamp.AssistClear));
+        Assert.That(BmsLampCalculator.Calculate(score(ScoreRank.D, stats((HitResult.Perfect, 1), (HitResult.Ok, 1)), new BmsModAssistEasyGauge())), Is.EqualTo(BmsLamp.LightAssistClear));
         Assert.That(BmsLampCalculator.Calculate(score(ScoreRank.D, stats((HitResult.Perfect, 1), (HitResult.Ok, 1)), new BmsModEasyGauge())), Is.EqualTo(BmsLamp.EasyClear));
         Assert.That(BmsLampCalculator.Calculate(score(ScoreRank.D, stats((HitResult.Perfect, 1), (HitResult.Ok, 1)))), Is.EqualTo(BmsLamp.Clear));
         Assert.That(BmsLampCalculator.Calculate(score(ScoreRank.D, stats((HitResult.Perfect, 1), (HitResult.Ok, 1)), new BmsModHardGauge())), Is.EqualTo(BmsLamp.HardClear));

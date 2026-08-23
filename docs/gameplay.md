@@ -34,8 +34,8 @@ the current window unchanged.
 
 ## Gauge
 
-The ruleset implements 6 selectable BMS gauge types covering both Groove and Survival modes.
-Default play uses the Normal gauge. Gauge types are selected via mods:
+The ruleset implements 6 regular BMS gauge types covering both Groove and Survival modes, plus 3 course gauge
+types for BMS course mode. Default play uses the Normal gauge. Gauge types are selected via mods:
 
 > [!NOTE]
 > The gauge values and algorithms are adapted from **beatoraja** (SEVENKEYS mode), itself a reimplementation of the
@@ -50,17 +50,59 @@ Default play uses the Normal gauge. Gauge types are selected via mods:
 | Hard        | **H1**      | Difficulty Increase  | Limit Increment | 100%       | Survive | Fixed red        |
 | EX Hard     | **H2**      | Difficulty Increase  | Limit Increment | 100%       | Survive | Fixed purple     |
 | Hazard      | **H3**      | Difficulty Increase  | Fixed           | 100%       | Survive | Fixed gold       |
+| Class       | **C1**      | Course                | Fixed           | 100%       | Survive | Fixed red        |
+| EX Class    | **C2**      | Course                | Fixed           | 100%       | Survive | Fixed purple     |
+| EX Hard Class | **C3**      | Course                | Fixed           | 100%       | Survive | Fixed gold       |
 
 - **Groove gauges** (E2/E1/Normal): recoverable, start at 20%, must reach clear threshold by song end. Bar colour
   transitions from red (< 20%) → amber (< clear) → green (≥ clear) based on the active gauge's threshold.
 - **Survival gauges** (H1/H2/H3): start at 100%, damage-only (no recovery for H3). Gauge uses a fixed colour with no
   clear line. Pass condition is purely survival (HP never hit 0).
+- **Course gauges** (C1/C2/C3): course-only Survival gauges with fixed red, purple, or gold bars. They carry their
+  remaining HP from one stage to the next; reaching 0% fails the entire course. In course mode, the regular gauge
+  selection is mapped to the corresponding Class tier.
 - Hard (H1) has **guts protection**: below each HP threshold, damage is reduced (below 50% → ×0.8, below 40% → ×0.7,
   …, below 10% → ×0.4).
 - `#TOTAL` controls the maximum gain rate for TOTAL-algorithm gauges. When it is omitted, 5-key, 7-key, PMS, and LR2
   layouts use `max(7.605 × N / (0.01 × N + 6.5), 260)`. 24-key layouts use
   `max(7.605 × (N + 100) / (0.01 × N + 6.5), 300)` (where N = total playable notes).
 - Landmine damage: base-36 value ÷ 2 percent (e.g., `ZZ` = 647.5% → instant wipe).
+
+## Lamps
+
+Song panels, stage panels, and course cards are tinted by a **clear lamp** that marks the best played result.
+Colours, flash behaviour, and the lamp hierarchy follow **beatoraja** (its default skin `lamp.png` atlas, which
+retains the LR2 lamp conventions). The lamp types, from lowest to highest:
+
+| Lamp     | Fill colour | Flash colour | Meaning                                        |
+|----------|-------------|--------------|------------------------------------------------|
+| NO PLAY  | `#282C30`   | —            | no score recorded                              |
+| FAILED   | `#E92F0A`   | `#0F0300`    | failed; flashes at a 60 ms cycle               |
+| L-ASSIST | `#DDA2DF`   | —            | passed with the **Assist Easy** gauge          |
+| EASY     | `#56CA43`   | —            | passed with the Easy gauge                     |
+| NORMAL   | `#F5C758`   | —            | passed with the Normal gauge                   |
+| HARD     | `#F8F7F5`   | —            | passed with the Hard gauge                     |
+| EX-HARD  | `#EFFD09`   | `#FD0909`    | passed with the EX-Hard or Hazard gauge; flashes at a 60 ms cycle |
+| FULL COMBO | `#FFFFFF` | `#09FAFD`    | full combo; flashes at a 60 ms cycle           |
+| PERFECT  | `#FFFFFF`   | `#3FFF4D`    | PGREAT + GREAT only; flashes at a 60 ms cycle  |
+| MAX      | `#FFFFFF`   | `#FFEB42`    | all PGREAT; flashes at a 60 ms cycle           |
+
+A passed score never downgrades a lamp earned from a harder gauge; the panel shows the highest lamp across the
+scores that match the currently selected mods.
+
+Beatoraja also distinguishes pattern-simplification assists (**ASSIST**, dark purple) from the
+Assist Easy *gauge* (**L-ASSIST**); the ruleset currently has no pattern-level assist options,
+so ASSIST is never produced and the Assist Easy gauge earns the L-ASSIST lamp.
+
+### Course Lamps
+
+| Course tier (gauge)  | Lamp    |
+|----------------------|---------|
+| Class (C1)           | NORMAL  |
+| Ex Class (C2)        | HARD    |
+| Ex Hard Class (C3)   | EX-HARD |
+
+Course results never reach the FULL COMBO/PERFECT/MAX tier, so the corresponding lights won't be produced.
 
 ## Mods
 

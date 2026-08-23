@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
@@ -33,9 +34,15 @@ internal sealed class BmsCourseResultStore
         indexPersistedFiles();
     }
 
-    internal BmsLamp GetLamp(string courseId) => tryGetSummary(courseId, out var result) ? result.Lamp : BmsLamp.NoPlay;
+    internal BmsLamp GetLamp(string courseId) =>
+        tryGetSummary(courseId, static x => (int)x.Lamp, out var result)
+            ? result.Lamp
+            : BmsLamp.NoPlay;
 
-    internal ScoreRank? GetRank(string courseId) => tryGetSummary(courseId, out var result) ? result.Rank : null;
+    internal ScoreRank? GetRank(string courseId) =>
+        tryGetSummary(courseId, static x => (int)(x.Rank ?? ScoreRank.F), out var result)
+            ? result.Rank
+            : null;
 
     internal bool TryGet(string courseId, out BmsCourseResult result)
     {
@@ -48,6 +55,9 @@ internal sealed class BmsCourseResultStore
 
         result = default;
         return false;
+
+        static (int Lamp, int Rank, long Score) resultPriority(BmsCourseResult result) =>
+            ((int)result.Lamp, (int)(result.Rank ?? ScoreRank.F), result.Score?.TotalScore ?? 0);
     }
 
     internal IReadOnlyList<BmsCourseResult> GetHistory(string courseId)
@@ -133,7 +143,7 @@ internal sealed class BmsCourseResultStore
             return;
 
         var result = status == BmsCourseStatus.Passed
-            ? new BmsCourseResult(BmsLamp.Clear, rank is null or ScoreRank.F ? ScoreRank.A : rank, BmsCourseScoreData.From(score), attempt)
+            ? new BmsCourseResult(lampFor(attempt?.GaugeType), rank is null or ScoreRank.F ? ScoreRank.A : rank, BmsCourseScoreData.From(score), attempt)
             : new BmsCourseResult(BmsLamp.Failed, ScoreRank.F, BmsCourseScoreData.From(score), attempt);
 
         var file = fileFor(courseId, result);
@@ -151,6 +161,14 @@ internal sealed class BmsCourseResultStore
         }
 
         Changed?.Invoke(courseId);
+        return;
+
+        static BmsLamp lampFor(BmsGaugeType? gaugeType) => gaugeType switch
+        {
+            BmsGaugeType.ExHardClass => BmsLamp.ExHardClear,
+            BmsGaugeType.ExClass => BmsLamp.HardClear,
+            _ => BmsLamp.Clear,
+        };
     }
 
     private void indexPersistedFiles()
@@ -171,12 +189,12 @@ internal sealed class BmsCourseResultStore
                 if (!int.TryParse(parts[^3], out var lampValue)
                     || !Enum.IsDefined(typeof(BmsLamp), lampValue)
                     || !tryParseRank(parts[^2], out var rank)
-                    || !long.TryParse(parts[^1], out var score))
+                    || !long.TryParse(parts[^1], out _))
                     continue;
 
                 if (!indexByCourseKey.TryGetValue(courseKey, out var entries))
                     indexByCourseKey[courseKey] = entries = [];
-                entries.Add(new IndexedCourseResult(file, (BmsLamp)lampValue, rank, score));
+                entries.Add(new IndexedCourseResult(file, (BmsLamp)lampValue, rank));
             }
         }
     }
@@ -198,13 +216,13 @@ internal sealed class BmsCourseResultStore
     private static string courseKeyFor(string courseId) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(courseId)));
 
-    private bool tryGetSummary(string courseId, out IndexedCourseResult result)
+    private bool tryGetSummary<TKey>(string courseId, Func<IndexedCourseResult, TKey> priority, out IndexedCourseResult result)
     {
         lock (sync)
         {
             if (indexByCourseKey.TryGetValue(courseKeyFor(courseId), out var entries) && entries.Count > 0)
             {
-                result = entries.MaxBy(indexedResultPriority);
+                result = entries.MaxBy(priority);
                 return true;
             }
 
@@ -246,16 +264,10 @@ internal sealed class BmsCourseResultStore
         }
     }
 
-    private static (int Lamp, int Rank, long Score) resultPriority(BmsCourseResult result) =>
-        (result.Lamp == BmsLamp.Clear ? 1 : 0, (int)(result.Rank ?? ScoreRank.F), result.Score?.TotalScore ?? 0);
-
-    private static (int Lamp, int Rank, long Score) indexedResultPriority(IndexedCourseResult result) =>
-        (result.Lamp == BmsLamp.Clear ? 1 : 0, (int)(result.Rank ?? ScoreRank.F), result.Score);
-
-    private readonly record struct IndexedCourseResult(string Path, BmsLamp Lamp, ScoreRank? Rank, long Score)
+    private readonly record struct IndexedCourseResult(string Path, BmsLamp Lamp, ScoreRank? Rank)
     {
         internal static IndexedCourseResult From(string path, BmsCourseResult result) =>
-            new(path, result.Lamp, result.Rank, result.Score?.TotalScore ?? 0);
+            new(path, result.Lamp, result.Rank);
     }
 }
 
@@ -299,7 +311,10 @@ internal sealed record BmsCourseStageAttemptData
 
 internal sealed record BmsCourseScoreData
 {
-    public long TotalScore { get; init; }
+    // System.Text.Json skips non-public accessors unless annotated, which would silently
+    // round-trip persisted results with TotalScore = 0.
+    [JsonInclude]
+    public long TotalScore { get; private init; }
 
     internal static BmsCourseScoreData? From(ScoreInfo? score) => score == null
         ? null
