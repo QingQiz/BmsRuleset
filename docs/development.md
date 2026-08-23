@@ -70,7 +70,6 @@ The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                |
 | **Renderer**  | POOR BGA duration hardcoded 500ms (beatoraja uses config-driven `misslayerDuration`)     | 3        |
 | **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                   | 3        |
-| **Scoring**   | Course constraints that alter judgement windows, including NO_GOOD/NO_GREAT              | 4        |
 | **Scoring**   | beatoraja non-default judge algorithms: Duration, Lowest, Score                          | 4        |
 | **Skin**      | `HitGreat` → `HitGreatSlow` / `HitGreatFast` split images                                |
 | **Skin**      | E-POOR judgement image                                                                   | 3        |

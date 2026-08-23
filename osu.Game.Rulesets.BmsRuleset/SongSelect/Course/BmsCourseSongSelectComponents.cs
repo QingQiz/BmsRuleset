@@ -136,6 +136,7 @@ internal partial class BmsCourseTitleWedge : VisibilityContainer
     private OsuSpriteText tableText = null!;
     private OsuSpriteText titleText = null!;
     private OsuSpriteText summaryText = null!;
+    private OsuSpriteText constraintText = null!;
 
     internal BmsCourseTitleWedge(IBindable<BmsCourseDefinition?> selectedCourse)
     {
@@ -185,6 +186,11 @@ internal partial class BmsCourseTitleWedge : VisibilityContainer
                         RelativeSizeAxes = Axes.X,
                         Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold, italics: false),
                     }),
+                    unShear(constraintText = new OsuSpriteText
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold, italics: false),
+                    }),
                 ],
             },
         ];
@@ -213,7 +219,29 @@ internal partial class BmsCourseTitleWedge : VisibilityContainer
         summaryText.Text = course == null
             ? BmsStrings.SelectCourseForDetails
             : BmsStrings.CourseTitleSummary(course.Stages.Count);
+        constraintText.Text = course == null
+            ? string.Empty
+            : string.Join(" · ", course.Constraints.Select(formatConstraint));
     }
+
+    private static string formatConstraint(string constraint) => constraint.ToLowerInvariant() switch
+    {
+        "grade" => "GRADE",
+        "grade_mirror" => "GRADE MIRROR",
+        "grade_random" => "GRADE RANDOM",
+        "no_speed" => "NO SPEED",
+        "no_good" => "NO GOOD",
+        "no_great" => "NO GREAT",
+        "gauge_lr2" => "GAUGE LR2",
+        "gauge_5k" => "GAUGE 5K",
+        "gauge_7k" => "GAUGE 7K",
+        "gauge_9k" => "GAUGE 9K",
+        "gauge_24k" => "GAUGE 24K",
+        "ln" => "LN",
+        "cn" => "CN",
+        "hcn" => "HCN",
+        _ => constraint,
+    };
 
     private static Drawable unShear(Drawable drawable)
     {
@@ -856,8 +884,11 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
     private void cancelPendingRefresh()
     {
         Interlocked.Increment(ref refreshGeneration);
+        // Deliberately no Dispose: in-flight Realm tasks and continuations may still access
+        // `cancellation.Token` after cancellation (see refreshIsCurrent), and accessing a token
+        // on a disposed source throws ObjectDisposedException. The CTS has a finaliser that
+        // releases its kernel handle, and refreshes are infrequent.
         refreshCancellation?.Cancel();
-        refreshCancellation?.Dispose();
         refreshCancellation = null;
         AlwaysPresent = false;
     }

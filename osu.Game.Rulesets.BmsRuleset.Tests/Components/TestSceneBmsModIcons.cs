@@ -42,6 +42,8 @@ public partial class TestSceneBmsModIcons : OsuTestScene
                         Spacing = new Vector2(20, 0),
                         Children =
                         [
+                            createIcon(new BmsModNoGood()),
+                            createIcon(new BmsModNoGreat()),
                             createIcon(new BmsModHideScratch()),
                             createIcon(new BmsModAutoScratch()),
                             createIcon(new BmsModAutoGauge()),

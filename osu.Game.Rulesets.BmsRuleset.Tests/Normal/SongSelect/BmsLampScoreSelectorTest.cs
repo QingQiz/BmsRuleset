@@ -162,6 +162,33 @@ public class BmsLampScoreSelectorTest
         Assert.That(BmsLampScoreSelector.SelectBest([harderClear, easierFullCombo], [new BmsModHideScratch()]), Is.SameAs(easierFullCombo));
     }
 
+    [TestCase(typeof(BmsModNoGood))]
+    [TestCase(typeof(BmsModNoGreat))]
+    public void TestNoGoodNoGreatModsMatchLikeDifficultyIncreaseMods(Type modType)
+    {
+        var noModScore = score(1_000);
+        var constrainedScore = score(900, create(modType));
+
+        // An unselected NG/NE score does not match the unmodified selection.
+        Assert.That(BmsLampScoreSelector.SelectBest([constrainedScore, noModScore], []), Is.SameAs(noModScore));
+
+        // Selecting NG/NE hides the unmodified score (difficulty-increase matching).
+        Assert.That(BmsLampScoreSelector.SelectBest([noModScore], [create(modType)]), Is.Null);
+
+        // A NG/NE score only matches when the same mod is selected.
+        Assert.That(BmsLampScoreSelector.SelectBest([constrainedScore], [create(modType)]), Is.SameAs(constrainedScore));
+    }
+
+    [Test]
+    public void TestNoGoodAndNoGreatScoresDoNotCrossMatch()
+    {
+        var noGoodScore = score(1_000, new BmsModNoGood());
+        var noGreatScore = score(900, new BmsModNoGreat());
+
+        Assert.That(BmsLampScoreSelector.SelectBest([noGreatScore], [new BmsModNoGood()]), Is.Null);
+        Assert.That(BmsLampScoreSelector.SelectBest([noGoodScore], [new BmsModNoGreat()]), Is.Null);
+    }
+
     [Test]
     public void TestBestMatchingScoreUsesPanelLocalRankOrdering()
     {

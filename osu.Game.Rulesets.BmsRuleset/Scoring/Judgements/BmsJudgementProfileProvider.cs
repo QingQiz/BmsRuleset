@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
@@ -10,6 +12,17 @@ public static class BmsJudgementProfileProvider
     private static readonly double[] rank_rates = [0.25, 0.50, 0.75, 1.00, 1.25];
     private static readonly double[] pms_rank_rates = [0.33, 0.50, 0.70, 1.00, 1.33];
     private static readonly ConcurrentDictionary<ProfileKey, BmsJudgementProfile> profiles = new();
+
+    private static IReadOnlyList<IApplicableToJudgementWindow> activeWindowMods = [];
+
+    internal static void SetActiveWindowMods(IReadOnlyList<IApplicableToJudgementWindow> mods)
+        => activeWindowMods = mods;
+
+    internal static void ClearActiveWindowMods(IReadOnlyList<IApplicableToJudgementWindow> mods)
+    {
+        if (ReferenceEquals(activeWindowMods, mods))
+            activeWindowMods = [];
+    }
 
     public static BmsJudgementWindowTable GetTable(BmsLayoutVariant layout, int column, int rank, bool tail)
         => getTable(layout, column, RateForRank(layout, rank), tail);
@@ -28,13 +41,18 @@ public static class BmsJudgementProfileProvider
         var profile = profiles.GetOrAdd(new ProfileKey(layout, judgementRate), static key => createProfile(key.Layout, key.Rate));
         var scratch = BmsLayout.IsScratchColumn(column, layout);
 
-        return tail
+        var table = tail
             ? scratch
                 ? profile.LongScratchTail
                 : profile.LongNoteTail
             : scratch
                 ? profile.Scratch
                 : profile.Normal;
+
+        foreach (var mod in activeWindowMods)
+            table = mod.ApplyToJudgementWindow(table);
+
+        return table;
     }
 
     private static double rateForLayoutRank(BmsLayoutVariant layout, int rank)

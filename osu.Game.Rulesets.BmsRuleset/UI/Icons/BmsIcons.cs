@@ -17,5 +17,9 @@ public static class BmsIcons
 
     public static IconUsage AutoGauge => get(0xE003);
 
+    public static IconUsage NoGood => get(0xE004);
+
+    public static IconUsage NoGreat => get(0xE005);
+
     private static IconUsage get(int codepoint) => new((char)codepoint, font_name);
 }

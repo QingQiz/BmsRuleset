@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Mods;
@@ -52,7 +55,13 @@ internal sealed class BmsCourseSession
 
     internal BmsGaugeType GaugeType { get; }
 
-    internal BmsGaugeProfileFamily? GaugeProfileFamilyOverride { get; }
+    private BmsGaugeProfileFamily? gaugeProfileFamilyOverride { get; }
+
+    /// <summary>
+    ///     Whether the course declares the <c>no_speed</c> constraint. Applied at play start by
+    ///     locking the playfield scroll speed rather than via a mod.
+    /// </summary>
+    internal bool HasNoSpeedConstraint { get; }
 
     internal BmsCourseStatus Status { get; private set; } = BmsCourseStatus.InProgress;
 
@@ -76,7 +85,8 @@ internal sealed class BmsCourseSession
         this.stages = stages.Select(stage => new BmsCourseStageAttempt(stage)).ToArray();
         Mods = mods.Select(mod => mod.DeepClone()).ToArray();
         GaugeType = gaugeType;
-        GaugeProfileFamilyOverride = ResolveCourseGaugeProfileFamily(course.Constraints);
+        gaugeProfileFamilyOverride = ResolveCourseGaugeProfileFamily(course.Constraints);
+        HasNoSpeedConstraint = course.Constraints.Any(constraint => constraint.Equals("no_speed", StringComparison.OrdinalIgnoreCase));
         CurrentGaugeStates = [];
 
         if (this.stages.Length == 0)
@@ -238,21 +248,157 @@ internal sealed class BmsCourseSession
         return family;
     }
 
-    internal static IReadOnlyList<Mod> CreateCourseMods(IEnumerable<Mod> selectedMods, BmsGaugeType gaugeType)
+    internal static IReadOnlyList<Mod> CreateCourseMods(IReadOnlyList<Mod> selectedMods, BmsGaugeType gaugeType, IEnumerable<string>? constraints = null)
     {
         var selected = selectedMods.ToArray();
         var usesAutoGauge = selected.Any(mod => mod is BmsModAutoGauge);
-        var mods = selected.Where(mod => mod is not BmsModGauge and not BmsModAutoGauge)
+        var constraintMods = CreateConstraintMods(constraints ?? []);
+        var requiredMods = ResolveRequiredMods(selected, constraintMods);
+        var hasLnConstraint = requiredMods.Any(mod => mod is BmsModLongNoteModeBase);
+        var forbidden = ResolveForbiddenModTypes(constraints ?? []).ToArray();
+
+        var mods = selected
+            .Where(mod => mod is not BmsModGauge and not BmsModAutoGauge)
+            .Where(mod => !hasLnConstraint || mod is not BmsModLongNoteModeBase)
+            .Where(mod => !forbidden.Any(type => type.IsInstanceOfType(mod)))
             .Select(mod => mod.DeepClone())
             .ToList();
 
         mods.Add(usesAutoGauge ? new BmsModAutoGauge() : CreateGaugeMod(gaugeType));
+
+        // A required NE replaces a user-selected NG (the course demands the stricter one).
+        if (requiredMods.Any(mod => mod is BmsModNoGreat))
+            mods.RemoveAll(mod => mod is BmsModNoGood);
+
+        foreach (var required in requiredMods)
+        {
+            if (mods.All(mod => mod.GetType() != required.GetType()))
+                mods.Add(required);
+        }
+
         return mods;
+    }
+
+    /// <summary>
+    ///     Returns the constraint mods that must be active for the course, dropping a required
+    ///     NG/NE when the user already selected an equal or stricter judgement constraint.
+    /// </summary>
+    internal static IReadOnlyList<Mod> ResolveRequiredMods(IReadOnlyList<Mod> selectedMods, IReadOnlyList<Mod> constraintMods)
+    {
+        var selectedConstraint = selectedMods.OfType<BmsModNoGreat>().Any() ? 0
+            : selectedMods.OfType<BmsModNoGood>().Any() ? 1
+            : 2;
+
+        return constraintMods.Where(mod => mod is BmsModNoGreat
+                ? selectedConstraint > 0
+                : mod is not BmsModNoGood || selectedConstraint > 1)
+            .ToArray();
+    }
+
+    internal static List<Mod> CreateConstraintMods(IEnumerable<string> constraints)
+    {
+        var mods = new List<Mod>();
+        var lnMode = BmsLongNoteMode.Undefined;
+        var judgementConstraint = 2;
+
+        foreach (var constraint in constraints.Select(constraint => constraint.ToLowerInvariant()))
+        {
+            switch (constraint)
+            {
+                case "no_good":
+                    judgementConstraint = Math.Min(judgementConstraint, 1);
+                    break;
+
+                case "no_great":
+                    judgementConstraint = Math.Min(judgementConstraint, 0);
+                    break;
+
+                case "ln":
+                    lnMode = BmsLongNoteMode.LongNote;
+                    break;
+
+                case "cn":
+                    lnMode = BmsLongNoteMode.ChargeNote;
+                    break;
+
+                case "hcn":
+                    lnMode = BmsLongNoteMode.HellChargeNote;
+                    break;
+            }
+        }
+
+        if (judgementConstraint == 0)
+            mods.Add(new BmsModNoGreat());
+        else if (judgementConstraint == 1)
+            mods.Add(new BmsModNoGood());
+
+        if (lnMode != BmsLongNoteMode.Undefined)
+            mods.Add(lnMode switch
+            {
+                BmsLongNoteMode.LongNote => new BmsModLongNote(),
+                BmsLongNoteMode.ChargeNote => new BmsModChargeNote(),
+                _ => new BmsModHellChargeNote(),
+            });
+
+        return mods;
+    }
+
+    /// <summary>
+    ///     Returns the mod types the given course constraints forbid the user from selecting.
+    ///     Used to adjust the selected mods and to disable the matching entries in the mod select
+    ///     overlay while the course is selected, mirroring beatoraja's select-screen handling.
+    /// </summary>
+    internal static IEnumerable<Type> ResolveForbiddenModTypes(IEnumerable<string> constraints)
+    {
+        var forbidden = new HashSet<Type>();
+
+        foreach (var constraint in constraints.Select(constraint => constraint.ToLowerInvariant()))
+        {
+            switch (constraint)
+            {
+                // grade: only IDENTITY survives — mirror and all shuffles are forbidden.
+                case "grade":
+                    forbidden.Add(typeof(BmsModMirror));
+                    forbidden.Add(typeof(BmsModLaneRandom));
+                    forbidden.Add(typeof(BmsModNoteRandom));
+                    forbidden.Add(typeof(BmsModRotationRandom));
+                    break;
+
+                // grade_mirror: MIRROR or IDENTITY; shuffles are forbidden.
+                case "grade_mirror":
+                    forbidden.Add(typeof(BmsModLaneRandom));
+                    forbidden.Add(typeof(BmsModNoteRandom));
+                    forbidden.Add(typeof(BmsModRotationRandom));
+                    break;
+
+                // no_speed fixes the scroll speed, so constant scroll must not override it either.
+                case "no_speed":
+                    forbidden.Add(typeof(BmsModConstant));
+                    break;
+
+                case "ln":
+                    forbidden.Add(typeof(BmsModChargeNote));
+                    forbidden.Add(typeof(BmsModHellChargeNote));
+                    break;
+
+                case "cn":
+                    forbidden.Add(typeof(BmsModLongNote));
+                    forbidden.Add(typeof(BmsModHellChargeNote));
+                    break;
+
+                case "hcn":
+                    forbidden.Add(typeof(BmsModLongNote));
+                    forbidden.Add(typeof(BmsModChargeNote));
+                    break;
+            }
+        }
+
+        return forbidden;
     }
 
     internal void ConfigureHealthProcessor(BmsHealthProcessor healthProcessor)
     {
-        healthProcessor.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: GaugeProfileFamilyOverride);
+        healthProcessor.ConfigureGaugeContext(isCourseGaugeMode: true, familyOverride: gaugeProfileFamilyOverride);
 
         var usesAutoGauge = Mods.Any(mod => mod is BmsModAutoGauge);
         var initialStates = CurrentGaugeStates.Where(state => !state.Failed).ToArray();
@@ -267,7 +413,7 @@ internal sealed class BmsCourseSession
         healthProcessor.SetGaugeTypes(
             gaugeTypes,
             replaceExisting: true,
-            profileFamilyOverride: GaugeProfileFamilyOverride,
+            profileFamilyOverride: gaugeProfileFamilyOverride,
             initialStates: initialStates);
     }
 

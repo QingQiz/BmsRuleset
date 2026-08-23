@@ -7,10 +7,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 
 public sealed class BmsJudgementWindowTable
 {
-    private readonly BmsJudgementWindow[] hitWindows;
-    private readonly BmsJudgementWindow? missWindow;
     private readonly double? goodFastDTime;
     private readonly double? passivePoorOffset;
+
+    public IReadOnlyList<BmsJudgementWindow> HitWindows { get; }
+
+    public BmsJudgementWindow? MissWindow { get; }
 
     public BmsJudgementWindowTable(IEnumerable<BmsJudgementWindow> rows)
     {
@@ -43,15 +45,15 @@ public sealed class BmsJudgementWindowTable
             }
         }
 
-        hitWindows = hits;
-        missWindow = miss;
+        HitWindows = hits;
+        MissWindow = miss;
     }
 
     public double GoodFastDTime => goodFastDTime ?? throw new InvalidOperationException("Sequence contains no matching element");
 
     public HitResult ResultForOffset(double timeOffset)
     {
-        foreach (var row in hitWindows)
+        foreach (var row in HitWindows)
         {
             if (row.ContainsOffset(timeOffset))
                 return row.Result;
@@ -62,16 +64,14 @@ public sealed class BmsJudgementWindowTable
 
     public bool IsEmptyPoorOffset(double timeOffset)
     {
-        if (missWindow == null || !missWindow.Value.ContainsOffset(timeOffset))
+        if (MissWindow == null || !MissWindow.Value.ContainsOffset(timeOffset))
             return false;
 
         return ResultForOffset(timeOffset) == HitResult.None;
     }
 
-    public bool IsPastPassivePoorOffset(double timeOffset)
-    {
-        return timeOffset > (passivePoorOffset ?? throw new InvalidOperationException("Sequence contains no matching element"));
-    }
+    public bool IsPastPassivePoorOffset(double timeOffset) =>
+        timeOffset > (passivePoorOffset ?? throw new InvalidOperationException("Sequence contains no matching element"));
 
     public double FrameworkWindowFor(HitResult result)
     {
@@ -98,9 +98,9 @@ public sealed class BmsJudgementWindowTable
     private BmsJudgementWindow? rowFor(HitResult result)
     {
         if (result == HitResult.Miss)
-            return missWindow;
+            return MissWindow;
 
-        foreach (var row in hitWindows)
+        foreach (var row in HitWindows)
         {
             if (row.Result == result)
                 return row;

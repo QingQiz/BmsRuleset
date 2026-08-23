@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
@@ -12,6 +13,8 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
+using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
@@ -93,6 +96,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
     protected override void Dispose(bool isDisposing)
     {
+        BmsJudgementProfileProvider.ClearActiveWindowMods(windowMods);
+
         var previewRestoreTime = isDisposing ? gameplayClockContainer?.CurrentTime : null;
 
         base.Dispose(isDisposing);
@@ -121,7 +126,15 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             BmsBranchReplayState.EnsureBranchReplayMod(replayScore, bmsBeatmap.BranchDecisions);
     }
 
-    protected override Playfield CreatePlayfield() => new BmsPlayfield((BmsBeatmap)Beatmap);
+    private IReadOnlyList<IApplicableToJudgementWindow> windowMods = [];
+
+    protected override Playfield CreatePlayfield()
+    {
+        windowMods = Mods.OfType<IApplicableToJudgementWindow>().ToArray();
+        BmsJudgementProfileProvider.SetActiveWindowMods(windowMods);
+
+        return new BmsPlayfield((BmsBeatmap)Beatmap);
+    }
 
     protected override void LoadComplete()
     {

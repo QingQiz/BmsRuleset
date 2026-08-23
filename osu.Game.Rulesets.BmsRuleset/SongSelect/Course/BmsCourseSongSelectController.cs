@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
@@ -15,10 +16,12 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Input.Bindings;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Result.Course;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
 
@@ -48,6 +51,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     private readonly BmsCourseCatalog catalog;
     private readonly SoloSongSelect songSelect;
+    private readonly Func<ModSelectOverlay?> modSelectAccessor;
     private readonly BeatmapTitleWedge originalTitle;
     private readonly BeatmapDetailsArea originalDetails;
     private readonly FilterControl originalFilter;
@@ -80,6 +84,11 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     private Sample? confirmSelectionSample;
     private WorkingBeatmap? beatmapBeforeCourseMode;
     private ScheduledDelegate? pendingCoursePreviewUpdate;
+    private Mod[] modsBeforeCourseMode = [];
+    private Mod[] userMods = [];
+    private Mod[] lockedMods = [];
+    private bool adjustingMods;
+    private BmsCourseDefinition? modsAdjustedForCourse;
 
     [Resolved]
     private BeatmapManager beatmaps { get; set; } = null!;
@@ -90,6 +99,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     internal BmsCourseSongSelectController(
         BmsCourseCatalog catalog,
         SoloSongSelect songSelect,
+        Func<ModSelectOverlay?> modSelectAccessor,
         FillFlowContainer wedgesContainer,
         BeatmapTitleWedge originalTitle,
         BeatmapDetailsArea originalDetails,
@@ -100,6 +110,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     {
         this.catalog = catalog;
         this.songSelect = songSelect;
+        this.modSelectAccessor = modSelectAccessor;
         this.wedgesContainer = wedgesContainer;
         this.originalTitle = originalTitle;
         this.originalDetails = originalDetails;
@@ -160,6 +171,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         CourseCarousel.MatchesChanged += matchesChanged;
         SearchTerm.BindValueChanged(searchChanged);
         catalog.Changed += catalogChanged;
+        songSelect.Mods.BindValueChanged(onModsChanged);
         CourseCarousel.SetCourses(catalog.Courses);
     }
 
@@ -206,7 +218,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             return;
         }
 
-        var mods = BmsCourseSession.CreateCourseMods(songSelect.Mods.Value, gaugeType);
+        var mods = BmsCourseSession.CreateCourseMods(songSelect.Mods.Value, gaugeType, course.Constraints);
         var session = new BmsCourseSession(course, resolvedStages.Cast<BmsResolvedCourseStage>(), mods, gaugeType);
         var originalBeatmap = beatmapBeforeCourseMode ?? songSelect.Beatmap.Value;
 
@@ -241,6 +253,11 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
         State.Value = Visibility.Visible;
         randomButton?.Enabled.Value = false;
+        modsBeforeCourseMode = songSelect.Mods.Value.Where(x => x is not null).ToArray();
+        userMods = modsBeforeCourseMode.Select(mod => mod.DeepClone()).ToArray();
+        lockedMods = [];
+        modsAdjustedForCourse = null;
+        applyModsForCourse(selectedCourse.Value);
         applyModeVisibility();
         queueCoursePreview(selectedCourse.Value);
         CourseModeChanged?.Invoke(true);
@@ -256,6 +273,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         courseHistory.CancelPendingRefresh();
         State.Value = Visibility.Hidden;
         restoreBeatmapBeforeCourseMode();
+        restoreModsBeforeCourseMode();
         randomButton?.Enabled.Value = randomButtonEnabledBeforeCourseMode;
         applyModeVisibility();
         CourseModeChanged?.Invoke(false);
@@ -285,6 +303,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     {
         catalog.Changed -= catalogChanged;
         SearchTerm.ValueChanged -= searchChanged;
+        songSelect.Mods.ValueChanged -= onModsChanged;
         CourseCarousel.CourseSelected -= courseSelected;
         CourseCarousel.CourseActivated -= courseActivated;
         CourseCarousel.MatchesChanged -= matchesChanged;
@@ -402,7 +421,10 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         selectedCourse.Value = course;
 
         if (IsCourseMode)
+        {
+            applyModsForCourse(course);
             queueCoursePreview(course);
+        }
     }
 
     private void courseActivated() => StartRequested?.Invoke();
@@ -480,6 +502,133 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
         songSelect.Beatmap.Value = beatmapBeforeCourseMode;
         beatmapBeforeCourseMode = null;
+    }
+
+    /// <summary>
+    ///     Adjusts the user's mod selection for the given course. The user's manual mod set
+    ///     (<see cref="userMods"/>) is the source of truth while course mode is active: required
+    ///     constraint mods are added, and mods forbidden by the course are dropped from the active
+    ///     selection (while staying in the manual set so they come back when the course changes).
+    /// </summary>
+    private void applyModsForCourse(BmsCourseDefinition? course)
+    {
+        lockedMods = course == null
+            ? []
+            : BmsCourseSession.ResolveRequiredMods(userMods, BmsCourseSession.CreateConstraintMods(course.Constraints))
+                .Select(mod => mod.DeepClone())
+                .ToArray();
+
+        var forbidden = course == null
+            ? []
+            : BmsCourseSession.ResolveForbiddenModTypes(course.Constraints).ToArray();
+
+        var mods = userMods
+            .Where(mod => !forbidden.Any(type => type.IsInstanceOfType(mod)))
+            .ToList();
+
+        foreach (var locked in lockedMods)
+        {
+            if (mods.All(mod => mod.GetType() != locked.GetType()))
+                mods.Add(locked);
+        }
+
+        setMods(mods.ToArray());
+        modsAdjustedForCourse = course;
+        updateModSelectFilter(course);
+    }
+
+    /// <summary>
+    ///     Removes mods forbidden by the selected course from the mod select overlay entirely
+    ///     (via <see cref="ModSelectOverlay.IsValidMod"/>), and restores the full list when
+    ///     course mode is hidden.
+    /// </summary>
+    private void updateModSelectFilter(BmsCourseDefinition? course)
+    {
+        var modSelect = modSelectAccessor();
+        if (modSelect == null)
+            return;
+
+        var forbidden = course == null
+            ? []
+            : BmsCourseSession.ResolveForbiddenModTypes(course.Constraints).ToArray();
+
+        modSelect.IsValidMod = forbidden.Length == 0
+            ? _ => true
+            : mod => !forbidden.Any(type => type.IsInstanceOfType(mod));
+    }
+
+    private void setMods(IReadOnlyList<Mod> mods)
+    {
+        adjustingMods = true;
+        try
+        {
+            songSelect.Mods.Value = mods;
+        }
+        finally
+        {
+            adjustingMods = false;
+        }
+    }
+
+    private void restoreModsBeforeCourseMode()
+    {
+        if (modsBeforeCourseMode.Length == 0 && modsAdjustedForCourse == null)
+            return;
+
+        setMods(modsBeforeCourseMode);
+        modsAdjustedForCourse = null;
+        modsBeforeCourseMode = [];
+        userMods = [];
+        lockedMods = [];
+        updateModSelectFilter(null);
+    }
+
+    /// <summary>
+    ///     Observes user-driven mod changes while course mode is active. The user's manual mod set
+    ///     (<see cref="userMods"/>) is diffed against the effective selection: additions are recorded,
+    ///     removals drop the mod from the manual set, and a required constraint mod that the user
+    ///     tries to remove is re-applied. Mods hidden by the current course's constraints stay in
+    ///     the manual set and come back once they are allowed again.
+    /// </summary>
+    private void onModsChanged(ValueChangedEvent<IReadOnlyList<Mod>> change)
+    {
+        if (adjustingMods || !IsCourseMode || modsAdjustedForCourse == null)
+            return;
+
+        var added = change.NewValue
+            .Where(mod => change.OldValue.All(old => old.GetType() != mod.GetType()))
+            .ToArray();
+        var removed = change.OldValue
+            .Where(mod => change.NewValue.All(next => next.GetType() != mod.GetType()))
+            .ToArray();
+
+        foreach (var mod in added)
+        {
+            if (lockedMods.Any(locked => locked.GetType() == mod.GetType()))
+                continue;
+
+            if (userMods.All(user => user.GetType() != mod.GetType()))
+                userMods = [.. userMods, mod.DeepClone()];
+        }
+
+        var removedLockedMod = false;
+
+        foreach (var mod in removed)
+        {
+            if (lockedMods.Any(locked => locked.GetType() == mod.GetType()))
+            {
+                removedLockedMod = true;
+                continue;
+            }
+
+            userMods = userMods.Where(user => user.GetType() != mod.GetType()).ToArray();
+        }
+
+        // Re-apply the current course's constraints after any manual change so newly added mods
+        // forbidden by the course are dropped from the active selection (they stay in userMods
+        // and come back once the course allows them again).
+        if (added.Length > 0 || removedLockedMod)
+            applyModsForCourse(modsAdjustedForCourse);
     }
 
     private static void restoreVisibility(VisibilityContainer container, Visibility state)

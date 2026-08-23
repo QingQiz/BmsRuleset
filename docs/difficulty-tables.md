@@ -40,28 +40,26 @@ object requires a `name` and a list of stage hashes. Stages retain their declare
 charts by MD5 or SHA-256. Song titles, artists, and table levels are filled from the table's chart data; stages whose
 charts are not installed remain unavailable until the matching chart is imported.
 
-The optional `gauge` field records the course's declared gauge (`Class`, `ExClass`, or `ExHardClass`). If omitted, the
-declared tier can be inferred from `gauge_ex`/`gauge_ex_class` or `gauge_exhard`/`gauge_exhard_class` constraints;
-otherwise it defaults to `Class`. During play, the selected Gauge Mod is mapped to the corresponding course tier.
-Gauge-family constraints such as `gauge_lr2`, `gauge_5k`, `gauge_7k`, `gauge_9k`, and `gauge_24k` select the
-corresponding gauge profile.
+Courses do not declare a gauge tier; like beatoraja, the selected Gauge Mod is mapped onto the three course
+gauge tiers (Class, EX Class, EX Hard Class) at play time. The course's `constraint` array is shown in the
+course select title area and enforced during play.
 
-Minimal example:
-
-```json
-{
-  "name": "Example Table",
-  "symbol": "ex",
-  "course": [
-    {
-      "name": "Example Class",
-      "md5": ["0123456789abcdef0123456789abcdef"],
-      "gauge": "Class",
-      "constraint": ["gauge_7k"]
-    }
-  ]
-}
-```
+| Constraint    | Effect                                                  |
+|---------------|---------------------------------------------------------|
+| `grade`       | Only the default layout; no mirror or random            |
+| `grade_mirror`| Mirror or default layout                                |
+| `grade_random`| —                                                       |
+| `no_speed`    | Locks the in-play scroll speed and disable Constant mod |
+| `no_good`     | Removes the GOOD judgement window                       |
+| `no_great`    | Removes the GREAT and GOOD judgement windows            |
+| `gauge_lr2`   | Forces the LR2 gauge profile                            |
+| `gauge_5k`    | Forces the 5-key gauge profile                          |
+| `gauge_7k`    | Forces the 7-key gauge profile                          |
+| `gauge_9k`    | Forces the PMS gauge profile                            |
+| `gauge_24k`   | Forces the 24-key gauge profile                         |
+| `ln`          | Forces classic long-note (LN) mode                      |
+| `cn`          | Forces charge-note (CN) mode                            |
+| `hcn`         | Forces hell-charge-note (HCN) mode                      |
 
 ## How Markers Work
 

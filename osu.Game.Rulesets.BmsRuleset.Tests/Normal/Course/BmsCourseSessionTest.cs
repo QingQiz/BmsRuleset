@@ -9,6 +9,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
@@ -62,7 +63,7 @@ public class BmsCourseSessionTest
                 new BmsCourseStage($"Stage {index}", $"Level {index}", BeatmapHash: $"hash-{index}"),
                 new BeatmapInfo { Hash = $"hash-{index}" }))
             .ToArray();
-        var course = new BmsCourseDefinition("course", "Table", "Course", stages.Select(stage => stage.Definition).ToArray(), "Class", []);
+        var course = new BmsCourseDefinition("course", "Table", "Course", stages.Select(stage => stage.Definition).ToArray(), []);
         return new BmsCourseSession(course, stages, mods ?? [], gaugeType);
     }
 
@@ -402,6 +403,103 @@ public class BmsCourseSessionTest
         var mods = BmsCourseSession.CreateCourseMods([new BmsModHardGauge()], BmsGaugeType.ExClass);
 
         Assert.That(mods.Single(), Is.TypeOf<BmsModExClassGauge>());
+    }
+
+    [TestCase("no_good", typeof(BmsModNoGood))]
+    [TestCase("no_great", typeof(BmsModNoGreat))]
+    [TestCase("ln", typeof(BmsModLongNote))]
+    [TestCase("cn", typeof(BmsModChargeNote))]
+    [TestCase("hcn", typeof(BmsModHellChargeNote))]
+    public void TestCourseConstraintModsAreCreated(string constraint, Type expectedModType)
+    {
+        var mods = BmsCourseSession.CreateCourseMods([], BmsGaugeType.Class, [constraint]);
+
+        Assert.That(mods, Has.One.TypeOf(expectedModType));
+    }
+
+    [Test]
+    public void TestCourseJudgementConstraintKeepsStricterSelectedMod()
+    {
+        // A user-selected NG is stricter than nothing; a declared no_great upgrades it.
+        var upgraded = BmsCourseSession.CreateCourseMods([new BmsModNoGood()], BmsGaugeType.Class, ["no_great"]);
+
+        Assert.That(upgraded, Has.One.TypeOf<BmsModNoGreat>());
+        Assert.That(upgraded, Has.None.TypeOf<BmsModNoGood>());
+
+        // A user-selected NE stays when the course declares the looser no_good.
+        var kept = BmsCourseSession.CreateCourseMods([new BmsModNoGreat()], BmsGaugeType.Class, ["no_good"]);
+
+        Assert.That(kept, Has.One.TypeOf<BmsModNoGreat>());
+        Assert.That(kept, Has.None.TypeOf<BmsModNoGood>());
+    }
+
+    [Test]
+    public void TestNoSpeedConstraintIsNotACourseMod()
+    {
+        var mods = BmsCourseSession.CreateCourseMods([], BmsGaugeType.Class, ["no_speed"]);
+
+        Assert.That(mods, Has.Count.EqualTo(1));
+        Assert.That(mods.Single(), Is.TypeOf<BmsModClassGauge>());
+    }
+
+    [Test]
+    public void TestNoSpeedConstraintForbidsConstant()
+    {
+        var mods = BmsCourseSession.CreateCourseMods([new BmsModConstant()], BmsGaugeType.Class, ["no_speed"]);
+
+        Assert.That(mods, Has.None.TypeOf<BmsModConstant>());
+        Assert.That(mods, Has.One.TypeOf<BmsModClassGauge>());
+    }
+
+    [Test]
+    public void TestGradeConstraintRemovesMirrorAndShuffles()
+    {
+        var mods = BmsCourseSession.CreateCourseMods([new BmsModMirror(), new BmsModLaneRandom()], BmsGaugeType.Class, ["grade"]);
+
+        Assert.That(mods, Has.None.TypeOf<BmsModMirror>());
+        Assert.That(mods, Has.None.TypeOf<BmsModLaneRandom>());
+        Assert.That(mods, Has.One.TypeOf<BmsModClassGauge>());
+    }
+
+    [Test]
+    public void TestGradeMirrorRemovesShufflesKeepsMirror()
+    {
+        var mods = BmsCourseSession.CreateCourseMods([new BmsModMirror()], BmsGaugeType.Class, ["grade_mirror"]);
+
+        Assert.That(mods, Has.One.TypeOf<BmsModMirror>());
+        Assert.That(mods, Has.One.TypeOf<BmsModClassGauge>());
+
+        var withRandom = BmsCourseSession.CreateCourseMods([new BmsModLaneRandom()], BmsGaugeType.Class, ["grade_mirror"]);
+
+        Assert.That(withRandom, Has.None.TypeOf<BmsModLaneRandom>());
+    }
+
+    [Test]
+    public void TestGradeRandomRemovesNothing()
+    {
+        var mods = BmsCourseSession.CreateCourseMods([new BmsModMirror()], BmsGaugeType.Class, ["grade_random"]);
+
+        Assert.That(mods, Has.One.TypeOf<BmsModMirror>());
+        Assert.That(mods, Has.One.TypeOf<BmsModClassGauge>());
+    }
+
+    [Test]
+    public void TestCourseConstraintModsMapRealCourseConstraints()
+    {
+        var mods = BmsCourseSession.CreateCourseMods([], BmsGaugeType.Class, ["grade_mirror", "gauge_lr2", "ln", "no_good", "no_speed"]);
+
+        Assert.That(mods, Has.Count.EqualTo(3));
+        Assert.That(mods, Has.One.TypeOf<BmsModClassGauge>());
+        Assert.That(mods, Has.One.TypeOf<BmsModNoGood>());
+        Assert.That(mods, Has.One.TypeOf<BmsModLongNote>());
+    }
+
+    [Test]
+    public void TestCourseConstraintModsAreCaseInsensitive()
+    {
+        var mods = BmsCourseSession.CreateCourseMods([], BmsGaugeType.Class, ["LN"]);
+
+        Assert.That(mods, Has.One.TypeOf<BmsModLongNote>());
     }
 
     [Test]

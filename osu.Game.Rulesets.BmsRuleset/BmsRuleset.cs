@@ -161,6 +161,9 @@ public partial class BmsRuleset : Ruleset
             new BmsModExHardGauge(),
             new BmsModHazardGauge(),
 
+            new BmsModNoGood(),
+            new BmsModNoGreat(),
+
             new BmsModDoubleTime(),
         ],
         ModType.Automation =>

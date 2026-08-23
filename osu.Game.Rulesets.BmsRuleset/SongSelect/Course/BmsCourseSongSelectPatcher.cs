@@ -7,6 +7,7 @@ using HarmonyLib;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
+using osu.Game.Overlays.Mods;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.Select;
 using OsuSongSelect = osu.Game.Screens.Select.SongSelect;
@@ -25,6 +26,7 @@ public static class BmsCourseSongSelectPatcher
     private static FieldInfo? detailsAreaField;
     private static FieldInfo? carouselField;
     private static FieldInfo? noResultsPlaceholderField;
+    private static FieldInfo? modSelectOverlayField;
     private static MethodInfo? filterControlGetter;
     private static MethodInfo? soloOnStartMethod;
     private static bool disabled;
@@ -48,6 +50,7 @@ public static class BmsCourseSongSelectPatcher
             detailsAreaField = AccessTools.Field(typeof(OsuSongSelect), "detailsArea");
             carouselField = AccessTools.Field(typeof(OsuSongSelect), "carousel");
             noResultsPlaceholderField = AccessTools.Field(typeof(OsuSongSelect), "noResultsPlaceholder");
+            modSelectOverlayField = AccessTools.Field(typeof(OsuSongSelect), "modSelectOverlay");
             filterControlGetter = AccessTools.PropertyGetter(typeof(OsuSongSelect), "FilterControl");
 
             if (target == null || postfixMethod == null || soloOnStartMethod == null || startPrefixMethod == null || addInternalMethod == null || wedgesContainerField == null
@@ -103,6 +106,7 @@ public static class BmsCourseSongSelectPatcher
         var controller = new BmsCourseSongSelectController(
             BmsRulesetRuntime.CourseCatalog,
             songSelect,
+            () => modSelectOverlayField?.GetValue(songSelect) as ModSelectOverlay,
             (FillFlowContainer)wedgesContainerField!.GetValue(songSelect)!,
             (BeatmapTitleWedge)titleWedgeField!.GetValue(songSelect)!,
             (BeatmapDetailsArea)detailsAreaField!.GetValue(songSelect)!,

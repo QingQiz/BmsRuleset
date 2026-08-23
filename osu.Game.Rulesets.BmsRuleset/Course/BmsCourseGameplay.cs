@@ -109,6 +109,9 @@ internal partial class BmsCoursePlayer : SoloPlayer
     {
         if (GameplayState.HealthProcessor is Scoring.BmsHealthProcessor healthProcessor)
             session.ConfigureHealthProcessor(healthProcessor);
+
+        if (session.HasNoSpeedConstraint && DrawableRuleset.Playfield is UI.BmsPlayfield playfield)
+            playfield.ScrollController.LockScrollSpeedMultiplier();
     }
 
     protected override ResultsScreen CreateResults(ScoreInfo score)

@@ -114,6 +114,7 @@ Course results never reach the FULL COMBO/PERFECT/MAX tier, so the corresponding
 | Mirror                   | Mirrors the key layout                                          |         |
 | Invert (IN)              | Converts each note except the lane's last into a hold note      | Randomise LN length; seed                          |
 | 2P                       | change the player layout from 1P to 2P                          |         |
+| Constant (CN)            | disable SV (including #SPEED/#SCROLL/Bpm change)                |         |
 | Auto Scratch (AS)        | auto play scratch lane                                          |         |
 | Hide Scratch (HS)        | Remove the scratch notes and hide scratch lane                  |         |
 | Background Keysound (BK) | Play all keysounds as background audio instead of on key press. |         |
@@ -126,6 +127,8 @@ Course results never reach the FULL COMBO/PERFECT/MAX tier, so the corresponding
 | EX Hard Gauge (H2)       | Use EX Hard BMS gauge                                           |         |
 | Hazard Gauge (H3)        | Use Hazard BMS gauge                                            |         |
 | Auto Gauge (AG)          | Start with the hardest gauge; drop a tier on failure            |         |
+| No Good (NG)             | Removes the GOOD judgement window                               |         |
+| No Great (NE)            | Removes the GREAT and GOOD judgement windows                    |         |
 | Long Note (L1)           | LN judgement: LN mode: single endpoint judged at tail           |         |
 | Charge Note (L2)         | LN judgement: CN mode: head & tail judged separately            |         |
 | Hell Charge Note (L3)    | LN judgement: HCN mode: CN + body gauge drain/recover           |         |

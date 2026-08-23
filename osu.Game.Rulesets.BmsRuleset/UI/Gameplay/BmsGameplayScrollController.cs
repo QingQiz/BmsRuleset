@@ -29,6 +29,19 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 
     public bool ConstantScrollActive { get; set; }
 
+    /// <summary>
+    ///     Whether the in-play scroll speed multiplier is locked to its default value,
+    ///     enforced by the course <c>no_speed</c> constraint.
+    /// </summary>
+    private bool scrollSpeedMultiplierLocked { get; set; }
+
+    public void LockScrollSpeedMultiplier()
+    {
+        scrollSpeedMultiplierLocked = true;
+        currentMultiplierIndex = default_multiplier_index;
+        setScrollSpeedFromMultiplierIndex();
+    }
+
     public double ScrollSpeed { get; private set; } = default_scroll_speed;
 
     public double CurrentScrollPosition { get; private set; }
@@ -74,6 +87,9 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 
     public void AdjustScrollSpeed(double delta)
     {
+        if (scrollSpeedMultiplierLocked)
+            return;
+
         var direction = delta > 0 ? 1 : -1;
         var newIndex = Math.Clamp(currentMultiplierIndex + direction, 0, scroll_speed_multipliers.Length - 1);
 

@@ -37,10 +37,15 @@ public static class BmsLampScoreSelector
         reductionModMatches<BmsModLongNote>(score.Mods, selectedMods) &&
         reductionModMatches<BmsModChargeNote>(score.Mods, selectedMods) &&
         reductionModMatches<BmsModHellChargeNote>(score.Mods, selectedMods) &&
+        judgementConstraintModsMatch(score.Mods, selectedMods) &&
         rateModsMatch(score.Mods, selectedMods);
 
     private static bool reductionModMatches<TMod>(IEnumerable<Mod> scoreMods, IEnumerable<Mod> selectedMods)
         where TMod : Mod => !has<TMod>(scoreMods) || has<TMod>(selectedMods);
+
+    private static bool judgementConstraintModsMatch(Mod[] scoreMods, IReadOnlyList<Mod> selectedMods) =>
+        has<BmsModNoGood>(scoreMods) == has<BmsModNoGood>(selectedMods) &&
+        has<BmsModNoGreat>(scoreMods) == has<BmsModNoGreat>(selectedMods);
 
     private static bool has<TMod>(IEnumerable<Mod> mods)
         where TMod : Mod => mods.Any(mod => mod is TMod);

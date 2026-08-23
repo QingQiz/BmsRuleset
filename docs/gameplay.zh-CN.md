@@ -98,29 +98,32 @@ beatoraja 还会区分谱面简化辅助选项（**ASSIST**，深紫）与 Assis
 
 ## Mods
 
-| Mod                      | 说明                         | 选项                     |
-|--------------------------|----------------------------|------------------------|
-| Autoplay                 | 自动播放                       |     |
-| Double Time / Half Time  |                            | 速度；调整音高             |
-| No Fail                  |                            |     |
-| Mirror                   | 镜像键位布局                     |     |
-| 反键 (IN)                  | 将每条轨道中除最后一个音符外的音符转换为长按音符   | 随机 LN 长度；随机种子          |
-| 2P                       | 将玩家布局从 1P 切换为 2P           |     |
-| Auto Scratch (AS)        | 自动播放 皿                     |     |
-| Hide Scratch (HS)        | 删除 皿 列的 note，并隐藏该列         |     |
-| Background Keysound (BK) | 移除按键音，把它们当作背景音播放           |     |
-| Lane Random (LR)         | RANDOM：随机排列轨道列             | 包含皿；随机种子；轨道顺序       |
-| Note Random (NR)         | S-RANDOM / H-RANDOM：逐音符随机  | 包含皿；模式；随机种子           |
-| Rotation Random (RR)     | R-RANDOM：旋转 + 可选镜像         | 包含皿；随机种子                 |
-| Assist Easy Gauge (E2)   | 使用 Assist Easy BMS 血量      |     |
-| Easy Gauge (E1)          | 使用 Easy BMS 血量             |     |
-| Hard Gauge (H1)          | 使用 Hard BMS 血量             |     |
-| EX Hard Gauge (H2)       | 使用 EX Hard BMS 血量          |     |
-| Hazard Gauge (H3)        | 使用 Hazard BMS 血量           |     |
-| Auto Gauge (AG)          | 从最难血量起；失败时降一档              |     |
-| Long Note (L1)           | LN 判定：LN 模式：尾部单一判定         |     |
-| Charge Note (L2)         | LN 判定：CN 模式：头尾各自独立判分       |     |
-| Hell Charge Note (L3)    | LN 判定：HCN 模式：CN + 持续身体血量流失 |     |
+| Mod                      | 说明                                       | 选项                     |
+|--------------------------|------------------------------------------|------------------------|
+| Autoplay                 | 自动播放                                     |     |
+| Double Time / Half Time  |                                          | 速度；调整音高             |
+| No Fail                  |                                          |     |
+| Mirror                   | 镜像键位布局                                   |     |
+| 反键 (IN)                  | 将每条轨道中除最后一个音符外的音符转换为长按音符                 | 随机 LN 长度；随机种子          |
+| 2P                       | 将玩家布局从 1P 切换为 2P                         |     |
+| Constant (CN)            | 禁用 SV (包括 #SPEED/#SCROLL/Bpm change 造成的) |         |
+| Auto Scratch (AS)        | 自动播放 皿                                   |     |
+| Hide Scratch (HS)        | 删除 皿 列的 note，并隐藏该列                       |     |
+| Background Keysound (BK) | 移除按键音，把它们当作背景音播放                         |     |
+| Lane Random (LR)         | RANDOM：随机排列轨道列                           | 包含皿；随机种子；轨道顺序       |
+| Note Random (NR)         | S-RANDOM / H-RANDOM：逐音符随机                | 包含皿；模式；随机种子           |
+| Rotation Random (RR)     | R-RANDOM：旋转 + 可选镜像                       | 包含皿；随机种子                 |
+| Assist Easy Gauge (E2)   | 使用 Assist Easy BMS 血量                    |     |
+| Easy Gauge (E1)          | 使用 Easy BMS 血量                           |     |
+| Hard Gauge (H1)          | 使用 Hard BMS 血量                           |     |
+| EX Hard Gauge (H2)       | 使用 EX Hard BMS 血量                        |     |
+| Hazard Gauge (H3)        | 使用 Hazard BMS 血量                         |     |
+| Auto Gauge (AG)          | 从最难血量起；失败时降一档                            |     |
+| No Good (NG)             | 移除 GOOD 判定窗口                             |     |
+| No Great (NE)            | 移除 GREAT 和 GOOD 判定窗口                     |     |
+| Long Note (L1)           | LN 判定：LN 模式：尾部单一判定                       |     |
+| Charge Note (L2)         | LN 判定：CN 模式：头尾各自独立判分                     |     |
+| Hell Charge Note (L3)    | LN 判定：HCN 模式：CN + 持续身体血量流失               |     |
 
 ## 设置
 

@@ -145,7 +145,7 @@ tables including Satellite, Stella, Insane BMS, Overjoy, Scramble, and Luminous 
 Remote tables can be updated from their source. Any table can be subdivided into per-level collections, merged again,
 or removed from the BMS settings. See the [difficulty table guide](./docs/difficulty-tables.md) for the complete workflow.
 
-### BMS Course Mode
+### Course Mode
 
 Difficulty tables can also provide BMS courses through their `course` definitions. Imported courses appear in the BMS
 course mode with their stages in the declared order, using the course gauge and constraints from the table. Course

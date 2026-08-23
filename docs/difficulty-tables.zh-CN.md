@@ -39,27 +39,26 @@
 和 stage 哈希列表。段位会保留声明顺序，并通过 MD5 或 SHA-256 匹配本地谱面；歌曲标题、作曲家和难度等级从
 难度表的谱面数据中补齐。尚未导入对应谱面的 stage 会显示为不可用，导入匹配谱面后即可游玩。
 
-可选的 `gauge` 字段用于选择段位血条（`Class`、`ExClass` 或 `ExHardClass`）。省略时，可以根据
-`gauge_ex`/`gauge_ex_class` 或 `gauge_exhard`/`gauge_exhard_class` 约束推断；否则默认使用 `Class`。
-`gauge_lr2`、`gauge_5k`、`gauge_7k`、`gauge_9k` 和 `gauge_24k` 等血条系列约束会选择对应的血条配置，
-其它约束会随段位保留并交由规则集处理。
+段位不声明血条档位；与 beatoraja 一致，游玩时把所选的血条 Mod 映射到三个段位血条档位
+（Class、EX Class、EX Hard Class）。段位的 `constraint` 数组会显示在段位选择界面的左上角，
+并在游玩时强制执行。
 
-最小示例：
-
-```json
-{
-  "name": "Example Table",
-  "symbol": "ex",
-  "course": [
-    {
-      "name": "Example Class",
-      "md5": ["0123456789abcdef0123456789abcdef"],
-      "gauge": "Class",
-      "constraint": ["gauge_7k"]
-    }
-  ]
-}
-```
+| 约束          | 效果                         |
+|---------------|----------------------------|
+| `grade`       | 仅默认布局；禁用 Mirror 和 random   |
+| `grade_mirror`| Mirror 或默认布局               |
+| `grade_random`| —                          |
+| `no_speed`    | 锁定游戏内卷动速度并禁用 Constant mod  |
+| `no_good`     | 移除 GOOD 判定窗口               |
+| `no_great`    | 移除 GREAT 和 GOOD 判定窗口       |
+| `gauge_lr2`   | 强制 LR2 血条配置                |
+| `gauge_5k`    | 强制 5 键血条配置                 |
+| `gauge_7k`    | 强制 7 键血条配置                 |
+| `gauge_9k`    | 强制 PMS 血条配置                |
+| `gauge_24k`   | 强制 24 键血条配置                |
+| `ln`          | 强制经典长条（LN）模式               |
+| `cn`          | 强制 Charge Note（CN）模式       |
+| `hcn`         | 强制 Hell Charge Note（HCN）模式 |
 
 ## 标记
 
