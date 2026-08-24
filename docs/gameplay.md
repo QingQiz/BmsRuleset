@@ -87,8 +87,8 @@ retains the LR2 lamp conventions). The lamp types, from lowest to highest:
 | PERFECT  | `#FFFFFF`   | `#3FFF4D`    | PGREAT + GREAT only; flashes at a 60 ms cycle  |
 | MAX      | `#FFFFFF`   | `#FFEB42`    | all PGREAT; flashes at a 60 ms cycle           |
 
-A passed score never downgrades a lamp earned from a harder gauge; the panel shows the highest lamp across the
-scores that match the currently selected mods.
+A passed score never downgrades a lamp earned from a harder gauge; the panel shows the highest lamp and the
+highest rank among the scores that match the currently selected mods.
 
 Beatoraja also distinguishes pattern-simplification assists (**ASSIST**, dark purple) from the
 Assist Easy *gauge* (**L-ASSIST**); the ruleset currently has no pattern-level assist options,
@@ -103,6 +103,8 @@ so ASSIST is never produced and the Assist Easy gauge earns the L-ASSIST lamp.
 | Ex Hard Class (C3)   | EX-HARD |
 
 Course results never reach the FULL COMBO/PERFECT/MAX tier, so the corresponding lights won't be produced.
+The course card shows the best lamp and rank among the course results whose mods match the currently selected
+mods.
 
 ## Mods
 

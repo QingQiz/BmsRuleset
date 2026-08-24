@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
@@ -11,7 +13,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Course;
-using osu.Game.Scoring;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select;
 using osuTK;
 using osuTK.Graphics;
@@ -46,6 +48,9 @@ internal partial class BmsCoursePanel : Panel
     private BmsCourseDefinition? currentCourse;
     private BmsCourseResultStore? resultStore;
     private Color4 availableIconColour;
+
+    [Resolved]
+    private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
     public BmsCoursePanel()
     {
@@ -133,6 +138,7 @@ internal partial class BmsCoursePanel : Panel
         Selected.BindValueChanged(_ => updateLeafPanelOffset());
         KeyboardSelected.BindValueChanged(_ => updateLeafPanelOffset());
         BmsRulesetRuntime.CourseResultsChanged += resultStoreChanged;
+        mods.BindValueChanged(_ => updateResult());
         updateResultStore();
         updateResult();
         updateLeafPanelOffset(false);
@@ -209,8 +215,8 @@ internal partial class BmsCoursePanel : Panel
         if (currentCourse == null)
             return;
 
-        courseLamp.Lamp = resultStore?.GetLamp(currentCourse.Id) ?? BmsLamp.NoPlay;
-        ScoreRank? rank = resultStore?.GetRank(currentCourse.Id);
+        var (lamp, rank) = BmsCourseScoreSelector.SelectBest(resultStore?.GetHistory(currentCourse.Id) ?? [], mods.Value);
+        courseLamp.Lamp = lamp;
         courseRank.Rank = rank;
         courseRank.Alpha = rank.HasValue ? 1 : 0;
     }

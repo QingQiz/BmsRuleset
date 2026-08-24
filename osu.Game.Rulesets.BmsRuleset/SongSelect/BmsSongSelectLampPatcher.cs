@@ -12,6 +12,7 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Online.Leaderboards;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select;
 using osu.Game.Scoring;
@@ -30,6 +31,7 @@ public static partial class BmsSongSelectLampPatcher
     private static PropertyInfo? beatmapProperty;
     private static PropertyInfo? realmProperty;
     private static FieldInfo? localUserField;
+    private static FieldInfo? updateableField;
     private static FieldInfo? iconContainerField;
     private static FieldInfo? backgroundContainerField;
     private static MethodInfo? addInternalMethod;
@@ -51,6 +53,7 @@ public static partial class BmsSongSelectLampPatcher
             beatmapProperty = AccessTools.Property(typeof(PanelLocalRankDisplay), nameof(PanelLocalRankDisplay.Beatmap));
             realmProperty = AccessTools.Property(typeof(PanelLocalRankDisplay), "realm");
             localUserField = AccessTools.Field(typeof(PanelLocalRankDisplay), "localUser");
+            updateableField = AccessTools.Field(typeof(PanelLocalRankDisplay), "updateable");
             iconContainerField = AccessTools.Field(typeof(Panel), "iconContainer");
             backgroundContainerField = AccessTools.Field(typeof(Panel), "backgroundContainer");
             addInternalMethod = AccessTools.Method(typeof(CompositeDrawable), "AddInternal", [typeof(Drawable)]);
@@ -63,6 +66,7 @@ public static partial class BmsSongSelectLampPatcher
                 (name: "PanelLocalRankDisplay.Beatmap", member: beatmapProperty),
                 (name: "PanelLocalRankDisplay.realm", member: realmProperty),
                 (name: "PanelLocalRankDisplay.localUser", member: localUserField),
+                (name: "PanelLocalRankDisplay.updateable", member: updateableField),
                 (name: "Panel.iconContainer", member: iconContainerField),
                 (name: "Panel.backgroundContainer", member: backgroundContainerField),
                 (name: "CompositeDrawable.AddInternal", member: addInternalMethod),
@@ -98,7 +102,33 @@ public static partial class BmsSongSelectLampPatcher
                 return;
             }
 
-            var lamp = BmsLampCalculator.Calculate(scoreForCurrentMods(rankDisplay, fallbackTopScore));
+            var mods = selectedMods(rankDisplay);
+            var scores = localScoresFor(rankDisplay, fallbackTopScore);
+
+            ScoreInfo? lampScore;
+
+            if (mods != null)
+            {
+                lampScore = BmsLampScoreSelector.SelectBest(scores, mods);
+
+                var bestRank = scores
+                    .Where(score => BmsLampScoreSelector.MatchesSelectedMods(score, mods))
+                    .Select(score => (ScoreRank?)score.Rank)
+                    .DefaultIfEmpty()
+                    .Max();
+
+                if (updateableField?.GetValue(rankDisplay) is UpdateableRank updateable)
+                {
+                    updateable.Rank = bestRank;
+                    updateable.Alpha = bestRank.HasValue ? 1 : 0;
+                }
+            }
+            else
+            {
+                lampScore = fallbackTopScore;
+            }
+
+            var lamp = BmsLampCalculator.Calculate(lampScore);
 
             var panel = findParentPanel(rankDisplay);
             var iconContainer = panel != null ? getIconContainer(panel) : null;
@@ -146,33 +176,35 @@ public static partial class BmsSongSelectLampPatcher
         }
     }
 
-    private static ScoreInfo? scoreForCurrentMods(PanelLocalRankDisplay display, ScoreInfo? fallbackTopScore)
+    private static IReadOnlyList<Mod>? selectedMods(PanelLocalRankDisplay display)
+    {
+        if (display.Dependencies.TryGet<IBindable<IReadOnlyList<Mod>>>(out var selectedMods))
+            return selectedMods.Value;
+
+        return null;
+    }
+
+    private static ScoreInfo[] localScoresFor(PanelLocalRankDisplay display, ScoreInfo? fallbackTopScore)
     {
         if (beatmapProperty?.GetValue(display) is not BeatmapInfo beatmap)
-            return fallbackTopScore;
+            return fallbackTopScore != null ? [fallbackTopScore] : [];
 
         if (realmProperty?.GetValue(display) is not RealmAccess realm)
-            return fallbackTopScore;
+            return fallbackTopScore != null ? [fallbackTopScore] : [];
 
         if (localUserField?.GetValue(display) is not IBindable<APIUser> localUser)
-            return fallbackTopScore;
+            return fallbackTopScore != null ? [fallbackTopScore] : [];
 
         if (rulesetProperty?.GetValue(display) is not IBindable<RulesetInfo> ruleset)
-            return fallbackTopScore;
+            return fallbackTopScore != null ? [fallbackTopScore] : [];
 
-        if (!display.Dependencies.TryGet<IBindable<IReadOnlyList<Mod>>>(out var selectedMods))
-            return fallbackTopScore;
-
-        return realm.Run(r =>
-        {
-            var localScores = r.All<ScoreInfo>()
-                .Where(s => s.BeatmapHash == beatmap.Hash && !s.DeletePending)
-                .ToArray()
-                .Where(s => s.UserID == localUser.Value.Id || s.UserID <= 1)
-                .Where(s => ruleset.Value.Equals(s.Ruleset));
-
-            return BmsLampScoreSelector.SelectBest(localScores, selectedMods.Value)?.DeepClone();
-        });
+        return realm.Run(r => r.All<ScoreInfo>()
+            .Where(s => s.BeatmapHash == beatmap.Hash && !s.DeletePending)
+            .ToArray()
+            .Where(s => s.UserID == localUser.Value.Id || s.UserID <= 1)
+            .Where(s => ruleset.Value.Equals(s.Ruleset))
+            .Select(s => s.DeepClone())
+            .ToArray());
     }
 
     private static bool isBmsRuleset(PanelLocalRankDisplay display)

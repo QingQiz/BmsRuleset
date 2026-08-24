@@ -130,12 +130,14 @@ public class BmsLampScoreSelectorTest
     [TestCase(typeof(BmsModLongNote))]
     [TestCase(typeof(BmsModChargeNote))]
     [TestCase(typeof(BmsModHellChargeNote))]
-    public void TestLongNoteModeModsUseDifficultyReductionMatching(Type modType)
+    public void TestLongNoteModeModsDoNotAffectMatching(Type modType)
     {
         var noModScore = score(900);
         var modeScore = score(1_000, create(modType));
 
-        Assert.That(BmsLampScoreSelector.SelectBest([modeScore, noModScore], []), Is.SameAs(noModScore));
+        // LongNote mode scores remain eligible for an unmodified selection.
+        Assert.That(BmsLampScoreSelector.SelectBest([modeScore, noModScore], []), Is.SameAs(modeScore));
+        // Selecting a LongNote mode does not hide an unmodified score.
         Assert.That(BmsLampScoreSelector.SelectBest([noModScore], [create(modType)]), Is.SameAs(noModScore));
         Assert.That(BmsLampScoreSelector.SelectBest([modeScore], [create(modType)]), Is.SameAs(modeScore));
     }
@@ -146,11 +148,11 @@ public class BmsLampScoreSelectorTest
     [TestCase(typeof(BmsModChargeNote), typeof(BmsModHellChargeNote))]
     [TestCase(typeof(BmsModHellChargeNote), typeof(BmsModLongNote))]
     [TestCase(typeof(BmsModHellChargeNote), typeof(BmsModChargeNote))]
-    public void TestDifferentLongNoteModeScoresDoNotMatch(Type scoreModType, Type selectedModType)
+    public void TestDifferentLongNoteModeScoresCrossMatch(Type scoreModType, Type selectedModType)
     {
         var modeScore = score(1_000, create(scoreModType));
 
-        Assert.That(BmsLampScoreSelector.SelectBest([modeScore], [create(selectedModType)]), Is.Null);
+        Assert.That(BmsLampScoreSelector.SelectBest([modeScore], [create(selectedModType)]), Is.SameAs(modeScore));
     }
 
     [Test]
@@ -164,29 +166,29 @@ public class BmsLampScoreSelectorTest
 
     [TestCase(typeof(BmsModNoGood))]
     [TestCase(typeof(BmsModNoGreat))]
-    public void TestNoGoodNoGreatModsMatchLikeDifficultyIncreaseMods(Type modType)
+    public void TestNoGoodNoGreatModsDoNotAffectMatching(Type modType)
     {
         var noModScore = score(1_000);
         var constrainedScore = score(900, create(modType));
 
-        // An unselected NG/NE score does not match the unmodified selection.
-        Assert.That(BmsLampScoreSelector.SelectBest([constrainedScore, noModScore], []), Is.SameAs(noModScore));
+        // NG/NE scores remain eligible for an unmodified selection.
+        Assert.That(BmsLampScoreSelector.SelectBest([constrainedScore], []), Is.SameAs(constrainedScore));
 
-        // Selecting NG/NE hides the unmodified score (difficulty-increase matching).
-        Assert.That(BmsLampScoreSelector.SelectBest([noModScore], [create(modType)]), Is.Null);
+        // Selecting NG/NE does not hide an unmodified score.
+        Assert.That(BmsLampScoreSelector.SelectBest([noModScore], [create(modType)]), Is.SameAs(noModScore));
 
-        // A NG/NE score only matches when the same mod is selected.
+        // A NG/NE score remains eligible regardless of the selected Mod.
         Assert.That(BmsLampScoreSelector.SelectBest([constrainedScore], [create(modType)]), Is.SameAs(constrainedScore));
     }
 
     [Test]
-    public void TestNoGoodAndNoGreatScoresDoNotCrossMatch()
+    public void TestNoGoodAndNoGreatScoresCrossMatch()
     {
         var noGoodScore = score(1_000, new BmsModNoGood());
         var noGreatScore = score(900, new BmsModNoGreat());
 
-        Assert.That(BmsLampScoreSelector.SelectBest([noGreatScore], [new BmsModNoGood()]), Is.Null);
-        Assert.That(BmsLampScoreSelector.SelectBest([noGoodScore], [new BmsModNoGreat()]), Is.Null);
+        Assert.That(BmsLampScoreSelector.SelectBest([noGreatScore], [new BmsModNoGood()]), Is.SameAs(noGreatScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([noGoodScore], [new BmsModNoGreat()]), Is.SameAs(noGoodScore));
     }
 
     [Test]

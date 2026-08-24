@@ -81,7 +81,7 @@
 | PERFECT  | `#FFFFFF` | `#3FFF4D` | 仅 PGREAT + GREAT；以 60 ms 周期闪烁    |
 | MAX      | `#FFFFFF` | `#FFEB42` | 全 PGREAT；以 60 ms 周期闪烁            |
 
-已通过的成绩不会让更难血条获得的灯降级；面板会显示与当前所选 Mod 匹配的成绩中最高的灯。
+已通过的成绩不会让更难血条获得的灯降级；面板会显示与当前所选 Mod 匹配的成绩中最高的灯和评级。
 
 beatoraja 还会区分谱面简化辅助选项（**ASSIST**，深紫）与 Assist Easy 血条（**L-ASSIST**）；
 规则集目前没有谱面级辅助选项，因此不会产生 ASSIST 灯，Assist Easy 血条获得 L-ASSIST 灯。
@@ -94,7 +94,8 @@ beatoraja 还会区分谱面简化辅助选项（**ASSIST**，深紫）与 Assis
 | Ex Class (C2) | HARD |
 | Ex Hard Class (C3) | EX-HARD |
 
-段位成绩不会有 FULL COMBO/PERFECT/MAX 的区别，因此不会产生相应的灯
+段位成绩不会有 FULL COMBO/PERFECT/MAX 的区别，因此不会产生相应的灯。
+段位卡片显示与当前所选 Mod 匹配的段位成绩中的最佳灯和评级。
 
 ## Mods
 

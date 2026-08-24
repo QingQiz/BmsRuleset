@@ -20,6 +20,7 @@ using osu.Game.Database;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Toolbar;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.Mods;
@@ -159,6 +160,43 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
             panel.ScreenSpaceDrawQuad.AABBFloat.Top >= 0 && panel.ScreenSpaceDrawQuad.AABBFloat.Bottom <= DrawHeight));
     }
 
+    [Test]
+    public void TestRankFollowsSelectedMods()
+    {
+        BeatmapInfo beatmap = null!;
+        BeatmapSetInfo rankBeatmapSet = null!;
+
+        AddStep("import a beatmap with ranked scores", () =>
+        {
+            var bmsRuleset = rulesets.AvailableRulesets.Single(r => r.ShortName == Constant.SHORT_NAME);
+            var imported = beatmaps.Import(createBeatmapSet(bmsRuleset));
+
+            Assert.That(imported, Is.Not.Null);
+            rankBeatmapSet = imported!.Value.Detach();
+            beatmap = rankBeatmapSet.Beatmaps.First();
+
+            // The no-mod score holds a lower rank; the modded one holds the highest.
+            Assert.That(scoreManager.Import(createScore(beatmap, ScoreRank.A, stats((HitResult.Perfect, 1), (HitResult.Ok, 1)))), Is.Not.Null);
+            Assert.That(scoreManager.Import(createScore(beatmap, ScoreRank.S, stats((HitResult.Perfect, 1), (HitResult.Ok, 1)), new BmsModHideScratch())), Is.Not.Null);
+        });
+        AddUntilStep("wait for scores", () => Realm.Run(r =>
+            r.All<ScoreInfo>().AsEnumerable().Count(score => score.BeatmapHash == beatmap.Hash && !score.DeletePending)), () => Is.EqualTo(2));
+        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
+        AddUntilStep("wait for carousel presentation", () => songSelect.CarouselItemsPresented && !songSelect.IsFiltering);
+        AddStep("scope to rank beatmap set", () => songSelect.ScopeToBeatmapSet(rankBeatmapSet));
+        AddUntilStep("wait for scoped carousel", () => !songSelect.IsFiltering
+                                                       && carousel.Criteria?.SelectedBeatmapSet != null
+                                                       && carousel.Criteria.SelectedBeatmapSet.Equals(rankBeatmapSet));
+        AddUntilStep("rank panel realised", () => rankDisplayFor(beatmap) != null);
+        AddUntilStep("no-mod rank shown", () => rankDisplayFor(beatmap)!.ChildrenOfType<UpdateableRank>().Single().Rank, () => Is.EqualTo(ScoreRank.A));
+        AddStep("select hide scratch", () => songSelect.Mods.Value = [new BmsModHideScratch()]);
+        AddUntilStep("rank follows selected mods", () => rankDisplayFor(beatmap)!.ChildrenOfType<UpdateableRank>().Single().Rank, () => Is.EqualTo(ScoreRank.S));
+    }
+
+    private PanelLocalRankDisplay? rankDisplayFor(BeatmapInfo beatmap) =>
+        carousel.ChildrenOfType<PanelLocalRankDisplay>().SingleOrDefault(display => display.Beatmap?.Hash == beatmap.Hash);
+
     private void importLampBeatmapSet()
     {
         AddStep("import one BMS set with all lamp difficulties", () =>
@@ -281,7 +319,11 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
     [Test]
     public void TestLampColoursMatchBeatoraja()
     {
-        AddStep("clear previous lamp displays", Clear);
+        AddStep("clear previous lamp displays", () =>
+        {
+            foreach (var display in lampDisplays())
+                display.Expire();
+        });
 
         AddStep("create a lamp display per state", () =>
         {
@@ -320,7 +362,11 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
     [Test]
     public void TestLampFlashAlphaFollowsBeatorajaCycle()
     {
-        AddStep("clear previous lamp displays", Clear);
+        AddStep("clear previous lamp displays", () =>
+        {
+            foreach (var display in lampDisplays())
+                display.Expire();
+        });
 
         AddStep("create lamp displays", () =>
         {
