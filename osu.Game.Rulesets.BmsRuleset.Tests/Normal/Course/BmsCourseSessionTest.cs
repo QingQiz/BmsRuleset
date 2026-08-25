@@ -84,6 +84,21 @@ public class BmsCourseSessionTest
     };
 
     [Test]
+    public void TestCourseRecordUsesFinalGaugeTierOverStartingTier()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+
+        // Auto Gauge starts at ExHardClass; passing on the surviving Class tier must
+        // record the NORMAL lamp rather than the starting tier's EX-HARD.
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.ExHardClass), finalGaugeType: BmsGaugeType.Class);
+
+        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
+    }
+
+    [Test]
     public void TestAbortDuringStageStoresPartialScore()
     {
         var session = createSession();
@@ -309,6 +324,32 @@ public class BmsCourseSessionTest
         store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(gaugeType));
 
         Assert.That(store.GetLamp("course"), Is.EqualTo(expectedLamp));
+    }
+
+    [TestCase(BmsGaugeType.Class, BmsLamp.Clear)]
+    [TestCase(BmsGaugeType.ExClass, BmsLamp.HardClear)]
+    [TestCase(BmsGaugeType.ExHardClass, BmsLamp.ExHardClear)]
+    public void TestCourseLampUsesFinalGaugeTierOnPass(BmsGaugeType finalGaugeType, BmsLamp expectedLamp)
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+
+        // Auto Gauge starts at ExHardClass but can conclude on any surviving tier.
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.ExHardClass), finalGaugeType: finalGaugeType);
+
+        Assert.That(store.GetLamp("course"), Is.EqualTo(expectedLamp));
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+        Assert.That(store.GetLamp("course"), Is.EqualTo(expectedLamp));
+    }
+
+    [Test]
+    public void TestCourseLampFallsBackToStartingTierWithoutFinalGauge()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.A, attempt: attempt(BmsGaugeType.ExHardClass));
+
+        Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.ExHardClear));
     }
 
     [Test]

@@ -47,7 +47,10 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
 
         var aggregateScore = BmsCourseResultPresentation.CreateAggregateScore(session);
         if (recordResult)
-            BmsRulesetRuntime.CourseResults?.Record(session.Course.Id, session.Status, aggregateScore.Rank, aggregateScore, BmsCourseAttemptData.From(session));
+        {
+            var finalGaugeType = session.CurrentGaugeStates.FirstOrDefault(state => !state.Failed)?.GaugeType;
+            BmsRulesetRuntime.CourseResults?.Record(session.Course.Id, session.Status, aggregateScore.Rank, aggregateScore, BmsCourseAttemptData.From(session), finalGaugeType);
+        }
 
         summaryBeatmap = Beatmap.Value;
 

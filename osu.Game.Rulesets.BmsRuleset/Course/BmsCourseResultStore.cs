@@ -136,14 +136,14 @@ internal sealed class BmsCourseResultStore
         }
     }
 
-    internal void Record(string courseId, BmsCourseStatus status, ScoreRank? rank = null, ScoreInfo? score = null, BmsCourseAttemptData? attempt = null)
+    internal void Record(string courseId, BmsCourseStatus status, ScoreRank? rank = null, ScoreInfo? score = null, BmsCourseAttemptData? attempt = null, BmsGaugeType? finalGaugeType = null)
     {
         if (status == BmsCourseStatus.InProgress
             || (status == BmsCourseStatus.Aborted && score == null && attempt == null))
             return;
 
         var result = status == BmsCourseStatus.Passed
-            ? new BmsCourseResult(lampFor(attempt?.GaugeType), rank is null or ScoreRank.F ? ScoreRank.A : rank, BmsCourseScoreData.From(score), attempt)
+            ? new BmsCourseResult(lampFor(finalGaugeType ?? attempt?.GaugeType), rank is null or ScoreRank.F ? ScoreRank.A : rank, BmsCourseScoreData.From(score), attempt)
             : new BmsCourseResult(BmsLamp.Failed, ScoreRank.F, BmsCourseScoreData.From(score), attempt);
 
         var file = fileFor(courseId, result);
