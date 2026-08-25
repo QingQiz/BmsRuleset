@@ -767,6 +767,50 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
     }
 
     [Test]
+    public void TestRemovingStricterModRestoresRequiredConstraintMod()
+    {
+        AddStep("configure a no-good course", () =>
+        {
+            var bmsRuleset = rulesets.AvailableRulesets.Single(ruleset => ruleset.ShortName == Constant.SHORT_NAME);
+            var imported = beatmaps.Import(createBeatmapSet(bmsRuleset));
+            Assert.That(imported, Is.Not.Null);
+            var beatmap = imported!.Value.Beatmaps.First();
+
+            BmsRulesetRuntime.CourseCatalog.Replace(
+            [
+                new BmsCourseDefinition(
+                    "constraint-test",
+                    "Constraint Table",
+                    "No Good Course",
+                    [new BmsCourseStage("Stage", "1", BeatmapHash: beatmap.Hash)],
+                    ["no_good"]),
+            ]);
+        });
+        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
+        AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
+        AddStep("show course mode", () => controller.ShowCourseMode());
+        AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
+                                                       && !controller.CourseCarousel.IsFiltering);
+        AddUntilStep("required no-good applied", () => songSelect.Mods.Value.Any(mod => mod is BmsModNoGood));
+        AddStep("select stricter no-great", () => songSelect.Mods.Value = [new BmsModNoGreat()]);
+        AddUntilStep("no-great replaces no-good", () =>
+            songSelect.Mods.Value.Any(mod => mod is BmsModNoGreat) && songSelect.Mods.Value.All(mod => mod is not BmsModNoGood));
+        AddStep("remove no-great", () => songSelect.Mods.Value = []);
+        AddUntilStep("no-good restored after stricter mod removal", () => songSelect.Mods.Value.Any(mod => mod is BmsModNoGood));
+        AddStep("add mirror alongside constraint", () => songSelect.Mods.Value = [new BmsModNoGood(), new BmsModMirror()]);
+        AddUntilStep("manual mirror kept with required no-good", () =>
+            songSelect.Mods.Value.Any(mod => mod is BmsModMirror) && songSelect.Mods.Value.Any(mod => mod is BmsModNoGood));
+        AddStep("remove everything", () => songSelect.Mods.Value = []);
+        AddUntilStep("required no-good survives removal", () => songSelect.Mods.Value.Any(mod => mod is BmsModNoGood));
+        AddStep("select no-great again", () => songSelect.Mods.Value = [new BmsModNoGreat()]);
+        AddUntilStep("no-great replaces no-good again", () =>
+            songSelect.Mods.Value.Any(mod => mod is BmsModNoGreat) && songSelect.Mods.Value.All(mod => mod is not BmsModNoGood));
+        AddStep("clear mods", () => songSelect.Mods.Value = []);
+        AddUntilStep("no-good restored after second removal", () => songSelect.Mods.Value.Any(mod => mod is BmsModNoGood));
+    }
+
+    [Test]
     public void TestSelectedCourseUpdatesAndRestoresPreviewBeatmap()
     {
         BeatmapInfo originalBeatmap = null!;

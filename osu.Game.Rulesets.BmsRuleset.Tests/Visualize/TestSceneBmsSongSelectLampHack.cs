@@ -194,7 +194,7 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         AddUntilStep("rank follows selected mods", () => rankDisplayFor(beatmap)!.ChildrenOfType<UpdateableRank>().Single().Rank, () => Is.EqualTo(ScoreRank.S));
     }
 
-    private PanelLocalRankDisplay? rankDisplayFor(BeatmapInfo beatmap) =>
+    private PanelLocalRankDisplay rankDisplayFor(BeatmapInfo beatmap) =>
         carousel.ChildrenOfType<PanelLocalRankDisplay>().SingleOrDefault(display => display.Beatmap?.Hash == beatmap.Hash);
 
     private void importLampBeatmapSet()

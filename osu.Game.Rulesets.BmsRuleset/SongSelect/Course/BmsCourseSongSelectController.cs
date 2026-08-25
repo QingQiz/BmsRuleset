@@ -512,7 +512,17 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     /// </summary>
     private void applyModsForCourse(BmsCourseDefinition? course)
     {
-        lockedMods = course == null
+        var mods = computeCourseMods(course, out var locked);
+
+        lockedMods = locked;
+        setMods(mods);
+        modsAdjustedForCourse = course;
+        updateModSelectFilter(course);
+    }
+
+    private Mod[] computeCourseMods(BmsCourseDefinition? course, out Mod[] locked)
+    {
+        locked = course == null
             ? []
             : BmsCourseSession.ResolveRequiredMods(userMods, BmsCourseSession.CreateConstraintMods(course.Constraints))
                 .Select(mod => mod.DeepClone())
@@ -526,15 +536,13 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             .Where(mod => !forbidden.Any(type => type.IsInstanceOfType(mod)))
             .ToList();
 
-        foreach (var locked in lockedMods)
+        foreach (var lockedMod in locked)
         {
-            if (mods.All(mod => mod.GetType() != locked.GetType()))
-                mods.Add(locked);
+            if (mods.All(mod => mod.GetType() != lockedMod.GetType()))
+                mods.Add(lockedMod);
         }
 
-        setMods(mods.ToArray());
-        modsAdjustedForCourse = course;
-        updateModSelectFilter(course);
+        return mods.ToArray();
     }
 
     /// <summary>
@@ -583,52 +591,20 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         updateModSelectFilter(null);
     }
 
-    /// <summary>
-    ///     Observes user-driven mod changes while course mode is active. The user's manual mod set
-    ///     (<see cref="userMods"/>) is diffed against the effective selection: additions are recorded,
-    ///     removals drop the mod from the manual set, and a required constraint mod that the user
-    ///     tries to remove is re-applied. Mods hidden by the current course's constraints stay in
-    ///     the manual set and come back once they are allowed again.
-    /// </summary>
     private void onModsChanged(ValueChangedEvent<IReadOnlyList<Mod>> change)
     {
         if (adjustingMods || !IsCourseMode || modsAdjustedForCourse == null)
             return;
 
-        var added = change.NewValue
-            .Where(mod => change.OldValue.All(old => old.GetType() != mod.GetType()))
+        var forbidden = BmsCourseSession.ResolveForbiddenModTypes(modsAdjustedForCourse.Constraints).ToArray();
+
+        userMods = change.NewValue
+            .Where(mod => lockedMods.All(locked => locked.GetType() != mod.GetType()))
+            .Select(mod => mod.DeepClone())
+            .Concat(userMods.Where(mod => forbidden.Any(type => type.IsInstanceOfType(mod))))
             .ToArray();
-        var removed = change.OldValue
-            .Where(mod => change.NewValue.All(next => next.GetType() != mod.GetType()))
-            .ToArray();
 
-        foreach (var mod in added)
-        {
-            if (lockedMods.Any(locked => locked.GetType() == mod.GetType()))
-                continue;
-
-            if (userMods.All(user => user.GetType() != mod.GetType()))
-                userMods = [.. userMods, mod.DeepClone()];
-        }
-
-        var removedLockedMod = false;
-
-        foreach (var mod in removed)
-        {
-            if (lockedMods.Any(locked => locked.GetType() == mod.GetType()))
-            {
-                removedLockedMod = true;
-                continue;
-            }
-
-            userMods = userMods.Where(user => user.GetType() != mod.GetType()).ToArray();
-        }
-
-        // Re-apply the current course's constraints after any manual change so newly added mods
-        // forbidden by the course are dropped from the active selection (they stay in userMods
-        // and come back once the course allows them again).
-        if (added.Length > 0 || removedLockedMod)
-            applyModsForCourse(modsAdjustedForCourse);
+        applyModsForCourse(modsAdjustedForCourse);
     }
 
     private static void restoreVisibility(VisibilityContainer container, Visibility state)
