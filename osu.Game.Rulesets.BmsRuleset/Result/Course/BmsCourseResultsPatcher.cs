@@ -3,6 +3,8 @@ using HarmonyLib;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Framework.Logging;
+using osu.Game.Input.Bindings;
+using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Ranking.Statistics;
 
 namespace osu.Game.Rulesets.BmsRuleset.Result.Course;
@@ -23,14 +25,17 @@ internal static class BmsCourseResultsPatcher
         {
             var target = AccessTools.Method(typeof(StatisticsPanel), "OnClick", [typeof(ClickEvent)]);
             var prefix = AccessTools.Method(typeof(BmsCourseResultsPatcher), nameof(onClickPrefix));
+            var selectTarget = AccessTools.Method(typeof(ResultsScreen), nameof(ResultsScreen.OnPressed), [typeof(KeyBindingPressEvent<GlobalAction>)]);
+            var selectPrefix = AccessTools.Method(typeof(BmsCourseResultsPatcher), nameof(onSelectPrefix));
 
-            if (target == null || prefix == null)
+            if (target == null || prefix == null || selectTarget == null || selectPrefix == null)
             {
-                disable("osu! statistics panel internals no longer match the BMS course-results patch expectations.");
+                disable("osu! results screen internals no longer match the BMS course-results patch expectations.");
                 return;
             }
 
             new Harmony(harmony_id).Patch(target, prefix: new HarmonyMethod(prefix));
+            new Harmony(harmony_id).Patch(selectTarget, prefix: new HarmonyMethod(selectPrefix));
             IsInstalled = true;
         }
         catch (Exception e)
@@ -42,12 +47,22 @@ internal static class BmsCourseResultsPatcher
     // ReSharper disable InconsistentNaming
     private static bool onClickPrefix(StatisticsPanel __instance, ref bool __result)
     {
-        if (__instance.FindClosestParent<BmsCourseResultsScreen>() == null)
+        if (__instance.FindClosestParent<BmsCourseResultsScreen>() == null
+            && __instance.FindClosestParent<BmsCourseStageResultsScreen>() == null)
             return true;
 
-        // Do not consume the click: stage cards are below the full-screen
-        // statistics panel and must receive the same event.
+        // Do not consume the click so the surrounding result screen can handle it.
         __result = false;
+        return false;
+    }
+
+    private static bool onSelectPrefix(ResultsScreen __instance, KeyBindingPressEvent<GlobalAction> e, ref bool __result)
+    {
+        if (e.Action != GlobalAction.Select || e.Repeat || __instance is not BmsCourseStageResultsScreen stageResults)
+            return true;
+
+        stageResults.AdvanceFromEnter();
+        __result = true;
         return false;
     }
     // ReSharper restore InconsistentNaming

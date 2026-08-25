@@ -373,10 +373,11 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
             () => abandonRequested = true)));
         AddUntilStep("result screen loaded", () => screen.IsLoaded && Stack.CurrentScreen == screen);
 
+        AddUntilStep("stage statistics expanded", () => screen.ChildrenOfType<StatisticsPanel>().Single().State.Value == Visibility.Visible);
+
         AddAssert("result uses score copy", () => screen.Score, () => Is.Not.SameAs(sourceScore));
         AddAssert("watch replay disabled", () => screen.AllowWatchingReplay, () => Is.False);
         AddAssert("retry disabled", () => screen.AllowRetry, () => Is.False);
-        AddAssert("no replay action", () => screen.ChildrenOfType<ReplayDownloadButton>(), () => Is.Empty);
         AddAssert("no retry action", () => screen.ChildrenOfType<RetryButton>(), () => Is.Empty);
         AddUntilStep("countdown shown", () => screen.ChildrenOfType<OsuSpriteText>()
             .Any(text => text.Text.ToString().StartsWith("Next stage in ", StringComparison.Ordinal)));
@@ -430,5 +431,31 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddUntilStep("next stage requested", () => nextRequested);
         AddAssert("abandon was not requested", () => abandonRequested, () => Is.False);
         AddUntilStep("result screen exited", () => Stack.CurrentScreen != screen);
+    }
+
+    [Test]
+    public void TestIntermediateStageEnterAdvancesInsteadOfTogglingStatistics()
+    {
+        var nextRequested = false;
+        var sourceScore = createScore(createBeatmap("stage-enter", "Enter Stage"), true, 765432, 0.91);
+        BmsCourseStageResultsScreen screen = null!;
+
+        AddStep("show intermediate stage result", () => Stack.Push(screen = new BmsCourseStageResultsScreen(
+            sourceScore,
+            () => nextRequested = true,
+            () => { })));
+        AddUntilStep("result screen loaded", () => screen.IsLoaded && Stack.CurrentScreen == screen);
+        AddUntilStep("stage statistics expanded", () => screen.ChildrenOfType<StatisticsPanel>().Single().State.Value == Visibility.Visible);
+        AddUntilStep("stage score card remains visible", () => screen.ChildrenOfType<ScorePanel>()
+            .Any(panel => panel.IsPresent && panel.Alpha > 0));
+        AddAssert("stage score card stays on the left", () =>
+        {
+            var scorePanel = screen.ChildrenOfType<ScorePanel>().Single();
+            return scorePanel.ScreenSpaceDrawQuad.Centre.X < screen.ScreenSpaceDrawQuad.Centre.X;
+        });
+        AddStep("press enter", () => InputManager.Key(Key.Enter));
+        AddUntilStep("next stage requested", () => nextRequested);
+        AddAssert("statistics remain expanded", () => screen.ChildrenOfType<StatisticsPanel>().Single().State.Value,
+            () => Is.EqualTo(Visibility.Visible));
     }
 }

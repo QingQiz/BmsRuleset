@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
@@ -123,6 +124,8 @@ internal partial class BmsCourseStageResultsScreen : ResultsScreen
     {
         base.OnEntering(e);
 
+        StatisticsPanel.Show();
+        Schedule(() => ScorePanelList.GetScorePanels().SingleOrDefault()?.Show());
         countdown.Start();
     }
 
@@ -154,7 +157,15 @@ internal partial class BmsCourseStageResultsScreen : ResultsScreen
         return base.OnExiting(e);
     }
 
+    public override bool OnBackButton()
+    {
+        requestAbandon();
+        return true;
+    }
+
     protected override Task<ScoreInfo[]> FetchScores() => Task.FromResult<ScoreInfo[]>([]);
+
+    internal void AdvanceFromEnter() => advance();
 
     private void advance() => completeAction(nextStage);
 
