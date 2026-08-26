@@ -22,6 +22,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.Ranking;
+using osu.Game.Screens.Ranking.Expanded.Statistics;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Tests.Visual;
 using osuTK;
@@ -32,6 +33,70 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [TestFixture]
 public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerTestScene
 {
+    [Test]
+    public void TestBmsResultStatisticsUseExScoreInsteadOfPerformance()
+    {
+        TestBmsSoloResultsScreen screen = null!;
+
+        AddStep("load results screen", () =>
+        {
+            OsuScreenStack stack;
+            Child = stack = new OsuScreenStack { RelativeSizeAxes = Axes.Both };
+            stack.Push(screen = new TestBmsSoloResultsScreen(createScore()));
+        });
+
+        AddUntilStep("results screen loaded", () => screen.IsLoaded);
+        AddStep("open statistics", () =>
+        {
+            var expandedPanel = this.ChildrenOfType<ScorePanel>().Single(p => p.State == PanelState.Expanded);
+            InputManager.MoveMouseTo(expandedPanel);
+            InputManager.Click(MouseButton.Left);
+        });
+        AddUntilStep("statistics shown", () => this.ChildrenOfType<StatisticsPanel>().Single().State.Value == Visibility.Visible);
+        AddAssert("performance statistic is absent", () => this.ChildrenOfType<PerformanceStatistic>().Count() == 0);
+        AddAssert("BMS EXSCORE statistic is present", () => this.ChildrenOfType<BmsExScoreStatistic>().Count() == 1);
+        AddAssert("BMS accuracy statistic is present", () => this.ChildrenOfType<BmsAccuracyStatistic>().Count() == 1);
+        AddAssert("BMS max combo statistic is present", () => this.ChildrenOfType<BmsComboStatistic>().Count() == 1);
+        AddAssert("BMS statistics are ordered ACC EXSCORE MAX COMBO", () => this.ChildrenOfType<StatisticDisplay>()
+            .Where(statistic => statistic is BmsAccuracyStatistic or BmsExScoreStatistic or BmsComboStatistic)
+            .OrderBy(statistic => statistic.ScreenSpaceDrawQuad.AABBFloat.Left)
+            .Select(statistic => statistic.GetType())
+            .SequenceEqual([typeof(BmsAccuracyStatistic), typeof(BmsExScoreStatistic), typeof(BmsComboStatistic)]));
+    }
+
+    [Test]
+    public void TestPerfectExScoreAndComboShowPerfect()
+    {
+        ScoreInfo score = null!;
+
+        BmsExScoreStatistic exScore = null!;
+        BmsComboStatistic combo = null!;
+        AddStep("load perfect statistics", () =>
+        {
+            score = createScore();
+            score.Statistics = new Dictionary<HitResult, int> { [HitResult.Perfect] = 985 };
+            score.MaxCombo = 985;
+            Child = new Container
+            {
+                AutoSizeAxes = Axes.Both,
+                Children =
+                [
+                    exScore = new BmsExScoreStatistic(score),
+                    combo = new BmsComboStatistic(score.MaxCombo, score.GetMaximumAchievableCombo()),
+                ],
+            };
+        });
+        AddUntilStep("perfect statistics loaded", () => exScore.IsLoaded && combo.IsLoaded);
+        AddAssert("EXSCORE uses combo statistic layout", () => exScore is ComboStatistic);
+        AddAssert("max combo uses native rolling counter", () => combo.ChildrenOfType<StatisticCounter>().Count() == 1);
+        AddStep("show perfect statistics", () =>
+        {
+            exScore.Appear();
+            combo.Appear();
+        });
+        AddUntilStep("perfect labels shown", () => this.ChildrenOfType<SpriteText>().Count(text => text.Text.ToString() == "PERFECT") == 2);
+        AddAssert("max combo displays current and maximum", () => this.ChildrenOfType<SpriteText>().Any(text => text.Text.ToString() == "/985"));
+    }
 
     private ScoreInfo createScore()
     {

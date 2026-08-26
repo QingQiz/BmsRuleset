@@ -9,6 +9,11 @@
   <data name="timeline" xml:space="preserve"><value>Timeline</value></data>
   <data name="hit_scatter" xml:space="preserve"><value>Hit Scatter</value></data>
   <data name="hit_offset" xml:space="preserve"><value>Hit Offset</value></data>
+  <data name="accuracy" xml:space="preserve"><value>ACC</value></data>
+  <data name="exscore" xml:space="preserve"><value>EXSCORE</value></data>
+  <data name="max_combo" xml:space="preserve"><value>MAX COMBO</value></data>
+  <data name="maximum_value" xml:space="preserve"><value>/{0:N0}</value></data>
+  <data name="perfect_score" xml:space="preserve"><value>PERFECT</value></data>
   <data name="standard_deviation" xml:space="preserve"><value>SD {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>Reference BPM</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA dim</value></data>

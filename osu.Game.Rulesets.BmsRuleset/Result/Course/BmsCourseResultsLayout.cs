@@ -159,9 +159,9 @@ internal partial class BmsCourseScoreMiddleContent : CompositeDrawable
 
         var topStatistics = new StatisticDisplay[]
         {
-            new BmsCourseAccuracyStatistic(aggregate.Accuracy),
-            new BmsCourseExScoreStatistic(aggregate),
-            new ComboStatistic(aggregate.MaxCombo, null),
+            new BmsAccuracyStatistic(aggregate.Accuracy),
+            new BmsExScoreStatistic(aggregate),
+            new BmsComboStatistic(aggregate.MaxCombo, aggregate.GetMaximumAchievableCombo()),
         };
         statistics.AddRange(topStatistics);
 
@@ -485,9 +485,9 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
     {
         StatisticDisplay[] topStatistics =
         [
-            new BmsCourseAccuracyStatistic(score.Accuracy),
-            new BmsCourseExScoreStatistic(score),
-            new ComboStatistic(score.MaxCombo, score.GetMaximumAchievableCombo()),
+            new BmsAccuracyStatistic(score.Accuracy),
+            new BmsExScoreStatistic(score),
+            new BmsComboStatistic(score.MaxCombo, score.GetMaximumAchievableCombo()),
         ];
         var hitStatistics = score.GetStatisticsForDisplay()
             .Select(result => (StatisticDisplay)new HitResultStatistic(result))
@@ -546,70 +546,6 @@ internal partial class BmsCourseStageCard : OsuClickableContainer
         var selected = selectedStage.Value == stageIndex;
         background.Colour = selected ? colours.Background1 : colours.Background2;
         background.Alpha = selected ? 0.35f : IsHovered ? 0.18f : 0;
-    }
-}
-
-internal partial class BmsCourseAccuracyStatistic : StatisticDisplay
-{
-    private readonly double accuracy;
-
-    internal BmsCourseAccuracyStatistic(double accuracy)
-        : base("ACC")
-    {
-        this.accuracy = accuracy;
-    }
-
-    protected override Drawable CreateContent() => new OsuSpriteText
-    {
-        Font = OsuFont.Torus.With(size: 20, fixedWidth: true),
-        Spacing = new Vector2(-2, 0),
-        Text = accuracy.FormatAccuracy(),
-    };
-}
-
-internal partial class BmsCourseExScoreStatistic : StatisticDisplay
-{
-    private readonly int exScore;
-    private readonly int maximumExScore;
-
-    internal BmsCourseExScoreStatistic(ScoreInfo score)
-        : base("EXSCORE")
-    {
-        maximumExScore = BmsExScore.Calculate(score.MaximumStatistics);
-        exScore = BmsExScore.Calculate(score, maximumExScore);
-    }
-
-    protected override Drawable CreateContent()
-    {
-        var perfect = maximumExScore > 0 && exScore == maximumExScore;
-
-        return new FillFlowContainer
-        {
-            AutoSizeAxes = Axes.Both,
-            Direction = FillDirection.Horizontal,
-            Colour = perfect
-                ? ColourInfo.GradientVertical(Color4Extensions.FromHex("#66FFCC"), Color4Extensions.FromHex("#FF9AD7"))
-                : Color4.White,
-            Children =
-            [
-                new OsuSpriteText
-                {
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                    Font = OsuFont.Torus.With(size: 20, fixedWidth: true),
-                    Spacing = new Vector2(-2, 0),
-                    Text = $"{exScore:N0}",
-                },
-                new OsuSpriteText
-                {
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                    Font = OsuFont.Torus.With(size: 12, fixedWidth: true),
-                    Spacing = new Vector2(-2, 0),
-                    Text = $"/{maximumExScore:N0}",
-                },
-            ],
-        };
     }
 }
 

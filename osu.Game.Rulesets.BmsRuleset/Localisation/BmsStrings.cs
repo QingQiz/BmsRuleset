@@ -25,6 +25,16 @@ public static class BmsStrings
 
     public static LocalisableString HitOffset => get("hit_offset");
 
+    public static LocalisableString Accuracy => get("accuracy");
+
+    public static LocalisableString ExScore => get("exscore");
+
+    public static LocalisableString MaxCombo => get("max_combo");
+
+    public static LocalisableString MaximumValue(int value) => get("maximum_value", value);
+
+    public static LocalisableString PerfectScore => get("perfect_score");
+
     public static LocalisableString StandardDeviation(double value) => get("standard_deviation", value);
 
     public static LocalisableString ReferenceBpm => get("reference_bpm");
