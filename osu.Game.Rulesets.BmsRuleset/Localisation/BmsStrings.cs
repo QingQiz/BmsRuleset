@@ -564,6 +564,10 @@ public static class BmsStrings
 
     public static LocalisableString ModNoteRandom => get("mod_note_random");
 
+    public static LocalisableString ModNoGood => get("mod_no_good");
+
+    public static LocalisableString ModNoGreat => get("mod_no_great");
+
     public static LocalisableString ModPaused => get("mod_paused");
 
     public static LocalisableString ModRotationRandom => get("mod_rotation_random");

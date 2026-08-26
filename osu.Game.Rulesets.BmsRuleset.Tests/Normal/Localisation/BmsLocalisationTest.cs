@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Configuration;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Localisation;
@@ -71,6 +72,21 @@ public class BmsLocalisationTest
 
         config.SetValue(FrameworkSetting.Locale, "zh");
         Assert.That(text.Value, Is.EqualTo("标准差 12.3 ms"));
+    }
+
+    [Test]
+    public void TestNoGoodAndNoGreatDescriptionsUseLocalisation()
+    {
+        var noGood = new BmsModNoGood();
+        var noGreat = new BmsModNoGreat();
+
+        Assert.That(localisation.GetLocalisedString(noGood.Description), Is.EqualTo("GOOD counts as BAD."));
+        Assert.That(localisation.GetLocalisedString(noGreat.Description), Is.EqualTo("GREAT and GOOD count as BAD."));
+
+        config.SetValue(FrameworkSetting.Locale, "zh");
+
+        Assert.That(localisation.GetLocalisedString(noGood.Description), Is.EqualTo("将 GOOD 计为 BAD。"));
+        Assert.That(localisation.GetLocalisedString(noGreat.Description), Is.EqualTo("将 GREAT 和 GOOD 计为 BAD。"));
     }
 
     [Test]

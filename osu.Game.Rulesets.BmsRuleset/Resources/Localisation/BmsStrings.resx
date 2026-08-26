@@ -186,6 +186,8 @@
   <data name="mod_lane_random" xml:space="preserve"><value>Permutes lane columns. Set a custom lane order or let it generate a random permutation.</value></data>
   <data name="mod_mirror" xml:space="preserve"><value>Mirrors the key layout.</value></data>
   <data name="mod_note_random" xml:space="preserve"><value>Per-note randomisation.&#x20;&#10;S-RANDOM shuffles every note with a 40ms anti-jack window.&#x20;&#10;H-RANDOM widens it to 100ms, aggressively breaking jacks at the cost of more chaotic patterns.</value></data>
+  <data name="mod_no_good" xml:space="preserve"><value>GOOD counts as BAD.</value></data>
+  <data name="mod_no_great" xml:space="preserve"><value>GREAT and GOOD count as BAD.</value></data>
   <data name="mod_paused" xml:space="preserve"><value>The play was paused and resumed.</value></data>
   <data name="mod_rotation_random" xml:space="preserve"><value>R-RANDOM: randomly rotates columns, with 50% chance of also mirroring.</value></data>
   <data name="mod_long_note" xml:space="preserve"><value>Standard hold-note: single endpoint judged at the tail using worst offset.</value></data>

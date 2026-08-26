@@ -186,6 +186,8 @@
   <data name="mod_lane_random" xml:space="preserve"><value>重新排列轨道。可指定轨道顺序，或随机生成一种排列。</value></data>
   <data name="mod_mirror" xml:space="preserve"><value>镜像翻转按键布局。</value></data>
   <data name="mod_note_random" xml:space="preserve"><value>逐音符随机排列。&#10;S-RANDOM 使用 40ms 防纵连窗口打乱每个音符。&#10;H-RANDOM 将窗口扩大至 100ms，以更混乱的排列为代价强力拆分纵连。</value></data>
+  <data name="mod_no_good" xml:space="preserve"><value>将 GOOD 计为 BAD。</value></data>
+  <data name="mod_no_great" xml:space="preserve"><value>将 GREAT 和 GOOD 计为 BAD。</value></data>
   <data name="mod_paused" xml:space="preserve"><value>本次游玩曾暂停并继续。</value></data>
   <data name="mod_rotation_random" xml:space="preserve"><value>R-RANDOM：随机旋转轨道，并有 50% 概率同时镜像。</value></data>
   <data name="mod_long_note" xml:space="preserve"><value>标准长按音符：在尾端以首尾两次偏差中较差的一次进行单次判定。</value></data>

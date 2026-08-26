@@ -4,6 +4,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 
@@ -15,7 +16,7 @@ public class BmsModNoGreat : Mod, IApplicableToJudgementWindow
 
     public override string Acronym => "NE";
 
-    public override LocalisableString Description => "GREAT and GOOD count as BAD.";
+    public override LocalisableString Description => BmsStrings.ModNoGreat;
 
     public override ModType Type => ModType.DifficultyIncrease;
 
