@@ -9,6 +9,8 @@ public class BmsLongNote : BmsHitObject, IHasDuration
 
     public double Duration { get; set; }
 
+    internal double VisualScrollPositionAtEndTime { get; set; } = double.NaN;
+
     /// <summary>
     ///     Precomputed scroll position at <see cref="EndTime"/>.
     ///     Computed once during beatmap loading.

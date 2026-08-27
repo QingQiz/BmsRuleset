@@ -29,6 +29,7 @@ internal sealed class BmsGameplaySettingsController : IDisposable
         {
             config.BindWith(BmsRulesetSetting.BgaDim, bgaDim);
             config.BindWith(BmsRulesetSetting.VisualOffset, playfield.VisualOffset);
+            config.BindWith(BmsRulesetSetting.LongNoteTailVisualOffset, playfield.LongNoteTailVisualOffset);
             playfield.ScrollController.SetConfiguredScrollSpeed(config.Get<double>(BmsRulesetSetting.ScrollSpeed));
 
             unlockFrameRateLimit = config.GetBindable<bool>(BmsRulesetSetting.UnlockFrameRateLimit);

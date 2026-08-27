@@ -75,7 +75,9 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
             if (note is ILongNoteHolder ln && hitObject is BmsLongNote longNote)
             {
-                var endPosition = scrollController.GetVisualScrollPosition(longNote.EndTime, longNote.ScrollPositionAtEndTime);
+                var endPosition = double.IsNaN(longNote.VisualScrollPositionAtEndTime)
+                    ? longNote.ScrollPositionAtEndTime
+                    : longNote.VisualScrollPositionAtEndTime;
                 var endOffset = (float)((endPosition - currentScrollPos) * scale);
                 ln.UpdateBodyGeometry(y, -(hitTarget + endOffset));
             }

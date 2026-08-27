@@ -19,9 +19,11 @@
   <data name="bga_dim" xml:space="preserve"><value>BGA 暗化</value></data>
   <data name="visual_offset" xml:space="preserve"><value>视觉偏移</value></data>
   <data name="bms_visual_offset" xml:space="preserve"><value>BMS 视觉偏移</value></data>
+  <data name="long_note_tail_visual_offset" xml:space="preserve"><value>LN 尾视觉偏移</value></data>
   <data name="offset_milliseconds" xml:space="preserve"><value>{0:N0} 毫秒</value></data>
   <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} 毫秒 - 音符提前显示；适合 Slow 较多的玩家</value></data>
   <data name="visual_offset_later" xml:space="preserve"><value>{0:N0} 毫秒 - 音符延后显示；适合 Fast 较多的玩家</value></data>
+  <data name="long_note_tail_visual_offset_earlier" xml:space="preserve"><value>{0:N0} 毫秒 - LN 尾提前显示，使 LN 看起来更短</value></data>
   <data name="visual_offset_suggestion_note" xml:space="preserve"><value>游玩几张 BMS 谱面后即可获得建议的视觉偏移！</value></data>
   <data name="visual_offset_suggestion_correct" xml:space="preserve"><value>根据最近 {0} 次游玩，当前视觉偏移设置正确！</value></data>
   <data name="visual_offset_suggestion_received" xml:space="preserve"><value>根据最近 {0} 次游玩，建议的视觉偏移为 {1}。</value></data>

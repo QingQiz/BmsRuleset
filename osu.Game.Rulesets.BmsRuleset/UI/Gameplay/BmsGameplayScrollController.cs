@@ -1,4 +1,5 @@
 using System;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 
@@ -113,6 +114,20 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 
     public double GetVisualScrollPosition(double time, double mappedScrollPosition) =>
         ConstantScrollActive ? time : mappedScrollPosition;
+
+    public void ApplyLongNoteTailVisualOffset(BmsLongNote longNote, double visualOffset)
+    {
+        if (visualOffset == 0)
+        {
+            longNote.VisualScrollPositionAtEndTime = GetVisualScrollPosition(longNote.EndTime, longNote.ScrollPositionAtEndTime);
+            return;
+        }
+
+        var visualEndTime = Math.Max(longNote.StartTime, longNote.EndTime - visualOffset * PlaybackRate);
+        longNote.VisualScrollPositionAtEndTime = ConstantScrollActive || TimingMap == null
+            ? visualEndTime
+            : TimingMap.GetScrollPositionAtTime(visualEndTime);
+    }
 
     public float YForScrollProgress(double progress, double parentHeight, double hitTargetPosition, double noteHeight = 0)
         => (float)(parentHeight - hitTargetPosition - progress * ScrollCoordinateScale(parentHeight, hitTargetPosition) - noteHeight);

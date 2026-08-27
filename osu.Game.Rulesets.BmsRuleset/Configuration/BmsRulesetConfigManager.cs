@@ -11,6 +11,8 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
     public const double DEFAULT_SCROLL_SPEED = 8.0;
     public const double MIN_VISUAL_OFFSET = -500;
     public const double MAX_VISUAL_OFFSET = 500;
+    public const double MIN_LONG_NOTE_TAIL_VISUAL_OFFSET = 0;
+    public const double MAX_LONG_NOTE_TAIL_VISUAL_OFFSET = 1000;
 
     protected override void InitialiseDefaults()
     {
@@ -21,6 +23,7 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
         SetDefault(BmsRulesetSetting.ReferenceBpmMode, BmsReferenceBpmMode.MainBpm);
         SetDefault(BmsRulesetSetting.BgaDim, 0.7, 0, 1, 0.01);
         SetDefault(BmsRulesetSetting.VisualOffset, 0.0, MIN_VISUAL_OFFSET, MAX_VISUAL_OFFSET, 1.0);
+        SetDefault(BmsRulesetSetting.LongNoteTailVisualOffset, 0.0, MIN_LONG_NOTE_TAIL_VISUAL_OFFSET, MAX_LONG_NOTE_TAIL_VISUAL_OFFSET, 1.0);
         SetDefault(BmsRulesetSetting.AutomaticallyAdjustVisualOffset, false);
         SetDefault(BmsRulesetSetting.UseDedicatedPreviewAudio, true);
         SetDefault(BmsRulesetSetting.UnlockFrameRateLimit, false);
@@ -44,6 +47,7 @@ public enum BmsRulesetSetting
     ReferenceBpmMode,
     BgaDim,
     VisualOffset,
+    LongNoteTailVisualOffset,
     AutomaticallyAdjustVisualOffset,
     ShowBms5K,
     ShowBme7K,

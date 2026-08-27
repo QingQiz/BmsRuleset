@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
@@ -63,6 +65,88 @@ public class BmsGameplayScrollControllerTest
 
         Assert.That(controller.GetVisualScrollPosition(60000, 120000), Is.EqualTo(60000));
         Assert.That(controller.GetVisualScrollPosition(60000, 120000) - controller.CurrentScrollPosition, Is.EqualTo(1000));
+    }
+
+    [Test]
+    public void TestLongNoteTailVisualOffsetMovesTailEarlier()
+    {
+        var controller = new BmsGameplayScrollController(null)
+        {
+            ConstantScrollActive = true,
+        };
+
+        var longNote = new BmsLongNote { StartTime = 1000, Duration = 1000, ScrollPositionAtEndTime = 2000 };
+        controller.ApplyLongNoteTailVisualOffset(longNote, 250);
+
+        Assert.That(longNote.VisualScrollPositionAtEndTime, Is.EqualTo(1750));
+    }
+
+    [Test]
+    public void TestLongNoteTailVisualOffsetCannotMoveTailBeforeHead()
+    {
+        var controller = new BmsGameplayScrollController(null)
+        {
+            ConstantScrollActive = true,
+        };
+
+        var longNote = new BmsLongNote { StartTime = 1000, Duration = 1000, ScrollPositionAtEndTime = 2000 };
+        controller.ApplyLongNoteTailVisualOffset(longNote, 1500);
+
+        Assert.That(longNote.VisualScrollPositionAtEndTime, Is.EqualTo(1000));
+    }
+
+    [Test]
+    public void TestLongNoteTailVisualOffsetUsesReverseScrollMapping()
+    {
+        var timingMap = new BmsTimingMap(
+            192,
+            [],
+            [new BmsBpmEvent(0, 120, 0), new BmsBpmEvent(384, -120, 4000)],
+            [],
+            [],
+            []);
+        var controller = new BmsGameplayScrollController(timingMap);
+
+        var longNote = new BmsLongNote
+        {
+            StartTime = 4000,
+            Duration = 2000,
+            ScrollPositionAtEndTime = timingMap.GetScrollPositionAtTime(6000),
+        };
+        controller.ApplyLongNoteTailVisualOffset(longNote, 500);
+
+        Assert.That(longNote.VisualScrollPositionAtEndTime, Is.EqualTo(2500).Within(0.001));
+    }
+
+    [Test]
+    public void TestLongNoteTailVisualOffsetAccountsForPlaybackRate()
+    {
+        var controller = new BmsGameplayScrollController(null)
+        {
+            ConstantScrollActive = true,
+        };
+        controller.SetPlaybackRate(1.5);
+
+        var longNote = new BmsLongNote { StartTime = 1000, Duration = 1000, ScrollPositionAtEndTime = 2000 };
+        controller.ApplyLongNoteTailVisualOffset(longNote, 200);
+
+        Assert.That(longNote.VisualScrollPositionAtEndTime, Is.EqualTo(1700));
+    }
+
+    [Test]
+    public void TestLongNoteTailVisualOffsetCachesMappedPositionOnLongNote()
+    {
+        var controller = new BmsGameplayScrollController(null)
+        {
+            ConstantScrollActive = true,
+        };
+        var longNote = new BmsLongNote { StartTime = 1000, Duration = 1000, ScrollPositionAtEndTime = 2000 };
+
+        controller.ApplyLongNoteTailVisualOffset(longNote, 250);
+        Assert.That(longNote.VisualScrollPositionAtEndTime, Is.EqualTo(1750));
+
+        controller.ApplyLongNoteTailVisualOffset(longNote, 100);
+        Assert.That(longNote.VisualScrollPositionAtEndTime, Is.EqualTo(1900));
     }
 
     [Test]

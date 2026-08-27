@@ -224,6 +224,14 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Current = manager.GetBindable<double>(BmsRulesetSetting.VisualOffset),
                 Margin = new MarginPadding { Bottom = 5 },
             },
+            new SettingsItemV2(new FormSliderBar<double>
+            {
+                Caption = BmsStrings.LongNoteTailVisualOffset,
+                Current = manager.GetBindable<double>(BmsRulesetSetting.LongNoteTailVisualOffset),
+                KeyboardStep = 1,
+                LabelFormat = BmsStrings.OffsetMilliseconds,
+                TooltipFormat = BmsStrings.LongNoteTailVisualOffsetTooltip,
+            }),
             new SettingsItemV2(new FormCheckBox
             {
                 Caption = BmsStrings.AdjustVisualOffsetAutomatically,

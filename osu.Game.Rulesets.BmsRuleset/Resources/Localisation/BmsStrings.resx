@@ -19,9 +19,11 @@
   <data name="bga_dim" xml:space="preserve"><value>BGA dim</value></data>
   <data name="visual_offset" xml:space="preserve"><value>Visual offset</value></data>
   <data name="bms_visual_offset" xml:space="preserve"><value>BMS Visual offset</value></data>
+  <data name="long_note_tail_visual_offset" xml:space="preserve"><value>LN tail visual offset</value></data>
   <data name="offset_milliseconds" xml:space="preserve"><value>{0:N0} ms</value></data>
   <data name="visual_offset_earlier" xml:space="preserve"><value>{0:N0} ms - notes appear earlier; suited to players who receive more Slow judgements</value></data>
   <data name="visual_offset_later" xml:space="preserve"><value>{0:N0} ms - notes appear later; suited to players who receive more Fast judgements</value></data>
+  <data name="long_note_tail_visual_offset_earlier" xml:space="preserve"><value>{0:N0} ms - the LN tail appears earlier, making the LN look shorter</value></data>
   <data name="visual_offset_suggestion_note" xml:space="preserve"><value>Play a few BMS charts to receive a suggested visual offset!</value></data>
   <data name="visual_offset_suggestion_correct" xml:space="preserve"><value>Based on {0} recent plays, your visual offset is set correctly!</value></data>
   <data name="visual_offset_suggestion_received" xml:space="preserve"><value>Based on {0} recent plays, the suggested visual offset is {1}.</value></data>

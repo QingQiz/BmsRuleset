@@ -45,12 +45,20 @@ public static class BmsStrings
 
     public static LocalisableString BmsVisualOffset => get("bms_visual_offset");
 
+    public static LocalisableString LongNoteTailVisualOffset => get("long_note_tail_visual_offset");
+
     public static LocalisableString OffsetMilliseconds(double value) => get("offset_milliseconds", value);
 
     public static LocalisableString VisualOffsetTooltip(double value) => value switch
     {
         > 0 => get("visual_offset_earlier", value),
         < 0 => get("visual_offset_later", value),
+        _ => OffsetMilliseconds(value),
+    };
+
+    public static LocalisableString LongNoteTailVisualOffsetTooltip(double value) => value switch
+    {
+        > 0 => get("long_note_tail_visual_offset_earlier", value),
         _ => OffsetMilliseconds(value),
     };
 

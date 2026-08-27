@@ -493,6 +493,7 @@ public class BmsRulesetTest
         using var config = new BmsRulesetConfigManager(null, ruleset.RulesetInfo);
 
         Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.Zero);
+        Assert.That(config.Get<double>(BmsRulesetSetting.LongNoteTailVisualOffset), Is.Zero);
         Assert.That(config.Get<bool>(BmsRulesetSetting.AutomaticallyAdjustVisualOffset), Is.False);
 
         config.SetValue(BmsRulesetSetting.VisualOffset, 1000d);
@@ -500,5 +501,11 @@ public class BmsRulesetTest
 
         config.SetValue(BmsRulesetSetting.VisualOffset, -1000d);
         Assert.That(config.Get<double>(BmsRulesetSetting.VisualOffset), Is.EqualTo(BmsRulesetConfigManager.MIN_VISUAL_OFFSET));
+
+        config.SetValue(BmsRulesetSetting.LongNoteTailVisualOffset, 2000d);
+        Assert.That(config.Get<double>(BmsRulesetSetting.LongNoteTailVisualOffset), Is.EqualTo(BmsRulesetConfigManager.MAX_LONG_NOTE_TAIL_VISUAL_OFFSET));
+
+        config.SetValue(BmsRulesetSetting.LongNoteTailVisualOffset, -1000d);
+        Assert.That(config.Get<double>(BmsRulesetSetting.LongNoteTailVisualOffset), Is.Zero);
     }
 }

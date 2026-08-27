@@ -1,5 +1,6 @@
 ﻿using System;
 using osu.Framework.Allocation;
+using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Primitives;
@@ -154,6 +155,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// </summary>
     internal BindableDouble VisualOffset { get; } = new();
 
+    internal BindableDouble LongNoteTailVisualOffset { get; } = new();
+
     #endregion
 
     #region Skin / DI
@@ -274,6 +277,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         }
     }
 
+    internal void ApplyLongNoteTailVisualOffsetToAllHitObjects()
+    {
+        foreach (var longNote in Beatmap.HitObjects.OfType<BmsLongNote>())
+            ScrollController.ApplyLongNoteTailVisualOffset(longNote, LongNoteTailVisualOffset.Value);
+    }
+
     #endregion
 
     #region Lifecycle
@@ -350,6 +359,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         }
 
         VisualOffset.BindValueChanged(_ => ApplyVisualOffsetToAllLifetimes());
+        LongNoteTailVisualOffset.BindValueChanged(_ => ApplyLongNoteTailVisualOffsetToAllHitObjects());
+        ApplyLongNoteTailVisualOffsetToAllHitObjects();
         RefreshAllLifetimes();
     }
 

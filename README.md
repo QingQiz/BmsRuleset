@@ -116,6 +116,9 @@ Valid local plays contribute visual-offset suggestions based on their median hit
 suggestions and can apply their average manually, or automatically apply each new suggestion after a play. Replays,
 automatic play, and plays with fewer than 50 timed hits are excluded from calibration.
 
+The same BMS settings section includes **LN tail visual offset**. It advances only the visual tail of long notes,
+making them appear shorter.
+
 ### Uncapped BMS Frame Rate
 
 Enable **Unlock frame rate limit** in the BMS settings to remove osu!'s 1000 Hz cap from BMS rendering, updates, and
