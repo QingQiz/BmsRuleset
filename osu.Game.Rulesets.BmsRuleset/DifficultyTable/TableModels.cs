@@ -38,6 +38,10 @@ public class TableEntry
     public string? Title { get; init; }
 
     public string? Artist { get; init; }
+
+    public string? Url { get; init; }
+
+    public string? UrlDiff { get; init; }
 }
 
 public class TableCourse
@@ -85,4 +89,10 @@ public class RawChartItem
     public string? Title { get; init; }
 
     public string? Artist { get; init; }
+
+    public string? Url { get; init; }
+
+    public string? UrlDiff { get; init; }
 }
+
+public readonly record struct UnavailableTableEntry(TableEntry Entry, DifficultyTable Table);

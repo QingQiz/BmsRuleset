@@ -80,11 +80,8 @@ public partial class BmsRuleset : Ruleset
         BmsBeatmapDecoder.Register();
         BmsEditorPatcher.InstallOnce();
         BmsReplayPatcher.InstallOnce();
-        BmsSongSelectLampPatcher.InstallOnce();
-        BmsCourseSongSelectPatcher.InstallOnce();
+        BmsSongSelectEntryPatcher.InstallOnce();
         BmsCourseResultsPatcher.InstallOnce();
-        BmsConvertedBeatmapFilterPatcher.InstallOnce();
-        BmsLocalLeaderboardPatcher.InstallOnce();
         BmsDifficultyIconPatcher.InstallOnce();
         BmsRankingHitResultColourPatcher.InstallOnce();
         BmsResultStatisticsPatcher.InstallOnce();

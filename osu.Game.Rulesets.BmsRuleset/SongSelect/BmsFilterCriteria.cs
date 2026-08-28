@@ -8,6 +8,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.Filter;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select;
@@ -68,11 +69,12 @@ public class BmsFilterCriteria : IRulesetFilterCriteria
     public bool Matches(BeatmapInfo beatmapInfo, FilterCriteria criteria)
     {
         var variant = GetVariant(beatmapInfo);
+        var layoutKnown = !UnavailableTableBeatmapFactory.IsUnavailable(beatmapInfo);
 
-        if (!enabledVariants.Contains(variant))
+        if (layoutKnown && !enabledVariants.Contains(variant))
             return false;
 
-        if (keyRestrictedVariants != null && !keyRestrictedVariants.Contains(variant))
+        if (layoutKnown && keyRestrictedVariants != null && !keyRestrictedVariants.Contains(variant))
             return false;
 
         if (source.HasFilter && !source.Matches(beatmapInfo.Metadata.Source))

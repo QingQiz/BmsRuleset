@@ -1,11 +1,12 @@
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
+using osu.Game.Screens.Select;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;
 
 [TestFixture]
-public class BmsConvertedBeatmapFilterPatcherTest
+public class BmsBeatmapCarouselFilterMatchingTest
 {
     private readonly RulesetInfo bmsRuleset = new() { ShortName = Constant.SHORT_NAME, OnlineID = -1 };
 
@@ -14,7 +15,8 @@ public class BmsConvertedBeatmapFilterPatcherTest
     {
         _ = new BmsRuleset();
 
-        Assert.That(createManiaBeatmapInfo(7).AllowGameplayWithRuleset(bmsRuleset, true), Is.True);
+        var criteria = new FilterCriteria { Ruleset = bmsRuleset, AllowConvertedBeatmaps = true };
+        Assert.That(BmsBeatmapCarouselFilterMatching.Matches(createManiaBeatmapInfo(7), criteria), Is.True);
     }
 
     [TestCase(4)]
@@ -23,7 +25,7 @@ public class BmsConvertedBeatmapFilterPatcherTest
     public void TestShowConvertsRejectsOtherManiaKeyCounts(int keyCount)
     {
         Assert.That(
-            BmsConvertedBeatmapFilterPatcher.ApplyConversionAllowance(false, createManiaBeatmapInfo(keyCount), bmsRuleset, true),
+            BmsBeatmapCarouselFilterMatching.Matches(createManiaBeatmapInfo(keyCount), new FilterCriteria { Ruleset = bmsRuleset, AllowConvertedBeatmaps = true }),
             Is.False);
     }
 
@@ -31,17 +33,17 @@ public class BmsConvertedBeatmapFilterPatcherTest
     public void TestDisabledShowConvertsStillRejectsMania7K()
     {
         Assert.That(
-            BmsConvertedBeatmapFilterPatcher.ApplyConversionAllowance(false, createManiaBeatmapInfo(7), bmsRuleset, false),
+            BmsBeatmapCarouselFilterMatching.Matches(createManiaBeatmapInfo(7), new FilterCriteria { Ruleset = bmsRuleset, AllowConvertedBeatmaps = false }),
             Is.False);
     }
 
     [Test]
     public void TestOtherTargetRulesetIsUnchanged()
     {
-        var maniaRuleset = new RulesetInfo { ShortName = "mania", OnlineID = 3 };
+        var osuRuleset = new RulesetInfo { ShortName = "osu", OnlineID = 0 };
 
         Assert.That(
-            BmsConvertedBeatmapFilterPatcher.ApplyConversionAllowance(false, createManiaBeatmapInfo(7), maniaRuleset, true),
+            BmsBeatmapCarouselFilterMatching.Matches(createManiaBeatmapInfo(7), new FilterCriteria { Ruleset = osuRuleset, AllowConvertedBeatmaps = true }),
             Is.False);
     }
 

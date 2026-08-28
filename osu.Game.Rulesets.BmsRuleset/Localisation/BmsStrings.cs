@@ -278,6 +278,10 @@ public static class BmsStrings
 
     public static LocalisableString SongSelect => get("song_select");
 
+    public static LocalisableString DifficultyTableBeatmapNotImported => get("difficulty_table_beatmap_not_imported");
+
+    public static LocalisableString DifficultyTableBeatmapDownloadPrompt(string title) => get("difficulty_table_beatmap_download_prompt", title);
+
     public static LocalisableString CourseSearchPlaceholder => get("course_search_placeholder");
 
     public static LocalisableString CourseTableGroup(string tableName, string mark) => get("course_table_group", tableName, mark);

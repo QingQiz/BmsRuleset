@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -9,12 +10,15 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
+using osu.Framework.Screens;
 using osu.Game.Database;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Scoring;
+using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking.Statistics;
+using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Replays;
@@ -29,6 +33,7 @@ public static class BmsReplayPatcher
     private static FieldInfo? scoreImporterFilesField;
     private static FieldInfo? replayFailIndicatorTrackField;
     private static FieldInfo? replayFailIndicatorFailSampleField;
+    private static FieldInfo? mainMenuLogoProxyField;
     private static MethodInfo? drawableScheduleMethod;
 
     public static bool IsInstalled { get; private set; }
@@ -50,12 +55,17 @@ public static class BmsReplayPatcher
             var statisticsPanelPopulatePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(statisticsPanelPopulatePrefix));
             var replayFailIndicatorDisposeTarget = AccessTools.Method(typeof(ReplayFailIndicator), "Dispose", [typeof(bool)]);
             var replayFailIndicatorDisposePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(replayFailIndicatorDisposePrefix));
+            var mainMenuLogoArrivingTarget = AccessTools.Method(typeof(MainMenu), "LogoArriving", [typeof(OsuLogo), typeof(bool)]);
+            var mainMenuLogoArrivingPrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(mainMenuLogoArrivingPrefix));
+            var performFromScreenTarget = AccessTools.Method(typeof(OsuGame), nameof(OsuGame.PerformFromScreen), [typeof(Action<IScreen>), typeof(IEnumerable<Type>)]);
+            var performFromScreenPrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(performFromScreenPrefix));
 
             playerScoreManagerProperty = AccessTools.Property(typeof(Player), "scoreManager");
             modelManagerRealmProperty = AccessTools.Property(typeof(ModelManager<ScoreInfo>), "Realm");
             scoreImporterFilesField = AccessTools.Field(typeof(RealmArchiveModelImporter<ScoreInfo>), "Files");
             replayFailIndicatorTrackField = AccessTools.Field(typeof(ReplayFailIndicator), "track");
             replayFailIndicatorFailSampleField = AccessTools.Field(typeof(ReplayFailIndicator), "failSample");
+            mainMenuLogoProxyField = AccessTools.Field(typeof(MainMenu), "logoProxy");
             drawableScheduleMethod = AccessTools.Method(typeof(Drawable), "Schedule", [typeof(Action)]);
 
             var missingMembers = new (string name, MemberInfo? member)[]
@@ -70,11 +80,16 @@ public static class BmsReplayPatcher
                 (name: "BmsReplayPatcher.statisticsPanelPopulatePrefix", member: statisticsPanelPopulatePrefixMethod),
                 (name: "ReplayFailIndicator.Dispose", member: replayFailIndicatorDisposeTarget),
                 (name: "BmsReplayPatcher.replayFailIndicatorDisposePrefix", member: replayFailIndicatorDisposePrefixMethod),
+                (name: "MainMenu.LogoArriving", member: mainMenuLogoArrivingTarget),
+                (name: "BmsReplayPatcher.mainMenuLogoArrivingPrefix", member: mainMenuLogoArrivingPrefixMethod),
+                (name: "OsuGame.PerformFromScreen", member: performFromScreenTarget),
+                (name: "BmsReplayPatcher.performFromScreenPrefix", member: performFromScreenPrefixMethod),
                 (name: "Player.scoreManager", member: playerScoreManagerProperty),
                 (name: "ModelManager<ScoreInfo>.Realm", member: modelManagerRealmProperty),
                 (name: "RealmArchiveModelImporter<ScoreInfo>.Files", member: scoreImporterFilesField),
                 (name: "ReplayFailIndicator.track", member: replayFailIndicatorTrackField),
                 (name: "ReplayFailIndicator.failSample", member: replayFailIndicatorFailSampleField),
+                (name: "MainMenu.logoProxy", member: mainMenuLogoProxyField),
                 (name: "Drawable.Schedule", member: drawableScheduleMethod),
             }.Where(m => m.member == null).Select(m => m.name).ToArray();
 
@@ -90,6 +105,8 @@ public static class BmsReplayPatcher
             harmony.Patch(getScoreTarget, prefix: new HarmonyMethod(getScorePrefixMethod));
             harmony.Patch(statisticsPanelPopulateTarget, prefix: new HarmonyMethod(statisticsPanelPopulatePrefixMethod));
             harmony.Patch(replayFailIndicatorDisposeTarget, prefix: new HarmonyMethod(replayFailIndicatorDisposePrefixMethod));
+            harmony.Patch(mainMenuLogoArrivingTarget, prefix: new HarmonyMethod(mainMenuLogoArrivingPrefixMethod));
+            harmony.Patch(performFromScreenTarget, prefix: new HarmonyMethod(performFromScreenPrefixMethod));
             IsInstalled = true;
         }
         catch (Exception e)
@@ -272,7 +289,31 @@ public static class BmsReplayPatcher
         replayFailIndicatorFailSampleField?.SetValue(__instance, new SkinnableSound());
         replayFailIndicatorTrackField?.SetValue(__instance, new TrackVirtual(0));
     }
+
+    // Rapid screen changes can leave MainMenu's logo proxy pending when its arriving animation runs again.
+    private static void mainMenuLogoArrivingPrefix(MainMenu __instance)
+    {
+        if (mainMenuLogoProxyField?.GetValue(__instance) is IDisposable proxy)
+        {
+            proxy.Dispose();
+            mainMenuLogoProxyField.SetValue(__instance, null);
+        }
+    }
     // ReSharper restore InconsistentNaming
+
+    private static void performFromScreenPrefix(ref IEnumerable<Type> validScreens)
+    {
+        validScreens = AddBmsSongSelect(validScreens);
+    }
+
+    internal static IEnumerable<Type> AddBmsSongSelect(IEnumerable<Type>? validScreens)
+    {
+        var screens = validScreens?.ToArray() ?? Array.Empty<Type>();
+
+        return screens.Contains(typeof(osu.Game.Screens.Select.SongSelect)) && !screens.Contains(typeof(BmsSongSelect))
+            ? screens.Append(typeof(BmsSongSelect))
+            : screens;
+    }
 
     private static bool isBmsScore(ScoreInfo score) => score.Ruleset.ShortName == Constant.SHORT_NAME;
 

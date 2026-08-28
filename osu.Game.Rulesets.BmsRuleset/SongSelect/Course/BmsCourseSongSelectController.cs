@@ -19,11 +19,13 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Course;
+using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Result.Course;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
+using osu.Game.Screens;
 
 namespace osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
 
@@ -50,10 +52,10 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     internal event Action<bool>? CourseModeChanged;
 
     private readonly BmsCourseCatalog catalog;
-    private readonly SoloSongSelect songSelect;
+    private readonly OsuScreen songSelect;
     private readonly Func<ModSelectOverlay?> modSelectAccessor;
     private readonly BeatmapTitleWedge originalTitle;
-    private readonly BeatmapDetailsArea originalDetails;
+    private readonly BmsBeatmapDetailsArea originalDetails;
     private readonly FilterControl originalFilter;
     private readonly BeatmapCarousel originalCarousel;
     private readonly NoResultsPlaceholder originalNoResults;
@@ -93,16 +95,19 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     [Resolved]
     private BeatmapManager beatmaps { get; set; } = null!;
 
+    [Resolved]
+    private GameHost host { get; set; } = null!;
+
     [Resolved(canBeNull: true)]
     private INotificationOverlay? notifications { get; set; }
 
     internal BmsCourseSongSelectController(
         BmsCourseCatalog catalog,
-        SoloSongSelect songSelect,
+        OsuScreen songSelect,
         Func<ModSelectOverlay?> modSelectAccessor,
         FillFlowContainer wedgesContainer,
         BeatmapTitleWedge originalTitle,
-        BeatmapDetailsArea originalDetails,
+        BmsBeatmapDetailsArea originalDetails,
         FilterControl originalFilter,
         BeatmapCarousel originalCarousel,
         NoResultsPlaceholder originalNoResults,
@@ -176,7 +181,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     }
 
     [BackgroundDependencyLoader]
-    private void load(AudioManager audio, GameHost host, RealmAccess realm)
+    private void load(AudioManager audio, RealmAccess realm)
     {
         confirmSelectionSample = audio.Samples.Get(@"SongSelect/confirm-selection");
         BmsRulesetRuntime.EnsureDifficultyTableStore(host, realm);
@@ -201,7 +206,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             ShowCourseMode();
     }
 
-    internal void StartCourse(SoloSongSelect songSelect)
+    internal void StartCourse(OsuScreen songSelect)
     {
         var course = SelectedCourse;
 
@@ -212,9 +217,22 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
         var resolvedStages = course.Stages.Select(resolveStage).ToArray();
 
-        if (resolvedStages.Any(stage => stage == null))
+        var missingStages = course.Stages
+            .Where((_, index) => resolvedStages[index] == null)
+            .ToArray();
+
+        if (missingStages.Length > 0)
         {
-            notifications?.Post(new SimpleNotification { Text = BmsStrings.CourseCannotStartMissingStages });
+            var downloadUrls = ResolveMissingStageDownloadUrls(missingStages, BmsRulesetRuntime.DifficultyTableStore);
+
+            if (downloadUrls == null)
+                notifications?.Post(new SimpleNotification { Text = BmsStrings.CourseCannotStartMissingStages });
+            else
+            {
+                foreach (var url in downloadUrls)
+                    host.OpenUrlExternally(url);
+            }
+
             return;
         }
 
@@ -236,6 +254,33 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             var beatmap = BmsCourseStagePanel.QueryBeatmap(beatmaps, stage.BeatmapHash);
             return beatmap == null ? null : new BmsResolvedCourseStage(stage, beatmap);
         }
+    }
+
+    internal static IReadOnlyList<string>? ResolveMissingStageDownloadUrls(
+        IEnumerable<BmsCourseStage> missingStages,
+        DifficultyTableStore? store)
+    {
+        var urls = new List<string>();
+        var seenUrls = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var stage in missingStages)
+        {
+            if (string.IsNullOrEmpty(stage.BeatmapHash))
+                return null;
+
+            var unavailable = UnavailableTableBeatmapFactory.Resolve(stage.BeatmapHash, store);
+            var url = unavailable is { } resolved
+                ? UnavailableTableBeatmapFactory.GetDownloadUrl(resolved.Entry)
+                : null;
+
+            if (url == null)
+                return null;
+
+            if (seenUrls.Add(url))
+                urls.Add(url);
+        }
+
+        return urls;
     }
 
     internal void ShowCourseMode()
@@ -324,6 +369,11 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     public bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
     {
         if (!IsCourseMode)
+            return false;
+
+        // The mod overlay is owned by song select in the BMS implementation rather than
+        // registered with the game's global overlay manager. Let it consume global actions first.
+        if (modSelectAccessor()?.State.Value == Visibility.Visible)
             return false;
 
         switch (e.Action)

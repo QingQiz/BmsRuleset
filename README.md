@@ -139,6 +139,10 @@ difficulty increase for lamp filtering.
 file; charts are matched by MD5, marked with their table levels, and collected automatically for browsing. Well-known
 tables including Satellite, Stella, Insane BMS, Overjoy, Scramble, and Luminous are available as presets.
 
+Charts listed by an imported table but missing from the local library are still shown in song select.
+Selecting one opens the download page provided by the table when available: an orange warning
+indicates a valid download link, while a red warning means that the table provides no usable link.
+
 <p align="center">
   <img src="https://github.com/user-attachments/assets/29b2c98c-0293-4b39-8c08-7341108476d9" width="900" alt="Clear lamps and difficulty table markers in song select">
   <br>
@@ -153,6 +157,10 @@ or removed from the BMS settings. See the [difficulty table guide](./docs/diffic
 Difficulty tables can also provide BMS courses through their `course` definitions. Imported courses appear in the BMS
 course mode with their stages in the declared order, using the course gauge and constraints from the table. Course
 results are saved locally and shown alongside the course cards in song select.
+
+When a course has missing stages, attempting to start it opens the table-provided download pages if every missing
+stage has a valid URL. If any missing stage has no usable URL, no pages are opened and the course remains blocked with
+a missing-stage notification.
 
 Pausing is prohibited in course mode. The maximum wait between two songs is 99 seconds; if exceeded, the next song starts automatically.
 

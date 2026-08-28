@@ -37,6 +37,7 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
     private readonly DrawablePool<BmsCoursePanel> coursePanelPool = new(100);
     private readonly DrawablePool<BmsCourseTablePanel> tablePanelPool = new(20);
     private readonly DrawablePool<BmsCourseStagePanel> stagePanelPool = new(20);
+    private readonly DrawablePool<BmsUnavailableBeatmapPanel> unavailableStagePanelPool = new(20);
 
     private object? keyboardSelectedModel;
     private BmsGroupedCourse? pendingKeyboardSelection;
@@ -59,6 +60,7 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
         AddInternal(tablePanelPool);
         AddInternal(coursePanelPool);
         AddInternal(stagePanelPool);
+        AddInternal(unavailableStagePanelPool);
     }
 
     internal void SetCourses(IEnumerable<BmsCourseDefinition> courses) => Items.ReplaceRange(0, Items.Count, courses);
@@ -136,6 +138,9 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
                 var coursePanel = coursePanelPool.Get();
                 coursePanel.CourseCarousel = this;
                 return coursePanel;
+
+            case BmsGroupedCourseStage { Beatmap: null }:
+                return unavailableStagePanelPool.Get();
 
             case BmsGroupedCourseStage:
                 return stagePanelPool.Get();

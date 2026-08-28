@@ -10,6 +10,7 @@ namespace osu.Game.Rulesets.BmsRuleset;
 
 internal static class BmsRulesetRuntime
 {
+    internal static event Action? DifficultyTablesChanged;
     internal static event Action? CourseResultsChanged;
 
     internal static BmsRulesetConfigManager? ConfigManager
@@ -88,6 +89,9 @@ internal static class BmsRulesetRuntime
         store.LoadPersistedTables();
     }
 
-    private static void syncCourses() => CourseCatalog.Replace(
-        BmsCourseTableConverter.Convert(difficultyTableStore?.Tables ?? []));
+    private static void syncCourses()
+    {
+        CourseCatalog.Replace(BmsCourseTableConverter.Convert(difficultyTableStore?.Tables ?? []));
+        DifficultyTablesChanged?.Invoke();
+    }
 }

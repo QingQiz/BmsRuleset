@@ -276,6 +276,8 @@
   <data name="score_graph_show_judgement_comparison_description" xml:space="preserve"><value>显示当前成绩与个人最好成绩的判定数量。</value></data>
   <data name="courses" xml:space="preserve"><value>段位</value></data>
   <data name="song_select" xml:space="preserve"><value>选歌</value></data>
+  <data name="difficulty_table_beatmap_not_imported" xml:space="preserve"><value>该谱面尚未导入。</value></data>
+  <data name="difficulty_table_beatmap_download_prompt" xml:space="preserve"><value>正在打开“{0}”的下载页面。</value></data>
   <data name="course_search_placeholder" xml:space="preserve"><value>搜索段位、难度表或曲目</value></data>
   <data name="course_table_group" xml:space="preserve"><value>{0} ({1})</value></data>
   <data name="course_title_summary" xml:space="preserve"><value>{0} 首</value></data>

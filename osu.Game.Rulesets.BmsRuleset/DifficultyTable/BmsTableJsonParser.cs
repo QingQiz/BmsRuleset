@@ -106,6 +106,8 @@ public static class BmsTableJsonParser
                 Sha256Hash = IsValidSha256(chart.Sha256) ? chart.Sha256!.ToLowerInvariant() : null,
                 Title = chart.Title,
                 Artist = chart.Artist,
+                Url = chart.Url,
+                UrlDiff = chart.UrlDiff,
             });
         }
 
@@ -289,6 +291,8 @@ public static class BmsTableJsonParser
                 Sha256 = item.TryGetProperty("sha256", out var sh) ? sh.GetString() : null,
                 Title = item.TryGetProperty("title", out var t) ? t.GetString() : null,
                 Artist = item.TryGetProperty("artist", out var a) ? a.GetString() : null,
+                Url = item.TryGetProperty("url", out var u) ? u.GetString() : null,
+                UrlDiff = item.TryGetProperty("url_diff", out var ud) ? ud.GetString() : null,
             });
         }
 

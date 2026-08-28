@@ -99,7 +99,7 @@ public partial class BmsFileImporterTest
 
             await importer.Import(directory).ConfigureAwait(false);
 
-            await realm.WriteAsync(r =>
+            realm.Write(r =>
             {
                 var sets = r.All<BeatmapSetInfo>().AsEnumerable()
                     .Where(s => !s.DeletePending && !s.Protected)
@@ -459,7 +459,7 @@ public partial class BmsFileImporterTest
 
             await importer.Import(chartPath).ConfigureAwait(false);
 
-            await realm.WriteAsync(r =>
+            realm.Write(r =>
             {
                 var set = r.All<BeatmapSetInfo>().Single();
                 set.DeletePending = true;

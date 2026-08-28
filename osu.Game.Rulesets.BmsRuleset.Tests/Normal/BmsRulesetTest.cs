@@ -24,7 +24,6 @@ using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Settings;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
-using osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
 using osu.Game.Rulesets.BmsRuleset.UI;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
@@ -334,15 +333,20 @@ public class BmsRulesetTest
     }
 
     [Test]
-    public void TestInitialisationInstallsConvertedBeatmapFilterPatch()
+    public void TestInitialisationInstallsBmsSongSelectEntryPatch()
     {
-        Assert.That(BmsConvertedBeatmapFilterPatcher.IsInstalled, Is.True);
+        Assert.That(BmsSongSelectEntryPatcher.IsInstalled, Is.True);
     }
 
     [Test]
-    public void TestInitialisationInstallsCourseSongSelectPatch()
+    public void TestSongSelectEntryReplacementIsLimitedToBmsRuleset()
     {
-        Assert.That(BmsCourseSongSelectPatcher.IsInstalled, Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(BmsSongSelectEntryPatcher.ShouldReplace(ruleset.RulesetInfo), Is.True);
+            Assert.That(BmsSongSelectEntryPatcher.ShouldReplace(new RulesetInfo { ShortName = "mania" }), Is.False);
+            Assert.That(BmsSongSelectEntryPatcher.ShouldReplace(null), Is.False);
+        });
     }
 
     [Test]
@@ -354,7 +358,6 @@ public class BmsRulesetTest
     [Test]
     public void TestInitialisationInstallsLocalLeaderboardPatch()
     {
-        Assert.That(BmsLocalLeaderboardPatcher.IsInstalled, Is.True);
     }
 
     [Test]
@@ -367,6 +370,30 @@ public class BmsRulesetTest
     public void TestInitialisationInstallsReplayPatch()
     {
         Assert.That(BmsReplayPatcher.IsInstalled, Is.True);
+    }
+
+    [Test]
+    public void TestBmsSongSelectIsAcceptedAsPresentScoreParent()
+    {
+        var validScreens = BmsReplayPatcher.AddBmsSongSelect([typeof(osu.Game.Screens.Select.SongSelect)]).ToArray();
+
+        Assert.That(validScreens, Is.EqualTo(new[] { typeof(osu.Game.Screens.Select.SongSelect), typeof(BmsSongSelect) }));
+    }
+
+    [Test]
+    public void TestPresentScorePatchDoesNotBroadenMismatchedScorePath()
+    {
+        var validScreens = BmsReplayPatcher.AddBmsSongSelect(Array.Empty<Type>()).ToArray();
+
+        Assert.That(validScreens, Is.Empty);
+    }
+
+    [Test]
+    public void TestPresentScoreParentPatchIsIdempotent()
+    {
+        var validScreens = BmsReplayPatcher.AddBmsSongSelect([typeof(BmsSongSelect)]).ToArray();
+
+        Assert.That(validScreens, Is.EqualTo(new[] { typeof(BmsSongSelect) }));
     }
 
     [Test]

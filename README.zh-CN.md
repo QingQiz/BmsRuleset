@@ -128,6 +128,9 @@ EX Hard Clear，一直到 Full Combo、Perfect 与 Max。降低难度时仍会�
 通过 MD5 匹配谱面、在难度名中添加等级标记，并自动生成可浏览的收藏夹。Satellite、Stella、发狂 BMS、
 Overjoy、Scramble 和 Luminous 等常用难度表可直接从预设中选择。
 
+难度表中存在、但本地曲库尚未导入的谱面也会显示在选歌界面。选择歌曲时，若难度表提供了有效下载地址，
+则显示为橙色感叹号，并在尝试游玩时打开对应下载页面；没有可用地址时则显示为红色感叹号。
+
 <p align="center">
   <img src="https://github.com/user-attachments/assets/29b2c98c-0293-4b39-8c08-7341108476d9" width="900" alt="选歌界面中的 Clear Lamp 和难度表标记">
   <br>
@@ -141,6 +144,9 @@ Overjoy、Scramble 和 Luminous 等常用难度表可直接从预设中选择。
 
 难度表还可以通过 `course` 定义提供 BMS 段位。导入的段位会按声明顺序加入 BMS 段位模式，使用难度表指定的
 段位血条与约束。段位成绩会保存在本地，并显示在选歌界面的段位卡片中。
+
+段位存在缺失 stage 时，尝试开始段位会在所有缺失 stage 都有有效 URL 的情况下批量打开难度表提供的下载页面。
+只要任意缺失 stage 没有可用 URL，就不会打开任何页面，并提示 stage 不齐、阻止开始段位。
 
 段位模式中禁止暂停，两首歌之间最多停留99秒，超时会自动开始下一首歌。
 

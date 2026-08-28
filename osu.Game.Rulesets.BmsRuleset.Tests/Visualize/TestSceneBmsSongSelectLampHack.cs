@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
@@ -9,10 +10,10 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
-using osuTK;
 using osuTK.Graphics;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -22,6 +23,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Toolbar;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -43,7 +45,7 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
     private OsuConfigManager config = null!;
     private ScoreManager scoreManager = null!;
     private RealmDetachedBeatmapStore beatmapStore = null!;
-    private osu.Game.Screens.Select.SongSelect songSelect = null!;
+    private BmsSongSelect songSelect = null!;
     private BeatmapSetInfo lampBeatmapSet = null!;
 
     // AssistClear (beatoraja's pattern-assist lamp) has no producing mod in this ruleset and is excluded.
@@ -111,8 +113,6 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
 
         AddStep("reset song select stores", () =>
         {
-            BmsSongSelectLampPatcher.InstallOnce();
-
             Ruleset.Value = rulesets.AvailableRulesets.Single(r => r.ShortName == Constant.SHORT_NAME);
             Beatmap.SetDefault();
             SelectedMods.SetDefault();
@@ -135,7 +135,6 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         importLampScores();
         loadSongSelect();
 
-        AddAssert("patch installed", () => BmsSongSelectLampPatcher.IsInstalled);
         AddUntilStep("BMS ruleset active", () => Ruleset.Value.ShortName == Constant.SHORT_NAME);
         AddUntilStep("all lamp panels are realised", () => lampRankDisplays().Count(), () => Is.EqualTo(all_lamps.Length));
         AddUntilStep("all real panels have BMS lamps", () => visibleLampDisplays().Count(), () => Is.EqualTo(all_lamps.Length));
@@ -161,6 +160,104 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
     }
 
     [Test]
+    public void TestReplacementPageOwnsModSelectOverlay()
+    {
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
+        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
+        AddAssert("mod overlay belongs to song select", () => songSelect.ModSelectOverlay.Parent, () => Is.SameAs(songSelect));
+        AddStep("show mod overlay", () => songSelect.ModSelectOverlay.Show());
+        AddUntilStep("mod overlay visible", () => songSelect.ModSelectOverlay.State.Value == Visibility.Visible && songSelect.ModSelectOverlay.IsPresent);
+    }
+
+    [Test]
+    public void TestUnavailableDifficultyTableBeatmapIsPresented()
+    {
+        const string missing_hash = "abcdef0123456789abcdef0123456789";
+        DifficultyTableStore previousStore = null!;
+
+        AddStep("load missing table entry", () =>
+        {
+            previousStore = BmsRulesetRuntime.DifficultyTableStore;
+            var store = new DifficultyTableStore(null, Path.Combine(LocalStorage.GetFullPath(string.Empty), "unavailable-table-carousel-test"));
+            store.RestoreTable(new DifficultyTable.DifficultyTable
+            {
+                Name = "Test",
+                Symbol = "T",
+                Entries = [new TableEntry { Level = "1", Md5Hash = missing_hash, Title = "Missing" }],
+            });
+            BmsRulesetRuntime.DifficultyTableStore = store;
+        });
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
+        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
+        AddUntilStep("missing entry presented", () => !songSelect.IsFiltering && carousel.GetCarouselItems()?
+            .Select(item => item.Model)
+            .OfType<GroupedBeatmap>()
+            .Any(grouped => grouped.Beatmap.MD5Hash == missing_hash) == true);
+        AddAssert("missing entry uses BMS", () => carousel.GetCarouselItems()!
+            .Select(item => item.Model)
+            .OfType<GroupedBeatmap>()
+            .Single(grouped => grouped.Beatmap.MD5Hash == missing_hash)
+            .Beatmap.Ruleset.ShortName, () => Is.EqualTo(Constant.SHORT_NAME));
+        AddUntilStep("missing entry panel realised", () => carousel.ChildrenOfType<BmsUnavailableBeatmapPanel>()
+            .Any(panel => panel.Item?.Model is GroupedBeatmap grouped && grouped.Beatmap.MD5Hash == missing_hash));
+        AddAssert("missing entry panel marks unavailable", () => carousel.ChildrenOfType<BmsUnavailableBeatmapPanel>()
+            .Single(panel => panel.Item?.Model is GroupedBeatmap grouped && grouped.Beatmap.MD5Hash == missing_hash)
+            .ChildrenOfType<SpriteIcon>()
+            .Any(icon => icon.Icon.Equals(FontAwesome.Solid.ExclamationTriangle)));
+        AddAssert("missing entry warning is visible", () => carousel.ChildrenOfType<BmsUnavailableBeatmapPanel>()
+            .Single(panel => panel.Item?.Model is GroupedBeatmap grouped && grouped.Beatmap.MD5Hash == missing_hash)
+            .ChildrenOfType<SpriteIcon>()
+            .Any(icon => icon.Icon.Equals(FontAwesome.Solid.ExclamationTriangle) && icon.Alpha > 0 && icon.DrawWidth > 0 && icon.DrawHeight > 0));
+        AddAssert("missing entry warning is red", () => carousel.ChildrenOfType<BmsUnavailableBeatmapPanel>()
+            .Single(panel => panel.Item?.Model is GroupedBeatmap grouped && grouped.Beatmap.MD5Hash == missing_hash)
+            .ChildrenOfType<SpriteIcon>()
+            .Where(icon => icon.Icon.Equals(FontAwesome.Solid.ExclamationTriangle))
+            .Select(icon => icon.Colour)
+            .Any(colour => colour == Color4.Red));
+        AddStep("activate missing entry", () => carousel.Activate(carousel.GetCarouselItems()!
+            .Single(item => item.Model is GroupedBeatmap grouped && grouped.Beatmap.MD5Hash == missing_hash)));
+        AddAssert("missing entry does not replace working beatmap", () => Beatmap.IsDefault);
+        AddStep("confirm missing entry", () => carousel.Activate(carousel.GetCarouselItems()!
+            .Single(item => item.Model is GroupedBeatmap grouped && grouped.Beatmap.MD5Hash == missing_hash)));
+        AddAssert("confirm does not start gameplay", () => Stack.CurrentScreen == songSelect && Beatmap.IsDefault);
+        AddStep("restore table store", () => BmsRulesetRuntime.DifficultyTableStore = previousStore);
+    }
+
+    [Test]
+    public void TestImportedDifficultyTableBeatmapIsNotDuplicated()
+    {
+        DifficultyTableStore previousStore = null!;
+        BeatmapInfo importedBeatmap = null!;
+
+        AddStep("import matching BMS beatmap", () =>
+        {
+            var bmsRuleset = rulesets.AvailableRulesets.Single(r => r.ShortName == Constant.SHORT_NAME);
+            importedBeatmap = beatmaps.Import(createBeatmapSet(bmsRuleset))!.Value.Beatmaps.First().Detach();
+
+            previousStore = BmsRulesetRuntime.DifficultyTableStore;
+            var store = new DifficultyTableStore(null, Path.Combine(LocalStorage.GetFullPath(string.Empty), "available-table-carousel-test"));
+            store.RestoreTable(new DifficultyTable.DifficultyTable
+            {
+                Name = "Test",
+                Symbol = "T",
+                Entries = [new TableEntry { Level = "1", Md5Hash = importedBeatmap.MD5Hash, Title = "Imported" }],
+            });
+            BmsRulesetRuntime.DifficultyTableStore = store;
+            Beatmap.Value = beatmaps.GetWorkingBeatmap(importedBeatmap, true);
+        });
+        AddUntilStep("wait for imported beatmap", () => beatmaps.GetAllUsableBeatmapSets()
+            .SelectMany(set => set.Beatmaps)
+            .Any(beatmap => beatmap.MD5Hash == importedBeatmap.MD5Hash));
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
+        AddUntilStep("wait for song select presentation", () => Stack.CurrentScreen == songSelect && songSelect.CarouselItemsPresented && !songSelect.IsFiltering);
+        AddAssert("matching beatmap appears once", () => carousel.GetCarouselItems()!
+            .Select(item => item.Model)
+            .OfType<GroupedBeatmap>()
+            .Count(grouped => grouped.Beatmap.MD5Hash == importedBeatmap.MD5Hash), () => Is.EqualTo(1));
+        AddStep("restore table store", () => BmsRulesetRuntime.DifficultyTableStore = previousStore);
+    }
+
+    [Test]
     public void TestRankFollowsSelectedMods()
     {
         BeatmapInfo beatmap = null!;
@@ -181,7 +278,7 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         });
         AddUntilStep("wait for scores", () => Realm.Run(r =>
             r.All<ScoreInfo>().AsEnumerable().Count(score => score.BeatmapHash == beatmap.Hash && !score.DeletePending)), () => Is.EqualTo(2));
-        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for carousel presentation", () => songSelect.CarouselItemsPresented && !songSelect.IsFiltering);
         AddStep("scope to rank beatmap set", () => songSelect.ScopeToBeatmapSet(rankBeatmapSet));
@@ -236,7 +333,7 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
 
     private void loadSongSelect()
     {
-        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for carousel presentation", () => songSelect.CarouselItemsPresented && !songSelect.IsFiltering);
         AddStep("scope to lamp beatmap set", () => songSelect.ScopeToBeatmapSet(lampBeatmapSet));
@@ -332,19 +429,19 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         });
 
         foreach (var (lampValue, expectedBase, expectedFlash) in new[]
-        {
-            (BmsLamp.NoPlay, new Color4(40, 44, 48, 255), Color4.Transparent),
-            (BmsLamp.Failed, new Color4(233, 47, 10, 255), new Color4(15, 3, 0, 255)),
-            (BmsLamp.AssistClear, new Color4(206, 1, 214, 255), Color4.Transparent),
-            (BmsLamp.LightAssistClear, new Color4(221, 162, 223, 255), Color4.Transparent),
-            (BmsLamp.EasyClear, new Color4(86, 202, 67, 255), Color4.Transparent),
-            (BmsLamp.Clear, new Color4(245, 199, 88, 255), Color4.Transparent),
-            (BmsLamp.HardClear, new Color4(248, 247, 245, 255), Color4.Transparent),
-            (BmsLamp.ExHardClear, new Color4(239, 253, 9, 255), new Color4(253, 9, 9, 255)),
-            (BmsLamp.FullCombo, new Color4(255, 255, 255, 255), new Color4(9, 250, 253, 255)),
-            (BmsLamp.Perfect, new Color4(255, 255, 255, 255), new Color4(63, 255, 77, 255)),
-            (BmsLamp.Max, new Color4(255, 255, 255, 255), new Color4(255, 235, 66, 255)),
-        })
+                 {
+                     (BmsLamp.NoPlay, new Color4(40, 44, 48, 255), Color4.Transparent),
+                     (BmsLamp.Failed, new Color4(233, 47, 10, 255), new Color4(15, 3, 0, 255)),
+                     (BmsLamp.AssistClear, new Color4(206, 1, 214, 255), Color4.Transparent),
+                     (BmsLamp.LightAssistClear, new Color4(221, 162, 223, 255), Color4.Transparent),
+                     (BmsLamp.EasyClear, new Color4(86, 202, 67, 255), Color4.Transparent),
+                     (BmsLamp.Clear, new Color4(245, 199, 88, 255), Color4.Transparent),
+                     (BmsLamp.HardClear, new Color4(248, 247, 245, 255), Color4.Transparent),
+                     (BmsLamp.ExHardClear, new Color4(239, 253, 9, 255), new Color4(253, 9, 9, 255)),
+                     (BmsLamp.FullCombo, new Color4(255, 255, 255, 255), new Color4(9, 250, 253, 255)),
+                     (BmsLamp.Perfect, new Color4(255, 255, 255, 255), new Color4(63, 255, 77, 255)),
+                     (BmsLamp.Max, new Color4(255, 255, 255, 255), new Color4(255, 235, 66, 255)),
+                 })
         {
             AddAssert($"{lampValue} base colour matches beatoraja", () =>
             {

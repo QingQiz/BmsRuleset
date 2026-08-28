@@ -60,7 +60,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
     private ScoreManager scoreManager = null!;
     private RealmDetachedBeatmapStore beatmapStore = null!;
     private OsuConfigManager config = null!;
-    private Screens.Select.SongSelect songSelect = null!;
+    private BmsSongSelect songSelect = null!;
 
     private BeatmapCarousel carousel => songSelect.ChildrenOfType<BeatmapCarousel>().Single();
 
@@ -124,7 +124,6 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
 
         AddStep("configure BMS courses", () =>
         {
-            BmsCourseSongSelectPatcher.InstallOnce();
             BmsRulesetRuntime.CourseCatalog.Replace(createCourses());
             Ruleset.Value = rulesets.AvailableRulesets.Single(ruleset => ruleset.ShortName == Constant.SHORT_NAME);
             Beatmap.SetDefault();
@@ -262,7 +261,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         var originalFilterWidth = 0f;
         var courseActivationCount = 0;
 
-        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
 
@@ -308,14 +307,17 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             (songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().ScreenSpaceDrawQuad.TopLeft - originalFilterTopLeft).Length, () => Is.LessThan(0.5f));
         AddAssert("course filter matches song select top-right", () =>
             (songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().ScreenSpaceDrawQuad.TopRight - originalFilterTopRight).Length, () => Is.LessThan(0.5f));
-        AddUntilStep("four nested stage panels shown in carousel", () =>
-            controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Count(), () => Is.EqualTo(4));
+        AddUntilStep("four unavailable stage panels shown in carousel", () =>
+            controller.CourseCarousel.ChildrenOfType<BmsUnavailableBeatmapPanel>().Count(), () => Is.EqualTo(4));
+        AddAssert("unavailable stage panels reuse difficulty table panel", () =>
+            controller.CourseCarousel.ChildrenOfType<BmsUnavailableBeatmapPanel>()
+                .All(panel => panel.Item?.Model is BmsGroupedCourseStage { Beatmap: null }));
         AddAssert("stage panels removed from filter card", () =>
-            songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().ChildrenOfType<BmsCourseStagePanel>(), () => Is.Empty);
+            songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().ChildrenOfType<BmsUnavailableBeatmapPanel>(), () => Is.Empty);
         AddAssert("stage panels removed from history area", () =>
-            songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().ChildrenOfType<BmsCourseStagePanel>(), () => Is.Empty);
+            songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().ChildrenOfType<BmsUnavailableBeatmapPanel>(), () => Is.Empty);
         AddAssert("stage panels removed from title wedge", () =>
-            songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().ChildrenOfType<BmsCourseStagePanel>(), () => Is.Empty);
+            songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().ChildrenOfType<BmsUnavailableBeatmapPanel>(), () => Is.Empty);
         AddAssert("only selected course stages visible", () => controller.CourseCarousel.GetCarouselItems()?
             .Count(item => item.IsVisible && item.Model is BmsGroupedCourseStage), () => Is.EqualTo(4));
         AddAssert("all course stages retained in carousel", () => controller.CourseCarousel.GetCarouselItems()?
@@ -323,7 +325,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddAssert("selected course is expanded", () => controller.CourseCarousel.GetCarouselItems()?
             .Single(item => item.Model is BmsGroupedCourse grouped && grouped.Course.Id == controller.SelectedCourse?.Id).IsExpanded == true);
         AddAssert("stage panel text is not italic", () =>
-            controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>()
+            controller.CourseCarousel.ChildrenOfType<BmsUnavailableBeatmapPanel>()
                 .SelectMany(panel => panel.ChildrenOfType<OsuSpriteText>()).All(text => !text.Font.Italics));
         AddAssert("stage panels follow selected course card", () =>
         {
@@ -556,20 +558,20 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddStep("simulate song select resuming after gameplay", () =>
         {
             songSelect.ChildrenOfType<BeatmapTitleWedge>().Single().Show();
-            songSelect.ChildrenOfType<BeatmapDetailsArea>().Single().Show();
+            songSelect.ChildrenOfType<BmsBeatmapDetailsArea>().Single().Show();
             songSelect.ChildrenOfType<FilterControl>().Single().Show();
         });
         AddUntilStep("course mode keeps resumed controls hidden", () =>
             songSelect.ChildrenOfType<BeatmapTitleWedge>().Single().State.Value == Visibility.Visible
             && songSelect.ChildrenOfType<BeatmapTitleWedge>().Single().Alpha == 0
-            && songSelect.ChildrenOfType<BeatmapDetailsArea>().Single().State.Value == Visibility.Visible
-            && songSelect.ChildrenOfType<BeatmapDetailsArea>().Single().Alpha == 0
+            && songSelect.ChildrenOfType<BmsBeatmapDetailsArea>().Single().State.Value == Visibility.Visible
+            && songSelect.ChildrenOfType<BmsBeatmapDetailsArea>().Single().Alpha == 0
             && songSelect.ChildrenOfType<FilterControl>().Single().State.Value == Visibility.Visible
             && songSelect.ChildrenOfType<FilterControl>().Single().Alpha == 0);
         AddStep("return to song select", () => controller.HideCourseMode());
         AddAssert("normal carousel restored", () => carousel.Alpha, () => Is.GreaterThan(0));
         AddUntilStep("song select title restored", () => songSelect.ChildrenOfType<BeatmapTitleWedge>().Single().Alpha, () => Is.GreaterThan(0.9f));
-        AddUntilStep("song select details restored", () => songSelect.ChildrenOfType<BeatmapDetailsArea>().Single().Alpha, () => Is.GreaterThan(0.9f));
+        AddUntilStep("song select details restored", () => songSelect.ChildrenOfType<BmsBeatmapDetailsArea>().Single().Alpha, () => Is.GreaterThan(0.9f));
         AddUntilStep("song select filter restored", () => songSelect.ChildrenOfType<FilterControl>().Single().Alpha, () => Is.GreaterThan(0.9f));
         AddAssert("course carousel stops receiving input", () => !controller.CourseCarousel.IsPresent && controller.CourseCarousel.Alpha == 0);
         AddAssert("normal carousel input is restored", () => controller.OriginalCarouselAcceptsInput, () => Is.True);
@@ -580,6 +582,21 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddWaitStep("allow re-entry scheduling", 2);
         AddAssert("reopening course mode does not refresh carousel", () => controller.CourseCarousel.IsFiltering, () => Is.False);
         AddAssert("course selection retained on re-entry", () => controller.SelectedCourse?.Id, () => Is.EqualTo("stella-1"));
+    }
+
+    [Test]
+    public void TestModOverlayBackDoesNotExitCourseMode()
+    {
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
+        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
+        AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
+        AddStep("show course mode", () => controller.ShowCourseMode());
+        AddUntilStep("course mode visible", () => controller.IsCourseMode);
+        AddStep("show mod overlay", () => songSelect.ModSelectOverlay.Show());
+        AddUntilStep("mod overlay visible", () => songSelect.ModSelectOverlay.State.Value == Visibility.Visible);
+        AddStep("press escape", () => InputManager.Key(Key.Escape));
+        AddUntilStep("mod overlay hidden", () => songSelect.ModSelectOverlay.State.Value != Visibility.Visible);
+        AddAssert("course mode remains visible", () => controller.IsCourseMode);
     }
 
     [Test]
@@ -636,7 +653,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         });
         AddUntilStep("wait for course stage scores", () => Realm.Run(r =>
             r.All<ScoreInfo>().AsEnumerable().Count(score => score.BeatmapHash == beatmap.Hash && !score.DeletePending)), () => Is.EqualTo(3));
-        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
         AddStep("show course mode", () => controller.ShowCourseMode());
@@ -786,7 +803,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                     ["no_good"]),
             ]);
         });
-        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
         AddStep("show course mode", () => controller.ShowCourseMode());
@@ -835,7 +852,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                     [new BmsCourseStage($"Preview {index}", "1", BeatmapHash: beatmap.Hash)],
                     [])));
         });
-        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
         AddStep("select original beatmap", () => songSelect.Beatmap.Value = beatmaps.GetWorkingBeatmap(originalBeatmap));
@@ -910,7 +927,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                     []),
             ]);
         });
-        AddStep("load real song select", () => Stack.Push(songSelect = new SoloSongSelect()));
+        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
         AddStep("show course mode", () => controller.ShowCourseMode());

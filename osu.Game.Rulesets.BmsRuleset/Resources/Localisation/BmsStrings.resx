@@ -276,6 +276,8 @@
   <data name="score_graph_show_judgement_comparison_description" xml:space="preserve"><value>Shows current and personal-best judgement counts.</value></data>
   <data name="courses" xml:space="preserve"><value>Courses</value></data>
   <data name="song_select" xml:space="preserve"><value>Song Select</value></data>
+  <data name="difficulty_table_beatmap_not_imported" xml:space="preserve"><value>This beatmap has not been imported.</value></data>
+  <data name="difficulty_table_beatmap_download_prompt" xml:space="preserve"><value>Opening download page for {0}.</value></data>
   <data name="course_search_placeholder" xml:space="preserve"><value>Search courses, tables or songs</value></data>
   <data name="course_table_group" xml:space="preserve"><value>{0} ({1})</value></data>
   <data name="course_title_summary" xml:space="preserve"><value>{0} stages</value></data>
