@@ -233,6 +233,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
 
     public void RefetchScores()
     {
+        fetchedScores.Value = null;
         SetScores([]);
 
         if (beatmap.IsDefault)
@@ -266,9 +267,25 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
                     r => r.All<ScoreInfo>().Where(s => s.BeatmapHash == fetchBeatmapInfo.Hash && !s.DeletePending),
                     (sender, changes) =>
                     {
+                        if (fetchScope != Scope.Value
+                            || !fetchBeatmapInfo.Equals(beatmap.Value.BeatmapInfo)
+                            || !fetchRuleset.Equals(ruleset.Value))
+                            return;
+
                         if (changes?.HasCollectionChanges() != false)
                             fetchedScores.Value = BmsLocalLeaderboardService.CreateScores(sender.AsEnumerable(), criteria);
                     });
+
+                // Realm's initial notification can race subscription setup. Initialise from the current
+                // snapshot as well so an empty local leaderboard can always leave the retrieving state.
+                var localScores = realm.Run(r => BmsLocalLeaderboardService.CreateScores(
+                    r.All<ScoreInfo>().Where(s => s.BeatmapHash == fetchBeatmapInfo.Hash && !s.DeletePending),
+                    criteria));
+
+                if (fetchScope == Scope.Value
+                    && fetchBeatmapInfo.Equals(beatmap.Value.BeatmapInfo)
+                    && fetchRuleset.Equals(ruleset.Value))
+                    fetchedScores.Value = localScores;
             }
             else
                 leaderboardManager.FetchWithCriteria(criteria, forceRefresh: true);
@@ -277,10 +294,8 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
             {
                 // only bind this after the first fetch to avoid reading stale scores.
                 // Schedule is important here to avoid handling changes after this drawable is disposed.
-                if (fetchScope == BeatmapLeaderboardScope.Local)
-                    fetchedScores.BindValueChanged(_ => Schedule(updateScores), true);
-                else
-                    leaderboardManager.Scores.BindValueChanged(_ => Schedule(updateScores), true);
+                fetchedScores.BindValueChanged(_ => Schedule(updateScores), true);
+                leaderboardManager.Scores.BindValueChanged(_ => Schedule(updateScores), true);
                 initialFetchComplete = true;
             }
         }, initialFetchComplete && fetchScope != BeatmapLeaderboardScope.Local ? 300 : 0);
