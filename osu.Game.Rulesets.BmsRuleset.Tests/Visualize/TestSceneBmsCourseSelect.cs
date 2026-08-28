@@ -4,6 +4,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
@@ -35,6 +36,7 @@ using osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Screens;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play.Leaderboards;
 using osu.Game.Screens.Select;
@@ -61,6 +63,9 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
     private RealmDetachedBeatmapStore beatmapStore = null!;
     private OsuConfigManager config = null!;
     private BmsSongSelect songSelect = null!;
+
+    [Resolved]
+    private Bindable<RulesetInfo> globalRuleset { get; set; } = null!;
 
     private BeatmapCarousel carousel => songSelect.ChildrenOfType<BeatmapCarousel>().Single();
 
@@ -600,6 +605,42 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
     }
 
     [Test]
+    public void TestRulesetSwitchReplacesSongSelectImplementation()
+    {
+        TestParentScreen parentScreen = null!;
+        RulesetInfo originalRuleset = null!;
+        ToolbarRulesetSelector rulesetSelector = null!;
+
+        AddStep("load parent screen", () => Stack.Push(parentScreen = new TestParentScreen()));
+        AddUntilStep("wait for parent screen", () => Stack.CurrentScreen == parentScreen && parentScreen.IsLoaded);
+        AddStep("load real song select", () =>
+        {
+            parentScreen.Push(songSelect = new BmsSoloSongSelect());
+            BmsSongSelectEntryPatcher.TrackRulesetChanges(songSelect);
+        });
+        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
+        AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
+        AddStep("show course mode", () => controller.ShowCourseMode());
+        AddUntilStep("course mode visible", () => controller.IsCourseMode);
+        AddStep("switch away from BMS", () =>
+        {
+            originalRuleset = globalRuleset.Value;
+            rulesetSelector = this.ChildrenOfType<ToolbarRulesetSelector>().Single();
+            rulesetSelector.Current.UnbindBindings();
+            globalRuleset.Value = new AlternateTestRuleset().RulesetInfo;
+        });
+        AddUntilStep("upstream song select loaded", () => Stack.CurrentScreen is SoloSongSelect upstream && upstream.IsLoaded && upstream.IsCurrentScreen());
+        AddAssert("alternate ruleset remains selected", () => globalRuleset.Value.ShortName, () => Is.EqualTo("other"));
+        AddStep("switch back to BMS", () => globalRuleset.Value = originalRuleset);
+        AddUntilStep("BMS song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect bms && bms.IsLoaded && bms.IsCurrentScreen());
+        AddStep("restore toolbar binding", () =>
+        {
+            rulesetSelector.Current.BindTo(globalRuleset);
+            songSelect = (BmsSoloSongSelect)Stack.CurrentScreen;
+        });
+    }
+
+    [Test]
     public void TestCourseStageCardsDisplayHistoricalLampAndRank()
     {
         BeatmapInfo beatmap = null!;
@@ -944,5 +985,16 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddWaitStep("allow hidden carousel to settle", 120);
         AddStep("stop cache tracking", () => cacheTracker.Cancel());
         AddAssert("intermediate beatmaps were not cached", () => peakCacheCount - baselineCacheCount, () => Is.LessThanOrEqualTo(8));
+    }
+
+    private partial class TestParentScreen : OsuScreen
+    {
+    }
+
+    public class AlternateTestRuleset : BmsRuleset
+    {
+        public override string Description => "Other";
+
+        public override string ShortName => "other";
     }
 }

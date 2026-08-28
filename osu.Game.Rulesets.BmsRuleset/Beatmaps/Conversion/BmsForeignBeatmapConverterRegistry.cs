@@ -17,6 +17,16 @@ internal static class BmsForeignBeatmapConverterRegistry
     public static IBmsForeignBeatmapConverter? FindConverter(IBeatmapInfo source) =>
         findConverter(converters, converter => converter.CanConvert(source), source.Ruleset.ShortName);
 
+    public static bool AllowsGameplay(IBeatmapInfo source, RulesetInfo targetRuleset, bool allowConversion)
+    {
+        if (source.AllowGameplayWithRuleset(targetRuleset, allowConversion))
+            return true;
+
+        return allowConversion
+               && targetRuleset.ShortName == Constant.SHORT_NAME
+               && FindConverter(source) != null;
+    }
+
     internal static IBmsForeignBeatmapConverter? FindConverter(
         IBeatmap source,
         IReadOnlyList<IBmsForeignBeatmapConverter> candidates) =>

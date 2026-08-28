@@ -38,10 +38,8 @@ internal sealed class BmsBeatmapCarouselFilterMatching(Func<FilterCriteria> getC
 
     internal static bool Matches(BeatmapInfo beatmap, FilterCriteria criteria)
     {
-        var match = criteria.Ruleset == null || beatmap.AllowGameplayWithRuleset(criteria.Ruleset!, criteria.AllowConvertedBeatmaps);
-
-        if (!match && criteria.AllowConvertedBeatmaps && criteria.Ruleset?.ShortName == Constant.SHORT_NAME)
-            match = BmsForeignBeatmapConverterRegistry.FindConverter(beatmap) != null;
+        var match = criteria.Ruleset == null
+                    || BmsForeignBeatmapConverterRegistry.AllowsGameplay(beatmap, criteria.Ruleset, criteria.AllowConvertedBeatmaps);
 
         if (criteria.SelectedBeatmapSet != null)
             return beatmap.BeatmapSet?.Equals(criteria.SelectedBeatmapSet) == true && match;

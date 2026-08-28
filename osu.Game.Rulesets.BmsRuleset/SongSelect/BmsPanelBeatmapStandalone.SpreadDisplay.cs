@@ -15,6 +15,7 @@ using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Screens.Select;
 using osuTK;
 
@@ -164,7 +165,7 @@ internal partial class BmsPanelBeatmapStandalone
 
             var otherStarDifficulties = Beatmap.Value.BeatmapSet!.Beatmaps
                 .Except([Beatmap.Value])
-                .Where(b => b.AllowGameplayWithRuleset(ruleset.Value, showConvertedBeatmaps.Value))
+                .Where(b => BmsForeignBeatmapConverterRegistry.AllowsGameplay(b, ruleset.Value, showConvertedBeatmaps.Value))
                 .OrderBy(b => b.StarRating)
                 .Select(b => b.StarRating)
                 .ToList();

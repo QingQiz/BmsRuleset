@@ -642,7 +642,8 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             ((IBmsBeatmap)working.Beatmap).SampleDefinitions[1] == "b_accordion (切る)_v100l8o5c.wav");
 
         AddStep("load preview track", () => previewTrack = working.LoadTrack());
-        AddUntilStep("preview uses decoded sample path", () => getFirstPreviewEventSamplePath(previewTrack) == "b_accordion (切る)_v100l8o5c.wav");
+        AddUntilStep("preview playback created", () => BmsAudioTestAccess.HasPreviewPlayback((BmsPreviewTrack)previewTrack));
+        AddAssert("preview uses decoded sample path", () => getFirstPreviewEventSamplePath(previewTrack) == "b_accordion (切る)_v100l8o5c.wav");
     }
 
     [Test]

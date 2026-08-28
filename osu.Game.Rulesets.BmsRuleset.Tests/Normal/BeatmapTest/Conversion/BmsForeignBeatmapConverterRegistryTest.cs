@@ -13,6 +13,33 @@ public class BmsForeignBeatmapConverterRegistryTest
     private readonly Beatmap source = new();
 
     [Test]
+    public void TestAllowsSupportedForeignConversionForBms()
+    {
+        var mania = createManiaBeatmapInfo(7);
+        var bms = new RulesetInfo { ShortName = Constant.SHORT_NAME, OnlineID = -1 };
+
+        Assert.That(BmsForeignBeatmapConverterRegistry.AllowsGameplay(mania, bms, true), Is.True);
+    }
+
+    [Test]
+    public void TestRejectsForeignConversionWhenDisabled()
+    {
+        var mania = createManiaBeatmapInfo(7);
+        var bms = new RulesetInfo { ShortName = Constant.SHORT_NAME, OnlineID = -1 };
+
+        Assert.That(BmsForeignBeatmapConverterRegistry.AllowsGameplay(mania, bms, false), Is.False);
+    }
+
+    [Test]
+    public void TestDoesNotExtendForeignConversionToOtherTargetRulesets()
+    {
+        var mania = createManiaBeatmapInfo(7);
+        var catchRuleset = new RulesetInfo { ShortName = "fruits", OnlineID = 2 };
+
+        Assert.That(BmsForeignBeatmapConverterRegistry.AllowsGameplay(mania, catchRuleset, true), Is.False);
+    }
+
+    [Test]
     public void TestNoMatchReturnsNull()
     {
         var result = BmsForeignBeatmapConverterRegistry.FindConverter(source, [new TestConverter(false)]);
@@ -39,6 +66,10 @@ public class BmsForeignBeatmapConverterRegistryTest
             source,
             [new TestConverter(true), new TestConverter(true)]));
     }
+
+    private static BeatmapInfo createManiaBeatmapInfo(int keyCount) => new(
+        new RulesetInfo { ShortName = "mania", OnlineID = 3 },
+        new BeatmapDifficulty { CircleSize = keyCount });
 
     private sealed class TestConverter(bool canConvert) : IBmsForeignBeatmapConverter
     {
