@@ -47,6 +47,7 @@ using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Volume;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
 using osu.Game.Scoring;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.Menu;
@@ -875,6 +876,16 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
     /// </summary>
     public bool CarouselItemsPresented { get; private set; }
 
+    private CourseModeRestoration? pendingInitialRestoration;
+
+    internal void RestoreSelectionAfterInitialPresentation(CourseModeRestoration restoration)
+    {
+        pendingInitialRestoration = restoration;
+
+        if (CarouselItemsPresented)
+            applyInitialRestoration();
+    }
+
     /// <summary>
     /// Whether the carousel is or will be undergoing a filter operation.
     /// </summary>
@@ -904,6 +915,8 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
         CarouselItemsPresented = true;
 
+        applyInitialRestoration();
+
         updateNoResultsPlaceholder();
 
         FilterControl.StatusText = SongSelectStrings.MatchesCount(Carousel.MatchedBeatmapsCount);
@@ -916,6 +929,17 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
             ensureGlobalBeatmapValid();
 
         updateWedgeVisibility();
+    }
+
+    private void applyInitialRestoration()
+    {
+        var restoration = pendingInitialRestoration;
+        if (restoration == null)
+            return;
+
+        pendingInitialRestoration = null;
+        Beatmap.Value = restoration.Beatmap;
+        Mods.Value = restoration.Mods;
     }
 
     private void updateNoResultsPlaceholder()

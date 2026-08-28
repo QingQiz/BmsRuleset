@@ -52,7 +52,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     internal event Action<bool>? CourseModeChanged;
 
     private readonly BmsCourseCatalog catalog;
-    private readonly OsuScreen songSelect;
+    private readonly BmsSoloSongSelect songSelect;
     private readonly Func<ModSelectOverlay?> modSelectAccessor;
     private readonly BeatmapTitleWedge originalTitle;
     private readonly BmsBeatmapDetailsArea originalDetails;
@@ -75,13 +75,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     private readonly Drawable courseHistoryWrapper;
 
     private FooterButtonRandom? randomButton;
-    private bool randomButtonEnabledBeforeCourseMode;
     private bool courseCarouselPrepared;
-    private Visibility originalTitleState;
-    private Visibility originalDetailsState;
-    private Visibility originalFilterState;
-    private Visibility originalNoResultsState;
-    private float originalCarouselAlpha = 1;
     private int matchedCourses = -1;
     private Sample? confirmSelectionSample;
     private WorkingBeatmap? beatmapBeforeCourseMode;
@@ -103,7 +97,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     internal BmsCourseSongSelectController(
         BmsCourseCatalog catalog,
-        OsuScreen songSelect,
+        BmsSoloSongSelect songSelect,
         Func<ModSelectOverlay?> modSelectAccessor,
         FillFlowContainer wedgesContainer,
         BeatmapTitleWedge originalTitle,
@@ -194,16 +188,12 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         if (randomButton == null || !IsCourseMode)
             return;
 
-        randomButtonEnabledBeforeCourseMode = randomButton.Enabled.Value;
         randomButton.Enabled.Value = false;
     }
 
     internal void ToggleMode()
     {
-        if (IsCourseMode)
-            HideCourseMode();
-        else
-            ShowCourseMode();
+        songSelect.ReplaceCourseMode(!IsCourseMode);
     }
 
     internal void StartCourse(OsuScreen songSelect)
@@ -283,45 +273,51 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         return urls;
     }
 
-    internal void ShowCourseMode()
+    internal void ShowCourseMode(CourseModeRestoration? initialRestoration = null)
     {
         if (IsCourseMode)
             return;
 
-        originalTitleState = originalTitle.State.Value;
-        originalDetailsState = originalDetails.State.Value;
-        originalFilterState = originalFilter.State.Value;
-        originalNoResultsState = originalNoResults.State.Value;
-        originalCarouselAlpha = originalCarousel.Alpha;
-        randomButtonEnabledBeforeCourseMode = randomButton?.Enabled.Value ?? false;
-        beatmapBeforeCourseMode = songSelect.Beatmap.Value;
+        beatmapBeforeCourseMode = initialRestoration?.Beatmap ?? songSelect.Beatmap.Value;
+        selectedCourse.Value = initialRestoration?.CourseId is string courseId
+            ? catalog.Courses.FirstOrDefault(course => course.Id == courseId)
+            : null;
 
         State.Value = Visibility.Visible;
         randomButton?.Enabled.Value = false;
-        modsBeforeCourseMode = songSelect.Mods.Value.Where(x => x is not null).ToArray();
+        modsBeforeCourseMode = initialRestoration?.Mods.ToArray()
+                               ?? songSelect.Mods.Value.Where(x => x is not null).ToArray();
         userMods = modsBeforeCourseMode.Select(mod => mod.DeepClone()).ToArray();
         lockedMods = [];
         modsAdjustedForCourse = null;
         applyModsForCourse(selectedCourse.Value);
-        applyModeVisibility();
+        showCourseMode();
         queueCoursePreview(selectedCourse.Value);
         CourseModeChanged?.Invoke(true);
     }
 
-    internal void HideCourseMode()
+    internal CourseModeRestoration PrepareForScreenReplacement()
     {
         if (!IsCourseMode)
-            return;
+            throw new InvalidOperationException("Course mode must be active before preparing its replacement.");
 
         pendingCoursePreviewUpdate?.Cancel();
         pendingCoursePreviewUpdate = null;
         courseHistory.CancelPendingRefresh();
+
+        var restoration = new CourseModeRestoration(
+            beatmapBeforeCourseMode ?? songSelect.Beatmap.Value,
+            modsBeforeCourseMode,
+            selectedCourse.Value?.Id);
+
         State.Value = Visibility.Hidden;
-        restoreBeatmapBeforeCourseMode();
-        restoreModsBeforeCourseMode();
-        randomButton?.Enabled.Value = randomButtonEnabledBeforeCourseMode;
-        applyModeVisibility();
+        beatmapBeforeCourseMode = null;
+        modsBeforeCourseMode = [];
+        userMods = [];
+        lockedMods = [];
+        modsAdjustedForCourse = null;
         CourseModeChanged?.Invoke(false);
+        return restoration;
     }
 
     protected override void Update()
@@ -354,15 +350,6 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         CourseCarousel.MatchesChanged -= matchesChanged;
         pendingCoursePreviewUpdate?.Cancel();
 
-        if (IsCourseMode && randomButton != null)
-            randomButton.Enabled.Value = randomButtonEnabledBeforeCourseMode;
-
-        if (IsCourseMode)
-            carouselHost.Padding = originalCarouselHostPadding;
-
-        if (IsCourseMode)
-            restoreBeatmapBeforeCourseMode();
-
         base.Dispose(isDisposing);
     }
 
@@ -385,7 +372,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
                 return CourseCarousel.MoveKeyboardSelection(e, 1);
 
             case GlobalAction.Back:
-                HideCourseMode();
+                songSelect.ReplaceCourseMode(false);
                 return true;
 
             default:
@@ -397,58 +384,31 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     {
     }
 
-    private void applyModeVisibility()
+    private void showCourseMode()
     {
-        if (IsCourseMode)
-        {
-            originalTitleWrapper.BypassAutoSizeAxes |= Axes.Y;
-            originalDetailsWrapper.BypassAutoSizeAxes |= Axes.Y;
-            courseTitleWrapper.BypassAutoSizeAxes &= ~Axes.Y;
-            courseHistoryWrapper.BypassAutoSizeAxes &= ~Axes.Y;
+        originalTitleWrapper.BypassAutoSizeAxes |= Axes.Y;
+        originalDetailsWrapper.BypassAutoSizeAxes |= Axes.Y;
+        courseTitleWrapper.BypassAutoSizeAxes &= ~Axes.Y;
+        courseHistoryWrapper.BypassAutoSizeAxes &= ~Axes.Y;
 
-            originalTitle.Hide();
-            originalDetails.Hide();
-            originalFilter.Hide();
-            originalNoResults.Hide();
+        originalTitle.Hide();
+        originalDetails.Hide();
+        originalFilter.Hide();
+        originalNoResults.Hide();
 
-            originalCarouselHostWrapper.AlwaysPresent = false;
-            originalCarouselHostWrapper.InputEnabled = false;
-            originalCarouselHostWrapper.Alpha = 0;
-            originalCarousel.Hide();
+        originalCarouselHostWrapper.InputEnabled = false;
+        originalCarouselHostWrapper.Alpha = 0;
+        originalCarousel.Hide();
 
-            courseTitle.Show();
-            courseHistory.Refresh();
-            courseFilter.Show();
-            CourseCarousel.Show();
-            updateCourseCarouselTopPadding();
-            if (!courseCarouselPrepared)
-                CourseCarousel.Refresh();
-            updateNoResultsVisibility();
-        }
-        else
-        {
-            originalTitleWrapper.BypassAutoSizeAxes &= ~Axes.Y;
-            originalDetailsWrapper.BypassAutoSizeAxes &= ~Axes.Y;
-            courseTitleWrapper.BypassAutoSizeAxes |= Axes.Y;
-            courseHistoryWrapper.BypassAutoSizeAxes |= Axes.Y;
-
-            restoreVisibility(originalTitle, originalTitleState);
-            restoreVisibility(originalDetails, originalDetailsState);
-            restoreVisibility(originalFilter, originalFilterState);
-            originalCarouselHostWrapper.AlwaysPresent = true;
-            originalCarouselHostWrapper.InputEnabled = true;
-            originalCarouselHostWrapper.FadeTo(1, 200, Easing.OutQuint);
-            originalCarousel.Show();
-            originalCarousel.FadeTo(originalCarouselAlpha, 200, Easing.OutQuint);
-            restoreVisibility(originalNoResults, originalNoResultsState);
-            carouselHost.Padding = originalCarouselHostPadding;
-
-            courseTitle.Hide();
-            courseHistory.Hide();
-            courseFilter.Hide();
-            CourseCarousel.Hide();
-            courseNoResults.Hide();
-        }
+        courseTitle.Show();
+        courseHistory.Refresh();
+        courseFilter.Show();
+        CourseCarousel.Show();
+        updateCourseCarouselTopPadding();
+        CourseCarousel.RestoreSelection(selectedCourse.Value?.Id);
+        if (!courseCarouselPrepared)
+            CourseCarousel.Refresh();
+        updateNoResultsVisibility();
     }
 
     private void catalogChanged() => Schedule(() =>
@@ -545,15 +505,6 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         songSelect.Push(new BmsCourseResultsScreen(session, recordResult: false));
     }
 
-    private void restoreBeatmapBeforeCourseMode()
-    {
-        if (beatmapBeforeCourseMode == null)
-            return;
-
-        songSelect.Beatmap.Value = beatmapBeforeCourseMode;
-        beatmapBeforeCourseMode = null;
-    }
-
     /// <summary>
     ///     Adjusts the user's mod selection for the given course. The user's manual mod set
     ///     (<see cref="userMods"/>) is the source of truth while course mode is active: required
@@ -597,8 +548,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     /// <summary>
     ///     Removes mods forbidden by the selected course from the mod select overlay entirely
-    ///     (via <see cref="ModSelectOverlay.IsValidMod"/>), and restores the full list when
-    ///     course mode is hidden.
+    ///     via <see cref="ModSelectOverlay.IsValidMod"/>.
     /// </summary>
     private void updateModSelectFilter(BmsCourseDefinition? course)
     {
@@ -628,19 +578,6 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         }
     }
 
-    private void restoreModsBeforeCourseMode()
-    {
-        if (modsBeforeCourseMode.Length == 0 && modsAdjustedForCourse == null)
-            return;
-
-        setMods(modsBeforeCourseMode);
-        modsAdjustedForCourse = null;
-        modsBeforeCourseMode = [];
-        userMods = [];
-        lockedMods = [];
-        updateModSelectFilter(null);
-    }
-
     private void onModsChanged(ValueChangedEvent<IReadOnlyList<Mod>> change)
     {
         if (adjustingMods || !IsCourseMode || modsAdjustedForCourse == null)
@@ -657,21 +594,9 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         applyModsForCourse(modsAdjustedForCourse);
     }
 
-    private static void restoreVisibility(VisibilityContainer container, Visibility state)
-    {
-        if (state == Visibility.Visible)
-        {
-            // SongSelect may have already called Show() while returning from gameplay, after which course mode keeps the drawable transparent.
-            // Re-entering the visible state is required to restart both its position and alpha transforms.
-            if (container.State.Value == Visibility.Visible)
-                container.Hide();
-
-            container.Show();
-        }
-        else
-            container.Hide();
-    }
 }
+
+internal sealed record CourseModeRestoration(WorkingBeatmap Beatmap, IReadOnlyList<Mod> Mods, string? CourseId = null);
 
 internal sealed partial class BmsCourseCarouselHost : Container
 {
@@ -685,12 +610,4 @@ internal sealed partial class BmsCourseCarouselHost : Container
 
     public override bool PropagateNonPositionalInputSubTree => InputEnabled && base.PropagateNonPositionalInputSubTree;
 
-    protected override void Update()
-    {
-        base.Update();
-
-        // Keep the reveal animation alive, then let the normal drawable lifecycle resume.
-        if (InputEnabled && AlwaysPresent && Alpha > 0)
-            AlwaysPresent = false;
-    }
 }

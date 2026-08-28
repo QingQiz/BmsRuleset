@@ -573,20 +573,6 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             && songSelect.ChildrenOfType<BmsBeatmapDetailsArea>().Single().Alpha == 0
             && songSelect.ChildrenOfType<FilterControl>().Single().State.Value == Visibility.Visible
             && songSelect.ChildrenOfType<FilterControl>().Single().Alpha == 0);
-        AddStep("return to song select", () => controller.HideCourseMode());
-        AddAssert("normal carousel restored", () => carousel.Alpha, () => Is.GreaterThan(0));
-        AddUntilStep("song select title restored", () => songSelect.ChildrenOfType<BeatmapTitleWedge>().Single().Alpha, () => Is.GreaterThan(0.9f));
-        AddUntilStep("song select details restored", () => songSelect.ChildrenOfType<BmsBeatmapDetailsArea>().Single().Alpha, () => Is.GreaterThan(0.9f));
-        AddUntilStep("song select filter restored", () => songSelect.ChildrenOfType<FilterControl>().Single().Alpha, () => Is.GreaterThan(0.9f));
-        AddAssert("course carousel stops receiving input", () => !controller.CourseCarousel.IsPresent && controller.CourseCarousel.Alpha == 0);
-        AddAssert("normal carousel input is restored", () => controller.OriginalCarouselAcceptsInput, () => Is.True);
-        AddAssert("normal carousel host is no longer always present", () => controller.OriginalCarouselHostAlwaysPresent, () => Is.False);
-        AddAssert("random restored in song select", () => this.ChildrenOfType<FooterButtonRandom>().Single().Enabled.Value);
-        AddAssert("course mode hidden", () => !controller.IsCourseMode);
-        AddStep("show course mode again", () => controller.ShowCourseMode());
-        AddWaitStep("allow re-entry scheduling", 2);
-        AddAssert("reopening course mode does not refresh carousel", () => controller.CourseCarousel.IsFiltering, () => Is.False);
-        AddAssert("course selection retained on re-entry", () => controller.SelectedCourse?.Id, () => Is.EqualTo("stella-1"));
     }
 
     [Test]
@@ -638,6 +624,51 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             rulesetSelector.Current.BindTo(globalRuleset);
             songSelect = (BmsSoloSongSelect)Stack.CurrentScreen;
         });
+    }
+
+    [Test]
+    public void TestCourseModeSwitchReplacesSongSelectImplementation()
+    {
+        TestParentScreen parentScreen = null!;
+        BmsSoloSongSelect normalSongSelect = null!;
+        BmsSoloSongSelect courseSongSelect = null!;
+        BmsSoloSongSelect restoredNormalSongSelect = null!;
+
+        AddStep("load parent screen", () => Stack.Push(parentScreen = new TestParentScreen()));
+        AddUntilStep("wait for parent screen", () => Stack.CurrentScreen == parentScreen && parentScreen.IsLoaded);
+        AddStep("load normal song select", () =>
+        {
+            parentScreen.Push(normalSongSelect = new BmsSoloSongSelect());
+            BmsSongSelectEntryPatcher.TrackRulesetChanges(normalSongSelect);
+            songSelect = normalSongSelect;
+        });
+        AddUntilStep("wait for normal song select", () => Stack.CurrentScreen == normalSongSelect && normalSongSelect.IsLoaded);
+        AddStep("select user mod", () => normalSongSelect.Mods.Value = [new BmsModDoubleTime()]);
+        AddStep("switch to course mode", () => controller.ToggleMode());
+        AddUntilStep("course song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
+                                                         && current != normalSongSelect
+                                                         && current.IsLoaded
+                                                         && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == true);
+        AddStep("capture course song select", () => songSelect = courseSongSelect = (BmsSoloSongSelect)Stack.CurrentScreen);
+        AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
+                                                       && !controller.CourseCarousel.IsFiltering);
+        AddStep("select non-first course", () => controller.CourseCarousel.Activate(controller.CourseCarousel.GetCarouselItems()!
+            .Single(item => item.Model is BmsGroupedCourse grouped && grouped.Course.Id == "stella-1")));
+        AddUntilStep("non-first course selected", () => controller.SelectedCourse?.Id, () => Is.EqualTo("stella-1"));
+        AddStep("return with escape", () => InputManager.Key(Key.Escape));
+        AddUntilStep("fresh normal song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
+                                                                && current != courseSongSelect
+                                                                && current.IsLoaded
+                                                                && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == false);
+        AddStep("capture restored normal song select", () => songSelect = restoredNormalSongSelect = (BmsSoloSongSelect)Stack.CurrentScreen);
+        AddAssert("user mods restored", () => restoredNormalSongSelect.Mods.Value, () => Has.Exactly(1).TypeOf<BmsModDoubleTime>());
+        AddStep("re-enter course mode", () => controller.ToggleMode());
+        AddUntilStep("replacement course song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
+                                                                     && current != restoredNormalSongSelect
+                                                                     && current.IsLoaded
+                                                                     && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == true);
+        AddStep("capture replacement course song select", () => songSelect = (BmsSoloSongSelect)Stack.CurrentScreen);
+        AddUntilStep("course selection restored", () => controller.SelectedCourse?.Id, () => Is.EqualTo("stella-1"));
     }
 
     [Test]
@@ -796,16 +827,6 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddWaitStep("allow realm notifications", 5);
         AddAssert("unrelated score does not rebuild course history", () => ReferenceEquals(historyPanel,
             songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().ChildrenOfType<BeatmapLeaderboardScore>().First()));
-        AddStep("hide course mode", () => controller.HideCourseMode());
-        AddStep("record course while hidden", () => BmsRulesetRuntime.CourseResults?.Record(
-            "history-test", BmsCourseStatus.Passed, alternateScore.Rank, alternateScore,
-            createCourseAttempt(alternateScore, beatmap, [new BmsModMirror(), new BmsModClassGauge()])));
-        AddWaitStep("allow result notification", 5);
-        AddAssert("hidden history is not rebuilt", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(2));
-        AddStep("show course mode again", () => controller.ShowCourseMode());
-        AddUntilStep("new history appears on demand", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(3));
         AddStep("open course history score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
             .ChildrenOfType<BeatmapLeaderboardScore>().First(score => score.Score.TotalScore == 800_000).TriggerClick());
         AddUntilStep("course score details opened", () => Stack.CurrentScreen, Is.TypeOf<BmsCourseResultsScreen>);
@@ -817,11 +838,11 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             createCourseAttempt(alternateScore, beatmap, [new BmsModMirror(), new BmsModClassGauge()])));
         AddWaitStep("allow suspended result notification", 5);
         AddAssert("suspended history is not rebuilt", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(3));
+            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(2));
         AddStep("close course score details", () => Stack.CurrentScreen.Exit());
         AddUntilStep("song select resumed", () => Stack.CurrentScreen, () => Is.SameAs(songSelect));
         AddUntilStep("suspended result appears after resume", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(4));
+            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(3));
     }
 
     [Test]
@@ -873,6 +894,9 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
     {
         BeatmapInfo originalBeatmap = null!;
         BeatmapInfo[] previewBeatmaps = null!;
+        TestParentScreen parentScreen = null!;
+        BmsSoloSongSelect normalSongSelect = null!;
+        BmsSoloSongSelect courseSongSelect = null!;
 
         AddStep("import original and course preview beatmaps", () =>
         {
@@ -893,12 +917,24 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                     [new BmsCourseStage($"Preview {index}", "1", BeatmapHash: beatmap.Hash)],
                     [])));
         });
-        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
-        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
+        AddStep("load parent screen", () => Stack.Push(parentScreen = new TestParentScreen()));
+        AddUntilStep("wait for parent screen", () => Stack.CurrentScreen == parentScreen && parentScreen.IsLoaded);
+        AddStep("load normal song select", () =>
+        {
+            parentScreen.Push(normalSongSelect = new BmsSoloSongSelect());
+            BmsSongSelectEntryPatcher.TrackRulesetChanges(normalSongSelect);
+            songSelect = normalSongSelect;
+        });
+        AddUntilStep("wait for song select load", () => Stack.CurrentScreen == normalSongSelect && normalSongSelect.IsLoaded);
         AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
         AddStep("select original beatmap", () => songSelect.Beatmap.Value = beatmaps.GetWorkingBeatmap(originalBeatmap));
         AddUntilStep("original beatmap selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(originalBeatmap.Hash));
-        AddStep("show course mode", () => controller.ShowCourseMode());
+        AddStep("switch to course mode", () => controller.ToggleMode());
+        AddUntilStep("course song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
+                                                         && current != normalSongSelect
+                                                         && current.IsLoaded
+                                                         && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == true);
+        AddStep("capture course song select", () => songSelect = courseSongSelect = (BmsSoloSongSelect)Stack.CurrentScreen);
         AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
                                                        && !controller.CourseCarousel.IsFiltering);
         AddUntilStep("first course preview selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(previewBeatmaps[0].Hash));
@@ -916,8 +952,13 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("only final course preview selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(previewBeatmaps[2].Hash));
         AddUntilStep("stage panel reset to final course", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>()
             .SingleOrDefault()?.ResolvedBeatmap?.Hash, () => Is.EqualTo(previewBeatmaps[2].Hash));
-        AddStep("hide course mode", () => controller.HideCourseMode());
-        AddUntilStep("original beatmap restored", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(originalBeatmap.Hash));
+        AddStep("return to normal song select", () => controller.ToggleMode());
+        AddUntilStep("fresh normal song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
+                                                                && current != courseSongSelect
+                                                                && current.IsLoaded
+                                                                && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == false);
+        AddUntilStep("original beatmap restored", () => ((BmsSoloSongSelect)Stack.CurrentScreen).Beatmap.Value.BeatmapInfo.Hash,
+            () => Is.EqualTo(originalBeatmap.Hash));
 
         BeatmapInfo importBeatmap(BeatmapSetInfo set)
         {

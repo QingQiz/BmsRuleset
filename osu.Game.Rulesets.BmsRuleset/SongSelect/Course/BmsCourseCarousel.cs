@@ -41,6 +41,7 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
 
     private object? keyboardSelectedModel;
     private BmsGroupedCourse? pendingKeyboardSelection;
+    private string? pendingSelectionId;
     private string searchTerm = string.Empty;
 
     [Resolved]
@@ -76,6 +77,22 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
 
     internal void Refresh() => Schedule(() => FilterAsync());
 
+    internal void RestoreSelection(string? courseId)
+    {
+        if (courseId == null)
+            return;
+
+        var course = GetCarouselItems()?
+            .Select(item => item.Model)
+            .OfType<BmsGroupedCourse>()
+            .FirstOrDefault(course => course.Course.Id == courseId);
+
+        if (course != null)
+            CurrentSelection = course;
+        else
+            pendingSelectionId = courseId;
+    }
+
     internal IReadOnlyList<BeatmapInfo> GetResolvedBeatmaps(string courseId) => filter.GroupItems
         .SelectMany(pair => pair.Value)
         .Where(items => items.Course.Course.Id == courseId)
@@ -98,7 +115,7 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
         var currentIndex = Array.FindIndex(courses, item => item.Model is BmsGroupedCourse grouped
                                                             && grouped.Course.Id == currentId);
         var nextIndex = currentIndex < 0
-            ? (direction > 0 ? 0 : courses.Length - 1)
+            ? direction > 0 ? 0 : courses.Length - 1
             : (currentIndex + direction + courses.Length) % courses.Length;
 
         pendingKeyboardSelection = (BmsGroupedCourse)courses[nextIndex].Model;
@@ -201,7 +218,8 @@ internal partial class BmsCourseCarousel : Carousel<BmsCourseDefinition>
             .OfType<BmsGroupedCourse>()
             .ToArray() ?? [];
 
-        var selectedId = SelectedCourse?.Id;
+        var selectedId = pendingSelectionId ?? SelectedCourse?.Id;
+        pendingSelectionId = null;
         var nextSelection = courses.FirstOrDefault(course => course.Course.Id == selectedId)
                             ?? courses.FirstOrDefault();
 

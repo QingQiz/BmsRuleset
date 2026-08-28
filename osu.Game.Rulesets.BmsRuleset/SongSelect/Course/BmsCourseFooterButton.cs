@@ -53,9 +53,6 @@ internal partial class BmsCourseFooterButton : ScreenFooterButton
         this.ResizeWidthTo(isBms ? BUTTON_WIDTH : 0, 180, Easing.OutQuint);
         this.FadeTo(isBms ? 1 : 0, 120, Easing.OutQuint);
 
-        if (!isBms && controller.IsCourseMode)
-            controller.HideCourseMode();
-
         courseModeChanged(controller.IsCourseMode);
     }
 }

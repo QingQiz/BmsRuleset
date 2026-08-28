@@ -37,6 +37,19 @@ namespace osu.Game.Rulesets.BmsRuleset.SongSelect
         private PlayerLoader? playerLoader;
         private IReadOnlyList<Mod>? modsAtGameplayStart;
         private BmsCourseSongSelectController? courseController;
+        private readonly bool startInCourseMode;
+        private readonly CourseModeRestoration? initialCourseRestoration;
+        private bool initialModeScheduled;
+
+        public BmsSoloSongSelect()
+        {
+        }
+
+        internal BmsSoloSongSelect(bool startInCourseMode, CourseModeRestoration? initialCourseRestoration = null)
+        {
+            this.startInCourseMode = startInCourseMode;
+            this.initialCourseRestoration = initialCourseRestoration;
+        }
 
         public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
         {
@@ -45,6 +58,17 @@ namespace osu.Game.Rulesets.BmsRuleset.SongSelect
             courseController.StartRequested = () => courseController.StartCourse(this);
             courseController.AttachRandomButton(buttons.OfType<FooterButtonRandom>().SingleOrDefault());
             buttons.Add(new BmsCourseFooterButton(courseController));
+
+            if (!initialModeScheduled)
+            {
+                initialModeScheduled = true;
+
+                if (startInCourseMode)
+                    Schedule(() => courseController.ShowCourseMode(initialCourseRestoration));
+                else if (initialCourseRestoration != null)
+                    RestoreSelectionAfterInitialPresentation(initialCourseRestoration);
+            }
+
             return buttons;
         }
 
@@ -214,6 +238,45 @@ namespace osu.Game.Rulesets.BmsRuleset.SongSelect
 
             AddCourseController(controller);
             return controller;
+        }
+
+        internal void ReplaceCourseMode(bool courseMode)
+        {
+            var controller = courseController;
+
+            if (!this.IsCurrentScreen() || controller == null || controller.IsCourseMode == courseMode)
+                return;
+
+            var parent = this.GetParentScreen();
+            if (parent == null)
+                return;
+
+            var restoration = courseMode
+                ? new CourseModeRestoration(Beatmap.Value, Mods.Value, initialCourseRestoration?.CourseId)
+                : TakeCourseModeRestoration();
+
+            this.Exit();
+
+            // Restore global state only after the old song select has unbound its UI callbacks.
+            // This avoids waking the suspended normal carousel that the replacement is intended to discard.
+            if (restoration != null)
+            {
+                Beatmap.Value = restoration.Beatmap;
+                Mods.Value = restoration.Mods;
+            }
+
+            if (!parent.IsCurrentScreen())
+                return;
+
+            var replacement = new BmsSoloSongSelect(courseMode, restoration);
+            parent.Push(replacement);
+            BmsSongSelectEntryPatcher.TrackRulesetChanges(replacement);
+        }
+
+        internal CourseModeRestoration? TakeCourseModeRestoration()
+        {
+            var controller = courseController;
+            return controller?.IsCourseMode == true ? controller.PrepareForScreenReplacement() : null;
         }
 
         private void revertMods()

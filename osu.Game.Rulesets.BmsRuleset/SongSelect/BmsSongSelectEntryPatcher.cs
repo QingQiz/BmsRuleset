@@ -5,6 +5,7 @@ using osu.Framework.Screens;
 using osu.Game.Screens;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Select;
+using osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
 
 namespace osu.Game.Rulesets.BmsRuleset.SongSelect;
 
@@ -90,7 +91,15 @@ internal static class BmsSongSelectEntryPatcher
         if (parent == null)
             return;
 
+        var restoration = (songSelect as BmsSoloSongSelect)?.TakeCourseModeRestoration();
+
         songSelect.Exit();
+
+        if (restoration != null)
+        {
+            songSelect.Beatmap.Value = restoration.Beatmap;
+            songSelect.Mods.Value = restoration.Mods;
+        }
 
         if (!parent.IsCurrentScreen())
             return;
