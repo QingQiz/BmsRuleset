@@ -74,7 +74,7 @@ internal sealed class BmsCourseResultStore
                 {
                     try
                     {
-                        var result = JsonSerializer.Deserialize<BmsCourseResult>(File.ReadAllText(entry.Path));
+                        var result = JsonSerializer.Deserialize<BmsCourseResult>(File.ReadAllText(entry.Path)) with { SourcePath = entry.Path };
                         history.Add(result);
                     }
                     catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
@@ -126,7 +126,7 @@ internal sealed class BmsCourseResultStore
                 {
                     var json = await File.ReadAllTextAsync(entry.Path, cancellationToken).ConfigureAwait(false);
                     var result = JsonSerializer.Deserialize<BmsCourseResult>(json);
-                    loadedByPath[entry.Path] = result;
+                    loadedByPath[entry.Path] = result with { SourcePath = entry.Path };
                 }
                 catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
                 {
@@ -148,6 +148,7 @@ internal sealed class BmsCourseResultStore
 
         var file = fileFor(courseId, result);
         writeAtomically(file, result);
+        result = result with { SourcePath = file };
 
         lock (sync)
         {
@@ -169,6 +170,31 @@ internal sealed class BmsCourseResultStore
             BmsGaugeType.ExClass => BmsLamp.HardClear,
             _ => BmsLamp.Clear,
         };
+    }
+
+    internal bool Delete(string courseId, BmsCourseResult result)
+    {
+        bool deleted;
+
+        lock (sync)
+        {
+            if (!indexByCourseKey.TryGetValue(courseKeyFor(courseId), out var entries))
+                return false;
+
+            if (result.SourcePath == null || !entries.Any(entry => entry.Path == result.SourcePath) || !File.Exists(result.SourcePath))
+                return false;
+
+            File.Delete(result.SourcePath);
+            entries.RemoveAll(entry => entry.Path == result.SourcePath);
+            if (loadedResults.TryGetValue(courseId, out var history))
+                history.Remove(result);
+            deleted = true;
+        }
+
+        if (deleted)
+            Changed?.Invoke(courseId);
+
+        return deleted;
     }
 
     private void indexPersistedFiles()
@@ -271,7 +297,11 @@ internal sealed class BmsCourseResultStore
     }
 }
 
-internal readonly record struct BmsCourseResult(BmsLamp Lamp, ScoreRank? Rank, BmsCourseScoreData? Score, BmsCourseAttemptData? Attempt = null);
+internal readonly record struct BmsCourseResult(BmsLamp Lamp, ScoreRank? Rank, BmsCourseScoreData? Score, BmsCourseAttemptData? Attempt = null)
+{
+    [JsonIgnore]
+    internal string? SourcePath { get; init; }
+}
 
 internal sealed record BmsCourseAttemptData
 {

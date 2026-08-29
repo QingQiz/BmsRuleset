@@ -588,6 +588,33 @@ public class BmsCourseSessionTest
     }
 
     [Test]
+    public void TestDeletingCourseResultOnlyRemovesSelectedHistoryFile()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S, createScore(true, 900_000));
+        store.Record("course", BmsCourseStatus.Failed, ScoreRank.F, createScore(false, 500_000));
+
+        var history = store.GetHistory("course");
+        Assert.That(history, Has.Count.EqualTo(2));
+
+        var changed = new List<string>();
+        store.Changed += changed.Add;
+
+        Assert.That(store.Delete("course", history[0]), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(history[0].SourcePath), Is.False);
+            Assert.That(store.GetHistory("course"), Has.Count.EqualTo(1));
+            Assert.That(store.GetHistory("course").Single().Score?.TotalScore, Is.EqualTo(500_000));
+            Assert.That(Directory.EnumerateFiles(courseResultsDirectory, "*.json"), Has.One.Items);
+            Assert.That(changed, Is.EqualTo(["course"]));
+        });
+
+        var reloaded = new BmsCourseResultStore(courseResultsDirectory);
+        Assert.That(reloaded.GetHistory("course").Single().Score?.TotalScore, Is.EqualTo(500_000));
+    }
+
+    [Test]
     public void TestCourseScoreCloneRetainsGaugeHistory()
     {
         var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);

@@ -296,4 +296,5 @@
   <data name="course_passed" xml:space="preserve"><value>Course passed</value></data>
   <data name="course_failed" xml:space="preserve"><value>Course failed</value></data>
   <data name="course_aborted" xml:space="preserve"><value>Course abandoned</value></data>
+  <data name="course_history_delete_confirmation" xml:space="preserve"><value>Delete this course result? Scores saved for individual stages will be kept.</value></data>
 </root>

@@ -10,6 +10,7 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
@@ -23,12 +24,15 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Dialog;
+using WebCommonStrings = osu.Game.Resources.Localisation.Web.CommonStrings;
 using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
@@ -625,22 +629,26 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
                 Shear = -OsuGame.SHEAR,
                 RelativeSizeAxes = Axes.Both,
                 Padding = new MarginPadding { Top = header_height },
-                Child = new OsuScrollContainer
+                Child = new OsuContextMenuContainer
                 {
-                    Shear = OsuGame.SHEAR,
                     RelativeSizeAxes = Axes.Both,
-                    ScrollbarVisible = false,
-                    Child = content = new FillFlowContainer
+                    Child = new OsuScrollContainer
                     {
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Direction = FillDirection.Vertical,
-                        Spacing = new Vector2(0, BeatmapLeaderboardWedge.SPACING_BETWEEN_SCORES),
-                        Padding = new MarginPadding
+                        Shear = OsuGame.SHEAR,
+                        RelativeSizeAxes = Axes.Both,
+                        ScrollbarVisible = false,
+                        Child = content = new FillFlowContainer
                         {
-                            Top = 5,
-                            Left = 80,
-                            Bottom = BeatmapLeaderboardScore.HEIGHT * 3,
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Direction = FillDirection.Vertical,
+                            Spacing = new Vector2(0, BeatmapLeaderboardWedge.SPACING_BETWEEN_SCORES),
+                            Padding = new MarginPadding
+                            {
+                                Top = 5,
+                                Left = 80,
+                                Bottom = BeatmapLeaderboardScore.HEIGHT * 3,
+                            },
                         },
                     },
                 },
@@ -773,7 +781,7 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
                 var score = BmsCourseResultPresentation.CreateAggregateScore(session);
 
                 if (!filterBySelectedMods || matchesSelectedMods(score, selectedModAcronyms))
-                    entries.Add(new CourseHistoryEntry(session, score));
+                    entries.Add(new CourseHistoryEntry(result, session, score));
             }
 
             var orderedScores = entries.Select(entry => entry.Score).OrderByCriteria(sorting);
@@ -825,13 +833,12 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
         if (!refreshIsCurrent(course, store, generation, cancellation))
             return;
 
-        var drawables = entries.Skip(offset).Take(drawable_batch_size).Select((entry, index) => new BeatmapLeaderboardScore(entry.Score)
-        {
-            Rank = offset + index + 1,
-            Shear = Vector2.Zero,
-            SelectedMods = { BindTarget = mods },
-            Action = () => presentScore(entry.Score, entry.Session),
-        }).ToArray();
+        var drawables = entries.Skip(offset).Take(drawable_batch_size).Select((entry, index) => new BmsCourseHistoryScore(
+            entry.Score,
+            offset + index + 1,
+            result => presentScore(result, entry.Session),
+            () => store.Delete(course.Id, entry.Result),
+            mods)).ToArray();
 
         LoadComponentsAsync(drawables, loadedDrawables =>
         {
@@ -966,7 +973,86 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
 
     private static bool isFilterableMod(Mod mod) => mod.Type != ModType.System && mod is not BmsModGauge;
 
-    private sealed record CourseHistoryEntry(BmsCourseSession Session, ScoreInfo Score);
+    private sealed record CourseHistoryEntry(BmsCourseResult Result, BmsCourseSession Session, ScoreInfo Score);
+}
+
+internal partial class BmsCourseHistoryScore : CompositeDrawable, IHasContextMenu
+{
+    private readonly ScoreInfo score;
+    private readonly Action<ScoreInfo> presentScore;
+    private readonly Action deleteScore;
+    private readonly Bindable<IReadOnlyList<Mod>> selectedMods = new();
+
+    [Resolved]
+    private IDialogOverlay? dialogOverlay { get; set; }
+
+    internal BmsCourseHistoryScore(
+        ScoreInfo score,
+        int rank,
+        Action<ScoreInfo> presentScore,
+        Action deleteScore,
+        IBindable<IReadOnlyList<Mod>> selectedMods)
+    {
+        this.score = score;
+        this.presentScore = presentScore;
+        this.deleteScore = deleteScore;
+        RelativeSizeAxes = Axes.X;
+        Height = BeatmapLeaderboardScore.HEIGHT;
+        Shear = Vector2.Zero;
+
+        var scoreDisplay = new BeatmapLeaderboardScore(score)
+        {
+            Rank = rank,
+            Shear = Vector2.Zero,
+            Action = () => presentScore(score),
+        };
+
+        ((IBindable<IReadOnlyList<Mod>>)this.selectedMods).BindTo(selectedMods);
+        ((IBindable<IReadOnlyList<Mod>>)scoreDisplay.SelectedMods).BindTo(this.selectedMods);
+        InternalChild = new InputBlockedContainer
+        {
+            RelativeSizeAxes = Axes.Both,
+            Child = scoreDisplay,
+        };
+    }
+
+    protected override bool OnClick(ClickEvent e)
+    {
+        presentScore(score);
+        return true;
+    }
+
+    MenuItem[] IHasContextMenu.ContextMenuItems
+    {
+        get
+        {
+            var items = new List<MenuItem>();
+            var copyableMods = score.Mods.Where(mod => mod.Type != ModType.System).ToArray();
+
+            if (copyableMods.Length > 0)
+                items.Add(new OsuMenuItem(SongSelectStrings.UseTheseMods, MenuItemType.Highlighted, () => selectedMods.Value = copyableMods));
+
+            if (items.Count > 0)
+                items.Add(new OsuMenuItemSpacer());
+
+            items.Add(new OsuMenuItem(WebCommonStrings.ButtonsDelete, MenuItemType.Destructive, () => dialogOverlay?.Push(new BmsCourseResultDeleteDialog(deleteScore))));
+            return items.ToArray();
+        }
+    }
+}
+
+internal partial class InputBlockedContainer : Container
+{
+    public override bool PropagatePositionalInputSubTree => false;
+}
+
+internal partial class BmsCourseResultDeleteDialog : DeletionDialog
+{
+    internal BmsCourseResultDeleteDialog(Action deleteScore)
+    {
+        BodyText = BmsStrings.CourseHistoryDeleteConfirmation;
+        DangerousAction = deleteScore;
+    }
 }
 
 internal partial class BmsCourseHistoryHeader : CompositeDrawable

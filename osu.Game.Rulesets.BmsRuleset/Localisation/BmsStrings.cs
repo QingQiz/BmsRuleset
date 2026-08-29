@@ -318,6 +318,8 @@ public static class BmsStrings
 
     public static LocalisableString CourseAborted => get("course_aborted");
 
+    public static LocalisableString CourseHistoryDeleteConfirmation => get("course_history_delete_confirmation");
+
     public static LocalisableString Subdivide => get("subdivide");
 
     public static LocalisableString Unsubdivide => get("unsubdivide");

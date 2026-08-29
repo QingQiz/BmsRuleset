@@ -296,4 +296,5 @@
   <data name="course_passed" xml:space="preserve"><value>段位通过</value></data>
   <data name="course_failed" xml:space="preserve"><value>段位失败</value></data>
   <data name="course_aborted" xml:space="preserve"><value>已放弃段位</value></data>
+  <data name="course_history_delete_confirmation" xml:space="preserve"><value>确定删除该段位成绩吗？各曲目单独保存的成绩将会保留。</value></data>
 </root>
