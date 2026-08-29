@@ -30,16 +30,12 @@ internal static class BmsSongSelectLampService
 
     internal static (ScoreInfo? Score, ScoreRank? Rank) Select(
         IEnumerable<ScoreInfo> scores,
-        IReadOnlyList<Mod>? selectedMods,
-        ScoreInfo? fallbackScore = null)
+        IReadOnlyList<Mod> selectedMods)
     {
-        if (selectedMods == null)
-            return (fallbackScore, fallbackScore?.Rank);
-
         var scoreList = scores as ScoreInfo[] ?? scores.ToArray();
-        var score = BmsLampScoreSelector.SelectBest(scoreList, selectedMods);
+        var score = BmsScoreSelector.SelectBest(scoreList, selectedMods);
         var rank = scoreList
-            .Where(s => BmsLampScoreSelector.MatchesSelectedMods(s, selectedMods))
+            .Where(s => BmsScoreSelector.MatchesSelectedMods(s, selectedMods))
             .Select(s => (ScoreRank?)s.Rank)
             .DefaultIfEmpty()
             .Max();

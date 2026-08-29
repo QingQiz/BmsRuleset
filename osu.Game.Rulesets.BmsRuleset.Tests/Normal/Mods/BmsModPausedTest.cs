@@ -124,7 +124,7 @@ public class BmsModPausedTest
             Mods = [new BmsModPaused(), new BmsModBranchReplay()],
         };
 
-        var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
+        var selected = BmsLocalLeaderboardService.SelectScores(
             [pausedScore],
             "hash",
             Constant.SHORT_NAME,

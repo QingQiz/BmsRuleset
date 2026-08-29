@@ -11,7 +11,7 @@ using osu.Game.Scoring;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;
 
 [TestFixture]
-public class BmsLocalLeaderboardScoreSelectorTest
+public class BmsLocalLeaderboardServiceTest
 {
 
     private static ScoreInfo score(string beatmapHash, string rulesetShortName, long totalScore, BeatmapInfo beatmapInfo = null, params Mod[] mods) => new()
@@ -31,7 +31,7 @@ public class BmsLocalLeaderboardScoreSelectorTest
         var scoreWithoutBeatmapInfo = score("target-hash", Constant.SHORT_NAME, 900_000);
         scoreWithoutBeatmapInfo.BeatmapInfo = null;
 
-        var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
+        var selected = BmsLocalLeaderboardService.SelectScores(
             [scoreWithoutBeatmapInfo],
             "target-hash",
             Constant.SHORT_NAME,
@@ -49,14 +49,14 @@ public class BmsLocalLeaderboardScoreSelectorTest
         var noFailScore = score("target-hash", Constant.SHORT_NAME, 800_000, mods: new BmsModNoFail());
         var noFailMirrorScore = score("target-hash", Constant.SHORT_NAME, 1_000_000, mods: [new BmsModNoFail(), new BmsModMirror()]);
 
-        var noModSelected = BmsLocalLeaderboardScoreSelector.SelectScores(
+        var noModSelected = BmsLocalLeaderboardService.SelectScores(
             [noFailScore, noModScore],
             "target-hash",
             Constant.SHORT_NAME,
             [],
             LeaderboardSortMode.Score);
 
-        var noFailSelected = BmsLocalLeaderboardScoreSelector.SelectScores(
+        var noFailSelected = BmsLocalLeaderboardService.SelectScores(
             [noFailMirrorScore, noModScore, noFailScore],
             "target-hash",
             Constant.SHORT_NAME,
@@ -76,7 +76,7 @@ public class BmsLocalLeaderboardScoreSelectorTest
         var deleted = score("target-hash", Constant.SHORT_NAME, 1_000_000);
         deleted.DeletePending = true;
 
-        var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
+        var selected = BmsLocalLeaderboardService.SelectScores(
             [otherHash, otherRuleset, deleted, matching],
             "target-hash",
             Constant.SHORT_NAME,
@@ -92,7 +92,7 @@ public class BmsLocalLeaderboardScoreSelectorTest
         var oldBeatmap = new BeatmapInfo { Hash = "target-hash" };
         var scoreWithOldBeatmapLink = score("target-hash", Constant.SHORT_NAME, 900_000, oldBeatmap);
 
-        var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
+        var selected = BmsLocalLeaderboardService.SelectScores(
             [scoreWithOldBeatmapLink],
             "target-hash",
             Constant.SHORT_NAME,
@@ -111,7 +111,7 @@ public class BmsLocalLeaderboardScoreSelectorTest
         var higherAccuracy = score("target-hash", Constant.SHORT_NAME, 900_000);
         higherAccuracy.Accuracy = 0.99;
 
-        var selected = BmsLocalLeaderboardScoreSelector.SelectScores(
+        var selected = BmsLocalLeaderboardService.SelectScores(
             [lowerAccuracy, higherAccuracy],
             "target-hash",
             Constant.SHORT_NAME,

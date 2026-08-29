@@ -51,11 +51,21 @@ internal partial class BmsCourseSessionScreen : ScreenWithBeatmapBackground
             return;
         }
 
-        if (session.Status == BmsCourseStatus.InProgress && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
+        if (session.CanContinue && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
             session.AbortCurrentStageWithoutScore();
 
         if (session.Status == BmsCourseStatus.InProgress)
             return;
+
+        if (session.Status == BmsCourseStatus.Failed
+            && !session.SummaryShown
+            && session.HasNoFail
+            && session.CurrentStage.Status == BmsCourseStageStatus.Failed
+            && session.CurrentStageIndex < session.Stages.Count - 1)
+        {
+            this.Push(createStageResults());
+            return;
+        }
 
         if (session.SummaryShown)
         {
@@ -67,6 +77,17 @@ internal partial class BmsCourseSessionScreen : ScreenWithBeatmapBackground
         this.Push(new BmsCourseResultsScreen(session));
     }
 
+    private BmsCourseStageResultsScreen createStageResults()
+    {
+        var score = session.CurrentStage.Score
+                    ?? throw new InvalidOperationException("A stage result requires a stage score.");
+
+        return new BmsCourseStageResultsScreen(
+            score,
+            () => session.RequestAdvance(),
+            () => session.AbortAfterStageResult());
+    }
+
     public override bool OnExiting(ScreenExitEvent e)
     {
         Beatmap.Value = originalBeatmap;
@@ -76,7 +97,7 @@ internal partial class BmsCourseSessionScreen : ScreenWithBeatmapBackground
 
     private void startCurrentStage()
     {
-        if (!this.IsCurrentScreen() || stageStarted || session.Status != BmsCourseStatus.InProgress)
+        if (!this.IsCurrentScreen() || stageStarted || !session.CanContinue)
             return;
 
         stageStarted = true;
@@ -118,13 +139,8 @@ internal partial class BmsCoursePlayer : SoloPlayer
     {
         session.CompleteCurrentStage(score, currentGaugeStates);
 
-        if (session.Status == BmsCourseStatus.InProgress)
-        {
-            return new BmsCourseStageResultsScreen(
-                score,
-                () => session.RequestAdvance(),
-                () => session.AbortAfterStageResult());
-        }
+        if (session.CurrentStageIndex < session.Stages.Count - 1 && session.CanContinue)
+            return createStageResults(score);
 
         session.SummaryShown = true;
         return new BmsCourseResultsScreen(session);
@@ -136,7 +152,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
         {
             base.ConcludeFailedScore(score);
 
-            if (session.Status == BmsCourseStatus.InProgress && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
+            if (session.CanContinue && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
             {
                 ScoreProcessor.PopulateScore(score.ScoreInfo);
                 score.ScoreInfo.Date = DateTimeOffset.Now;
@@ -169,7 +185,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
 
     public override bool OnExiting(ScreenExitEvent e)
     {
-        if (session.Status == BmsCourseStatus.InProgress && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
+        if (session.CanContinue && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
         {
             ScoreProcessor.PopulateScore(Score.ScoreInfo);
             ScoreProcessor.FailScore(Score.ScoreInfo);
@@ -182,4 +198,15 @@ internal partial class BmsCoursePlayer : SoloPlayer
 
     private IReadOnlyList<Scoring.Gauge.BmsGaugeStateSnapshot> currentGaugeStates =>
         ((Scoring.BmsHealthProcessor)GameplayState.HealthProcessor).CurrentGaugeStates;
+
+    private BmsCourseStageResultsScreen createStageResults(ScoreInfo? score = null)
+    {
+        score ??= session.CurrentStage.Score
+                  ?? throw new InvalidOperationException("A stage result requires a stage score.");
+
+        return new BmsCourseStageResultsScreen(
+            score,
+            () => session.RequestAdvance(),
+            () => session.AbortAfterStageResult());
+    }
 }

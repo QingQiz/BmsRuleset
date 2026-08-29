@@ -356,7 +356,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                 .Select(score => score.DeepClone())
                 .ToArray());
 
-            var personalBest = BmsScoreGraphScoreSelector.SelectBest(scores, gameplayState.Mods, maximumExScore);
+            var personalBest = BmsScoreSelector.SelectBest(scores, gameplayState.Mods, maximumExScore);
 
             if (personalBest == null)
                 return;

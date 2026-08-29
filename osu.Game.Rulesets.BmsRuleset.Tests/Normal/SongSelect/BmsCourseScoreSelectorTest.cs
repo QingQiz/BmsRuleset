@@ -12,7 +12,7 @@ using osu.Game.Scoring;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;
 
 [TestFixture]
-public class BmsCourseScoreSelectorTest
+public class BmsScoreSelectorCourseTest
 {
     [Test]
     public void TestLampIsFilteredByMods()
@@ -20,8 +20,8 @@ public class BmsCourseScoreSelectorTest
         var noModResult = result(BmsLamp.Clear, ScoreRank.S);
         var hideScratchResult = result(BmsLamp.ExHardClear, ScoreRank.S, mods: [new BmsModHideScratch()]);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([hideScratchResult, noModResult], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
-        Assert.That(BmsCourseScoreSelector.SelectBest([hideScratchResult, noModResult], [new BmsModHideScratch()]), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([hideScratchResult, noModResult], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([hideScratchResult, noModResult], [new BmsModHideScratch()]), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
     }
 
     [Test]
@@ -31,9 +31,9 @@ public class BmsCourseScoreSelectorTest
         var doubleTimeResult = result(BmsLamp.ExHardClear, ScoreRank.A, mods: [new BmsModDoubleTime()]);
 
         // Both the lamp and rank follow the selected Mod.
-        Assert.That(BmsCourseScoreSelector.SelectBest([doubleTimeResult, noModResult], [new BmsModDoubleTime()]),
+        Assert.That(BmsScoreSelector.SelectBestCourse([doubleTimeResult, noModResult], [new BmsModDoubleTime()]),
             Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.A)));
-        Assert.That(BmsCourseScoreSelector.SelectBest([doubleTimeResult, noModResult], []),
+        Assert.That(BmsScoreSelector.SelectBestCourse([doubleTimeResult, noModResult], []),
             Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
     }
 
@@ -42,7 +42,7 @@ public class BmsCourseScoreSelectorTest
     {
         var noModResult = result(BmsLamp.Clear, ScoreRank.S);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([noModResult], [new BmsModDoubleTime()]), Is.EqualTo((BmsLamp.NoPlay, (ScoreRank?)null)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([noModResult], [new BmsModDoubleTime()]), Is.EqualTo((BmsLamp.NoPlay, (ScoreRank?)null)));
     }
 
     [Test]
@@ -50,7 +50,7 @@ public class BmsCourseScoreSelectorTest
     {
         var unknownModResult = result(BmsLamp.Clear, ScoreRank.A, acronyms: ["XX"]);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([unknownModResult], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.A)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([unknownModResult], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.A)));
     }
 
     [Test]
@@ -58,8 +58,8 @@ public class BmsCourseScoreSelectorTest
     {
         var exClassResult = result(BmsLamp.HardClear, ScoreRank.S, acronyms: ["C2"]);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([exClassResult], []), Is.EqualTo((BmsLamp.HardClear, (ScoreRank?)ScoreRank.S)));
-        Assert.That(BmsCourseScoreSelector.SelectBest([exClassResult], [new BmsModHardGauge()]), Is.EqualTo((BmsLamp.HardClear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([exClassResult], []), Is.EqualTo((BmsLamp.HardClear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([exClassResult], [new BmsModHardGauge()]), Is.EqualTo((BmsLamp.HardClear, (ScoreRank?)ScoreRank.S)));
     }
 
     [Test]
@@ -67,8 +67,8 @@ public class BmsCourseScoreSelectorTest
     {
         var exHardClassResult = result(BmsLamp.ExHardClear, ScoreRank.S, acronyms: ["C3"]);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([exHardClassResult], []), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
-        Assert.That(BmsCourseScoreSelector.SelectBest([exHardClassResult], [new BmsModExHardGauge()]), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([exHardClassResult], []), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([exHardClassResult], [new BmsModExHardGauge()]), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
     }
 
     [Test]
@@ -76,8 +76,8 @@ public class BmsCourseScoreSelectorTest
     {
         var autoGaugeResult = result(BmsLamp.ExHardClear, ScoreRank.S, acronyms: ["AG"]);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([autoGaugeResult], []), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
-        Assert.That(BmsCourseScoreSelector.SelectBest([autoGaugeResult], [new BmsModAutoGauge()]), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([autoGaugeResult], []), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([autoGaugeResult], [new BmsModAutoGauge()]), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
     }
 
     [Test]
@@ -86,8 +86,29 @@ public class BmsCourseScoreSelectorTest
         var failedResult = result(BmsLamp.Failed, ScoreRank.F);
         var clearResult = result(BmsLamp.Clear, ScoreRank.S);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([failedResult, clearResult], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
-        Assert.That(BmsCourseScoreSelector.SelectBest([failedResult], []), Is.EqualTo((BmsLamp.Failed, (ScoreRank?)ScoreRank.F)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([failedResult, clearResult], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([failedResult], []), Is.EqualTo((BmsLamp.Failed, (ScoreRank?)ScoreRank.F)));
+    }
+
+    [Test]
+    public void TestScorelessStageAttemptDoesNotCreateFailedLamp()
+    {
+        var result = new BmsCourseResult(
+            BmsLamp.Failed,
+            ScoreRank.F,
+            new BmsCourseScoreData(),
+            new BmsCourseAttemptData
+            {
+                Stages =
+                [
+                    new BmsCourseStageAttemptData
+                    {
+                        Status = BmsCourseStageStatus.Aborted,
+                    },
+                ],
+            });
+
+        Assert.That(BmsScoreSelector.SelectBestCourse([result], []), Is.EqualTo((BmsLamp.NoPlay, (ScoreRank?)null)));
     }
 
     [Test]
@@ -96,7 +117,16 @@ public class BmsCourseScoreSelectorTest
         var classResult = result(BmsLamp.Clear, ScoreRank.S, acronyms: ["C1"]);
         var exHardResult = result(BmsLamp.ExHardClear, ScoreRank.A, acronyms: ["C3"]);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([classResult, exHardResult], []), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([classResult, exHardResult], []), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
+    }
+
+    [Test]
+    public void TestLampPriorityMatchesSingleScoreSelection()
+    {
+        var fullComboResult = result(BmsLamp.FullCombo, ScoreRank.S);
+        var perfectResult = result(BmsLamp.Perfect, ScoreRank.A);
+
+        Assert.That(BmsScoreSelector.SelectBestCourse([fullComboResult, perfectResult], []), Is.EqualTo((BmsLamp.Perfect, (ScoreRank?)ScoreRank.S)));
     }
 
     [Test]
@@ -105,7 +135,7 @@ public class BmsCourseScoreSelectorTest
         var hideScratchResult = result(BmsLamp.ExHardClear, ScoreRank.A, mods: [new BmsModHideScratch()]);
         var clearResult = result(BmsLamp.Clear, ScoreRank.S);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([hideScratchResult, clearResult], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([hideScratchResult, clearResult], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
     }
 
     [Test]
@@ -114,7 +144,7 @@ public class BmsCourseScoreSelectorTest
         var noModResult = result(BmsLamp.Clear, ScoreRank.S);
         var hideScratchResult = result(BmsLamp.ExHardClear, ScoreRank.X, mods: [new BmsModHideScratch()]);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([hideScratchResult, noModResult], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([hideScratchResult, noModResult], []), Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
     }
 
     [Test]
@@ -123,14 +153,69 @@ public class BmsCourseScoreSelectorTest
         var noGoodResult = result(BmsLamp.HardClear, ScoreRank.A, mods: [new BmsModNoGood()]);
         var noGreatResult = result(BmsLamp.ExHardClear, ScoreRank.S, mods: [new BmsModNoGreat()]);
 
-        Assert.That(BmsCourseScoreSelector.SelectBest([noGoodResult, noGreatResult], []), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
-        Assert.That(BmsCourseScoreSelector.SelectBest([noGoodResult], [new BmsModNoGreat()]), Is.EqualTo((BmsLamp.HardClear, (ScoreRank?)ScoreRank.A)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([noGoodResult, noGreatResult], []), Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([noGoodResult], [new BmsModNoGreat()]), Is.EqualTo((BmsLamp.HardClear, (ScoreRank?)ScoreRank.A)));
     }
 
     [Test]
     public void TestEmptyResultsShowNoPlay()
     {
-        Assert.That(BmsCourseScoreSelector.SelectBest([], []), Is.EqualTo((BmsLamp.NoPlay, (ScoreRank?)null)));
+        Assert.That(BmsScoreSelector.SelectBestCourse([], []), Is.EqualTo((BmsLamp.NoPlay, (ScoreRank?)null)));
+    }
+
+    [Test]
+    public void TestAutoplayResultDoesNotAwardCourseLamp()
+    {
+        var autoplayResult = result(BmsLamp.ExHardClear, ScoreRank.X, mods: [new BmsModAutoplay()]);
+
+        Assert.That(BmsScoreSelector.SelectBestCourse([autoplayResult], []), Is.EqualTo((BmsLamp.NoPlay, (ScoreRank?)null)));
+    }
+
+    [Test]
+    public void TestCourseStageScoreSelectorIgnoresMissingStageScore()
+    {
+        var score = new ScoreInfo { ID = Guid.NewGuid() };
+        var result = new BmsCourseResult(
+            BmsLamp.Clear,
+            ScoreRank.S,
+            null,
+            new BmsCourseAttemptData
+            {
+                Stages =
+                [
+                    new BmsCourseStageAttemptData
+                    {
+                        BeatmapHash = "target",
+                        Status = BmsCourseStageStatus.Passed,
+                    },
+                ],
+            });
+
+        Assert.That(BmsCourseStageScoreSelector.Select([result], 0, "target", [score]), Is.Empty);
+    }
+
+    [Test]
+    public void TestCourseStageScoreSelectorIgnoresEmptyScoreId()
+    {
+        var score = new ScoreInfo { ID = Guid.Empty };
+        var result = new BmsCourseResult(
+            BmsLamp.Clear,
+            ScoreRank.S,
+            null,
+            new BmsCourseAttemptData
+            {
+                Stages =
+                [
+                    new BmsCourseStageAttemptData
+                    {
+                        BeatmapHash = "target",
+                        Status = BmsCourseStageStatus.Passed,
+                        ScoreId = Guid.Empty,
+                    },
+                ],
+            });
+
+        Assert.That(BmsCourseStageScoreSelector.Select([result], 0, "target", [score]), Is.Empty);
     }
 
     private static BmsCourseResult result(
@@ -154,7 +239,14 @@ public class BmsCourseScoreSelectorTest
                 Status = BmsCourseStatus.Passed,
                 GaugeType = BmsGaugeType.Class,
                 ModAcronyms = acronyms ?? Array.ConvertAll(mods ?? [], mod => mod.Acronym),
-                Stages = [],
+                Stages =
+                [
+                    new BmsCourseStageAttemptData
+                    {
+                        Status = BmsCourseStageStatus.Passed,
+                        ScoreId = Guid.NewGuid(),
+                    },
+                ],
             });
     }
 }

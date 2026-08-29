@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
+using osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 
@@ -439,6 +440,44 @@ public class BmsCourseSessionTest
     }
 
     [Test]
+    public void TestCourseModsKeepNoFailButDropAutoplay()
+    {
+        var mods = BmsCourseSession.CreateCourseMods([new BmsModNoFail(), new BmsModAutoplay()], BmsGaugeType.Class);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(mods, Has.One.TypeOf<BmsModNoFail>());
+            Assert.That(mods, Has.None.TypeOf<BmsModAutoplay>());
+            Assert.That(mods, Has.One.TypeOf<BmsModClassGauge>());
+        });
+    }
+
+    [Test]
+    public void TestCourseStageScoresExcludeScoresOutsideCourseHistory()
+    {
+        var included = createScore(true, 900_000);
+        included.ID = Guid.NewGuid();
+        var unrelated = createScore(true, 1_000_000);
+        unrelated.ID = Guid.NewGuid();
+        var result = new BmsCourseResult(BmsLamp.Clear, ScoreRank.S, null, new BmsCourseAttemptData
+        {
+            Stages =
+            [
+                new BmsCourseStageAttemptData
+                {
+                    BeatmapHash = "target",
+                    Status = BmsCourseStageStatus.Passed,
+                    ScoreId = included.ID,
+                },
+            ],
+        });
+
+        var selected = BmsCourseStageScoreSelector.Select([result], 0, "target", [included, unrelated]);
+
+        Assert.That(selected, Is.EqualTo([included]));
+    }
+
+    [Test]
     public void TestCourseModsUseResolvedClassGauge()
     {
         var mods = BmsCourseSession.CreateCourseMods([new BmsModHardGauge()], BmsGaugeType.ExClass);
@@ -554,10 +593,36 @@ public class BmsCourseSessionTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.Clear));
-            Assert.That(store.GetRank("course"), Is.EqualTo(ScoreRank.S));
+            Assert.That(store.GetLamp("course"), Is.EqualTo(BmsLamp.NoPlay));
+            Assert.That(store.GetRank("course"), Is.Null);
             Assert.That(store.GetHistory("course"), Is.Empty);
         });
+    }
+
+    [Test]
+    public void TestCourseResultWithUnsupportedVersionIsIgnored()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S);
+        var path = Directory.EnumerateFiles(courseResultsDirectory, "*.json").Single();
+        File.WriteAllText(path, File.ReadAllText(path).Replace("\"Version\":0", "\"Version\":1", StringComparison.Ordinal));
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+
+        Assert.That(store.GetHistory("course"), Is.Empty);
+    }
+
+    [Test]
+    public void TestCourseResultWithoutVersionUsesVersionZero()
+    {
+        var store = new BmsCourseResultStore(courseResultsDirectory);
+        store.Record("course", BmsCourseStatus.Passed, ScoreRank.S);
+        var path = Directory.EnumerateFiles(courseResultsDirectory, "*.json").Single();
+        File.WriteAllText(path, File.ReadAllText(path).Replace("\"Version\":0,", string.Empty, StringComparison.Ordinal));
+
+        store = new BmsCourseResultStore(courseResultsDirectory);
+
+        Assert.That(store.GetHistory("course"), Has.Count.EqualTo(1));
     }
 
     [Test]
@@ -739,6 +804,44 @@ public class BmsCourseSessionTest
             Assert.That(session.CurrentHealth, Is.Zero);
             Assert.That(session.Stages[1].Status, Is.EqualTo(BmsCourseStageStatus.NotPlayed));
             Assert.That(session.Stages[1].Score, Is.Null);
+        });
+    }
+
+    [Test]
+    public void TestNoFailKeepsFailedStageButAllowsCourseToContinue()
+    {
+        var session = createSession(mods: [new BmsModNoFail()]);
+
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(false, 100), gaugeStates(0, true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Failed));
+            Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Failed));
+        });
+
+        session.RequestAdvance();
+        session.Advance();
+        Assert.That(session.CurrentStageIndex, Is.EqualTo(1));
+
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(true, 200), gaugeStates(0.75));
+        Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Failed));
+    }
+
+    [Test]
+    public void TestNoFailStillFailsCourseAfterFinalFailedStage()
+    {
+        var session = createSession(1, [new BmsModNoFail()]);
+
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(false, 100), gaugeStates(0, true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Failed));
+            Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Failed));
         });
     }
 

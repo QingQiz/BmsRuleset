@@ -127,14 +127,14 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
         if (selectedMods != null && ruleset.Value.ShortName == Constant.SHORT_NAME)
         {
             var scores = BmsSongSelectLampService.GetLocalScores(realm, Beatmap!, localUser, ruleset);
-            var selection = BmsSongSelectLampService.Select(scores, selectedMods.Value, topScore);
+            var selection = BmsSongSelectLampService.Select(scores, selectedMods.Value);
             updateable.Rank = selection.Rank;
             updateable.Alpha = selection.Rank.HasValue ? 1 : 0;
         }
         else
             setRankFromScore(topScore);
 
-        updateLamp(topScore);
+        updateLamp();
     }
 
     private void setRankFromScore(ScoreInfo? topScore)
@@ -143,7 +143,7 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
         updateable.Alpha = topScore != null ? 1 : 0;
     }
 
-    private void updateLamp(ScoreInfo? fallbackTopScore = null)
+    private void updateLamp()
     {
         if (ruleset.Value.ShortName != Constant.SHORT_NAME || Beatmap == null || selectedMods == null)
         {
@@ -152,7 +152,7 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
         }
 
         var scores = BmsSongSelectLampService.GetLocalScores(realm, Beatmap, localUser, ruleset);
-        var selection = BmsSongSelectLampService.Select(scores, selectedMods.Value, fallbackTopScore);
+        var selection = BmsSongSelectLampService.Select(scores, selectedMods.Value);
         updateable.Rank = selection.Rank;
         updateable.Alpha = selection.Rank.HasValue ? 1 : 0;
         lampDisplay.Lamp = BmsLampCalculator.Calculate(selection.Score);

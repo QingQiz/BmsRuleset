@@ -398,52 +398,13 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             .Single(panel => panel.Item?.Model is BmsGroupedCourse { Course.Id: "satellite-8" })
             .ChildrenOfType<UpdateableRank>().Single().Alpha, () => Is.Zero);
         AddAssert("first course selected", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));
-        AddStep("record selected course clear", () => BmsRulesetRuntime.CourseResults?.Record("satellite-7", BmsCourseStatus.Passed, ScoreRank.S));
-        AddUntilStep("selected course lamp updates", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
-            .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
-            .ChildrenOfType<BmsLampDisplay>().Single().Lamp, () => Is.EqualTo(BmsLamp.Clear));
-        AddUntilStep("selected course rank updates", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
-            .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
-            .ChildrenOfType<UpdateableRank>().Single().Rank, () => Is.EqualTo(ScoreRank.S));
-        AddStep("record ex-class course result", () => BmsRulesetRuntime.CourseResults?.Record(
-            "satellite-7", BmsCourseStatus.Passed, ScoreRank.A, new ScoreInfo { TotalScore = 500_000 },
-            new BmsCourseAttemptData
-            {
-                Status = BmsCourseStatus.Passed,
-                GaugeType = BmsGaugeType.ExClass,
-                ModAcronyms = ["C2"],
-            }));
-        AddUntilStep("course lamp prefers ex-class clear", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
-            .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
-            .ChildrenOfType<BmsLampDisplay>().Single().Lamp, () => Is.EqualTo(BmsLamp.HardClear));
-        AddUntilStep("course rank stays with highest matching result", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
-            .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
-            .ChildrenOfType<UpdateableRank>().Single().Rank, () => Is.EqualTo(ScoreRank.S));
-        AddStep("select double time", () => songSelect.Mods.Value = [new BmsModDoubleTime()]);
-        AddUntilStep("course lamp hides without matching mods", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
+        AddStep("record course summary without stage history", () => BmsRulesetRuntime.CourseResults?.Record("satellite-7", BmsCourseStatus.Passed, ScoreRank.S));
+        AddUntilStep("course lamp stays hidden without history", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
             .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
             .ChildrenOfType<BmsLampDisplay>().Single().Lamp, () => Is.EqualTo(BmsLamp.NoPlay));
-        AddUntilStep("course rank hides without matching mods", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
+        AddAssert("course rank stays hidden without history", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
             .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
             .ChildrenOfType<UpdateableRank>().Single().Alpha, () => Is.Zero);
-        AddStep("record double time ex-class course result", () => BmsRulesetRuntime.CourseResults?.Record(
-            "satellite-7", BmsCourseStatus.Passed, ScoreRank.A, new ScoreInfo { TotalScore = 600_000 },
-            new BmsCourseAttemptData
-            {
-                Status = BmsCourseStatus.Passed,
-                GaugeType = BmsGaugeType.ExClass,
-                ModAcronyms = ["C2", new BmsModDoubleTime().Acronym],
-            }));
-        AddUntilStep("course lamp uses matching double time result", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
-            .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
-            .ChildrenOfType<BmsLampDisplay>().Single().Lamp, () => Is.EqualTo(BmsLamp.HardClear));
-        AddUntilStep("course rank uses matching double time result", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
-            .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
-            .ChildrenOfType<UpdateableRank>().Single().Rank, () => Is.EqualTo(ScoreRank.A));
-        AddStep("clear mods", () => songSelect.Mods.Value = []);
-        AddUntilStep("course rank returns to highest no-mod result", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>()
-            .Single(panel => panel.Item?.Model is BmsGroupedCourse grouped && grouped.Course.Id == "satellite-7")
-            .ChildrenOfType<UpdateableRank>().Single().Rank, () => Is.EqualTo(ScoreRank.S));
         AddStep("press down to select next course", () => InputManager.Key(Key.Down));
         AddUntilStep("down skips expanded stages", () => controller.CourseCarousel.KeyboardSelectedCourse?.Id, () => Is.EqualTo("satellite-8"));
         AddAssert("down does not activate course", () => controller.SelectedCourse?.Id, () => Is.EqualTo("satellite-7"));

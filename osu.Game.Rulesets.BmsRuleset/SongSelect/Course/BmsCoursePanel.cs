@@ -215,7 +215,7 @@ internal partial class BmsCoursePanel : Panel
         if (currentCourse == null)
             return;
 
-        var (lamp, rank) = BmsCourseScoreSelector.SelectBest(resultStore?.GetHistory(currentCourse.Id) ?? [], mods.Value);
+        var (lamp, rank) = BmsScoreSelector.SelectBestCourse(resultStore?.GetHistory(currentCourse.Id) ?? [], mods.Value);
         courseLamp.Lamp = lamp;
         courseRank.Rank = rank;
         courseRank.Alpha = rank.HasValue ? 1 : 0;

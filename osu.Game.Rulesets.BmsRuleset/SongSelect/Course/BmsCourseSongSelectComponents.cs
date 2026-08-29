@@ -456,7 +456,7 @@ internal partial class BmsCourseStagePanel : Panel
 
         lamp.Alpha = ResolvedBeatmap != null ? 1 : 0;
         missingBackground.Alpha = ResolvedBeatmap != null ? 0 : 1;
-        stageScoreDisplay.Beatmap = ResolvedBeatmap;
+        stageScoreDisplay.Stage = model;
         stageScoreDisplay.Alpha = ResolvedBeatmap != null ? 1 : 0;
         starRatingDisplay.Alpha = ResolvedBeatmap != null ? 1 : 0;
         spreadDisplay.Alpha = ResolvedBeatmap != null ? 1 : 0;
@@ -489,7 +489,7 @@ internal partial class BmsCourseStagePanel : Panel
         starDifficultyCancellationSource = null;
         starDifficultyBindable = null;
         panelBackground.Beatmap = null;
-        stageScoreDisplay.Beatmap = null;
+        stageScoreDisplay.Stage = null;
         spreadDisplay.Beatmap.Value = null;
         spreadDisplay.StarDifficulty.Value = default;
         spreadDisplay.Current.Colour = Color4.White;
@@ -943,10 +943,8 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
         && selectedCourse.Value?.Id == course.Id
         && isActive();
 
-    private static bool matchesSelectedMods(ScoreInfo score, HashSet<string> selectedAcronyms)
-    {
-        return selectedAcronyms.SetEquals(score.Mods.Where(isFilterableMod).Select(mod => mod.Acronym));
-    }
+    private static bool matchesSelectedMods(ScoreInfo score, HashSet<string> selectedAcronyms) =>
+        BmsScoreSelector.MatchesExactAcronyms(score.Mods, selectedAcronyms, isFilterableMod);
 
     private static void logRefreshFailure(Exception exception)
     {

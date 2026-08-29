@@ -5,11 +5,11 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Leaderboards;
+using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osuTK;
@@ -21,7 +21,8 @@ internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
 {
     private readonly BmsLampDisplay lamp;
     private readonly IBindable<APIUser> localUser = new Bindable<APIUser>();
-    private BeatmapInfo? beatmap;
+    private BmsGroupedCourseStage? stage;
+    private BmsCourseResultStore? resultStore;
 
     [Resolved]
     private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -37,14 +38,14 @@ internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
 
     internal bool HasRank => rank.Rank != null;
 
-    internal BeatmapInfo? Beatmap
+    internal BmsGroupedCourseStage? Stage
     {
         set
         {
-            if (Equals(beatmap, value))
+            if (Equals(stage, value))
                 return;
 
-            beatmap = value;
+            stage = value;
 
             if (IsLoaded)
                 updateSubscription();
@@ -73,6 +74,7 @@ internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
     {
         base.LoadComplete();
 
+        BmsRulesetRuntime.CourseResultsChanged += resultStoreChanged;
         ruleset.BindValueChanged(_ => updateSubscription());
         selectedMods.BindValueChanged(_ => updateSubscription());
         localUser.BindValueChanged(_ => updateSubscription(), true);
@@ -83,19 +85,20 @@ internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
         scoreSubscription?.Dispose();
         scoreSubscription = null;
         updateScores([]);
+        updateResultStore();
 
-        if (beatmap == null)
+        if (stage?.Beatmap == null)
             return;
 
-        var targetBeatmap = beatmap;
+        var targetStage = stage;
         scoreSubscription = realm.RegisterForNotifications(
-            r => r.All<ScoreInfo>().Where(score => score.BeatmapHash == targetBeatmap.Hash && !score.DeletePending),
-            (scores, changes) => localScoresChanged(targetBeatmap, scores, changes));
+            r => r.All<ScoreInfo>().Where(score => score.BeatmapHash == targetStage.Beatmap.Hash && !score.DeletePending),
+            (scores, changes) => localScoresChanged(targetStage, scores, changes));
     }
 
-    private void localScoresChanged(BeatmapInfo targetBeatmap, IRealmCollection<ScoreInfo> sender, ChangeSet? changes)
+    private void localScoresChanged(BmsGroupedCourseStage targetStage, IRealmCollection<ScoreInfo> sender, ChangeSet? changes)
     {
-        if (!Equals(beatmap, targetBeatmap))
+        if (!Equals(stage, targetStage))
             return;
 
         // Linked beatmap updates do not change the result and can produce notification-only refreshes.
@@ -107,7 +110,12 @@ internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
             .Where(score => ruleset.Value.Equals(score.Ruleset))
             .ToArray();
 
-        updateScores(localScores);
+        var courseScores = BmsCourseStageScoreSelector.Select(
+            resultStore?.GetHistory(targetStage.Course.Id) ?? [],
+            targetStage.StageIndex,
+            targetStage.Beatmap!.Hash,
+            localScores);
+        updateScores(courseScores);
     }
 
     private void updateScores(IReadOnlyList<ScoreInfo> scores)
@@ -116,12 +124,38 @@ internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
         rank.Rank = highestScore?.Rank;
         rank.Alpha = highestScore != null ? 1 : 0;
 
-        lamp.Lamp = BmsLampCalculator.Calculate(BmsLampScoreSelector.SelectBest(scores, selectedMods.Value));
+        lamp.Lamp = BmsLampCalculator.Calculate(BmsScoreSelector.SelectBest(scores, selectedMods.Value));
     }
 
     protected override void Dispose(bool isDisposing)
     {
+        BmsRulesetRuntime.CourseResultsChanged -= resultStoreChanged;
+        if (resultStore != null)
+            resultStore.Changed -= courseResultChanged;
+
         scoreSubscription?.Dispose();
         base.Dispose(isDisposing);
     }
+
+    private void updateResultStore()
+    {
+        var current = BmsRulesetRuntime.CourseResults;
+        if (ReferenceEquals(resultStore, current))
+            return;
+
+        if (resultStore != null)
+            resultStore.Changed -= courseResultChanged;
+
+        resultStore = current;
+        if (resultStore != null)
+            resultStore.Changed += courseResultChanged;
+    }
+
+    private void courseResultChanged(string courseId)
+    {
+        if (stage?.Course.Id == courseId)
+            Scheduler.Add(updateSubscription);
+    }
+
+    private void resultStoreChanged() => Scheduler.Add(updateSubscription);
 }

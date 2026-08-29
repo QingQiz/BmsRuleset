@@ -18,6 +18,7 @@ internal sealed class BmsCourseResultStore
 {
     internal event Action<string>? Changed;
 
+    private const int current_version = 0;
     private const string file_extension = ".json";
 
     private readonly Dictionary<string, List<IndexedCourseResult>> indexByCourseKey = new(StringComparer.Ordinal);
@@ -34,15 +35,17 @@ internal sealed class BmsCourseResultStore
         indexPersistedFiles();
     }
 
-    internal BmsLamp GetLamp(string courseId) =>
-        tryGetSummary(courseId, static x => (int)x.Lamp, out var result)
-            ? result.Lamp
-            : BmsLamp.NoPlay;
+    internal BmsLamp GetLamp(string courseId)
+    {
+        var history = GetHistory(courseId);
+        return history.Count == 0 ? BmsLamp.NoPlay : history.MaxBy(result => (int)result.Lamp).Lamp;
+    }
 
-    internal ScoreRank? GetRank(string courseId) =>
-        tryGetSummary(courseId, static x => (int)(x.Rank ?? ScoreRank.F), out var result)
-            ? result.Rank
-            : null;
+    internal ScoreRank? GetRank(string courseId)
+    {
+        var history = GetHistory(courseId);
+        return history.Count == 0 ? null : history.MaxBy(result => (int)(result.Rank ?? ScoreRank.F)).Rank;
+    }
 
     internal bool TryGet(string courseId, out BmsCourseResult result)
     {
@@ -74,8 +77,9 @@ internal sealed class BmsCourseResultStore
                 {
                     try
                     {
-                        var result = JsonSerializer.Deserialize<BmsCourseResult>(File.ReadAllText(entry.Path)) with { SourcePath = entry.Path };
-                        history.Add(result);
+                        var result = JsonSerializer.Deserialize<BmsCourseResult>(File.ReadAllText(entry.Path));
+                        if (isValid(result))
+                            history.Add(result with { SourcePath = entry.Path });
                     }
                     catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
                     {
@@ -126,7 +130,8 @@ internal sealed class BmsCourseResultStore
                 {
                     var json = await File.ReadAllTextAsync(entry.Path, cancellationToken).ConfigureAwait(false);
                     var result = JsonSerializer.Deserialize<BmsCourseResult>(json);
-                    loadedByPath[entry.Path] = result with { SourcePath = entry.Path };
+                    if (isValid(result))
+                        loadedByPath[entry.Path] = result with { SourcePath = entry.Path };
                 }
                 catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
                 {
@@ -142,9 +147,11 @@ internal sealed class BmsCourseResultStore
             || (status == BmsCourseStatus.Aborted && score == null && attempt == null))
             return;
 
+        attempt ??= new BmsCourseAttemptData();
+
         var result = status == BmsCourseStatus.Passed
-            ? new BmsCourseResult(lampFor(finalGaugeType ?? attempt?.GaugeType), rank is null or ScoreRank.F ? ScoreRank.A : rank, BmsCourseScoreData.From(score), attempt)
-            : new BmsCourseResult(BmsLamp.Failed, ScoreRank.F, BmsCourseScoreData.From(score), attempt);
+            ? new BmsCourseResult(lampFor(finalGaugeType ?? attempt.GaugeType), rank is null or ScoreRank.F ? ScoreRank.A : rank, BmsCourseScoreData.From(score), attempt) { Version = current_version }
+            : new BmsCourseResult(BmsLamp.Failed, ScoreRank.F, BmsCourseScoreData.From(score), attempt) { Version = current_version };
 
         var file = fileFor(courseId, result);
         writeAtomically(file, result);
@@ -155,9 +162,9 @@ internal sealed class BmsCourseResultStore
             var courseKey = courseKeyFor(courseId);
             if (!indexByCourseKey.TryGetValue(courseKey, out var entries))
                 indexByCourseKey[courseKey] = entries = [];
-            entries.Add(IndexedCourseResult.From(file, result));
+            entries.Add(IndexedCourseResult.From(file));
 
-            if (loadedResults.TryGetValue(courseId, out var history))
+            if (loadedResults.TryGetValue(courseId, out var history) && isValid(result))
                 history.Add(result);
         }
 
@@ -181,7 +188,7 @@ internal sealed class BmsCourseResultStore
             if (!indexByCourseKey.TryGetValue(courseKeyFor(courseId), out var entries))
                 return false;
 
-            if (result.SourcePath == null || !entries.Any(entry => entry.Path == result.SourcePath) || !File.Exists(result.SourcePath))
+            if (result.SourcePath == null || entries.All(entry => entry.Path != result.SourcePath) || !File.Exists(result.SourcePath))
                 return false;
 
             File.Delete(result.SourcePath);
@@ -212,15 +219,9 @@ internal sealed class BmsCourseResultStore
                 if (courseKey.Length != 64 || !courseKey.All(Uri.IsHexDigit))
                     continue;
 
-                if (!int.TryParse(parts[^3], out var lampValue)
-                    || !Enum.IsDefined(typeof(BmsLamp), lampValue)
-                    || !tryParseRank(parts[^2], out var rank)
-                    || !long.TryParse(parts[^1], out _))
-                    continue;
-
                 if (!indexByCourseKey.TryGetValue(courseKey, out var entries))
                     indexByCourseKey[courseKey] = entries = [];
-                entries.Add(new IndexedCourseResult(file, (BmsLamp)lampValue, rank));
+                entries.Add(new IndexedCourseResult(file));
             }
         }
     }
@@ -242,38 +243,9 @@ internal sealed class BmsCourseResultStore
     private static string courseKeyFor(string courseId) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(courseId)));
 
-    private bool tryGetSummary<TKey>(string courseId, Func<IndexedCourseResult, TKey> priority, out IndexedCourseResult result)
-    {
-        lock (sync)
-        {
-            if (indexByCourseKey.TryGetValue(courseKeyFor(courseId), out var entries) && entries.Count > 0)
-            {
-                result = entries.MaxBy(priority);
-                return true;
-            }
-
-            result = default;
-            return false;
-        }
-    }
-
-    private static bool tryParseRank(string value, out ScoreRank? rank)
-    {
-        if (value == "n")
-        {
-            rank = null;
-            return true;
-        }
-
-        if (int.TryParse(value, out var parsed) && Enum.IsDefined(typeof(ScoreRank), parsed))
-        {
-            rank = (ScoreRank)parsed;
-            return true;
-        }
-
-        rank = null;
-        return false;
-    }
+    private static bool isValid(BmsCourseResult result) =>
+        result.Version == current_version
+        && result.Attempt != null;
 
     private static void writeAtomically(string path, BmsCourseResult result)
     {
@@ -290,15 +262,16 @@ internal sealed class BmsCourseResultStore
         }
     }
 
-    private readonly record struct IndexedCourseResult(string Path, BmsLamp Lamp, ScoreRank? Rank)
+    private readonly record struct IndexedCourseResult(string Path)
     {
-        internal static IndexedCourseResult From(string path, BmsCourseResult result) =>
-            new(path, result.Lamp, result.Rank);
+        internal static IndexedCourseResult From(string path) => new(path);
     }
 }
 
 internal readonly record struct BmsCourseResult(BmsLamp Lamp, ScoreRank? Rank, BmsCourseScoreData? Score, BmsCourseAttemptData? Attempt = null)
 {
+    public int Version { get; init; }
+
     [JsonIgnore]
     internal string? SourcePath { get; init; }
 }
