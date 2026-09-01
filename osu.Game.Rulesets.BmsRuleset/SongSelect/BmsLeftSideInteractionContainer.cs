@@ -10,16 +10,11 @@ using osu.Framework.Input.Events;
 
 namespace osu.Game.Rulesets.BmsRuleset.SongSelect;
 
-internal partial class BmsLeftSideInteractionContainer : Container
+internal partial class BmsLeftSideInteractionContainer(Action resetCarouselPosition) : Container
 {
-    private readonly Action? resetCarouselPosition;
+    private readonly Action? resetCarouselPosition = resetCarouselPosition;
     private bool mouseContained;
     private InputManager inputManager = null!;
-
-    public BmsLeftSideInteractionContainer(Action resetCarouselPosition)
-    {
-        this.resetCarouselPosition = resetCarouselPosition;
-    }
 
     protected override bool OnScroll(ScrollEvent e) => !e.ControlPressed && !e.AltPressed && !e.ShiftPressed && !e.SuperPressed;
 

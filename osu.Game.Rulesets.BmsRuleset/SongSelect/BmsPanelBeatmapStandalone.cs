@@ -13,11 +13,8 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Drawables;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets.Mods;
@@ -51,22 +48,10 @@ internal partial class BmsPanelBeatmapStandalone : Panel
     private IBindable<StarDifficulty>? starDifficultyBindable;
     private CancellationTokenSource? starDifficultyCancellationSource;
 
-    private PanelSetBackground beatmapBackground = null!;
     private ScheduledDelegate? scheduledBackgroundRetrieval;
 
-    private OsuSpriteText titleText = null!;
-    private OsuSpriteText artistText = null!;
-    private PanelUpdateBeatmapButton updateButton = null!;
-    private BeatmapSetOnlineStatusPill statusPill = null!;
-
     private ConstrainedIconContainer difficultyIcon = null!;
-    private StarRatingDisplay starRatingDisplay = null!;
-    private SpreadDisplay spreadDisplay = null!;
-    private BmsPanelLocalRankDisplay localRank = null!;
-    private OsuSpriteText keyCountText = null!;
-    private OsuSpriteText difficultyText = null!;
-    private OsuSpriteText authorText = null!;
-    private FillFlowContainer mainFill = null!;
+    private BmsStandaloneBeatmapContent panelContent = null!;
 
     private Box backgroundBorder = null!;
 
@@ -94,114 +79,7 @@ internal partial class BmsPanelBeatmapStandalone : Panel
             RelativeSizeAxes = Axes.Both,
         };
 
-        Content.Children =
-        [
-            beatmapBackground = new PanelSetBackground(),
-            new FillFlowContainer
-            {
-                AutoSizeAxes = Axes.Both,
-                Anchor = Anchor.CentreLeft,
-                Origin = Anchor.CentreLeft,
-                Spacing = new Vector2(5),
-                Margin = new MarginPadding { Left = 6.5f },
-                Direction = FillDirection.Horizontal,
-                Children =
-                [
-                    localRank = new BmsPanelLocalRankDisplay
-                    {
-                        Scale = new Vector2(0.8f),
-                        Origin = Anchor.CentreLeft,
-                        Anchor = Anchor.CentreLeft,
-                    },
-                    mainFill = new FillFlowContainer
-                    {
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                        Direction = FillDirection.Vertical,
-                        Padding = new MarginPadding { Bottom = 4.8f },
-                        AutoSizeAxes = Axes.Both,
-                        Children =
-                        [
-                            titleText = new OsuSpriteText
-                            {
-                                Font = OsuFont.Style.Heading2.With(typeface: Typeface.TorusAlternate, weight: FontWeight.Bold),
-                            },
-                            artistText = new OsuSpriteText
-                            {
-                                Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
-                                Padding = new MarginPadding { Top = -2 },
-                            },
-                            new FillFlowContainer
-                            {
-                                Direction = FillDirection.Horizontal,
-                                AutoSizeAxes = Axes.Both,
-                                Padding = new MarginPadding { Top = 2, Bottom = 2 },
-                                Children =
-                                [
-                                    statusPill = new BeatmapSetOnlineStatusPill
-                                    {
-                                        Animated = false,
-                                        Origin = Anchor.BottomLeft,
-                                        Anchor = Anchor.BottomLeft,
-                                        TextSize = OsuFont.Style.Caption2.Size,
-                                        Margin = new MarginPadding { Right = 4f },
-                                    },
-                                    updateButton = new PanelUpdateBeatmapButton
-                                    {
-                                        Scale = new Vector2(0.8f),
-                                        Anchor = Anchor.BottomLeft,
-                                        Origin = Anchor.BottomLeft,
-                                        Margin = new MarginPadding { Right = 4f, Bottom = -1f },
-                                    },
-                                    keyCountText = new OsuSpriteText
-                                    {
-                                        Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
-                                        Anchor = Anchor.BottomLeft,
-                                        Origin = Anchor.BottomLeft,
-                                        Alpha = 0,
-                                    },
-                                    difficultyText = new OsuSpriteText
-                                    {
-                                        Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
-                                        Anchor = Anchor.BottomLeft,
-                                        Origin = Anchor.BottomLeft,
-                                        Margin = new MarginPadding { Right = 3f },
-                                    },
-                                    authorText = new OsuSpriteText
-                                    {
-                                        Colour = colourProvider.Content2,
-                                        Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
-                                        Anchor = Anchor.BottomLeft,
-                                        Origin = Anchor.BottomLeft,
-                                    },
-                                ],
-                            },
-                            new FillFlowContainer
-                            {
-                                Direction = FillDirection.Horizontal,
-                                Spacing = new Vector2(3),
-                                AutoSizeAxes = Axes.Both,
-                                Children =
-                                [
-                                    starRatingDisplay = new StarRatingDisplay(default, StarRatingDisplaySize.Small, animated: true)
-                                    {
-                                        Origin = Anchor.CentreLeft,
-                                        Anchor = Anchor.CentreLeft,
-                                        Scale = new Vector2(0.875f),
-                                    },
-                                    spreadDisplay = new SpreadDisplay
-                                    {
-                                        Origin = Anchor.CentreLeft,
-                                        Anchor = Anchor.CentreLeft,
-                                        Selected = { BindTarget = Selected },
-                                    },
-                                ],
-                            },
-                        ],
-                    },
-                ],
-            },
-        ];
+        Content.Child = panelContent = new BmsStandaloneBeatmapContent(Selected, includeSetMetadata: true);
     }
 
     protected override void LoadComplete()
@@ -223,25 +101,25 @@ internal partial class BmsPanelBeatmapStandalone : Panel
 
         var beatmapSet = beatmap.BeatmapSet!;
 
-        scheduledBackgroundRetrieval = Scheduler.AddDelayed(b => beatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b), beatmap, 50);
+        scheduledBackgroundRetrieval = Scheduler.AddDelayed(b => panelContent.BeatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b), beatmap, 50);
 
-        titleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
-        artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
-        updateButton.BeatmapSet = beatmapSet;
-        statusPill.Status = beatmap.Status;
+        panelContent.TitleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
+        panelContent.ArtistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
+        panelContent.UpdateButton!.BeatmapSet = beatmapSet;
+        panelContent.StatusPill!.Status = beatmap.Status;
 
         difficultyIcon.Icon = beatmap.Ruleset.CreateInstance().CreateIcon();
         difficultyIcon.Show();
 
-        localRank.Beatmap = beatmap;
-        localRank.RefreshBmsScores();
+        panelContent.LocalRank.Beatmap = beatmap;
+        panelContent.LocalRank.RefreshBmsScores();
         difficultyIcon.Parent!.Alpha = 0;
-        localRank.AttachLamp((Container)backgroundBorder.Parent!);
-        difficultyText.Text = beatmap.DifficultyName;
-        authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
+        panelContent.LocalRank.AttachLamp((Container)backgroundBorder.Parent!);
+        panelContent.DifficultyText.Text = beatmap.DifficultyName;
+        panelContent.AuthorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
         computeStarRating();
-        spreadDisplay.Beatmap.Value = beatmap;
+        panelContent.SpreadDisplay.Beatmap.Value = beatmap;
         updateKeyCount();
     }
 
@@ -251,13 +129,13 @@ internal partial class BmsPanelBeatmapStandalone : Panel
 
         scheduledBackgroundRetrieval?.Cancel();
         scheduledBackgroundRetrieval = null;
-        beatmapBackground.Beatmap = null;
-        updateButton.BeatmapSet = null;
-        localRank.Beatmap = null;
+        panelContent.BeatmapBackground.Beatmap = null;
+        panelContent.UpdateButton!.BeatmapSet = null;
+        panelContent.LocalRank.Beatmap = null;
         difficultyIcon.Parent!.Alpha = 1;
-        localRank.DetachLamp();
+        panelContent.LocalRank.DetachLamp();
         starDifficultyBindable = null;
-        spreadDisplay.Beatmap.Value = null;
+        panelContent.SpreadDisplay.Beatmap.Value = null;
 
         starDifficultyCancellationSource?.Cancel();
     }
@@ -273,8 +151,8 @@ internal partial class BmsPanelBeatmapStandalone : Panel
         starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, BmsSongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
         starDifficultyBindable.BindValueChanged(starDifficulty =>
         {
-            starRatingDisplay.Current.Value = starDifficulty.NewValue;
-            spreadDisplay.StarDifficulty.Value = starDifficulty.NewValue;
+            panelContent.StarRatingDisplay.Current.Value = starDifficulty.NewValue;
+            panelContent.SpreadDisplay.StarDifficulty.Value = starDifficulty.NewValue;
         }, true);
     }
 
@@ -290,15 +168,15 @@ internal partial class BmsPanelBeatmapStandalone : Panel
 
         // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.
         // I can't find a better way to do this.
-        mainFill.Margin = new MarginPadding { Left = 1 / starRatingDisplay.Scale.X * (localRank.HasRank ? 0 : -3) };
+        panelContent.MainFill.Margin = new MarginPadding { Left = 1 / panelContent.StarRatingDisplay.Scale.X * (panelContent.LocalRank.HasRank ? 0 : -3) };
 
-        var diffColour = starRatingDisplay.DisplayedDifficultyColour;
+        var diffColour = panelContent.StarRatingDisplay.DisplayedDifficultyColour;
 
         AccentColour = diffColour;
-        spreadDisplay.Current.Colour = diffColour;
+        panelContent.SpreadDisplay.Current.Colour = diffColour;
 
         backgroundBorder.Colour = diffColour;
-        difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
+        difficultyIcon.Colour = panelContent.StarRatingDisplay.DisplayedDifficultyTextColour;
     }
 
     private void updateKeyCount()
@@ -313,11 +191,11 @@ internal partial class BmsPanelBeatmapStandalone : Panel
             var variant = rulesetInstance.GetVariantForBeatmap(beatmap, mods.Value);
             var variantName = rulesetInstance.GetVariantName(variant);
 
-            keyCountText.Alpha = 1;
-            keyCountText.Text = LocalisableString.Interpolate($"[{variantName}] ");
+            panelContent.KeyCountText.Alpha = 1;
+            panelContent.KeyCountText.Text = LocalisableString.Interpolate($"[{variantName}] ");
         }
         else
-            keyCountText.Alpha = 0;
+            panelContent.KeyCountText.Alpha = 0;
     }
 
     public override MenuItem[] ContextMenuItems

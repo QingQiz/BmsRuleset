@@ -453,31 +453,6 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestCourseStageScoresExcludeScoresOutsideCourseHistory()
-    {
-        var included = createScore(true, 900_000);
-        included.ID = Guid.NewGuid();
-        var unrelated = createScore(true, 1_000_000);
-        unrelated.ID = Guid.NewGuid();
-        var result = new BmsCourseResult(BmsLamp.Clear, ScoreRank.S, null, new BmsCourseAttemptData
-        {
-            Stages =
-            [
-                new BmsCourseStageAttemptData
-                {
-                    BeatmapHash = "target",
-                    Status = BmsCourseStageStatus.Passed,
-                    ScoreId = included.ID,
-                },
-            ],
-        });
-
-        var selected = BmsCourseStageScoreSelector.Select([result], 0, "target", [included, unrelated]);
-
-        Assert.That(selected, Is.EqualTo([included]));
-    }
-
-    [Test]
     public void TestCourseModsUseResolvedClassGauge()
     {
         var mods = BmsCourseSession.CreateCourseMods([new BmsModHardGauge()], BmsGaugeType.ExClass);

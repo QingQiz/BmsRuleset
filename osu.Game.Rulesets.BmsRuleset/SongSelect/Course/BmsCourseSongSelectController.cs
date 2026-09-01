@@ -67,7 +67,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     private readonly BmsCourseCarouselHost originalCarouselHostWrapper;
 
     private readonly Bindable<BmsCourseDefinition?> selectedCourse = new();
-    private readonly BmsCourseTitleWedge courseTitle;
+    private readonly BmsCourseDetailsArea courseTitle;
     private readonly BmsCourseHistoryArea courseHistory;
     private readonly BmsCourseFilterControl courseFilter;
     private readonly BmsCourseNoResultsPlaceholder courseNoResults;
@@ -134,7 +134,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         Size = new osuTK.Vector2(1);
         Alpha = 0;
 
-        courseTitle = new BmsCourseTitleWedge(selectedCourse)
+        courseTitle = new BmsCourseDetailsArea(selectedCourse)
         {
             TopPadding = topPadding,
         };

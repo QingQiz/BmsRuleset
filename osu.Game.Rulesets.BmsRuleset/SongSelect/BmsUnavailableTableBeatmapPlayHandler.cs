@@ -30,5 +30,4 @@ internal static class BmsUnavailableTableBeatmapPlayHandler
 
         return true;
     }
-
 }

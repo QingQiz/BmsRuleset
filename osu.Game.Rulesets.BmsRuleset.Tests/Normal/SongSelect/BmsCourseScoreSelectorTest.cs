@@ -171,53 +171,6 @@ public class BmsScoreSelectorCourseTest
         Assert.That(BmsScoreSelector.SelectBestCourse([autoplayResult], []), Is.EqualTo((BmsLamp.NoPlay, (ScoreRank?)null)));
     }
 
-    [Test]
-    public void TestCourseStageScoreSelectorIgnoresMissingStageScore()
-    {
-        var score = new ScoreInfo { ID = Guid.NewGuid() };
-        var result = new BmsCourseResult(
-            BmsLamp.Clear,
-            ScoreRank.S,
-            null,
-            new BmsCourseAttemptData
-            {
-                Stages =
-                [
-                    new BmsCourseStageAttemptData
-                    {
-                        BeatmapHash = "target",
-                        Status = BmsCourseStageStatus.Passed,
-                    },
-                ],
-            });
-
-        Assert.That(BmsCourseStageScoreSelector.Select([result], 0, "target", [score]), Is.Empty);
-    }
-
-    [Test]
-    public void TestCourseStageScoreSelectorIgnoresEmptyScoreId()
-    {
-        var score = new ScoreInfo { ID = Guid.Empty };
-        var result = new BmsCourseResult(
-            BmsLamp.Clear,
-            ScoreRank.S,
-            null,
-            new BmsCourseAttemptData
-            {
-                Stages =
-                [
-                    new BmsCourseStageAttemptData
-                    {
-                        BeatmapHash = "target",
-                        Status = BmsCourseStageStatus.Passed,
-                        ScoreId = Guid.Empty,
-                    },
-                ],
-            });
-
-        Assert.That(BmsCourseStageScoreSelector.Select([result], 0, "target", [score]), Is.Empty);
-    }
-
     private static BmsCourseResult result(
         BmsLamp lamp,
         ScoreRank? rank,

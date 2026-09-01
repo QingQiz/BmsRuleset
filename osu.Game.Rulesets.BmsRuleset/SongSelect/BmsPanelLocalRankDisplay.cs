@@ -51,10 +51,15 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
 
     internal void DetachLamp()
     {
+        if (lampDisplay.Parent == this)
+            return;
+
         if (lampDisplay.Parent is Container parent)
             parent.Remove(lampDisplay, false);
 
-        AddInternal(lampDisplay);
+        if (lampDisplay.Parent == null)
+            AddInternal(lampDisplay);
+
         lampDisplay.RelativeSizeAxes = Axes.None;
         lampDisplay.Size = new Vector2(40, 20);
     }
@@ -127,8 +132,8 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
 
         if (selectedMods != null && ruleset.Value.ShortName == Constant.SHORT_NAME)
         {
-            var scores = BmsSongSelectLampService.GetLocalScores(realm, Beatmap!, localUser, ruleset);
-            var selection = BmsSongSelectLampService.Select(scores, selectedMods.Value);
+            var scores = getLocalScores(Beatmap!);
+            var selection = select(scores, selectedMods.Value);
             updateable.Rank = selection.Rank;
             updateable.Alpha = selection.Rank.HasValue ? 1 : 0;
         }
@@ -152,12 +157,38 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
             return;
         }
 
-        var scores = BmsSongSelectLampService.GetLocalScores(realm, Beatmap, localUser, ruleset);
-        var selection = BmsSongSelectLampService.Select(scores, selectedMods.Value);
+        var scores = getLocalScores(Beatmap);
+        var selection = select(scores, selectedMods.Value);
         updateable.Rank = selection.Rank;
         updateable.Alpha = selection.Rank.HasValue ? 1 : 0;
         lampDisplay.Lamp = BmsLampCalculator.Calculate(selection.Score);
         lampDisplay.Alpha = 1;
+    }
+
+    private ScoreInfo[] getLocalScores(BeatmapInfo beatmap)
+    {
+        var beatmapHash = beatmap.Hash;
+
+        return realm.Run(r => r.All<ScoreInfo>()
+            .Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending)
+            .ToArray()
+            .Where(s => s.UserID == localUser.Value.Id || s.UserID <= 1)
+            .Where(s => ruleset.Value.Equals(s.Ruleset))
+            .Select(s => s.DeepClone())
+            .ToArray());
+    }
+
+    private static (ScoreInfo? Score, ScoreRank? Rank) select(IEnumerable<ScoreInfo> scores, IReadOnlyList<Mod> selectedMods)
+    {
+        var scoreList = scores as ScoreInfo[] ?? scores.ToArray();
+        var score = BmsScoreSelector.SelectBest(scoreList, selectedMods);
+        var rank = scoreList
+            .Where(s => BmsScoreSelector.MatchesSelectedMods(s, selectedMods))
+            .Select(s => (ScoreRank?)s.Rank)
+            .DefaultIfEmpty()
+            .Max();
+
+        return (score, rank);
     }
 
     protected override void Dispose(bool isDisposing)

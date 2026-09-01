@@ -273,7 +273,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("course controller attached", () => songSelect.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault() != null);
         AddAssert("course carousel cannot receive input before course mode", () => !controller.CourseCarousel.IsPresent && controller.CourseCarousel.Alpha == 0);
         AddAssert("normal carousel host is not always present before course mode", () => controller.OriginalCarouselHostAlwaysPresent, () => Is.False);
-        AddAssert("course title starts offscreen left", () => songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().X, () => Is.EqualTo(-150));
+        AddAssert("course title starts offscreen left", () => songSelect.ChildrenOfType<BmsCourseDetailsArea>().Single().X, () => Is.EqualTo(-150));
         AddAssert("course history starts offscreen left", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().X, () => Is.EqualTo(-150));
         AddAssert("course filter starts offscreen right", () => songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().X, () => Is.EqualTo(150));
         AddStep("capture song select filter bounds", () =>
@@ -289,7 +289,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                                                        && !controller.CourseCarousel.IsFiltering);
         AddStep("finish course mode transition", () =>
         {
-            songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().FinishTransforms(true);
+            songSelect.ChildrenOfType<BmsCourseDetailsArea>().Single().FinishTransforms(true);
             songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().FinishTransforms(true);
             songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().FinishTransforms(true);
         });
@@ -301,7 +301,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddAssert("course carousel matches song select position", () =>
             Math.Abs(controller.CourseCarousel.ScreenSpaceDrawQuad.AABBFloat.Left - carousel.ScreenSpaceDrawQuad.AABBFloat.Left), () => Is.LessThan(0.5f));
         AddAssert("course title uses title wedge host", () =>
-            songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().Parent?.Parent
+            songSelect.ChildrenOfType<BmsCourseDetailsArea>().Single().Parent?.Parent
             == songSelect.ChildrenOfType<BeatmapTitleWedge>().Single().Parent?.Parent);
         AddAssert("course filter uses filter host", () =>
             songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().Parent
@@ -322,7 +322,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddAssert("stage panels removed from history area", () =>
             songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().ChildrenOfType<BmsUnavailableBeatmapPanel>(), () => Is.Empty);
         AddAssert("stage panels removed from title wedge", () =>
-            songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().ChildrenOfType<BmsUnavailableBeatmapPanel>(), () => Is.Empty);
+            songSelect.ChildrenOfType<BmsCourseDetailsArea>().Single().ChildrenOfType<BmsUnavailableBeatmapPanel>(), () => Is.Empty);
         AddAssert("only selected course stages visible", () => controller.CourseCarousel.GetCarouselItems()?
             .Count(item => item.IsVisible && item.Model is BmsGroupedCourseStage), () => Is.EqualTo(4));
         AddAssert("all course stages retained in carousel", () => controller.CourseCarousel.GetCarouselItems()?
@@ -501,7 +501,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             controller.CourseCarousel.ScreenSpaceDrawQuad.AABBFloat.Top
             >= songSelect.ChildrenOfType<BmsCourseFilterControl>().Single().ScreenSpaceDrawQuad.AABBFloat.Bottom - 0.5f);
         AddAssert("course title finishes at song select position", () =>
-            songSelect.ChildrenOfType<BmsCourseTitleWedge>().Single().X, () => Is.Zero);
+            songSelect.ChildrenOfType<BmsCourseDetailsArea>().Single().X, () => Is.Zero);
         AddAssert("history stays hidden for course without result", () =>
             songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().State.Value, () => Is.EqualTo(Visibility.Hidden));
         AddAssert("two table groups displayed", () =>
@@ -633,7 +633,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
     }
 
     [Test]
-    public void TestCourseStageCardsDisplayHistoricalLampAndRank()
+    public void TestCourseStageCardsDisplayLocalLampAndRank()
     {
         BeatmapInfo beatmap = null!;
         ScoreInfo alternateScore = null!;
@@ -709,13 +709,13 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         {
             var panel = controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single();
             return panel.ChildrenOfType<StarRatingDisplay>().Count() == 1
-                   && panel.ChildrenOfType<PanelBeatmapStandalone.SpreadDisplay>().Count() == 1;
+                   && panel.ChildrenOfType<BmsPanelBeatmapStandalone.SpreadDisplay>().Count() == 1;
         });
         AddUntilStep("current difficulty marker uses rating colour", () =>
         {
             var panel = controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single();
             var rating = panel.ChildrenOfType<StarRatingDisplay>().Single();
-            var spread = panel.ChildrenOfType<PanelBeatmapStandalone.SpreadDisplay>().Single();
+            var spread = panel.ChildrenOfType<BmsPanelBeatmapStandalone.SpreadDisplay>().Single();
             return ((Color4)spread.Current.Colour).Equals(rating.DisplayedDifficultyColour);
         });
         AddAssert("stage card uses song select metadata order", () =>
@@ -733,9 +733,9 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         });
         AddAssert("complete course keeps trophy icon", () => controller.CourseCarousel.ChildrenOfType<BmsCoursePanel>().Single()
             .ChildrenOfType<SpriteIcon>().Any(icon => icon.Icon.Equals(FontAwesome.Solid.Trophy)));
-        AddUntilStep("stage card uses best historical lamp", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
+        AddUntilStep("stage card uses best local lamp", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
             .ChildrenOfType<BmsLampDisplay>().Single(display => display.Alpha > 0).Lamp, () => Is.EqualTo(BmsLamp.HardClear));
-        AddUntilStep("stage card uses highest historical rank", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
+        AddUntilStep("stage card uses highest local rank", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
             .ChildrenOfType<UpdateableRank>().Single(rank => rank.Alpha > 0).Rank, () => Is.EqualTo(ScoreRank.S));
         AddUntilStep("course history keeps every aggregate score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
             .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(2));
