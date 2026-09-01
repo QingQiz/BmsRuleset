@@ -1,4 +1,6 @@
+using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -27,6 +29,7 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
 
     private BmsCourseResultsLayout courseLayout = null!;
     private WorkingBeatmap summaryBeatmap = null!;
+    private CancellationTokenSource? stageBeatmapLoadCancellation;
 
     [Resolved]
     private BeatmapManager beatmaps { get; set; } = null!;
@@ -49,7 +52,9 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
         if (recordResult)
         {
             var finalGaugeType = session.CurrentGaugeStates.FirstOrDefault(state => !state.Failed)?.GaugeType;
-            BmsRulesetRuntime.CourseResults?.Record(session.Course.Id, session.Status, aggregateScore.Rank, aggregateScore, BmsCourseAttemptData.From(session), finalGaugeType);
+            var store = BmsRulesetRuntime.CourseResults;
+            if (store != null)
+                _ = store.RecordAsync(session.Course.Id, session.Status, aggregateScore.Rank, aggregateScore, BmsCourseAttemptData.From(session), finalGaugeType);
         }
 
         summaryBeatmap = Beatmap.Value;
@@ -62,8 +67,9 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
         StatisticsPanel.Hide();
         SelectedScore.Value = null;
 
-        AddInternal(courseLayout = new BmsCourseResultsLayout(session, selectedStage));
-        AddInternal(new InputBlockingContainer
+        var layout = courseLayout = new BmsCourseResultsLayout(session, selectedStage);
+        LoadComponentAsync(layout, AddInternal);
+        LoadComponentAsync(new InputBlockingContainer
         {
             Anchor = Anchor.BottomLeft,
             Origin = Anchor.BottomLeft,
@@ -87,7 +93,7 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
                     Action = this.Exit,
                 },
             ],
-        });
+        }, AddInternal);
 
         selectedStage.BindValueChanged(selectionChanged, true);
     }
@@ -107,12 +113,18 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
 
     protected override void Dispose(bool isDisposing)
     {
+        stageBeatmapLoadCancellation?.Cancel();
+        stageBeatmapLoadCancellation?.Dispose();
         selectedStage.ValueChanged -= selectionChanged;
         base.Dispose(isDisposing);
     }
 
     private void selectionChanged(ValueChangedEvent<int?> selection)
     {
+        stageBeatmapLoadCancellation?.Cancel();
+        stageBeatmapLoadCancellation?.Dispose();
+        stageBeatmapLoadCancellation = null;
+
         if (!selection.NewValue.HasValue)
         {
             SelectedScore.Value = null;
@@ -131,14 +143,43 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
         }
 
         courseLayout.AggregateStatistics.Hide();
-        Beatmap.Value = beatmaps.GetWorkingBeatmap(attempt.Stage.Beatmap, true);
-        SelectedScore.Value = attempt.Score;
-        // ScorePanelList is still bound to SelectedScore by ResultsScreen and
-        // may update its hidden native panel during this change. Show after
-        // those bindings have settled so the first stage click cannot toggle
-        // the statistics panel back off.
-        Schedule(() => StatisticsPanel.Show());
-        Schedule(hideNativeScorePanels);
+        StatisticsPanel.Hide();
+
+        var stageIndex = selection.NewValue.Value;
+        var cancellation = stageBeatmapLoadCancellation = new CancellationTokenSource();
+        _ = loadStageBeatmapAsync(stageIndex, attempt, cancellation.Token);
+    }
+
+    private async Task loadStageBeatmapAsync(int stageIndex, BmsCourseStageAttempt attempt, CancellationToken cancellationToken)
+    {
+        WorkingBeatmap workingBeatmap;
+
+        try
+        {
+            workingBeatmap = await Task.Run(() => beatmaps.GetWorkingBeatmap(attempt.Stage.Beatmap, true), cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            BmsLogger.Error(exception, $"Failed to load BMS course stage beatmap: {exception.Message}");
+            return;
+        }
+
+        Schedule(() =>
+        {
+            if (IsDisposed || cancellationToken.IsCancellationRequested || selectedStage.Value != stageIndex)
+                return;
+
+            Beatmap.Value = workingBeatmap;
+            SelectedScore.Value = attempt.Score;
+            // ScorePanelList is still bound to SelectedScore by ResultsScreen and may update its
+            // hidden native panel during this change. Show after those bindings settle.
+            Schedule(() => StatisticsPanel.Show());
+            Schedule(hideNativeScorePanels);
+        });
     }
 
     private void hideNativeScorePanels()

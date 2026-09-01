@@ -71,7 +71,10 @@ internal sealed partial class BmsSupplementalVideoDrawable : CompositeDrawable
             return;
         }
 
-        var sourceStream = stream!;
+        var sourceStream = stream;
+        if (sourceStream == null)
+            return;
+
         using var memory = new MemoryStream();
         if (sourceStream.CanSeek)
             sourceStream.Position = 0;

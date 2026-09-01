@@ -33,16 +33,19 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
     internal const float FAILURE_MARKER_SIZE = 13;
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
-    private readonly IReadOnlyList<GaugeSeries> series;
-    private readonly IReadOnlyList<float> stageBoundaries;
+    private readonly ScoreInfo? score;
+    private readonly IBeatmap? playableBeatmap;
+    private readonly IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)>? stages;
+    private IReadOnlyList<GaugeSeries> series = null!;
+    private IReadOnlyList<float> stageBoundaries = null!;
 
     public BmsGaugeHistoryGraph(ScoreInfo score, IBeatmap playableBeatmap)
     {
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        series = CreateSeries(score, playableBeatmap);
-        stageBoundaries = [];
+        this.score = score;
+        this.playableBeatmap = playableBeatmap;
     }
 
     internal BmsGaugeHistoryGraph(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
@@ -50,13 +53,23 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        series = CreateCourseSeries(stages);
-        stageBoundaries = CreateCourseStageBoundaries(stages);
+        this.stages = stages;
     }
 
     [BackgroundDependencyLoader]
     private void load()
     {
+        if (score != null)
+        {
+            series = CreateSeries(score, playableBeatmap!);
+            stageBoundaries = [];
+        }
+        else
+        {
+            series = CreateCourseSeries(stages!);
+            stageBoundaries = CreateCourseStageBoundaries(stages!);
+        }
+
         InternalChild = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.X,

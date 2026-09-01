@@ -593,6 +593,8 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, beatmap, beatmapInfo), audio);
         });
 
+        AddStep("resolve external background metadata", () => working.GetPanelBackground());
+
         AddAssert("panel marker is ready before texture load", () => Path.GetFileName(working.Metadata.BackgroundFile) == "banner.png");
         AddAssert("panel marker has file hash", () => working.BeatmapSetInfo.GetFile(working.Metadata.BackgroundFile) != null);
     }
@@ -677,6 +679,13 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
             third = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap { BackBmp = "first.png", Banner = "banner.png" }, thirdInfo), audio);
             fourth = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap { BackBmp = "first.png", Banner = "other-banner.png" }, fourthInfo), audio);
             fifth = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, new BmsBeatmap { BackBmp = "second.png", Banner = "other-banner.png" }, fifthInfo), audio);
+
+            // Background identity is now resolved lazily on the background loading path.
+            first.GetBackground();
+            second.GetBackground();
+            third.GetBackground();
+            fourth.GetPanelBackground();
+            fifth.GetBackground();
         });
 
         AddAssert("main backgrounds compare different", () => !first.BeatmapInfo.BackgroundEquals(second.BeatmapInfo));

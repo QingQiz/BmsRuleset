@@ -32,7 +32,10 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
     private const float minimum_bar_height = 0.02f;
     private const float label_width = 96;
 
-    private readonly HitOffsetStatistics statistics;
+    private readonly IReadOnlyList<HitEvent>? hitEvents;
+    private readonly IBeatmap? playableBeatmap;
+    private readonly IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)>? stages;
+    private HitOffsetStatistics statistics = null!;
 
     private FillFlowContainer content = null!;
     private bool expanded;
@@ -42,7 +45,8 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        statistics = CreateStatistics(playableBeatmap, hitEvents);
+        this.hitEvents = hitEvents;
+        this.playableBeatmap = playableBeatmap;
     }
 
     internal BmsHitOffsetStatistic(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
@@ -50,7 +54,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        statistics = createCourseStatistics(stages);
+        this.stages = stages;
     }
 
     public override bool HandlePositionalInput => true;
@@ -58,6 +62,10 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
     [BackgroundDependencyLoader]
     private void load()
     {
+        statistics = hitEvents != null
+            ? CreateStatistics(playableBeatmap!, hitEvents)
+            : createCourseStatistics(stages!);
+
         InternalChild = content = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.X,

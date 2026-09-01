@@ -142,6 +142,12 @@ internal sealed class BmsCourseResultStore
     }
 
     internal void Record(string courseId, BmsCourseStatus status, ScoreRank? rank = null, ScoreInfo? score = null, BmsCourseAttemptData? attempt = null, BmsGaugeType? finalGaugeType = null)
+        => record(courseId, status, rank, score, attempt, finalGaugeType);
+
+    internal Task RecordAsync(string courseId, BmsCourseStatus status, ScoreRank? rank = null, ScoreInfo? score = null, BmsCourseAttemptData? attempt = null, BmsGaugeType? finalGaugeType = null)
+        => Task.Run(() => record(courseId, status, rank, score, attempt, finalGaugeType));
+
+    private void record(string courseId, BmsCourseStatus status, ScoreRank? rank, ScoreInfo? score, BmsCourseAttemptData? attempt, BmsGaugeType? finalGaugeType)
     {
         if (status == BmsCourseStatus.InProgress
             || (status == BmsCourseStatus.Aborted && score == null && attempt == null))

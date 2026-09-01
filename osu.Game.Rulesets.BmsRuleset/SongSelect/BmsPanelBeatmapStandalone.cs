@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -13,6 +14,7 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Overlays;
@@ -49,6 +51,7 @@ internal partial class BmsPanelBeatmapStandalone : Panel
     private CancellationTokenSource? starDifficultyCancellationSource;
 
     private ScheduledDelegate? scheduledBackgroundRetrieval;
+    private CancellationTokenSource? backgroundCancellationSource;
 
     private ConstrainedIconContainer difficultyIcon = null!;
     private BmsStandaloneBeatmapContent panelContent = null!;
@@ -97,11 +100,40 @@ internal partial class BmsPanelBeatmapStandalone : Panel
 
     protected override void PrepareForUse()
     {
+        // Carousel reuses a panel by replacing Item and calling PrepareForUse without
+        // FreeAfterUse, so clear any previous background request before starting a new one.
+        scheduledBackgroundRetrieval?.Cancel();
+        scheduledBackgroundRetrieval = null;
+        backgroundCancellationSource?.Cancel();
+        backgroundCancellationSource = null;
+        panelContent.BeatmapBackground.Beatmap = null;
+
         base.PrepareForUse();
 
         var beatmapSet = beatmap.BeatmapSet!;
 
-        scheduledBackgroundRetrieval = Scheduler.AddDelayed(b => panelContent.BeatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b), beatmap, 50);
+        var backgroundCancellation = backgroundCancellationSource = new CancellationTokenSource();
+        scheduledBackgroundRetrieval = Scheduler.AddDelayed(b =>
+        {
+            var working = beatmaps.GetWorkingBeatmap(b);
+
+            if (working is not BmsWorkingBeatmap bmsWorking)
+            {
+                panelContent.BeatmapBackground.Beatmap = working;
+                return;
+            }
+
+            bmsWorking.PrepareBackgroundMetadataAsync(backgroundCancellation.Token).ContinueWith(task => Scheduler.Add(() =>
+            {
+                if (!task.IsCompletedSuccessfully || backgroundCancellation.IsCancellationRequested || IsDisposed)
+                    return;
+
+                if (Item?.Model is not GroupedBeatmap grouped || !ReferenceEquals(grouped.Beatmap, b))
+                    return;
+
+                panelContent.BeatmapBackground.Beatmap = bmsWorking;
+            }), TaskScheduler.Default);
+        }, beatmap, 50);
 
         panelContent.TitleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
         panelContent.ArtistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
@@ -129,6 +161,8 @@ internal partial class BmsPanelBeatmapStandalone : Panel
 
         scheduledBackgroundRetrieval?.Cancel();
         scheduledBackgroundRetrieval = null;
+        backgroundCancellationSource?.Cancel();
+        backgroundCancellationSource = null;
         panelContent.BeatmapBackground.Beatmap = null;
         panelContent.UpdateButton!.BeatmapSet = null;
         panelContent.LocalRank.Beatmap = null;

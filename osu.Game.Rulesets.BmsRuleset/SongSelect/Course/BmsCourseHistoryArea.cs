@@ -321,13 +321,13 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
 
     }
 
-    private void courseResultChanged(string courseId)
+    private void courseResultChanged(string courseId) => Scheduler.Add(() =>
     {
         if (selectedCourse.Value?.Id == courseId)
             requestRefresh();
-    }
+    });
 
-    private void resultStoreChanged() => requestRefresh();
+    private void resultStoreChanged() => Scheduler.Add(requestRefresh);
 
     private void requestRefresh()
     {

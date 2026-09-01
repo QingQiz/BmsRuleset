@@ -102,7 +102,10 @@ internal partial class BmsCourseSessionScreen : ScreenWithBeatmapBackground
 
         stageStarted = true;
         session.BeginCurrentStage();
-        Beatmap.Value = beatmaps.GetWorkingBeatmap(session.CurrentStage.Stage.Beatmap, true);
+        // Course stages were resolved from the database immediately before the session was
+        // created. Avoid another synchronous Realm refetch on the update thread when entering
+        // gameplay; WorkingBeatmap performs chart decoding through its asynchronous load path.
+        Beatmap.Value = beatmaps.GetWorkingBeatmap(session.CurrentStage.Stage.Beatmap);
         Mods.Value = session.Mods;
         this.Push(new PlayerLoader(() => new BmsCoursePlayer(session)));
     }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using HarmonyLib;
 using osu.Framework.Allocation;
@@ -14,6 +15,7 @@ using osu.Framework.Screens;
 using osu.Game.Database;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
@@ -35,6 +37,8 @@ public static class BmsReplayPatcher
     private static FieldInfo? replayFailIndicatorFailSampleField;
     private static FieldInfo? mainMenuLogoProxyField;
     private static MethodInfo? drawableScheduleMethod;
+    private static readonly ConditionalWeakTable<ScoreInfo, RestoreTask> pending_score_restores = new();
+    private static readonly ConditionalWeakTable<ScoreInfo, RestoreTask> completed_score_restores = new();
 
     public static bool IsInstalled { get; private set; }
 
@@ -246,7 +250,46 @@ public static class BmsReplayPatcher
         if (dependencies == null || !dependencies.TryGet<ScoreManager>(out var scoreManager))
             return;
 
-        RestoreScoreData(scoreManager, scoreInfo);
+        // Online leaderboard entries and scores loaded from older databases may not carry the
+        // BMS sidecar data in memory. Reading the replay archive here would block the update
+        // thread exactly while the results screen is appearing, so perform it in the background
+        // and refresh the bindable once the data is available.
+        lock (pending_score_restores)
+        {
+            if (completed_score_restores.TryGetValue(scoreInfo, out _))
+                return;
+
+            if (pending_score_restores.TryGetValue(scoreInfo, out _))
+                return;
+
+            pending_score_restores.Add(scoreInfo, new RestoreTask());
+        }
+
+        var restoreTask = Task.Run(() => readScoreData(scoreManager, scoreInfo));
+        _ = restoreTask.ContinueWith(task =>
+        {
+            lock (pending_score_restores)
+            {
+                pending_score_restores.Remove(scoreInfo);
+                if (task.IsCompletedSuccessfully && task.Result != null)
+                    completed_score_restores.GetValue(scoreInfo, static _ => new RestoreTask());
+            }
+
+            if (!task.IsCompletedSuccessfully || task.Result == null)
+                return;
+
+            drawableScheduleMethod!.Invoke(__instance,
+            [
+                () =>
+                {
+                    if (__instance.Score.Value == scoreInfo)
+                    {
+                        applyScoreData(scoreInfo, task.Result);
+                        __instance.Score.TriggerChange();
+                    }
+                },
+            ]);
+        }, TaskScheduler.Default);
     }
 
     internal static void RestoreScoreData(ScoreManager scoreManager, ScoreInfo scoreInfo)
@@ -256,30 +299,52 @@ public static class BmsReplayPatcher
 
         try
         {
-            var scoreWithReplay = scoreManager.GetScore(scoreInfo);
+            var data = readScoreData(scoreManager, scoreInfo);
+            if (data == null)
+                return;
 
-            if (scoreWithReplay?.ScoreInfo.HitEvents.Count > 0)
-                scoreInfo.HitEvents = scoreWithReplay.ScoreInfo.HitEvents;
-
-            if (scoreWithReplay != null
-                && BmsJudgementEventStore.TryGet(scoreWithReplay.ScoreInfo, out var restoredJudgementEvents)
-                && restoredJudgementEvents.Count > 0)
-            {
-                BmsJudgementEventStore.Set(scoreInfo, restoredJudgementEvents);
-            }
-
-            if (scoreWithReplay != null
-                && BmsScoreGaugeHistoryStore.TryGet(scoreWithReplay.ScoreInfo, out var restoredGaugeHistory)
-                && restoredGaugeHistory.Count > 0)
-            {
-                BmsScoreGaugeHistoryStore.Set(scoreInfo, restoredGaugeHistory);
-            }
+            applyScoreData(scoreInfo, data);
+            return;
         }
         catch (Exception e)
         {
             BmsLogger.Error(e, "BMS replay patch failed to restore score data.");
         }
+
     }
+
+    private static RestoredScoreData? readScoreData(ScoreManager scoreManager, ScoreInfo scoreInfo)
+    {
+        var scoreWithReplay = scoreManager.GetScore(scoreInfo);
+        if (scoreWithReplay == null)
+            return null;
+
+        var hitEvents = scoreWithReplay.ScoreInfo.HitEvents.Count > 0 ? scoreWithReplay.ScoreInfo.HitEvents : null;
+        var judgementEvents = BmsJudgementEventStore.TryGet(scoreWithReplay.ScoreInfo, out var restoredJudgementEvents) && restoredJudgementEvents.Count > 0
+            ? restoredJudgementEvents
+            : null;
+        var gaugeHistory = BmsScoreGaugeHistoryStore.TryGet(scoreWithReplay.ScoreInfo, out var restoredGaugeHistory) && restoredGaugeHistory.Count > 0
+            ? restoredGaugeHistory
+            : null;
+
+        return hitEvents == null && judgementEvents == null && gaugeHistory == null
+            ? null
+            : new RestoredScoreData(hitEvents, judgementEvents, gaugeHistory);
+    }
+
+    private static void applyScoreData(ScoreInfo scoreInfo, RestoredScoreData data)
+    {
+        if (data.HitEvents != null)
+            scoreInfo.HitEvents = data.HitEvents;
+        if (data.JudgementEvents != null)
+            BmsJudgementEventStore.Set(scoreInfo, data.JudgementEvents);
+        if (data.GaugeHistory != null)
+            BmsScoreGaugeHistoryStore.Set(scoreInfo, data.GaugeHistory);
+    }
+
+    private sealed record RestoredScoreData(List<HitEvent>? HitEvents, IReadOnlyList<BmsJudgementEvent>? JudgementEvents, IReadOnlyList<BmsGaugeHistoryEvent>? GaugeHistory);
+
+    private sealed class RestoreTask;
 
     private static void replayFailIndicatorDisposePrefix(ReplayFailIndicator __instance)
     {

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -12,6 +13,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Graphics.Containers;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Course;
@@ -33,6 +35,7 @@ internal partial class BmsCourseStagePanel : Panel
     private Color4 availableIconColour;
     private Color4 defaultAccentColour;
     private ScheduledDelegate? scheduledBackgroundRetrieval;
+    private CancellationTokenSource? backgroundCancellationSource;
     private IBindable<StarDifficulty>? starDifficultyBindable;
     private CancellationTokenSource? starDifficultyCancellationSource;
 
@@ -98,6 +101,14 @@ internal partial class BmsCourseStagePanel : Panel
 
     protected override void PrepareForUse()
     {
+        // Carousel reuse can call PrepareForUse directly when replacing the stage item.
+        // Cancel the previous background request before publishing the new stage.
+        scheduledBackgroundRetrieval?.Cancel();
+        scheduledBackgroundRetrieval = null;
+        backgroundCancellationSource?.Cancel();
+        backgroundCancellationSource = null;
+        panelContent.BeatmapBackground.Beatmap = null;
+
         resetModelState();
         base.PrepareForUse();
 
@@ -134,11 +145,31 @@ internal partial class BmsCourseStagePanel : Panel
         panelContent.StarRatingDisplay.Current.Value = default;
 
         if (ResolvedBeatmap != null)
+        {
+            var backgroundCancellation = backgroundCancellationSource = new CancellationTokenSource();
             scheduledBackgroundRetrieval = Scheduler.AddDelayed(b =>
             {
-                if (ReferenceEquals(ResolvedBeatmap, b))
-                    panelContent.BeatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b);
+                if (!ReferenceEquals(ResolvedBeatmap, b))
+                    return;
+
+                var working = beatmaps.GetWorkingBeatmap(b);
+
+                if (working is not BmsWorkingBeatmap bmsWorking)
+                {
+                    panelContent.BeatmapBackground.Beatmap = working;
+                    return;
+                }
+
+                bmsWorking.PrepareBackgroundMetadataAsync(backgroundCancellation.Token).ContinueWith(task => Scheduler.Add(() =>
+                {
+                    if (!task.IsCompletedSuccessfully || backgroundCancellation.IsCancellationRequested || IsDisposed
+                        || !ReferenceEquals(ResolvedBeatmap, b))
+                        return;
+
+                    panelContent.BeatmapBackground.Beatmap = bmsWorking;
+                }), TaskScheduler.Default);
             }, ResolvedBeatmap, 50);
+        }
 
         computeStarRating();
         updateKeyCount();
@@ -154,6 +185,8 @@ internal partial class BmsCourseStagePanel : Panel
     {
         scheduledBackgroundRetrieval?.Cancel();
         scheduledBackgroundRetrieval = null;
+        backgroundCancellationSource?.Cancel();
+        backgroundCancellationSource = null;
         starDifficultyCancellationSource?.Cancel();
         starDifficultyCancellationSource = null;
         starDifficultyBindable = null;

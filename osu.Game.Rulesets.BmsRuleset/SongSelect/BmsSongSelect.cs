@@ -46,6 +46,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Volume;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
 using osu.Game.Scoring;
@@ -174,6 +175,8 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     private Bindable<bool> configBackgroundBlur = null!;
     private Bindable<bool> showConvertedBeatmaps = null!;
+    private CancellationTokenSource? backgroundMetadataCancellation;
+    private int backgroundMetadataGeneration;
 
 
     [BackgroundDependencyLoader]
@@ -653,6 +656,29 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     }
 
+    private CancellationTokenSource? resumeValidationCancellation;
+    private int resumeValidationGeneration;
+
+    private void validateSelectionAfterResume()
+    {
+        resumeValidationCancellation?.Cancel();
+        var cancellation = resumeValidationCancellation = new CancellationTokenSource();
+        var generation = ++resumeValidationGeneration;
+        var selected = Beatmap.Value.BeatmapInfo;
+
+        Task.Run(() => beatmaps.GetWorkingBeatmap(selected, true), cancellation.Token).ContinueWith(task => Scheduler.Add(() =>
+        {
+            if (generation != resumeValidationGeneration || !task.IsCompletedSuccessfully || cancellation.IsCancellationRequested || !this.IsCurrentScreen())
+                return;
+
+            var current = task.Result;
+            if (Beatmap.Value.BeatmapInfo.Equals(current.BeatmapInfo))
+                Beatmap.Value = current;
+            else
+                ensureGlobalBeatmapValid();
+        }), TaskScheduler.Default);
+    }
+
     private bool checkBeatmapValidForSelection(BeatmapInfo beatmap)
     {
         if (!BmsForeignBeatmapConverterRegistry.AllowsGameplay(beatmap, Ruleset.Value, showConvertedBeatmaps.Value))
@@ -689,9 +715,8 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         this.FadeIn(fade_duration, Easing.OutQuint);
         onArrivingAtScreen();
 
-        ensureGlobalBeatmapValid();
-
         DetailsArea.Refresh();
+        validateSelectionAfterResume();
 
         if (controlGlobalMusic)
         {
@@ -714,6 +739,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     public override bool OnExiting(ScreenExitEvent e)
     {
+        resumeValidationCancellation?.Cancel();
         this.FadeOut(fade_duration, Easing.OutQuint);
         onLeavingScreen();
 
@@ -766,6 +792,9 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     private void onLeavingScreen()
     {
+        backgroundMetadataCancellation?.Cancel();
+        backgroundMetadataCancellation = null;
+
         restoreBackground();
 
         Beatmap.ValueChanged -= updateVariousState;
@@ -852,9 +881,34 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         }
     }
 
-    private void updateBackgroundDim() => ApplyToBackground(backgroundModeBeatmap =>
+    private void updateBackgroundDim()
     {
-        backgroundModeBeatmap.Beatmap = Beatmap.Value;
+        var selected = Beatmap.Value;
+
+        if (selected is BmsWorkingBeatmap bmsWorking)
+        {
+            backgroundMetadataCancellation?.Cancel();
+            var cancellation = backgroundMetadataCancellation = new CancellationTokenSource();
+            var generation = ++backgroundMetadataGeneration;
+
+            bmsWorking.PrepareBackgroundMetadataAsync(cancellation.Token).ContinueWith(task => Scheduler.Add(() =>
+            {
+                if (generation != backgroundMetadataGeneration || !task.IsCompletedSuccessfully || cancellation.IsCancellationRequested
+                    || !this.IsCurrentScreen() || !ReferenceEquals(Beatmap.Value, selected))
+                    return;
+
+                applyBackgroundDim(selected);
+            }), TaskScheduler.Default);
+
+            return;
+        }
+
+        applyBackgroundDim(selected);
+    }
+
+    private void applyBackgroundDim(WorkingBeatmap selected) => ApplyToBackground(backgroundModeBeatmap =>
+    {
+        backgroundModeBeatmap.Beatmap = selected;
         backgroundModeBeatmap.IgnoreUserSettings.Value = true;
 
         backgroundModeBeatmap.DimWhenUserSettingsIgnored.Value = 0.1f;

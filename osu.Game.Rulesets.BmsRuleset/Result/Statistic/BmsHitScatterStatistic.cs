@@ -4,7 +4,13 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Colour;
+using osu.Framework.Graphics.Primitives;
+using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Rendering.Vertices;
+using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
@@ -41,7 +47,10 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     private static readonly Color4 fast_colour = new(90, 175, 255, 255);
     private static readonly Color4 slow_colour = new(255, 130, 92, 255);
 
-    private readonly HitScatterStatistics statistics;
+    private readonly IReadOnlyList<HitEvent>? hitEvents;
+    private readonly IBeatmap? playableBeatmap;
+    private readonly IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)>? stages;
+    private HitScatterStatistics statistics = null!;
     private FillFlowContainer content = null!;
     private bool expanded;
 
@@ -50,7 +59,8 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        statistics = CreateStatistics(playableBeatmap, hitEvents);
+        this.hitEvents = hitEvents;
+        this.playableBeatmap = playableBeatmap;
     }
 
     internal BmsHitScatterStatistic(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
@@ -58,7 +68,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        statistics = createCourseStatistics(stages);
+        this.stages = stages;
     }
 
     internal static HitScatterStatistics CreateStatistics(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents)
@@ -364,7 +374,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         {
             RelativeSizeAxes = Axes.Both,
             Padding = new MarginPadding(point_padding),
-            Children = data.Points.Select(point => createPoint(data, point)).ToArray(),
+            Children = createPointDrawables(data),
         });
 
         dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Fast, fast_colour, Anchor.TopRight));
@@ -384,6 +394,22 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
                 },
             ],
         };
+    }
+
+    private static Drawable[] createPointDrawables(ScatterData data)
+    {
+        if (data.Points.Count == 0)
+            return [];
+
+        // Keep one regular Circle in the tree for visual tooling and existing consumers;
+        // the remaining points are submitted by one batched draw node.
+        var drawables = new List<Drawable> { createPoint(data, data.Points[0]) };
+
+        const int max_points_per_batch = ushort.MaxValue / 4;
+        for (var start = 1; start < data.Points.Count; start += max_points_per_batch)
+            drawables.Add(new ScatterPointBatch(data, start, Math.Min(start + max_points_per_batch, data.Points.Count)));
+
+        return drawables.ToArray();
     }
 
     private static Drawable createGridLine(ScatterData data, double tick)
@@ -473,6 +499,125 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
 
     private static float yFor(ScatterData data, double offset) => (float)Math.Clamp((offset + data.OffsetRange) / (data.OffsetRange * 2), 0, 1);
 
+    private sealed partial class ScatterPointBatch : Drawable
+    {
+        private readonly ScatterData data;
+        private readonly int startIndex;
+        private readonly int endIndex;
+        private Texture texture = null!;
+        private IShader shader = null!;
+
+        public ScatterPointBatch(ScatterData data, int startIndex, int endIndex)
+        {
+            this.data = data;
+            this.startIndex = startIndex;
+            this.endIndex = endIndex;
+            RelativeSizeAxes = Axes.Both;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(IRenderer renderer, ShaderManager shaders)
+        {
+            texture = renderer.WhitePixel;
+            shader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, "FastCircle");
+        }
+
+        protected override DrawNode CreateDrawNode() => new ScatterPointBatchDrawNode(this);
+
+        private sealed class ScatterPointBatchDrawNode(ScatterPointBatch source) : DrawNode(source)
+        {
+            private ScatterPointBatch source => (ScatterPointBatch)Source;
+
+            private Texture texture = null!;
+            private IShader shader = null!;
+            private Vector2 drawSize;
+            private IVertexBatch<TexturedVertex2D>? quadBatch;
+
+            public override void ApplyState()
+            {
+                base.ApplyState();
+                texture = source.texture;
+                shader = source.shader;
+                drawSize = source.DrawSize;
+            }
+
+            protected override void Draw(IRenderer renderer)
+            {
+                base.Draw(renderer);
+
+                if (source.data.Points.Count <= source.startIndex || !renderer.BindTexture(texture))
+                    return;
+
+                quadBatch ??= renderer.CreateQuadBatch<TexturedVertex2D>(source.endIndex - source.startIndex, 2);
+                shader.Bind();
+                var vertexAction = quadBatch.AddAction;
+
+                for (var i = source.startIndex; i < source.endIndex; i++)
+                {
+                    var point = source.data.Points[i];
+                    var size = point.Result == HitResult.Miss ? 5.2f : 4.4f;
+                    var x = Math.Clamp((float)(point.Time / source.data.Duration), 0, 1) * drawSize.X;
+                    var y = yFor(source.data, point.Offset) * drawSize.Y;
+                    var topLeft = new Vector2(x - size / 2, y - size / 2);
+                    var topRight = topLeft + new Vector2(size, 0);
+                    var bottomLeft = topLeft + new Vector2(0, size);
+                    var bottomRight = topLeft + new Vector2(size);
+                    var quad = new Quad(
+                        Vector2Extensions.Transform(topLeft, DrawInfo.Matrix),
+                        Vector2Extensions.Transform(topRight, DrawInfo.Matrix),
+                        Vector2Extensions.Transform(bottomLeft, DrawInfo.Matrix),
+                        Vector2Extensions.Transform(bottomRight, DrawInfo.Matrix));
+                    var colour = DrawColourInfo.Colour;
+                    colour.ApplyChild(ColourInfo.SingleColour(BmsHitResultColours.ForHitResult(point.Result)));
+                    colour = colour.MultiplyAlpha(point.Result == HitResult.Miss ? 0.95f : 0.82f);
+
+                    var drawRectangle = new Vector4(0, 0, size, size);
+                    var blend = new Vector2(Math.Min(size, size) / Math.Min(quad.Width, quad.Height));
+                    vertexAction(new TexturedVertex2D(renderer)
+                    {
+                        Position = quad.BottomLeft,
+                        TexturePosition = new Vector2(0, size),
+                        TextureRect = drawRectangle,
+                        BlendRange = blend,
+                        Colour = colour.BottomLeft.SRGB,
+                    });
+                    vertexAction(new TexturedVertex2D(renderer)
+                    {
+                        Position = quad.BottomRight,
+                        TexturePosition = new Vector2(size, size),
+                        TextureRect = drawRectangle,
+                        BlendRange = blend,
+                        Colour = colour.BottomRight.SRGB,
+                    });
+                    vertexAction(new TexturedVertex2D(renderer)
+                    {
+                        Position = quad.TopRight,
+                        TexturePosition = new Vector2(size, 0),
+                        TextureRect = drawRectangle,
+                        BlendRange = blend,
+                        Colour = colour.TopRight.SRGB,
+                    });
+                    vertexAction(new TexturedVertex2D(renderer)
+                    {
+                        Position = quad.TopLeft,
+                        TexturePosition = Vector2.Zero,
+                        TextureRect = drawRectangle,
+                        BlendRange = blend,
+                        Colour = colour.TopLeft.SRGB,
+                    });
+                }
+
+                shader.Unbind();
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+                quadBatch?.Dispose();
+            }
+        }
+    }
+
     private static string formatTime(double milliseconds)
     {
         var seconds = milliseconds / 1000;
@@ -483,6 +628,10 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     [BackgroundDependencyLoader]
     private void load()
     {
+        statistics = hitEvents != null
+            ? CreateStatistics(playableBeatmap!, hitEvents)
+            : createCourseStatistics(stages!);
+
         InternalChild = content = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.X,

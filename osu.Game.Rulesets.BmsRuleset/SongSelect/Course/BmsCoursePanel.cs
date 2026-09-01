@@ -184,11 +184,11 @@ internal partial class BmsCoursePanel : Panel
 
     public override MenuItem[] ContextMenuItems => [];
 
-    private void courseResultChanged(string courseId)
+    private void courseResultChanged(string courseId) => Scheduler.Add(() =>
     {
         if (currentCourse?.Id == courseId)
-            Scheduler.Add(updateResult);
-    }
+            updateResult();
+    });
 
     private void resultStoreChanged() => Scheduler.Add(() =>
     {

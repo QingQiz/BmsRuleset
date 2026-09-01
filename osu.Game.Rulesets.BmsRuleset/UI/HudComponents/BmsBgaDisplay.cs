@@ -66,6 +66,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
     private readonly Dictionary<BmsBgaLayer, BmsBgaEvent> activeEvents = new();
     private readonly Dictionary<BmsBgaLayer, BmsBgaOpacityEvent> activeOpacityEvents = new();
     private readonly Dictionary<BmsBgaLayer, Container> layerHosts = new();
+    private readonly Dictionary<BmsBgaLayer, int> layerGenerations = new();
 
     private BmsBgaTimeline? bga;
     private BmsBgaResourceStore? resources;
@@ -150,16 +151,14 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
 
         var time = drawableRuleset.FrameStableClock.CurrentTime;
 
-        if (time < lastTime)
-        {
-            activeEvents.Clear();
-            activeOpacityEvents.Clear();
-            nextEventIndex = 0;
-            nextOpacityEventIndex = 0;
-            poorLayerVisible = false;
-            poorLayerUntil = double.NegativeInfinity;
-            clearLayerHosts();
-        }
+        var pendingEvents = upperBound(events, time) - nextEventIndex;
+        var pendingOpacityEvents = upperBound(opacityEvents, time) - nextOpacityEventIndex;
+
+        // Replaying every BGA event after a seek (or a long pause) can create hundreds of
+        // textures/video drawables in one update. Rebuild only the final state for each layer;
+        // normal frame-sized advances retain the ordered path below.
+        if (time < lastTime || pendingEvents > 64 || pendingOpacityEvents > 64)
+            rebuildStateAt(time);
 
         lastTime = time;
 
@@ -182,6 +181,68 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             activeEvents[evt.Layer] = evt;
             setLayerDrawable(evt);
         }
+    }
+
+    private void rebuildStateAt(double time)
+    {
+        activeEvents.Clear();
+        activeOpacityEvents.Clear();
+        poorLayerVisible = false;
+        poorLayerUntil = double.NegativeInfinity;
+        clearLayerHosts();
+
+        var eventEnd = upperBound(events, time);
+        for (var i = 0; i < eventEnd; i++)
+            activeEvents[events[i].Layer] = events[i];
+
+        var opacityEnd = upperBound(opacityEvents, time);
+        for (var i = 0; i < opacityEnd; i++)
+            activeOpacityEvents[opacityEvents[i].Layer] = opacityEvents[i];
+
+        nextEventIndex = eventEnd;
+        nextOpacityEventIndex = opacityEnd;
+
+        foreach (var evt in activeEvents.Values)
+            setLayerDrawable(evt);
+
+        foreach (var layer in activeOpacityEvents.Keys)
+            applyLayerOpacity(layer);
+
+        applyLayerVisibility();
+    }
+
+    private static int upperBound(BmsBgaEvent[] source, double time)
+    {
+        var low = 0;
+        var high = source.Length;
+
+        while (low < high)
+        {
+            var middle = low + (high - low) / 2;
+            if (source[middle].Time <= time)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
+    }
+
+    private static int upperBound(BmsBgaOpacityEvent[] source, double time)
+    {
+        var low = 0;
+        var high = source.Length;
+
+        while (low < high)
+        {
+            var middle = low + (high - low) / 2;
+            if (source[middle].Time <= time)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
     }
 
     protected override void Dispose(bool isDisposing)
@@ -435,8 +496,30 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
 
         var drawable = createDrawable(evt);
         host.Clear();
+        var generation = layerGenerations.TryGetValue(evt.Layer, out var previousGeneration)
+            ? previousGeneration + 1
+            : 0;
+        layerGenerations[evt.Layer] = generation;
 
-        if (drawable != null)
+        if (drawable is BmsDeferredVideoDrawable deferredVideo)
+        {
+            // Adding a child to an already-loaded host loads it synchronously. Video creation
+            // performs file IO and codec probing, so keep that work on the framework loader and
+            // only attach the drawable after it is ready. An event may have been superseded while
+            // the load was in flight; in that case discard the stale drawable.
+            LoadComponentAsync(deferredVideo, loaded =>
+            {
+                if (!IsDisposed
+                    && layerGenerations.TryGetValue(evt.Layer, out var currentGeneration)
+                    && currentGeneration == generation
+                    && activeEvents.TryGetValue(evt.Layer, out var active)
+                    && active.Sequence == evt.Sequence)
+                    host.Add(loaded);
+                else
+                    loaded.Dispose();
+            });
+        }
+        else if (drawable != null)
             host.Add(drawable);
 
         applyLayerOpacity(evt.Layer);
@@ -560,11 +643,19 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         if (videoPreloader?.TryCreateDrawable(path, clock, eventStartTime, out var warmDrawable) == true)
             return warmDrawable;
 
-        var stream = resources?.GetStream(path);
-        if (stream == null)
+        var resourceStore = resources;
+        if (resourceStore == null)
             return null;
 
-        return BmsBgaVideoFactory.Create(path, stream, clock, eventStartTime);
+        // Opening and probing a video can involve file IO and codec initialisation. Defer both to
+        // the drawable loading pathway because this method is reached from Update().
+        return new BmsDeferredVideoDrawable(path, () => resourceStore.GetStream(path), clock, eventStartTime)
+        {
+            Anchor = Anchor.Centre,
+            Origin = Anchor.Centre,
+            RelativeSizeAxes = Axes.Both,
+            FillMode = FillMode.Stretch,
+        };
     }
 
     private static bool isVideo(string path) => video_extensions.Contains(Path.GetExtension(path));

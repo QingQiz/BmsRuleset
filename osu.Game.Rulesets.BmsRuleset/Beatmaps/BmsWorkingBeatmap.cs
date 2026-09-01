@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
@@ -47,6 +48,14 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
     public override Texture GetBackground() => getExternalBackground(false) ?? inner.GetBackground();
 
     public override Texture GetPanelBackground() => getExternalBackground(true) ?? inner.GetPanelBackground();
+
+    /// <summary>
+    ///     Resolves external background metadata away from the update thread. The song-select
+    ///     panel uses this metadata as the identity for its background debounce, so it must be
+    ///     available before assigning the working beatmap to the drawable.
+    /// </summary>
+    internal Task PrepareBackgroundMetadataAsync(CancellationToken cancellationToken = default)
+        => Task.Run(ensureExternalBackgroundResolved, cancellationToken);
 
     public override Stream GetStream(string storagePath) => inner.GetStream(storagePath);
 
@@ -162,10 +171,17 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
     private static BeatmapInfo createWrapperBeatmapInfo(WorkingBeatmap inner)
     {
         var beatmapInfo = cloneBeatmapInfo(inner.BeatmapInfo);
-        var bmsBeatmap = tryDecodeExternalBeatmap(beatmapInfo) as IBmsBeatmap ?? inner.Beatmap as IBmsBeatmap;
-        var backgroundPaths = resolveExternalBackgroundPaths(beatmapInfo.Metadata.Source, bmsBeatmap, false);
-        var panelBackgroundPaths = resolveExternalBackgroundPaths(beatmapInfo.Metadata.Source, bmsBeatmap, true);
-        applyExternalBackgroundMarker(beatmapInfo, backgroundPaths.FirstOrDefault(), panelBackgroundPaths.FirstOrDefault());
+        // Keep cache lookup cheap. External chart decoding is performed by WorkingBeatmap's
+        // asynchronous beatmap load and background resolution is deferred until the background
+        // drawable is loaded.
+        // Already materialised in-memory beatmaps are safe to use for metadata-only callers (and
+        // avoid changing the behaviour of non-file-backed working beatmaps).
+        if (inner.BeatmapLoaded && inner.Beatmap is IBmsBeatmap bmsBeatmap)
+        {
+            var backgroundPaths = resolveExternalBackgroundPaths(beatmapInfo.Metadata.Source, bmsBeatmap, false);
+            var panelBackgroundPaths = resolveExternalBackgroundPaths(beatmapInfo.Metadata.Source, bmsBeatmap, true);
+            applyExternalBackgroundMarker(beatmapInfo, backgroundPaths.FirstOrDefault(), panelBackgroundPaths.FirstOrDefault());
+        }
 
         return beatmapInfo;
     }
@@ -286,7 +302,10 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
             }
 
             if (BmsFileResourceStore.IsPathInsideDirectory(fullPath, baseFullPath) && File.Exists(fullPath))
-                paths.Add(fullPath);
+                // Texture stores resolve names relative to their backing directory. Keep the
+                // validated relative name here; passing an absolute path makes the sandbox reject
+                // every external background.
+                paths.Add(Path.GetRelativePath(baseFullPath, fullPath));
         }
 
         return paths;

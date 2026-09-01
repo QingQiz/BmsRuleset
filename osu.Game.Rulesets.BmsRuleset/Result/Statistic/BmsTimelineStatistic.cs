@@ -33,14 +33,18 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
     private static readonly Color4 scratch_colour = colours.Yellow;
     private static readonly Color4 fast_colour = new(90, 175, 255, 255);
     private static readonly Color4 slow_colour = new(255, 130, 92, 255);
-    private readonly TimelineData data;
+    private readonly ScoreInfo? score;
+    private readonly IBeatmap? playableBeatmap;
+    private readonly IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)>? stages;
+    private TimelineData data = null!;
 
     public BmsTimelineStatistic(ScoreInfo score, IBeatmap playableBeatmap)
     {
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        data = CreateData(score, playableBeatmap);
+        this.score = score;
+        this.playableBeatmap = playableBeatmap;
     }
 
     internal BmsTimelineStatistic(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
@@ -48,12 +52,16 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         RelativeSizeAxes = Axes.X;
         AutoSizeAxes = Axes.Y;
 
-        data = CreateCourseData(stages);
+        this.stages = stages;
     }
 
     [BackgroundDependencyLoader]
     private void load()
     {
+        data = score != null
+            ? CreateData(score, playableBeatmap!)
+            : CreateCourseData(stages!);
+
         InternalChild = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.X,
