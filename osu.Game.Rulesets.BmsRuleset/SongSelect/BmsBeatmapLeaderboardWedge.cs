@@ -257,6 +257,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
             // In the future, removing this requirement may be deemed useful, but will need ample testing of edge case scenarios
             // (like returning from gameplay after setting a new score, returning to song select after main menu).
             var criteria = new LeaderboardCriteria(fetchBeatmapInfo, fetchRuleset, fetchScope, FilterBySelectedMods.Value ? mods.Value.ToArray() : null, fetchSorting);
+            var beatmapHash = fetchBeatmapInfo.Hash;
 
             localSubscription?.Dispose();
             localSubscription = null;
@@ -264,7 +265,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
             if (BmsLocalLeaderboardService.IsApplicable(criteria))
             {
                 localSubscription = realm.RegisterForNotifications(
-                    r => r.All<ScoreInfo>().Where(s => s.BeatmapHash == fetchBeatmapInfo.Hash && !s.DeletePending),
+                    r => r.All<ScoreInfo>().Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending),
                     (sender, changes) =>
                     {
                         if (fetchScope != Scope.Value
@@ -279,7 +280,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
                 // Realm's initial notification can race subscription setup. Initialise from the current
                 // snapshot as well so an empty local leaderboard can always leave the retrieving state.
                 var localScores = realm.Run(r => BmsLocalLeaderboardService.CreateScores(
-                    r.All<ScoreInfo>().Where(s => s.BeatmapHash == fetchBeatmapInfo.Hash && !s.DeletePending),
+                    r.All<ScoreInfo>().Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending),
                     criteria));
 
                 if (fetchScope == Scope.Value

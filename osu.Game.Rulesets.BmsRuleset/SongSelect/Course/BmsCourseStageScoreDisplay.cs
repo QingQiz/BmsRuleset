@@ -91,8 +91,9 @@ internal partial class BmsCourseStageScoreDisplay : CompositeDrawable
             return;
 
         var targetStage = stage;
+        var beatmapHash = targetStage.Beatmap.Hash;
         scoreSubscription = realm.RegisterForNotifications(
-            r => r.All<ScoreInfo>().Where(score => score.BeatmapHash == targetStage.Beatmap.Hash && !score.DeletePending),
+            r => r.All<ScoreInfo>().Where(score => score.BeatmapHash == beatmapHash && !score.DeletePending),
             (scores, changes) => localScoresChanged(targetStage, scores, changes));
     }
 

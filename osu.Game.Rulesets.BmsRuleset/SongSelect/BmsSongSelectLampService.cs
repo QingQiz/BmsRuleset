@@ -20,13 +20,17 @@ internal static class BmsSongSelectLampService
         BeatmapInfo beatmap,
         IBindable<APIUser> localUser,
         IBindable<RulesetInfo> ruleset)
-        => realm.Run(r => r.All<ScoreInfo>()
-            .Where(s => s.BeatmapHash == beatmap.Hash && !s.DeletePending)
+    {
+        var beatmapHash = beatmap.Hash;
+
+        return realm.Run(r => r.All<ScoreInfo>()
+            .Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending)
             .ToArray()
             .Where(s => s.UserID == localUser.Value.Id || s.UserID <= 1)
             .Where(s => ruleset.Value.Equals(s.Ruleset))
             .Select(s => s.DeepClone())
             .ToArray());
+    }
 
     internal static (ScoreInfo? Score, ScoreRank? Rank) Select(
         IEnumerable<ScoreInfo> scores,

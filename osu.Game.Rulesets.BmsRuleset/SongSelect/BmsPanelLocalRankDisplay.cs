@@ -108,7 +108,8 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
         if (Beatmap == null)
             return;
 
-        scoreSubscription = realm.RegisterForNotifications(r => r.All<ScoreInfo>().Where(s => s.BeatmapHash == Beatmap.Hash && !s.DeletePending), localScoresChanged);
+        var beatmapHash = Beatmap.Hash;
+        scoreSubscription = realm.RegisterForNotifications(r => r.All<ScoreInfo>().Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending), localScoresChanged);
     }
 
     private void localScoresChanged(IRealmCollection<ScoreInfo> sender, ChangeSet? changes)
