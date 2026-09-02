@@ -86,6 +86,7 @@ public partial class BmsRuleset : Ruleset
         BmsRankingHitResultColourPatcher.InstallOnce();
         BmsResultStatisticsPatcher.InstallOnce();
         BmsWorkingBeatmapPatcher.InstallOnce();
+        BmsBeatmapStatisticsPatcher.InstallOnce();
         BmsFrameStatisticsPatcher.InstallOnce();
     }
 
