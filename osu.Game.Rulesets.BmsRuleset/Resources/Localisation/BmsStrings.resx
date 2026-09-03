@@ -86,6 +86,8 @@
   <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>Shows POOR judgements at the latest end of the meter.</value></data>
   <data name="hit_error_meter_fade_duration" xml:space="preserve"><value>Judgement fade duration</value></data>
   <data name="hit_error_meter_fade_duration_description" xml:space="preserve"><value>Seconds taken for judgement lines to fade out.</value></data>
+  <data name="judgement_display_show_empty_poor" xml:space="preserve"><value>Show E-POOR</value></data>
+  <data name="judgement_display_show_empty_poor_description" xml:space="preserve"><value>Shows empty POOR judgements in the judgement HUD.</value></data>
   <data name="key" xml:space="preserve"><value>Key {0}</value></data>
   <data name="notes" xml:space="preserve"><value>Notes</value></data>
   <data name="judgement" xml:space="preserve"><value>Judgement</value></data>

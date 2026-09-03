@@ -120,6 +120,24 @@ public class BmsDefaultHudTest
     }
 
     [Test]
+    public void TestJudgementDisplayShowEmptyPoorSurvivesLayoutRoundTrip()
+    {
+        var hud = BmsDefaultHud.GetDrawableComponent(new GlobalSkinnableContainerLookup(
+            GlobalSkinnableContainers.Playfield,
+            new BmsRuleset().RulesetInfo));
+
+        Assert.That(hud, Is.Not.Null);
+
+        var display = hud!.ChildrenOfType<BmsJudgementDisplay>().Single();
+        Assert.That(display.ShowEmptyPoor.Value, Is.True);
+
+        display.ShowEmptyPoor.Value = false;
+        var restored = (BmsJudgementDisplay)display.CreateSerialisedInfo().CreateInstance();
+
+        Assert.That(restored.ShowEmptyPoor.Value, Is.False);
+    }
+
+    [Test]
     public void TestHitErrorMeterIndependentSizeSurvivesLayoutRoundTrip()
     {
         var meter = new BmsHitErrorMeter

@@ -207,8 +207,10 @@ Displays the result of the most recently judged note. A new PGREAT, GREAT, GOOD,
 replaces the previous result and restarts that judgement image's animation. Images come from the `HitPGreat` through
 `HitPoor` entries in a `[BMS]` skin, or the corresponding mania judgement images described above.
 
-There are no component-specific sidebar settings. Use the editor controls to set the popup's position and scale, and
-use the skin image files to change its artwork or animation.
+- **Show E-POOR** toggles whether empty POOR judgements appear in the popup. It is enabled by default.
+
+Use the editor controls to set the popup's position and scale, and use the skin image files to change its artwork or
+animation.
 
 ### Hit Error Meter
 

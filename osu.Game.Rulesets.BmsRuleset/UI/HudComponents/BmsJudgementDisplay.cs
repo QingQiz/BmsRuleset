@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Platform;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
@@ -17,6 +20,9 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 public sealed partial class BmsJudgementDisplay : BmsHudComponent
 {
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.JudgementDisplayShowEmptyPoor), nameof(BmsStrings.JudgementDisplayShowEmptyPoorDescription))]
+    public Bindable<bool> ShowEmptyPoor { get; } = new BindableBool(true);
+
     private readonly Dictionary<HitResult, SkinnableDrawable> drawableCache = new();
     private readonly Container drawablePool;
     private readonly Container displayArea;
@@ -114,6 +120,9 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
 
     private void showJudgement(HitResult result)
     {
+        if (result == HitResult.Miss && !ShowEmptyPoor.Value)
+            return;
+
         if (!drawableCache.TryGetValue(result, out var drawable))
             return;
 

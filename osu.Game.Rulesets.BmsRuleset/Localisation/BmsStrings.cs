@@ -374,6 +374,10 @@ public static class BmsStrings
 
     public static LocalisableString HitErrorMeterFadeDurationDescription => get("hit_error_meter_fade_duration_description");
 
+    public static LocalisableString JudgementDisplayShowEmptyPoor => get("judgement_display_show_empty_poor");
+
+    public static LocalisableString JudgementDisplayShowEmptyPoorDescription => get("judgement_display_show_empty_poor_description");
+
     public static LocalisableString Key(int number) => get("key", number);
 
     public static LocalisableString Notes => get("notes");

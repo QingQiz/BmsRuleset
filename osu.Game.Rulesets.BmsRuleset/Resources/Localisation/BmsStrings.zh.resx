@@ -86,6 +86,8 @@
   <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>在误差条最偏慢的一端显示 POOR 判定。</value></data>
   <data name="hit_error_meter_fade_duration" xml:space="preserve"><value>判定线淡出时间</value></data>
   <data name="hit_error_meter_fade_duration_description" xml:space="preserve"><value>判定线完成淡出所需的秒数。</value></data>
+  <data name="judgement_display_show_empty_poor" xml:space="preserve"><value>显示 E-POOR</value></data>
+  <data name="judgement_display_show_empty_poor_description" xml:space="preserve"><value>在判定 HUD 中显示空 POOR 判定。</value></data>
   <data name="key" xml:space="preserve"><value>按键 {0}</value></data>
   <data name="notes" xml:space="preserve"><value>音符</value></data>
   <data name="judgement" xml:space="preserve"><value>判定</value></data>
