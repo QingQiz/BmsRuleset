@@ -4,7 +4,8 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Result.Course;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
@@ -134,7 +135,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
         if (GameplayState.HealthProcessor is Scoring.BmsHealthProcessor healthProcessor)
             session.ConfigureHealthProcessor(healthProcessor);
 
-        if (session.HasNoSpeedConstraint && DrawableRuleset.Playfield is UI.BmsPlayfield playfield)
+        if (session.HasNoSpeedConstraint && DrawableRuleset.Playfield is BmsPlayfield playfield)
             playfield.ScrollController.LockScrollSpeedMultiplier();
     }
 

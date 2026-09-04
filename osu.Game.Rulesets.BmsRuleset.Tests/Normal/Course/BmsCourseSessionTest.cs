@@ -12,8 +12,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
-using osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 

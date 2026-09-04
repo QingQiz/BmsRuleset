@@ -14,7 +14,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
@@ -357,7 +357,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                 .Select(score => score.DeepClone())
                 .ToArray());
 
-            var personalBest = BmsScoreSelector.SelectBest(scores, gameplayState.Mods, maximumExScore);
+            var personalBest = BmsLampScoreSelector.SelectBest(scores, gameplayState.Mods, maximumExScore);
 
             if (personalBest == null)
                 return;

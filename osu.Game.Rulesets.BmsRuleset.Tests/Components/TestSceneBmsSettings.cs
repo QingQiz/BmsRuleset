@@ -12,7 +12,7 @@ using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.IO.Import;
-using osu.Game.Rulesets.BmsRuleset.Settings.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
 using osu.Game.Tests.Visual;
 using DT = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
 

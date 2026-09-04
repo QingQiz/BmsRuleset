@@ -2,12 +2,11 @@ using NUnit.Framework;
 using System.Linq;
 using System.IO;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Filter;
 using osu.Game.Screens.Select;
-using osu.Game.Screens.Select.Filter;
 using osuTK.Graphics;
 using DifficultyTableModel = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
 

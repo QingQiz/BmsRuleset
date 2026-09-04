@@ -11,12 +11,12 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Settings.Components;
-using osu.Game.Rulesets.BmsRuleset.UI;
-using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
-using osu.Game.Rulesets.BmsRuleset.Skinning.LegacyDrawables;
-using osu.Game.Rulesets.BmsRuleset.UI.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
 using osu.Game.Skinning;
 using osuTK;
 

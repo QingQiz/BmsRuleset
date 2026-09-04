@@ -1,6 +1,6 @@
 using NUnit.Framework;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Filter;
 using osu.Game.Screens.Select;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;

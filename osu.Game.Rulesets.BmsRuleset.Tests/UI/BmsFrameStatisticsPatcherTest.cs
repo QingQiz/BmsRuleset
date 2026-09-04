@@ -3,7 +3,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.UI;
 

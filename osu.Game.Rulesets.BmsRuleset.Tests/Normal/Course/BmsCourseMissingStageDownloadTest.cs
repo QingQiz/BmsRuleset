@@ -2,7 +2,7 @@ using System.IO;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
-using osu.Game.Rulesets.BmsRuleset.SongSelect.Course;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Course;
 using DifficultyTableModel = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Course;

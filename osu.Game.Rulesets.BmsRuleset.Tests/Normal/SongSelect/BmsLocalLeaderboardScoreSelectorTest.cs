@@ -4,7 +4,8 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Rulesets.BmsRuleset.Mods;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 

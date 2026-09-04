@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Course;

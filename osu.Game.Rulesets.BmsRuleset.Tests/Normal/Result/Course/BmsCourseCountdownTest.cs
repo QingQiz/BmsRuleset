@@ -1,6 +1,6 @@
 using System;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Result.Course;
+using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result.Course;
 

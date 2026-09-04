@@ -2,6 +2,7 @@ using System;
 using System.Collections.Specialized;
 using System.Linq;
 using osu.Framework.Graphics;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Skinning;
 using osuTK;
 

@@ -4,7 +4,7 @@ using osu.Framework.Localisation;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 

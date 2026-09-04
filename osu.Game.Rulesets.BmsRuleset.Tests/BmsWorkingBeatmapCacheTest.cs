@@ -23,7 +23,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
-using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;

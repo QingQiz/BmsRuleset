@@ -2,7 +2,8 @@ using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Mods;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -17,7 +18,7 @@ public class BmsScoreSelectorGraphTest
         var higherTotalScore = score(900_000, 10, 0);
         var higherExScore = score(800_000, 9, 3);
 
-        Assert.That(BmsScoreSelector.SelectBest([higherTotalScore, higherExScore], [], 100), Is.SameAs(higherExScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([higherTotalScore, higherExScore], [], 100), Is.SameAs(higherExScore));
     }
 
     [Test]
@@ -29,8 +30,8 @@ public class BmsScoreSelectorGraphTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(BmsScoreSelector.SelectBest([noMod, hiddenScratch], [], 100), Is.SameAs(noMod));
-            Assert.That(BmsScoreSelector.SelectBest([noMod, hiddenScratch], [new BmsModHideScratch()], 100), Is.SameAs(hiddenScratch));
+            Assert.That(BmsLampScoreSelector.SelectBest([noMod, hiddenScratch], [], 100), Is.SameAs(noMod));
+            Assert.That(BmsLampScoreSelector.SelectBest([noMod, hiddenScratch], [new BmsModHideScratch()], 100), Is.SameAs(hiddenScratch));
         });
     }
 
@@ -40,7 +41,7 @@ public class BmsScoreSelectorGraphTest
         var lower = new ScoreInfo { Accuracy = 0.75 };
         var higher = new ScoreInfo { Accuracy = 0.8 };
 
-        Assert.That(BmsScoreSelector.SelectBest([lower, higher], [], 100), Is.SameAs(higher));
+        Assert.That(BmsLampScoreSelector.SelectBest([lower, higher], [], 100), Is.SameAs(higher));
     }
 
     [Test]
@@ -51,7 +52,7 @@ public class BmsScoreSelectorGraphTest
         var later = score(800_000, 10, 0);
         later.Date = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero);
 
-        Assert.That(BmsScoreSelector.SelectBest([later, earlier], [], 100), Is.SameAs(earlier));
+        Assert.That(BmsLampScoreSelector.SelectBest([later, earlier], [], 100), Is.SameAs(earlier));
     }
 
     private static ScoreInfo score(long totalScore, int perfect, int great)

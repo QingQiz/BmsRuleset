@@ -15,12 +15,12 @@ using osu.Framework.Screens;
 using osu.Game.Database;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking.Statistics;
-using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Replays;

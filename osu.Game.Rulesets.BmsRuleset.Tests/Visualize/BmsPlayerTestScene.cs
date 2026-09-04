@@ -10,7 +10,7 @@ using osu.Framework.Platform;
 using osu.Game.Database;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.UI;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Tests.Visual;
 
