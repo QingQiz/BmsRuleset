@@ -12,7 +12,6 @@
   <data name="accuracy" xml:space="preserve"><value>ACC</value></data>
   <data name="exscore" xml:space="preserve"><value>EXSCORE</value></data>
   <data name="max_combo" xml:space="preserve"><value>MAX COMBO</value></data>
-  <data name="maximum_value" xml:space="preserve"><value>/{0:N0}</value></data>
   <data name="perfect_score" xml:space="preserve"><value>PERFECT</value></data>
   <data name="standard_deviation" xml:space="preserve"><value>SD {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>Reference BPM</value></data>
@@ -247,23 +246,8 @@
   <data name="score_graph_personal_best" xml:space="preserve"><value>Personal best</value></data>
   <data name="score_graph_personal_best_short" xml:space="preserve"><value>Best</value></data>
   <data name="score_graph_target" xml:space="preserve"><value>Target {0}</value></data>
-  <data name="score_graph_rank_x" xml:space="preserve"><value>X</value></data>
-  <data name="score_graph_rank_s" xml:space="preserve"><value>S</value></data>
-  <data name="score_graph_rank_a" xml:space="preserve"><value>A</value></data>
-  <data name="score_graph_rank_b" xml:space="preserve"><value>B</value></data>
-  <data name="score_graph_rank_c" xml:space="preserve"><value>C</value></data>
-  <data name="score_graph_rank_d" xml:space="preserve"><value>D</value></data>
-  <data name="score_graph_rank_threshold" xml:space="preserve"><value>{0} {1:D4}</value></data>
   <data name="score_graph_ex_score" xml:space="preserve"><value>{0:D4}</value></data>
   <data name="score_graph_difference" xml:space="preserve"><value>{0:+0000;-0000;+0000}</value></data>
-  <data name="score_graph_judgement_pgreat" xml:space="preserve"><value>PGREAT</value></data>
-  <data name="score_graph_judgement_great" xml:space="preserve"><value>GREAT</value></data>
-  <data name="score_graph_judgement_good" xml:space="preserve"><value>GOOD</value></data>
-  <data name="score_graph_judgement_bad" xml:space="preserve"><value>BAD</value></data>
-  <data name="score_graph_judgement_poor" xml:space="preserve"><value>POOR</value></data>
-  <data name="score_graph_judgement_empty_poor" xml:space="preserve"><value>E-POOR</value></data>
-  <data name="score_graph_judgement_count" xml:space="preserve"><value>{0:D4}</value></data>
-  <data name="score_graph_judgement_unavailable" xml:space="preserve"><value>—</value></data>
   <data name="score_graph_current_colour" xml:space="preserve"><value>Current score colour</value></data>
   <data name="score_graph_current_colour_description" xml:space="preserve"><value>Colour of the current EX score column.</value></data>
   <data name="score_graph_personal_best_colour" xml:space="preserve"><value>Personal best colour</value></data>

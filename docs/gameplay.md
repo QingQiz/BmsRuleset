@@ -30,7 +30,7 @@ the current window unchanged.
 
 **Score:** `total EX score / max EX score × 1,000,000`
 
-**DJ LEVEL rank:** X (all PGREAT) · S ≥ 8/9 · A ≥ 7/9 · B ≥ 6/9 · C ≥ 5/9 · D otherwise
+**DJ LEVEL rank:** S (all PGREAT) · AAA ≥ 8/9 · AA ≥ 7/9 · A ≥ 6/9 · B ≥ 5/9 · C otherwise
 
 ## Gauge
 

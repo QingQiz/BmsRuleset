@@ -16,6 +16,7 @@ using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Screens.Select;
 using osu.Game.Scoring;
 using osuTK;
@@ -78,7 +79,7 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
 
         InternalChildren =
         [
-            updateable = new UpdateableRank(animate: false)
+            updateable = new BmsUpdateableRank(animate: false)
             {
                 Size = new Vector2(40, 20),
                 Alpha = 0,

@@ -241,8 +241,8 @@ Tracks the current EX score against two references throughout the chart:
 - **Personal best** is the saved play with the highest EX score among scores achieved with the currently selected mods
   or with more difficult mods. Its live progression is reconstructed from the saved play when replay judgement data is
   available.
-- **Target** is the minimum EX score for the rank immediately above the personal best (C, B, A, S, then X). Once the
-  personal best is X, X remains the target.
+- **Target** is the minimum EX score for the rank immediately above the personal best (C, B, A, AA, AAA, then S). Once the
+  personal best is S, S remains the target.
 
 The graph can show rank threshold lines, three live score bars, the current difference from the personal best and
 target, and a PGREAT-through-E-POOR judgement-count comparison. The personal-best judgement column shows an unavailable

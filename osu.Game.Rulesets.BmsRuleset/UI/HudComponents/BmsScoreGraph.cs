@@ -13,6 +13,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.SongSelect;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -212,7 +213,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                         out personalBestScoreText,
                         out personalBestDifferenceText),
                     targetScoreRow = createScoreRow(
-                        BmsStrings.ScoreGraphTarget(targetRank),
+                        BmsStrings.ScoreGraphTarget(BmsRankDisplay.GetRankLetter(targetRank)),
                         showDifference: true,
                         out var targetAccent,
                         out targetScoreText,
@@ -384,7 +385,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         var personalBestRank = BmsExScore.RankFromScore(personalBestFinalScore, maximumExScore);
         targetRank = BmsExScore.NextRank(personalBestRank);
         targetFinalScore = BmsExScore.MinimumScoreForRank(targetRank, maximumExScore);
-        targetLabelText.Text = BmsStrings.ScoreGraphTarget(targetRank);
+        targetLabelText.Text = BmsStrings.ScoreGraphTarget(BmsRankDisplay.GetRankLetter(targetRank));
     }
 
     private void updateSectionVisibility(BindableBool changedSetting, bool isVisible)
@@ -512,7 +513,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
             displayedCurrentJudgementCounts[i] = count;
             var texts = judgementCountTexts[result];
-            texts.Current.Text = BmsStrings.ScoreGraphJudgementCount(count);
+            texts.Current.Text = count.ToString("D4");
         }
     }
 
@@ -523,8 +524,8 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             var texts = judgementCountTexts[displayed_judgements[i]];
             var personalBestCount = counts?[i];
             texts.PersonalBest.Text = personalBestCount == null
-                ? BmsStrings.ScoreGraphJudgementUnavailable
-                : BmsStrings.ScoreGraphJudgementCount(personalBestCount.Value);
+                ? "—"
+                : personalBestCount.Value.ToString("D4");
         }
     }
 
@@ -618,7 +619,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             new OsuSpriteText
             {
                 Position = new Vector2(4, 0),
-                Text = BmsStrings.ScoreGraphJudgement(result),
+                Text = BmsRuleset.HIT_RESULT_LABELS[result],
                 Font = OsuFont.GetFont(size: 8, weight: FontWeight.SemiBold),
                 Colour = BmsHitResultColours.ForHitResult(result),
             },
@@ -745,7 +746,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
         public void SetMaximumScore(int maximumScore)
         {
-            label.Text = BmsStrings.ScoreGraphRankThreshold(rank, BmsExScore.MinimumScoreForRank(rank, maximumScore));
+            label.Text = $"{BmsRankDisplay.GetRankLetter(rank)} {BmsExScore.MinimumScoreForRank(rank, maximumScore):D4}";
         }
     }
 

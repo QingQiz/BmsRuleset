@@ -13,6 +13,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Course;
+using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select;
 using osuTK;
@@ -98,7 +99,7 @@ internal partial class BmsCoursePanel : Panel
                 {
                     new Drawable[]
                     {
-                        courseRank = new UpdateableRank(animate: false)
+                        courseRank = new BmsUpdateableRank(animate: false)
                         {
                             Anchor = Anchor.CentreLeft,
                             Origin = Anchor.CentreLeft,

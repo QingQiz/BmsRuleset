@@ -2,8 +2,6 @@ using System;
 using System.Globalization;
 using System.Resources;
 using osu.Framework.Localisation;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 
 
 namespace osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -30,8 +28,6 @@ public static class BmsStrings
     public static LocalisableString ExScore => get("exscore");
 
     public static LocalisableString MaxCombo => get("max_combo");
-
-    public static LocalisableString MaximumValue(int value) => get("maximum_value", value);
 
     public static LocalisableString PerfectScore => get("perfect_score");
 
@@ -163,38 +159,11 @@ public static class BmsStrings
 
     public static LocalisableString ScoreGraphPersonalBestShort => get("score_graph_personal_best_short");
 
-    public static LocalisableString ScoreGraphTarget(ScoreRank rank) => get("score_graph_target", ScoreGraphRank(rank));
-
-    public static LocalisableString ScoreGraphRank(ScoreRank rank) => rank switch
-    {
-        ScoreRank.X or ScoreRank.XH => get("score_graph_rank_x"),
-        ScoreRank.S or ScoreRank.SH => get("score_graph_rank_s"),
-        ScoreRank.A => get("score_graph_rank_a"),
-        ScoreRank.B => get("score_graph_rank_b"),
-        ScoreRank.C => get("score_graph_rank_c"),
-        _ => get("score_graph_rank_d"),
-    };
-
-    public static LocalisableString ScoreGraphRankThreshold(ScoreRank rank, int score) =>
-        get("score_graph_rank_threshold", ScoreGraphRank(rank), score);
+    public static LocalisableString ScoreGraphTarget(string rank) => get("score_graph_target", rank);
 
     public static LocalisableString ScoreGraphExScore(int score) => get("score_graph_ex_score", score);
 
     public static LocalisableString ScoreGraphDifference(int difference) => get("score_graph_difference", difference);
-
-    public static LocalisableString ScoreGraphJudgement(HitResult result) => result switch
-    {
-        HitResult.Perfect => get("score_graph_judgement_pgreat"),
-        HitResult.Great => get("score_graph_judgement_great"),
-        HitResult.Good => get("score_graph_judgement_good"),
-        HitResult.Ok => get("score_graph_judgement_bad"),
-        HitResult.Meh => get("score_graph_judgement_poor"),
-        _ => get("score_graph_judgement_empty_poor"),
-    };
-
-    public static LocalisableString ScoreGraphJudgementCount(int count) => get("score_graph_judgement_count", count);
-
-    public static LocalisableString ScoreGraphJudgementUnavailable => get("score_graph_judgement_unavailable");
 
     public static LocalisableString ScoreGraphCurrentColour => get("score_graph_current_colour");
 
