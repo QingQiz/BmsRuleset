@@ -12,6 +12,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Ranking.Statistics;
@@ -21,13 +22,21 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
 internal partial class BmsStatisticsPanel : StatisticsPanel
 {
+    private const double minimum_loading_duration = 550;
+    private const double content_fade_duration = 250;
+
     private readonly Container content;
     private readonly LoadingSpinner spinner;
     private readonly Container? overview;
     private CancellationTokenSource? loadCancellation;
+    private double? loadingStartTime;
+    private bool contentReady;
 
     [Resolved]
     protected BeatmapManager Beatmaps { get; private set; } = null!;
+
+    [Resolved]
+    private ScoreManager scores { get; set; } = null!;
 
     internal BmsStatisticsPanel(bool showOverview = true)
     {
@@ -36,7 +45,7 @@ internal partial class BmsStatisticsPanel : StatisticsPanel
             RelativeSizeAxes = Axes.Both,
             Children =
             [
-                content = new Container { RelativeSizeAxes = Axes.Both },
+                content = new Container { Name = "Result statistics content", RelativeSizeAxes = Axes.Both },
                 spinner = new LoadingSpinner(),
             ],
         };
@@ -51,6 +60,9 @@ internal partial class BmsStatisticsPanel : StatisticsPanel
     protected override IEnumerable<StatisticItem> CreateStatisticItems(ScoreInfo newScore, IBeatmap playableBeatmap) =>
         newScore.Ruleset.CreateInstance().CreateStatisticsForScore(newScore, playableBeatmap);
 
+    protected virtual Task RestoreReplayDataAsync(ScoreInfo score, CancellationToken cancellationToken) =>
+        BmsReplayPatcher.RestoreScoreDataAsync(scores, score, cancellationToken);
+
     protected virtual async Task<StatisticItem[]> LoadStatisticItemsAsync(ScoreInfo score, CancellationToken cancellationToken)
     {
         var workingBeatmap = Beatmaps.GetWorkingBeatmap(score.BeatmapInfo);
@@ -64,6 +76,10 @@ internal partial class BmsStatisticsPanel : StatisticsPanel
         loadCancellation?.Cancel();
         loadCancellation?.Dispose();
         loadCancellation = null;
+        contentReady = false;
+        loadingStartTime = null;
+        content.ClearTransforms();
+        content.Hide();
         content.Clear();
         overview?.Clear();
         spinner.Hide();
@@ -83,6 +99,8 @@ internal partial class BmsStatisticsPanel : StatisticsPanel
     {
         try
         {
+            await RestoreReplayDataAsync(score, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             var items = await LoadStatisticItemsAsync(score, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -90,6 +108,9 @@ internal partial class BmsStatisticsPanel : StatisticsPanel
             {
                 if (IsDisposed || cancellationToken.IsCancellationRequested)
                     return;
+
+                if (overview?.Child is BmsResultOverview resultOverview)
+                    resultOverview.SetScore(score);
 
                 var availableItems = items.Where(item => !item.RequiresHitEvents || score.HitEvents.Count > 0).ToArray();
                 Drawable statistics = availableItems.Length > 0
@@ -121,7 +142,7 @@ internal partial class BmsStatisticsPanel : StatisticsPanel
                         return;
 
                     content.Child = loaded;
-                    spinner.Hide();
+                    contentReady = true;
                 }, cancellationToken);
             });
         }
@@ -136,15 +157,35 @@ internal partial class BmsStatisticsPanel : StatisticsPanel
                 if (IsDisposed || cancellationToken.IsCancellationRequested)
                     return;
 
-                spinner.Hide();
                 content.Child = new OsuTextFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    TextAnchor = Anchor.Centre,
                     Text = BmsStrings.ResultStatisticsUnavailable,
                 };
+                contentReady = true;
             });
         }
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+
+        if (spinner.State.Value != Visibility.Visible)
+            return;
+
+        // Measure visible loading time so a cached result still completes the spinner's entrance.
+        loadingStartTime ??= Time.Current;
+        if (!contentReady || Time.Current - loadingStartTime.Value < minimum_loading_duration)
+            return;
+
+        contentReady = false;
+        spinner.Hide();
+        content.Delay(LoadingSpinner.TRANSITION_DURATION / 2).FadeIn(content_fade_duration, Easing.OutQuint);
     }
 
     protected override bool OnClick(ClickEvent e) => false;

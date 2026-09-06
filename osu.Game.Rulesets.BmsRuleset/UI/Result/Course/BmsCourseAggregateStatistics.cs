@@ -24,6 +24,9 @@ internal partial class BmsCourseAggregateStatistics : BmsStatisticsPanel
         Score.Value = aggregate;
     }
 
+    // Course replays are restored per stage; the aggregate has no replay archive of its own.
+    protected override Task RestoreReplayDataAsync(ScoreInfo score, CancellationToken cancellationToken) => Task.CompletedTask;
+
     protected override async Task<StatisticItem[]> LoadStatisticItemsAsync(ScoreInfo score, CancellationToken cancellationToken)
     {
         var stages = session.Stages

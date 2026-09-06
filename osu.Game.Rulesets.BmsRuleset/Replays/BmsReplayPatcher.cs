@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using HarmonyLib;
 using osu.Framework.Allocation;
@@ -15,6 +16,7 @@ using osu.Framework.Screens;
 using osu.Game.Database;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -231,6 +233,10 @@ public static class BmsReplayPatcher
 
     private static void statisticsPanelPopulatePrefix(StatisticsPanel __instance, ValueChangedEvent<ScoreInfo?> score)
     {
+        // The BMS panel owns replay restoration so its loading animation covers the entire operation.
+        if (__instance is BmsStatisticsPanel)
+            return;
+
         var scoreInfo = score.NewValue;
 
         if (scoreInfo == null || !isBmsScore(scoreInfo))
@@ -311,6 +317,18 @@ public static class BmsReplayPatcher
             BmsLogger.Error(e, "BMS replay patch failed to restore score data.");
         }
 
+    }
+
+    internal static async Task RestoreScoreDataAsync(ScoreManager scoreManager, ScoreInfo scoreInfo, CancellationToken cancellationToken)
+    {
+        if (!isBmsScore(scoreInfo)
+            || (scoreInfo.HitEvents.Count > 0 && BmsScoreGaugeHistoryStore.TryGet(scoreInfo, out var history) && history.Count > 0))
+            return;
+
+        var data = await Task.Run(() => readScoreData(scoreManager, scoreInfo), cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (data != null)
+            applyScoreData(scoreInfo, data);
     }
 
     private static RestoredScoreData? readScoreData(ScoreManager scoreManager, ScoreInfo scoreInfo)
