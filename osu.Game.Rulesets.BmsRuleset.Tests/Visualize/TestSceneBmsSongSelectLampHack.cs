@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,12 +7,14 @@ using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Platform;
+using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osuTK.Graphics;
@@ -30,6 +33,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Screens;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
@@ -49,6 +53,16 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
     private RealmDetachedBeatmapStore beatmapStore = null!;
     private BmsSongSelect songSelect = null!;
     private BeatmapSetInfo lampBeatmapSet = null!;
+    private Action<WorkingBeatmap> resumeInvalidationObserver;
+
+    [TearDown]
+    public void TearDownResumeObserver()
+    {
+        if (resumeInvalidationObserver != null)
+            beatmaps.OnInvalidated -= resumeInvalidationObserver;
+
+        resumeInvalidationObserver = null;
+    }
 
     // AssistClear (beatoraja's pattern-assist lamp) has no producing mod in this ruleset and is excluded.
     private static readonly BmsLamp[] all_lamps = Enum.GetValues<BmsLamp>().Where(lamp => lamp != BmsLamp.AssistClear).ToArray();
@@ -169,6 +183,55 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         AddAssert("mod overlay belongs to song select", () => songSelect.ModSelectOverlay.Parent, () => Is.SameAs(songSelect));
         AddStep("show mod overlay", () => songSelect.ModSelectOverlay.Show());
         AddUntilStep("mod overlay visible", () => songSelect.ModSelectOverlay.State.Value == Visibility.Visible && songSelect.ModSelectOverlay.IsPresent);
+    }
+
+    [Test]
+    public void TestResumeRefetchesSelectionOnlyInBackground()
+    {
+        WorkingBeatmap selected = null!;
+        var invalidationThreads = new ConcurrentQueue<bool>();
+
+        importLampBeatmapSet();
+        loadSongSelect();
+        AddStep("suspend song select", () =>
+        {
+            selected = songSelect.Beatmap.Value;
+            songSelect.Push(new ResumeTestScreen());
+        });
+        AddUntilStep("child screen loaded", () => Stack.CurrentScreen is ResumeTestScreen { IsLoaded: true });
+        AddStep("observe selection refetches", () =>
+        {
+            resumeInvalidationObserver = _ => invalidationThreads.Enqueue(ThreadSafety.IsUpdateThread);
+            beatmaps.OnInvalidated += resumeInvalidationObserver;
+        });
+        AddStep("return to song select", () => Stack.Exit());
+        AddUntilStep("fresh selection applied", () => !ReferenceEquals(songSelect.Beatmap.Value, selected));
+        AddAssert("same chart selected", () => songSelect.Beatmap.Value.BeatmapInfo.ID, () => Is.EqualTo(selected.BeatmapInfo.ID));
+        AddAssert("single background refetch", () => invalidationThreads.ToArray(), () => Is.EqualTo(new[] { false }));
+    }
+
+    [Test]
+    public void TestResumeReplacesHiddenSelection()
+    {
+        BeatmapInfo selected = null!;
+
+        importLampBeatmapSet();
+        loadSongSelect();
+        AddStep("suspend song select", () =>
+        {
+            selected = songSelect.Beatmap.Value.BeatmapInfo;
+            songSelect.Push(new ResumeTestScreen());
+        });
+        AddUntilStep("child screen loaded", () => Stack.CurrentScreen is ResumeTestScreen { IsLoaded: true });
+        AddStep("hide selected chart", () => beatmaps.Hide(selected));
+        AddUntilStep("chart hidden in database", () => Realm.Run(r => r.Find<BeatmapInfo>(selected.ID)!.Hidden));
+        AddStep("return to song select", () => Stack.Exit());
+        AddUntilStep("another chart selected", () => songSelect.Beatmap.Value.BeatmapInfo.ID != selected.ID);
+        AddAssert("replacement is selectable", () => !songSelect.Beatmap.Value.BeatmapInfo.Hidden && !songSelect.Beatmap.IsDefault);
+    }
+
+    private partial class ResumeTestScreen : OsuScreen
+    {
     }
 
     [Test]

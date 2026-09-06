@@ -604,7 +604,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         debounceQueueSelection(groupedBeatmap.Beatmap);
     }
 
-    private void ensureGlobalBeatmapValid()
+    private void ensureGlobalBeatmapValid(bool refetch = true)
     {
         if (!this.IsCurrentScreen())
             return;
@@ -617,7 +617,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
             return;
 
         // Refetch to be confident that the current selection is still valid. It may have been deleted or hidden.
-        var currentBeatmap = beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo, true);
+        var currentBeatmap = refetch ? beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo, true) : Beatmap.Value;
         var validSelection = checkBeatmapValidForSelection(currentBeatmap.BeatmapInfo);
 
         if (validSelection)
@@ -665,18 +665,15 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         resumeValidationCancellation?.Cancel();
         var cancellation = resumeValidationCancellation = new CancellationTokenSource();
         var generation = ++resumeValidationGeneration;
-        var selected = Beatmap.Value.BeatmapInfo;
+        var selected = Beatmap.Value;
 
-        Task.Run(() => beatmaps.GetWorkingBeatmap(selected, true), cancellation.Token).ContinueWith(task => Scheduler.Add(() =>
+        Task.Run(() => beatmaps.GetWorkingBeatmap(selected.BeatmapInfo, true), cancellation.Token).ContinueWith(task => Scheduler.Add(() =>
         {
-            if (generation != resumeValidationGeneration || !task.IsCompletedSuccessfully || cancellation.IsCancellationRequested || !this.IsCurrentScreen())
+            if (generation != resumeValidationGeneration || !task.IsCompletedSuccessfully || cancellation.IsCancellationRequested || !this.IsCurrentScreen()
+                || !ReferenceEquals(Beatmap.Value, selected))
                 return;
 
-            var current = task.Result;
-            if (Beatmap.Value.BeatmapInfo.Equals(current.BeatmapInfo))
-                Beatmap.Value = current;
-            else
-                ensureGlobalBeatmapValid();
+            Beatmap.Value = task.Result;
         }), TaskScheduler.Default);
     }
 
@@ -783,7 +780,9 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         if (!this.IsCurrentScreen())
             return;
 
-        ensureGlobalBeatmapValid();
+        // The working beatmap already represents this change; resuming refetches it asynchronously.
+        // Refetching here duplicates that query on the update thread and invalidates its fresh result again.
+        ensureGlobalBeatmapValid(refetch: false);
 
         ensurePlayingSelected();
         updateBackgroundDim();
@@ -793,6 +792,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     private void onLeavingScreen()
     {
+        resumeValidationCancellation?.Cancel();
         backgroundMetadataCancellation?.Cancel();
         backgroundMetadataCancellation = null;
 
