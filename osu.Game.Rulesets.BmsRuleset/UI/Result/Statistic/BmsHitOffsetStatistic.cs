@@ -21,7 +21,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
-public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
+public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResultStatistic
 {
     private const float graph_height = 200;
     private const float key_graph_height = 100;
@@ -39,6 +39,8 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
 
     private FillFlowContainer content = null!;
     private bool expanded;
+    private Drawable overallRow = null!;
+    private float summaryHeight = graph_height;
 
     public BmsHitOffsetStatistic(IReadOnlyList<HitEvent> hitEvents, IBeatmap playableBeatmap)
     {
@@ -152,13 +154,20 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
     {
         content.Clear();
 
-        content.Add(createRow(BmsStrings.Overall, statistics.Overall, graph_height));
+        content.Add(overallRow = createRow(BmsStrings.Overall, statistics.Overall, summaryHeight));
 
         if (expanded)
         {
             foreach (var key in statistics.Keys)
                 content.Add(createRow(localiseLabel(key.Label), key.Summary, key_graph_height));
         }
+    }
+
+    void IBmsResultStatistic.FitSummaryToHeight(float height)
+    {
+        summaryHeight = Math.Max(0, height);
+        if (IsLoaded)
+            overallRow.Height = summaryHeight;
     }
 
     protected override bool OnClick(ClickEvent e)
@@ -214,7 +223,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
             new OsuSpriteText
             {
                 Text = $"{summary.AverageOffset:+0.0;-0.0;0.0} ms",
-                Colour = summary.AverageOffset < 0 ? fast_colour : slow_colour,
+                Colour = summary.AverageOffset < 0 ? BmsResultColours.FAST : BmsResultColours.SLOW,
                 Font = OsuFont.GetFont(size: 12, weight: FontWeight.SemiBold),
             },
             new OsuSpriteText
@@ -285,8 +294,6 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
             binsByResult);
     }
 
-    private static readonly Color4 fast_colour = new(90, 175, 255, 255);
-    private static readonly Color4 slow_colour = new(255, 130, 92, 255);
 
     internal sealed record HitOffsetStatistics(HitOffsetSummary Overall, IReadOnlyList<KeyHitOffsetStatistics> Keys);
 
@@ -305,6 +312,8 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
     private partial class OffsetHistogram : CompositeDrawable
     {
         private readonly HitOffsetSummary summary;
+        private readonly List<(OsuSpriteText Fast, OsuSpriteText Slow, float Alpha)> axisTicks = [];
+        private OsuSpriteText zeroLabel = null!;
 
         public OffsetHistogram(HitOffsetSummary summary)
         {
@@ -357,10 +366,11 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
         {
             var axis = new Container
             {
+                Name = "Hit offset axis",
                 RelativeSizeAxes = Axes.Both,
             };
 
-            axis.Add(new OsuSpriteText
+            axis.Add(zeroLabel = new OsuSpriteText
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
@@ -377,19 +387,39 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable
                 var position = (float)(axisValue / maxValue);
                 var alpha = 1f - position * 0.8f;
 
-                axis.AddRange([
-                    createTickLabel(-axisValue, -position / 2, alpha),
-                    createTickLabel(axisValue, position / 2, alpha),
-                ]);
+                var fast = createTickLabel(-axisValue, -position / 2, alpha);
+                var slow = createTickLabel(axisValue, position / 2, alpha);
+                axisTicks.Add((fast, slow, alpha));
+                axis.AddRange([fast, slow]);
             }
 
             return axis;
         }
 
+        protected override void UpdateAfterChildren()
+        {
+            base.UpdateAfterChildren();
+
+            var left = zeroLabel.ScreenSpaceDrawQuad.AABBFloat.Left;
+            var right = zeroLabel.ScreenSpaceDrawQuad.AABBFloat.Right;
+            foreach (var (fast, slow, alpha) in axisTicks)
+            {
+                var fastBounds = fast.ScreenSpaceDrawQuad.AABBFloat;
+                var slowBounds = slow.ScreenSpaceDrawQuad.AABBFloat;
+                var visible = fastBounds.Right + 4 <= left && slowBounds.Left - 4 >= right;
+                fast.Alpha = slow.Alpha = visible ? alpha : 0;
+                if (visible)
+                {
+                    left = fastBounds.Left;
+                    right = slowBounds.Right;
+                }
+            }
+        }
+
         private static OsuSpriteText createTickLabel(double offset, float x, float alpha) => new()
         {
             Anchor = Anchor.Centre,
-            Origin = Anchor.Centre,
+            Origin = x <= -0.5f ? Anchor.CentreLeft : x >= 0.5f ? Anchor.CentreRight : Anchor.Centre,
             RelativePositionAxes = Axes.X,
             X = x,
             Text = offset.ToString("+0;-0;0"),

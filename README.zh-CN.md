@@ -157,9 +157,15 @@ Overjoy、Scramble 和 Luminous 等常用难度表可直接从预设中选择。
 除了标准 osu! 成绩摘要，结算界面还提供血量历史、音符与判定时间线、Fast/Slow 分布、击打散点与偏移图，以及逐键位时机分析。
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/38f62e99-8977-47eb-a0bc-d87837714905" width="900" alt="提供详细游玩分析的 BMS 结算界面">
+  <img src="https://github.com/user-attachments/assets/54c03242-a091-4824-9b7e-a6c8ffaa44b0" width="900" alt="提供详细游玩分析的 BMS 结算界面">
   <br>
   <sub>从整体时机方向到单独键位，定位一次游玩中的失分原因。</sub>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/33c14f89-29a9-42dc-a09f-1224563274d2" width="900" alt="BMS 段位模式结算界面">
+  <br>
+  <sub>查看段位汇总成绩，或点击曲目卡片切换到对应单曲的统计。</sub>
 </p>
 
 ### osu!mania 7K 转谱

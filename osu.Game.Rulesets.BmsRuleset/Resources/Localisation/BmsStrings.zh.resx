@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
+  <data name="result_statistics_require_replay" xml:space="preserve"><value>观看回放后可查看详细统计。</value></data>
+  <data name="result_statistics_unavailable" xml:space="preserve"><value>无法加载统计数据。</value></data>
+  <data name="result_performance" xml:space="preserve"><value>成绩</value></data>
+  <data name="result_accuracy" xml:space="preserve"><value>准确率</value></data>
+  <data name="result_combo" xml:space="preserve"><value>连击</value></data>
+  <data name="result_number" xml:space="preserve"><value>{0:0}</value></data>
+  <data name="result_maximum" xml:space="preserve"><value>/{0:0}</value></data>
+  <data name="result_percentage" xml:space="preserve"><value>{0:0.00%}</value></data>
+  <data name="result_judgement_perfect" xml:space="preserve"><value>PGREAT</value></data>
+  <data name="result_judgement_great" xml:space="preserve"><value>GREAT</value></data>
+  <data name="result_judgement_good" xml:space="preserve"><value>GOOD</value></data>
+  <data name="result_judgement_ok" xml:space="preserve"><value>BAD</value></data>
+  <data name="result_judgement_meh" xml:space="preserve"><value>POOR</value></data>
+  <data name="result_judgement_miss" xml:space="preserve"><value>E-POOR</value></data>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
@@ -279,8 +293,5 @@
   <data name="abandon_course_confirm" xml:space="preserve"><value>放弃</value></data>
   <data name="cancel" xml:space="preserve"><value>取消</value></data>
   <data name="return_to_course_select" xml:space="preserve"><value>返回段位选择</value></data>
-  <data name="course_passed" xml:space="preserve"><value>段位通过</value></data>
-  <data name="course_failed" xml:space="preserve"><value>段位失败</value></data>
-  <data name="course_aborted" xml:space="preserve"><value>已放弃段位</value></data>
   <data name="course_history_delete_confirmation" xml:space="preserve"><value>确定删除该段位成绩吗？各曲目单独保存的成绩将会保留。</value></data>
 </root>

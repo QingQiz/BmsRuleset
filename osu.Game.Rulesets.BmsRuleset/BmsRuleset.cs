@@ -27,7 +27,7 @@ using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
-using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
+using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.BmsRuleset.UI.Settings;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
@@ -83,7 +83,7 @@ public partial class BmsRuleset : Ruleset
         BmsEditorPatcher.InstallOnce();
         BmsReplayPatcher.InstallOnce();
         BmsSongSelectEntryPatcher.InstallOnce();
-        BmsCourseResultsPatcher.InstallOnce();
+        BmsResultsScreenPatcher.InstallOnce();
         BmsDifficultyIconPatcher.InstallOnce();
         BmsResultRankPatcher.InstallOnce();
         BmsRankingHitResultColourPatcher.InstallOnce();

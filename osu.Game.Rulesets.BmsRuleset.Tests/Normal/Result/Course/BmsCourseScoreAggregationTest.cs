@@ -3,15 +3,13 @@ using osu.Game.Beatmaps;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
-using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result.Course;
 
 [TestFixture]
-public class BmsCourseResultPresentationTest
+public class BmsCourseScoreAggregationTest
 {
-
     private static ScoreInfo createScore(BeatmapInfo beatmap, int maxCombo) => new()
     {
         User = new APIUser(),
@@ -54,7 +52,7 @@ public class BmsCourseResultPresentationTest
         session.BeginCurrentStage();
         session.CompleteCurrentStage(createScore(beatmaps[1], 360), [new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.7, false)]);
 
-        var aggregate = BmsCourseResultPresentation.CreateAggregateScore(session);
+        var aggregate = BmsCourseScoreAggregation.CreateScore(session);
 
         Assert.That(aggregate.MaxCombo, Is.EqualTo(360));
     }

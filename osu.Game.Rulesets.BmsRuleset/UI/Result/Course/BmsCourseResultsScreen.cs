@@ -9,10 +9,10 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
-using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
@@ -34,6 +34,12 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
     [Resolved]
     private BeatmapManager beatmaps { get; set; } = null!;
 
+    [Resolved]
+    private OsuColour colours { get; set; } = null!;
+
+    [Resolved]
+    private ScoreManager scores { get; set; } = null!;
+
     internal BmsCourseResultsScreen(BmsCourseSession session, bool recordResult = true)
         : base(createBackingScore(session))
     {
@@ -48,7 +54,14 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
     {
         base.LoadComplete();
 
-        var aggregateScore = BmsCourseResultPresentation.CreateAggregateScore(session);
+        // Both columns need restored replay timing before building their summaries.
+        foreach (var stage in session.Stages)
+        {
+            if (stage.Score != null)
+                BmsReplayPatcher.RestoreScoreData(scores, stage.Score);
+        }
+
+        var aggregateScore = BmsCourseScoreAggregation.CreateScore(session);
         if (recordResult)
         {
             var finalGaugeType = session.CurrentGaugeStates.FirstOrDefault(state => !state.Failed)?.GaugeType;
@@ -67,33 +80,29 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
         StatisticsPanel.Hide();
         SelectedScore.Value = null;
 
-        var layout = courseLayout = new BmsCourseResultsLayout(session, selectedStage);
-        LoadComponentAsync(layout, AddInternal);
-        LoadComponentAsync(new InputBlockingContainer
-        {
-            Anchor = Anchor.BottomLeft,
-            Origin = Anchor.BottomLeft,
-            RelativeSizeAxes = Axes.X,
-            Height = 50,
-            Children =
-            [
-                new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = OsuColour.Gray(0.2f),
-                },
-                new RoundedButton
-                {
-                    Anchor = Anchor.CentreRight,
-                    Origin = Anchor.CentreRight,
-                    Width = 260,
-                    Height = 40,
-                    Margin = new MarginPadding(5),
-                    Text = BmsStrings.ReturnToCourseSelect,
-                    Action = this.Exit,
-                },
-            ],
-        }, AddInternal);
+        var layout = courseLayout = new BmsCourseResultsLayout(session, aggregateScore, selectedStage);
+        LoadComponentAsync(layout, VerticalScrollContent.Add);
+        var bottomPanel = BmsResultsScreenPatcher.GetBottomPanel(this);
+        bottomPanel.Name = "Course result controls";
+        bottomPanel.Children =
+        [
+            new Box
+            {
+                RelativeSizeAxes = Axes.Both,
+                Colour = OsuColour.Gray(0.2f),
+            },
+            new BmsCourseResultButton
+            {
+                Name = "Return to course select button",
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                Text = BmsStrings.ReturnToCourseSelect,
+                Icon = OsuIcon.LeftCircle,
+                BackgroundColour = colours.Pink,
+                HoverColour = colours.PinkDark,
+                Action = this.Exit,
+            },
+        ];
 
         selectedStage.BindValueChanged(selectionChanged, true);
     }
@@ -115,6 +124,7 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
     {
         stageBeatmapLoadCancellation?.Cancel();
         stageBeatmapLoadCancellation?.Dispose();
+        stageBeatmapLoadCancellation = null;
         selectedStage.ValueChanged -= selectionChanged;
         base.Dispose(isDisposing);
     }
@@ -130,6 +140,7 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
             SelectedScore.Value = null;
             StatisticsPanel.Hide();
             courseLayout.AggregateStatistics.Show();
+            courseLayout.ShowScore(null);
             Beatmap.Value = summaryBeatmap;
             Schedule(hideNativeScorePanels);
             return;
@@ -175,9 +186,14 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
 
             Beatmap.Value = workingBeatmap;
             SelectedScore.Value = attempt.Score;
+            courseLayout.ShowScore(attempt.Score);
             // ScorePanelList is still bound to SelectedScore by ResultsScreen and may update its
             // hidden native panel during this change. Show after those bindings settle.
-            Schedule(() => StatisticsPanel.Show());
+            Schedule(() =>
+            {
+                if (!IsDisposed && !cancellationToken.IsCancellationRequested && selectedStage.Value == stageIndex)
+                    StatisticsPanel.Show();
+            });
             Schedule(hideNativeScorePanels);
         });
     }

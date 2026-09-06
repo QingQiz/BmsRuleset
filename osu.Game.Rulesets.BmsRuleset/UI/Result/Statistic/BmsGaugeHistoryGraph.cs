@@ -24,7 +24,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
-public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
+public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResultStatistic
 {
     private const float graph_height = 180;
     private const float final_line_radius = 2.0f;
@@ -38,6 +38,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
     private readonly IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)>? stages;
     private IReadOnlyList<GaugeSeries> series = null!;
     private IReadOnlyList<float> stageBoundaries = null!;
+    private Drawable graph = null!;
+    private Drawable legend = null!;
 
     public BmsGaugeHistoryGraph(ScoreInfo score, IBeatmap playableBeatmap)
     {
@@ -78,10 +80,16 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
             Spacing = new Vector2(0, 8),
             Children =
             [
-                createGraph(),
-                createLegend(),
+                graph = createGraph(),
+                legend = createLegend(),
             ],
         };
+    }
+
+    void IBmsResultStatistic.FitSummaryToHeight(float height)
+    {
+        if (IsLoaded)
+            graph.Height = Math.Max(0, height - legend.DrawHeight - 8);
     }
 
     internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap)
@@ -296,8 +304,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
 
         var graph = new Container
         {
-            RelativeSizeAxes = Axes.X,
-            Height = graph_height,
+            RelativeSizeAxes = Axes.Both,
             Children =
             [
                 plotBackground,
@@ -326,7 +333,13 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
         foreach (var boundary in stageBoundaries)
             graph.Add(createStageBoundary(boundary));
 
-        return graph;
+        return new Container
+        {
+            RelativeSizeAxes = Axes.X,
+            Height = graph_height,
+            Padding = new MarginPadding { Left = 28, Right = 7, Vertical = 7 },
+            Child = graph,
+        };
     }
 
     private static Drawable createStageBoundary(float fraction) => new Box
@@ -390,7 +403,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable
     {
         RelativeSizeAxes = Axes.X,
         AutoSizeAxes = Axes.Y,
-        Direction = FillDirection.Horizontal,
+        Direction = FillDirection.Full,
         Spacing = new Vector2(12, 6),
         Children = series.Select(createLegendItem).ToArray(),
     };

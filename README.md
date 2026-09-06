@@ -173,9 +173,15 @@ The result screen goes beyond the standard osu! score summary with gauge history
 fast/slow distribution, hit scatter and offset graphs, and per-key timing breakdowns.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/38f62e99-8977-47eb-a0bc-d87837714905" width="900" alt="BMS result screen with detailed performance analysis">
+  <img src="https://github.com/user-attachments/assets/54c03242-a091-4824-9b7e-a6c8ffaa44b0" width="900" alt="BMS result screen with detailed performance analysis">
   <br>
   <sub>Inspect where a run was lost, down to timing direction and individual keys.</sub>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/33c14f89-29a9-42dc-a09f-1224563274d2" width="900" alt="BMS course mode result screen">
+  <br>
+  <sub>View the course totals, or select a song card to inspect its individual statistics.</sub>
 </p>
 
 ### osu!mania 7K Conversion

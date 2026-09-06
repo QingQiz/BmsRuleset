@@ -1,18 +1,14 @@
 using System;
-using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Screens;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -24,8 +20,6 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 
 internal partial class BmsCourseStageResultsScreen : ResultsScreen
 {
-    private static readonly FieldInfo bottom_panel_field = typeof(ResultsScreen).GetField("bottomPanel", BindingFlags.Instance | BindingFlags.NonPublic)!;
-
     private readonly Action nextStage;
     private readonly Action abandonCourse;
     private readonly BmsCourseCountdown countdown = new();
@@ -64,7 +58,7 @@ internal partial class BmsCourseStageResultsScreen : ResultsScreen
     {
         base.LoadComplete();
 
-        var bottomPanel = (Container)bottom_panel_field.GetValue(this)!;
+        var bottomPanel = BmsResultsScreenPatcher.GetBottomPanel(this);
 
         bottomPanel.Name = "Course stage result controls";
         bottomPanel.Children =
@@ -75,47 +69,34 @@ internal partial class BmsCourseStageResultsScreen : ResultsScreen
                 Colour = colours.Gray3,
                 Depth = 1,
             },
-            new GridContainer
+            new BmsCourseResultButton
             {
-                RelativeSizeAxes = Axes.Both,
-                Padding = new MarginPadding(5),
-                Depth = 0,
-                ColumnDimensions =
-                [
-                    new Dimension(GridSizeMode.Absolute, 220),
-                    new Dimension(),
-                    new Dimension(GridSizeMode.Absolute, 260),
-                ],
-                Content = new[]
-                {
-                    new Drawable[]
-                    {
-                        new RoundedButton
-                        {
-                            Name = "Abandon course button",
-                            RelativeSizeAxes = Axes.Both,
-                            Size = osuTK.Vector2.One,
-                            Text = BmsStrings.AbandonCourse,
-                            BackgroundColour = colours.Red3,
-                            Action = requestAbandon,
-                        },
-                        countdownText = new OsuSpriteText
-                        {
-                            Anchor = Anchor.Centre,
-                            Origin = Anchor.Centre,
-                            Font = OsuFont.Style.Heading2.With(weight: FontWeight.Bold),
-                        },
-                        new RoundedButton
-                        {
-                            Name = "Start next course stage button",
-                            RelativeSizeAxes = Axes.Both,
-                            Size = osuTK.Vector2.One,
-                            Text = BmsStrings.StartNextCourseStage,
-                            BackgroundColour = colours.Green3,
-                            Action = advance,
-                        },
-                    },
-                },
+                Name = "Abandon course button",
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                Text = BmsStrings.AbandonCourse,
+                Icon = OsuIcon.LeftCircle,
+                BackgroundColour = colours.Red3,
+                HoverColour = colours.Red4,
+                Action = requestAbandon,
+            },
+            countdownText = new OsuSpriteText
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Font = OsuFont.Style.Heading2.With(weight: FontWeight.Bold),
+            },
+            new BmsCourseResultButton
+            {
+                Name = "Start next course stage button",
+                Anchor = Anchor.CentreRight,
+                Origin = Anchor.CentreRight,
+                X = -5,
+                Text = BmsStrings.StartNextCourseStage,
+                Icon = OsuIcon.Play,
+                BackgroundColour = colours.Green3,
+                HoverColour = colours.Green4,
+                Action = advance,
             },
         ];
     }
@@ -124,8 +105,6 @@ internal partial class BmsCourseStageResultsScreen : ResultsScreen
     {
         base.OnEntering(e);
 
-        StatisticsPanel.Show();
-        Schedule(() => ScorePanelList.GetScorePanels().SingleOrDefault()?.Show());
         countdown.Start();
     }
 

@@ -14,7 +14,6 @@ using osu.Game.Graphics.Cursor;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
-using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -226,7 +225,7 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
                 if (result.Attempt == null || createHistorySession(course, result.Attempt, r, cancellation.Token) is not { } session)
                     continue;
 
-                var score = BmsCourseResultPresentation.CreateAggregateScore(session);
+                var score = BmsCourseScoreAggregation.CreateScore(session);
 
                 if (!filterBySelectedMods || matchesSelectedMods(score, selectedModAcronyms))
                     entries.Add(new CourseHistoryEntry(result, session, score));

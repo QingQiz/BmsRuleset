@@ -793,7 +793,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddStep("open course history score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
             .ChildrenOfType<BeatmapLeaderboardScore>().First(score => score.Score.TotalScore == 800_000).TriggerClick());
         AddUntilStep("course score details opened", () => Stack.CurrentScreen, Is.TypeOf<BmsCourseResultsScreen>);
-        AddUntilStep("course summary is displayed", () => ((BmsCourseResultsScreen)Stack.CurrentScreen).ChildrenOfType<BmsCourseSummaryCard>().SingleOrDefault(), () => Is.Not.Null);
+        AddUntilStep("course summary is displayed", () => ((BmsCourseResultsScreen)Stack.CurrentScreen).ChildrenOfType<BmsCourseResultsLayout>().SingleOrDefault(), () => Is.Not.Null);
         AddAssert("course score details match selected history", () => ((BmsCourseResultsScreen)Stack.CurrentScreen).Score?.TotalScore,
             () => Is.EqualTo(800_000));
         AddStep("record course while song select is suspended", () => BmsRulesetRuntime.CourseResults?.Record(

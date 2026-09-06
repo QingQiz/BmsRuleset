@@ -28,7 +28,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
-public sealed partial class BmsHitScatterStatistic : CompositeDrawable
+public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResultStatistic
 {
 
     public override bool HandlePositionalInput => true;
@@ -44,8 +44,6 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     private const double minimum_offset_range = 150;
     private const double maximum_offset_range = 300;
 
-    private static readonly Color4 fast_colour = new(90, 175, 255, 255);
-    private static readonly Color4 slow_colour = new(255, 130, 92, 255);
 
     private readonly IReadOnlyList<HitEvent>? hitEvents;
     private readonly IBeatmap? playableBeatmap;
@@ -53,6 +51,9 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     private HitScatterStatistics statistics = null!;
     private FillFlowContainer content = null!;
     private bool expanded;
+    private Drawable legend = null!;
+    private Drawable overallRow = null!;
+    private float summaryHeight = graph_height;
 
     public BmsHitScatterStatistic(IReadOnlyList<HitEvent> hitEvents, IBeatmap playableBeatmap)
     {
@@ -235,8 +236,8 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         {
             RelativeSizeAxes = Axes.X,
             AutoSizeAxes = Axes.Y,
-            Direction = FillDirection.Horizontal,
-            Spacing = new Vector2(10, 0),
+            Direction = FillDirection.Full,
+            Spacing = new Vector2(10, 2),
             Children = children,
         };
     }
@@ -263,7 +264,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             new[]
             {
                 createLabel(label, data),
-                createGraph(data, height),
+                createGraph(data),
             },
         },
     };
@@ -293,19 +294,17 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
         ],
     };
 
-    private static Drawable createGraph(ScatterData data, float height) => new Container
+    private static Drawable createGraph(ScatterData data) => new Container
     {
-        RelativeSizeAxes = Axes.X,
-        Height = height + x_axis_height,
+        RelativeSizeAxes = Axes.Both,
         Children =
         [
             new GridContainer
             {
-                RelativeSizeAxes = Axes.X,
-                Height = height + x_axis_height,
+                RelativeSizeAxes = Axes.Both,
                 RowDimensions =
                 [
-                    new Dimension(GridSizeMode.Absolute, height),
+                    new Dimension(),
                     new Dimension(GridSizeMode.Absolute, x_axis_height),
                 ],
                 Content = new[]
@@ -319,7 +318,8 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopRight,
                 Width = axis_width,
-                Height = height,
+                RelativeSizeAxes = Axes.Y,
+                Padding = new MarginPadding { Bottom = x_axis_height },
                 Child = createYAxis(data),
             },
         ],
@@ -344,7 +344,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             Y = y,
             X = -10,
             Text = $"{tick:+0;-0;0} ms",
-            Colour = tick < 0 ? fast_colour : tick > 0 ? slow_colour : Color4.White,
+            Colour = tick < 0 ? BmsResultColours.FAST : tick > 0 ? BmsResultColours.SLOW : Color4.White,
             Alpha = tick == 0 ? 0.75f : 0.55f,
             Font = OsuFont.GetFont(size: 10, weight: tick == 0 ? FontWeight.SemiBold : FontWeight.Regular),
         };
@@ -377,8 +377,8 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
             Children = createPointDrawables(data),
         });
 
-        dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Fast, fast_colour, Anchor.TopRight));
-        dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Slow, slow_colour, Anchor.BottomRight));
+        dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Fast, BmsResultColours.FAST, Anchor.TopRight));
+        dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Slow, BmsResultColours.SLOW, Anchor.BottomRight));
 
         return new Container
         {
@@ -647,14 +647,23 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable
     {
         content.Clear();
 
-        content.Add(createLegend(statistics.Overall));
-        content.Add(createRow(BmsStrings.Overall, statistics.Overall, graph_height));
+        content.Add(legend = createLegend(statistics.Overall));
+        content.Add(overallRow = createRow(BmsStrings.Overall, statistics.Overall, summaryHeight));
 
         if (expanded)
         {
             foreach (var key in statistics.Keys)
                 content.Add(createRow(localiseLabel(key.Label), key.Data, key_graph_height));
         }
+    }
+
+    void IBmsResultStatistic.FitSummaryToHeight(float height)
+    {
+        if (!IsLoaded)
+            return;
+
+        summaryHeight = Math.Max(0, height - legend.DrawHeight - 8 - x_axis_height);
+        overallRow.Height = summaryHeight + x_axis_height;
     }
 
     internal sealed record HitScatterStatistics(ScatterData Overall, IReadOnlyList<KeyHitScatterStatistics> Keys);

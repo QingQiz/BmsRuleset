@@ -23,6 +23,24 @@ public static class BmsStrings
 
     public static LocalisableString HitOffset => get("hit_offset");
 
+    public static LocalisableString ResultStatisticsRequireReplay => get("result_statistics_require_replay");
+
+    public static LocalisableString ResultStatisticsUnavailable => get("result_statistics_unavailable");
+
+    public static LocalisableString ResultPerformance => get("result_performance");
+
+    public static LocalisableString ResultAccuracy => get("result_accuracy");
+
+    public static LocalisableString ResultCombo => get("result_combo");
+
+    public static LocalisableString ResultNumber(int value) => get("result_number", value);
+
+    public static LocalisableString ResultMaximum(int value) => get("result_maximum", value);
+
+    public static LocalisableString ResultPercentage(double value) => get("result_percentage", value);
+
+    public static LocalisableString ResultJudgement(osu.Game.Rulesets.Scoring.HitResult result) => get($"result_judgement_{result.ToString().ToLowerInvariant()}");
+
     public static LocalisableString Accuracy => get("accuracy");
 
     public static LocalisableString ExScore => get("exscore");
@@ -280,12 +298,6 @@ public static class BmsStrings
     public static LocalisableString Cancel => get("cancel");
 
     public static LocalisableString ReturnToCourseSelect => get("return_to_course_select");
-
-    public static LocalisableString CoursePassed => get("course_passed");
-
-    public static LocalisableString CourseFailed => get("course_failed");
-
-    public static LocalisableString CourseAborted => get("course_aborted");
 
     public static LocalisableString CourseHistoryDeleteConfirmation => get("course_history_delete_confirmation");
 

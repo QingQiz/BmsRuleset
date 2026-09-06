@@ -9,6 +9,20 @@
   <data name="timeline" xml:space="preserve"><value>Timeline</value></data>
   <data name="hit_scatter" xml:space="preserve"><value>Hit Scatter</value></data>
   <data name="hit_offset" xml:space="preserve"><value>Hit Offset</value></data>
+  <data name="result_statistics_require_replay" xml:space="preserve"><value>Watch the replay to view detailed statistics.</value></data>
+  <data name="result_statistics_unavailable" xml:space="preserve"><value>Statistics could not be loaded.</value></data>
+  <data name="result_performance" xml:space="preserve"><value>Performance</value></data>
+  <data name="result_accuracy" xml:space="preserve"><value>ACCURACY</value></data>
+  <data name="result_combo" xml:space="preserve"><value>COMBO</value></data>
+  <data name="result_number" xml:space="preserve"><value>{0:0}</value></data>
+  <data name="result_maximum" xml:space="preserve"><value>/{0:0}</value></data>
+  <data name="result_percentage" xml:space="preserve"><value>{0:0.00%}</value></data>
+  <data name="result_judgement_perfect" xml:space="preserve"><value>PGREAT</value></data>
+  <data name="result_judgement_great" xml:space="preserve"><value>GREAT</value></data>
+  <data name="result_judgement_good" xml:space="preserve"><value>GOOD</value></data>
+  <data name="result_judgement_ok" xml:space="preserve"><value>BAD</value></data>
+  <data name="result_judgement_meh" xml:space="preserve"><value>POOR</value></data>
+  <data name="result_judgement_miss" xml:space="preserve"><value>E-POOR</value></data>
   <data name="accuracy" xml:space="preserve"><value>ACC</value></data>
   <data name="exscore" xml:space="preserve"><value>EXSCORE</value></data>
   <data name="max_combo" xml:space="preserve"><value>MAX COMBO</value></data>
@@ -279,8 +293,5 @@
   <data name="abandon_course_confirm" xml:space="preserve"><value>Abandon</value></data>
   <data name="cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="return_to_course_select" xml:space="preserve"><value>Return to course select</value></data>
-  <data name="course_passed" xml:space="preserve"><value>Course passed</value></data>
-  <data name="course_failed" xml:space="preserve"><value>Course failed</value></data>
-  <data name="course_aborted" xml:space="preserve"><value>Course abandoned</value></data>
   <data name="course_history_delete_confirmation" xml:space="preserve"><value>Delete this course result? Scores saved for individual stages will be kept.</value></data>
 </root>

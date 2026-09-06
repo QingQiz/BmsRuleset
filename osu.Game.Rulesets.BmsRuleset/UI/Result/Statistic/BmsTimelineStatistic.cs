@@ -22,7 +22,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
-public sealed partial class BmsTimelineStatistic : CompositeDrawable
+public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResultStatistic
 {
     private const int bucket_count = 300;
     private const float subplot_height = 96;
@@ -31,12 +31,12 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
     private static readonly Color4 note_colour = colours.Blue;
     private static readonly Color4 ln_colour = colours.GreenLight;
     private static readonly Color4 scratch_colour = colours.Yellow;
-    private static readonly Color4 fast_colour = new(90, 175, 255, 255);
-    private static readonly Color4 slow_colour = new(255, 130, 92, 255);
     private readonly ScoreInfo? score;
     private readonly IBeatmap? playableBeatmap;
     private readonly IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)>? stages;
     private TimelineData data = null!;
+    private readonly List<Drawable> plots = [];
+    private readonly List<Drawable> legends = [];
 
     public BmsTimelineStatistic(ScoreInfo score, IBeatmap playableBeatmap)
     {
@@ -233,8 +233,8 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
 
         return new SubplotData(
         [
-            new CategoryData("fast", fast_colour, fast),
-            new CategoryData("slow", slow_colour, slow),
+            new CategoryData("fast", BmsResultColours.FAST, fast),
+            new CategoryData("slow", BmsResultColours.SLOW, slow),
         ], uniformBucketWeights(duration));
     }
 
@@ -254,18 +254,32 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         return NoteKind.Note;
     }
 
-    private static Drawable createSubplot(LocalisableString title, SubplotData subplot, IReadOnlyList<float> stageBoundaries) => new FillFlowContainer
+    void IBmsResultStatistic.FitSummaryToHeight(float height)
     {
-        RelativeSizeAxes = Axes.X,
-        AutoSizeAxes = Axes.Y,
-        Direction = FillDirection.Vertical,
-        Spacing = new Vector2(0, 2),
-        Children =
-        [
-            createLegend(title, subplot),
-            createPlot(subplot, stageBoundaries),
-        ],
-    };
+        var plotHeight = Math.Max(0, (height - legends.Sum(legend => legend.DrawHeight) - 22) / 3);
+        foreach (var plot in plots)
+            plot.Height = plotHeight;
+    }
+
+    private Drawable createSubplot(LocalisableString title, SubplotData subplot, IReadOnlyList<float> stageBoundaries)
+    {
+        var legend = createLegend(title, subplot);
+        var plot = createPlot(subplot, stageBoundaries);
+        legends.Add(legend);
+        plots.Add(plot);
+        return new FillFlowContainer
+        {
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y,
+            Direction = FillDirection.Vertical,
+            Spacing = new Vector2(0, 2),
+            Children =
+            [
+                legend,
+                plot,
+            ],
+        };
+    }
 
     private static Drawable createLegend(LocalisableString title, SubplotData subplot)
     {
@@ -313,8 +327,8 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable
         {
             RelativeSizeAxes = Axes.X,
             AutoSizeAxes = Axes.Y,
-            Direction = FillDirection.Horizontal,
-            Spacing = new Vector2(10, 0),
+            Direction = FillDirection.Full,
+            Spacing = new Vector2(10, 2),
             Children = items,
         };
     }
