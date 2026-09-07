@@ -24,6 +24,7 @@ using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
@@ -356,6 +357,8 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddUntilStep("aggregate left statistics match", () => overviewMatches(screen, 0.77, 375, 600, 1, 2));
         AddAssert("course overview omits pp", () => screen.ChildrenOfType<BmsResultOverview>().Single()
             .ChildrenOfType<PerformanceStatistic>(), () => Is.Empty);
+        AddAssert("course header uses the local icon without a chart tooltip", () => screen.ChildrenOfType<BmsCourseOverviewHeader>().Single()
+            .ChildrenOfType<BmsResultDifficultyIcon>().Single(icon => !icon.ShowTooltip).ChildrenOfType<BmsRulesetIcon>().Any());
         AddUntilStep("all cards and left statistics fit viewport", () => overviewFits(screen));
         AddAssert("unplayed stage disabled", () => screen.ChildrenOfType<BmsCourseStageCard>()
             .Single(card => card.Name == "Course stage 3 result").Enabled.Value, () => Is.False);

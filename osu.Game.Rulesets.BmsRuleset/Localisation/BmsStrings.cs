@@ -71,6 +71,12 @@ public static class BmsStrings
 
     public static LocalisableString LeaderboardDeleteConfirmation => get("leaderboard_delete_confirmation");
 
+    public static LocalisableString DifficultyAttribute(string acronym, float value) => get("difficulty_attribute", acronym, value);
+
+    public static LocalisableString DifficultyLength(LocalisableString duration) => get("difficulty_length", duration);
+
+    public static LocalisableString DifficultyBpm(double bpm) => get("difficulty_bpm", bpm);
+
     public static LocalisableString Accuracy => get("accuracy");
 
     public static LocalisableString ExScore => get("exscore");

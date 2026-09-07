@@ -319,4 +319,7 @@
   <data name="leaderboard_lamp_max" xml:space="preserve"><value>MAX</value></data>
   <data name="leaderboard_lamp_perfect" xml:space="preserve"><value>PERFECT</value></data>
   <data name="leaderboard_lamp_fullcombo" xml:space="preserve"><value>FULL COMBO</value></data>
+  <data name="difficulty_attribute" xml:space="preserve"><value>{0}: {1:0.##}</value></data>
+  <data name="difficulty_length" xml:space="preserve"><value>时长：{0}</value></data>
+  <data name="difficulty_bpm" xml:space="preserve"><value>BPM：{0:0}</value></data>
 </root>

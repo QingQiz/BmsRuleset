@@ -19,6 +19,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
@@ -91,6 +92,8 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddUntilStep("all charts fit viewport", () => ChartsFitViewport(screen));
         AddUntilStep("result overview fills left column", () => OverviewFitsViewport(screen));
         AddAssert("native score list absent", () => screen.ChildrenOfType<ScorePanelList>(), () => Is.Empty);
+        AddAssert("solo header uses the local difficulty icon", () => screen.ChildrenOfType<BmsResultModDisplay>().Single()
+            .ChildrenOfType<BmsResultDifficultyIcon>().Single(icon => icon.ShowTooltip).ChildrenOfType<BmsRulesetIcon>().Any());
         AddAssert("rank text fits inside rating circle", () =>
         {
             var circle = screen.ChildrenOfType<BmsResultOverview>().Single().ChildrenOfType<BmsAccuracyCircle>().Single();

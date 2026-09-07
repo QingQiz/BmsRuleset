@@ -83,7 +83,6 @@ public partial class BmsRuleset : Ruleset
         BmsReplayPatcher.InstallOnce();
         BmsSongSelectEntryPatcher.InstallOnce();
         BmsResultsScreenEntryPatcher.InstallOnce();
-        BmsDifficultyIconPatcher.InstallOnce();
         BmsWorkingBeatmapPatcher.InstallOnce();
         BmsBeatmapStatisticsPatcher.InstallOnce();
         BmsFrameStatisticsPatcher.InstallOnce();

@@ -39,15 +39,19 @@ internal partial class BmsResultModDisplay : BmsResultFittedContainer
             });
         }
 
+        var difficultyIcon = new BmsResultDifficultyIcon(score)
+        {
+            Anchor = Anchor.CentreLeft,
+            Origin = Anchor.CentreLeft,
+            ShowTooltip = showStarRating,
+        };
+
+        if (stars != null)
+            difficultyIcon.Current.BindTo(stars.Current);
+
         flow.AddRange(
         [
-            new DifficultyIcon(beatmap, score.Ruleset)
-            {
-                Anchor = Anchor.CentreLeft,
-                Origin = Anchor.CentreLeft,
-                Size = new Vector2(20),
-                TooltipType = showStarRating ? DifficultyIconTooltipType.Extended : DifficultyIconTooltipType.None,
-            },
+            difficultyIcon,
             new ModDisplay
             {
                 Anchor = Anchor.CentreLeft,
