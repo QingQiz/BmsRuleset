@@ -297,6 +297,12 @@
   <data name="leaderboard_date_24" xml:space="preserve"><value>{0:yyyy/M/d HH:mm:ss}</value></data>
   <data name="leaderboard_date_12" xml:space="preserve"><value>{0:yyyy/M/d tt h:mm:ss}</value></data>
   <data name="leaderboard_relative_time" xml:space="preserve"><value>{0}</value></data>
+  <data name="leaderboard_time_just_now" xml:space="preserve"><value>刚刚</value></data>
+  <data name="leaderboard_time_minutes_ago" xml:space="preserve"><value>{0:0}分钟前</value></data>
+  <data name="leaderboard_time_hours_ago" xml:space="preserve"><value>{0:0}小时前</value></data>
+  <data name="leaderboard_time_days_ago" xml:space="preserve"><value>{0:0}天前</value></data>
+  <data name="leaderboard_time_months_ago" xml:space="preserve"><value>{0:0}个月前</value></data>
+  <data name="leaderboard_time_years_ago" xml:space="preserve"><value>{0:0}年前</value></data>
   <data name="leaderboard_position" xml:space="preserve"><value>#{0:N0}</value></data>
   <data name="leaderboard_unknown" xml:space="preserve"><value>-</value></data>
   <data name="leaderboard_grade" xml:space="preserve"><value>{0}</value></data>

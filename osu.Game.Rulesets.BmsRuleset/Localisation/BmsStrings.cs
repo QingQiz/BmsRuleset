@@ -59,6 +59,33 @@ public static class BmsStrings
 
     public static LocalisableString LeaderboardRelativeTime(LocalisableString relativeTime) => get("leaderboard_relative_time", relativeTime);
 
+    public static LocalisableString LeaderboardTimeAgo(DateTimeOffset date, DateTimeOffset now)
+    {
+        if (date.Date == default)
+            return LeaderboardUnknown;
+
+        var elapsed = now - date;
+        if (elapsed.TotalMinutes < 1)
+            return get("leaderboard_time_just_now");
+        if (elapsed.TotalHours < 1)
+            return get("leaderboard_time_minutes_ago", (int)elapsed.TotalMinutes);
+        if (elapsed.TotalDays < 1)
+            return get("leaderboard_time_hours_ago", (int)elapsed.TotalHours);
+
+        date = date.ToUniversalTime();
+        now = now.ToUniversalTime();
+        var months = (now.Year - date.Year) * 12 + now.Month - date.Month;
+        if (date.AddMonths(months) > now)
+            months--;
+
+        if (months < 1)
+            return get("leaderboard_time_days_ago", (int)elapsed.TotalDays);
+        if (months < 12)
+            return get("leaderboard_time_months_ago", months);
+
+        return get("leaderboard_time_years_ago", months / 12);
+    }
+
     public static LocalisableString LeaderboardUseMods => get("leaderboard_use_mods");
 
     public static LocalisableString LeaderboardCopyLink => get("leaderboard_copy_link");

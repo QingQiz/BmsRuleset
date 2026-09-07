@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -87,6 +88,27 @@ public class BmsLocalisationTest
 
         Assert.That(localisation.GetLocalisedString(noGood.Description), Is.EqualTo("将 GOOD 计为 BAD。"));
         Assert.That(localisation.GetLocalisedString(noGreat.Description), Is.EqualTo("将 GREAT 和 GOOD 计为 BAD。"));
+    }
+
+    [TestCase(-60, "just now", "刚刚")]
+    [TestCase(59, "just now", "刚刚")]
+    [TestCase(60, "1min ago", "1分钟前")]
+    [TestCase(300, "5min ago", "5分钟前")]
+    [TestCase(3599, "59min ago", "59分钟前")]
+    [TestCase(3600, "1hr ago", "1小时前")]
+    [TestCase(86400, "1d ago", "1天前")]
+    [TestCase(2678400, "1mo ago", "1个月前")]
+    [TestCase(31536000, "1yr ago", "1年前")]
+    public void TestLeaderboardTimeAgoUpdatesWhenLanguageChanges(int seconds, string english, string chinese)
+    {
+        var now = new DateTimeOffset(2026, 9, 7, 12, 0, 0, TimeSpan.Zero);
+        var date = now.AddSeconds(-seconds).ToOffset(TimeSpan.FromHours(8));
+        var text = localisation.GetLocalisedBindableString(BmsStrings.LeaderboardTimeAgo(date, now));
+
+        Assert.That(text.Value, Is.EqualTo(english));
+
+        config.SetValue(FrameworkSetting.Locale, "zh");
+        Assert.That(text.Value, Is.EqualTo(chinese));
     }
 
     [Test]

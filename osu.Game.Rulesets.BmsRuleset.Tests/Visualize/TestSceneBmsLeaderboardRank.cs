@@ -184,6 +184,7 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
         AddStep("load score with adjusted speed", () =>
         {
             var score = createScore(ScoreRank.S, "QINGQIZ");
+            score.Date = DateTimeOffset.UtcNow.AddMinutes(-5);
             score.Mods = [speed, new BmsModMirror()];
             Child = new Container
             {
@@ -196,16 +197,19 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
         AddUntilStep("row shows speed setting", () => row.ChildrenOfType<OsuSpriteText>().Any(text => text.Text.ToString() == speed.ExtendedIconInformation));
         AddAssert("mod icons are larger", () => row.ChildrenOfType<ModIcon>().All(icon => icon.ScreenSpaceDrawQuad.AABBFloat.Height > 20));
         AddStep("use 24 hour time", () => Dependencies.Get<OsuConfigManager>().SetValue(OsuSetting.Prefer24HourTime, true));
-        AddUntilStep("row shows full 24 hour timestamp", () => row.ChildrenOfType<OsuSpriteText>().Single(text => text.Name == "Leaderboard timestamp")
-            .Text.ToString(), () => Is.EqualTo(BmsStrings.LeaderboardDate(row.Score.Date.ToLocalTime(), true).ToString()));
+        AddUntilStep("row shows relative time", () => row.ChildrenOfType<OsuSpriteText>().Single(text => text.Name == "Leaderboard timestamp")
+            .Text.ToString(), () => Is.EqualTo("5min ago"));
         AddStep("hover score", () => InputManager.MoveMouseTo(row));
         AddUntilStep("tooltip appears", () => (tooltip = this.ChildrenOfType<BmsLeaderboardScoreTooltip>().SingleOrDefault())?.IsPresent == true);
         AddUntilStep("tooltip shows speed setting", () => tooltip.ChildrenOfType<OsuSpriteText>().Any(text => text.Text.ToString() == speed.ExtendedIconInformation));
         AddStep("use 12 hour time", () => Dependencies.Get<OsuConfigManager>().SetValue(OsuSetting.Prefer24HourTime, false));
-        AddUntilStep("row updates to 12 hour timestamp", () => row.ChildrenOfType<OsuSpriteText>().Single(text => text.Name == "Leaderboard timestamp")
-            .Text.ToString(), () => Is.EqualTo(BmsStrings.LeaderboardDate(row.Score.Date.ToLocalTime(), false).ToString()));
+        AddUntilStep("row keeps relative time in 12 hour mode", () => row.ChildrenOfType<OsuSpriteText>().Single(text => text.Name == "Leaderboard timestamp")
+            .Text.ToString(), () => Is.EqualTo("5min ago"));
         AddUntilStep("tooltip updates detailed timestamp", () => tooltip.ChildrenOfType<OsuSpriteText>()
             .Any(text => text.Text.ToString() == BmsStrings.LeaderboardDate(row.Score.Date.ToLocalTime(), false).ToString()));
+        AddStep("update score date", () => row.Score.Date = DateTimeOffset.UtcNow);
+        AddUntilStep("row refreshes relative time", () => row.ChildrenOfType<OsuSpriteText>().Single(text => text.Name == "Leaderboard timestamp")
+            .Text.ToString(), () => Is.EqualTo("just now"));
     }
 
     private ScoreInfo createScore(ScoreRank rank, string username) => new()

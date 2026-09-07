@@ -297,6 +297,12 @@
   <data name="leaderboard_date_24" xml:space="preserve"><value>{0:d MMM yyyy HH:mm:ss}</value></data>
   <data name="leaderboard_date_12" xml:space="preserve"><value>{0:d MMM yyyy h:mm:ss tt}</value></data>
   <data name="leaderboard_relative_time" xml:space="preserve"><value>{0}</value></data>
+  <data name="leaderboard_time_just_now" xml:space="preserve"><value>just now</value></data>
+  <data name="leaderboard_time_minutes_ago" xml:space="preserve"><value>{0:0}min ago</value></data>
+  <data name="leaderboard_time_hours_ago" xml:space="preserve"><value>{0:0}hr ago</value></data>
+  <data name="leaderboard_time_days_ago" xml:space="preserve"><value>{0:0}d ago</value></data>
+  <data name="leaderboard_time_months_ago" xml:space="preserve"><value>{0:0}mo ago</value></data>
+  <data name="leaderboard_time_years_ago" xml:space="preserve"><value>{0:0}yr ago</value></data>
   <data name="leaderboard_position" xml:space="preserve"><value>#{0:N0}</value></data>
   <data name="leaderboard_unknown" xml:space="preserve"><value>-</value></data>
   <data name="leaderboard_grade" xml:space="preserve"><value>{0}</value></data>

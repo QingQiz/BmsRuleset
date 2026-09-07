@@ -19,7 +19,6 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
-using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Containers;
@@ -78,9 +77,6 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
     private ScoreManager scoreManager { get; set; } = null!;
 
     [Resolved]
-    private OsuConfigManager config { get; set; } = null!;
-
-    [Resolved]
     private OsuGame? game { get; set; }
 
     [Resolved]
@@ -103,7 +99,6 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
     private Colour4 backgroundColour;
     private ColourInfo totalScoreBackgroundGradient;
 
-    private readonly Bindable<bool> prefer24HourTime = new();
     private TruncatingSpriteText timestamp = null!;
     private TruncatingSpriteText username = null!;
     private OsuSpriteText totalScoreText = null!;
@@ -545,8 +540,8 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
     {
         base.LoadComplete();
 
-        config.BindWith(OsuSetting.Prefer24HourTime, prefer24HourTime);
-        prefer24HourTime.BindValueChanged(_ => timestamp.Text = BmsStrings.LeaderboardDate(Score.Date.ToLocalTime(), prefer24HourTime.Value), true);
+        updateTimestamp();
+        Scheduler.AddDelayed(updateTimestamp, 1000, true);
         rightContent.Width = 150;
         modsContainer.ChildrenEnumerable = Score.Mods.AsOrdered().Select(mod => new ModIcon(mod, showTooltip: false, showExtendedInformation: true)
         {
@@ -555,6 +550,8 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
             Scale = new Vector2(0.32f),
         });
     }
+
+    private void updateTimestamp() => timestamp.Text = BmsStrings.LeaderboardTimeAgo(Score.Date, DateTimeOffset.UtcNow);
 
     protected override bool OnHover(HoverEvent e)
     {
