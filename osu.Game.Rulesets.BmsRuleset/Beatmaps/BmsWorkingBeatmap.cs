@@ -232,7 +232,12 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         beatmapInfo.Metadata.BackgroundFile = markerPath;
 
         if (beatmapInfo.BeatmapSet?.GetFile(markerPath) == null)
-            beatmapInfo.BeatmapSet?.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = $"{backgroundPath}|{panelBackgroundPath}" }, markerPath));
+        {
+            // BackgroundEquals compares these hashes across sets, where identical relative
+            // filenames can refer to different images in each external song directory.
+            var sourceDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(beatmapInfo.Metadata.Source));
+            beatmapInfo.BeatmapSet?.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = $"{sourceDirectory}|{backgroundPath}|{panelBackgroundPath}" }, markerPath));
+        }
     }
 
     private static IBeatmap? tryDecodeExternalBeatmap(BeatmapInfo beatmapInfo)

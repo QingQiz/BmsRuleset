@@ -694,6 +694,59 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
         AddAssert("same background compares equal", () => first.BeatmapInfo.BackgroundEquals(third.BeatmapInfo));
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestBmsWorkingBeatmapBackgroundComparisonDistinguishesExternalDirectories(bool preloadBeatmap)
+    {
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-background-directories-{Guid.NewGuid()}");
+        BmsWorkingBeatmap first = null!;
+        BmsWorkingBeatmap second = null!;
+        BmsWorkingBeatmap sameBackground = null!;
+        Task preparation = null!;
+
+        AddStep("create backgrounds with matching filenames in different directories", () =>
+        {
+            createdDirectories.Add(directory);
+            var firstDirectory = Path.Combine(directory, "first");
+            var secondDirectory = Path.Combine(directory, "second");
+            string[] sourceDirectories = [firstDirectory, secondDirectory];
+
+            foreach (var sourceDirectory in sourceDirectories)
+            {
+                Directory.CreateDirectory(sourceDirectory);
+                createTestTexture(Path.Combine(sourceDirectory, "stage.png"), sourceDirectory == firstDirectory ? 4 : 8, 2);
+                createTestTexture(Path.Combine(sourceDirectory, "banner.png"), 2, sourceDirectory == firstDirectory ? 4 : 8);
+            }
+
+            first = createWorkingBeatmap(firstDirectory, "first.bms");
+            second = createWorkingBeatmap(secondDirectory, "second.bms");
+            sameBackground = createWorkingBeatmap(Path.Combine(firstDirectory, "."), "another-difficulty.bms");
+        });
+
+        if (!preloadBeatmap)
+        {
+            AddStep("prepare background metadata asynchronously", () => preparation = Task.WhenAll(
+                first.PrepareBackgroundMetadataAsync(), second.PrepareBackgroundMetadataAsync(), sameBackground.PrepareBackgroundMetadataAsync()));
+            AddUntilStep("background metadata prepared", () => preparation.IsCompleted);
+            AddStep("background preparation succeeded", () => preparation.GetAwaiter().GetResult());
+        }
+
+        AddAssert("switching forwards requires a background refresh", () => !first.BeatmapInfo.BackgroundEquals(second.BeatmapInfo));
+        AddAssert("switching backwards requires a background refresh", () => !second.BeatmapInfo.BackgroundEquals(first.BeatmapInfo));
+        AddAssert("same directory and files still compare equal", () => first.BeatmapInfo.BackgroundEquals(sameBackground.BeatmapInfo));
+
+        BmsWorkingBeatmap createWorkingBeatmap(string sourceDirectory, string filename)
+        {
+            var beatmapInfo = createBeatmapInfo(new BeatmapSetInfo(), sourceDirectory, filename);
+            var inner = new StubWorkingBeatmap(audio, new BmsBeatmap { StageFile = "stage.png", Banner = "banner.png" }, beatmapInfo);
+
+            if (preloadBeatmap)
+                _ = inner.Beatmap;
+
+            return new BmsWorkingBeatmap(inner, audio);
+        }
+    }
+
     [TearDown]
     public void TearDownExternalBackgroundDirectories()
     {
