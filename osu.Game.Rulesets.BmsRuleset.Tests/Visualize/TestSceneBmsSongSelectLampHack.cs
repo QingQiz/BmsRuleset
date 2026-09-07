@@ -129,6 +129,9 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
 
         AddStep("reset song select stores", () =>
         {
+            // Lamp animation tests freeze this clock; later asynchronous UI tests need it advancing.
+            Content.Clock = Content.Parent!.Clock;
+            Content.ProcessCustomClock = false;
             Ruleset.Value = rulesets.AvailableRulesets.Single(r => r.ShortName == Constant.SHORT_NAME);
             Beatmap.SetDefault();
             SelectedMods.SetDefault();
@@ -356,8 +359,8 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         AddUntilStep("rank follows selected mods", () => rankDisplayFor(beatmap)!.ChildrenOfType<UpdateableRank>().Single().Rank, () => Is.EqualTo(ScoreRank.S));
     }
 
-    private PanelLocalRankDisplay rankDisplayFor(BeatmapInfo beatmap) =>
-        carousel.ChildrenOfType<PanelLocalRankDisplay>().SingleOrDefault(display => display.Beatmap?.Hash == beatmap.Hash);
+    private BmsPanelLocalRankDisplay rankDisplayFor(BeatmapInfo beatmap) =>
+        carousel.ChildrenOfType<BmsPanelLocalRankDisplay>().SingleOrDefault(display => display.Beatmap?.Hash == beatmap.Hash);
 
     private void importLampBeatmapSet()
     {
@@ -413,15 +416,15 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
 
     private IEnumerable<Panel> lampPanels() =>
         carousel.ChildrenOfType<Panel>()
-            .Where(panel => panel.ChildrenOfType<PanelLocalRankDisplay>().Any(display => isLampBeatmap(display.Beatmap)));
+            .Where(panel => panel.ChildrenOfType<BmsPanelLocalRankDisplay>().Any(display => isLampBeatmap(display.Beatmap)));
 
-    private IEnumerable<PanelLocalRankDisplay> lampRankDisplays() =>
-        lampPanels().Select(panel => panel.ChildrenOfType<PanelLocalRankDisplay>().Single());
+    private IEnumerable<BmsPanelLocalRankDisplay> lampRankDisplays() =>
+        lampPanels().Select(panel => panel.ChildrenOfType<BmsPanelLocalRankDisplay>().Single());
 
-    private IEnumerable<PanelLocalRankDisplay> playedRankDisplays() =>
+    private IEnumerable<BmsPanelLocalRankDisplay> playedRankDisplays() =>
         lampRankDisplays().Where(display => display.Beatmap != null && lampForBeatmap(display.Beatmap) != BmsLamp.NoPlay);
 
-    private PanelLocalRankDisplay noPlayRankDisplay() =>
+    private BmsPanelLocalRankDisplay noPlayRankDisplay() =>
         lampRankDisplays().SingleOrDefault(display => display.Beatmap != null && lampForBeatmap(display.Beatmap) == BmsLamp.NoPlay);
 
     private IEnumerable<BmsLampDisplay> visibleLampDisplays() =>
@@ -441,16 +444,16 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         throw new InvalidOperationException($"Beatmap {beatmap} is not part of the lamp set.");
     }
 
-    private static bool hasVisibleStockRank(PanelLocalRankDisplay display) =>
+    private static bool hasVisibleStockRank(BmsPanelLocalRankDisplay display) =>
         display.ChildrenOfType<UpdateableRank>().Any(rank => rank.Rank != null && rank.Alpha > 0);
 
-    private static bool hasHiddenRulesetMark(PanelLocalRankDisplay display)
+    private static bool hasHiddenRulesetMark(BmsPanelLocalRankDisplay display)
     {
         var iconContainer = getIconContainer(parentPanel(display));
         return iconContainer != null && iconContainer.Alpha == 0;
     }
 
-    private static bool hasNoStockRank(PanelLocalRankDisplay display) => !hasVisibleStockRank(display);
+    private static bool hasNoStockRank(BmsPanelLocalRankDisplay display) => !hasVisibleStockRank(display);
 
     private static Panel parentPanel(Drawable drawable)
     {
@@ -542,6 +545,7 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
 
         AddStep("take control of the lamp clock", () =>
         {
+            Content.ProcessCustomClock = true;
             Content.Clock = new FramedClock(new ManualClock { CurrentTime = 0 });
         });
 

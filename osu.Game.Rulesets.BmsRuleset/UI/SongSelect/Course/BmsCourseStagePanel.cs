@@ -92,8 +92,6 @@ internal partial class BmsCourseStagePanel : BmsBeatmapPanel
         DifficultyIcon.Alpha = ResolvedBeatmap != null ? 0 : 1;
 
         LocalRank.Beatmap = ResolvedBeatmap;
-        if (ResolvedBeatmap != null)
-            LocalRank.RefreshBmsScores();
         LocalRank.Alpha = ResolvedBeatmap != null ? 1 : 0;
         LocalRank.AttachLamp(backgroundContainer);
         missingBackground.Alpha = ResolvedBeatmap != null ? 0 : 1;

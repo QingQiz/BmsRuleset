@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
@@ -32,7 +33,6 @@ using osu.Game.Online.Leaderboards;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
-using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens;
@@ -41,7 +41,7 @@ using osu.Game.Screens.Select;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Leaderboard;
+namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 
 public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
 {
@@ -93,6 +93,8 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
 
     private readonly Bindable<LeaderboardScores?> fetchedScores = new();
     private IDisposable? localSubscription;
+    private CancellationTokenSource? localFetchCancellation;
+    private ScheduledDelegate? localFetchOperation;
 
     private const float personal_best_height = 112;
 
@@ -235,6 +237,10 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
 
     public void RefetchScores()
     {
+        refetchOperation?.Cancel();
+        localSubscription?.Dispose();
+        localSubscription = null;
+        cancelLocalFetch();
         fetchedScores.Value = null;
         SetScores([]);
 
@@ -248,7 +254,6 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
 
         var fetchScope = Scope.Value;
 
-        refetchOperation?.Cancel();
         refetchOperation = Scheduler.AddDelayed(() =>
         {
             var fetchBeatmapInfo = beatmap.Value.BeatmapInfo;
@@ -258,7 +263,8 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
             // For now, we forcefully refresh to keep things simple.
             // In the future, removing this requirement may be deemed useful, but will need ample testing of edge case scenarios
             // (like returning from gameplay after setting a new score, returning to song select after main menu).
-            var criteria = new LeaderboardCriteria(fetchBeatmapInfo, fetchRuleset, fetchScope, FilterBySelectedMods.Value ? mods.Value.ToArray() : null, fetchSorting);
+            var criteria = new LeaderboardCriteria(fetchBeatmapInfo, fetchRuleset, fetchScope,
+                FilterBySelectedMods.Value ? mods.Value.Select(mod => mod.DeepClone()).ToArray() : null, fetchSorting);
             var beatmapHash = fetchBeatmapInfo.Hash;
 
             localSubscription?.Dispose();
@@ -268,7 +274,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
             {
                 localSubscription = realm.RegisterForNotifications(
                     r => r.All<ScoreInfo>().Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending),
-                    (sender, changes) =>
+                    (_, changes) =>
                     {
                         if (fetchScope != Scope.Value
                             || !fetchBeatmapInfo.Equals(beatmap.Value.BeatmapInfo)
@@ -276,19 +282,10 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
                             return;
 
                         if (changes?.HasCollectionChanges() != false)
-                            fetchedScores.Value = BmsLocalLeaderboardService.CreateScores(sender.AsEnumerable(), criteria);
+                            queueLocalFetch(criteria);
                     });
 
-                // Realm's initial notification can race subscription setup. Initialise from the current
-                // snapshot as well so an empty local leaderboard can always leave the retrieving state.
-                var localScores = realm.Run(r => BmsLocalLeaderboardService.CreateScores(
-                    r.All<ScoreInfo>().Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending),
-                    criteria));
-
-                if (fetchScope == Scope.Value
-                    && fetchBeatmapInfo.Equals(beatmap.Value.BeatmapInfo)
-                    && fetchRuleset.Equals(ruleset.Value))
-                    fetchedScores.Value = localScores;
+                queueLocalFetch(criteria);
             }
             else
                 leaderboardManager.FetchWithCriteria(criteria, forceRefresh: true);
@@ -302,6 +299,58 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
                 initialFetchComplete = true;
             }
         }, initialFetchComplete && fetchScope != BeatmapLeaderboardScope.Local ? 300 : 0);
+    }
+
+    private void queueLocalFetch(LeaderboardCriteria criteria)
+    {
+        cancelLocalFetch();
+        if (IsDisposed)
+            return;
+
+        var cancellation = localFetchCancellation = new CancellationTokenSource();
+        var token = cancellation.Token;
+        // Coalesce the initial snapshot and score notifications before querying the database.
+        localFetchOperation = Schedule(() => _ = fetchLocalScoresAsync(criteria, token));
+    }
+
+    protected virtual Task<LeaderboardScores> LoadLocalScoresAsync(LeaderboardCriteria criteria, CancellationToken token)
+    {
+        var beatmapHash = criteria.Beatmap!.Hash;
+        return Task.Run(() => realm.Run(r => BmsLocalLeaderboardService.CreateScores(
+            r.All<ScoreInfo>().Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending), criteria)), token);
+    }
+
+    private async Task fetchLocalScoresAsync(LeaderboardCriteria criteria, CancellationToken token)
+    {
+        try
+        {
+            var scores = await LoadLocalScoresAsync(criteria, token).ConfigureAwait(false);
+            Schedule(() =>
+            {
+                if (!IsDisposed && !token.IsCancellationRequested)
+                    fetchedScores.Value = scores;
+            });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            BmsLogger.Error(exception, "Failed to load the BMS local leaderboard.");
+            Schedule(() =>
+            {
+                if (!IsDisposed && !token.IsCancellationRequested)
+                    SetState(LeaderboardState.NetworkFailure);
+            });
+        }
+    }
+
+    private void cancelLocalFetch()
+    {
+        localFetchOperation?.Cancel();
+        localFetchCancellation?.Cancel();
+        localFetchCancellation?.Dispose();
+        localFetchCancellation = null;
     }
 
     private void updateScores()
@@ -324,6 +373,8 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
 
     protected override void Dispose(bool isDisposing)
     {
+        refetchOperation?.Cancel();
+        cancelLocalFetch();
         localSubscription?.Dispose();
         base.Dispose(isDisposing);
     }

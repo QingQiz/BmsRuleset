@@ -206,7 +206,6 @@ internal partial class BmsPanelBeatmap : Panel
         difficultyIcon.Icon = getRulesetIcon(beatmap.Ruleset);
 
         localRank.Beatmap = beatmap;
-        localRank.RefreshBmsScores();
         difficultyIcon.Parent!.Alpha = 0;
         localRank.AttachLamp((Container)backgroundBorder.Parent!);
         difficultyText.Text = beatmap.DifficultyName;

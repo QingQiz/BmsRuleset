@@ -19,14 +19,32 @@ using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
-using osu.Game.Screens.Select;
 using osuTK;
 using Realms;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 
-internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
+// Own the subscription: the native rank display would also scan scores on the update thread.
+internal partial class BmsPanelLocalRankDisplay : CompositeDrawable
 {
+    private BeatmapInfo? beatmap;
+
+    public BeatmapInfo? Beatmap
+    {
+        get => beatmap;
+        set
+        {
+            if (beatmap?.Equals(value) == true)
+                return;
+
+            beatmap = value;
+            if (IsLoaded)
+                updateSubscription();
+        }
+    }
+
+    public bool HasRank => updateable.Rank != null;
+
     [Resolved]
     private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
@@ -74,8 +92,8 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
     private IBindable<IReadOnlyList<Mod>>? selectedMods { get; set; }
 
     public BmsPanelLocalRankDisplay(BeatmapInfo? beatmap = null)
-        : base(beatmap)
     {
+        this.beatmap = beatmap;
         AutoSizeAxes = Axes.Both;
 
         InternalChildren =
@@ -94,8 +112,6 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
 
     }
 
-    internal void RefreshBmsScores() => updateSubscription();
-
     [BackgroundDependencyLoader]
     private void load(IAPIProvider api)
     {
@@ -108,13 +124,17 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
 
         ruleset.BindValueChanged(_ => updateSubscription());
         localUser.BindValueChanged(_ => updateSubscription(), true);
-        selectedMods?.BindValueChanged(_ => updateLamp());
+        selectedMods?.BindValueChanged(_ => updateScores());
     }
 
     private void updateSubscription()
     {
         scoreSubscription?.Dispose();
-        setRankFromScore(null);
+        scoreSubscription = null;
+        cancelScoreQuery();
+        updateable.Rank = null;
+        updateable.Alpha = 0;
+        lampDisplay.Alpha = 0;
 
         if (Beatmap == null)
             return;
@@ -130,39 +150,12 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
         if (IsDisposed || changes?.HasCollectionChanges() == false)
             return;
 
-        var currentBeatmap = Beatmap;
-        var currentUser = localUser.Value;
-        var currentRuleset = ruleset?.Value;
-
-        // A score write can notify this panel while its dependencies are being replaced during a screen transition.
-        if (currentBeatmap == null || currentUser == null || currentRuleset == null)
-            return;
-
-        ScoreInfo? topScore = sender
-            // doing these post realm filter is most efficient.
-            .Where(s => s.UserID == currentUser.Id || s.UserID <= 1)
-            .Where(s => currentRuleset.Equals(s.Ruleset))
-            .MaxBy(info => (info.TotalScore, -info.Date.UtcDateTime.Ticks));
-
-        if (selectedMods?.Value is { } currentMods && currentRuleset.ShortName == Constant.SHORT_NAME)
-        {
-            updateLamp(currentBeatmap, currentUser.Id, currentRuleset, currentMods);
-        }
-        else
-            setRankFromScore(topScore);
-
-        if (selectedMods?.Value is not { } || currentRuleset.ShortName != Constant.SHORT_NAME)
-            updateLamp();
+        updateScores();
     }
 
-    private void setRankFromScore(ScoreInfo? topScore)
+    private void updateScores()
     {
-        updateable.Rank = topScore?.Rank;
-        updateable.Alpha = topScore != null ? 1 : 0;
-    }
-
-    private void updateLamp()
-    {
+        cancelScoreQuery();
         if (IsDisposed)
             return;
 
@@ -171,46 +164,62 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
         var currentRuleset = ruleset?.Value;
         var currentMods = selectedMods?.Value;
 
-        if (currentRuleset == null || currentRuleset.ShortName != Constant.SHORT_NAME || currentBeatmap == null || currentUser == null || currentMods == null)
+        if (currentRuleset == null || currentBeatmap == null || currentUser == null)
         {
             lampDisplay.Alpha = 0;
             return;
         }
 
-        updateLamp(currentBeatmap, currentUser.Id, currentRuleset, currentMods);
-    }
-
-    private void updateLamp(BeatmapInfo beatmap, int userId, RulesetInfo rulesetInfo, IReadOnlyList<Mod> mods)
-    {
-        mods = mods.ToArray();
-        scoreQueryCancellation?.Cancel();
+        var beatmapHash = currentBeatmap.Hash;
+        var userId = currentUser.Id;
+        var rulesetShortName = currentRuleset.ShortName;
+        var mods = currentMods?.Select(mod => mod.DeepClone()).ToArray();
         var cancellation = scoreQueryCancellation = new CancellationTokenSource();
-        var generation = ++scoreQueryGeneration;
+        var token = cancellation.Token;
+        var generation = scoreQueryGeneration;
 
-        Task.Run(() => getLocalScores(beatmap, userId, rulesetInfo), cancellation.Token).ContinueWith(task => Scheduler.Add(() =>
+        Task.Run(() => realm.Run(r =>
         {
-            if (generation != scoreQueryGeneration || !task.IsCompletedSuccessfully || cancellation.IsCancellationRequested)
+            var scores = r.All<ScoreInfo>()
+                .Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending)
+                .AsEnumerable()
+                .Where(s => s.UserID == userId || s.UserID <= 1)
+                .Where(s => s.Ruleset.ShortName == rulesetShortName)
+                .ToArray();
+
+            if (rulesetShortName == Constant.SHORT_NAME && mods != null)
+            {
+                var selection = select(scores, mods);
+                return (selection.Rank, Lamp: (BmsLamp?)BmsLampCalculator.Calculate(selection.Score));
+            }
+
+            return (scores.MaxBy(info => (info.TotalScore, -info.Date.UtcDateTime.Ticks))?.Rank, Lamp: null);
+        }), token).ContinueWith(task => Scheduler.Add(() =>
+        {
+            if (IsDisposed || generation != scoreQueryGeneration || token.IsCancellationRequested)
                 return;
 
-            var selection = select(task.Result, mods);
+            if (!task.IsCompletedSuccessfully)
+            {
+                if (task.Exception != null)
+                    BmsLogger.Error(task.Exception, "Failed to load BMS local rank.");
+                return;
+            }
+
+            var selection = task.Result;
             updateable.Rank = selection.Rank;
             updateable.Alpha = selection.Rank.HasValue ? 1 : 0;
-            lampDisplay.Lamp = BmsLampCalculator.Calculate(selection.Score);
-            lampDisplay.Alpha = 1;
+            lampDisplay.Lamp = selection.Lamp ?? BmsLamp.NoPlay;
+            lampDisplay.Alpha = selection.Lamp.HasValue ? 1 : 0;
         }), TaskScheduler.Default);
     }
 
-    private ScoreInfo[] getLocalScores(BeatmapInfo beatmap, int userId, RulesetInfo rulesetInfo)
+    private void cancelScoreQuery()
     {
-        var beatmapHash = beatmap.Hash;
-
-        return realm.Run(r => r.All<ScoreInfo>()
-            .Where(s => s.BeatmapHash == beatmapHash && !s.DeletePending)
-            .ToArray()
-            .Where(s => s.UserID == userId || s.UserID <= 1)
-            .Where(s => rulesetInfo.Equals(s.Ruleset))
-            .Select(s => s.DeepClone())
-            .ToArray());
+        scoreQueryGeneration++;
+        scoreQueryCancellation?.Cancel();
+        scoreQueryCancellation?.Dispose();
+        scoreQueryCancellation = null;
     }
 
     private static (ScoreInfo? Score, ScoreRank? Rank) select(IEnumerable<ScoreInfo> scores, IReadOnlyList<Mod> selectedMods)
@@ -230,6 +239,6 @@ internal partial class BmsPanelLocalRankDisplay : PanelLocalRankDisplay
     {
         base.Dispose(isDisposing);
         scoreSubscription?.Dispose();
-        scoreQueryCancellation?.Cancel();
+        cancelScoreQuery();
     }
 }

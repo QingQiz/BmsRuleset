@@ -33,7 +33,6 @@ public static class BmsReplayPatcher
     private static FieldInfo? replayFailIndicatorTrackField;
     private static FieldInfo? replayFailIndicatorFailSampleField;
     private static FieldInfo? mainMenuLogoProxyField;
-    private static MethodInfo? drawableScheduleMethod;
 
     public static bool IsInstalled { get; private set; }
 
@@ -63,7 +62,6 @@ public static class BmsReplayPatcher
             replayFailIndicatorTrackField = AccessTools.Field(typeof(ReplayFailIndicator), "track");
             replayFailIndicatorFailSampleField = AccessTools.Field(typeof(ReplayFailIndicator), "failSample");
             mainMenuLogoProxyField = AccessTools.Field(typeof(MainMenu), "logoProxy");
-            drawableScheduleMethod = AccessTools.Method(typeof(Drawable), "Schedule", [typeof(Action)]);
 
             var missingMembers = new (string name, MemberInfo? member)[]
             {
@@ -85,7 +83,6 @@ public static class BmsReplayPatcher
                 (name: "ReplayFailIndicator.track", member: replayFailIndicatorTrackField),
                 (name: "ReplayFailIndicator.failSample", member: replayFailIndicatorFailSampleField),
                 (name: "MainMenu.logoProxy", member: mainMenuLogoProxyField),
-                (name: "Drawable.Schedule", member: drawableScheduleMethod),
             }.Where(m => m.member == null).Select(m => m.name).ToArray();
 
             if (missingMembers.Length > 0)
@@ -118,7 +115,9 @@ public static class BmsReplayPatcher
 
         try
         {
-            await scheduleOnPlayerUpdateThread(player, () => attachReplayToScore(player, score)).ConfigureAwait(false);
+            if (playerScoreManagerProperty?.GetValue(player) is ScoreManager scoreManager
+                && modelManagerRealmProperty?.GetValue(scoreManager) is RealmAccess realmAccess)
+                await AttachReplayAsync(scoreManager, realmAccess, score).ConfigureAwait(false);
         }
         catch (Exception e)
         {
@@ -126,54 +125,26 @@ public static class BmsReplayPatcher
         }
     }
 
-    private static void attachReplayToScore(Player player, Score score)
+    internal static Task AttachReplayAsync(ScoreManager scoreManager, RealmAccess realmAccess, Score score) => Task.Run(() =>
     {
-        if (playerScoreManagerProperty?.GetValue(player) is not ScoreManager scoreManager)
-            return;
-
         using var archive = BmsReplayArchive.Create(score, out var hash);
         using var stream = new MemoryStream(archive.Get(BmsReplayArchive.FILENAME));
 
-        scoreManager.AddFile(score.ScoreInfo, stream, BmsReplayArchive.FILENAME);
-        applyHash(scoreManager, score.ScoreInfo, hash);
-        score.ScoreInfo.Hash = hash;
-    }
-
-    private static void applyHash(ScoreManager scoreManager, ScoreInfo scoreInfo, string hash)
-    {
-        if (modelManagerRealmProperty?.GetValue(scoreManager) is not RealmAccess realmAccess)
-            return;
-
-        realmAccess.Write(realm =>
+        // The detached-score AddFile overload requires the update realm. Use the transaction
+        // overload so compression and disk writes cannot stall the transition to results.
+        var replayFiles = realmAccess.Write(realm =>
         {
-            var managed = realm.Find<ScoreInfo>(scoreInfo.ID);
-
-            managed?.Hash = hash;
+            var managed = realm.Find<ScoreInfo>(score.ScoreInfo.ID)
+                          ?? throw new InvalidOperationException("The imported BMS score no longer exists.");
+            scoreManager.AddFile(managed, stream, BmsReplayArchive.FILENAME, realm);
+            managed.Hash = hash;
+            return managed.Files.Detach().ToArray();
         });
-    }
-
-    private static Task scheduleOnPlayerUpdateThread(Player player, Action action)
-    {
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        drawableScheduleMethod!.Invoke(player,
-        [
-            () =>
-            {
-                try
-                {
-                    action();
-                    completion.SetResult();
-                }
-                catch (Exception e)
-                {
-                    completion.SetException(e);
-                }
-            },
-        ]);
-
-        return completion.Task;
-    }
+        score.ScoreInfo.Files.Clear();
+        foreach (var file in replayFiles)
+            score.ScoreInfo.Files.Add(file);
+        score.ScoreInfo.Hash = hash;
+    });
 
     // ReSharper disable InconsistentNaming
     private static void importScorePostfix(Player __instance, Score score, ref Task __result)

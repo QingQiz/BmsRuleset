@@ -72,7 +72,6 @@ internal partial class BmsPanelBeatmapStandalone : BmsBeatmapPanel
         DifficultyIcon.Show();
 
         LocalRank.Beatmap = beatmap;
-        LocalRank.RefreshBmsScores();
         DifficultyIcon.Parent!.Alpha = 0;
         LocalRank.AttachLamp((Container)backgroundBorder.Parent!);
         DifficultyText.Text = beatmap.DifficultyName;

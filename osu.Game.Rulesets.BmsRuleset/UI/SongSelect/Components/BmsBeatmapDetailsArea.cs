@@ -5,7 +5,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Graphics.Containers;
-using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Leaderboard;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 
