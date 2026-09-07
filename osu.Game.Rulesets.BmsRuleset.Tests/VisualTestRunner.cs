@@ -10,6 +10,7 @@ using osu.Framework;
 using osu.Framework.Configuration;
 using osu.Framework.Platform;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
+using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 using osu.Game.Tests;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;
@@ -19,6 +20,14 @@ public static class VisualTestRunner
     [STAThread]
     public static int Main(string[] args)
     {
+        if (args.FirstOrDefault() == "--leaderboard-preview")
+        {
+            using var previewHost = Host.GetSuitableDesktopHost("bms-leaderboard-preview");
+            var preview = new BmsLeaderboardPreviewGame(getOptionalArgument(args, "--output") ?? "artifacts/leaderboard", getOptionalArgument(args, "--locale") ?? "en");
+            previewHost.Run(preview);
+            return preview.ResultCode;
+        }
+
         if (args.FirstOrDefault() == "--list-wasapi-devices")
         {
             BmsWasapiDeviceEnumerator.PrintDevices();

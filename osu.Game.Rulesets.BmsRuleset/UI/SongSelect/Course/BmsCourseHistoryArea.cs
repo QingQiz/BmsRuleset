@@ -13,11 +13,12 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Rulesets.BmsRuleset.Course;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
-using osu.Game.Screens.Select;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Course;
@@ -89,12 +90,12 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
                             RelativeSizeAxes = Axes.X,
                             AutoSizeAxes = Axes.Y,
                             Direction = FillDirection.Vertical,
-                            Spacing = new Vector2(0, BeatmapLeaderboardWedge.SPACING_BETWEEN_SCORES),
+                            Spacing = new Vector2(0, BmsBeatmapLeaderboardWedge.SPACING_BETWEEN_SCORES),
                             Padding = new MarginPadding
                             {
                                 Top = 5,
                                 Left = 80,
-                                Bottom = BeatmapLeaderboardScore.HEIGHT * 3,
+                                Bottom = BmsLeaderboardScore.HEIGHT * 3,
                             },
                         },
                     },
@@ -134,14 +135,14 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
 
     protected override void PopIn()
     {
-        this.MoveToX(0, osu.Game.Screens.Select.SongSelect.ENTER_DURATION, Easing.OutQuint)
-            .FadeIn(osu.Game.Screens.Select.SongSelect.ENTER_DURATION / 3, Easing.In);
+        this.MoveToX(0, Screens.Select.SongSelect.ENTER_DURATION, Easing.OutQuint)
+            .FadeIn(Screens.Select.SongSelect.ENTER_DURATION / 3, Easing.In);
     }
 
     protected override void PopOut()
     {
-        this.MoveToX(-150, osu.Game.Screens.Select.SongSelect.ENTER_DURATION, Easing.OutQuint)
-            .FadeOut(osu.Game.Screens.Select.SongSelect.ENTER_DURATION / 3, Easing.In);
+        this.MoveToX(-150, Screens.Select.SongSelect.ENTER_DURATION, Easing.OutQuint)
+            .FadeOut(Screens.Select.SongSelect.ENTER_DURATION / 3, Easing.In);
     }
 
     internal void Refresh()
@@ -280,12 +281,15 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
         if (!refreshIsCurrent(course, store, generation, cancellation))
             return;
 
-        var drawables = entries.Skip(offset).Take(drawable_batch_size).Select((entry, index) => new BmsCourseHistoryScore(
-            entry.Score,
-            offset + index + 1,
-            result => presentScore(result, entry.Session),
-            () => store.Delete(course.Id, entry.Result),
-            mods)).ToArray();
+        var drawables = entries.Skip(offset).Take(drawable_batch_size).Select((entry, index) => new BmsLeaderboardScore(entry.Score)
+        {
+            Rank = offset + index + 1,
+            Shear = Vector2.Zero,
+            SelectedMods = { BindTarget = mods },
+            Action = () => presentScore(entry.Score, entry.Session),
+            DeleteScore = () => store.Delete(course.Id, entry.Result),
+            DeleteConfirmation = BmsStrings.CourseHistoryDeleteConfirmation,
+        }).ToArray();
 
         LoadComponentsAsync(drawables, loadedDrawables =>
         {

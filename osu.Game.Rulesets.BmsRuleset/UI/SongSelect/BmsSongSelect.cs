@@ -440,6 +440,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     private void debounceQueueSelection(BeatmapInfo beatmap)
     {
+        CancelBeatmapSelection();
         debounceQueuedSelection = beatmap;
         debounceElapsedTime = 0;
     }
@@ -468,20 +469,14 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
     {
         if (debounceQueuedSelection == null) return;
 
-        try
-        {
-            if (this is BmsSoloSongSelect && UnavailableTableBeatmapFactory.Resolve(debounceQueuedSelection, BmsRulesetRuntime.DifficultyTableStore) != null)
-                return;
+        var selected = debounceQueuedSelection;
+        cancelDebounceSelection();
 
-            if (Beatmap.Value.BeatmapInfo.Equals(debounceQueuedSelection))
-                return;
+        if (this is BmsSoloSongSelect && UnavailableTableBeatmapFactory.Resolve(selected, BmsRulesetRuntime.DifficultyTableStore) != null)
+            return;
 
-            Beatmap.Value = beatmaps.GetWorkingBeatmap(debounceQueuedSelection);
-        }
-        finally
-        {
-            cancelDebounceSelection();
-        }
+        if (!Beatmap.Value.BeatmapInfo.Equals(selected))
+            LoadBeatmapSelection(selected);
     }
 
     private void cancelDebounceSelection()
@@ -575,13 +570,26 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         // Carousel selection will update to the forced selection via a call of `ensureGlobalBeatmapValid` below, or when song select becomes current again.
         cancelDebounceSelection();
 
-        // Forced refetch is important here to guarantee correct invalidation across all difficulties (editor specific).
-        Beatmap.Value = beatmaps.GetWorkingBeatmap(beatmap, true);
+        // Confirm against fresh metadata before entering gameplay or the editor.
+        loadBeatmapSelection(beatmap, true, () =>
+        {
+            // Validation may queue a fallback, but confirmation still belongs to the requested chart.
+            if (loadingBeatmap == null && debounceQueuedSelection == null && !Beatmap.IsDefault
+                && Beatmap.Value.BeatmapInfo.Equals(beatmap) && checkBeatmapValidForSelection(Beatmap.Value.BeatmapInfo))
+                startAction();
+        });
+    }
 
-        if (Beatmap.IsDefault)
-            return;
+    private void selectCurrentAndRun()
+    {
+        var selected = debounceQueuedSelection ?? loadingBeatmap ?? Beatmap.Value.BeatmapInfo;
+        SelectAndRun(selected, OnStart);
+    }
 
-        startAction();
+    protected override void Dispose(bool isDisposing)
+    {
+        CancelBeatmapSelection();
+        base.Dispose(isDisposing);
     }
 
     /// <summary>
@@ -605,7 +613,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         debounceQueueSelection(groupedBeatmap.Beatmap);
     }
 
-    private void ensureGlobalBeatmapValid(bool refetch = true)
+    private void ensureGlobalBeatmapValid()
     {
         if (!this.IsCurrentScreen())
             return;
@@ -614,11 +622,10 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
         // While filtering, let's not ever attempt to change selection.
         // This will be resolved after the filter completes, see `newItemsPresented`.
-        if (IsFiltering)
+        if (IsFiltering || loadingBeatmap != null)
             return;
 
-        // Refetch to be confident that the current selection is still valid. It may have been deleted or hidden.
-        var currentBeatmap = refetch ? beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo, true) : Beatmap.Value;
+        var currentBeatmap = Beatmap.Value;
         var validSelection = checkBeatmapValidForSelection(currentBeatmap.BeatmapInfo);
 
         if (validSelection)
@@ -639,9 +646,12 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         if (!validSelection)
         {
             // In the case a difficulty was hidden or removed, prefer selecting another difficulty from the same set.
-            var activeSet = currentBeatmap.BeatmapSetInfo;
+            // BMS working beatmaps only retain their own difficulty. The carousel already has the full set metadata.
+            var activeSet = Carousel.GetCarouselItems()?.Select(item => item.Model).OfType<GroupedBeatmap>()
+                                .FirstOrDefault(grouped => grouped.Beatmap.BeatmapSet?.ID == currentBeatmap.BeatmapSetInfo.ID)?.Beatmap.BeatmapSet
+                            ?? currentBeatmap.BeatmapSetInfo;
 
-            var validBeatmaps = activeSet.Beatmaps.Where(checkBeatmapValidForSelection).ToArray();
+            var validBeatmaps = activeSet.Beatmaps.Where(beatmap => !beatmap.Equals(currentBeatmap.BeatmapInfo) && checkBeatmapValidForSelection(beatmap)).ToArray();
 
             if (validBeatmaps.Any())
             {
@@ -658,24 +668,82 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     }
 
-    private CancellationTokenSource? resumeValidationCancellation;
-    private int resumeValidationGeneration;
+    private CancellationTokenSource? beatmapSelectionCancellation;
+    private BeatmapInfo? loadingBeatmap;
+    private int beatmapSelectionGeneration;
+
+    internal void CancelBeatmapSelection()
+    {
+        beatmapSelectionGeneration++;
+        beatmapSelectionCancellation?.Cancel();
+        beatmapSelectionCancellation?.Dispose();
+        beatmapSelectionCancellation = null;
+        loadingBeatmap = null;
+    }
+
+    internal void LoadBeatmapSelection(BeatmapInfo beatmap, Action? onLoaded = null) => loadBeatmapSelection(beatmap, false, onLoaded);
+
+    protected virtual Task<WorkingBeatmap> LoadWorkingBeatmapAsync(BeatmapInfo beatmap, bool refetch, CancellationToken token) =>
+        Task.Run(() => beatmaps.GetWorkingBeatmap(beatmap, refetch), token);
+
+    private async void loadBeatmapSelection(BeatmapInfo beatmap, bool refetch, Action? onLoaded = null)
+    {
+        if (IsDisposed || !this.IsCurrentScreen())
+            return;
+
+        cancelDebounceSelection();
+        CancelBeatmapSelection();
+        var cancellation = beatmapSelectionCancellation = new CancellationTokenSource();
+        var token = cancellation.Token;
+        var generation = beatmapSelectionGeneration;
+        var selected = Beatmap.Value;
+        var ruleset = Ruleset.Value;
+        loadingBeatmap = beatmap;
+
+        try
+        {
+            var loaded = await LoadWorkingBeatmapAsync(beatmap, refetch, token).ConfigureAwait(false);
+            Schedule(() =>
+            {
+                if (IsDisposed || token.IsCancellationRequested || generation != beatmapSelectionGeneration)
+                    return;
+
+                CancelBeatmapSelection();
+                if (!this.IsCurrentScreen() || !ReferenceEquals(Beatmap.Value, selected) || !Ruleset.Value.Equals(ruleset))
+                    return;
+
+                Beatmap.Value = loaded;
+                onLoaded?.Invoke();
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            Schedule(() =>
+            {
+                if (!IsDisposed && generation == beatmapSelectionGeneration)
+                    CancelBeatmapSelection();
+            });
+        }
+        catch (Exception exception)
+        {
+            BmsLogger.Error(exception, "Failed to load the BMS song-select beatmap.");
+            Schedule(() =>
+            {
+                if (!IsDisposed && generation == beatmapSelectionGeneration)
+                    CancelBeatmapSelection();
+            });
+        }
+    }
 
     private void validateSelectionAfterResume()
     {
-        resumeValidationCancellation?.Cancel();
-        var cancellation = resumeValidationCancellation = new CancellationTokenSource();
-        var generation = ++resumeValidationGeneration;
         var selected = Beatmap.Value;
-
-        Task.Run(() => beatmaps.GetWorkingBeatmap(selected.BeatmapInfo, true), cancellation.Token).ContinueWith(task => Scheduler.Add(() =>
+        loadBeatmapSelection(debounceQueuedSelection ?? loadingBeatmap ?? selected.BeatmapInfo, true, () =>
         {
-            if (generation != resumeValidationGeneration || !task.IsCompletedSuccessfully || cancellation.IsCancellationRequested || !this.IsCurrentScreen()
-                || !ReferenceEquals(Beatmap.Value, selected))
-                return;
-
-            Beatmap.Value = task.Result;
-        }), TaskScheduler.Default);
+            // A new working beatmap already notifies the leaderboard through its binding.
+            if (ReferenceEquals(Beatmap.Value, selected))
+                DetailsArea.Refresh();
+        });
     }
 
     private bool checkBeatmapValidForSelection(BeatmapInfo beatmap)
@@ -714,7 +782,6 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         this.FadeIn(fade_duration, Easing.OutQuint);
         onArrivingAtScreen();
 
-        DetailsArea.Refresh();
         validateSelectionAfterResume();
 
         if (controlGlobalMusic)
@@ -738,7 +805,6 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     public override bool OnExiting(ScreenExitEvent e)
     {
-        resumeValidationCancellation?.Cancel();
         this.FadeOut(fade_duration, Easing.OutQuint);
         onLeavingScreen();
 
@@ -781,9 +847,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         if (!this.IsCurrentScreen())
             return;
 
-        // The working beatmap already represents this change; resuming refetches it asynchronously.
-        // Refetching here duplicates that query on the update thread and invalidates its fresh result again.
-        ensureGlobalBeatmapValid(refetch: false);
+        ensureGlobalBeatmapValid();
 
         ensurePlayingSelected();
         updateBackgroundDim();
@@ -793,7 +857,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     private void onLeavingScreen()
     {
-        resumeValidationCancellation?.Cancel();
+        CancelBeatmapSelection();
         backgroundMetadataCancellation?.Cancel();
         backgroundMetadataCancellation = null;
 
@@ -831,8 +895,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
         logo.Action = () =>
         {
-            ensureGlobalBeatmapValid();
-            SelectAndRun(Beatmap.Value.BeatmapInfo, OnStart);
+            selectCurrentAndRun();
             return false;
         };
     }
@@ -981,8 +1044,13 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         // Interrupting could cause the debounce interval to be reduced.
         //
         // `ensureGlobalBeatmapValid` is run post-selection which will resolve any pending incompatibilities (see `Beatmap` bindable callback).
-        if (debounceQueuedSelection == null)
-            ensureGlobalBeatmapValid();
+        if (debounceQueuedSelection == null && loadingBeatmap == null)
+        {
+            if (Beatmap.IsDefault)
+                ensureGlobalBeatmapValid();
+            else
+                loadBeatmapSelection(Beatmap.Value.BeatmapInfo, true, ensureGlobalBeatmapValid);
+        }
 
         updateWedgeVisibility();
     }
@@ -1134,8 +1202,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
                 // one of which is filtering out all visible beatmaps and attempting to start gameplay.
                 // in that case, users still expect a `Select` press to advance to gameplay anyway, using the ambient selected beatmap if there is one,
                 // which matches the behaviour resulting from clicking the osu! cookie in that scenario.
-                ensureGlobalBeatmapValid();
-                SelectAndRun(Beatmap.Value.BeatmapInfo, OnStart);
+                selectCurrentAndRun();
                 return true;
 
             case GlobalAction.IncreaseModSpeed:
@@ -1251,6 +1318,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     void IHandlePresentBeatmap.PresentBeatmap(WorkingBeatmap workingBeatmap, RulesetInfo ruleset)
     {
+        CancelBeatmapSelection();
         cancelDebounceSelection();
 
         var beatmapInfo = workingBeatmap.BeatmapInfo;

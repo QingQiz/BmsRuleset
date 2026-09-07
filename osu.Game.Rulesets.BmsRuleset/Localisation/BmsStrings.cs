@@ -41,6 +41,36 @@ public static class BmsStrings
 
     public static LocalisableString ResultJudgement(osu.Game.Rulesets.Scoring.HitResult result) => get($"result_judgement_{result.ToString().ToLowerInvariant()}");
 
+    public static LocalisableString LeaderboardPosition(int position) => get("leaderboard_position", position);
+
+    public static LocalisableString LeaderboardPosition(string position) => get("leaderboard_position", position);
+
+    public static LocalisableString LeaderboardUnknown => get("leaderboard_unknown");
+
+    public static LocalisableString LeaderboardGrade(string grade) => get("leaderboard_grade", grade);
+
+    public static LocalisableString LeaderboardClearStatus => get("leaderboard_clear_status");
+
+    public static LocalisableString LeaderboardLamp(UI.SongSelect.Lamp.BmsLamp lamp) => get($"leaderboard_lamp_{lamp.ToString().ToLowerInvariant()}");
+
+    public static LocalisableString LeaderboardFraction(int value, int maximum) => get("leaderboard_fraction", value, maximum);
+
+    public static LocalisableString LeaderboardDate(DateTimeOffset date, bool use24HourTime) => get(use24HourTime ? "leaderboard_date_24" : "leaderboard_date_12", date);
+
+    public static LocalisableString LeaderboardRelativeTime(LocalisableString relativeTime) => get("leaderboard_relative_time", relativeTime);
+
+    public static LocalisableString LeaderboardUseMods => get("leaderboard_use_mods");
+
+    public static LocalisableString LeaderboardCopyLink => get("leaderboard_copy_link");
+
+    public static LocalisableString LeaderboardWatchReplay => get("leaderboard_watch_replay");
+
+    public static LocalisableString LeaderboardExport => get("leaderboard_export");
+
+    public static LocalisableString LeaderboardDelete => get("leaderboard_delete");
+
+    public static LocalisableString LeaderboardDeleteConfirmation => get("leaderboard_delete_confirmation");
+
     public static LocalisableString Accuracy => get("accuracy");
 
     public static LocalisableString ExScore => get("exscore");

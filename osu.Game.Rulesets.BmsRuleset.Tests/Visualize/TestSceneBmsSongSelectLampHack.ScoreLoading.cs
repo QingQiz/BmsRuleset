@@ -120,15 +120,15 @@ public partial class TestSceneBmsSongSelectLampHack
             && leaderboard.ChildrenOfType<osu.Game.Graphics.UserInterface.LoadingLayer>().All(layer => layer.State.Value == osu.Framework.Graphics.Containers.Visibility.Hidden));
         AddStep("import score", () => score = scoreManager.Import(
             createScore(Beatmap.Value.BeatmapInfo, ScoreRank.A, stats((HitResult.Great, 1))))!.Value.Detach());
-        AddUntilStep("new score appears", () => leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().Any(row => row.Score.ID == score.ID));
-        AddAssert("displayed score is detached", () => leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().All(row => !row.Score.IsManaged));
+        AddUntilStep("new score appears", () => leaderboard.ChildrenOfType<BmsLeaderboardScore>().Any(row => row.Score.ID == score.ID));
+        AddAssert("displayed score is detached", () => leaderboard.ChildrenOfType<BmsLeaderboardScore>().All(row => !row.Score.IsManaged));
         AddStep("suspend song select", () => songSelect.Push(new ResumeTestScreen()));
         AddUntilStep("child screen loaded", () => Stack.CurrentScreen is ResumeTestScreen { IsLoaded: true });
         AddStep("return to song select", () => Stack.Exit());
         AddUntilStep("score remains after selection reload", () => Stack.CurrentScreen == songSelect
-            && leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().Any(row => row.Score.ID == score.ID));
+            && leaderboard.ChildrenOfType<BmsLeaderboardScore>().Any(row => row.Score.ID == score.ID));
         AddStep("delete score", () => scoreManager.Delete([score]));
-        AddUntilStep("deleted score disappears", () => !leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().Any());
+        AddUntilStep("deleted score disappears", () => !leaderboard.ChildrenOfType<BmsLeaderboardScore>().Any());
         AddStep("remove test leaderboard", () => Remove(leaderboard, true));
     }
 
@@ -167,10 +167,10 @@ public partial class TestSceneBmsSongSelectLampHack
             newRequest = leaderboard.Requests.Last();
             newRequest.SetResult(LeaderboardScores.Success([newScore], 1, 1, null));
         });
-        AddUntilStep("current score shown", () => leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().Any(row => row.Score.ID == newScore.ID));
+        AddUntilStep("current score shown", () => leaderboard.ChildrenOfType<BmsLeaderboardScore>().Any(row => row.Score.ID == newScore.ID));
         AddStep("complete obsolete query", () => oldRequest.SetResult(LeaderboardScores.Success([oldScore], 1, 1, null)));
         AddWaitStep("allow obsolete completion to run", 3);
-        AddAssert("obsolete score is ignored", () => leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().All(row => row.Score.ID == newScore.ID));
+        AddAssert("obsolete score is ignored", () => leaderboard.ChildrenOfType<BmsLeaderboardScore>().All(row => row.Score.ID == newScore.ID));
         AddStep("start another query", () => leaderboard.RefetchScores());
         AddUntilStep("another query pending", () => leaderboard.Requests.Last() != newRequest);
         AddStep("clear selection while query is pending", () =>
@@ -180,7 +180,7 @@ public partial class TestSceneBmsSongSelectLampHack
             newRequest.SetResult(LeaderboardScores.Success([oldScore], 1, 1, null));
         });
         AddWaitStep("allow cleared query to finish", 3);
-        AddAssert("empty selection stays empty", () => !leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().Any());
+        AddAssert("empty selection stays empty", () => !leaderboard.ChildrenOfType<BmsLeaderboardScore>().Any());
         AddStep("remove test leaderboard", () => Remove(leaderboard, true));
     }
 

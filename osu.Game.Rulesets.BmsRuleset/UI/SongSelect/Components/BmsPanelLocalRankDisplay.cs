@@ -10,6 +10,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Online.API;
@@ -56,6 +57,7 @@ internal partial class BmsPanelLocalRankDisplay : CompositeDrawable
     private IDisposable? scoreSubscription;
     private CancellationTokenSource? scoreQueryCancellation;
     private int scoreQueryGeneration;
+    private ScheduledDelegate? scoreQueryOperation;
 
     private readonly UpdateableRank updateable;
     private readonly BmsLampDisplay lampDisplay;
@@ -159,6 +161,12 @@ internal partial class BmsPanelLocalRankDisplay : CompositeDrawable
         if (IsDisposed)
             return;
 
+        // Returning from play may restore several mod bindings in the same update.
+        scoreQueryOperation = Schedule(queryScores);
+    }
+
+    private void queryScores()
+    {
         var currentBeatmap = Beatmap;
         var currentUser = localUser.Value;
         var currentRuleset = ruleset?.Value;
@@ -216,6 +224,7 @@ internal partial class BmsPanelLocalRankDisplay : CompositeDrawable
 
     private void cancelScoreQuery()
     {
+        scoreQueryOperation?.Cancel();
         scoreQueryGeneration++;
         scoreQueryCancellation?.Cancel();
         scoreQueryCancellation?.Dispose();

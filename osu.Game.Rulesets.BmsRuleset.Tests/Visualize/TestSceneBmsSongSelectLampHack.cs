@@ -399,9 +399,9 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         }), () => Is.EqualTo(all_lamps.Length - 1));
     }
 
-    private void loadSongSelect()
+    private void loadSongSelect(Func<BmsSoloSongSelect> create = null)
     {
-        AddStep("load real song select", () => Stack.Push(songSelect = new BmsSoloSongSelect()));
+        AddStep("load real song select", () => Stack.Push(songSelect = create?.Invoke() ?? new BmsSoloSongSelect()));
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for carousel presentation", () => songSelect.CarouselItemsPresented && !songSelect.IsFiltering);
         AddStep("scope to lamp beatmap set", () => songSelect.ScopeToBeatmapSet(lampBeatmapSet));

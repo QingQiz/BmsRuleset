@@ -242,28 +242,31 @@ internal abstract partial class BmsBeatmapPanel : Panel
 
     protected void ScheduleBackgroundRetrieval(BeatmapInfo beatmap)
     {
+        scheduledBackgroundRetrieval?.Cancel();
         backgroundCancellationSource?.Cancel();
+        backgroundCancellationSource?.Dispose();
         var backgroundCancellation = backgroundCancellationSource = new CancellationTokenSource();
+        var token = backgroundCancellation.Token;
         scheduledBackgroundRetrieval = Scheduler.AddDelayed(b =>
         {
-            if (!ReferenceEquals(CurrentBeatmap, b))
+            if (IsDisposed || token.IsCancellationRequested || !ReferenceEquals(CurrentBeatmap, b))
                 return;
 
-            var working = Beatmaps.GetWorkingBeatmap(b);
-
-            if (working is not BmsWorkingBeatmap bmsWorking)
+            Task.Run(async () =>
             {
-                BeatmapBackground.Beatmap = working;
-                return;
-            }
-
-            bmsWorking.PrepareBackgroundMetadataAsync(backgroundCancellation.Token).ContinueWith(task => Scheduler.Add(() =>
+                var working = Beatmaps.GetWorkingBeatmap(b);
+                if (working is BmsWorkingBeatmap bmsWorking)
+                    await bmsWorking.PrepareBackgroundMetadataAsync(token).ConfigureAwait(false);
+                return working;
+            }, token).ContinueWith(task => Scheduler.Add(() =>
             {
-                if (!task.IsCompletedSuccessfully || backgroundCancellation.IsCancellationRequested || IsDisposed
-                    || !ReferenceEquals(CurrentBeatmap, b))
+                if (task.Exception != null)
+                    BmsLogger.Error(task.Exception, "Failed to load the BMS song-select panel background.");
+
+                if (!task.IsCompletedSuccessfully || token.IsCancellationRequested || IsDisposed || !ReferenceEquals(CurrentBeatmap, b))
                     return;
 
-                BeatmapBackground.Beatmap = bmsWorking;
+                BeatmapBackground.Beatmap = task.Result;
             }), TaskScheduler.Default);
         }, beatmap, 50);
     }
@@ -346,6 +349,7 @@ internal abstract partial class BmsBeatmapPanel : Panel
         scheduledBackgroundRetrieval?.Cancel();
         scheduledBackgroundRetrieval = null;
         backgroundCancellationSource?.Cancel();
+        backgroundCancellationSource?.Dispose();
         backgroundCancellationSource = null;
         starDifficultyCancellationSource?.Cancel();
         starDifficultyCancellationSource = null;
@@ -372,6 +376,7 @@ internal abstract partial class BmsBeatmapPanel : Panel
     protected override void Dispose(bool isDisposing)
     {
         backgroundCancellationSource?.Cancel();
+        backgroundCancellationSource?.Dispose();
         starDifficultyCancellationSource?.Cancel();
         base.Dispose(isDisposing);
     }

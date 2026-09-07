@@ -5,6 +5,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.Textures;
 using osu.Game.Rulesets.Mods;
 using osuTK;
 using osuTK.Graphics;
@@ -13,8 +15,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 
 public sealed partial class BmsLampDisplay : CompositeDrawable
 {
-    private readonly Box baseFill;
-    private readonly Box flashFill;
+    private readonly Sprite baseFill;
+    private readonly Sprite flashFill;
 
     private BmsLamp lamp;
 
@@ -36,27 +38,23 @@ public sealed partial class BmsLampDisplay : CompositeDrawable
         }
     }
 
-    // Slab constructor used by the song-select patch: a label-less background that lets the
-    // panel's two rounded corners define the lamp shape. `masking` defaults to true but is
-    // passed as false in song select so the full-size lamp doesn't allocate its own frame
-    // buffer on top of TopLevelContent's.
     public BmsLampDisplay(BmsLamp lamp)
+        : this(lamp, null)
+    {
+    }
+
+    // Transparent panels need a shaped fill because an opaque cover would change their background.
+    internal BmsLampDisplay(BmsLamp lamp, Texture? texture)
     {
         Size = new Vector2(40, 20);
         Masking = false;
 
-        InternalChildren =
-        [
-            baseFill = new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-            },
-            flashFill = new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-                Alpha = 0,
-            },
-        ];
+        baseFill = texture == null ? new Box() : new Sprite { Texture = texture };
+        flashFill = texture == null ? new Box() : new Sprite { Texture = new Texture(texture) };
+        baseFill.RelativeSizeAxes = flashFill.RelativeSizeAxes = Axes.Both;
+        baseFill.Size = flashFill.Size = Vector2.One;
+        flashFill.Alpha = 0;
+        InternalChildren = [baseFill, flashFill];
 
         this.lamp = lamp;
         updateVisuals();

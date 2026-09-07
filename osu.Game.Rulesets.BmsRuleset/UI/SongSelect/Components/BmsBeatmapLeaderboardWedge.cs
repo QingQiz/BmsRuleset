@@ -32,7 +32,6 @@ using osu.Game.Online.API;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
-using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens;
@@ -85,7 +84,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
     private OsuScrollContainer scoresScroll = null!;
     private Container personalBestDisplay = null!;
 
-    private Container<BeatmapLeaderboardScore> personalBestScoreContainer = null!;
+    private Container<BmsLeaderboardScore> personalBestScoreContainer = null!;
     private OsuSpriteText personalBestText = null!;
     private LoadingLayer loading = null!;
 
@@ -135,7 +134,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
                             Left = 80f,
                             // Bottom padding ensures the last entry's full width is displayed
                             // (ie it is fully on screen after shear is considered).
-                            Bottom = BeatmapLeaderboardScore.HEIGHT * 3,
+                            Bottom = BmsLeaderboardScore.HEIGHT * 3,
                         },
                     },
                 },
@@ -177,7 +176,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
                                         Colour = colourProvider.Content2,
                                         Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
                                     },
-                                    personalBestScoreContainer = new Container<BeatmapLeaderboardScore>
+                                    personalBestScoreContainer = new Container<BmsLeaderboardScore>
                                     {
                                         RelativeSizeAxes = Axes.X,
                                         AutoSizeAxes = Axes.Y,
@@ -395,14 +394,14 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
 
         LoadComponentsAsync(scores.Select((s, i) =>
         {
-            BeatmapLeaderboardScore.HighlightType? highlightType = null;
+            BmsLeaderboardScore.HighlightType? highlightType = null;
 
             if (s.OnlineID == userScore?.OnlineID)
-                highlightType = BeatmapLeaderboardScore.HighlightType.Own;
+                highlightType = BmsLeaderboardScore.HighlightType.Own;
             else if (api.LocalUserState.Friends.Any(r => r.TargetID == s.UserID) && Scope.Value != BeatmapLeaderboardScope.Friend)
-                highlightType = BeatmapLeaderboardScore.HighlightType.Friend;
+                highlightType = BmsLeaderboardScore.HighlightType.Friend;
 
-            return new BeatmapLeaderboardScore(s)
+            return new BmsLeaderboardScore(s)
             {
                 Rank = i + 1,
                 Highlight = highlightType,
@@ -413,7 +412,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
                 ShowReplay = songSelect?.CanPresentScore == true
                     ? info => songSelect.PresentScore(info, ScorePresentType.Gameplay)
                     : null,
-            }.WithBmsRank();
+            };
         }), loadedScores =>
         {
             var delay = 200;
@@ -421,10 +420,10 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
 
             foreach (var d in loadedScores)
             {
-                d.Y = (BeatmapLeaderboardScore.HEIGHT + SPACING_BETWEEN_SCORES) * i;
+                d.Y = (BmsLeaderboardScore.HEIGHT + SPACING_BETWEEN_SCORES) * i;
 
                 // This is a bit of a weird one. We're already in a sheared state and don't want top-level
-                // shear applied, but still need the `BeatmapLeaderboardScore` to be in "sheared" mode (see ctor).
+                // shear applied, but still need the `BmsLeaderboardScore` to be in "sheared" mode (see ctor).
                 d.Shear = Vector2.Zero;
 
                 scoresContainer.Add(d);
@@ -461,13 +460,14 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
         {
             personalBestDisplay.MoveToX(0, 600, Easing.OutQuint);
             personalBestDisplay.FadeIn(600, Easing.OutQuint);
-            personalBestScoreContainer.Child = new BeatmapLeaderboardScore(userScore)
+            personalBestScoreContainer.Child = new BmsLeaderboardScore(userScore)
             {
-                Highlight = BeatmapLeaderboardScore.HighlightType.Own,
+                Highlight = BmsLeaderboardScore.HighlightType.Own,
                 Rank = userScore.Position,
                 SelectedMods = { BindTarget = mods },
-                Action = () => onLeaderboardScoreClicked(userScore),
-            }.WithBmsRank();
+                Action = songSelect?.CanPresentScore == true ? () => songSelect.PresentScore(userScore) : null,
+                ShowReplay = songSelect?.CanPresentScore == true ? info => songSelect.PresentScore(info, ScorePresentType.Gameplay) : null,
+            };
 
             scoresScroll.TransformTo(nameof(scoresScroll.Padding), new MarginPadding { Bottom = personal_best_height }, 300, Easing.OutQuint);
 
@@ -506,8 +506,6 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
         scoreSfxDelegates.ForEach(d => d.Cancel());
         scoreSfxDelegates.Clear();
     }
-
-    private void onLeaderboardScoreClicked(ScoreInfo score) => songSelect?.PresentScore(score);
 
     private LeaderboardState displayedState;
 
@@ -553,7 +551,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
     {
         base.UpdateAfterChildren();
 
-        const int height = BeatmapLeaderboardScore.HEIGHT;
+        const int height = BmsLeaderboardScore.HEIGHT;
 
         var fadeBottom = (float)(scoresScroll.Current + scoresScroll.DrawHeight);
         var fadeTop = (float)scoresScroll.Current;

@@ -640,7 +640,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
     {
         BeatmapInfo beatmap = null!;
         ScoreInfo alternateScore = null!;
-        BeatmapLeaderboardScore historyPanel = null!;
+        BmsLeaderboardScore historyPanel = null!;
 
         AddStep("import course stage beatmap and scores", () =>
         {
@@ -741,10 +741,10 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("stage card uses highest local rank", () => controller.CourseCarousel.ChildrenOfType<BmsCourseStagePanel>().Single()
             .ChildrenOfType<UpdateableRank>().Single(rank => rank.Alpha > 0).Rank, () => Is.EqualTo(ScoreRank.S));
         AddUntilStep("course history keeps every aggregate score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(2));
+            .ChildrenOfType<BmsLeaderboardScore>().Count(), () => Is.EqualTo(2));
         AddUntilStep("course history uses BMS rank lettering", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().OrderByDescending(row => row.Score.TotalScore)
-            .SelectMany(row => row.ChildrenOfType<OsuSpriteText>().Where(text => text.Font.Equals(osu.Game.Graphics.OsuFont.Numeric.With(size: 14))))
+            .ChildrenOfType<BmsLeaderboardScore>().OrderByDescending(row => row.Score.TotalScore)
+            .SelectMany(row => row.ChildrenOfType<OsuSpriteText>().Where(text => text.Name == "Leaderboard grade"))
             .Select(text => text.Text.ToString()), () => Is.EqualTo(new[] { "AAA", "AAA" }));
         AddAssert("course history has song select controls without tabs", () =>
         {
@@ -756,47 +756,47 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
                    && !history.ChildrenOfType<BeatmapDetailsArea.WedgeSelector<BeatmapDetailsArea.Header.Selection>>().Any();
         });
         AddAssert("course history sorts by score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().OrderBy(score => score.Rank).First().Score.TotalScore, () => Is.EqualTo(900_000));
+            .ChildrenOfType<BmsLeaderboardScore>().OrderBy(score => score.Rank).First().Score.TotalScore, () => Is.EqualTo(900_000));
         AddStep("sort course history by accuracy", () => config.SetValue(OsuSetting.BeatmapLeaderboardSortMode, LeaderboardSortMode.Accuracy));
         AddUntilStep("course history applies sorting", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().OrderBy(score => score.Rank).First().Score.TotalScore, () => Is.EqualTo(800_000));
+            .ChildrenOfType<BmsLeaderboardScore>().OrderBy(score => score.Rank).First().Score.TotalScore, () => Is.EqualTo(800_000));
         AddStep("filter course history by selected mods", () => config.SetValue(OsuSetting.BeatmapDetailModsFilter, true));
         AddUntilStep("only no-mod history remains", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(1));
+            .ChildrenOfType<BmsLeaderboardScore>().Count(), () => Is.EqualTo(1));
         AddAssert("no-mod history score is retained", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(900_000));
+            .ChildrenOfType<BmsLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(900_000));
         AddStep("select mirror", () => songSelect.Mods.Value = [new BmsModMirror()]);
         AddUntilStep("selected mods history is replaced", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(800_000));
+            .ChildrenOfType<BmsLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(800_000));
         AddAssert("selected mods filter ignores course gauge", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(800_000));
+            .ChildrenOfType<BmsLeaderboardScore>().Single().Score.TotalScore, () => Is.EqualTo(800_000));
         AddAssert("course history preserves judgement statistics", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Single().Score.Statistics.GetValueOrDefault(HitResult.Perfect), () => Is.EqualTo(2));
+            .ChildrenOfType<BmsLeaderboardScore>().Single().Score.Statistics.GetValueOrDefault(HitResult.Perfect), () => Is.EqualTo(2));
         AddAssert("course history card remains sheared", () =>
         {
             var quad = songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-                .ChildrenOfType<BeatmapLeaderboardScore>().Single().ScreenSpaceDrawQuad;
+                .ChildrenOfType<BmsLeaderboardScore>().Single().ScreenSpaceDrawQuad;
             return Math.Abs(quad.TopLeft.X - quad.BottomLeft.X) > 1;
         });
         AddAssert("course history text is not sheared", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Single()
+            .ChildrenOfType<BmsLeaderboardScore>().Single()
             .ChildrenOfType<OsuSpriteText>()
             .Where(text => text.IsPresent)
             .All(text => Math.Abs(text.ScreenSpaceDrawQuad.TopLeft.X - text.ScreenSpaceDrawQuad.BottomLeft.X) < 0.5f));
         AddStep("disable history mods filter", () => config.SetValue(OsuSetting.BeatmapDetailModsFilter, false));
         AddUntilStep("all history restored", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(2));
+            .ChildrenOfType<BmsLeaderboardScore>().Count(), () => Is.EqualTo(2));
         AddStep("capture existing history panel", () => historyPanel = songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().First());
+            .ChildrenOfType<BmsLeaderboardScore>().First());
         AddStep("import unrelated score", () => Assert.That(scoreManager.Import(createScore(beatmap, ScoreRank.B, 200_000,
             new Dictionary<HitResult, int> { [HitResult.Perfect] = 1 }, [])), Is.Not.Null));
         AddUntilStep("unrelated score imported", () => Realm.Run(r =>
             r.All<ScoreInfo>().AsEnumerable().Count(score => score.BeatmapHash == beatmap.Hash && !score.DeletePending)), () => Is.EqualTo(4));
         AddWaitStep("allow realm notifications", 5);
         AddAssert("unrelated score does not rebuild course history", () => ReferenceEquals(historyPanel,
-            songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().ChildrenOfType<BeatmapLeaderboardScore>().First()));
+            songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single().ChildrenOfType<BmsLeaderboardScore>().First()));
         AddStep("open course history score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().First(score => score.Score.TotalScore == 800_000).TriggerClick());
+            .ChildrenOfType<BmsLeaderboardScore>().First(score => score.Score.TotalScore == 800_000).TriggerClick());
         AddUntilStep("course score details opened", () => Stack.CurrentScreen, Is.TypeOf<BmsCourseResultsScreen>);
         AddUntilStep("course summary is displayed", () => ((BmsCourseResultsScreen)Stack.CurrentScreen).ChildrenOfType<BmsCourseResultsLayout>().SingleOrDefault(), () => Is.Not.Null);
         AddAssert("course score details match selected history", () => ((BmsCourseResultsScreen)Stack.CurrentScreen)
@@ -807,11 +807,17 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             createCourseAttempt(alternateScore, beatmap, [new BmsModMirror(), new BmsModClassGauge()])));
         AddWaitStep("allow suspended result notification", 5);
         AddAssert("suspended history is not rebuilt", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(2));
+            .ChildrenOfType<BmsLeaderboardScore>().Count(), () => Is.EqualTo(2));
         AddStep("close course score details", () => Stack.CurrentScreen.Exit());
         AddUntilStep("song select resumed", () => Stack.CurrentScreen, () => Is.SameAs(songSelect));
         AddUntilStep("suspended result appears after resume", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
-            .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(3));
+            .ChildrenOfType<BmsLeaderboardScore>().Count(), () => Is.EqualTo(3));
+        AddStep("mark history beatmap hidden", () => Realm.Write(r => r.Find<BeatmapInfo>(beatmap.ID)!.Hidden = true));
+        AddUntilStep("history beatmap hidden", () => Realm.Run(r => r.Find<BeatmapInfo>(beatmap.ID)!.Hidden));
+        AddStep("refresh hidden metadata", () => beatmaps.GetWorkingBeatmap(beatmap, true));
+        AddStep("open history for hidden beatmap", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BmsLeaderboardScore>().First(score => score.Score.TotalScore == 800_000).TriggerClick());
+        AddUntilStep("hidden beatmap history opened", () => Stack.CurrentScreen, Is.TypeOf<BmsCourseResultsScreen>);
     }
 
     [Test]

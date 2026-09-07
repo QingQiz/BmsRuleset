@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -8,6 +11,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
+using osu.Framework.Threading;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
@@ -50,6 +54,9 @@ internal partial class BmsCoursePanel : Panel
     private BmsCourseDefinition? currentCourse;
     private BmsCourseResultStore? resultStore;
     private Color4 availableIconColour;
+    private CancellationTokenSource? resultCancellation;
+    private int resultGeneration;
+    private ScheduledDelegate? resultQueryOperation;
 
     [Resolved]
     private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
@@ -163,12 +170,14 @@ internal partial class BmsCoursePanel : Panel
 
     protected override void FreeAfterUse()
     {
+        cancelResultQuery();
         currentCourse = null;
         base.FreeAfterUse();
     }
 
     protected override void Dispose(bool isDisposing)
     {
+        cancelResultQuery();
         BmsRulesetRuntime.CourseResultsChanged -= resultStoreChanged;
         if (resultStore != null)
             resultStore.Changed -= courseResultChanged;
@@ -214,13 +223,61 @@ internal partial class BmsCoursePanel : Panel
 
     private void updateResult()
     {
-        if (currentCourse == null)
+        cancelResultQuery();
+        if (IsDisposed || currentCourse == null)
             return;
 
-        var (lamp, rank) = BmsLampScoreSelector.SelectBestCourse(resultStore?.GetHistory(currentCourse.Id) ?? [], mods.Value);
-        courseLamp.Lamp = lamp;
-        courseRank.Rank = rank;
-        courseRank.Alpha = rank.HasValue ? 1 : 0;
+        courseLamp.Lamp = BmsLamp.NoPlay;
+        courseRank.Rank = null;
+        courseRank.Alpha = 0;
+
+        // Pool preparation and restored mod bindings can request the same history in one update.
+        resultQueryOperation = Schedule(queryResult);
+    }
+
+    private void queryResult()
+    {
+        if (IsDisposed || resultStore == null || currentCourse == null)
+            return;
+
+        var courseId = currentCourse.Id;
+        var store = resultStore;
+        var selectedMods = mods.Value.Select(mod => mod.DeepClone()).ToArray();
+        var generation = resultGeneration;
+        var cancellation = resultCancellation = new CancellationTokenSource();
+        var token = cancellation.Token;
+
+        // Cached histories still need mod selection, which can be expensive across a whole carousel.
+        Task.Run(async () => BmsLampScoreSelector.SelectBestCourse(await store.GetHistoryAsync(courseId, token).ConfigureAwait(false), selectedMods), token)
+            .ContinueWith(task =>
+            {
+                if (!task.IsCompletedSuccessfully)
+                {
+                    if (task.Exception != null)
+                        BmsLogger.Error(task.Exception, "Failed to load the BMS course lamp.");
+                    return;
+                }
+
+                Schedule(() =>
+                {
+                    if (IsDisposed || token.IsCancellationRequested || generation != resultGeneration)
+                        return;
+
+                    var (lamp, rank) = task.Result;
+                    courseLamp.Lamp = lamp;
+                    courseRank.Rank = rank;
+                    courseRank.Alpha = rank.HasValue ? 1 : 0;
+                });
+            }, TaskScheduler.Default);
+    }
+
+    private void cancelResultQuery()
+    {
+        resultQueryOperation?.Cancel();
+        resultGeneration++;
+        resultCancellation?.Cancel();
+        resultCancellation?.Dispose();
+        resultCancellation = null;
     }
 
     private void updateAvailability(bool hasMissingStage)

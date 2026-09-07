@@ -294,4 +294,29 @@
   <data name="cancel" xml:space="preserve"><value>取消</value></data>
   <data name="return_to_course_select" xml:space="preserve"><value>返回段位选择</value></data>
   <data name="course_history_delete_confirmation" xml:space="preserve"><value>确定删除该段位成绩吗？各曲目单独保存的成绩将会保留。</value></data>
+  <data name="leaderboard_date_24" xml:space="preserve"><value>{0:yyyy/M/d HH:mm:ss}</value></data>
+  <data name="leaderboard_date_12" xml:space="preserve"><value>{0:yyyy/M/d tt h:mm:ss}</value></data>
+  <data name="leaderboard_relative_time" xml:space="preserve"><value>{0}</value></data>
+  <data name="leaderboard_position" xml:space="preserve"><value>#{0:N0}</value></data>
+  <data name="leaderboard_unknown" xml:space="preserve"><value>-</value></data>
+  <data name="leaderboard_grade" xml:space="preserve"><value>{0}</value></data>
+  <data name="leaderboard_clear_status" xml:space="preserve"><value>通关状态</value></data>
+  <data name="leaderboard_fraction" xml:space="preserve"><value>{0:0} / {1:0}</value></data>
+  <data name="leaderboard_use_mods" xml:space="preserve"><value>使用这些模组</value></data>
+  <data name="leaderboard_copy_link" xml:space="preserve"><value>复制链接</value></data>
+  <data name="leaderboard_watch_replay" xml:space="preserve"><value>观看回放</value></data>
+  <data name="leaderboard_export" xml:space="preserve"><value>导出</value></data>
+  <data name="leaderboard_delete" xml:space="preserve"><value>删除</value></data>
+  <data name="leaderboard_delete_confirmation" xml:space="preserve"><value>删除此成绩及其回放？</value></data>
+  <data name="leaderboard_lamp_noplay" xml:space="preserve"><value>NO PLAY</value></data>
+  <data name="leaderboard_lamp_failed" xml:space="preserve"><value>FAILED</value></data>
+  <data name="leaderboard_lamp_assistclear" xml:space="preserve"><value>ASSIST CLEAR</value></data>
+  <data name="leaderboard_lamp_lightassistclear" xml:space="preserve"><value>LIGHT ASSIST CLEAR</value></data>
+  <data name="leaderboard_lamp_easyclear" xml:space="preserve"><value>EASY CLEAR</value></data>
+  <data name="leaderboard_lamp_clear" xml:space="preserve"><value>CLEAR</value></data>
+  <data name="leaderboard_lamp_hardclear" xml:space="preserve"><value>HARD CLEAR</value></data>
+  <data name="leaderboard_lamp_exhardclear" xml:space="preserve"><value>EX HARD CLEAR</value></data>
+  <data name="leaderboard_lamp_max" xml:space="preserve"><value>MAX</value></data>
+  <data name="leaderboard_lamp_perfect" xml:space="preserve"><value>PERFECT</value></data>
+  <data name="leaderboard_lamp_fullcombo" xml:space="preserve"><value>FULL COMBO</value></data>
 </root>

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
@@ -81,6 +83,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     private Sample? confirmSelectionSample;
     private WorkingBeatmap? beatmapBeforeCourseMode;
     private ScheduledDelegate? pendingCoursePreviewUpdate;
+    private CancellationTokenSource? courseStartCancellation;
     private Mod[] modsBeforeCourseMode = [];
     private Mod[] userMods = [];
     private Mod[] lockedMods = [];
@@ -204,47 +207,71 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         if (!IsCourseMode || course == null || !songSelect.IsCurrentScreen())
             return;
 
-        var gaugeType = BmsCourseSession.ResolveCourseGaugeType(songSelect.Mods.Value);
+        cancelCourseStart();
+        var cancellation = courseStartCancellation = new CancellationTokenSource();
+        var selectedMods = songSelect.Mods.Value.Select(mod => mod.DeepClone()).ToArray();
+        _ = startCourseAsync(course, songSelect, selectedMods, cancellation.Token);
+    }
 
-        var resolvedStages = course.Stages.Select(resolveStage).ToArray();
-
-        var missingStages = course.Stages
-            .Where((_, index) => resolvedStages[index] == null)
-            .ToArray();
-
-        if (missingStages.Length > 0)
+    private async Task startCourseAsync(BmsCourseDefinition course, OsuScreen songSelect, Mod[] selectedMods, CancellationToken token)
+    {
+        try
         {
-            var downloadUrls = ResolveMissingStageDownloadUrls(missingStages, BmsRulesetRuntime.DifficultyTableStore);
-
-            if (downloadUrls == null)
-                notifications?.Post(new SimpleNotification { Text = BmsStrings.CourseCannotStartMissingStages });
-            else
+            var resolvedStages = await Task.Run(() => course.Stages.Select(stage =>
             {
-                foreach (var url in downloadUrls)
-                    host.OpenUrlExternally(url);
-            }
+                token.ThrowIfCancellationRequested();
+                if (!stage.IsAvailable || string.IsNullOrEmpty(stage.BeatmapHash))
+                    return null;
 
-            return;
+                var beatmap = BmsCourseStagePanel.QueryBeatmap(beatmaps, stage.BeatmapHash);
+                return beatmap == null ? null : new BmsResolvedCourseStage(stage, beatmap);
+            }).ToArray(), token).ConfigureAwait(false);
+
+            Schedule(() =>
+            {
+                if (IsDisposed || token.IsCancellationRequested || !IsCourseMode || !songSelect.IsCurrentScreen() || !ReferenceEquals(course, SelectedCourse))
+                    return;
+
+                cancelCourseStart();
+                var missingStages = course.Stages.Where((_, index) => resolvedStages[index] == null).ToArray();
+                if (missingStages.Length > 0)
+                {
+                    var downloadUrls = ResolveMissingStageDownloadUrls(missingStages, BmsRulesetRuntime.DifficultyTableStore);
+                    if (downloadUrls == null)
+                        notifications?.Post(new SimpleNotification { Text = BmsStrings.CourseCannotStartMissingStages });
+                    else
+                    {
+                        foreach (var url in downloadUrls)
+                            host.OpenUrlExternally(url);
+                    }
+
+                    return;
+                }
+
+                var gaugeType = BmsCourseSession.ResolveCourseGaugeType(selectedMods);
+                var mods = BmsCourseSession.CreateCourseMods(selectedMods, gaugeType, course.Constraints);
+                var session = new BmsCourseSession(course, resolvedStages.Cast<BmsResolvedCourseStage>(), mods, gaugeType);
+                var originalBeatmap = beatmapBeforeCourseMode ?? songSelect.Beatmap.Value;
+
+                confirmSelectionSample?.Play();
+                // Restore the pre-course selection when leaving the session, rather than its preview stage.
+                songSelect.Push(new BmsCourseSessionScreen(session, originalBeatmap, selectedMods));
+            });
         }
-
-        var mods = BmsCourseSession.CreateCourseMods(songSelect.Mods.Value, gaugeType, course.Constraints);
-        var session = new BmsCourseSession(course, resolvedStages.Cast<BmsResolvedCourseStage>(), mods, gaugeType);
-        var originalBeatmap = beatmapBeforeCourseMode ?? songSelect.Beatmap.Value;
-
-        confirmSelectionSample?.Play();
-        // The current global beatmap is the course preview while course mode is visible. Restore the
-        // beatmap captured before entering course mode so SongSelect does not refetch a course stage
-        // before returning to the normal carousel.
-        songSelect.Push(new BmsCourseSessionScreen(session, originalBeatmap, songSelect.Mods.Value));
-
-        BmsResolvedCourseStage? resolveStage(BmsCourseStage stage)
+        catch (OperationCanceledException)
         {
-            if (!stage.IsAvailable || string.IsNullOrEmpty(stage.BeatmapHash))
-                return null;
-
-            var beatmap = BmsCourseStagePanel.QueryBeatmap(beatmaps, stage.BeatmapHash);
-            return beatmap == null ? null : new BmsResolvedCourseStage(stage, beatmap);
         }
+        catch (Exception exception)
+        {
+            BmsLogger.Error(exception, "Failed to resolve BMS course stages.");
+        }
+    }
+
+    private void cancelCourseStart()
+    {
+        courseStartCancellation?.Cancel();
+        courseStartCancellation?.Dispose();
+        courseStartCancellation = null;
     }
 
     internal static IReadOnlyList<string>? ResolveMissingStageDownloadUrls(
@@ -303,6 +330,8 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
             throw new InvalidOperationException("Course mode must be active before preparing its replacement.");
 
         pendingCoursePreviewUpdate?.Cancel();
+        cancelCourseStart();
+        songSelect.CancelBeatmapSelection();
         pendingCoursePreviewUpdate = null;
         courseHistory.CancelPendingRefresh();
 
@@ -325,6 +354,9 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     {
         base.Update();
 
+        if (!songSelect.IsCurrentScreen())
+            cancelCourseStart();
+
         if (!IsCourseMode)
             return;
 
@@ -343,6 +375,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     protected override void Dispose(bool isDisposing)
     {
+        cancelCourseStart();
         catalog.Changed -= catalogChanged;
         SearchTerm.ValueChanged -= searchChanged;
         songSelect.Mods.ValueChanged -= onModsChanged;
@@ -429,6 +462,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     private void courseSelected(BmsCourseDefinition? course)
     {
+        cancelCourseStart();
         selectedCourse.Value = course;
 
         if (IsCourseMode)
@@ -472,11 +506,12 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
     private void queueCoursePreview(BmsCourseDefinition? course)
     {
         pendingCoursePreviewUpdate?.Cancel();
+        songSelect.CancelBeatmapSelection();
         pendingCoursePreviewUpdate = Scheduler.AddDelayed(() =>
         {
             pendingCoursePreviewUpdate = null;
 
-            if (IsCourseMode)
+            if (IsCourseMode && songSelect.IsCurrentScreen())
                 updateCoursePreview(course);
         }, osu.Game.Screens.Select.SongSelect.SELECTION_DEBOUNCE);
     }
@@ -494,7 +529,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         }
 
         var previewBeatmap = candidates[Random.Shared.Next(candidates.Count)];
-        songSelect.Beatmap.Value = beatmaps.GetWorkingBeatmap(previewBeatmap);
+        songSelect.LoadBeatmapSelection(previewBeatmap);
     }
 
     private void presentCourseScore(ScoreInfo score, BmsCourseSession? session)
@@ -502,8 +537,9 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
         if (!IsCourseMode || !songSelect.IsCurrentScreen() || score.BeatmapInfo == null || session == null)
             return;
 
-        songSelect.Beatmap.Value = beatmaps.GetWorkingBeatmap(score.BeatmapInfo);
-        songSelect.Push(new BmsCourseResultsScreen(session, recordResult: false));
+        pendingCoursePreviewUpdate?.Cancel();
+        pendingCoursePreviewUpdate = null;
+        songSelect.LoadBeatmapSelection(score.BeatmapInfo, () => songSelect.Push(new BmsCourseResultsScreen(session, recordResult: false)));
     }
 
     /// <summary>
@@ -581,6 +617,7 @@ internal partial class BmsCourseSongSelectController : CompositeDrawable, IKeyBi
 
     private void onModsChanged(ValueChangedEvent<IReadOnlyList<Mod>> change)
     {
+        cancelCourseStart();
         if (adjustingMods || !IsCourseMode || modsAdjustedForCourse == null)
             return;
 
