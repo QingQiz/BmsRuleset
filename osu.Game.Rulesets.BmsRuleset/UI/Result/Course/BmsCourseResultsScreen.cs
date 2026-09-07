@@ -9,17 +9,15 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
-using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets.BmsRuleset.Course;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Replays;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Scoring;
-using osu.Game.Screens.Ranking;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 
-internal partial class BmsCourseResultsScreen : ResultsScreen
+internal partial class BmsCourseResultsScreen : BmsResultsScreen
 {
     internal int? SelectedStageIndex => selectedStage.Value;
 
@@ -41,7 +39,7 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
     private ScoreManager scores { get; set; } = null!;
 
     internal BmsCourseResultsScreen(BmsCourseSession session, bool recordResult = true)
-        : base(createBackingScore(session))
+        : base(null)
     {
         this.session = session;
         this.recordResult = recordResult;
@@ -49,6 +47,8 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
         AllowWatchingReplay = false;
         AllowRetry = false;
     }
+
+    protected override BmsStatisticsPanel CreateStatisticsPanel() => new(false);
 
     protected override void LoadComplete()
     {
@@ -72,19 +72,15 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
 
         summaryBeatmap = Beatmap.Value;
 
-        foreach (var score in session.Stages.Select(stage => stage.Score).Where(score => score != null && !score.Equals(Score)))
-            ScorePanelList.AddScore(score!);
-
-        hideNativeScorePanels();
-
-        StatisticsPanel.Hide();
-        SelectedScore.Value = null;
-
         var layout = courseLayout = new BmsCourseResultsLayout(session, aggregateScore, selectedStage);
-        LoadComponentAsync(layout, VerticalScrollContent.Add);
-        var bottomPanel = BmsResultsScreenPatcher.GetBottomPanel(this);
-        bottomPanel.Name = "Course result controls";
-        bottomPanel.Children =
+        LoadComponentAsync(layout, ResultsContent.Add);
+        selectedStage.BindValueChanged(selectionChanged, true);
+    }
+
+    protected override Drawable[] CreateResultControls()
+    {
+        BottomPanel.Name = "Course result controls";
+        return
         [
             new Box
             {
@@ -103,8 +99,6 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
                 Action = this.Exit,
             },
         ];
-
-        selectedStage.BindValueChanged(selectionChanged, true);
     }
 
     public override bool OnBackButton()
@@ -118,22 +112,33 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
         return base.OnBackButton();
     }
 
-    protected override Task<ScoreInfo[]> FetchScores() => Task.FromResult<ScoreInfo[]>([]);
+    public override bool OnExiting(ScreenExitEvent e)
+    {
+        if (base.OnExiting(e))
+            return true;
+
+        cancelStageBeatmapLoad();
+        courseLayout.AggregateStatistics.CancelLoading();
+        return false;
+    }
 
     protected override void Dispose(bool isDisposing)
     {
-        stageBeatmapLoadCancellation?.Cancel();
-        stageBeatmapLoadCancellation?.Dispose();
-        stageBeatmapLoadCancellation = null;
+        cancelStageBeatmapLoad();
         selectedStage.ValueChanged -= selectionChanged;
         base.Dispose(isDisposing);
     }
 
-    private void selectionChanged(ValueChangedEvent<int?> selection)
+    private void cancelStageBeatmapLoad()
     {
         stageBeatmapLoadCancellation?.Cancel();
         stageBeatmapLoadCancellation?.Dispose();
         stageBeatmapLoadCancellation = null;
+    }
+
+    private void selectionChanged(ValueChangedEvent<int?> selection)
+    {
+        cancelStageBeatmapLoad();
 
         if (!selection.NewValue.HasValue)
         {
@@ -142,7 +147,6 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
             courseLayout.AggregateStatistics.Show();
             courseLayout.ShowScore(null);
             Beatmap.Value = summaryBeatmap;
-            Schedule(hideNativeScorePanels);
             return;
         }
 
@@ -187,41 +191,7 @@ internal partial class BmsCourseResultsScreen : ResultsScreen
             Beatmap.Value = workingBeatmap;
             SelectedScore.Value = attempt.Score;
             courseLayout.ShowScore(attempt.Score);
-            // ScorePanelList is still bound to SelectedScore by ResultsScreen and may update its
-            // hidden native panel during this change. Show after those bindings settle.
-            Schedule(() =>
-            {
-                if (!IsDisposed && !cancellationToken.IsCancellationRequested && selectedStage.Value == stageIndex)
-                    StatisticsPanel.Show();
-            });
-            Schedule(hideNativeScorePanels);
+            StatisticsPanel.Show();
         });
-    }
-
-    private void hideNativeScorePanels()
-    {
-        ScorePanelList.Hide();
-        ScorePanelList.HandleInput = false;
-
-        foreach (var panel in ScorePanelList.GetScorePanels())
-            panel.Hide();
-    }
-
-    private static ScoreInfo createBackingScore(BmsCourseSession session)
-    {
-        var playedScore = session.Stages.Select(stage => stage.Score).FirstOrDefault(score => score != null);
-        if (playedScore != null)
-            return BmsScoreGaugeHistoryStore.Clone(playedScore);
-
-        var beatmap = session.Stages[0].Stage.Beatmap;
-        return new ScoreInfo
-        {
-            User = new APIUser(),
-            BeatmapInfo = beatmap,
-            BeatmapHash = beatmap.Hash,
-            Ruleset = beatmap.Ruleset,
-            Passed = false,
-            Mods = session.Mods.Select(mod => mod.DeepClone()).ToArray(),
-        };
     }
 }

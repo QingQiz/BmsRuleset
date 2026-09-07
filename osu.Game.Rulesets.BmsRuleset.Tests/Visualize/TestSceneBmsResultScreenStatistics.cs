@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Drawables;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Models;
@@ -19,16 +19,15 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
-using osu.Game.Rulesets.BmsRuleset.UI.Icons;
+using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
+using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.Ranking;
-using osu.Game.Screens.Ranking.Expanded.Accuracy;
 using osu.Game.Screens.Ranking.Expanded.Statistics;
-using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Screens.Ranking.Statistics.User;
 using osu.Game.Tests.Visual;
 using osuTK;
@@ -39,6 +38,35 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [TestFixture]
 public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerTestScene
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestNativeEntryReplacedBeforeLoading(bool gameplayRequest)
+    {
+        ResultsScreen original = null!;
+        BmsResultsScreen screen = null!;
+        ScoreInfo score = null!;
+        var hitCount = 0;
+
+        AddStep("push through native entry", () =>
+        {
+            score = createScore();
+            hitCount = score.HitEvents.Count;
+            var stack = new OsuScreenStack { RelativeSizeAxes = Axes.Both };
+            Child = stack;
+            original = gameplayRequest
+                ? new BmsResultsScreenRequest(new BmsResultsScreen(score) { AllowWatchingReplay = false })
+                : new SoloResultsScreen(score) { AllowWatchingReplay = false };
+            stack.Push(original);
+            screen = (BmsResultsScreen)stack.CurrentScreen;
+        });
+        AddUntilStep("owned result has loaded charts", () => screen.IsLoaded && screen.ChildrenOfType<BmsHitOffsetStatistic>().Any());
+        AddAssert("native screen never loaded", () => !original.IsLoaded);
+        AddAssert("native score list never created", () => screen.ChildrenOfType<ScorePanelList>(), () => Is.Empty);
+        AddAssert("score and hit events survive replacement", () => ReferenceEquals(screen.Score, score) && score.HitEvents.Count == hitCount);
+        AddStep("exit result", () => screen.Exit());
+        AddUntilStep("hit events released on exit", () => score.HitEvents, () => Is.Empty);
+    }
+
     [TestCase(1280, 720)]
     [TestCase(1024, 600)]
     [TestCase(1600, 900)]
@@ -62,10 +90,10 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                                                               && screen.ChildrenOfType<BmsStatisticsPanel>().Single().State.Value == Visibility.Visible);
         AddUntilStep("all charts fit viewport", () => ChartsFitViewport(screen));
         AddUntilStep("result overview fills left column", () => OverviewFitsViewport(screen));
-        AddAssert("native score list hidden", () => screen.ChildrenOfType<ScorePanelList>().Single().Alpha, () => Is.Zero);
+        AddAssert("native score list absent", () => screen.ChildrenOfType<ScorePanelList>(), () => Is.Empty);
         AddAssert("rank text fits inside rating circle", () =>
         {
-            var circle = screen.ChildrenOfType<BmsResultOverview>().Single().ChildrenOfType<AccuracyCircle>().Single();
+            var circle = screen.ChildrenOfType<BmsResultOverview>().Single().ChildrenOfType<BmsAccuracyCircle>().Single();
             var text = circle.ChildrenOfType<GlowingSpriteText>().Single().ScreenSpaceDrawQuad.AABBFloat;
             var bounds = circle.ScreenSpaceDrawQuad.AABBFloat;
             return text.Width < bounds.Width * 0.8f && text.Height < bounds.Height * 0.8f;
@@ -73,7 +101,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddAssert("rank composition fills the narrowed column", () =>
         {
             var overview = screen.ChildrenOfType<BmsResultOverview>().Single();
-            var circle = overview.ChildrenOfType<AccuracyCircle>().Single().ScreenSpaceDrawQuad.AABBFloat;
+            var circle = overview.ChildrenOfType<BmsAccuracyCircle>().Single().ScreenSpaceDrawQuad.AABBFloat;
             return circle.Width >= overview.ScreenSpaceDrawQuad.AABBFloat.Width * 0.6f;
         });
         AddStep("record metadata positions", () => metadataPositions = screen.ChildrenOfType<BmsResultOverview>().Single()
@@ -185,7 +213,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
     internal static bool ChartsFitViewport(Drawable screen)
     {
-        var grid = screen.ChildrenOfType<BmsResultStatisticsGrid>().SingleOrDefault(drawable => drawable.IsPresent && drawable.FindClosestParent<StatisticsPanel>()!.State.Value == Visibility.Visible);
+        var grid = screen.ChildrenOfType<BmsResultStatisticsGrid>().SingleOrDefault(drawable => drawable.IsPresent && drawable.FindClosestParent<BmsStatisticsPanel>()!.State.Value == Visibility.Visible);
         if (grid == null)
             return false;
 
@@ -200,7 +228,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         }) && grid.ChildrenOfType<OsuScrollContainer>().Single().ScrollableExtent < 1;
     }
 
-    internal static bool OverviewFitsViewport(ResultsScreen screen)
+    internal static bool OverviewFitsViewport(BmsResultsScreen screen)
     {
         var overview = screen.ChildrenOfType<BmsResultOverview>().SingleOrDefault();
         var grid = screen.ChildrenOfType<BmsResultStatisticsGrid>().SingleOrDefault();
@@ -219,7 +247,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
     internal static bool ChartsUseExpectedRows(Drawable screen)
     {
         var grid = screen.ChildrenOfType<BmsResultStatisticsGrid>().Single(drawable => drawable.IsPresent
-                                                                                       && drawable.FindClosestParent<StatisticsPanel>()!.State.Value == Visibility.Visible);
+                                                                                       && drawable.FindClosestParent<BmsStatisticsPanel>()!.State.Value == Visibility.Visible);
         var gauge = grid.ChildrenOfType<BmsGaugeHistoryGraph>().Single().ScreenSpaceDrawQuad.AABBFloat;
         var timeline = grid.ChildrenOfType<BmsTimelineStatistic>().Single().ScreenSpaceDrawQuad.AABBFloat;
         var scatter = grid.ChildrenOfType<BmsHitScatterStatistic>().Single().ScreenSpaceDrawQuad.AABBFloat;
@@ -317,7 +345,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         });
 
         AddUntilStep("results screen loaded", () => screen.IsLoaded);
-        AddUntilStep("statistics shown automatically", () => this.ChildrenOfType<StatisticsPanel>().Single().State.Value == Visibility.Visible);
+        AddUntilStep("statistics shown automatically", () => this.ChildrenOfType<BmsStatisticsPanel>().Single().State.Value == Visibility.Visible);
         AddAssert("performance statistic is absent", () => this.ChildrenOfType<PerformanceStatistic>().Count() == 0);
         AddUntilStep("new overview loaded", () => screen.ChildrenOfType<BmsResultOverview>().SingleOrDefault()?.IsLoaded == true);
         AddAssert("EXSCORE uses actual judgement values", () => screen.ChildrenOfType<BmsResultFittedText>()
@@ -356,40 +384,6 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         AddAssert("all progress bars remain valid", () => screen.ChildrenOfType<BmsResultBar>().All(bar => double.IsFinite(bar.Proportion)
                                                                                                            && bar.Proportion >= 0 && bar.Proportion <= 1));
         AddAssert("empty score bars stay empty", () => !empty || screen.ChildrenOfType<BmsResultBar>().All(bar => bar.Proportion == 0));
-    }
-
-    [Test]
-    public void TestPerfectExScoreAndComboShowPerfect()
-    {
-        ScoreInfo score = null!;
-
-        BmsExScoreStatistic exScore = null!;
-        BmsComboStatistic combo = null!;
-        AddStep("load perfect statistics", () =>
-        {
-            score = createScore();
-            score.Statistics = new Dictionary<HitResult, int> { [HitResult.Perfect] = 985 };
-            score.MaxCombo = 985;
-            Child = new Container
-            {
-                AutoSizeAxes = Axes.Both,
-                Children =
-                [
-                    exScore = new BmsExScoreStatistic(score),
-                    combo = new BmsComboStatistic(score.MaxCombo, score.GetMaximumAchievableCombo()),
-                ],
-            };
-        });
-        AddUntilStep("perfect statistics loaded", () => exScore.IsLoaded && combo.IsLoaded);
-        AddAssert("EXSCORE uses combo statistic layout", () => exScore is ComboStatistic);
-        AddAssert("max combo uses native rolling counter", () => combo.ChildrenOfType<StatisticCounter>().Count() == 1);
-        AddStep("show perfect statistics", () =>
-        {
-            exScore.Appear();
-            combo.Appear();
-        });
-        AddUntilStep("perfect labels shown", () => this.ChildrenOfType<SpriteText>().Count(text => text.Text.ToString() == "PERFECT") == 2);
-        AddAssert("max combo displays current and maximum", () => this.ChildrenOfType<SpriteText>().Any(text => text.Text.ToString() == "/985"));
     }
 
     private ScoreInfo createScore()
@@ -583,15 +577,13 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                && Math.Abs(markerCentreY - expectedY) < 0.5f;
     }
 
-    private partial class TestBmsSoloResultsScreen : SoloResultsScreen
+    private partial class TestBmsSoloResultsScreen : BmsResultsScreen
     {
         public TestBmsSoloResultsScreen(ScoreInfo score)
             : base(score)
         {
             AllowWatchingReplay = false;
         }
-
-        protected override Task<ScoreInfo[]> FetchScores() => Task.FromResult<ScoreInfo[]>([]);
     }
 
     [Test]
@@ -615,7 +607,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
         AddUntilStep("results screen loaded", () => screen.IsLoaded);
 
-        AddUntilStep("statistics shown automatically", () => this.ChildrenOfType<StatisticsPanel>().Single().State.Value == Visibility.Visible);
+        AddUntilStep("statistics shown automatically", () => this.ChildrenOfType<BmsStatisticsPanel>().Single().State.Value == Visibility.Visible);
 
         assertText("BMS Result Showcase");
         assertText("visual-test artist");
@@ -968,8 +960,9 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         assertNoHitScatterText("Key 1");
     }
 
-    [Test]
-    public void TestScoreCardUsesBmsRulesetIcon()
+    [TestCase(0.813197)]
+    [TestCase(0.95)]
+    public void TestResultUsesOwnedRankComponents(double accuracy)
     {
         TestBmsSoloResultsScreen screen = null!;
 
@@ -981,11 +974,24 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             };
 
             Child = stack;
-            stack.Push(screen = new TestBmsSoloResultsScreen(createScore()));
+            var score = createScore();
+            score.Accuracy = accuracy;
+            stack.Push(screen = new TestBmsSoloResultsScreen(score));
         });
 
         AddUntilStep("results screen loaded", () => screen.IsLoaded);
-        AddUntilStep("score card uses BMS ruleset icon", () =>
-            this.ChildrenOfType<DifficultyIcon>().Any(icon => icon.ChildrenOfType<BmsRulesetIcon>().Any()));
+        AddUntilStep("owned rank text loaded", () => screen.ChildrenOfType<BmsRankText>().Any());
+        AddAssert("rank text shows BMS lettering", () => screen.ChildrenOfType<BmsRankText>().Single()
+            .ChildrenOfType<GlowingSpriteText>().Single().Text.ToString(), () => Is.EqualTo("AA"));
+        AddAssert("rank badges show all BMS thresholds", () => screen.ChildrenOfType<BmsRankBadge>()
+            .Select(badge => badge.ChildrenOfType<BmsDrawableRank>().Single().ChildrenOfType<SpriteText>().Single().Text.ToString()),
+            () => Is.EqualTo(new[] { "C", "B", "A", "AA", "AAA", "S" }));
+        AddAssert("badge thresholds use EX score ratios", () => screen.ChildrenOfType<BmsRankBadge>().Select(badge => badge.Accuracy),
+            () => Is.EqualTo(new[] { 0, 5.0 / 9, 6.0 / 9, 7.0 / 9, 8.0 / 9, 1 }));
+        AddStep("finish rating animation", () => screen.ChildrenOfType<BmsAccuracyCircle>().Single().FinishTransforms(true));
+        AddAssert("stored rank does not lower accuracy progress", () => screen.ChildrenOfType<BmsAccuracyCircle>().Single()
+                .ChildrenOfType<CircularProgress>().Single(circle => circle.Name == "Accuracy circle").Progress,
+            () => Is.EqualTo(accuracy - 0.001).Within(0.0001));
+        AddAssert("native score panels absent", () => screen.ChildrenOfType<ScorePanel>(), () => Is.Empty);
     }
 }

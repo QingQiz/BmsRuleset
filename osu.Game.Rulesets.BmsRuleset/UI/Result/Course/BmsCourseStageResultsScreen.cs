@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
@@ -14,11 +13,10 @@ using osu.Game.Overlays.Dialog;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Scoring;
-using osu.Game.Screens.Ranking;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 
-internal partial class BmsCourseStageResultsScreen : ResultsScreen
+internal partial class BmsCourseStageResultsScreen : BmsResultsScreen
 {
     private readonly Action nextStage;
     private readonly Action abandonCourse;
@@ -54,14 +52,10 @@ internal partial class BmsCourseStageResultsScreen : ResultsScreen
         countdownSample = audio.Samples.Get(@"Multiplayer/countdown-warn");
     }
 
-    protected override void LoadComplete()
+    protected override Drawable[] CreateResultControls()
     {
-        base.LoadComplete();
-
-        var bottomPanel = BmsResultsScreenPatcher.GetBottomPanel(this);
-
-        bottomPanel.Name = "Course stage result controls";
-        bottomPanel.Children =
+        BottomPanel.Name = "Course stage result controls";
+        return
         [
             new Box
             {
@@ -142,9 +136,7 @@ internal partial class BmsCourseStageResultsScreen : ResultsScreen
         return true;
     }
 
-    protected override Task<ScoreInfo[]> FetchScores() => Task.FromResult<ScoreInfo[]>([]);
-
-    internal void AdvanceFromEnter() => advance();
+    protected override void OnSelect() => advance();
 
     private void advance() => completeAction(nextStage);
 

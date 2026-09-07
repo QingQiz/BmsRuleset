@@ -10,7 +10,7 @@ internal partial class BmsResultFittedContainer : CompositeDrawable
     private readonly Drawable content;
     private readonly Axes fitAxes;
 
-    protected BmsResultFittedContainer(Drawable content, Axes fitAxes = Axes.Both)
+    internal BmsResultFittedContainer(Drawable content, Axes fitAxes = Axes.Both)
     {
         this.content = content;
         this.fitAxes = fitAxes;

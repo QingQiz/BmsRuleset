@@ -31,6 +31,7 @@ using osu.Game.Online.API;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
+using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -361,7 +362,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
                 ShowReplay = songSelect?.CanPresentScore == true
                     ? info => songSelect.PresentScore(info, ScorePresentType.Gameplay)
                     : null,
-            };
+            }.WithBmsRank();
         }), loadedScores =>
         {
             var delay = 200;
@@ -415,7 +416,7 @@ public partial class BmsBeatmapLeaderboardWedge : VisibilityContainer
                 Rank = userScore.Position,
                 SelectedMods = { BindTarget = mods },
                 Action = () => onLeaderboardScoreClicked(userScore),
-            };
+            }.WithBmsRank();
 
             scoresScroll.TransformTo(nameof(scoresScroll.Padding), new MarginPadding { Bottom = personal_best_height }, 300, Easing.OutQuint);
 

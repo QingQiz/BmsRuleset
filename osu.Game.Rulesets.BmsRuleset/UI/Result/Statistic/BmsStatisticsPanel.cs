@@ -20,10 +20,14 @@ using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
-internal partial class BmsStatisticsPanel : StatisticsPanel
+internal partial class BmsStatisticsPanel : VisibilityContainer
 {
     private const double minimum_loading_duration = 550;
     private const double content_fade_duration = 250;
+
+    internal readonly Bindable<ScoreInfo?> Score = new();
+
+    protected override bool StartHidden => true;
 
     private readonly Container content;
     private readonly LoadingSpinner spinner;
@@ -57,7 +61,7 @@ internal partial class BmsStatisticsPanel : StatisticsPanel
     [BackgroundDependencyLoader]
     private void load() => Score.BindValueChanged(populate, true);
 
-    protected override IEnumerable<StatisticItem> CreateStatisticItems(ScoreInfo newScore, IBeatmap playableBeatmap) =>
+    protected virtual IEnumerable<StatisticItem> CreateStatisticItems(ScoreInfo newScore, IBeatmap playableBeatmap) =>
         newScore.Ruleset.CreateInstance().CreateStatisticsForScore(newScore, playableBeatmap);
 
     protected virtual Task RestoreReplayDataAsync(ScoreInfo score, CancellationToken cancellationToken) =>
@@ -73,9 +77,7 @@ internal partial class BmsStatisticsPanel : StatisticsPanel
 
     private void populate(ValueChangedEvent<ScoreInfo?> change)
     {
-        loadCancellation?.Cancel();
-        loadCancellation?.Dispose();
-        loadCancellation = null;
+        CancelLoading();
         contentReady = false;
         loadingStartTime = null;
         content.ClearTransforms();
@@ -190,11 +192,20 @@ internal partial class BmsStatisticsPanel : StatisticsPanel
 
     protected override bool OnClick(ClickEvent e) => false;
 
-    protected override void Dispose(bool isDisposing)
+    protected override void PopIn() => this.FadeIn(350, Easing.OutQuint);
+
+    protected override void PopOut() => this.FadeOut(200, Easing.OutQuint);
+
+    internal void CancelLoading()
     {
         loadCancellation?.Cancel();
         loadCancellation?.Dispose();
         loadCancellation = null;
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        CancelLoading();
         Score.ValueChanged -= populate;
         base.Dispose(isDisposing);
     }

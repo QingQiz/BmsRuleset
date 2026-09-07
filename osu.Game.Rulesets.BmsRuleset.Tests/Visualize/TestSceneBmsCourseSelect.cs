@@ -31,6 +31,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
+using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Course;
@@ -741,6 +742,10 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             .ChildrenOfType<UpdateableRank>().Single(rank => rank.Alpha > 0).Rank, () => Is.EqualTo(ScoreRank.S));
         AddUntilStep("course history keeps every aggregate score", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
             .ChildrenOfType<BeatmapLeaderboardScore>().Count(), () => Is.EqualTo(2));
+        AddUntilStep("course history uses BMS rank lettering", () => songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single()
+            .ChildrenOfType<BeatmapLeaderboardScore>().OrderByDescending(row => row.Score.TotalScore)
+            .SelectMany(row => row.ChildrenOfType<OsuSpriteText>().Where(text => text.Font.Equals(osu.Game.Graphics.OsuFont.Numeric.With(size: 14))))
+            .Select(text => text.Text.ToString()), () => Is.EqualTo(new[] { "AAA", "AAA" }));
         AddAssert("course history has song select controls without tabs", () =>
         {
             var history = songSelect.ChildrenOfType<BmsCourseHistoryArea>().Single();
@@ -794,7 +799,8 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             .ChildrenOfType<BeatmapLeaderboardScore>().First(score => score.Score.TotalScore == 800_000).TriggerClick());
         AddUntilStep("course score details opened", () => Stack.CurrentScreen, Is.TypeOf<BmsCourseResultsScreen>);
         AddUntilStep("course summary is displayed", () => ((BmsCourseResultsScreen)Stack.CurrentScreen).ChildrenOfType<BmsCourseResultsLayout>().SingleOrDefault(), () => Is.Not.Null);
-        AddAssert("course score details match selected history", () => ((BmsCourseResultsScreen)Stack.CurrentScreen).Score?.TotalScore,
+        AddAssert("course score details match selected history", () => ((BmsCourseResultsScreen)Stack.CurrentScreen)
+                .ChildrenOfType<BmsResultOverview>().Single().Score.TotalScore,
             () => Is.EqualTo(800_000));
         AddStep("record course while song select is suspended", () => BmsRulesetRuntime.CourseResults?.Record(
             "history-test", BmsCourseStatus.Passed, alternateScore.Rank, alternateScore,

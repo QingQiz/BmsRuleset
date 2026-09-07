@@ -31,9 +31,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Ranking.Expanded;
-using osu.Game.Screens.Ranking.Expanded.Accuracy;
 using osu.Game.Screens.Ranking.Expanded.Statistics;
-using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Tests.Visual;
 using osuTK;
 using osuTK.Graphics;
@@ -215,7 +213,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
 
         var bounds = overview.ScreenSpaceDrawQuad.AABBFloat;
         var viewport = screen.ScreenSpaceDrawQuad.AABBFloat;
-        var footer = BmsResultsScreenPatcher.GetBottomPanel(screen).ScreenSpaceDrawQuad.AABBFloat;
+        var footer = screen.BottomPanel.ScreenSpaceDrawQuad.AABBFloat;
         var cards = overview.ChildrenOfType<BmsCourseStageCard>().ToArray();
         return bounds.Left >= viewport.Left && bounds.Bottom <= footer.Top && bounds.Top >= viewport.Top
                && cards.Length == 4 && cards.All(card =>
@@ -273,7 +271,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddAssert("course timeline has no failure shade", () => hasFailureShade(screen), () => Is.False);
         AddStep("open aborted stage", () => clickCourseStage("Course stage 2 result"));
         AddUntilStep("aborted stage statistics shown", () => screen.SelectedStageIndex == 1
-                                                             && screen.ChildrenOfType<StatisticsPanel>()
+                                                             && screen.ChildrenOfType<BmsStatisticsPanel>()
                                                                  .Single(panel => panel is not BmsCourseAggregateStatistics)
                                                                  .State.Value == Visibility.Visible);
         AddUntilStep("aborted stage timeline loaded", () => screen.ChildrenOfType<BmsTimelineStatistic>().Count(), () => Is.EqualTo(2));
@@ -349,7 +347,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
             .All(card => !card.ChildrenOfType<StatisticDisplay>().Any()
                          && !card.ChildrenOfType<OsuSpriteText>().Any(text => text.Text.ToString() == "course mapper")));
         AddAssert("course overview replaces rank circle", () => screen.ChildrenOfType<BmsResultOverview>().Single()
-            .ChildrenOfType<AccuracyCircle>(), () => Is.Empty);
+            .ChildrenOfType<BmsAccuracyCircle>(), () => Is.Empty);
         AddAssert("course cards retain translucent outer section", () =>
         {
             var header = screen.ChildrenOfType<BmsCourseOverviewHeader>().Single();
@@ -377,7 +375,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
             return left.Right <= right.Left && Math.Abs(left.Top - right.Top) < 1;
         });
         AddAssert("aggregate charts stay above footer", () => screen.ChildrenOfType<BmsResultStatisticsGrid>().Single()
-            .ScreenSpaceDrawQuad.AABBFloat.Bottom <= BmsResultsScreenPatcher.GetBottomPanel(screen).ScreenSpaceDrawQuad.AABBFloat.Top);
+            .ScreenSpaceDrawQuad.AABBFloat.Bottom <= screen.BottomPanel.ScreenSpaceDrawQuad.AABBFloat.Top);
 
         AddStep("open first stage score", () => clickCourseStage("Course stage 1 result"));
         AddUntilStep("first stage selected", () => screen.SelectedStageIndex == 0);
@@ -386,12 +384,12 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
             .Single(card => card.IsSelected).Name, () => Is.EqualTo("Course stage 1 result"));
         AddAssert("screen stack unchanged", () => Stack.CurrentScreen, () => Is.SameAs(screen));
         AddAssert("first stage score selected", () => screen.SelectedScore.Value, () => Is.SameAs(session.Stages[0].Score));
-        AddUntilStep("native statistics shown", () => screen.ChildrenOfType<StatisticsPanel>()
+        AddUntilStep("stage statistics shown", () => screen.ChildrenOfType<BmsStatisticsPanel>()
             .Single(panel => panel is not BmsCourseAggregateStatistics).State.Value == Visibility.Visible);
         AddUntilStep("first stage chart shows its own hits", () => screen.ChildrenOfType<BmsStatisticsPanel>()
             .Single(panel => panel is not BmsCourseAggregateStatistics).ChildrenOfType<BmsHitScatterStatistic>()
             .SelectMany(chart => chart.ChildrenOfType<OsuSpriteText>()).Any(text => text.Text.ToString() == "2 hits"));
-        AddUntilStep("native score card hidden", () => screen.ChildrenOfType<ScorePanel>().All(panel => !panel.IsPresent));
+        AddAssert("native score cards absent", () => screen.ChildrenOfType<ScorePanel>(), () => Is.Empty);
         AddAssert("score replay disabled", () => screen.AllowWatchingReplay, () => Is.False);
         AddAssert("score retry disabled", () => screen.AllowRetry, () => Is.False);
 
@@ -403,7 +401,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddStep("open second stage directly", () => clickCourseStage("Course stage 2 result"));
         AddUntilStep("second stage selected directly", () => screen.SelectedStageIndex == 1
                                                              && ReferenceEquals(screen.SelectedScore.Value, session.Stages[1].Score)
-                                                             && screen.ChildrenOfType<StatisticsPanel>()
+                                                             && screen.ChildrenOfType<BmsStatisticsPanel>()
                                                                  .Single(panel => panel is not BmsCourseAggregateStatistics)
                                                                  .State.Value == Visibility.Visible);
 
@@ -417,7 +415,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         AddStep("switch from second stage to first stage", () => clickCourseStage("Course stage 1 result"));
         AddUntilStep("first stage selected directly", () => screen.SelectedStageIndex == 0
                                                             && ReferenceEquals(screen.SelectedScore.Value, session.Stages[0].Score)
-                                                            && screen.ChildrenOfType<StatisticsPanel>()
+                                                            && screen.ChildrenOfType<BmsStatisticsPanel>()
                                                                 .Single(panel => panel is not BmsCourseAggregateStatistics)
                                                                 .State.Value == Visibility.Visible);
         AddUntilStep("first stage left statistics restored", () => overviewMatches(screen, 0.91, 375, 300, 1, 1));
@@ -539,7 +537,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
             () => abandonRequested = true)));
         AddUntilStep("result screen loaded", () => screen.IsLoaded && Stack.CurrentScreen == screen);
 
-        AddUntilStep("stage statistics expanded", () => screen.ChildrenOfType<StatisticsPanel>().Single().State.Value == Visibility.Visible);
+        AddUntilStep("stage statistics expanded", () => screen.ChildrenOfType<BmsStatisticsPanel>().Single().State.Value == Visibility.Visible);
 
         AddAssert("result uses score copy", () => screen.Score, () => Is.Not.SameAs(sourceScore));
         AddAssert("watch replay disabled", () => screen.AllowWatchingReplay, () => Is.False);
@@ -630,7 +628,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
             () => nextRequested = true,
             () => { })));
         AddUntilStep("result screen loaded", () => screen.IsLoaded && Stack.CurrentScreen == screen);
-        AddUntilStep("stage statistics expanded", () => screen.ChildrenOfType<StatisticsPanel>().Single().State.Value == Visibility.Visible);
+        AddUntilStep("stage statistics expanded", () => screen.ChildrenOfType<BmsStatisticsPanel>().Single().State.Value == Visibility.Visible);
         AddUntilStep("stage result overview visible", () => screen.ChildrenOfType<BmsResultOverview>()
             .Any(panel => panel.DrawColourInfo.Colour.TopLeft.Alpha > 0));
         AddAssert("stage overview stays on the left", () =>
@@ -640,7 +638,7 @@ public partial class TestSceneBmsCourseResults : ScreenTestScene
         });
         AddStep("press enter", () => InputManager.Key(Key.Enter));
         AddUntilStep("next stage requested", () => nextRequested);
-        AddAssert("statistics remain expanded", () => screen.ChildrenOfType<StatisticsPanel>().Single().State.Value,
+        AddAssert("statistics remain expanded", () => screen.ChildrenOfType<BmsStatisticsPanel>().Single().State.Value,
             () => Is.EqualTo(Visibility.Visible));
     }
 }

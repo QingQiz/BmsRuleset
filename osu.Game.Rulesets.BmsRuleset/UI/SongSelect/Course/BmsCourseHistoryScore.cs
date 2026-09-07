@@ -13,6 +13,7 @@ using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
@@ -50,7 +51,7 @@ internal partial class BmsCourseHistoryScore : CompositeDrawable, IHasContextMen
             Rank = rank,
             Shear = Vector2.Zero,
             Action = () => presentScore(score),
-        };
+        }.WithBmsRank();
 
         ((IBindable<IReadOnlyList<Mod>>)this.selectedMods).BindTo(selectedMods);
         ((IBindable<IReadOnlyList<Mod>>)scoreDisplay.SelectedMods).BindTo(this.selectedMods);

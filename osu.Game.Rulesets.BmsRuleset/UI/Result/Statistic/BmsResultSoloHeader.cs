@@ -1,7 +1,6 @@
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Scoring;
-using osu.Game.Screens.Ranking.Expanded.Accuracy;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
@@ -39,9 +38,9 @@ internal partial class BmsResultSoloHeader : GridContainer
                                 RelativeSizeAxes = Axes.Both,
                                 Child = new DrawSizePreservingFillContainer
                                 {
-                                    // Fit the native circle and its outer badges without reserving extra square margins.
+                                    // Include the outer badges without reserving extra square margins.
                                     TargetDrawSize = new Vector2(300, 260),
-                                    Child = new AccuracyCircle(score)
+                                    Child = new BmsAccuracyCircle(score)
                                     {
                                         Anchor = Anchor.Centre,
                                         Origin = Anchor.Centre,

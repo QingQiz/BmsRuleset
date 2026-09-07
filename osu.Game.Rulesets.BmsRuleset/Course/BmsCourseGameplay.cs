@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -144,10 +145,10 @@ internal partial class BmsCoursePlayer : SoloPlayer
         session.CompleteCurrentStage(score, currentGaugeStates);
 
         if (session.CurrentStageIndex < session.Stages.Count - 1 && session.CanContinue)
-            return createStageResults(score);
+            return new BmsResultsScreenRequest(createStageResults(score));
 
         session.SummaryShown = true;
-        return new BmsCourseResultsScreen(session);
+        return new BmsResultsScreenRequest(new BmsCourseResultsScreen(session));
     }
 
     protected override async void ConcludeFailedScore(Score score)
