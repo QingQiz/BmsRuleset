@@ -624,6 +624,10 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         assertText("Normal");
         assertText("Easy");
         assertText("Assist Easy");
+        AddAssert("final gauge path drawn last", () => screen.ChildrenOfType<BmsGaugeHistoryGraph.GaugePath>().Last().Name,
+            () => Is.EqualTo("Hard gauge history"));
+        AddAssert("final gauge and marker draw above secondary gauges", () => screen.ChildrenOfType<Container>()
+            .Single(container => container.Name == "Gauge data").Children.Select(child => child.Alpha), () => Is.Ordered.Ascending);
         assertText("Timeline");
         assertText("Hit Offset");
         assertNoHitOffsetText("Scratch");

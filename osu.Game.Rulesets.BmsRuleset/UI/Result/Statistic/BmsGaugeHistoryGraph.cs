@@ -30,6 +30,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     private const float final_line_radius = 2.0f;
     private const float secondary_line_radius = 1.2f;
     private const float secondary_line_alpha = 0.35f;
+    private const float final_line_depth = -1;
     internal const float FAILURE_MARKER_SIZE = 13;
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
 
@@ -355,6 +356,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
                     PathRadius = gauge.LineRadius,
                     Colour = gauge.Colour,
                     Alpha = gauge.LineAlpha,
+                    Depth = gauge.IsFinalUsedGauge ? final_line_depth : 0,
                     Name = $"{gauge.Name} gauge history",
                 });
             }
@@ -411,6 +413,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         return new GaugeFailureMarker(gauge.Points, failurePoint, gauge.LineRadius)
         {
             Alpha = gauge.LineAlpha,
+            Depth = gauge.IsFinalUsedGauge ? final_line_depth : 0,
             Children =
             [
                 createMarkerLine(Color4.Black, shadow_width, 45, 0.6f),
