@@ -5,6 +5,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 
@@ -22,10 +23,26 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
     private const float heading_spacing = 6;
     private const float first_row_weight = 1.4f;
     private readonly StatisticCell[] cells;
+    private readonly BmsGaugeHistoryGraph gauge;
+    private readonly BmsTimelineStatistic timeline;
+    private readonly BmsHitScatterStatistic scatter;
+    private readonly BmsHitOffsetStatistic offset;
 
-    internal BmsResultStatisticsGrid(StatisticItem[] items)
+    internal BmsResultStatisticsGrid()
     {
         RelativeSizeAxes = Axes.Both;
+        var empty = BmsResultStatisticsData.Empty();
+        gauge = new BmsGaugeHistoryGraph(empty.Gauges, empty.StageBoundaries);
+        timeline = new BmsTimelineStatistic(empty.Timeline);
+        scatter = new BmsHitScatterStatistic(empty.Scatter);
+        offset = new BmsHitOffsetStatistic(empty.Offset);
+        StatisticItem[] items =
+        [
+            new(BmsStrings.GaugeHistory, () => gauge),
+            new(BmsStrings.Timeline, () => timeline),
+            new(BmsStrings.HitScatter, () => scatter),
+            new(BmsStrings.HitOffset, () => offset),
+        ];
         cells = items.Select(item => new StatisticCell(item)).ToArray();
 
         InternalChild = new OsuScrollContainer
@@ -51,6 +68,14 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
                 ],
             },
         };
+    }
+
+    internal void SetData(BmsResultStatisticsData data)
+    {
+        gauge.SetData(data.Gauges, data.StageBoundaries);
+        timeline.SetData(data.Timeline);
+        scatter.SetData(data.Scatter);
+        offset.SetData(data.Offset);
     }
 
     protected override void UpdateAfterChildren()

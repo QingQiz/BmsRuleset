@@ -38,6 +38,13 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
     private readonly List<Drawable> plots = [];
     private readonly List<Drawable> legends = [];
 
+    internal BmsTimelineStatistic(TimelineData data)
+    {
+        RelativeSizeAxes = Axes.X;
+        AutoSizeAxes = Axes.Y;
+        this.data = data;
+    }
+
     public BmsTimelineStatistic(ScoreInfo score, IBeatmap playableBeatmap)
     {
         RelativeSizeAxes = Axes.X;
@@ -58,10 +65,25 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
     [BackgroundDependencyLoader]
     private void load()
     {
-        data = score != null
+        data ??= score != null
             ? CreateData(score, playableBeatmap!)
             : CreateCourseData(stages!);
 
+        rebuild();
+    }
+
+    internal void SetData(TimelineData newData)
+    {
+        data = newData;
+        if (LoadState >= LoadState.Ready)
+            rebuild();
+    }
+
+    private void rebuild()
+    {
+        var height = plots.FirstOrDefault()?.Height ?? subplot_height;
+        plots.Clear();
+        legends.Clear();
         InternalChild = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.X,
@@ -75,6 +97,8 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
                 createSubplot(BmsStrings.FastSlow, data.FastSlow, data.StageBoundaries),
             ],
         };
+        foreach (var plot in plots)
+            plot.Height = height;
     }
 
     internal static TimelineData CreateData(ScoreInfo score, IBeatmap playableBeatmap)
@@ -358,17 +382,23 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
             .DefaultIfEmpty(0)
             .Max());
 
+        var bars = new GridContainer
+        {
+            Name = "Timeline data",
+            RelativeSizeAxes = Axes.Both,
+            Anchor = Anchor.BottomLeft,
+            Origin = Anchor.BottomLeft,
+            Scale = new Vector2(1, 0),
+            ColumnDimensions = columnWidths.Count == bucketCount
+                ? columnWidths.Select(width => new Dimension(GridSizeMode.Relative, width)).ToArray()
+                : Enumerable.Range(0, bucketCount).Select(_ => new Dimension()).ToArray(),
+            Content = new[] { Enumerable.Range(0, bucketCount).Select(b => createBar(subplot, b, maxTotal)).ToArray() },
+        };
+        bars.OnLoadComplete += _ => bars.ScaleTo(Vector2.One, 450, Easing.OutQuint);
         var children = new List<Drawable>
         {
             new Box { RelativeSizeAxes = Axes.Both, Colour = Color4.Black, Alpha = 0.18f },
-            new GridContainer
-            {
-                RelativeSizeAxes = Axes.Both,
-                ColumnDimensions = columnWidths.Count == bucketCount
-                    ? columnWidths.Select(width => new Dimension(GridSizeMode.Relative, width)).ToArray()
-                    : Enumerable.Range(0, bucketCount).Select(_ => new Dimension()).ToArray(),
-                Content = new[] { Enumerable.Range(0, bucketCount).Select(b => createBar(subplot, b, maxTotal)).ToArray() },
-            },
+            bars,
         };
 
         children.AddRange(stageBoundaries.Select(createStageBoundary));

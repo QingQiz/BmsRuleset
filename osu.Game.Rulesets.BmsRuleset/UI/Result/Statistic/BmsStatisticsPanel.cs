@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
@@ -10,31 +8,30 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
-using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
 internal partial class BmsStatisticsPanel : VisibilityContainer
 {
-    private const double minimum_loading_duration = 550;
-    private const double content_fade_duration = 250;
+    private const double minimum_chart_visibility_duration = 200;
+    private const double content_fade_duration = 450;
 
     internal readonly Bindable<ScoreInfo?> Score = new();
 
     protected override bool StartHidden => true;
 
     private readonly Container content;
-    private readonly LoadingSpinner spinner;
     private readonly Container? overview;
     private CancellationTokenSource? loadCancellation;
-    private double? loadingStartTime;
-    private bool contentReady;
+    private BmsResultStatisticsGrid? statistics;
+    private double? chartsVisibleSince;
+    private Drawable? unavailableMessage;
+    private bool unavailableTransitionStarted;
 
     [Resolved]
     protected BeatmapManager Beatmaps { get; private set; } = null!;
@@ -44,47 +41,38 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
 
     internal BmsStatisticsPanel(bool showOverview = true)
     {
-        var charts = new Container
-        {
-            RelativeSizeAxes = Axes.Both,
-            Children =
-            [
-                content = new Container { Name = "Result statistics content", RelativeSizeAxes = Axes.Both },
-                spinner = new LoadingSpinner(),
-            ],
-        };
+        content = new Container { Name = "Result statistics content", RelativeSizeAxes = Axes.Both };
         InternalChild = new BmsResultColumns(
             showOverview ? overview = new Container { RelativeSizeAxes = Axes.Both } : null,
-            charts);
+            content);
     }
 
     [BackgroundDependencyLoader]
     private void load() => Score.BindValueChanged(populate, true);
 
-    protected virtual IEnumerable<StatisticItem> CreateStatisticItems(ScoreInfo newScore, IBeatmap playableBeatmap) =>
-        newScore.Ruleset.CreateInstance().CreateStatisticsForScore(newScore, playableBeatmap);
-
     protected virtual Task RestoreReplayDataAsync(ScoreInfo score, CancellationToken cancellationToken) =>
         BmsReplayPatcher.RestoreScoreDataAsync(scores, score, cancellationToken);
 
-    protected virtual async Task<StatisticItem[]> LoadStatisticItemsAsync(ScoreInfo score, CancellationToken cancellationToken)
+    protected virtual async Task<BmsResultStatisticsData?> LoadStatisticsAsync(ScoreInfo score, CancellationToken cancellationToken)
     {
+        if (score.HitEvents.Count == 0)
+            return null;
+
         var workingBeatmap = Beatmaps.GetWorkingBeatmap(score.BeatmapInfo);
-        var playableBeatmap = await Task.Run(() => workingBeatmap.GetPlayableBeatmap(score.Ruleset, score.Mods), cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        return CreateStatisticItems(score, playableBeatmap).ToArray();
+        return await Task.Run(() =>
+        {
+            var playableBeatmap = workingBeatmap.GetPlayableBeatmap(score.Ruleset, score.Mods);
+            cancellationToken.ThrowIfCancellationRequested();
+            return BmsResultStatisticsData.Create(score, playableBeatmap);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private void populate(ValueChangedEvent<ScoreInfo?> change)
     {
         CancelLoading();
-        contentReady = false;
-        loadingStartTime = null;
-        content.ClearTransforms();
-        content.Hide();
         content.Clear();
+        statistics = null;
         overview?.Clear();
-        spinner.Hide();
 
         if (change.NewValue is not { } score)
             return;
@@ -92,7 +80,7 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
         if (overview != null)
             overview.Child = new BmsResultOverview(score);
 
-        spinner.Show();
+        content.Child = statistics = new BmsResultStatisticsGrid();
         var cancellation = loadCancellation = new CancellationTokenSource();
         _ = populateAsync(score, cancellation.Token);
     }
@@ -103,7 +91,7 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
         {
             await RestoreReplayDataAsync(score, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            var items = await LoadStatisticItemsAsync(score, cancellationToken).ConfigureAwait(false);
+            var data = await LoadStatisticsAsync(score, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
             Schedule(() =>
@@ -114,10 +102,10 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
                 if (overview?.Child is BmsResultOverview resultOverview)
                     resultOverview.SetScore(score);
 
-                var availableItems = items.Where(item => !item.RequiresHitEvents || score.HitEvents.Count > 0).ToArray();
-                Drawable statistics = availableItems.Length > 0
-                    ? new BmsResultStatisticsGrid(availableItems)
-                    : new FillFlowContainer
+                if (data != null)
+                    statistics!.SetData(data);
+                else
+                    showUnavailable(new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.X,
                         AutoSizeAxes = Axes.Y,
@@ -136,16 +124,7 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
                             },
                             new ReplayDownloadButton(score) { Anchor = Anchor.TopCentre, Origin = Anchor.TopCentre },
                         ],
-                    };
-
-                LoadComponentAsync(statistics, loaded =>
-                {
-                    if (IsDisposed || cancellationToken.IsCancellationRequested)
-                        return;
-
-                    content.Child = loaded;
-                    contentReady = true;
-                }, cancellationToken);
+                    }, cancellationToken);
             });
         }
         catch (OperationCanceledException)
@@ -159,7 +138,7 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
                 if (IsDisposed || cancellationToken.IsCancellationRequested)
                     return;
 
-                content.Child = new OsuTextFlowContainer
+                showUnavailable(new OsuTextFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
@@ -167,27 +146,52 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
                     Origin = Anchor.Centre,
                     TextAnchor = Anchor.Centre,
                     Text = BmsStrings.ResultStatisticsUnavailable,
-                };
-                contentReady = true;
+                }, cancellationToken);
             });
         }
     }
 
-    protected override void Update()
+    private void showUnavailable(Drawable message, CancellationToken cancellationToken)
     {
-        base.Update();
+        LoadComponentAsync(message, loaded =>
+        {
+            if (IsDisposed || cancellationToken.IsCancellationRequested)
+                return;
 
-        if (spinner.State.Value != Visibility.Visible)
+            unavailableMessage = loaded;
+        }, cancellationToken);
+    }
+
+    protected override void UpdateAfterChildren()
+    {
+        base.UpdateAfterChildren();
+
+        if (statistics is not { IsLoaded: true } currentStatistics || unavailableTransitionStarted)
             return;
 
-        // Measure visible loading time so a cached result still completes the spinner's entrance.
-        loadingStartTime ??= Time.Current;
-        if (!contentReady || Time.Current - loadingStartTime.Value < minimum_loading_duration)
+        // A cached failure can arrive during the screen's entrance; only count time the charts are visible to the user.
+        if (State.Value != Visibility.Visible || DrawColourInfo.Colour.MinAlpha < 0.99f
+                                               || currentStatistics.DrawWidth <= 0 || currentStatistics.DrawHeight <= 0)
+        {
+            chartsVisibleSince = null;
+            return;
+        }
+
+        chartsVisibleSince ??= Time.Current;
+        if (unavailableMessage is not { } message || Time.Current - chartsVisibleSince.Value < minimum_chart_visibility_duration)
             return;
 
-        contentReady = false;
-        spinner.Hide();
-        content.Delay(LoadingSpinner.TRANSITION_DURATION / 2).FadeIn(content_fade_duration, Easing.OutQuint);
+        unavailableTransitionStarted = true;
+        var cancellationToken = loadCancellation!.Token;
+        currentStatistics.FadeOut(content_fade_duration, Easing.InOutSine).OnComplete(_ =>
+        {
+            if (IsDisposed || cancellationToken.IsCancellationRequested)
+                return;
+
+            unavailableMessage = null;
+            content.Child = message;
+            message.FadeInFromZero(content_fade_duration, Easing.InOutSine);
+        });
     }
 
     protected override bool OnClick(ClickEvent e) => false;
@@ -201,6 +205,10 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
         loadCancellation?.Cancel();
         loadCancellation?.Dispose();
         loadCancellation = null;
+        chartsVisibleSince = null;
+        unavailableMessage?.Dispose();
+        unavailableMessage = null;
+        unavailableTransitionStarted = false;
     }
 
     protected override void Dispose(bool isDisposing)

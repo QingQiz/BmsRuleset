@@ -3,11 +3,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Rulesets.BmsRuleset.Course;
-using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
-using osu.Game.Screens.Ranking.Statistics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 
@@ -27,7 +25,7 @@ internal partial class BmsCourseAggregateStatistics : BmsStatisticsPanel
     // Course replays are restored per stage; the aggregate has no replay archive of its own.
     protected override Task RestoreReplayDataAsync(ScoreInfo score, CancellationToken cancellationToken) => Task.CompletedTask;
 
-    protected override async Task<StatisticItem[]> LoadStatisticItemsAsync(ScoreInfo score, CancellationToken cancellationToken)
+    protected override async Task<BmsResultStatisticsData?> LoadStatisticsAsync(ScoreInfo score, CancellationToken cancellationToken)
     {
         var stages = session.Stages
             .Select(stage => (stage.Score, WorkingBeatmap: Beatmaps.GetWorkingBeatmap(stage.Stage.Beatmap, true)))
@@ -45,12 +43,11 @@ internal partial class BmsCourseAggregateStatistics : BmsStatisticsPanel
         var played = data.Where(stage => stage.Score != null)
             .Select(stage => (stage.Beatmap, (IReadOnlyList<HitEvent>)stage.Score!.HitEvents)).ToArray();
 
-        return
-        [
-            new(BmsStrings.GaugeHistory, () => new BmsGaugeHistoryGraph(data)),
-            new(BmsStrings.Timeline, () => new BmsTimelineStatistic(data)),
-            new(BmsStrings.HitScatter, () => new BmsHitScatterStatistic(played)),
-            new(BmsStrings.HitOffset, () => new BmsHitOffsetStatistic(played)),
-        ];
+        return await Task.Run(() => new BmsResultStatisticsData(
+            BmsGaugeHistoryGraph.CreateCourseSeries(data),
+            BmsGaugeHistoryGraph.CreateCourseStageBoundaries(data),
+            BmsTimelineStatistic.CreateCourseData(data),
+            BmsHitScatterStatistic.CreateCourseStatistics(played),
+            BmsHitOffsetStatistic.CreateCourseStatistics(played)), cancellationToken).ConfigureAwait(false);
     }
 }

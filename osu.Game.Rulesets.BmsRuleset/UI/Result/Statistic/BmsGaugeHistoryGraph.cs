@@ -41,6 +41,14 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     private Drawable graph = null!;
     private Drawable legend = null!;
 
+    internal BmsGaugeHistoryGraph(IReadOnlyList<GaugeSeries> series, IReadOnlyList<float> stageBoundaries)
+    {
+        RelativeSizeAxes = Axes.X;
+        AutoSizeAxes = Axes.Y;
+        this.series = series;
+        this.stageBoundaries = stageBoundaries;
+    }
+
     public BmsGaugeHistoryGraph(ScoreInfo score, IBeatmap playableBeatmap)
     {
         RelativeSizeAxes = Axes.X;
@@ -61,6 +69,12 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     [BackgroundDependencyLoader]
     private void load()
     {
+        if (series != null)
+        {
+            rebuild();
+            return;
+        }
+
         if (score != null)
         {
             series = CreateSeries(score, playableBeatmap!);
@@ -72,6 +86,20 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
             stageBoundaries = CreateCourseStageBoundaries(stages!);
         }
 
+        rebuild();
+    }
+
+    internal void SetData(IReadOnlyList<GaugeSeries> newSeries, IReadOnlyList<float> boundaries)
+    {
+        series = newSeries;
+        stageBoundaries = boundaries;
+        if (LoadState >= LoadState.Ready)
+            rebuild();
+    }
+
+    private void rebuild()
+    {
+        var height = graph?.Height ?? graph_height;
         InternalChild = new FillFlowContainer
         {
             RelativeSizeAxes = Axes.X,
@@ -84,6 +112,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
                 legend = createLegend(),
             ],
         };
+        graph.Height = height;
     }
 
     void IBmsResultStatistic.FitSummaryToHeight(float height)
@@ -313,11 +342,15 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
             ],
         };
 
+        var dataLayer = new Container { Name = "Gauge data", RelativeSizeAxes = Axes.Both, Alpha = 0 };
+        graph.Add(dataLayer);
+        dataLayer.OnLoadComplete += _ => dataLayer.FadeIn(450, Easing.OutQuint);
+
         foreach (var gauge in series)
         {
             foreach (var segment in gauge.Segments)
             {
-                graph.Add(new GaugePath(pointsForPath(segment, gauge.FailurePoint), 0)
+                dataLayer.Add(new GaugePath(pointsForPath(segment, gauge.FailurePoint), 0)
                 {
                     PathRadius = gauge.LineRadius,
                     Colour = gauge.Colour,
@@ -327,7 +360,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
             }
 
             if (gauge.FailurePoint is { } failurePoint)
-                graph.Add(createFailureMarker(gauge, failurePoint));
+                dataLayer.Add(createFailureMarker(gauge, failurePoint));
         }
 
         foreach (var boundary in stageBoundaries)

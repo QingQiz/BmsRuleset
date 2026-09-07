@@ -55,6 +55,13 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     private Drawable overallRow = null!;
     private float summaryHeight = graph_height;
 
+    internal BmsHitScatterStatistic(HitScatterStatistics statistics)
+    {
+        RelativeSizeAxes = Axes.X;
+        AutoSizeAxes = Axes.Y;
+        this.statistics = statistics;
+    }
+
     public BmsHitScatterStatistic(IReadOnlyList<HitEvent> hitEvents, IBeatmap playableBeatmap)
     {
         RelativeSizeAxes = Axes.X;
@@ -120,7 +127,7 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         return true;
     }
 
-    private static HitScatterStatistics createCourseStatistics(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
+    internal static HitScatterStatistics CreateCourseStatistics(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
     {
         var stageStatistics = stages.Select(stage => CreateStatistics(stage.Beatmap, stage.HitEvents)).ToArray();
         var durations = stageStatistics.Select(stage => stage.Overall.Duration).ToArray();
@@ -370,12 +377,16 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         foreach (var tick in data.OffsetTicks)
             dataAreaChildren.Add(createGridLine(data, tick));
 
-        dataAreaChildren.Add(new Container
+        var points = new Container
         {
+            Name = "Hit scatter data",
             RelativeSizeAxes = Axes.Both,
             Padding = new MarginPadding(point_padding),
             Children = createPointDrawables(data),
-        });
+            Alpha = 0,
+        };
+        points.OnLoadComplete += _ => points.FadeIn(450, Easing.OutQuint);
+        dataAreaChildren.Add(points);
 
         dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Fast, BmsResultColours.FAST, Anchor.TopRight));
         dataAreaChildren.Add(createTimingDirectionLabel(BmsStrings.Slow, BmsResultColours.SLOW, Anchor.BottomRight));
@@ -628,9 +639,9 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
     [BackgroundDependencyLoader]
     private void load()
     {
-        statistics = hitEvents != null
+        statistics ??= hitEvents != null
             ? CreateStatistics(playableBeatmap!, hitEvents)
-            : createCourseStatistics(stages!);
+            : CreateCourseStatistics(stages!);
 
         InternalChild = content = new FillFlowContainer
         {
@@ -641,6 +652,13 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
         };
 
         rebuild();
+    }
+
+    internal void SetData(HitScatterStatistics data)
+    {
+        statistics = data;
+        if (LoadState >= LoadState.Ready)
+            rebuild();
     }
 
     private void rebuild()

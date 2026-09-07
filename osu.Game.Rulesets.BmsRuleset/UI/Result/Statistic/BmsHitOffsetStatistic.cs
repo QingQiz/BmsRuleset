@@ -42,6 +42,13 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     private Drawable overallRow = null!;
     private float summaryHeight = graph_height;
 
+    internal BmsHitOffsetStatistic(HitOffsetStatistics statistics)
+    {
+        RelativeSizeAxes = Axes.X;
+        AutoSizeAxes = Axes.Y;
+        this.statistics = statistics;
+    }
+
     public BmsHitOffsetStatistic(IReadOnlyList<HitEvent> hitEvents, IBeatmap playableBeatmap)
     {
         RelativeSizeAxes = Axes.X;
@@ -64,9 +71,9 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
     [BackgroundDependencyLoader]
     private void load()
     {
-        statistics = hitEvents != null
+        statistics ??= hitEvents != null
             ? CreateStatistics(playableBeatmap!, hitEvents)
-            : createCourseStatistics(stages!);
+            : CreateCourseStatistics(stages!);
 
         InternalChild = content = new FillFlowContainer
         {
@@ -77,6 +84,13 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         };
 
         rebuild();
+    }
+
+    internal void SetData(HitOffsetStatistics data)
+    {
+        statistics = data;
+        if (LoadState >= LoadState.Ready)
+            rebuild();
     }
 
     internal static HitOffsetStatistics CreateStatistics(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents)
@@ -102,7 +116,7 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
         return new HitOffsetStatistics(createSummary(displayedHitEvents.Select(e => (e.TimeOffset, e.Result))), keyGroups);
     }
 
-    private static HitOffsetStatistics createCourseStatistics(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
+    internal static HitOffsetStatistics CreateCourseStatistics(IReadOnlyList<(IBeatmap Beatmap, IReadOnlyList<HitEvent> HitEvents)> stages)
     {
         var overall = new List<(double offset, HitResult result)>();
         var hitsByKey = new Dictionary<int, List<(double offset, HitResult result)>>();
@@ -348,19 +362,28 @@ public sealed partial class BmsHitOffsetStatistic : CompositeDrawable, IBmsResul
             };
         }
 
-        private Drawable createPlot(int maxTotal) => new Container
+        private Drawable createPlot(int maxTotal)
         {
-            RelativeSizeAxes = Axes.Both,
-            Child = new GridContainer
+            var bars = new GridContainer
             {
+                Name = "Hit offset data",
                 RelativeSizeAxes = Axes.Both,
+                Anchor = Anchor.BottomLeft,
+                Origin = Anchor.BottomLeft,
                 ColumnDimensions = Enumerable.Range(0, bin_count).Select(_ => new Dimension()).ToArray(),
                 Content = new[]
                 {
                     Enumerable.Range(0, bin_count).Select(b => createBar(b, maxTotal)).ToArray(),
                 },
-            },
-        };
+            };
+            if (summary.Count > 0)
+            {
+                bars.Scale = new Vector2(1, 0);
+                bars.OnLoadComplete += _ => bars.ScaleTo(Vector2.One, 450, Easing.OutQuint);
+            }
+
+            return new Container { RelativeSizeAxes = Axes.Both, Child = bars };
+        }
 
         private Drawable createAxis()
         {
