@@ -360,6 +360,8 @@ public static class BmsStrings
 
     public static LocalisableString Cancel => get("cancel");
 
+    public static LocalisableString ReturnToSongSelect => get("return_to_song_select");
+
     public static LocalisableString ReturnToCourseSelect => get("return_to_course_select");
 
     public static LocalisableString CourseHistoryDeleteConfirmation => get("course_history_delete_confirmation");

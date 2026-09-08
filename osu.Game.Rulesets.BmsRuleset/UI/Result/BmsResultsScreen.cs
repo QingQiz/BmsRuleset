@@ -20,6 +20,8 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Volume;
+using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
@@ -38,6 +40,9 @@ internal partial class BmsResultsScreen : ScreenWithBeatmapBackground, IKeyBindi
 
     protected override OverlayActivation InitialOverlayActivationMode => OverlayActivation.UserTriggered;
 
+    // The global back button lives outside the fixed-scale result content.
+    protected override bool InitialBackButtonVisibility => false;
+
     internal readonly Bindable<ScoreInfo?> SelectedScore = new();
     internal readonly ScoreInfo? Score;
 
@@ -55,6 +60,9 @@ internal partial class BmsResultsScreen : ScreenWithBeatmapBackground, IKeyBindi
 
     [Resolved]
     private Player? player { get; set; }
+
+    [Resolved]
+    private OsuColour colours { get; set; } = null!;
 
     [Cached]
     private readonly OverlayColourProvider colourProvider = new(OverlayColourScheme.Aquamarine);
@@ -77,30 +85,34 @@ internal partial class BmsResultsScreen : ScreenWithBeatmapBackground, IKeyBindi
         StatisticsPanel.RelativeSizeAxes = Axes.Both;
         StatisticsPanel.Score.BindTo(SelectedScore);
 
-        InternalChild = new PopoverContainer
+        InternalChild = new BmsFixedScaleContainer
         {
             RelativeSizeAxes = Axes.Both,
-            Child = new GridContainer
+            Child = new PopoverContainer
             {
                 RelativeSizeAxes = Axes.Both,
-                RowDimensions = [new Dimension(), new Dimension(GridSizeMode.Absolute, TwoLayerButton.SIZE_EXTENDED.Y)],
-                Content = new Drawable[][]
+                Child = new GridContainer
                 {
-                    [
-                        ResultsContent = new Container
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Masking = true,
-                            Children = [new GlobalScrollAdjustsVolume(), StatisticsPanel],
-                        }
-                    ],
-                    [
-                        BottomPanel = new Container
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Alpha = 0,
-                        }
-                    ],
+                    RelativeSizeAxes = Axes.Both,
+                    RowDimensions = [new Dimension(), new Dimension(GridSizeMode.Absolute, TwoLayerButton.SIZE_EXTENDED.Y)],
+                    Content = new Drawable[][]
+                    {
+                        [
+                            ResultsContent = new Container
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Masking = true,
+                                Children = [new GlobalScrollAdjustsVolume(), StatisticsPanel],
+                            }
+                        ],
+                        [
+                            BottomPanel = new Container
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Alpha = 0,
+                            }
+                        ],
+                    },
                 },
             },
         };
@@ -171,9 +183,25 @@ internal partial class BmsResultsScreen : ScreenWithBeatmapBackground, IKeyBindi
             new Box { RelativeSizeAxes = Axes.Both, Colour = OsuColour.Gray(0.2f) },
             new Container
             {
+                Name = "Result action buttons",
                 RelativeSizeAxes = Axes.Both,
-                Padding = new MarginPadding(10),
+                Padding = new MarginPadding { Horizontal = BmsCourseResultButton.ExpandedWidth + 10, Vertical = 10 },
                 Child = new BmsResultFittedContainer(buttons),
+            },
+            new BmsCourseResultButton
+            {
+                Name = "Return to song select button",
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                Text = BmsStrings.ReturnToSongSelect,
+                Icon = OsuIcon.LeftCircle,
+                BackgroundColour = colours.Pink,
+                HoverColour = colours.PinkDark,
+                Action = () =>
+                {
+                    if (this.IsCurrentScreen() && !OnBackButton())
+                        this.Exit();
+                },
             },
         ];
     }
@@ -266,4 +294,26 @@ internal partial class BmsResultsScreen : ScreenWithBeatmapBackground, IKeyBindi
     }
 
     protected override bool OnScroll(ScrollEvent e) => !e.CurrentState.Keyboard.AltPressed || base.OnScroll(e);
+
+    private partial class BmsFixedScaleContainer : DrawSizePreservingFillContainer
+    {
+        private const float design_scale = 0.8f;
+
+        [Resolved(canBeNull: true)]
+        private OsuGame? game { get; set; }
+
+        internal BmsFixedScaleContainer()
+        {
+            // Preserve the layout authored at 0.8x regardless of the parent's animated UI scale.
+            TargetDrawSize /= design_scale;
+        }
+
+        protected override void Update()
+        {
+            if (game != null)
+                TargetDrawSize = game.ScalingContainerTargetDrawSize / design_scale;
+
+            base.Update();
+        }
+    }
 }

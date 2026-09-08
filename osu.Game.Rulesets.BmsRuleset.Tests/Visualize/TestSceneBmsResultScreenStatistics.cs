@@ -2,16 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Models;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays;
@@ -22,11 +27,13 @@ using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
+using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens;
+using osu.Game.Screens.Footer;
 using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Ranking.Expanded.Statistics;
 using osu.Game.Screens.Ranking.Statistics.User;
@@ -39,6 +46,132 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [TestFixture]
 public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerTestScene
 {
+    private float? originalUIScale;
+
+    [TearDownSteps]
+    public void RestoreUIScale() => AddStep("restore UI scale", () =>
+    {
+        if (originalUIScale is not { } scale)
+            return;
+
+        Dependencies.Get<OsuConfigManager>().SetValue(OsuSetting.UIScale, scale);
+        originalUIScale = null;
+    });
+
+    [TestCase(1280, 720, 0.8f, false)]
+    [TestCase(1024, 768, 1f, true)]
+    [TestCase(2560, 1080, 1.6f, false)]
+    public void TestResultsIgnoreUIScale(int width, int height, float initialScale, bool keyboardBack)
+    {
+        TestBmsSoloResultsScreen screen = null!;
+        OsuScreenStack stack = null!;
+        ScreenStackFooter footer = null!;
+        BmsCourseResultButton backButton = null!;
+        ScalingContainer.ScalingDrawSizePreservingFillContainer scaling = null!;
+        Container viewport = null!;
+        Dictionary<Drawable, Quad> originalBounds = null!;
+        OsuConfigManager config = null!;
+
+        AddStep("load results with UI scaling", () =>
+        {
+            config = Dependencies.Get<OsuConfigManager>();
+            originalUIScale = config.Get<float>(OsuSetting.UIScale);
+            config.SetValue(OsuSetting.UIScale, initialScale);
+            InputManager.MoveMouseTo(new Vector2(-100));
+            stack = new OsuScreenStack { RelativeSizeAxes = Axes.Both };
+            var backReceptor = new ScreenFooter.BackReceptor();
+            Child = viewport = new Container
+            {
+                Size = new Vector2(width, height),
+                Scale = new Vector2(Math.Min(Content.DrawWidth / width, Content.DrawHeight / height)),
+                Child = scaling = new ScalingContainer.ScalingDrawSizePreservingFillContainer(true)
+                {
+                    Children =
+                    [
+                        backReceptor,
+                        stack,
+                        new PopoverContainer
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Child = footer = new ScreenStackFooter(stack, backReceptor)
+                            {
+                                BackButtonPressed = () =>
+                                {
+                                    if (!((OsuScreen)stack.CurrentScreen).OnBackButton())
+                                        stack.Exit();
+                                },
+                            },
+                        },
+                    ],
+                },
+            };
+            stack.Push(screen = new TestBmsSoloResultsScreen(createScore()));
+        });
+        AddUntilStep("charts loaded", () => screen.IsLoaded && ChartsFitViewport(screen));
+        AddAssert("global back button hidden", () => !screen.BackButtonVisibility.Value && footer.BackButton.State.Value == Visibility.Hidden);
+        AddStep("find local back button", () => backButton = screen.BottomPanel.ChildrenOfType<BmsCourseResultButton>().Single());
+        AddAssert("return to song select label shown", () => backButton.ChildrenOfType<OsuSpriteText>().Single().Text.ToString(),
+            () => Is.EqualTo("Return to song select"));
+        AddUntilStep("return label fits text segment", () => backButton.ChildrenOfType<OsuSpriteText>().Single().DrawWidth + 24 <= backButton.TextLayer.DrawWidth);
+        AddUntilStep("initial UI scale applied", () => Math.Abs(scaling.Scale.X - initialScale) < 0.0001f);
+        AddUntilStep("controls retain the 0.8x design height", () =>
+        {
+            var game = Dependencies.Get<OsuGame>();
+            var target = game?.ScalingContainerTargetDrawSize ?? new Vector2(1024, 768);
+            var expectedHeight = TwoLayerButton.SIZE_EXTENDED.Y * 0.8f * Math.Min(width / target.X, height / target.Y);
+            var expectedBounds = viewport.ToScreenSpace(new RectangleF(0, height - expectedHeight, width, expectedHeight));
+            return screen.BottomPanel.ScreenSpaceDrawQuad.AlmostEquals(expectedBounds);
+        });
+        AddStep("record result layout", () => originalBounds = screen.ChildrenOfType<Drawable>()
+            .Where(drawable => drawable is BmsResultOverview or BmsGaugeHistoryGraph or BmsTimelineStatistic
+                or BmsHitScatterStatistic or BmsHitOffsetStatistic || drawable == screen.BottomPanel || drawable == backButton)
+            .ToDictionary(drawable => drawable, drawable => drawable.ScreenSpaceDrawQuad));
+
+        foreach (var scale in new[] { 0.8f, 1f, 1.6f, 0.8f })
+        {
+            AddStep($"set UI scale to {scale}", () => config.SetValue(OsuSetting.UIScale, scale));
+            AddUntilStep("layout stays fixed during scaling", () =>
+            {
+                Assert.That(originalBounds.All(pair => pair.Key.ScreenSpaceDrawQuad.AlmostEquals(pair.Value)), Is.True);
+                return Math.Abs(scaling.Scale.X - scale) < 0.0001f;
+            });
+            AddAssert("charts still fit", () => ChartsFitViewport(screen));
+            AddStep("hover local back button", () => InputManager.MoveMouseTo(backButton));
+            AddUntilStep("back button reaches hover width", () => Math.Abs(backButton.Width - BmsCourseResultButton.ExpandedWidth) < 0.05f);
+            AddAssert("back button does not overlap actions", () => screen.BottomPanel.ChildrenOfType<ReplayDownloadButton>()
+                .Cast<Drawable>().Concat(screen.BottomPanel.ChildrenOfType<CollectionButton>()).Concat(screen.BottomPanel.ChildrenOfType<FavouriteButton>())
+                .All(button => button.ScreenSpaceDrawQuad.AABBFloat.Left > backButton.ScreenSpaceDrawQuad.AABBFloat.Right));
+            AddStep("leave local back button", () => InputManager.MoveMouseTo(new Vector2(-100)));
+            AddUntilStep("back button returns to resting size", () => backButton.ScreenSpaceDrawQuad.AlmostEquals(originalBounds[backButton]));
+            AddAssert("result leaves global scale unchanged", () => config.Get<float>(OsuSetting.UIScale), () => Is.EqualTo(scale));
+            AddStep("expand offset by pointer", () =>
+            {
+                InputManager.MoveMouseTo(originalBounds[screen.ChildrenOfType<BmsHitOffsetStatistic>().Single()].Centre);
+                InputManager.Click(MouseButton.Left);
+            });
+            AddUntilStep("offset expanded", () => screen.ChildrenOfType<BmsHitOffsetStatistic>().Single()
+                .ChildrenOfType<SpriteText>().Any(text => text.Text.ToString() == "Scratch"));
+            AddStep("collapse offset by pointer", () =>
+            {
+                InputManager.MoveMouseTo(originalBounds[screen.ChildrenOfType<BmsHitOffsetStatistic>().Single()].Centre);
+                InputManager.Click(MouseButton.Left);
+            });
+            AddUntilStep("layout restored after collapse", () => originalBounds.All(pair => pair.Key.ScreenSpaceDrawQuad.AlmostEquals(pair.Value)));
+        }
+
+        AddStep(keyboardBack ? "return with escape" : "return with local back button", () =>
+        {
+            if (keyboardBack)
+                InputManager.Key(Key.Escape);
+            else
+            {
+                InputManager.MoveMouseTo(backButton);
+                InputManager.Click(MouseButton.Left);
+            }
+        });
+        AddUntilStep("results exited", () => stack.CurrentScreen != screen);
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void TestNativeEntryReplacedBeforeLoading(bool gameplayRequest)

@@ -10,6 +10,8 @@ internal partial class BmsCourseResultButton : TwoLayerButton
     private const float additional_text_width = 140;
     private const double transform_time = 600;
 
+    internal static float ExpandedWidth => SIZE_EXTENDED.X + additional_text_width;
+
     private Drawable iconContainer = null!;
     private Drawable textContainer = null!;
     private float iconWidthRatio;

@@ -292,6 +292,7 @@
   <data name="abandon_course_confirmation" xml:space="preserve"><value>确定放弃该段位吗？已完成曲目的成绩会保留，尚未游玩的曲目将留空。</value></data>
   <data name="abandon_course_confirm" xml:space="preserve"><value>放弃</value></data>
   <data name="cancel" xml:space="preserve"><value>取消</value></data>
+  <data name="return_to_song_select" xml:space="preserve"><value>返回选歌</value></data>
   <data name="return_to_course_select" xml:space="preserve"><value>返回段位选择</value></data>
   <data name="course_history_delete_confirmation" xml:space="preserve"><value>确定删除该段位成绩吗？各曲目单独保存的成绩将会保留。</value></data>
   <data name="leaderboard_date_24" xml:space="preserve"><value>{0:yyyy/M/d HH:mm:ss}</value></data>
