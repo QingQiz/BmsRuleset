@@ -4,16 +4,14 @@
 
 ## Objective
 
-Add native BMSON chart import and playback without translating BMSON into synthetic BMS text. Both the existing BMS
-parser and the new BMSON parser should produce the same format-neutral runtime chart model, while preserving current
-BMS behaviour and performance.
+Add native BMSON import and playback through a shared runtime chart model, preserving BMS behaviour and performance.
+Both parsers should produce this model directly; BMSON must not be translated into synthetic BMS text.
 
-The first release should target the official BMSON 1.0 schema. Legacy 0.21 files and player-specific extensions should
-be detected and reported explicitly rather than being interpreted as 1.0 data.
+Target the official BMSON 1.0 schema first. Detect and report legacy 0.21 files and player-specific extensions explicitly.
 
 ## Initial Scope
 
-The first implementation should support:
+Initial support:
 
 - BMSON 1.0 version detection and schema validation.
 - Metadata, BPM changes, stops, bar lines, playable notes, long notes, background audio, and BGA.
@@ -22,19 +20,18 @@ The first implementation should support:
 - Import summaries, star rating calculation, previews, gameplay seeking, and external resource loading.
 - The same path traversal protections and global-volume routing rules as BMS resources.
 
-The first implementation should not silently accept:
+Require explicit compatibility handling before accepting:
 
 - BMSON 0.21 files without an explicit compatibility path.
 - Unknown or extended `mode_hint` values.
 - `generic-nkeys`, `popn-5k`, or layouts that cannot be represented by the current playfield and input model.
 - Player-specific fields such as non-standard mine channels until their schema and compatibility behaviour are defined.
 
-Unknown JSON properties may be ignored, but an unsupported version or layout must produce a useful import diagnostic.
+Unknown JSON properties may be ignored. Unsupported versions or layouts must produce an import diagnostic.
 
 ## Architectural Direction
 
-BMSON must not be converted into fake measure/channel lines or allocated into two-character `#WAVxx` identifiers.
-The intended pipeline is:
+Keep BMS measure/channel syntax and two-character `#WAVxx` identifiers inside the BMS parser:
 
 ```text
 BMS text parser  ──┐
@@ -42,18 +39,16 @@ BMS text parser  ──┐
 BMSON JSON parser ─┘
 ```
 
-Format-specific syntax should end at the parser boundary. Timing projection, hit objects, audio playback, previews,
-BGA playback, difficulty calculation, and gameplay should consume normalised data.
+Timing, hit objects, audio, previews, BGA, difficulty calculation, and gameplay should consume normalised data.
 
 ## BMSON 1.0 Format Reference
 
-This section is an implementation-oriented summary of the official
-[BMSON specification](https://github.com/bemusic/bmson-spec). It distinguishes normative format behaviour from
-ruleset-specific implementation policy where the specification permits player-dependent behaviour.
+This summary of the [BMSON specification](https://github.com/bemusic/bmson-spec) separates format requirements from
+ruleset policy where the specification leaves behaviour to the player.
 
 ### Complete Object Shape
 
-A representative BMSON 1.0 document has this shape:
+Example BMSON 1.0 document:
 
 ```json
 {
@@ -113,8 +108,7 @@ A representative BMSON 1.0 document has this shape:
 }
 ```
 
-JSON object property order has no meaning. Array order does matter when the specification defines posterior or
-same-pulse behaviour.
+JSON property order has no meaning. Array order matters for precedence and same-pulse events.
 
 ### Top-Level Fields
 
@@ -128,8 +122,8 @@ same-pulse behaviour.
 | `sound_channels` | array | Required | Audio tracks and every playable or background note that uses them. |
 | `bga` | object | Schema field | BGA resource declarations and base, layer, and poor event timelines. |
 
-For practical compatibility, a missing `bga` object or missing BGA arrays may be normalised to an empty BGA timeline.
-This is a tolerant reader policy, not a reason for writers to omit the schema fields.
+Readers may treat missing `bga` or BGA arrays as an empty timeline for compatibility. Writers should still include
+these schema fields.
 
 ### Version Handling
 
@@ -141,9 +135,8 @@ This is a tolerant reader policy, not a reason for writers to omit the schema fi
 - A syntactically invalid version is an error.
 - Unsupported major or pre-1.0 versions must not be interpreted using the 1.0 field names or units.
 
-The first implementation should reject legacy and unsupported versions with a diagnostic that names the detected or
-missing version. Version comparison should be kept in one parser component so a future compatible-version policy can
-be added without changing gameplay code.
+Reject legacy and unsupported versions with a diagnostic identifying the version or its absence. Keep version
+comparison in one parser component so compatibility policy can change independently of gameplay.
 
 ### Information Object
 
@@ -181,11 +174,10 @@ Numeric normalisation from the specification:
 - `total == 0` means successful judgements do not increase the lifebar.
 - A negative `total` is interpreted using its absolute value.
 - `resolution == 0`, null, or missing uses `240`.
-- A negative resolution is interpreted using its absolute value by the specification, although a warning is appropriate
-  because the schema describes it as unsigned.
+- Use the absolute value of a negative resolution, as specified, and warn because the schema declares it unsigned.
 
-Ruleset implementation policy should additionally reject non-finite numeric values. Zero or negative BPM values are
-not usefully defined by BMSON 1.0 and should be rejected initially rather than treated as BMS reverse-scroll extensions.
+The ruleset should also reject non-finite numbers and non-positive BPM. BMSON 1.0 does not define useful behaviour
+for non-positive BPM; do not apply BMS reverse-scroll semantics.
 
 ### Pulse Coordinates
 
@@ -214,14 +206,14 @@ Each `lines` entry has one field:
 |-------|------|---------|
 | `y` | unsigned integer | Absolute pulse at which a bar line may be displayed. |
 
-The three states are semantically distinct:
+Distinguish three states:
 
 - Missing or null `lines`: assume regular 4/4 bar lines every `4 * resolution` pulses.
 - Empty `lines`: the chart has no bar lines.
 - Populated `lines`: use the specified positions; irregular spacing simulates time-signature or measure-length changes.
 
-The first line at `y = 0` may be omitted. Readers may choose whether to display it when it is present. Bar lines do not
-alter note timing, BPM, STOP duration, or pulse coordinates.
+The line at `y = 0` is optional, and readers may choose whether to display it. Bar lines affect only appearance,
+not note timing, BPM, STOP duration, or pulse coordinates.
 
 ### BPM Events
 
@@ -232,8 +224,8 @@ Each `bpm_events` entry contains:
 | `y` | unsigned integer | Absolute pulse at which the BPM becomes active. |
 | `bpm` | number | New tempo in beats per minute. |
 
-Timing begins with `info.init_bpm`. If multiple BPM events have the same `y`, the last event in the array wins. The
-reader should preserve source array order until same-pulse resolution is complete.
+Timing starts at `info.init_bpm`. For BPM events sharing `y`, the last array entry wins; preserve source order until
+these ties are resolved.
 
 Example:
 
@@ -264,12 +256,11 @@ Unlike same-pulse BPM events, same-pulse STOP durations add together.
 ]
 ```
 
-This produces a 1200-pulse STOP. Its metric duration uses the BPM active at pulse 240 after processing BPM events at
-that pulse.
+This produces a 1200-pulse STOP, converted to milliseconds using the BPM after any changes at pulse 240.
 
 ### Same-Pulse Processing Order
 
-When multiple classes of events share a pulse, process them in this order:
+Process events at the same pulse in this order:
 
 1. Notes and BGA events activate.
 2. BPM events apply, with the last same-pulse BPM becoming active.
@@ -284,8 +275,7 @@ Consequences:
 
 ### Sound Channels
 
-BMSON is sound-channel based. A sound channel represents one logical audio track and contains all chart events that use
-that track:
+A sound channel is one logical audio track with all chart events that use it:
 
 ```json
 {
@@ -301,8 +291,7 @@ that track:
 | `name` | string | Audio resource path for this logical channel. |
 | `notes` | array | Playable and background notes that also define the channel's slice boundaries. |
 
-Different sound-channel objects may refer to the same filename. They remain distinct logical channels and must be able
-to overlap, matching multiplex BMS WAV definitions.
+Sound channels referencing the same file remain independent and may overlap, like multiplex BMS WAV definitions.
 
 Resource lookup rules from the specification:
 
@@ -312,12 +301,10 @@ Resource lookup rules from the specification:
 - Absolute paths, parent-directory traversal, null characters, and resolved paths outside the chart directory must be
   rejected.
 
-Players are expected to support WAV and either OGG Vorbis or MP4 AAC/M4A. MP3 is discouraged because encoder and
-decoder delay can shift keysounds by enough time to affect judgement. The ruleset may support additional formats, but
-the format-reference fixtures should use the expected lossless or gap-safe formats.
+Players are expected to support WAV and either OGG Vorbis or MP4 AAC/M4A. MP3 encoder/decoder delay can affect keysound
+timing. Additional formats are allowed, but reference fixtures should use the expected lossless or gap-safe formats.
 
-The existing `BmsSampleInfo` fallback lookup and `BmsFileResourceStore` containment check should remain the common
-implementation for both BMS and BMSON.
+Share `BmsSampleInfo` fallback lookup and `BmsFileResourceStore` containment checks between BMS and BMSON.
 
 ### Notes
 
@@ -330,16 +317,15 @@ Each sound-channel note has:
 | `l` | unsigned integer | `0` | Length in pulses. Zero is a short note; positive values create a long note ending at `y + l`. |
 | `c` | boolean | `false` | Continuation flag. False restarts source audio; true continues its source position. |
 
-Although `x` is formally `any`, the first ruleset implementation should accept only null or an integral numeric lane.
-Other values require a mode-specific extension and should produce an unsupported-lane diagnostic.
+Initially accept only null or integral numeric `x`, despite the schema's `any` type. Other values require a mode
+extension and should produce an unsupported-lane diagnostic.
 
-`l` affects gameplay note duration. It does not by itself determine the duration of the associated audio slice; slice
-boundaries come from note pulse positions across the whole sound channel.
+`l` controls gameplay note duration. Audio slice boundaries come from note pulses across the entire sound channel.
 
 ### Sound Slicing
 
-Every distinct note pulse in a sound channel is a slice boundary. Slicing must be calculated per sound-channel object,
-not per filename and not per lane.
+Each distinct note pulse defines a slice boundary. Calculate slices per sound-channel object, independently of filenames
+and lanes.
 
 For one sound channel:
 
@@ -351,8 +337,7 @@ For one sound channel:
 6. Otherwise start it at the previous slice's calculated end offset.
 7. Assign every note in the group to that new slice; the final slice extends to end of file.
 
-When notes at the same pulse mix `c == true` and `c == false`, the group is treated as a restart. Multiple notes at the
-same pulse therefore share one slice from that sound channel.
+Mixed `c == true` and `c == false` at one pulse restart the source. All notes in that group share the resulting slice.
 
 Example at BPM 120:
 
@@ -377,8 +362,8 @@ Example at BPM 120:
 | 840 | 1.75 s | No | 0.25 s | 1.00 s |
 | 1200 | 2.50 s | No | 1.00 s | End of file |
 
-The two slices starting at source offset zero are distinct slice identities because they begin at different chart
-boundaries. They may have different end offsets and playback lifetimes.
+The two slices starting at source offset zero have distinct identities because they start at different chart boundaries.
+Their end offsets and playback lifetimes may differ.
 
 ### Slice Playback Rules
 
@@ -389,8 +374,8 @@ boundaries. They may have different end offsets and playback lifetimes.
 - Different sound channels referring to the same file remain independent and may overlap.
 - If one slice is assigned to both a playable note and a BGM note at the same pulse, discard the BGM use.
 
-The specification permits joining consecutive slices used only by BGM when the later slice is continuing. This is an
-optional optimisation and should be deferred until correct independent-slice playback is covered by tests.
+The specification permits merging consecutive BGM-only slices when the later slice continues the source. Defer this
+optimisation until tests cover independent-slice playback.
 
 ### Layered Notes
 
@@ -401,14 +386,12 @@ Notes from different sound channels at the same `(x, y)` are fused into one game
 - All contributing notes are expected to have equal `l` values.
 - Unequal lengths are an error; a reader may warn and choose a deterministic recovery policy.
 
-The recommended first recovery policy is to keep the first source-ordered length and attach all audio slices to that
-object, while reporting the conflicting values. Invalid input must not create overlapping duplicate judgement objects
-in one lane.
+Initially, keep the first length in source order, attach all slices, and report conflicting lengths. Never create
+duplicate judgement objects in one lane to recover from invalid input.
 
 ### Canonical Mode Hints
 
-`mode_hint` determines the meaning of `x`. Lane count alone is insufficient because a generic keyboard mode and a
-beatmania-style mode can have the same number of positive lane values but different controls.
+`mode_hint` defines `x`. Generic keyboard and beatmania modes may share a lane count but use different controls.
 
 | `mode_hint` | `x = 1`-`5` | `x = 6`-`7` | `x = 8` | `x = 9`-`13` | `x = 14`-`15` | `x = 16` |
 |-------------|-------------|-------------|---------|--------------|---------------|----------|
@@ -427,8 +410,7 @@ Pop'n modes use consecutive lanes:
 Generic keyboard layouts use names such as `generic-8keys`, ordered left to right. They require a dynamic layout model
 and are outside the first implementation scope.
 
-Internal column mapping must explicitly relocate beat-mode scratches to the ruleset's scratch columns. It must not
-assume `x` is already the runtime column index.
+Map beat-mode scratches to the runtime scratch columns; `x` is not a runtime column index.
 
 ### BGA Object
 
@@ -455,16 +437,15 @@ The BGA object contains four arrays:
 | `y` | unsigned integer | Activation pulse. |
 | `id` | unsigned integer | Resource identifier from `bga_header`. |
 
-When duplicate header IDs occur, the posterior declaration wins and a warning may be emitted. Undefined event IDs
-should produce a missing-resource diagnostic without aborting otherwise playable chart data.
+For duplicate header IDs, the last declaration wins and may produce a warning. Undefined event IDs should produce
+a missing-resource diagnostic while allowing the chart to play.
 
-The specification recommends PNG images and WebM video. Video audio may be ignored. Unlike legacy BMS layer handling,
-pure black pixels in BMSON layer images are not made transparent; authors must use an alpha-capable resource such as
-PNG when transparency is required.
+The specification recommends PNG images and WebM video; video audio may be ignored. BMSON does not make black pixels
+transparent. Transparency requires an alpha-capable resource such as PNG.
 
 ### Legacy BMSON 0.21 Differences
 
-A document without `version` is legacy BMSON, not incomplete 1.0. Important 0.21-to-1.0 differences include:
+A document without `version` is legacy BMSON. Changes from 0.21 to 1.0 include:
 
 | Legacy form | BMSON 1.0 form or change |
 |-------------|--------------------------|
@@ -483,8 +464,8 @@ A document without `version` is legacy BMSON, not incomplete 1.0. Important 0.21
 | Legacy time units | 1.0 pulse-based positions and durations |
 | Legacy `total` semantics | 1.0 relative percentage semantics |
 
-Because field names, units, and gauge semantics all changed, compatibility cannot be implemented safely as a few JSON
-aliases. A future 0.21 reader should have separate DTOs and a dedicated normalisation adapter with its own fixtures.
+Changed units and gauge semantics require more than field aliases. A future 0.21 reader needs separate DTOs,
+a normalisation adapter, and dedicated fixtures.
 
 ### Parser Validation Summary
 
@@ -510,8 +491,7 @@ aliases. A future 0.21 reader should have separate DTOs and a dedicated normalis
 
 ### Sample Identity and Clip Definitions
 
-Replace the two-character BMS key as the runtime sample identity. A runtime sample identifies a playable audio slice,
-not merely a source filename.
+Replace two-character BMS sample keys with runtime IDs for playable audio slices:
 
 ```csharp
 public readonly record struct BmsSampleId(int Value);
@@ -526,12 +506,10 @@ public readonly record struct BmsSampleTrigger(
     int Volume = 100);
 ```
 
-Traditional BMS definitions use a zero start offset and no end offset. BMSON sound slices use offsets calculated from
-the sound channel's restart and continuation sequence.
+BMS definitions start at zero and have no end offset. BMSON offsets come from each channel's restart/continuation sequence.
 
-The same BMSON slice must retain the same `BmsSampleId`. This preserves its polyphony of one: simultaneous triggers of
-the same slice do not become louder, and a later trigger truncates or restarts the same voice. Different slices from
-the same source channel must have distinct IDs so they can overlap.
+Reuse one `BmsSampleId` per slice to enforce [polyphony rules](#slice-playback-rules). Different slices need distinct IDs
+so they can overlap, even within one source channel.
 
 Update these existing models to use `BmsSampleId` and `BmsSampleDefinition`:
 
@@ -557,19 +535,16 @@ Replace `BmsLongNote.TailSampleKey` with:
 public IReadOnlyList<BmsSampleTrigger> TailSamples { get; set; } = [];
 ```
 
-The BMSON parser must fuse notes from different sound channels at the same playable `(x, y)` into one hit object whose
-`Samples` contains every associated slice. Unequal long-note lengths at the same `(x, y)` should produce a diagnostic
-and follow one documented deterministic policy.
+Fuse notes at the same playable `(x, y)` into one hit object containing all slices in `Samples`.
+Handle conflicting long-note lengths using the [layered-note policy](#layered-notes).
 
 Background audio may remain one `BmsSampleEvent` per sample trigger. Multiple events at the same time are valid.
 
 ### Format-Neutral Columns
 
-`Column` should be the authoritative runtime lane. `SourceChannel` is BMS syntax and must no longer be required for
-layout inference or column remapping after a chart has been parsed.
-
-The converter should trust the parser-provided `TotalColumns`, `LayoutVariant`, and `Column`. If source information is
-useful for diagnostics or BMS-specific tests, retain it as optional metadata rather than gameplay state.
+The converter should use parser-provided `TotalColumns`, `LayoutVariant`, and `Column`. Layout inference and remapping
+must no longer depend on `SourceChannel` after parsing. Retain BMS source information only as optional metadata for
+diagnostics and tests.
 
 ### Timing Resolution and Bar Lines
 
@@ -585,9 +560,9 @@ Timing conversion should use:
 pulses * 60000 / bpm / PulsesPerQuarter
 ```
 
-The current `TickResolution` represents ticks per four-quarter-note measure and divides by four during conversion. The
-migration should either replace that convention throughout the timing map or isolate it behind a clearly named legacy
-conversion. New BMSON code must not pass `info.resolution` into the current property without conversion.
+`TickResolution` currently uses ticks per four-quarter-note measure and divides by four during conversion.
+Replace this convention throughout the timing map or isolate it in a named legacy adapter. Convert `info.resolution`
+before passing it to the existing property.
 
 Separate visual bar lines from timing projection:
 
@@ -595,14 +570,8 @@ Separate visual bar lines from timing projection:
 public IReadOnlyList<long> BarLines { get; }
 ```
 
-This is required to distinguish the following BMSON states:
-
-- Missing `lines`: generate regular 4/4 bar lines.
-- Empty `lines`: display no bar lines.
-- Populated `lines`: display exactly the specified pulse positions.
-
-`BmsMeasureInfo` may remain as an internal BMS parsing aid during migration, but gameplay measure-line rendering should
-consume the normalised bar-line collection.
+Preserve the [distinct meanings of missing, empty, and populated `lines`](#bar-lines).
+`BmsMeasureInfo` may remain inside the BMS parser during migration; gameplay should render the normalised collection.
 
 ### Normalised Judgement and Gauge Values
 
@@ -614,8 +583,8 @@ public double DefaultJudgementRate { get; set; }
 public double GaugeTotal { get; set; }
 ```
 
-Existing BMS `#RANK`, `#DEFEXRANK`, and `#TOTAL` fields may be retained as source metadata, but consumers should use the
-normalised values. Per-object judgement-rate events continue to override the chart default.
+Consumers should use normalised values; BMS `#RANK`, `#DEFEXRANK`, and `#TOTAL` may remain as source metadata.
+Per-object judgement-rate events still override the chart default.
 
 BMSON values should be converted as follows:
 
@@ -644,8 +613,8 @@ public IReadOnlyList<BmsCredit> Credits { get; init; } = [];
 public sealed record BmsCredit(string Role, string Name);
 ```
 
-`info.subtitle` is song metadata, while `info.chart_name` is the difficulty name. BMSON `subartists` entries should be
-parsed as role/name pairs and flattened only when writing osu! metadata.
+Use `info.subtitle` for the song subtitle and `info.chart_name` for difficulty. Preserve `subartists` as role/name pairs
+until writing osu! metadata.
 
 Use format-neutral image names in the normalised model where practical:
 
@@ -657,8 +626,7 @@ Use format-neutral image names in the normalised model where practical:
 
 ### BGA Identifiers
 
-Widen BGA identifiers from `ushort` to a 32-bit type or an opaque `BmsBgaId`. BMSON `bga_header.id` is not constrained
-to a two-character BMS identifier.
+Widen BGA identifiers from `ushort` to a 32-bit type or opaque `BmsBgaId` to accommodate BMSON `bga_header.id`.
 
 The existing layer model is sufficient for the first implementation:
 
@@ -678,9 +646,8 @@ public enum BmsChartFormat
 }
 ```
 
-Rename `RawLines` to `RawBmsLines`, or otherwise ensure it is used only when `SourceFormat == Bms`. Runtime branch
-materialisation remains a BMS-only operation. BMSON charts can reuse their deterministic decoded data without being
-represented as line-oriented text.
+Restrict `RawLines` to `SourceFormat == Bms`, preferably renaming it `RawBmsLines`. Only BMS materialises runtime
+branches; BMSON reuses deterministic decoded data.
 
 ## Implementation Phases
 
@@ -694,7 +661,7 @@ Before changing runtime types:
    note data.
 4. Record expected object counts, timings, sample slices, metadata, and BGA events.
 
-Fixtures should use generated tones or existing test audio assets and remain small enough for normal unit tests.
+Keep fixtures small enough for unit tests, using generated tones or existing test audio.
 
 ### Phase 1: Generalise the Runtime Model
 
@@ -707,7 +674,7 @@ Fixtures should use generated tones or existing test audio assets and remain sma
 
 Acceptance criteria:
 
-- Existing BMS decoder tests remain unchanged in observable behaviour.
+- Existing BMS decoder tests retain the same expected behaviour.
 - Existing keysound, BGM, preview, seek, BGA, judgement, and gauge tests pass.
 - No BMSON parser is required yet.
 
@@ -730,7 +697,7 @@ Acceptance criteria:
 
 ### Phase 3: Implement the BMSON Reader
 
-Create a dedicated BMSON namespace or parser folder with JSON DTOs separate from the normalised chart model.
+Place BMSON JSON DTOs in a dedicated namespace or parser folder, separate from the normalised model.
 
 1. Parse JSON with explicit numeric validation and cancellation where import paths require it.
 2. Validate `version` using semantic-version rules and initially accept compatible 1.0 files only.
@@ -761,7 +728,7 @@ Initial mode mappings:
 | `beat-14k` | keys `1`-`7` and `9`-`15`, scratches `8` and `16` | `Bme7KDouble` |
 | `popn-9k` | `1`-`9` | `Pms9K` |
 
-Unsupported modes must stop import with a diagnostic instead of falling back to BMS 5K.
+Reject unsupported modes with a diagnostic; never fall back to BMS 5K.
 
 ### Phase 5: Build Sound Slices and Hit Objects
 
@@ -784,7 +751,7 @@ After slicing all channels:
 5. Discard a background use when the same slice is also assigned to a playable note at that pulse.
 6. Sort the final objects and background events deterministically.
 
-Do not infer long-note tails from BMS `LNOBJ` rules. BMSON long notes use `l > 0` directly.
+Build BMSON long notes from `l > 0`, without applying BMS `LNOBJ` rules.
 
 ### Phase 6: Import and Decoder Integration
 
@@ -798,7 +765,7 @@ Do not infer long-note tails from BMS `LNOBJ` rules. BMSON long notes use `l > 0
 7. Ensure BMS runtime random branches continue to re-materialise, while BMSON remains deterministic.
 8. Report unsupported version, mode, and schema errors through localised import notifications or detailed logs.
 
-If new user-facing diagnostics are added, update the English resource and every supported `.resx` translation together.
+Add new user-facing diagnostics to the English resource and every supported `.resx` translation together.
 
 ### Phase 7: Metadata, BGA, and Preview Completion
 
@@ -821,8 +788,7 @@ If new user-facing diagnostics are added, update the English resource and every 
 
 ## Focused Test Commands
 
-Do not run the unfiltered test suite or benchmark tests while developing BMSON support. Use focused filters and expand
-them as each phase lands, for example:
+Use filtered tests as each phase lands; do not run the unfiltered suite or benchmarks. For example:
 
 ```powershell
 dotnet test osu.Game.Rulesets.BmsRuleset.Tests --filter "FullyQualifiedName~Bmson"
@@ -830,12 +796,9 @@ dotnet test osu.Game.Rulesets.BmsRuleset.Tests --filter "FullyQualifiedName~BmsS
 dotnet test osu.Game.Rulesets.BmsRuleset.Tests --filter "FullyQualifiedName~BmsBeatmapDecoder"
 ```
 
-Before completion, also run filtered existing coverage for timing, preview, BGA, gauge, and import code affected by the
-model migration.
+Also run filtered timing, preview, BGA, gauge, and import tests affected by the model migration before completion.
 
 ## Expected Change Areas
-
-The implementation is expected to touch these areas:
 
 - `BmsParser` for the normalised chart model, timing conventions, and BMS adapter.
 - A new BMSON parser namespace for JSON DTOs, validation, mapping, and diagnostics.
@@ -852,29 +815,27 @@ The implementation is expected to touch these areas:
 
 ### Regressing Existing BMS Audio
 
-Land the runtime model migration before the BMSON parser. Keep traditional BMS samples represented as full-file clips
-and require all existing audio tests to pass before adding slicing behaviour.
+Migrate the runtime model before adding the BMSON parser. Keep BMS samples as full-file clips and pass the existing
+audio tests before adding slicing.
 
 ### Excessive Track Count
 
-A BMSON chart may produce many slices from a small number of files. Retain lazy loading and usage-based prefetching,
-measure real charts before adding cache complexity, and avoid eagerly decoding all slices into separate audio files.
+A few source files can produce many slices. Keep lazy loading and usage-based prefetching, measure real charts before
+adding cache complexity, and avoid eagerly decoding slices into separate files.
 
 ### Ambiguous Community Extensions
 
-Keep the initial schema strict around version and mode. Add each extension behind explicit detection and dedicated
-fixtures rather than accepting fields opportunistically.
+Validate versions and modes strictly. Require explicit detection and dedicated fixtures for each extension.
 
 ### Layout Assumptions
 
-Reject unsupported modes initially. Supporting generic layouts later requires a dynamic layout descriptor carrying
-lane role, player side, scratch status, input action, and skin lookup information; it should not be approximated by
-`TotalColumns` alone.
+Reject unsupported modes initially. Future generic layouts need descriptors for lane role, player side, scratch status,
+input action, and skin lookup; `TotalColumns` alone is insufficient.
 
 ### Timing Unit Confusion
 
-Use `Pulse` and `PulsesPerQuarter` consistently in new APIs and tests. Any compatibility conversion to the existing
-ticks-per-measure representation should be isolated in one adapter and removed after migration.
+Use `Pulse` and `PulsesPerQuarter` in new APIs and tests. Isolate conversion to legacy ticks-per-measure in one adapter,
+then remove it after migration.
 
 ## Definition of Done
 

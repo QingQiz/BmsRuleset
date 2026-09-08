@@ -27,12 +27,12 @@
 | Extended BPM table      | `#BPMxx`                                                                   | Real-number BPM (beyond 0–255 from channel `03`)                                                  |
 | STOP table              | `#STOPxx`                                                                  | Stop sequence durations (1 unit = 1/192 of a 4/4 measure)                                         |
 | Sample definitions      | `#WAVxx`                                                                   | Audio file paths (WAV/OGG/MP3/FLAC)                                                               |
-| BGA image/video slots   | `#BMPxx`                                                                   | Image or video file paths for BGA layers (see Background Animation below)                         |
+| BGA image/video slots   | `#BMPxx`                                                                   | Image or video paths for BGA layers                         |
 | BGA crop definitions    | `#BGAxx`                                                                   | Cropped BGA: `<bmp> <x1> <y1> <x2> <y2> <dx> <dy>` (7-field; w=x2−x1, h=y2−y1)                    |
 | Poor BGA mode           | `#POORBGA 0/1/2`                                                           | 0=Replace (hide other layers on miss), 1=Add (overlay), 2=Off                                     |
 | Long-note type          | `#LNTYPE 1` / `#LNTYPE 2`                                                  | LN notation: 1=RDM (default), 2=MGQ                                                               |
 | Long-note marker        | `#LNOBJ`                                                                   | LN end-point marker value (accumulated in HashSet)                                                |
-| global audio volumn     | `#VOLWAV`                                                                  | Global volume scalar (0–100) for WAV playback                                                     |
+| Global audio volume     | `#VOLWAV`                                                                  | Global volume scalar (0–100) for WAV playback                                                     |
 | Long-note lock mode     | `#LNMODE 1` / `#LNMODE 2` / `#LNMODE 3`                                    | Locks LN type: 1=LN, 2=CN (Charge Note), 3=HCN (Hell Charge Note)                                 |
 | Text events             | `#TEXTxx`, `#SONGxx`                                                       | Displayed during gameplay on channel `99`                                                         |
 | Base 62 extension       | `#BASE 62`                                                                 | Case-sensitive base-62 encoding for commands and channels                                         |
@@ -42,18 +42,13 @@
 | Scroll speed            | `#SCROLLxx`                                                                | Per-segment display multiplier on scroll coordinate                                               |
 | Spacing change          | `#SPEEDxx`                                                                 | Per-segment multiplier on `ScrollSpeedMultiplier`                                                 |
 
-**Not parsed:** `#EXWAVxx`,
-`#WAVCMD`, `#EXBPMxx`, `#STP`, `#PATH_WAV` / `#PATH_BMP`, `#OPTION`,
-`#CHANGEOPTIONxx`, `#SWBGAxx`, `#@BGAxx`, `#ARGBxx`, `#CHARFILE`,
-`#ExtChr`, `#OCT/FP`, `#MATERIALS`
-
-dynamic option channel (`A6`).
+**Not parsed:** `#EXWAVxx`, `#WAVCMD`, `#EXBPMxx`, `#STP`, `#PATH_WAV` / `#PATH_BMP`, `#OPTION`,
+`#CHANGEOPTIONxx`, `#SWBGAxx`, `#@BGAxx`, `#ARGBxx`, `#CHARFILE`, `#ExtChr`, `#OCT/FP`, `#MATERIALS`.
 
 > [!NOTE]
-> The resolved preview source is exposed so callers can tell whether a declared single-file (`#PREVIEW` / `preview.*`)
-> or BGM/keysound playback is active. BGM/keysound playback often gives a more representative preview; declared files
-> may not reflect the chart's full audio content. The **Use dedicated preview audio** setting can disable single-file
-> previews and avoid their loading cost.
+> Callers can inspect whether the preview uses a dedicated file (`#PREVIEW` / `preview.*`) or BGM/keysounds.
+> BGM/keysounds may better represent the chart's audio. Disable **Use dedicated preview audio** to use them exclusively
+> and avoid loading a preview file.
 
 **Header ignored:**
 
@@ -101,11 +96,9 @@ dynamic option channel (`A6`).
 
 **Not parsed:** invisible note channels (`31`–`39`, `41`–`49`), dynamic option change (`A6`).
 
-> Channel `02` controls per-measure length (time signature changes), defined by `#xxx02`. A value of `1` means standard
-> length (4/4), `0.5` half length, `2` double length.
-> Measure duration (ms) = `#xxx02 × 240000 / BPM` (at a fixed BPM).
-> `1/1024` is the smallest value that can be accurately represented. Smaller values may round to 0 ticks, collapsing all
-> events in that measure to the same position.
+> `#xxx02` sets measure length: `1` = 4/4, `0.5` = half, `2` = double. At a fixed BPM,
+> duration (ms) = `#xxx02 × 240000 / BPM`. The smallest accurately represented value is `1/1024`;
+> smaller values may round to 0 ticks and collapse the measure's events to one position.
 
 **Channels ignored:**
 
@@ -116,9 +109,8 @@ dynamic option channel (`A6`).
 
 ## Comprehensive BMS Command Reference
 
-This section catalogs **all known BMS commands** (header, channel, and control flow) across the
-original BM98 specification, community players (LR2, beatoraja), and extended format proposals.
-Commands are grouped by origin and listed with their status in this ruleset.
+Header commands, channels, and control flow from BM98, community players, and format extensions are grouped below
+by origin, with their implementation status in this ruleset.
 
 > Legend: ✓ = implemented · ◐ = partial · ✗ = not implemented · — = N/A
 
@@ -163,7 +155,7 @@ Commands are grouped by origin and listed with their status in this ruleset.
 | `#WAVxx` (ogg) | ✓      | Ogg Vorbis support via same `#WAVxx` command             |
 | `#WAVxx` (flac) | ✓      | FLAC support, including same-name fallback from `.wav`   |
 
-When a declared audio file is missing, same-name alternatives are tried in descending quality order: WAV, FLAC, OGG, then MP3.
+If a declared audio file is missing, files with the same base name are tried in order: WAV, FLAC, OGG, then MP3.
 
 #### 1.5 nanasigroove Extensions
 
@@ -256,16 +248,16 @@ When a declared audio file is missing, same-name alternatives are tried in desce
 | `#MAKER`        | ✓      | Charter/noter name                                                                              |
 | `#EXWAVxx`      | ✗      | Extended WAV with pan/volume/frequency (nanasi)                                                 |
 | `#EXBMPxx`      | ✗      | Extended BMP definition slot                                                                    |
-| `#EXRANK`       | ✓      | Bare `#EXRANK` sets the initial judge-window percentage; indexed `#EXRANKxx` feeds channel A0   |
+| `#EXRANK`       | ✓      | Unnumbered `#EXRANK` sets the initial window percentage; indexed `#EXRANKxx` is used by channel A0 |
 | `#POORBGA`      | ✓      | POOR BGA display mode (0=Replace, 1=Add, 2=Off)                                                 |
 | `#SWBGAxx`      | ✗      | Switchable BGA definition                                                                       |
-| `#@BGAxx`       | ✗      | Extended BGA crop with dest w/h (9 fields); only 7-field `#BGAxx` parsed                        |
+| `#@BGAxx`       | ✗      | 9-field BGA crop with destination width/height; only 7-field `#BGAxx` is parsed                        |
 | `#ARGBxx`       | ✗      | ARGB color/alpha definition for BGA elements                                                    |
 | `#POORBGAxx`    | ✗      | Per-slot POOR BGA crop definition (distinct from scalar `#POORBGA` mode)                        |
 | `#BGAEXPAND`    | ✗      | Global BGA scaling: 0=stretch, 1=keep aspect, 2=no expand                                       |
 | `#BGAOFF`       | ✗      | Disable BGA for the chart                                                                       |
 | `#SCROLLxx`     | ✓      | Scroll speed change definitions; per-segment visual multiplier                                  |
-| `#SPEEDxx`      | ✓      | Spacing change definitions via ChartSpeedFactor`                                                |
+| `#SPEEDxx`      | ✓      | Spacing change definitions via `ChartSpeedFactor`                                                |
 | `#VIDEOFILE`    | ✗      | Video file path                                                                                 |
 | `#MOVIE`        | ✗      | Movie file path                                                                                 |
 | `#SEEKxx`       | ✗      | Seek position for video                                                                         |
@@ -306,9 +298,9 @@ When a declared audio file is missing, same-name alternatives are tried in desce
 | `0B`–`0E` | BGA opacity | ✓      | Opacity changes for base/layer/layer2/poor BGA      |
 
 > [!NOTE]
-> Layer z-order (back-to-front): Base (`04`) → Layer 1 (`07`) → Layer 2 (`0A`) → Poor (`06`, replaces the
-> others while active on MISS). Opacity channels `0B`–`0E` are decoded as hex bytes (`00`–`FF` → 0–1); whether
-> LR2 uses hex-byte vs base-36 encoding is a pending spec verification. See
+> Layer order, back to front: Base (`04`) → Layer 1 (`07`) → Layer 2 (`0A`) → Poor (`06`).
+> `#POORBGA` controls whether the Poor layer replaces or overlays other layers on a miss, or stays off.
+> Opacity channels `0B`–`0E` use hex bytes (`00`–`FF` → 0–1); LR2's use of hex or base-36 still needs verification. See
 > [Not Yet Implemented](./development.md#not-yet-implemented) for related BGA parser and rendering gaps.
 
 #### 2.3 Playable Note Lanes — Player 1

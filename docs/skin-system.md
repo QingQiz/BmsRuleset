@@ -2,7 +2,15 @@
 
 [Back to README](../README.md) | [中文](./skin-system.zh-CN.md)
 
-The skin configuration selection order is described in [osu!mania Skin Support](../README.md#osumania-skin-support).
+## Configuration Priority
+
+For BMS 7K (seven keys plus scratch), skin configuration is selected in this order:
+
+1. `[BMS]` with `Layout: 7K`
+2. `[Mania]` with `Keys: 8` and `SpecialStyle: 1`
+3. `[Mania]` with `Keys: 8`
+4. `[Mania]` with `Keys: 7`
+5. The ruleset's built-in fallback skin
 
 ## Creating a Skin
 
@@ -42,6 +50,7 @@ Write one `[BMS]` section per layout you want to support. The `Layout:` key is r
 > **Scratch column special notes**
 >
 > Column index 0 is **always** the scratch column, regardless of visual position.
+>
 > - `ColumnWidth` — the first value is always the scratch lane width
 > - `NoteImage0` / `KeyImage0` — always refer to the scratch column
 >
@@ -89,9 +98,7 @@ Write one `[BMS]` section per layout you want to support. The `Layout:` key is r
 |---------------|-----------------------------------------------|---------|
 | `ComboPrefix` | Texture prefix for combo counter digit images | `score` |
 
-The combo counter loads textures as `{ComboPrefix}-0.png` through `{ComboPrefix}-9.png`
-
-If the digit textures are missing, the combo counter is silently hidden.
+The combo counter uses `{ComboPrefix}-0.png` through `{ComboPrefix}-9.png` and stays hidden if the textures are missing.
 
 **Note images:**
 
@@ -137,8 +144,7 @@ If the digit textures are missing, the combo counter is silently hidden.
 
 ### Frame Animations (N-suffix)
 
-Most image assets can be provided as multi-frame animations. Append `-0`, `-1`, `-2`, … to the
-texture name:
+To provide a multi-frame animation, append `-0`, `-1`, `-2`, … to the texture name:
 
 ```
 lightingN-0.png
@@ -146,32 +152,27 @@ lightingN-1.png
 lightingN-2.png
 ```
 
-If frames are found, they play as an animation at the rate specified by `LightFramePerSecond`
-(for `StageLight`) or a frame-length derived from frame count (for `LightingN`/`LightingL`).
-If only a single frame (the plain name, e.g. `lightingN.png`) is found, it is used as a static
-sprite.
+`StageLight` uses the frame rate in `LightFramePerSecond`; `LightingN`/`LightingL` derive frame duration from the
+frame count. A single file with no suffix, such as `lightingN.png`, displays as a static sprite.
 
 This works for any image key: `NoteImage`, `KeyImage`/`KeyImageD`, `StageLight`, `LightingN`,
 `LightingL`, `StageHint`, judgement images, etc.
 
 ### Missing image resources
 
-Image-name defaults apply only when the corresponding configuration key is absent. If a key is
-present, its value remains authoritative: the ruleset searches the active skin hierarchy for that
-exact resource name, and renders no image when no source provides it. It does not retry with the
-legacy default filename.
+Default image names apply only to omitted configuration keys. For a configured name, the ruleset searches the active
+skin hierarchy for that exact resource. If it is missing everywhere, no image is drawn; the default name is not tried.
 
 For example, an omitted `KeyImage1` uses `mania-key1` and may retrieve it from a fallback skin.
 `KeyImage1: custom-key` with no `custom-key` resource renders an empty up-state instead of retrying
 `mania-key1`.
 
-Long-note heads and tails retain osu!mania's semantic fallback chain (tail to head to normal note,
-and head to normal note). Judgement images also retain osu!mania's component-level fallback, so a
-lower-priority skin may provide the complete judgement component when the current skin cannot.
+Long-note tails fall back to heads, then normal notes; heads fall back to normal notes, as in osu!mania.
+If the current skin cannot supply a judgement component, a lower-priority skin may supply the whole component.
 
 ### osu!mania Skin Compatibility
 
-You can also use `[Mania]` sections from a standard osu!mania skin. The ruleset will match on:
+`[Mania]` sections are matched in this order:
 
 - `[Mania]` with `SpecialStyle: 1` and scratch-inclusive keys (`6`, `8`, `12`, `16`)
 - `[Mania]` with scratch-inclusive keys (`6`, `8`, `12`, `16`), before exact key-only fallback
@@ -182,44 +183,37 @@ In `[Mania]` sections, use mania standard judgement names: `Hit300g` (PGREAT), `
 
 ## Skin Components
 
-Open the **Skin Editor** during gameplay to add, remove, reposition, and resize components. Selecting a component also
-opens its component-specific settings in the sidebar. Saving the editor layout stores both the transforms and these
-settings in the active skin's BMS-specific gameplay layout. The layout is loaded again whenever that skin is used for
-BMS; chart files and `skin.ini` are not modified.
+Open the **Skin Editor** during gameplay to add, remove, move, and resize components. Select a component to edit its
+settings in the sidebar. Positions, sizes, and settings are saved in the active skin's BMS layout and restored when
+that skin is used again. Chart files and `skin.ini` are unchanged.
+
+Moving and resizing affect appearance only. Special resize rules are described below.
 
 ### Combo
 
-Displays the current combo using the skin's combo digit textures (`ComboPrefix`, or `score` by default). The number
-animates on each increment and flashes with `ColourBreak` when the combo is broken. If the required digit textures are
-missing, the counter has nothing to draw and remains hidden.
+Displays the combo using `ComboPrefix` digit textures (`score` by default). Digits animate on each increment and flash
+with `ColourBreak` on a combo break. Missing digit textures hide the counter.
 
-- **Auto-hide delay** controls how many seconds the counter remains visible after the combo stops increasing. Each
-  increment restarts the timer. The allowed range is -1 to 100 seconds, the default is 3 seconds, and -1 disables
-  automatic hiding.
-- **Min visible combo** controls the first combo value at which the counter appears. Values below this threshold are
-  hidden immediately; the allowed range is 0 to 100 and the default is 10.
-
-Moving or scaling the component changes where and how large the digits are drawn; it does not change either threshold.
+- **Auto-hide delay**: seconds before hiding after the last combo increment; each increment restarts the timer.
+  Range: -1 to 100; default: 3; -1 disables automatic hiding.
+- **Min visible combo**: minimum combo to display. Combos below it hide immediately. Range: 0 to 100; default: 10.
 
 ### Judgement
 
-Displays the result of the most recently judged note. A new PGREAT, GREAT, GOOD, BAD, or POOR/E-POOR immediately
-replaces the previous result and restarts that judgement image's animation. Images come from the `HitPGreat` through
-`HitPoor` entries in a `[BMS]` skin, or the corresponding mania judgement images described above.
+Displays the latest PGREAT, GREAT, GOOD, BAD, or POOR/E-POOR, replacing the previous result and restarting its
+animation. Uses `[BMS]` images `HitPGreat` through `HitPoor`, or their osu!mania equivalents listed above.
 
 - **Show E-POOR** toggles whether empty POOR judgements appear in the popup. It is enabled by default.
 
-Use the editor controls to set the popup's position and scale, and use the skin image files to change its artwork or
-animation.
+Edit the skin image files to change the artwork or animation.
 
 ### Hit Error Meter
 
-Shows timing errors on a horizontal axis with Fast on the left and Slow on the right. The white 0 ms marker remains
-at the visual centre. Both sides reserve the same amount of space, so asymmetric BMS timing windows leave unused space
-on the shorter side instead of shifting the centre.
+Shows timing errors with Fast on the left and Slow on the right. The white 0 ms marker stays centred. Both sides
+have equal space; asymmetric windows leave unused space on the shorter side.
 
-The coloured judgement windows form one continuous bar. E-POOR adds a grey segment beyond the Fast BAD window without
-shortening the other sections. POOR has no finite late edge and is therefore drawn at the final Slow position.
+Judgement windows form a continuous colour bar. E-POOR adds a grey segment beyond Fast BAD without shortening other
+segments. POOR has no finite late boundary, so it appears at the Slow end.
 
 - **Judgement line thickness** controls the width of each displayed timing line from 1 to 8 (default 4).
 - **Judgement fade duration** controls how many seconds a timing line takes to fade out, from 0.1 to 20 seconds
@@ -236,26 +230,22 @@ the two directions can be adjusted independently.
 
 ### Score Graph
 
-Tracks the current EX score against two references throughout the chart:
+Compares the current EX score with two references during play:
 
-- **Personal best** is the saved play with the highest EX score among scores achieved with the currently selected mods
-  or with more difficult mods. Its live progression is reconstructed from the saved play when replay judgement data is
-  available.
-- **Target** is the minimum EX score for the rank immediately above the personal best (C, B, A, AA, AAA, then S). Once the
-  personal best is S, S remains the target.
+- **Personal best**: the highest saved EX score with the selected mods or harder mods. Replay judgement data, when
+  available, reconstructs its score progression.
+- **Target**: the minimum EX score for the rank above the personal best (C, B, A, AA, AAA, then S). At S, the target stays S.
 
-The graph can show rank threshold lines, three live score bars, the current difference from the personal best and
-target, and a PGREAT-through-E-POOR judgement-count comparison. The personal-best judgement column shows an unavailable
-marker when the saved score does not contain the required replay judgement data.
+The graph shows rank thresholds, three live score bars, differences from personal best and target, and judgement
+counts from PGREAT to E-POOR. Personal-best judgement counts show as unavailable without replay judgement data.
 
 - **Current score colour** changes the live EX-score bar and current-score accents.
 - **Personal best colour** changes the personal-best bar, its final-score ghost, and personal-best accents.
 - **Target colour** changes the target bar, its final-score ghost, and target accents.
-- **Show score bars**, **Show score differences**, and **Show judgement comparison** independently control the three
-  sections. At least one section must remain enabled, so disabling the last visible section is rejected.
+- **Show score bars**, **Show score differences**, and **Show judgement comparison** toggle each section.
+  At least one must stay visible.
 
-The component enforces a minimum width and enough height for the enabled sections. Resizing it beyond those limits gives
-the score plot more room without changing any score calculations.
+The component enforces a minimum width and enough height for the visible sections.
 
 <details>
 <summary>Example</summary>
@@ -266,59 +256,48 @@ the score plot more room without changing any score calculations.
 
 ### Health Bar
 
-Shows the currently selected BMS gauge as a bottom-to-top fill. For Assist Easy, Easy, and Normal, a clear line marks
-the gauge's clear threshold and the fill changes colour as it passes the red-zone and clear thresholds. The thresholds
-come from the selected gauge rules: the red zone ends at 20%, Assist Easy clears at 60%, and Easy and Normal clear at
-80%.
+Fills from bottom to top. Assist Easy, Easy, and Normal show a clear line and change colour at the red-zone and clear
+thresholds. The red zone ends at 20%; Assist Easy clears at 60%, Easy and Normal at 80%.
 
 - **Groove low health colour** is used below the red-zone threshold.
 - **Groove mid health colour** is used from the red-zone threshold up to the clear threshold.
 - **Groove high health colour** is used at or above the clear threshold.
 - **Hard**, **ExHard**, and **Hazard gauge fill colour** each set the single fill colour used by that survival gauge.
 
-Class, ExClass, and ExHard Class use the Hard, ExHard, and Hazard fill colours respectively. Resizing the component
-changes the gauge's visible width and height only; it does not change health values, thresholds, or gauge behaviour.
+Class, ExClass, and ExHard Class use the Hard, ExHard, and Hazard fill colours respectively.
 
 ### Song Progress
 
-Shows playback position along a vertical track: the glowing marker starts at the top, remains there during the intro,
-and travels towards the bottom as the playable portion of the chart advances.
+Shows playback progress with a glowing marker: it stays at the top during the intro, then moves downward during play.
+The track sits at the Stage's left edge by default; its height determines the marker's travel distance.
 
-**Indicator colour** changes both the sharp marker and its surrounding glow. Moving the component places the progress
-track elsewhere; changing its height changes the marker's travel distance.
-
-The default layout attaches it to the left edge of the Stage.
+**Indicator colour** changes the marker and its glow.
 
 ---
 
 ### BGA
 
-Displays the chart-authored BGA timeline, including the base, layer 1, layer 2, and POOR layers. The component applies
-chart-defined crop and opacity events and shows the POOR layer briefly after a miss according to the chart's POOR BGA
-mode.
+Displays the chart's base, layer 1, layer 2, and POOR BGA layers, including crop and opacity events. Misses briefly
+show the POOR layer according to the chart's POOR BGA mode.
 
-The component's rectangle defines the BGA viewport. Content always preserves its aspect ratio with aspect-fit sizing,
-scaling up or down as needed to fit inside the viewport. It is rendered behind the playfield and remains there when
-the gameplay HUD is hidden.
+The BGA scales to fit the component's rectangle while preserving its aspect ratio. It stays behind the playfield
+and remains visible when the gameplay HUD is hidden.
 
 - **Fill screen** expands the component across the full HUD area and is enabled in the default layout. Moving, resizing,
   or rotating the component automatically disables this option and preserves the edited BGA window.
 
-**BGA dim** is a ruleset-wide gameplay setting rather than a component setting, and affects the BGA regardless of
-which saved component layout is active.
+**BGA dim** in the BMS settings applies to every component layout.
 
 ### Stage
 
-Represents the complete playable Stage: its lanes, notes, measure lines, key area, judgement line, hit explosions, and
-Stage artwork all move together when this component is repositioned.
+Contains the lanes, notes, measure lines, key area, judgement line, hit effects, and Stage artwork. They move together.
 
-- **Judgement line offset** moves the judgement line relative to the position supplied by the skin. Positive values
-  move it upward and negative values move it downward. The editor limits the value so the line remains within the
-  current visible Stage; changing the offset does not change judgement timing.
+- **Judgement line offset** moves the line from its skin-defined position: positive moves up, negative moves down.
+  The editor keeps it within the visible Stage. Judgement timing is unchanged.
 - **Note height scale** scales the height of note heads and tails from 0.01x to 5x (default 1x). It does not move notes,
   alter long-note body length, or scale other Stage elements.
 
-The Stage resize handles deliberately perform different operations:
+Stage resize handles have three functions:
 
 - **Horizontal resize** (left/right handles) changes the Stage width, stretching lanes, notes, and Stage graphics
   horizontally without changing the visible lane length.
@@ -327,9 +306,8 @@ The Stage resize handles deliberately perform different operations:
 - **Diagonal resize** (corner handles) scales the entire Stage uniformly, including lane width, note size, and Stage
   graphics, while preserving its proportions and the amount of lane content shown.
 
-The Stage skin component is required and is not offered in the component toolbox. Deleting it automatically creates
-a new default instance, resetting its position, size, and settings, including the judgement line offset. If a saved
-layout contains duplicates, only the first instance is retained.
+Stage is required and absent from the component toolbox. Deleting it creates a default instance, resetting position,
+size, and settings, including judgement line offset. If a saved layout has duplicates, only the first is kept.
 
 <details>
 <summary>Example</summary>
@@ -340,14 +318,11 @@ https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
 
 ### Text
 
-Shows short gameplay messages in a dark-backed text banner. At chart start it briefly displays `Game Start`. During
-play, channel `99` events display the corresponding `#TEXTxx` value; if `#TEXT00` is defined, a POOR judgement displays
-it as the mistake message. An in-game scroll-speed change displays the new multiplier with `>>` or `<<` direction
-markers. Each message fades out automatically after a short delay.
+Shows a dark-backed banner for `Game Start`, channel `99` messages from `#TEXTxx`, and `#TEXT00` on POOR when defined.
+Scroll-speed changes show the new multiplier with `>>` or `<<`. Messages fade after a short delay.
 
-There are no component-specific sidebar settings. Because the component is normally transparent between messages, the
-skin editor replaces its contents with a fully visible `Sample Text Event` placeholder. Use that placeholder to place
-and scale the banner; it is never shown during normal gameplay.
+This component has no sidebar settings. The editor shows `Sample Text Event` for positioning and scaling because
+the banner is transparent between messages. The placeholder does not appear during gameplay.
 
 ## Example skin.ini (7K)
 

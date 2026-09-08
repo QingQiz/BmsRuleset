@@ -5,8 +5,7 @@
 ## Build Manually
 
 Install [Git](https://git-scm.com/) and the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), then clone
-this repository and osu! into sibling directories under any working directory. The sparse checkout skips the large
-test-song folder:
+this repository and osu! into sibling directories. Sparse checkout skips the large test-song folder:
 
 ```bash
 git clone --filter=blob:none --sparse https://github.com/QingQiz/BmsRuleset.git
@@ -21,9 +20,8 @@ Read `OsuBase` in `BmsRuleset/Directory.Build.props`, then check out the matchin
 git -C osu checkout 2026.711.0-lazer
 ```
 
-The project enables `UseLocalOsu` by default and automatically references the sibling `osu` checkout. This is needed
-because ppy often does not update the `ppy.osu.Game` NuGet package at the same time as an osu!lazer release. Building
-against the matching local tag keeps the referenced API and osu! version in sync without waiting for a NuGet update.
+`UseLocalOsu` is enabled by default and references the sibling `osu` checkout. The `ppy.osu.Game` NuGet package
+can lag behind osu!lazer releases, so building against the matching tag keeps the API version in sync.
 
 Build the ruleset in Release configuration:
 
@@ -41,9 +39,9 @@ The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets
 |---------------|------------------------------------------------------------------------------------------|----------|
 | **Audio**     | `#WAVCMD` (MacBeat) — pitch/volume/playback-time per WAV slot                            |
 | **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                  |
-| **Input**     | Scratch turntable semantics — scratch is routed as a plain column key                    |
+| **Input**     | Turntable input — scratch currently behaves as a column key                    |
 | **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |          |
-| **Parser**    | `#@BGAxx` — extended BGA crop with dest w/h (9 fields); only 7-field `#BGAxx` parsed     | 2        |
+| **Parser**    | `#@BGAxx` — 9-field BGA crop with destination width/height; only 7-field `#BGAxx` is parsed | 2        |
 | **Parser**    | `#SWBGAxx` — switchable BGA definition                                                   | 3        |
 | **Parser**    | `#ARGBxx` — ARGB color/alpha definition for BGA elements                                 | 3        |
 | **Parser**    | `#EXBMPxx` — extended BMP definition slot                                                | 3        |
@@ -68,12 +66,12 @@ The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets
 | **Parser**    | Channel `17` / `27` — free-zone keys                                                     |
 | **Parser**    | Channel `31`–`49` — invisible notes                                                      |
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                |
-| **Renderer**  | POOR BGA duration hardcoded 500ms (beatoraja uses config-driven `misslayerDuration`)     | 3        |
+| **Renderer**  | Configurable POOR BGA duration — fixed at 500 ms; beatoraja uses `misslayerDuration`     | 3        |
 | **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                   | 3        |
 | **Skin**      | `HitGreat` → `HitGreatSlow` / `HitGreatFast` split images                                |
 | **Skin**      | E-POOR judgement image                                                                   | 3        |
 | **UI**        | Lane cover / skin / movement                                                             | 2        |
-| **Perf**      | fps is not stable when a large amount of mine disposed                                   | 4        |
+| **Perf**      | Unstable frame rate when disposing of many mines                                   | 4        |
 
 ### FIXME
 
@@ -87,6 +85,5 @@ The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets
        .<updateCountStatistics>b__0()
 ```
 
-Switching the active ruleset from BMS to any other crashes with
-`BeatmapInvalidForRulesetException` because the beatmap title wedge tries to recalculate
-difficulty using the wrong converter while the carousel selection is stale.
+Switching from BMS to another ruleset crashes with `BeatmapInvalidForRulesetException`: the beatmap title wedge
+recalculates difficulty with the wrong converter while the carousel selection is stale.

@@ -2,12 +2,12 @@
 
 [Back to README](../README.md) | [中文](./difficulty-tables.zh-CN.md)
 
-Difficulty tables (LR2/beatoraja format) provide difficulty ratings and markers for BMS charts. The ruleset supports
-importing tables from a JSON file or URL, and automatically matches charts by MD5 hash.
+Import LR2/beatoraja difficulty tables from a JSON file or URL. Charts are matched by MD5 and receive table-level
+markers and collections.
 
 ## Preset Tables
 
-The following well-known tables are available as one-click presets in the autocomplete dropdown:
+Select a preset from the autocomplete dropdown:
 
 | Table                 | Symbol | URL                                                    |
 |-----------------------|--------|--------------------------------------------------------|
@@ -27,29 +27,38 @@ The following well-known tables are available as one-click presets in the autoco
 2. Paste a URL (e.g. `http://zris.work/bmstable/turbow/header.json`) or a local file path into the text box.
 3. Click **Import** (or press Enter).
 
-The importer supports three JSON formats:
+The importer accepts three formats:
 
 - **Separate files** — `header.json` + `data.json` linked by `data_url`
 - **Combined file** — a single JSON with both header fields (name, symbol, level_order) and `"charts": [...]`
 - **HTML page** — a web page with `<meta name="bmstable" content="URL">` pointing to the JSON
 
+## Missing Charts
+
+Charts listed by an imported table but missing from the local library still appear in song select.
+An orange warning indicates an available download link; a red warning means the table provides no usable link.
+Attempting to play a missing chart opens its download page when available.
+
 ## Courses
 
-If the table header contains a bmstable `course` array, its courses are also added to BMS course mode. Each course
-object requires a `name` and a list of stage hashes. Stages retain their declared order and are matched to installed
-charts by MD5 or SHA-256. Song titles, artists, and table levels are filled from the table's chart data; stages whose
-charts are not installed remain unavailable until the matching chart is imported.
+The table header's `course` array defines courses. Each requires a `name` and an ordered list of stage hashes,
+matched to local charts by MD5 or SHA-256. Titles, artists, and levels come from the table's chart data.
+Missing stages remain unavailable until their charts are imported.
 
-Courses do not declare a gauge tier; like beatoraja, the selected Gauge Mod is mapped onto the three course
-gauge tiers (Class, EX Class, EX Hard Class) at play time. The course's `constraint` array is shown in the
-course select title area and enforced during play.
+All stages must be installed to start a course. Otherwise, attempting to start opens download pages for all missing
+stages if each has a valid URL. If any lacks a URL, no pages open and a missing-stage notification appears.
+
+Courses cannot be paused. Between stages, the next song starts automatically after 99 seconds.
+
+The selected gauge mod determines the course gauge tier (Class, EX Class, or EX Hard Class), as in beatoraja;
+courses do not specify a tier. The `constraint` array defines rules shown in course select and enforced during play.
 
 | Constraint    | Effect                                                  |
 |---------------|---------------------------------------------------------|
 | `grade`       | Only the default layout; no mirror or random            |
 | `grade_mirror`| Mirror or default layout                                |
 | `grade_random`| —                                                       |
-| `no_speed`    | Locks the in-play scroll speed and disable Constant mod |
+| `no_speed`    | Locks in-play scroll speed and disables the Constant mod |
 | `no_good`     | Removes the GOOD judgement window                       |
 | `no_great`    | Removes the GREAT and GOOD judgement windows            |
 | `gauge_lr2`   | Forces the LR2 gauge profile                            |
@@ -69,34 +78,24 @@ After import, every beatmap whose MD5 matches a table entry gets a **marker** ap
 DP ☆NOTHER [TT★1 TT★2]
 ```
 
-The marker shows the table symbol and the entry's level. Markers update automatically when tables are added or removed.
+Markers contain the table symbol and level, and update when tables are added or removed.
 
 > [!IMPORTANT]
-> Do **not** add or remove difficulty tables while on the **song select** screen.
-> Removing a table triggers a full marker rebuild across all BMS beatmaps, which contends with the
-> beatmap carousel's active Realm reads and will freeze the UI. Always switch to the **main menu**
-> before importing or deleting a difficulty table.
+> Switch to the **main menu** before importing or deleting a table. Deleting one rebuilds all BMS markers;
+> on the song select screen, this conflicts with the carousel's Realm reads and freezes the UI.
 
 ## Collections
 
-Each table also creates a **BeatmapCollection** named `[BMS] {table.Name}` containing all matched charts. This lets you
-browse the table's songs directly from the song select collection list.
-(The collection name uses invisible characters under the hood, so you don't need to worry about it colliding with your
-own collections.)
+Each table creates a collection named `[BMS] {table.Name}` for browsing matched charts in song select.
+Invisible characters in the name prevent collisions with your own collections.
 
 ## Table Row Display
 
-Each imported table appears as an expandable item in the settings list. Hover it to see a tooltip with the chart count
-per level.
+Hover a table in the BMS settings to see chart counts per level. Click it to expand its actions:
 
-Click a table to show its available actions. Remote tables provide **Subdivide/Unsubdivide**, **Update**, and
-**Delete table**; local tables omit **Update**. The actions stay visible after an operation, including when the table
-list is rebuilt.
+- **Subdivide/Unsubdivide** splits the collection by level or merges it back. Split collections have ordering indices,
+  such as `[BMS] Table [00] ★1` and `[BMS] Table [01] ★2`. Indices use 1 digit for &lt;10 levels, 2 for &lt;100, and so on.
+- **Update** re-imports a remote table from its source URL. Local tables do not offer this action.
+- **Delete table** removes the table, its markers, and its collections after confirmation.
 
-Expand the table row and click **Subdivide** to split its collection into per-level collections with ordering indices
-(e.g., `[BMS] Table [00] ★1`, `[BMS] Table [01] ★2`). The index width adapts to the number of levels
-(1 digit for &lt;10, 2 for &lt;100, etc.). Click **Unsubdivide** to merge them back into one.
-
-Remote tables provide an **Update** action that re-imports the table from its original source URL.
-
-Click **Delete table** and confirm the dialog to remove a table, its markers, and its generated collections.
+The row stays expanded after an operation, including when the table list is rebuilt.

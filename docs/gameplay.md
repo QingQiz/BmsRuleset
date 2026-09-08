@@ -4,11 +4,10 @@
 
 ## Input and Key Bindings
 
-Default bindings (all rebindable in **Settings → Key Bindings → osu!BMS**):
+Use **Up/Down** to temporarily increase/decrease scroll speed during play. Rebind controls in
+**Settings → Key Bindings → osu!BMS**.
 
-**ingame controls:** increase/decrease scroll speed temporarily
-
-Key sound of the next upcoming note in a column plays on every key press regardless of judgement result.
+Each key press plays the next note's keysound in that column, regardless of the judgement.
 
 ## Judgements and Scoring
 
@@ -24,9 +23,8 @@ Key sound of the next upcoming note in a column plays on every key press regardl
 | **E-POOR** | 0      | **no break** | [-500ms,-220ms], no note consume |
 
 `#RANK` 0 = Very Hard (±5/15/37.5 ms, BAD -220/+280 ms) → 4 = Very Easy (±25/75/187.5 ms, BAD -220/+280 ms).
-`#DEFEXRANK` and bare `#EXRANK` set the initial judge-window width as a percentage where `100` matches Normal
-(`#RANK 2`). Indexed `#EXRANKxx` values can be applied mid-chart through channel `A0`; undefined `A0` references leave
-the current window unchanged.
+`#DEFEXRANK` and unnumbered `#EXRANK` set the initial window width as a percentage; `100` equals Normal (`#RANK 2`).
+Channel `A0` applies indexed `#EXRANKxx` values mid-chart. Undefined references leave the window unchanged.
 
 **Score:** `total EX score / max EX score × 1,000,000`
 
@@ -48,18 +46,15 @@ For example, on a 7K `#RANK 2` chart, two notes in the same key column occur at 
 gives the first note GOOD under Combo or Earliest note priority; Time difference or Score priority selects the second
 note for PGREAT.
 
-Selection applies to normal notes and long-note heads, including scratch columns. Each candidate uses its own judgement
-windows for the layout, rank/EXRANK, and active judgement-window mods. Long-note releases retain their existing rules;
-E-POOR still does not consume a note.
+Selection applies to normal notes and long-note heads, including scratch. Each note uses the windows determined by
+its layout, RANK/EXRANK, and active judgement-window mods. Long-note release rules are unchanged; E-POOR consumes no note.
 
-The algorithm is fixed when a play starts, so setting changes apply from the next play. New replays save that choice
-and use it regardless of the viewer's current setting. Replays recorded before this setting was introduced retain the
-original selection behaviour.
+The algorithm is fixed at play start; setting changes apply to the next play. Replays use the recorded algorithm
+regardless of the viewer's settings. Replays recorded before this setting existed use the original selection behaviour.
 
 ## Gauge
 
-The ruleset implements 6 regular BMS gauge types covering both Groove and Survival modes, plus 3 course gauge
-types for BMS course mode. Default play uses the Normal gauge. Gauge types are selected via mods:
+Choose from 6 regular gauges (Groove or Survival) and 3 course gauges through mods. Normal is the default:
 
 > [!NOTE]
 > The gauge values and algorithms are adapted from **beatoraja** (SEVENKEYS mode), itself a reimplementation of the
@@ -80,11 +75,10 @@ types for BMS course mode. Default play uses the Normal gauge. Gauge types are s
 
 - **Groove gauges** (E2/E1/Normal): recoverable, start at 20%, must reach clear threshold by song end. Bar colour
   transitions from red (< 20%) → amber (< clear) → green (≥ clear) based on the active gauge's threshold.
-- **Survival gauges** (H1/H2/H3): start at 100%, damage-only (no recovery for H3). Gauge uses a fixed colour with no
-  clear line. Pass condition is purely survival (HP never hit 0).
-- **Course gauges** (C1/C2/C3): course-only Survival gauges with fixed red, purple, or gold bars. They carry their
-  remaining HP from one stage to the next; reaching 0% fails the entire course. In course mode, the regular gauge
-  selection is mapped to the corresponding Class tier.
+- **Survival gauges** (H1/H2/H3): start at 100% and fail at 0%. H3 has no recovery. The bar uses a fixed colour with
+  no clear line.
+- **Course gauges** (C1/C2/C3): Survival gauges that carry HP between stages; reaching 0% fails the course. Bars are
+  red, purple, or gold. The selected regular gauge maps to the corresponding Class tier.
 - Hard (H1) has **guts protection**: below each HP threshold, damage is reduced (below 50% → ×0.8, below 40% → ×0.7,
   …, below 10% → ×0.4).
 - `#TOTAL` controls the maximum gain rate for TOTAL-algorithm gauges. When it is omitted, 5-key, 7-key, PMS, and LR2
@@ -94,9 +88,8 @@ types for BMS course mode. Default play uses the Normal gauge. Gauge types are s
 
 ## Lamps
 
-Song panels, stage panels, and course cards are tinted by a **clear lamp** that marks the best played result.
-Colours, flash behaviour, and the lamp hierarchy follow **beatoraja** (its default skin `lamp.png` atlas, which
-retains the LR2 lamp conventions). The lamp types, from lowest to highest:
+Song panels, stage panels, and course cards show **clear lamps** for the best result. Colours, flashing, and lamp
+order follow **beatoraja**'s default `lamp.png`, which retains LR2 conventions. From lowest to highest:
 
 | Lamp     | Fill colour | Flash colour | Meaning                                        |
 |----------|-------------|--------------|------------------------------------------------|
@@ -111,12 +104,14 @@ retains the LR2 lamp conventions). The lamp types, from lowest to highest:
 | PERFECT  | `#FFFFFF`   | `#3FFF4D`    | PGREAT + GREAT only; flashes at a 60 ms cycle  |
 | MAX      | `#FFFFFF`   | `#FFEB42`    | all PGREAT; flashes at a 60 ms cycle           |
 
-A passed score never downgrades a lamp earned from a harder gauge; the panel shows the highest lamp and the
-highest rank among the scores that match the currently selected mods.
+The panel shows the highest lamp and rank among scores matching the selected mods. A clear on an easier gauge
+does not downgrade an existing lamp.
 
-Beatoraja also distinguishes pattern-simplification assists (**ASSIST**, dark purple) from the
-Assist Easy *gauge* (**L-ASSIST**); the ruleset currently has no pattern-level assist options,
-so ASSIST is never produced and the Assist Easy gauge earns the L-ASSIST lamp.
+Lowering the difficulty keeps lamps earned under harder conditions visible, while raising it hides lamps earned
+under easier conditions. Only Double Time is treated as a difficulty increase for lamp filtering.
+
+Beatoraja distinguishes pattern assists (**ASSIST**, dark purple) from the Assist Easy gauge (**L-ASSIST**).
+This ruleset has no pattern-level assists, so it awards L-ASSIST for Assist Easy clears and never awards ASSIST.
 
 ### Course Lamps
 
@@ -126,24 +121,23 @@ so ASSIST is never produced and the Assist Easy gauge earns the L-ASSIST lamp.
 | Ex Class (C2)        | HARD    |
 | Ex Hard Class (C3)   | EX-HARD |
 
-Course results never reach the FULL COMBO/PERFECT/MAX tier, so the corresponding lights won't be produced.
-The course card shows the best lamp and rank among the course results whose mods match the currently selected
-mods.
+Courses do not award FULL COMBO, PERFECT, or MAX lamps. Course cards show the best lamp and rank among results
+matching the selected mods.
 
 ## Mods
 
 | Mod                      | Description                                                     | Options                                            |
 |--------------------------|-----------------------------------------------------------------|----------------------------------------------------|
-| Autoplay                 | auto play                                                       |         |
+| Autoplay                 | Plays automatically                                             |         |
 | Double Time / Half Time  |                                                                 | Speed; adjust pitch                                |
 | No Fail                  |                                                                 |         |
 | Mirror                   | Mirrors the key layout                                          |         |
 | Invert (IN)              | Converts each note except the lane's last into a hold note      | Randomise LN length; seed                          |
-| 2P                       | change the player layout from 1P to 2P                          |         |
-| Constant (CN)            | disable SV (including #SPEED/#SCROLL/Bpm change)                |         |
-| Auto Scratch (AS)        | auto play scratch lane                                          |         |
-| Hide Scratch (HS)        | Remove the scratch notes and hide scratch lane                  |         |
-| Background Keysound (BK) | Play all keysounds as background audio instead of on key press. |         |
+| 2P                       | Switches the layout from 1P to 2P                               |         |
+| Constant (CN)            | Disables scroll-speed changes, including #SPEED/#SCROLL/BPM     |         |
+| Auto Scratch (AS)        | Plays the scratch lane automatically                            |         |
+| Hide Scratch (HS)        | Removes scratch notes and hides the lane                        |         |
+| Background Keysound (BK) | Plays keysounds as background audio instead of on key press     |         |
 | Lane Random (LR)         | RANDOM: permutes lane columns                                   | Include scratch; seed; lane order                  |
 | Note Random (NR)         | S-RANDOM / H-RANDOM: per-note random                            | Include scratch; mode; seed                        |
 | Rotation Random (RR)     | R-RANDOM: rotate + optional mirror                              | Include scratch; seed                              |
@@ -155,22 +149,22 @@ mods.
 | Auto Gauge (AG)          | Start with the hardest gauge; drop a tier on failure            |         |
 | No Good (NG)             | Removes the GOOD judgement window                               |         |
 | No Great (NE)            | Removes the GREAT and GOOD judgement windows                    |         |
-| Long Note (L1)           | LN judgement: LN mode: single endpoint judged at tail           |         |
-| Charge Note (L2)         | LN judgement: CN mode: head & tail judged separately            |         |
-| Hell Charge Note (L3)    | LN judgement: HCN mode: CN + body gauge drain/recover           |         |
+| Long Note (L1)           | LN: judges only the tail                                       |         |
+| Charge Note (L2)         | CN: judges head and tail separately                            |         |
+| Hell Charge Note (L3)    | HCN: CN with gauge drain/recovery during the body              |         |
 
 ## Settings
 
 | Setting                       | Default  | Range / options                            | Description                                                                                                                                                                                     |
 |-------------------------------|----------|--------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Scroll speed                  | 8.0      | 1.0–50.0, step 0.1                        | Note fall speed. In-game scroll-speed actions adjust it temporarily; keys are rebindable under **Settings → Key Bindings → osu!BMS**.                                                         |
+| Scroll speed | 8.0 | 1.0–50.0, step 0.1 | Note fall speed; in-game controls adjust it temporarily. |
 | Reference BPM                 | Main BPM | Start BPM, Max BPM, Main BPM, or Min BPM   | Scroll-speed reference used when a chart has no `#BASEBPM`. Main BPM uses the BPM containing the most playable notes; ties use the earliest occurrence.                                       |
-| Judgement selection algorithm | Combo priority (LR2) | Combo priority (LR2), Time difference priority (AC), Earliest note priority, Score priority | Selects a note when judgement windows overlap in the same column. Changes apply from the next play; replays retain their recorded choice. See [selection rules](#judgement-selection-algorithms). |
-| BGA dim                       | 70%      | 0%–100%                                   | Dims background animation without removing it. 0% keeps full brightness; 100% makes the BGA invisible while it continues to run.                                                             |
+| Judgement selection algorithm | Combo priority (LR2) | Combo priority (LR2), Time difference priority (AC), Earliest note priority, Score priority | Selects which note receives a press when windows overlap. See [selection rules](#judgement-selection-algorithms). |
+| BGA dim | 70% | 0%–100% | 0% keeps full brightness; 100% hides the BGA without stopping playback. |
 | Unlock frame rate limit       | Off      | On / off                                  | Removes osu!'s 1000 Hz frame and input polling cap during BMS gameplay. Higher GC and GPU pressure may cause extra stutters; disable this option if that happens. |
-| Visual offset                 | 0 ms     | -500–500 ms, step 1 ms                    | Moves scrolling visuals only. Positive values display notes earlier for players who receive more Slow judgements; negative values display them later for players who receive more Fast judgements. Audio, judgements, scoring, and keysounds remain unchanged. |
-| LN tail visual offset        | 0 ms     | 0–1000 ms, step 1 ms                      | Advances only long-note tails visually, making LNs appear shorter. The tail is clamped so it never appears before its head. Audio, judgements, scoring, and keysounds remain unchanged. |
-| Adjust visual offset automatically | Off | On / off                                  | Applies the visual offset suggested by each valid local play. Replays, automatic play, and plays with fewer than 50 timed hits are excluded.                                                  |
+| Visual offset | 0 ms | -500–500 ms, step 1 ms | Positive values display notes earlier (for more Slow judgements); negative values display them later (for more Fast judgements). |
+| LN tail visual offset | 0 ms | 0–1000 ms, step 1 ms | Advances long-note tails visually, shortening notes without moving tails before their heads. |
+| Adjust visual offset automatically | Off | On / off | Applies each valid local play's suggested offset. See [calibration](#visual-offset-calibration). |
 | Use dedicated preview audio   | On       | On / off                                   | Uses `#PREVIEW` or `preview.*` when available. When disabled, song-select previews are synthesized only from BGM and keysound samples.                                                        |
 | Show BMS 5K                   | On       | On / off                                   | Shows or hides single-play BMS 5K charts in song select.                                                                                                                                       |
 | Show BME 7K                   | On       | On / off                                   | Shows or hides single-play BME 7K charts in song select.                                                                                                                                       |
@@ -179,10 +173,17 @@ mods.
 | Show BME 7K DP                | On       | On / off                                   | Shows or hides double-play BME 7K charts in song select.                                                                                                                                       |
 | Show PMS 9K DP                | On       | On / off                                   | Shows or hides double-play PMS 9K charts in song select.                                                                                                                                       |
 
-Layout visibility filters are applied live in song select — uncheck a layout to hide all beatmaps of that type.
+Layout filters take effect immediately in song select.
 
-The same BMS settings section also contains chart import and cleanup actions. Difficulty-table management is described
-in the [difficulty table guide](./difficulty-tables.md).
+The BMS settings also provide chart import, cleanup, and [difficulty-table management](./difficulty-tables.md).
+
+### Visual Offset Calibration
+
+Visual offset and LN tail visual offset affect only the display; audio, judgements, scoring, and keysounds stay unchanged.
+
+Local plays generate suggestions from their median hit error. Apply the average of recent suggestions in the BMS
+settings, or enable **Adjust visual offset automatically** to apply each new suggestion after a play.
+Replays, automatic play, and plays with fewer than 50 timed hits are excluded.
 
 ## Song Select Search
 
