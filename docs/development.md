@@ -2,6 +2,10 @@
 
 [Back to README](../README.md)
 
+## Design Plans
+
+- [Online leaderboard plan (中文)](online-leaderboard-plan.zh-CN.md): osu! OAuth, full replay uploads, and SQLite storage. Design only; not implemented.
+
 ## Build Manually
 
 Install [Git](https://git-scm.com/) and the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), then clone
