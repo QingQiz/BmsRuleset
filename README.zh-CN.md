@@ -55,7 +55,8 @@ BMS 元数据，而不会影响原始文件。
 ## 亮点
 
 从 BPM 和 STOP 变化，到长音符、地雷、随机分支、滚速变化、BGA 与 keysound，规则集围绕真正影响 BMS
-游玩体验的功能构建。判定使用兼容 beatoraja 的时间窗口，在 osu! 标准化分数之外保留传统 EX Score。
+游玩体验的功能构建。判定使用兼容 beatoraja 的时间窗口，并提供[四种可选判定算法](./docs/gameplay.zh-CN.md#判定选择算法)，
+在 osu! 标准化分数之外保留传统 EX Score。
 
 规则集还补充了标准 osu! 没有的 BMS 工作流：根据谱面音频合成选歌预览、难度表收藏夹与标记、跟随 Mods
 判断的 Clear Lamp，以及无需先观看 replay 就能直接查看的已保存成绩详细分析。

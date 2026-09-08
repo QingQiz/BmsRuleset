@@ -29,6 +29,12 @@
   <data name="perfect_score" xml:space="preserve"><value>PERFECT</value></data>
   <data name="standard_deviation" xml:space="preserve"><value>标准差 {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>基准 BPM</value></data>
+  <data name="judgement_algorithm" xml:space="preserve"><value>判定选择算法</value></data>
+  <data name="judgement_algorithm_hint" xml:space="preserve"><value>同一轨道有多个音符的判定窗口重叠时，决定本次按键判定哪个音符。连击／分数优先：前一个音符已晚于 GOOD／GREAT 窗口，且后一个音符未早于对应窗口时，选择后者。时间差优先：选择时间最近的音符。最早音符优先：选择最早可判定的音符。更改从下一局生效。</value></data>
+  <data name="judgement_algorithm_combo" xml:space="preserve"><value>连击优先（LR2）</value></data>
+  <data name="judgement_algorithm_duration" xml:space="preserve"><value>时间差优先（AC）</value></data>
+  <data name="judgement_algorithm_lowest" xml:space="preserve"><value>最早音符优先</value></data>
+  <data name="judgement_algorithm_score" xml:space="preserve"><value>分数优先</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA 暗化</value></data>
   <data name="visual_offset" xml:space="preserve"><value>视觉偏移</value></data>
   <data name="bms_visual_offset" xml:space="preserve"><value>BMS 视觉偏移</value></data>

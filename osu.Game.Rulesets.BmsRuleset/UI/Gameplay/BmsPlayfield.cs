@@ -156,6 +156,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     internal BindableDouble LongNoteTailVisualOffset { get; } = new();
 
+    // Null identifies replays recorded before selectable algorithms were introduced.
+    internal BmsJudgementAlgorithm? JudgementAlgorithm { get; set; } = BmsJudgementAlgorithm.Combo;
+
     #endregion
 
     #region Skin / DI

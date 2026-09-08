@@ -29,6 +29,12 @@
   <data name="perfect_score" xml:space="preserve"><value>PERFECT</value></data>
   <data name="standard_deviation" xml:space="preserve"><value>SD {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>Reference BPM</value></data>
+  <data name="judgement_algorithm" xml:space="preserve"><value>Judgement selection algorithm</value></data>
+  <data name="judgement_algorithm_hint" xml:space="preserve"><value>Choose which note receives a press when judgement windows overlap in the same column. Combo / Score priority switches to a later note when the earlier note is past GOOD / GREAT and the later note is within the early GOOD / GREAT limit. Time difference priority chooses the nearest note; earliest note priority keeps the first eligible note. Changes apply from the next play.</value></data>
+  <data name="judgement_algorithm_combo" xml:space="preserve"><value>Combo priority (LR2)</value></data>
+  <data name="judgement_algorithm_duration" xml:space="preserve"><value>Time difference priority (AC)</value></data>
+  <data name="judgement_algorithm_lowest" xml:space="preserve"><value>Earliest note priority</value></data>
+  <data name="judgement_algorithm_score" xml:space="preserve"><value>Score priority</value></data>
   <data name="bga_dim" xml:space="preserve"><value>BGA dim</value></data>
   <data name="visual_offset" xml:space="preserve"><value>Visual offset</value></data>
   <data name="bms_visual_offset" xml:space="preserve"><value>BMS Visual offset</value></data>

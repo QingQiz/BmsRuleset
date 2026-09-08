@@ -12,6 +12,7 @@ using osu.Framework.IO.Stores;
 using osu.Game.Extensions;
 using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
@@ -77,6 +78,24 @@ public class BmsReplayArchiveTest
         Assert.That(bytes.Length, Is.GreaterThanOrEqualTo(2));
         Assert.That(bytes[0], Is.EqualTo((byte)0x1f));
         Assert.That(bytes[1], Is.EqualTo((byte)0x8b));
+    }
+
+    [Test]
+    public void TestJudgementAlgorithmSurvivesCloneAndArchive([Values] BmsJudgementAlgorithm algorithm)
+    {
+        var original = createScore();
+        original.Replay.Frames[0] = new BmsReplayFrame(1234, BmsAction.Key1) { JudgementAlgorithm = algorithm };
+
+        using var archive = BmsReplayArchive.Create(original.DeepClone());
+        var replayFile = new RealmFile { Hash = "abcdef" };
+        var readTarget = new ScoreInfo();
+        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
+
+        var restored = BmsReplayArchive.ReadScore(
+            readTarget,
+            new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
+
+        Assert.That(((BmsReplayFrame)restored.Replay.Frames[0]).JudgementAlgorithm, Is.EqualTo(algorithm));
     }
 
     [Test]

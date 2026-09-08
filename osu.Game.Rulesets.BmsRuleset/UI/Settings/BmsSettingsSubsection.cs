@@ -138,6 +138,12 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Caption = BmsStrings.ReferenceBpm,
                 Current = manager.GetBindable<BmsReferenceBpmMode>(BmsRulesetSetting.ReferenceBpmMode),
             }),
+            new SettingsItemV2(new FormEnumDropdown<BmsJudgementAlgorithm>
+            {
+                Caption = BmsStrings.JudgementAlgorithm,
+                HintText = BmsStrings.JudgementAlgorithmHint,
+                Current = manager.GetBindable<BmsJudgementAlgorithm>(BmsRulesetSetting.JudgementAlgorithm),
+            }),
             new SettingsItemV2(new FormSliderBar<double>
             {
                 Caption = BmsStrings.BgaDim,

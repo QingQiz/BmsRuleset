@@ -116,6 +116,18 @@ public static class BmsStrings
 
     public static LocalisableString ReferenceBpm => get("reference_bpm");
 
+    public static LocalisableString JudgementAlgorithm => get("judgement_algorithm");
+
+    public static LocalisableString JudgementAlgorithmHint => get("judgement_algorithm_hint");
+
+    public static LocalisableString JudgementAlgorithmCombo => get("judgement_algorithm_combo");
+
+    public static LocalisableString JudgementAlgorithmDuration => get("judgement_algorithm_duration");
+
+    public static LocalisableString JudgementAlgorithmLowest => get("judgement_algorithm_lowest");
+
+    public static LocalisableString JudgementAlgorithmScore => get("judgement_algorithm_score");
+
     public static LocalisableString BgaDim => get("bga_dim");
 
     public static LocalisableString VisualOffset => get("visual_offset");

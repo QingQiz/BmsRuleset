@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
@@ -9,6 +12,146 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 public class BmsJudgementSelectorTest
 {
     private static double rankRate(int rank) => BmsJudgementProfileProvider.RateForRank(rank);
+
+    [TestCase(BmsJudgementAlgorithm.Combo, 1000, HitResult.Good)]
+    [TestCase(BmsJudgementAlgorithm.Duration, 1100, HitResult.Perfect)]
+    [TestCase(BmsJudgementAlgorithm.Lowest, 1000, HitResult.Good)]
+    [TestCase(BmsJudgementAlgorithm.Score, 1100, HitResult.Perfect)]
+    public void TestOverlappingGoodAndPerfect(BmsJudgementAlgorithm algorithm, double expectedTime, HitResult expectedResult)
+    {
+        var first = note(1000);
+        var second = note(1100);
+
+        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [second, first], 1100, algorithm);
+
+        Assert.That(selection.Candidate?.StartTime, Is.EqualTo(expectedTime));
+        Assert.That(selection.Result, Is.EqualTo(expectedResult));
+    }
+
+    [TestCase(BmsJudgementAlgorithm.Combo, 1200)]
+    [TestCase(BmsJudgementAlgorithm.Duration, 1200)]
+    [TestCase(BmsJudgementAlgorithm.Lowest, 1000)]
+    [TestCase(BmsJudgementAlgorithm.Score, 1200)]
+    public void TestOverlappingBadAndGreat(BmsJudgementAlgorithm algorithm, double expectedTime)
+    {
+        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1200), note(1000)], 1240, algorithm);
+
+        Assert.That(selection.Candidate?.StartTime, Is.EqualTo(expectedTime));
+    }
+
+    [TestCase(BmsJudgementAlgorithm.Combo, 1000)]
+    [TestCase(BmsJudgementAlgorithm.Duration, 1450)]
+    [TestCase(BmsJudgementAlgorithm.Lowest, 1000)]
+    [TestCase(BmsJudgementAlgorithm.Score, 1000)]
+    [TestCase(null, 1450)]
+    public void TestOverlappingBadWindowsPreserveLegacyReplayBehaviour(BmsJudgementAlgorithm? algorithm, double expectedTime)
+    {
+        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1450), note(1000)], 1250, algorithm);
+
+        Assert.That(selection.Candidate?.StartTime, Is.EqualTo(expectedTime));
+        Assert.That(selection.Result, Is.EqualTo(HitResult.Ok));
+    }
+
+    [TestCase(BmsJudgementAlgorithm.Combo, 150, 150, false)]
+    [TestCase(BmsJudgementAlgorithm.Combo, 150.01, 150, true)]
+    [TestCase(BmsJudgementAlgorithm.Combo, 151, 150.01, false)]
+    [TestCase(BmsJudgementAlgorithm.Score, 60, 60, false)]
+    [TestCase(BmsJudgementAlgorithm.Score, 60.01, 60, true)]
+    [TestCase(BmsJudgementAlgorithm.Score, 61, 60.01, false)]
+    public void TestStrictLateAndInclusiveEarlyThresholds(BmsJudgementAlgorithm algorithm, double lateOffset, double earlyOffset, bool selectNext)
+    {
+        var first = note(1000 - lateOffset);
+        var second = note(1000 + earlyOffset);
+
+        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [second, first], 1000, algorithm);
+
+        Assert.That(selection.Candidate, Is.EqualTo(selectNext ? second : first));
+    }
+
+    [TestCase(1100, 1000)]
+    [TestCase(1100.01, 1200)]
+    public void TestDurationRetainsEarlierNoteOnTie(double inputTime, double expectedTime)
+    {
+        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1200), note(1000)], inputTime, BmsJudgementAlgorithm.Duration);
+
+        Assert.That(selection.Candidate?.StartTime, Is.EqualTo(expectedTime));
+    }
+
+    [TestCase(BmsJudgementAlgorithm.Combo, 60)]
+    [TestCase(BmsJudgementAlgorithm.Score, 30)]
+    public void TestEachCandidateUsesItsOwnThreshold(BmsJudgementAlgorithm algorithm, double offset)
+    {
+        var tight = note(1000 - offset) with { JudgementRate = 0.25 };
+        var wide = note(1000 + offset);
+        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [tight, wide], 1000, algorithm);
+        Assert.That(selection.Candidate, Is.EqualTo(wide));
+
+        var firstWide = tight with { JudgementRate = 1 };
+        var nextTight = wide with { JudgementRate = 0.25 };
+        selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [firstWide, nextTight], 1000, algorithm);
+        Assert.That(selection.Candidate, Is.EqualTo(firstWide));
+    }
+
+    [TestCase(BmsLayoutVariant.Bms5K, 1, 100)]
+    [TestCase(BmsLayoutVariant.Bme7K, 0, 160)]
+    [TestCase(BmsLayoutVariant.Bme7KDouble, 15, 160)]
+    [TestCase(BmsLayoutVariant.Pms9K, 0, 117)]
+    public void TestComboUsesLayoutAndScratchWindows(BmsLayoutVariant layout, int column, double goodWindow)
+    {
+        var first = note(1000) with { Column = column };
+        var second = note(1000 + goodWindow) with { Column = column, IsLongNote = true, EndTime = 2000 };
+
+        var atBoundary = BmsJudgementSelector.SelectPress(layout, column, [second, first], second.StartTime, BmsJudgementAlgorithm.Combo);
+        var afterBoundary = BmsJudgementSelector.SelectPress(layout, column, [second, first], second.StartTime + 0.01, BmsJudgementAlgorithm.Combo);
+
+        Assert.That(atBoundary.Candidate, Is.EqualTo(first));
+        Assert.That(afterBoundary.Candidate, Is.EqualTo(second));
+    }
+
+    [Test]
+    public void TestAlgorithmsUseModifiedWindows()
+    {
+        IReadOnlyList<IApplicableToJudgementWindow> mods = [new BmsModNoGreat()];
+        BmsJudgementProfileProvider.SetActiveWindowMods(mods);
+        try
+        {
+            BmsJudgementAlgorithm[] algorithms = [BmsJudgementAlgorithm.Combo, BmsJudgementAlgorithm.Score];
+            foreach (var algorithm in algorithms)
+            {
+                var future = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000), note(1060)], 1050, algorithm);
+                var past = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000), note(1060)], 1060, algorithm);
+
+                Assert.That(future.Candidate?.StartTime, Is.EqualTo(1000), algorithm.ToString());
+                Assert.That(past.Candidate?.StartTime, Is.EqualTo(1060), algorithm.ToString());
+            }
+        }
+        finally
+        {
+            BmsJudgementProfileProvider.ClearActiveWindowMods(mods);
+        }
+    }
+
+    [Test]
+    public void TestEmptyPoorAndColumnIsolation([Values] BmsJudgementAlgorithm algorithm)
+    {
+        var next = note(1000);
+        var wrongColumn = note(600) with { Column = 2 };
+        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1100), wrongColumn, next], 600, algorithm);
+
+        Assert.That(selection.Candidate, Is.EqualTo(next));
+        Assert.That(selection.IsEmptyPoor, Is.True);
+        Assert.That(selection.Result, Is.EqualTo(HitResult.Miss));
+    }
+
+    [Test]
+    public void TestEmptyAndOutOfWindowCandidates([Values] BmsJudgementAlgorithm algorithm)
+    {
+        Assert.That(BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [], 1000, algorithm).Candidate, Is.Null);
+        Assert.That(BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000)], 499, algorithm).Candidate, Is.Null);
+        Assert.That(BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1000)], 1281, algorithm).Candidate, Is.Null);
+    }
+
+    private static BmsJudgementCandidate note(double time) => new(time, time, 1, 1, false);
 
     [Test]
     public void TestFastMissRowIsEmptyPoorForNextCandidate()

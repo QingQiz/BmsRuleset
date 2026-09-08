@@ -56,8 +56,9 @@ remove all imported BMS metadata without affecting the original files.
 ## Highlights
 
 From BPM and STOP changes to long notes, mines, random branches, scroll changes, BGA, and keysounds, the ruleset is
-built around the parts of BMS that shape how a chart feels to play. Judgements use beatoraja-compatible timing windows,
-with traditional EX score alongside osu!'s normalized score display.
+built around the parts of BMS that shape how a chart feels to play. Judgements use beatoraja-compatible timing windows
+and [four selectable judgement algorithms](./docs/gameplay.md#judgement-selection-algorithms), with traditional EX score
+alongside osu!'s normalized score display.
 
 It also adds BMS-focused workflows that standard osu! does not provide: previews synthesized from chart audio,
 difficulty-table collections and markers, mod-aware clear lamps, and detailed analysis of saved scores without first

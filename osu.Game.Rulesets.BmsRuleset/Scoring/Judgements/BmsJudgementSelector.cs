@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
@@ -15,7 +16,8 @@ public static class BmsJudgementSelector
         BmsLayoutVariant layout,
         int column,
         IEnumerable<BmsJudgementCandidate> candidates,
-        double inputTime)
+        double inputTime,
+        BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)
     {
         var initialCapacity = candidates.TryGetNonEnumeratedCount(out var candidateCount)
             ? Math.Max(1, candidateCount)
@@ -39,7 +41,7 @@ public static class BmsJudgementSelector
             }
 
             Array.Sort(sortedCandidates, 0, count, candidate_comparer);
-            return selectSorted(layout, column, sortedCandidates, count, inputTime);
+            return selectSorted(layout, column, sortedCandidates, count, inputTime, algorithm);
         }
         finally
         {
@@ -52,31 +54,37 @@ public static class BmsJudgementSelector
         int column,
         BmsJudgementCandidate[] candidates,
         int count,
-        double inputTime)
+        double inputTime,
+        BmsJudgementAlgorithm? algorithm)
     {
         BmsJudgementCandidate? selected = null;
         HitResult selectedResult = HitResult.None;
+        BmsJudgementWindowTable? selectedTable = null;
         BmsJudgementCandidate? emptyPoorCandidate = null;
 
         for (var i = 0; i < count; i++)
         {
             var candidate = candidates[i];
+            if (candidate.Column != column)
+                continue;
+
             var table = BmsJudgementProfileProvider.GetTable(layout, candidate.Column, candidate.JudgementRate, tail: false);
             var offset = inputTime - candidate.StartTime;
             var result = table.ResultForOffset(offset);
 
             if (result != HitResult.None)
             {
-                if (selected == null || shouldReplaceSelected(selected.Value, candidate, inputTime, selectedResult, result, table.GoodFastDTime))
+                if (selected == null || shouldReplaceSelected(selected.Value, candidate, inputTime, selectedResult, result, selectedTable!, table, algorithm))
                 {
                     selected = candidate;
                     selectedResult = result;
+                    selectedTable = table;
                 }
 
                 continue;
             }
 
-            if (candidate.Column == column && table.IsEmptyPoorOffset(offset))
+            if (table.IsEmptyPoorOffset(offset))
                 emptyPoorCandidate ??= candidate;
         }
 
@@ -89,6 +97,34 @@ public static class BmsJudgementSelector
     }
 
     private static bool shouldReplaceSelected(
+        BmsJudgementCandidate current,
+        BmsJudgementCandidate next,
+        double inputTime,
+        HitResult currentResult,
+        HitResult nextResult,
+        BmsJudgementWindowTable currentTable,
+        BmsJudgementWindowTable nextTable,
+        BmsJudgementAlgorithm? algorithm)
+    {
+        // Match beatoraja's JudgeAlgorithm comparisons, including strict late and inclusive early
+        // boundaries. Use each note's own table because BMS judgement rates can change mid-chart.
+        return algorithm switch
+        {
+            BmsJudgementAlgorithm.Combo => isPastWindow(HitResult.Good),
+            BmsJudgementAlgorithm.Duration => Math.Abs(current.StartTime - inputTime) > Math.Abs(next.StartTime - inputTime),
+            BmsJudgementAlgorithm.Lowest => false,
+            BmsJudgementAlgorithm.Score => isPastWindow(HitResult.Great),
+            // Unversioned replays must retain the original selector, including its BAD fallback.
+            null => shouldReplaceLegacySelection(current, next, inputTime, currentResult, nextResult, nextTable.GoodFastDTime),
+            _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm, null),
+        };
+
+        bool isPastWindow(HitResult threshold) =>
+            current.StartTime - inputTime < -currentTable.SlowWindowFor(threshold)
+            && next.StartTime - inputTime <= nextTable.FastWindowFor(threshold);
+    }
+
+    private static bool shouldReplaceLegacySelection(
         BmsJudgementCandidate current,
         BmsJudgementCandidate next,
         double inputTime,

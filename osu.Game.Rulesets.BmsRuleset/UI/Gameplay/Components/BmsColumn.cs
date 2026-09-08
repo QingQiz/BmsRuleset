@@ -318,7 +318,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             pressJudgementCandidates.Add(candidate);
         }
 
-        var selection = BmsJudgementSelector.SelectPress(LayoutVariant, Index, pressJudgementCandidates, time);
+        var selection = BmsJudgementSelector.SelectPress(LayoutVariant, Index, pressJudgementCandidates, time, ParentPlayfield.JudgementAlgorithm);
 
         if (!selection.IsEmptyPoor && selection.Candidate is { } selectedCandidate)
         {

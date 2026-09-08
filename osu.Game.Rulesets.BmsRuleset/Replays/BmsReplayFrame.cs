@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.Replays;
 
@@ -15,6 +16,8 @@ public class BmsReplayFrame : ReplayFrame
     public List<BmsAction> Actions { get; set; } = [];
 
     public string BranchDecisions { get; init; } = string.Empty;
+
+    public BmsJudgementAlgorithm? JudgementAlgorithm { get; init; }
 
     // deserialization requires a default ctor
     // ReSharper disable once UnusedMember.Global
@@ -38,5 +41,6 @@ public class BmsReplayFrame : ReplayFrame
         other is BmsReplayFrame bmsFrame
         && Math.Abs(Time - bmsFrame.Time) < 0.0001
         && BranchDecisions == bmsFrame.BranchDecisions
+        && JudgementAlgorithm == bmsFrame.JudgementAlgorithm
         && Actions.SequenceEqual(bmsFrame.Actions);
 }

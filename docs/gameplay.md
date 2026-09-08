@@ -32,6 +32,30 @@ the current window unchanged.
 
 **DJ LEVEL rank:** S (all PGREAT) · AAA ≥ 8/9 · AA ≥ 7/9 · A ≥ 6/9 · B ≥ 5/9 · C otherwise
 
+### Judgement Selection Algorithms
+
+Open **Settings → BMS → Judgement selection algorithm** to choose which note receives a press when judgement windows
+overlap in the same column. The four strategies follow beatoraja's `Combo`, `Duration`, `Lowest`, and `Score` algorithms:
+
+| Option | Selection rule |
+|--------|----------------|
+| **Combo priority (LR2)** — default | Switches to a later note when the current candidate is strictly past its late GOOD boundary and the press is at or after the later note's early GOOD boundary. |
+| **Time difference priority (AC)** | Chooses the eligible note closest to the press time. Equal time differences favour the earlier note. |
+| **Earliest note priority** | Chooses the earliest eligible note, even if a later note would receive a better judgement. |
+| **Score priority** | Uses the same switching rule as Combo priority, with GREAT boundaries instead of GOOD. |
+
+For example, on a 7K `#RANK 2` chart, two notes in the same key column occur at 1000 ms and 1100 ms. A press at 1100 ms
+gives the first note GOOD under Combo or Earliest note priority; Time difference or Score priority selects the second
+note for PGREAT.
+
+Selection applies to normal notes and long-note heads, including scratch columns. Each candidate uses its own judgement
+windows for the layout, rank/EXRANK, and active judgement-window mods. Long-note releases retain their existing rules;
+E-POOR still does not consume a note.
+
+The algorithm is fixed when a play starts, so setting changes apply from the next play. New replays save that choice
+and use it regardless of the viewer's current setting. Replays recorded before this setting was introduced retain the
+original selection behaviour.
+
 ## Gauge
 
 The ruleset implements 6 regular BMS gauge types covering both Groove and Survival modes, plus 3 course gauge
@@ -141,6 +165,7 @@ mods.
 |-------------------------------|----------|--------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Scroll speed                  | 8.0      | 1.0–50.0, step 0.1                        | Note fall speed. In-game scroll-speed actions adjust it temporarily; keys are rebindable under **Settings → Key Bindings → osu!BMS**.                                                         |
 | Reference BPM                 | Main BPM | Start BPM, Max BPM, Main BPM, or Min BPM   | Scroll-speed reference used when a chart has no `#BASEBPM`. Main BPM uses the BPM containing the most playable notes; ties use the earliest occurrence.                                       |
+| Judgement selection algorithm | Combo priority (LR2) | Combo priority (LR2), Time difference priority (AC), Earliest note priority, Score priority | Selects a note when judgement windows overlap in the same column. Changes apply from the next play; replays retain their recorded choice. See [selection rules](#judgement-selection-algorithms). |
 | BGA dim                       | 70%      | 0%–100%                                   | Dims background animation without removing it. 0% keeps full brightness; 100% makes the BGA invisible while it continues to run.                                                             |
 | Unlock frame rate limit       | Off      | On / off                                  | Removes osu!'s 1000 Hz frame and input polling cap during BMS gameplay. Higher GC and GPU pressure may cause extra stutters; disable this option if that happens. |
 | Visual offset                 | 0 ms     | -500–500 ms, step 1 ms                    | Moves scrolling visuals only. Positive values display notes earlier for players who receive more Slow judgements; negative values display them later for players who receive more Fast judgements. Audio, judgements, scoring, and keysounds remain unchanged. |

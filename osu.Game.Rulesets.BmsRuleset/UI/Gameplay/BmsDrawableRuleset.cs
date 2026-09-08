@@ -121,8 +121,18 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     {
         base.SetReplayScore(replayScore);
 
-        if (Beatmap is BmsBeatmap bmsBeatmap)
+        updateJudgementAlgorithm();
+
+        if (replayScore != null && Beatmap is BmsBeatmap bmsBeatmap)
             BmsBranchReplayState.EnsureBranchReplayMod(replayScore, bmsBeatmap.BranchDecisions);
+    }
+
+    private void updateJudgementAlgorithm()
+    {
+        // Snapshot once per play; a live config binding would make recorded inputs ambiguous.
+        ((BmsPlayfield)Playfield).JudgementAlgorithm = ReplayScore != null
+            ? ReplayScore.Replay.Frames.OfType<BmsReplayFrame>().FirstOrDefault()?.JudgementAlgorithm
+            : (Config as BmsRulesetConfigManager)?.Get<BmsJudgementAlgorithm>(BmsRulesetSetting.JudgementAlgorithm) ?? BmsJudgementAlgorithm.Combo;
     }
 
     private IReadOnlyList<IApplicableToJudgementWindow> windowMods = [];
@@ -188,13 +198,15 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (Beatmap is BmsBeatmap bmsBeatmap)
             BmsBranchReplayState.EnsureBranchReplayMod(score, bmsBeatmap.BranchDecisions);
 
-        return new BmsReplayRecorder(score);
+        return new BmsReplayRecorder(score, ((BmsPlayfield)Playfield).JudgementAlgorithm ?? BmsJudgementAlgorithm.Combo);
     }
 
     [BackgroundDependencyLoader]
     private void load()
     {
         var beatmap = (BmsBeatmap)Beatmap;
+
+        updateJudgementAlgorithm();
 
         Overlays.Add(StageHudController);
 
