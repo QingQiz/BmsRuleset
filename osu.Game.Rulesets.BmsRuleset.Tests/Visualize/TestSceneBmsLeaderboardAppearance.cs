@@ -14,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
 using osu.Game.Tests.Visual;
@@ -32,8 +33,13 @@ public partial class TestSceneBmsLeaderboardAppearance : OsuManualInputManagerTe
         AddUntilStep("all score rows loaded", () => this.ChildrenOfType<BmsLeaderboardScore>().Count(row => row.IsLoaded) == 5);
         AddUntilStep("score content remains horizontal", () => this.ChildrenOfType<BmsLeaderboardScore>().SelectMany(row => row.ChildrenOfType<OsuSpriteText>())
             .Where(text => text.IsPresent).All(text => Math.Abs(text.ScreenSpaceDrawQuad.TopLeft.X - text.ScreenSpaceDrawQuad.BottomLeft.X) < 0.5f));
-        AddUntilStep("narrow row keeps username readable", () => !this.ChildrenOfType<BmsLeaderboardScore>().Single(row => row.Parent.Width == 320)
-            .ChildrenOfType<TruncatingSpriteText>().Single(text => text.Name == "Leaderboard username").IsTruncated);
+        AddUntilStep("narrow row prevents user content overlapping mods", () =>
+        {
+            var row = this.ChildrenOfType<BmsLeaderboardScore>().Single(row => row.Parent.Width == 320);
+            var username = row.ChildrenOfType<TruncatingSpriteText>().Single(text => text.Name == "Leaderboard username");
+            return username.DrawColourInfo.Colour.TopLeft.Alpha == 0
+                   || username.ScreenSpaceDrawQuad.AABBFloat.Right <= row.ChildrenOfType<ModIcon>().Min(icon => icon.ScreenSpaceDrawQuad.AABBFloat.Left);
+        });
         AddStep("compact rows", () => this.ChildrenOfType<BmsLeaderboardScore>().First().Parent.Width = 480);
         AddStep("restore full rows", () => this.ChildrenOfType<BmsLeaderboardScore>().First().Parent.Width = 760);
     }

@@ -48,6 +48,8 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
             Child = row = new BmsLeaderboardScore(createScore(rank, username), false) { Rank = 123456 },
         });
         AddUntilStep("leaderboard loaded", () => row.IsLoaded);
+        AddUntilStep("large position remains visible", () => row.ChildrenOfType<OsuSpriteText>()
+            .Single(text => text.Name == "Leaderboard position").DrawColourInfo.Colour.TopLeft.Alpha == 1);
         AddAssert("grade uses BMS lettering", () => row.ChildrenOfType<OsuSpriteText>()
             .Single(text => text.Name == "Leaderboard grade").Text.ToString(), () => Is.EqualTo(expectedRank));
         AddAssert("username unchanged", () => row.ChildrenOfType<TruncatingSpriteText>()
@@ -155,24 +157,83 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
         AddAssert("empty mod panel is hidden", () => !tooltip.ChildrenOfType<CompositeDrawable>().Single(drawable => drawable.Name == "Tooltip mods").IsPresent);
     }
 
-    [Test]
-    public void TestNativeRankOverlayAfterResize()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestPositionsStayVisibleWithDifferentModsAndAfterResize(bool sheared)
     {
-        BmsLeaderboardScore row = null!;
+        BmsLeaderboardScore[] rows = null!;
+        (ModIcon Icon, float Width, float Height)[] iconSizes = null!;
         Container parent = null!;
-        AddStep("load full row", () => Child = parent = new Container
+        AddStep("load rows with three and four mods", () =>
         {
-            Width = 760,
-            Height = BmsLeaderboardScore.HEIGHT,
-            Child = row = new BmsLeaderboardScore(createScore(ScoreRank.S, "Guest"), false) { Rank = 123456 },
+            var first = createScore(ScoreRank.S, "Guest");
+            first.Mods = [new BmsModEasyGauge(), new BmsModHideScratch(), new BmsModMirror()];
+            var second = createScore(ScoreRank.A, "Guest");
+            second.Mods = [..first.Mods, new BmsModDoubleTime()];
+            rows =
+            [
+                new BmsLeaderboardScore(first, sheared) { Rank = 1 },
+                new BmsLeaderboardScore(second, sheared) { Rank = 2, Y = 60 },
+            ];
+            Child = parent = new Container
+            {
+                X = 20,
+                Width = 600,
+                Height = 110,
+                Children = rows,
+            };
         });
-        AddUntilStep("row loaded", () => row.IsLoaded);
-        AddStep("hover row", () => InputManager.MoveMouseTo(row.ScreenSpaceDrawQuad.TopLeft + new Vector2(80, 25)));
-        AddAssert("full row keeps separate rank", () => !row.ChildrenOfType<Container>().Single(container => container.Name == "Leaderboard rank overlay").IsPresent);
-        AddStep("resize while hovered", () => parent.Width = 320);
-        AddUntilStep("compact row overlays rank on avatar", () => row.ChildrenOfType<Container>().Single(container => container.Name == "Leaderboard rank overlay").Alpha == 1);
-        AddStep("leave row", () => InputManager.MoveMouseTo(new Vector2(-100)));
-        AddUntilStep("avatar overlay fades out", () => !row.ChildrenOfType<Container>().Single(container => container.Name == "Leaderboard rank overlay").IsPresent);
+        AddUntilStep("rows loaded", () => rows.All(row => row.IsLoaded));
+        AddStep("record mod icon sizes", () => iconSizes = rows.SelectMany(row => row.ChildrenOfType<ModIcon>())
+            .Select(icon => (icon, icon.ScreenSpaceDrawQuad.AABBFloat.Width, icon.ScreenSpaceDrawQuad.AABBFloat.Height)).ToArray());
+        AddStep("leave rows", () => InputManager.MoveMouseTo(new Vector2(-100)));
+        assertPositionsAndAlignment();
+        AddStep("hover second row", () => InputManager.MoveMouseTo(rows[1]));
+        assertPositionsAndAlignment();
+
+        int[] widths = [480, 320, 760];
+        foreach (var width in widths)
+        {
+            AddStep($"resize rows to {width}", () => parent.Width = width);
+            assertPositionsAndAlignment();
+        }
+
+        AddStep("leave rows after resize", () => InputManager.MoveMouseTo(new Vector2(-100)));
+        assertPositionsAndAlignment();
+
+        void assertPositionsAndAlignment()
+        {
+            AddUntilStep("positions are visible before avatars", () => rows.All(row =>
+            {
+                var position = row.ChildrenOfType<OsuSpriteText>().Single(text => text.Name == "Leaderboard position");
+                var avatar = row.ChildrenOfType<ClickableAvatar>().Single();
+                return position.Text.ToString() == BmsStrings.LeaderboardPosition(row.Rank!.Value).ToString()
+                       && position.DrawColourInfo.Colour.TopLeft.Alpha == 1
+                       && position.ScreenSpaceDrawQuad.AABBFloat.Width > 0
+                       && position.ScreenSpaceDrawQuad.AABBFloat.Right < avatar.ScreenSpaceDrawQuad.AABBFloat.Left;
+            }));
+            AddUntilStep("avatars stay aligned", () => Math.Abs(rows[0].ChildrenOfType<ClickableAvatar>().Single().ScreenSpaceDrawQuad.TopLeft.X
+                - rows[1].ChildrenOfType<ClickableAvatar>().Single().ScreenSpaceDrawQuad.TopLeft.X) < 0.5f);
+            AddUntilStep("mod icons keep their size", () => iconSizes.All(size =>
+                Math.Abs(size.Icon.ScreenSpaceDrawQuad.AABBFloat.Width - size.Width) < 0.5f
+                && Math.Abs(size.Icon.ScreenSpaceDrawQuad.AABBFloat.Height - size.Height) < 0.5f));
+            AddUntilStep("mod icons partially overlap in order", () => rows.All(row =>
+            {
+                var icons = row.ChildrenOfType<ModIcon>().ToArray();
+                return icons.Zip(icons.Skip(1)).All(pair =>
+                    pair.First.ScreenSpaceDrawQuad.AABBFloat.Left < pair.Second.ScreenSpaceDrawQuad.AABBFloat.Left
+                    && pair.First.ScreenSpaceDrawQuad.AABBFloat.Right > pair.Second.ScreenSpaceDrawQuad.AABBFloat.Left);
+            }));
+            AddUntilStep("usernames stay before mods", () => rows.All(row =>
+            {
+                var username = row.ChildrenOfType<TruncatingSpriteText>().Single(text => text.Name == "Leaderboard username");
+                if (parent.Width < 480 && username.DrawColourInfo.Colour.TopLeft.Alpha == 0)
+                    return true;
+
+                return username.DrawColourInfo.Colour.TopLeft.Alpha == 1 && (parent.Width < 480 || !username.IsTruncated)
+                    && username.ScreenSpaceDrawQuad.AABBFloat.Right <= row.ChildrenOfType<ModIcon>().Min(icon => icon.ScreenSpaceDrawQuad.AABBFloat.Left);
+            }));
+        }
     }
 
     [Test]

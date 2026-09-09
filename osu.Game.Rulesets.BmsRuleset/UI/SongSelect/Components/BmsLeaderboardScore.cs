@@ -110,6 +110,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
 
     private Container centreContent = null!;
     private Container rightContent = null!;
+    private FillFlowContainer userContent = null!;
 
     private FillFlowContainer<Drawable> modsContainer = null!;
 
@@ -117,8 +118,6 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
 
     private FillFlowContainer statisticsContainer = null!;
     private Container highlightGradient = null!;
-    private Container rankLabelStandalone = null!;
-    private Container rankLabelOverlay = null!;
 
     private readonly bool sheared;
 
@@ -162,7 +161,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
                     RelativeSizeAxes = Axes.Both,
                     Colour = backgroundColour,
                 },
-                rankLabelStandalone = new Container
+                new Container
                 {
                     Width = rank_label_width,
                     RelativeSizeAxes = Axes.Y,
@@ -226,43 +225,20 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
                                             AutoSizeAxes = Axes.Both,
                                             CornerRadius = corner_radius,
                                             Masking = true,
-                                            Children =
-                                            [
-                                                new DelayedLoadWrapper(innerAvatar = new ClickableAvatar(Score.User)
-                                                {
-                                                    Anchor = Anchor.Centre,
-                                                    Origin = Anchor.Centre,
-                                                    Scale = new Vector2(1.1f),
-                                                    Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
-                                                    RelativeSizeAxes = Axes.Both,
-                                                })
-                                                {
-                                                    RelativeSizeAxes = Axes.None,
-                                                    Size = new Vector2(HEIGHT),
-                                                },
-                                                rankLabelOverlay = new Container
-                                                {
-                                                    Name = "Leaderboard rank overlay",
-                                                    RelativeSizeAxes = Axes.Both,
-                                                    Alpha = 0,
-                                                    Children =
-                                                    [
-                                                        new Box
-                                                        {
-                                                            RelativeSizeAxes = Axes.Both,
-                                                            Colour = Colour4.Black.Opacity(0.5f),
-                                                        },
-                                                        new RankLabel(Rank, sheared, false)
-                                                        {
-                                                            AutoSizeAxes = Axes.Both,
-                                                            Anchor = Anchor.Centre,
-                                                            Origin = Anchor.Centre,
-                                                        },
-                                                    ],
-                                                },
-                                            ],
+                                            Child = new DelayedLoadWrapper(innerAvatar = new ClickableAvatar(Score.User)
+                                            {
+                                                Anchor = Anchor.Centre,
+                                                Origin = Anchor.Centre,
+                                                Scale = new Vector2(1.1f),
+                                                Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
+                                                RelativeSizeAxes = Axes.Both,
+                                            })
+                                            {
+                                                RelativeSizeAxes = Axes.None,
+                                                Size = new Vector2(HEIGHT),
+                                            },
                                         },
-                                        new FillFlowContainer
+                                        userContent = new FillFlowContainer
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
@@ -322,7 +298,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
                                             Origin = Anchor.Centre,
                                             AutoSizeAxes = Axes.Both,
                                             Direction = FillDirection.Horizontal,
-                                            Spacing = new Vector2(2, 0),
+                                            Spacing = new Vector2(-10, 0),
                                             Padding = new MarginPadding { Right = 10 },
                                             Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                         },
@@ -573,11 +549,6 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
         background.FadeColour(IsHovered ? backgroundColour.Lighten(0.2f) : backgroundColour, transition_duration, Easing.OutQuint);
         totalScoreBackground.FadeColour(IsHovered ? lightenedGradient : totalScoreBackgroundGradient, transition_duration, Easing.OutQuint);
         highlightGradient.FadeColour(getHighlightColour(Highlight, IsHovered ? 0.2f : 0), transition_duration, Easing.OutQuint);
-
-        if (IsHovered && currentMode != DisplayMode.Full)
-            rankLabelOverlay.FadeIn(transition_duration, Easing.OutQuint);
-        else
-            rankLabelOverlay.FadeOut(transition_duration, Easing.OutQuint);
     }
 
     private DisplayMode? currentMode;
@@ -586,9 +557,10 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
     {
         base.Update();
 
+        // Fixed-size mods can consume the user column entirely in very narrow rows.
+        userContent.Alpha = username.DrawWidth > 0 ? 1 : 0;
         timestamp.MaxWidth = Math.Max(0, username.DrawWidth - timestamp.X);
         timestamp.Alpha = timestamp.MaxWidth >= 50 ? 1 : 0;
-        modsContainer.Scale = new Vector2(Math.Min(1, DrawWidth * 0.25f / Math.Max(1, modsContainer.Width)));
 
         var mode = getCurrentDisplayMode();
 
@@ -601,7 +573,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
 
         centreContent.Padding = new MarginPadding
         {
-            Left = rankLabelStandalone.DrawWidth,
+            Left = rank_label_width,
             Right = rightContent.DrawWidth,
         };
     }
@@ -609,11 +581,6 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
     private void updateDisplayMode(DisplayMode mode)
     {
         var duration = currentMode == null ? 0 : transition_duration;
-        if (mode >= DisplayMode.Full)
-            rankLabelStandalone.FadeIn(duration, Easing.OutQuint).ResizeWidthTo(rank_label_width, duration, Easing.OutQuint);
-        else
-            rankLabelStandalone.FadeOut(duration, Easing.OutQuint).ResizeWidthTo(0, duration, Easing.OutQuint);
-
         if (mode >= DisplayMode.Regular)
         {
             statisticsContainer.FadeIn(duration, Easing.OutQuint).MoveToX(0, duration, Easing.OutQuint);
@@ -630,17 +597,13 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
             statisticsContainer.FadeOut(duration, Easing.OutQuint).MoveToX(statisticsContainer.DrawWidth, duration, Easing.OutQuint);
 
         currentMode = mode;
-        updateState();
     }
 
     private DisplayMode getCurrentDisplayMode()
     {
         // Use the unscaled score width so compact scaling cannot toggle the display mode each frame.
-        var availableWidth = DrawWidth - lamp_width - modsContainer.DrawWidth * modsContainer.Scale.X
+        var availableWidth = DrawWidth - lamp_width - rank_label_width - modsContainer.DrawWidth
                              - Math.Max(150, totalScoreText.DrawWidth + grade_width + corner_radius * 2);
-        if (availableWidth >= username_min_width + statistics_regular_min_width + rank_label_width)
-            return DisplayMode.Full;
-
         if (availableWidth >= username_min_width + statistics_regular_min_width)
             return DisplayMode.Regular;
 
@@ -692,7 +655,6 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
         Minimal,
         Compact,
         Regular,
-        Full,
     }
 
     private partial class ScoreComponentLabel(LocalisableString name, LocalisableString value, bool perfect, float minWidth)
@@ -745,6 +707,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
 
             Child = text = new TruncatingSpriteText
             {
+                Name = "Leaderboard position",
                 Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
