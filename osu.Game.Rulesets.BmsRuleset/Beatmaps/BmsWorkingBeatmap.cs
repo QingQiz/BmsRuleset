@@ -24,18 +24,46 @@ namespace osu.Game.Rulesets.BmsRuleset.Beatmaps;
 ///     overrides resource handling required by BMS charts, including preview playback and
 ///     disabling osu! beatmap skins. Other members are delegated to the inner working beatmap.
 /// </summary>
-public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, TextureStore? externalTextureStore = null)
-    : WorkingBeatmap(createWrapperBeatmapInfo(inner), audioManager)
+public class BmsWorkingBeatmap : WorkingBeatmap
 {
 
     internal static BmsPreviewTrack? ActivePreviewTrack { get; private set; }
 
-    private readonly AudioManager audioManager = audioManager;
+    private readonly WorkingBeatmap inner;
+    private readonly AudioManager audioManager;
+    private readonly TextureStore? externalTextureStore;
+    private readonly RealmNamedFileUsage? externalBackgroundMarker;
 
     private readonly object externalBackgroundResolutionLock = new();
     private volatile bool externalBackgroundResolved;
     private List<string> resolvedBackgroundPaths = [];
     private List<string> resolvedPanelBackgroundPaths = [];
+
+    public BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, TextureStore? externalTextureStore = null)
+        : base(cloneBeatmapInfo(inner.BeatmapInfo), audioManager)
+    {
+        this.inner = inner;
+        this.audioManager = audioManager;
+        this.externalTextureStore = externalTextureStore;
+
+        if (BeatmapInfo.BeatmapSet != null)
+        {
+            // The panel retains WorkingBeatmap.BeatmapSetInfo, while conversion enumerates its
+            // files. Reserve a marker before publication so neither reference nor list changes later.
+            var markerName = $"bms-background-{Guid.NewGuid():N}";
+            externalBackgroundMarker = new RealmNamedFileUsage(new RealmFile { Hash = markerName }, markerName);
+            BeatmapSetInfo.Files.Add(externalBackgroundMarker);
+        }
+
+        // Keep cache lookup cheap by deferring external chart decoding, while already-loaded
+        // in-memory charts can provide their background identity immediately.
+        if (inner.BeatmapLoaded && inner.Beatmap is IBmsBeatmap bmsBeatmap)
+        {
+            var backgroundPaths = resolveExternalBackgroundPaths(Metadata.Source, bmsBeatmap, false);
+            var panelBackgroundPaths = resolveExternalBackgroundPaths(Metadata.Source, bmsBeatmap, true);
+            applyExternalBackgroundMarker(backgroundPaths.FirstOrDefault(), panelBackgroundPaths.FirstOrDefault());
+        }
+    }
 
     public override bool TryTransferTrack(WorkingBeatmap target)
     {
@@ -168,24 +196,6 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
     protected override Waveform GetWaveform() => inner.Waveform;
 
-    private static BeatmapInfo createWrapperBeatmapInfo(WorkingBeatmap inner)
-    {
-        var beatmapInfo = cloneBeatmapInfo(inner.BeatmapInfo);
-        // Keep cache lookup cheap. External chart decoding is performed by WorkingBeatmap's
-        // asynchronous beatmap load and background resolution is deferred until the background
-        // drawable is loaded.
-        // Already materialised in-memory beatmaps are safe to use for metadata-only callers (and
-        // avoid changing the behaviour of non-file-backed working beatmaps).
-        if (inner.BeatmapLoaded && inner.Beatmap is IBmsBeatmap bmsBeatmap)
-        {
-            var backgroundPaths = resolveExternalBackgroundPaths(beatmapInfo.Metadata.Source, bmsBeatmap, false);
-            var panelBackgroundPaths = resolveExternalBackgroundPaths(beatmapInfo.Metadata.Source, bmsBeatmap, true);
-            applyExternalBackgroundMarker(beatmapInfo, backgroundPaths.FirstOrDefault(), panelBackgroundPaths.FirstOrDefault());
-        }
-
-        return beatmapInfo;
-    }
-
     private static BeatmapInfo cloneBeatmapInfo(BeatmapInfo source)
     {
         var clone = source.Clone();
@@ -220,24 +230,24 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
         return clone;
     }
 
-    private static void applyExternalBackgroundMarker(BeatmapInfo beatmapInfo, string? backgroundPath, string? panelBackgroundPath)
+    private void applyExternalBackgroundMarker(string? backgroundPath, string? panelBackgroundPath)
     {
         var markerPath = panelBackgroundPath ?? backgroundPath;
 
         if (markerPath == null)
             return;
 
-        // Song-select panels check this metadata before loading textures, so it must be ready
-        // as soon as the wrapper is constructed rather than on first GetBackground().
-        beatmapInfo.Metadata.BackgroundFile = markerPath;
-
-        if (beatmapInfo.BeatmapSet?.GetFile(markerPath) == null)
+        if (externalBackgroundMarker != null && BeatmapSetInfo.GetFile(markerPath) == null)
         {
             // BackgroundEquals compares these hashes across sets, where identical relative
             // filenames can refer to different images in each external song directory.
-            var sourceDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(beatmapInfo.Metadata.Source));
-            beatmapInfo.BeatmapSet?.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = $"{sourceDirectory}|{backgroundPath}|{panelBackgroundPath}" }, markerPath));
+            var sourceDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Metadata.Source));
+            externalBackgroundMarker.File.Hash = $"{sourceDirectory}|{backgroundPath}|{panelBackgroundPath}";
+            externalBackgroundMarker.Filename = markerPath;
         }
+
+        // BackgroundEquals must be able to resolve the marker before panels observe its name.
+        Metadata.BackgroundFile = markerPath;
     }
 
     private static IBeatmap? tryDecodeExternalBeatmap(BeatmapInfo beatmapInfo)
@@ -370,7 +380,7 @@ public class BmsWorkingBeatmap(WorkingBeatmap inner, AudioManager audioManager, 
 
             var backgroundPath = resolvedBackgroundPaths.FirstOrDefault();
             var panelBackgroundPath = resolvedPanelBackgroundPaths.FirstOrDefault();
-            applyExternalBackgroundMarker(BeatmapInfo, backgroundPath, panelBackgroundPath);
+            applyExternalBackgroundMarker(backgroundPath, panelBackgroundPath);
 
             // Publish completion only after both lists and their metadata marker are ready for readers.
             externalBackgroundResolved = true;

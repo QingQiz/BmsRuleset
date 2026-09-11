@@ -12,11 +12,13 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Models;
+using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -25,6 +27,7 @@ using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Select;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
 using SixLabors.ImageSharp;
@@ -527,6 +530,54 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
     }
 
     [Test]
+    public void TestBackgroundPreparationPreservesFileEnumerationDuringConversion()
+    {
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-background-conversion-{Guid.NewGuid()}");
+        BmsWorkingBeatmap working = null!;
+
+        AddStep("create working beatmap", () =>
+        {
+            Directory.CreateDirectory(directory);
+            createdDirectories.Add(directory);
+            File.WriteAllBytes(Path.Combine(directory, "stage.png"), []);
+
+            var beatmapSet = new BeatmapSetInfo();
+            beatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = "other-chart" }, "other.bms"));
+            var beatmapInfo = createBeatmapInfo(beatmapSet, directory, "chart.bms");
+            var beatmap = BmsBeatmapDecoder.DecodeBytes(Encoding.UTF8.GetBytes("#BPM 120\n#STAGEFILE stage.png\n#00111:01"), beatmapInfo);
+            working = new BmsWorkingBeatmap(new StubWorkingBeatmap(audio, beatmap, beatmapInfo), audio);
+        });
+
+        AddStep("prepare background during chart file lookup", () =>
+        {
+            var beatmapInfo = working.Beatmap.BeatmapInfo.Clone();
+            var files = beatmapInfo.BeatmapSet!.Files;
+            var fileCount = files.Count;
+
+            // Path uses this lookup after the converter has shallow-cloned BeatmapInfo.
+            var chart = files.FirstOrDefault(file =>
+            {
+                if (file.Filename == "other.bms")
+                    working.PrepareBackgroundMetadataAsync().GetAwaiter().GetResult();
+
+                return file.File.Hash == beatmapInfo.Hash;
+            });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(chart?.Filename, Is.EqualTo("chart.bms"));
+                Assert.That(files, Has.Count.EqualTo(fileCount));
+                Assert.That(working.BeatmapInfo.Path, Is.EqualTo("chart.bms"));
+                Assert.That(working.BeatmapInfo.BeatmapSet!.GetFile("stage.png"), Is.Not.Null);
+                Assert.That(working.BeatmapInfo.BeatmapSet.Files, Is.SameAs(files));
+            });
+
+            var converted = new BmsBeatmapConverter(working.Beatmap, new BmsRuleset()).Convert();
+            Assert.That(converted.HitObjects, Has.Count.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void TestBmsWorkingBeatmapPanelBackgroundPrefersBanner()
     {
         var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-panel-background-{Guid.NewGuid()}");
@@ -597,6 +648,78 @@ public partial class BmsWorkingBeatmapCacheTest : OsuTestScene
 
         AddAssert("panel marker is ready before texture load", () => Path.GetFileName(working.Metadata.BackgroundFile) == "banner.png");
         AddAssert("panel marker has file hash", () => working.BeatmapSetInfo.GetFile(working.Metadata.BackgroundFile) != null);
+        AddAssert("working beatmap keeps one set reference", () => ReferenceEquals(working.BeatmapSetInfo, working.BeatmapInfo.BeatmapSet));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestSongSelectPanelLoadsAndSwitchesExternalBackgrounds(bool preloadBeatmap)
+    {
+        var directory = Path.Combine(TestContext.CurrentContext.WorkDirectory, $"bms-panel-load-{Guid.NewGuid()}");
+        BmsWorkingBeatmap first = null!;
+        BmsWorkingBeatmap second = null!;
+        BmsWorkingBeatmap sameBackground = null!;
+        PanelSetBackground panel = null!;
+        Task preparation = null!;
+
+        AddStep("create external charts and panel", () =>
+        {
+            createdDirectories.Add(directory);
+            var firstDirectory = Path.Combine(directory, "first");
+            var secondDirectory = Path.Combine(directory, "second");
+            string[] sourceDirectories = [firstDirectory, secondDirectory];
+            foreach (var sourceDirectory in sourceDirectories)
+            {
+                Directory.CreateDirectory(sourceDirectory);
+                createTestTexture(Path.Combine(sourceDirectory, "stage.png"), 4, 2);
+                createTestTexture(Path.Combine(sourceDirectory, "banner.png"), sourceDirectory == firstDirectory ? 2 : 8, 4);
+                File.WriteAllText(Path.Combine(sourceDirectory, "chart.bms"), "#BPM 120\n#STAGEFILE stage.png\n#BANNER banner.png\n#00111:01");
+            }
+
+            first = createWorkingBeatmap(firstDirectory);
+            second = createWorkingBeatmap(secondDirectory);
+            sameBackground = createWorkingBeatmap(firstDirectory);
+            Child = new DependencyProvidingContainer
+            {
+                RelativeSizeAxes = Axes.Both,
+                CachedDependencies = [(typeof(OverlayColourProvider), new OverlayColourProvider(OverlayColourScheme.Purple))],
+                Child = panel = new PanelSetBackground(),
+            };
+        });
+
+        AddStep("prepare background metadata asynchronously", () => preparation = Task.WhenAll(
+            first.PrepareBackgroundMetadataAsync(), second.PrepareBackgroundMetadataAsync(), sameBackground.PrepareBackgroundMetadataAsync()));
+        AddUntilStep("background metadata prepared", () => preparation.IsCompleted);
+        AddStep("background preparation succeeded", () => preparation.GetAwaiter().GetResult());
+
+        AddStep("assign first chart", () => panel.Beatmap = first);
+        AddAssert("panel accepts first chart", () => ReferenceEquals(panel.Beatmap, first));
+        AddUntilStep("first banner loaded by panel", () => panel.ChildrenOfType<PanelSetBackground.PanelBeatmapBackground>()
+            .Any(background => background.Texture is { Width: 2, Height: 4 }));
+
+        AddStep("switch to matching filename in another directory", () => panel.Beatmap = second);
+        AddAssert("panel accepts second chart", () => ReferenceEquals(panel.Beatmap, second));
+        AddUntilStep("second banner loaded by panel", () => panel.ChildrenOfType<PanelSetBackground.PanelBeatmapBackground>()
+            .Any(background => background.Texture is { Width: 8, Height: 4 }));
+
+        AddStep("switch back to first chart", () => panel.Beatmap = first);
+        AddUntilStep("first banner restored", () => panel.ChildrenOfType<PanelSetBackground.PanelBeatmapBackground>()
+            .Any(background => background.Texture is { Width: 2, Height: 4 }));
+        AddStep("refetch same background", () => panel.Beatmap = sameBackground);
+        AddAssert("same background retains current working beatmap", () => ReferenceEquals(panel.Beatmap, first));
+        AddStep("clear panel", () => panel.Beatmap = null);
+        AddUntilStep("panel background removed", () => !panel.ChildrenOfType<PanelSetBackground.PanelBeatmapBackground>().Any());
+
+        BmsWorkingBeatmap createWorkingBeatmap(string sourceDirectory)
+        {
+            var info = createBeatmapInfo(new BeatmapSetInfo(), sourceDirectory, "chart.bms");
+            var inner = new StubWorkingBeatmap(audio, new BmsBeatmap { StageFile = "stage.png", Banner = "banner.png" }, info);
+            if (preloadBeatmap)
+                _ = inner.Beatmap;
+
+            var textures = new LargeTextureStore(host.Renderer, host.CreateTextureLoaderStore(new BmsFileResourceStore(sourceDirectory)));
+            return new BmsWorkingBeatmap(inner, audio, textures);
+        }
     }
 
     [Test]
