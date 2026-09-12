@@ -1,3 +1,4 @@
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -7,6 +8,7 @@ using osu.Game.Beatmaps.Drawables;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
+using osu.Game.Screens.Select;
 using osuTK;
 using osuTK.Graphics;
 
@@ -14,6 +16,9 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 
 internal partial class BmsResultBeatmapBanner : Container
 {
+    [Resolved]
+    private BeatmapManager beatmaps { get; set; } = null!;
+
     internal BmsResultBeatmapBanner(IBeatmapInfo beatmap, bool fitText = false)
     {
         var metadata = beatmap.BeatmapSet?.Metadata ?? beatmap.Metadata;
@@ -23,12 +28,20 @@ internal partial class BmsResultBeatmapBanner : Container
         CornerRadius = 8;
         Children =
         [
-            new UpdateableBeatmapBackgroundSprite
-            {
-                RelativeSizeAxes = Axes.Both,
-                BackgroundLoadDelay = 0,
-                Beatmap = { Value = beatmap },
-            },
+            beatmap is BeatmapInfo localBeatmap
+                ? new DelayedLoadWrapper(() => new PanelSetBackground.PanelBeatmapBackground(beatmaps.GetWorkingBeatmap(localBeatmap))
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    FillMode = FillMode.Fill,
+                }, 0) { RelativeSizeAxes = Axes.Both }
+                : new UpdateableBeatmapBackgroundSprite
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    BackgroundLoadDelay = 0,
+                    Beatmap = { Value = beatmap },
+                },
             new Box { RelativeSizeAxes = Axes.Both, Colour = Color4.Black, Alpha = 0.35f },
             fitText
                 ? new GridContainer
