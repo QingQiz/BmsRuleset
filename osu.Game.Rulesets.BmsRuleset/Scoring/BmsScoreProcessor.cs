@@ -20,6 +20,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     private static readonly Action<JudgementResult, int> set_combo_after = createComboAfterSetter();
 
     private double latestEndTime = double.MaxValue;
+    private int maximumScoringJudgementCount;
     private readonly List<BmsJudgementEvent> judgementEvents = [];
     private readonly Dictionary<JudgementResult, BmsJudgementEvent> eventsByResult = new();
     private readonly List<TimingHitEventEntry> timingHitEventEntries = [];
@@ -134,17 +135,20 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     protected override void Update()
     {
-        // Don't call base — JudgementProcessor.Update() checks JudgedHits == MaxHits,
-        // which never becomes true when mines expire without a result.  Replace with a
-        // time-based check: play is complete when the last object's slow window has passed.
+        // The clock can reach the end before the final passive POOR or CN/HCN tail is processed.
+        // Wait for every scoring judgement so pass/fail and Auto Gauge use the final HP.
+        // Mines may expire without a result, so they must not contribute to this count.
         // This must also clear completion after a rewind because looping players wait for
         // that transition before they stop seeking back to the start of the beatmap.
         if (HasCompleted is BindableBool bb)
-            bb.Value = Time.Current >= latestEndTime;
+            bb.Value = Time.Current >= latestEndTime && ScoringJudgementEventCount == maximumScoringJudgementCount;
     }
 
     protected override void Reset(bool storeResults)
     {
+        if (storeResults)
+            maximumScoringJudgementCount = ScoringJudgementEventCount;
+
         base.Reset(storeResults);
         judgementEvents.Clear();
         eventsByResult.Clear();
@@ -172,6 +176,10 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     /// </summary>
     protected override void ApplyScoreChange(JudgementResult result)
     {
+        // Count independently of hit-event recording, which can be disabled by the host.
+        if (result.HitObject is BmsHitObject and not BmsLandmine)
+            ScoringJudgementEventCount++;
+
         if (result.Type is HitResult.Ok or HitResult.Meh)
         {
             Combo.Value = 0;
@@ -182,6 +190,9 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     protected override void RemoveScoreChange(JudgementResult result)
     {
         base.RemoveScoreChange(result);
+
+        if (result.HitObject is BmsHitObject and not BmsLandmine)
+            ScoringJudgementEventCount--;
 
         if (eventsByResult.Remove(result, out var judgementEvent))
             removeJudgementEvent(judgementEvent);
@@ -219,18 +230,12 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     {
         judgementEvents.Add(judgementEvent);
         addTimingHitEvents(judgementEvent);
-
-        if (judgementEvent.Source.IsScoring)
-            ScoringJudgementEventCount++;
     }
 
     private void removeJudgementEvent(BmsJudgementEvent judgementEvent)
     {
         judgementEvents.Remove(judgementEvent);
         removeTimingHitEvents(judgementEvent);
-
-        if (judgementEvent.Source.IsScoring)
-            ScoringJudgementEventCount--;
     }
 
     private void addTimingHitEvents(BmsJudgementEvent judgementEvent)

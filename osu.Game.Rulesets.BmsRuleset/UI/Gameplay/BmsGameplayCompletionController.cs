@@ -47,8 +47,12 @@ internal sealed class BmsGameplayCompletionController : IDisposable
         return suggestion;
     }
 
-    private void onPlayCompleted(ValueChangedEvent<bool> _)
+    private void onPlayCompleted(ValueChangedEvent<bool> completed)
     {
+        // Rewinding clears completion; the intermediate gauge must not finalise a score.
+        if (!completed.NewValue)
+            return;
+
         if (healthProcessor is BmsHealthProcessor bmsHealthProcessor)
         {
             var passed = bmsHealthProcessor.HasPassedAtEnd();

@@ -116,7 +116,11 @@ public partial class BmsScoreProcessorTest
         {
             Clock = framedClock,
         };
-        processor.ApplyBeatmap(createThreeNoteBeatmap());
+        var beatmap = createThreeNoteBeatmap();
+        processor.ApplyBeatmap(beatmap);
+
+        foreach (var note in beatmap.HitObjects)
+            processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
 
         manualClock.CurrentTime = 10000;
         framedClock.ProcessFrame();

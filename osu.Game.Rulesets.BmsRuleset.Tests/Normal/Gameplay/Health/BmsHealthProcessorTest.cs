@@ -5,6 +5,7 @@ using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Judgements;
@@ -16,6 +17,52 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Health;
 [TestFixture]
 public class BmsHealthProcessorTest
 {
+    [Test]
+    public void TestEndClearThresholdBoundary(
+        [Values(BmsGaugeType.Normal, BmsGaugeType.Easy, BmsGaugeType.AssistEasy)] BmsGaugeType gaugeType,
+        [Values] BmsGaugeProfileFamily family,
+        [Values(-1, 0, 1)] int boundary)
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(gaugeType, family);
+        var threshold = processor.GaugeProfile.ClearThreshold;
+        var health = boundary switch
+        {
+            -1 => Math.BitDecrement(threshold),
+            1 => Math.BitIncrement(threshold),
+            _ => threshold,
+        };
+        processor.RestoreGaugeStates([new(gaugeType, health, false)]);
+
+        Assert.That(processor.HasPassedAtEnd(), Is.EqualTo(boundary >= 0));
+    }
+
+    [Test]
+    public void TestAutoGaugeClearThresholdBoundary([Values] BmsGaugeProfileFamily family, [Values(-1, 0, 1)] int boundary)
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeTypes(BmsModAutoGauge.AUTO_GAUGE_CHAIN, profileFamilyOverride: family);
+        var threshold = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal, family).ClearThreshold;
+        var normalHealth = boundary switch
+        {
+            -1 => Math.BitDecrement(threshold),
+            1 => Math.BitIncrement(threshold),
+            _ => threshold,
+        };
+        processor.RestoreGaugeStates(
+        [
+            new(BmsGaugeType.Hazard, 0, true),
+            new(BmsGaugeType.ExHard, 0, true),
+            new(BmsGaugeType.Hard, 0, true),
+            new(BmsGaugeType.Normal, normalHealth, false),
+            new(BmsGaugeType.Easy, threshold, false),
+            new(BmsGaugeType.AssistEasy, threshold, false),
+        ]);
+
+        Assert.That(processor.HasPassedAtEnd(), Is.True);
+        Assert.That(processor.WorstGaugeType, Is.EqualTo(boundary < 0 ? BmsGaugeType.Easy : BmsGaugeType.Normal));
+    }
+
     [Test]
     public void TestProvidedInitialGaugeStatesAreRecordedAtStageStart()
     {
