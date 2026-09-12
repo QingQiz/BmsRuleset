@@ -738,12 +738,8 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
     private void validateSelectionAfterResume()
     {
         var selected = Beatmap.Value;
-        loadBeatmapSelection(debounceQueuedSelection ?? loadingBeatmap ?? selected.BeatmapInfo, true, () =>
-        {
-            // A new working beatmap already notifies the leaderboard through its binding.
-            if (ReferenceEquals(Beatmap.Value, selected))
-                DetailsArea.Refresh();
-        });
+        // Assigning the refreshed working beatmap notifies the leaderboard through its binding.
+        loadBeatmapSelection(debounceQueuedSelection ?? loadingBeatmap ?? selected.BeatmapInfo, true);
     }
 
     private bool checkBeatmapValidForSelection(BeatmapInfo beatmap)
@@ -1032,6 +1028,9 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         if (Carousel.Criteria == null)
             return;
 
+        // Collection notifications re-run filtering while the screen is visible; keep the current working beatmap
+        // in place so those notifications do not cause an unnecessary preview and detail reload.
+        var wasPresented = CarouselItemsPresented;
         CarouselItemsPresented = true;
 
         applyInitialRestoration();
@@ -1048,8 +1047,10 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         {
             if (Beatmap.IsDefault)
                 ensureGlobalBeatmapValid();
-            else
+            else if (!wasPresented)
                 loadBeatmapSelection(Beatmap.Value.BeatmapInfo, true, ensureGlobalBeatmapValid);
+            else
+                ensureGlobalBeatmapValid();
         }
 
         updateWedgeVisibility();
