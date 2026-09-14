@@ -3,6 +3,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
@@ -14,6 +15,9 @@ internal sealed class BmsHitObjectLifetimeEntry(
     Func<double> getVisualOffset)
     : HitObjectLifetimeEntry(hitObject)
 {
+
+    // A resume rewind may return the drawable to its pool while its head/tail judgements remain valid.
+    internal BmsLongNoteJudgementController? LongNoteJudgementController { get; set; }
 
     /// <summary>
     ///     Set to true once <see cref="RefreshLifetime"/> has run.

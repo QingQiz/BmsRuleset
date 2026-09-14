@@ -38,7 +38,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private const float released_alpha = 0.4f;
 
     private readonly BmsLongNoteVisualState visualState = new();
-    private readonly BmsLongNoteJudgementController controller = new();
+    private BmsLongNoteJudgementController controller = new();
 
     private double lastHoldExplosionTime;
     private bool bodyGeometryValid;
@@ -160,7 +160,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     protected override void ResetKindState()
     {
         IsAutomaticallyHeld = false;
-        controller.Reset();
         visualState.Reset();
         bodyGeometryValid = false;
         longNoteBody.ResetBody();
@@ -180,7 +179,15 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         if (HitObject != null)
         {
+            controller = Entry is BmsHitObjectLifetimeEntry bmsEntry
+                ? bmsEntry.LongNoteJudgementController ??= new BmsLongNoteJudgementController()
+                : new BmsLongNoteJudgementController();
             controller.Bind((BmsLongNote)HitObject, this);
+
+            // Ordinary seeks replay judgements, but a pause lead-in must retain the original attempt.
+            if (ParentColumn?.IsResumeRewinding != true)
+                controller.Reset();
+
             longNoteBody.SetSkinLookup(LayoutVariant, Column);
         }
     }

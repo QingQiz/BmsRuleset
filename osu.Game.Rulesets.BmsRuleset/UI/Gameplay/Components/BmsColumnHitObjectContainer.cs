@@ -101,9 +101,8 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             if (note is not ILongNoteHolder longNoteHolder || note.HitObject is not BmsLongNote longNote)
                 continue;
 
-            // Pooled drawables reset their LN controller when they re-enter lifetime, while their
-            // framework result remains authoritative. EndTime covers HCN head-POOR, whose endpoints
-            // are scored synthetically without applying a result to the parent drawable.
+            // EndTime covers HCN head-POOR, whose endpoints are scored synthetically
+            // without applying a result to the parent drawable.
             if (longNote.EndTime <= rewindEndTime || (note.Judged && !longNoteHolder.IsHoldingLongNote))
                 note.Alpha = 0;
         }

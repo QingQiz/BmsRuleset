@@ -77,6 +77,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal float NoteHeightScale => ParentPlayfield.Stage.NoteHeightScale;
 
+    internal bool IsResumeRewinding => ParentPlayfield.IsResumeRewinding;
+
     protected BmsPlayfield ParentPlayfield { get; }
 
     private BmsColumnKeySound? keySound;
