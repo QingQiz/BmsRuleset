@@ -277,8 +277,9 @@ The track sits at the Stage's left edge by default; its height determines the ma
 
 ### BGA
 
-Displays the chart's base, layer 1, layer 2, and POOR BGA layers, including crop and opacity events. Misses briefly
-show the POOR layer according to the chart's POOR BGA mode.
+Displays the chart's base, layer 1, layer 2, and POOR BGA layers, including crop and opacity events. A judgement
+that leaves combo at zero shows the POOR layer for 500 ms according to the chart's POOR BGA mode. This includes
+BAD and POOR, plus E-POOR when combo is already zero. Each trigger restarts the duration.
 
 The BGA scales to fit the component's rectangle while preserving its aspect ratio. It stays behind the playfield
 and remains visible when the gameplay HUD is hidden.

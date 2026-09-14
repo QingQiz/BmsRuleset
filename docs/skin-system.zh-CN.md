@@ -266,7 +266,7 @@ Class、ExClass、ExHard Class 分别使用 Hard、ExHard、Hazard 的填充颜�
 
 ### BGA
 
-显示谱面的 Base、Layer 1、Layer 2 和 POOR 图层，应用裁剪和透明度事件。失误后按谱面的 POOR BGA 模式短暂显示 POOR 图层。
+显示谱面的 Base、Layer 1、Layer 2 和 POOR 图层，应用裁剪和透明度事件。判定后 Combo 为 0 时，按谱面的 POOR BGA 模式显示 POOR 图层 500 ms，包括 BAD、POOR，以及 Combo 已为 0 时的 E-POOR。每次触发都会重新计时。
 
 BGA 等比缩放以适应组件窗口，位于游玩区域后方，隐藏游玩 HUD 时仍会显示。
 

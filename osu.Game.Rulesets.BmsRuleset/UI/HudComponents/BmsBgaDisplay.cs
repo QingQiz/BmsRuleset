@@ -22,7 +22,9 @@ using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Media.Video;
 using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
@@ -79,7 +81,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
     private double lastTime = double.NegativeInfinity;
     private double poorLayerUntil = double.NegativeInfinity;
     private bool poorLayerVisible;
-    private IBmsGameplayEvents? gameplayEvents;
+    private BmsScoreProcessor? scoreProcessor;
     private BmsBgaDisplay? rehostedDisplay;
     private RehostedDisplayHost? rehostedDisplayHost;
     private IBindable<double>? bgaDim;
@@ -87,6 +89,9 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
 
     [Resolved(CanBeNull = true)]
     private DrawableRuleset? drawableRuleset { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private ScoreProcessor? resolvedScoreProcessor { get; set; }
 
     [Resolved(CanBeNull = true)]
     private IBindable<WorkingBeatmap>? workingBeatmap { get; set; }
@@ -128,9 +133,13 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         if (tryAddPlayfieldDisplay())
             return;
 
-        gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
-        if (gameplayEvents != null)
-            gameplayEvents.JudgementDisplayed += onJudgementDisplayed;
+        scoreProcessor = resolvedScoreProcessor as BmsScoreProcessor;
+        if (scoreProcessor != null)
+        {
+            // The playfield's display event can precede scoring; beatoraja checks combo after the judgement.
+            scoreProcessor.NewJudgement += onNewJudgement;
+            scoreProcessor.EmptyPoorRegistered += onEmptyPoorRegistered;
+        }
     }
 
     protected override void Update()
@@ -255,8 +264,11 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         rehostedDisplayHost = null;
         rehostedDisplay = null;
 
-        if (gameplayEvents != null)
-            gameplayEvents.JudgementDisplayed -= onJudgementDisplayed;
+        if (scoreProcessor != null)
+        {
+            scoreProcessor.NewJudgement -= onNewJudgement;
+            scoreProcessor.EmptyPoorRegistered -= onEmptyPoorRegistered;
+        }
 
         base.Dispose(isDisposing);
     }
@@ -660,9 +672,13 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
 
     private static bool isVideo(string path) => video_extensions.Contains(Path.GetExtension(path));
 
-    private void onJudgementDisplayed(HitResult result)
+    private void onNewJudgement(JudgementResult result) => tryShowPoorLayer();
+
+    private void onEmptyPoorRegistered(BmsTimingObservation observation) => tryShowPoorLayer();
+
+    private void tryShowPoorLayer()
     {
-        if (result != HitResult.Miss || drawableRuleset == null || bga == null || bga.PoorMode == BmsPoorBgaMode.Off)
+        if (scoreProcessor?.Combo.Value != 0 || drawableRuleset == null || bga == null || bga.PoorMode == BmsPoorBgaMode.Off)
             return;
 
         if (!activeEvents.ContainsKey(BmsBgaLayer.Poor)
