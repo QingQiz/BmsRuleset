@@ -252,6 +252,8 @@ internal sealed partial class DifficultyTableRowContainer : Container
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
+                // A masked zero-height container cannot advance its children's fade-in to restore its measured height.
+                AlwaysPresent = true,
                 Direction = FillDirection.Vertical,
                 Children =
                 [
