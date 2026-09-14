@@ -64,6 +64,12 @@ internal partial class BmsPanelLocalRankDisplay : CompositeDrawable
 
     internal void AttachLamp(Container host)
     {
+        // PrepareForUse can run again when the carousel refreshes its models. Keep the
+        // already attached lamp in place so the difficulty-coloured background never
+        // flashes through while it is reparented.
+        if (ReferenceEquals(lampDisplay.Parent, host))
+            return;
+
         if (lampDisplay.Parent == this)
             RemoveInternal(lampDisplay, false);
         else if (lampDisplay.Parent is Container parent)

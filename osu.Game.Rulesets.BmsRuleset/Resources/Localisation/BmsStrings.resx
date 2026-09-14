@@ -127,8 +127,8 @@
   <data name="updating_table" xml:space="preserve"><value>Updating difficulty table "{0}"...</value></data>
   <data name="updated_table" xml:space="preserve"><value>Updated table: {0} ({1} charts)</value></data>
   <data name="failed_to_update_table" xml:space="preserve"><value>Failed to update difficulty table: {0}</value></data>
-  <data name="delete_table_confirmation" xml:space="preserve"><value>Delete difficulty table "{0}" ({1} charts)?&#10;&#10;⚠ This may freeze the UI if done from song select. Switch to the main menu first.</value></data>
-  <data name="update_table_confirmation" xml:space="preserve"><value>Re-fetch difficulty table "{0}" from source?&#10;&#10;⚠ This may freeze the UI if done from song select. Switch to the main menu first.</value></data>
+  <data name="delete_table_confirmation" xml:space="preserve"><value>Delete difficulty table "{0}" ({1} charts)?</value></data>
+  <data name="update_table_confirmation" xml:space="preserve"><value>Re-fetch difficulty table "{0}" from source?</value></data>
   <data name="merge_table_confirmation" xml:space="preserve"><value>Merge difficulty table "{0}" back into a single collection?</value></data>
   <data name="split_table_confirmation" xml:space="preserve"><value>Split difficulty table "{0}" into per-level collections?</value></data>
   <data name="hit_count" xml:space="preserve"><value>{0} hits</value></data>

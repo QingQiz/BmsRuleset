@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Rulesets.BmsRuleset.Database;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using Realms;
 
@@ -17,6 +18,7 @@ namespace osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableStore store)
 {
     private const char marker_ownership_sentinel = '\u200B';
+    private readonly object refreshLock = new();
 
     public static void GetDifficultyName(BeatmapInfo beatmap, out string markerStr)
     {
@@ -36,14 +38,20 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
         $"{difficultyName}{marker_ownership_sentinel} [{markerStr}]";
 
     /// <summary>
-    /// Full rebuild — applies markers from every loaded table to the matching
-    /// beatmaps. Only processes entries that are actually in tables —
-    /// O(total-table-entries), not O(all-beatmaps-in-database).
-    /// Each chunk is a separate realm.Write so the write mutex is held only briefly.
+    /// Reconciles markers on BMS beatmaps, including suffixes belonging to removed tables.
+    /// Only changed names are written, and the detached library receives the final bulk state.
     /// </summary>
     public void RefreshAllMarkers(ProgressNotification? notification = null)
     {
+        // An older refresh must not commit after a newer one when table operations overlap.
+        lock (refreshLock)
+            refreshAllMarkers(notification);
+    }
+
+    private void refreshAllMarkers(ProgressNotification? notification)
+    {
         notification?.Text = BmsStrings.Collecting;
+        var markerNames = store.GetMarkerNames();
 
         List<(Guid, string)> collect = [];
 
@@ -52,11 +60,10 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
             var allBmsBeatmaps = r.All<BeatmapInfo>().Filter("Ruleset.ShortName == 'bms'");
             foreach (var beatmap in allBmsBeatmaps)
             {
-                var markers = store.GetMarkers(beatmap.MD5Hash);
-                var markerStr = FormatMarkers(markers);
+                var markerStr = markerNames.GetValueOrDefault(beatmap.MD5Hash, string.Empty);
                 var clean = ownedMarkerSuffixRegex().Replace(beatmap.DifficultyName, string.Empty);
 
-                var res = markers.Count == 0
+                var res = markerStr.Length == 0
                     ? clean
                     : AddMarkerSuffix(clean, markerStr);
 
@@ -65,6 +72,10 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
         });
 
         var total = collect.Count;
+        if (total == 0)
+            return;
+
+        using var bulkUpdate = BmsBulkBeatmapUpdate.Begin(realm);
         var processed = 0;
         notification?.Text = BmsStrings.Refreshing;
         notification?.Progress = 0;
@@ -75,8 +86,11 @@ public partial class DifficultyNameUpdater(RealmAccess realm, DifficultyTableSto
             {
                 r.Find<BeatmapInfo>(collectItem.Item1)?.DifficultyName = collectItem.Item2;
                 processed++;
-                notification?.Text = BmsStrings.RefreshingProgress(processed, total);
-                notification?.Progress = (float)processed / total;
+                if (processed % 128 == 0 || processed == total)
+                {
+                    notification?.Text = BmsStrings.RefreshingProgress(processed, total);
+                    notification?.Progress = (float)processed / total;
+                }
             }
         });
     }

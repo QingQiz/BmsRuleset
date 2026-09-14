@@ -75,6 +75,38 @@ public partial class BmsDifficultyTableIntegrationTest
         BitConverter.ToString(MD5.HashData(File.ReadAllBytes(path))).Replace("-", string.Empty).ToLowerInvariant();
 
     [Test]
+    public void TestImportReplacementSynchronizesTableOnce()
+    {
+        runIntegrationTest(async (_, storage) =>
+        {
+            var path = Path.Combine(storage.GetFullPath(string.Empty), "replacement.json");
+            await File.WriteAllTextAsync(path, """
+                {"name":"Updated", "symbol":"ST", "charts":[{"md5":"11111111111111111111111111111111","level":"2"}]}
+                """).ConfigureAwait(false);
+            var store = new DifficultyTableStore(null, Path.Combine(storage.GetFullPath(string.Empty), "tables"));
+            var oldTable = new global::osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+            {
+                Name = "Original", SourcePath = path, Symbol = "ST",
+                Entries = [new TableEntry { Md5Hash = "11111111111111111111111111111111", Level = "1" }],
+            };
+            store.RestoreTable(oldTable);
+            var rebuilds = 0;
+            var refreshes = 0;
+            var tableChanges = 0;
+            store.TableListRebuildEvent += _ => rebuilds++;
+            store.RefreshDiffNameEvent += _ => refreshes++;
+            store.TablesChanged += () => tableChanges++;
+
+            var result = await store.ImportAsync(path, new ProgressNotification(), oldTable).ConfigureAwait(false);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(store.Tables.Single(), Is.SameAs(result!.Table));
+            Assert.That(store.GetMarkers("11111111111111111111111111111111").Single().entry.Level, Is.EqualTo("2"));
+            Assert.That((rebuilds, refreshes, tableChanges), Is.EqualTo((1, 1, 1)));
+        });
+    }
+
+    [Test]
     public void TestDifficultyTableMarkersMatchImportedBeatmaps()
     {
         runIntegrationTest(async (realm, storage) =>

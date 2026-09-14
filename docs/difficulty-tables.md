@@ -80,10 +80,6 @@ DP ☆NOTHER [TT★1 TT★2]
 
 Markers contain the table symbol and level, and update when tables are added or removed.
 
-> [!IMPORTANT]
-> Switch to the **main menu** before importing or deleting a table. Deleting one rebuilds all BMS markers;
-> on the song select screen, this conflicts with the carousel's Realm reads and freezes the UI.
-
 ## Collections
 
 Each table creates a collection named `[BMS] {table.Name}` for browsing matched charts in song select.

@@ -287,6 +287,8 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
                                                             RelativeSizeAxes = Axes.Both,
                                                             RequestPresentBeatmap = b => SelectAndRun(b, OnStart),
                                                             RequestSelection = queueBeatmapSelection,
+                                                            BeatmapMetadataUpdated = refreshSelectedBeatmapMetadata,
+                                                            BeatmapSelectionRemoved = recoverRemovedBeatmapSelection,
                                                             RequestRecommendedSelection = requestRecommendedSelection,
                                                             NewItemsPresented = newItemsPresented,
                                                         },
@@ -682,6 +684,34 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
     }
 
     internal void LoadBeatmapSelection(BeatmapInfo beatmap, Action? onLoaded = null) => loadBeatmapSelection(beatmap, false, onLoaded);
+
+    private void refreshSelectedBeatmapMetadata(BeatmapInfo beatmap)
+    {
+        // Updating the current chart must bypass the selection debounce's equality shortcut without stealing a pending selection.
+        if (Beatmap.Value.BeatmapInfo.ID == beatmap.ID
+            && (debounceQueuedSelection == null || debounceQueuedSelection.ID == beatmap.ID)
+            && (loadingBeatmap == null || loadingBeatmap.ID == beatmap.ID))
+            loadBeatmapSelection(beatmap, true);
+    }
+
+    private void recoverRemovedBeatmapSelection(BeatmapInfo removed, GroupedBeatmap? replacement)
+    {
+        if (!this.IsCurrentScreen())
+            return;
+
+        // A completed snapshot must not steal a newer selection or revive its cancelled confirmation.
+        var requested = debounceQueuedSelection ?? loadingBeatmap ?? Beatmap.Value.BeatmapInfo;
+        if (requested.ID != removed.ID)
+            return;
+
+        cancelDebounceSelection();
+        CancelBeatmapSelection();
+        Carousel.CurrentGroupedBeatmap = replacement;
+        if (replacement != null)
+            loadBeatmapSelection(replacement.Beatmap, true);
+        else
+            Beatmap.SetDefault();
+    }
 
     protected virtual Task<WorkingBeatmap> LoadWorkingBeatmapAsync(BeatmapInfo beatmap, bool refetch, CancellationToken token) =>
         Task.Run(() => beatmaps.GetWorkingBeatmap(beatmap, refetch), token);

@@ -56,10 +56,10 @@ public class CollectionSyncManager
 
         persistSubdividedTables();
 
-        // rebuild first. so we can update the divided status
-        BmsRulesetRuntime.DifficultyTableStore?.NotifyToRebuildTableList(null);
-
-        SyncInTransaction(realm, null);
+        var store = BmsRulesetRuntime.DifficultyTableStore;
+        store?.NotifyToRebuildTableList(null);
+        if (store?.CollectionSyncManager != this)
+            SyncInTransaction(realm, null);
     }
 
     public bool IsSubdivided(DifficultyTable table)
@@ -70,24 +70,19 @@ public class CollectionSyncManager
 
 
     /// <summary>
-    /// Sync collections inside an active realm write transaction.
-    /// Uses diff-based updates (not delete + recreate).
+    /// Reconciles collection contents in one transaction while preserving existing collection identities.
     /// </summary>
     public void SyncInTransaction(RealmAccess? realm, DifficultyTable? tableRemoved)
     {
         if (tableRemoved != null && subdividedTables.Remove(tableRemoved.SourcePath ?? tableRemoved.Name))
             persistSubdividedTables();
 
-        if (realm == null) return;
-
-        // remove collections for removed table first
-        if (tableRemoved != null)
+        realm?.Write(r =>
         {
-            var prefix = $"{COLLECTION_PREFIX}{tableRemoved.Name} ";
-            var baseName = prefix.TrimEnd(' ');
-
-            realm.Write(r =>
+            if (tableRemoved != null)
             {
+                var prefix = $"{COLLECTION_PREFIX}{tableRemoved.Name} ";
+                var baseName = prefix.TrimEnd(' ');
                 var existing = r.All<BeatmapCollection>()
                     .Where(c => c.Name.StartsWith(prefix, StringComparison.Ordinal)
                                 || c.Name.Equals(baseName, StringComparison.Ordinal))
@@ -97,13 +92,11 @@ public class CollectionSyncManager
                 {
                     r.Remove(c);
                 }
-            });
-        }
+            }
 
-        foreach (var table in BmsRulesetRuntime.DifficultyTableStore?.Tables ?? [])
-        {
-            realm.Write(r => syncDivideStatus(r, table));
-        }
+            foreach (var table in BmsRulesetRuntime.DifficultyTableStore?.Tables ?? [])
+                syncDivideStatus(r, table);
+        });
     }
 
     private void persistSubdividedTables()

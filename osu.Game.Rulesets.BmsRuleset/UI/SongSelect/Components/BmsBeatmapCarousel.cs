@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -15,11 +17,16 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 
 internal partial class BmsBeatmapCarousel : BeatmapCarousel
 {
+    internal Action<BeatmapInfo>? BeatmapMetadataUpdated { get; init; }
+
+    internal Action<BeatmapInfo, GroupedBeatmap?>? BeatmapSelectionRemoved { get; init; }
+
     private readonly DrawablePool<BmsPanelBeatmap> beatmapPanelPool = new(100);
     private readonly DrawablePool<BmsPanelBeatmapStandalone> standalonePanelPool = new(100);
     private readonly DrawablePool<BmsUnavailableBeatmapPanel> unavailablePanelPool = new(100);
     private readonly List<BeatmapSetInfo> unavailableSets = [];
     private bool subscribed;
+    private bool replacingUnavailableEntries;
 
     public BmsBeatmapCarousel()
     {
@@ -70,24 +77,60 @@ internal partial class BmsBeatmapCarousel : BeatmapCarousel
 
     private void difficultyTablesChanged() => Schedule(syncUnavailableEntries);
 
+    protected override bool HandleItemsChanged(NotifyCollectionChangedEventArgs args) =>
+        replacingUnavailableEntries || base.HandleItemsChanged(args);
+
+    internal BeatmapInfo[] IncludeUnavailableEntries(BeatmapInfo[] charts)
+    {
+        var previous = unavailableSets.SelectMany(set => set.Beatmaps).ToDictionary(chart => chart.MD5Hash, StringComparer.OrdinalIgnoreCase);
+        unavailableSets.Clear();
+        var store = BmsRulesetRuntime.DifficultyTableStore;
+        if (store != null)
+            unavailableSets.AddRange(UnavailableTableBeatmapFactory.Create(store, new BmsRuleset().RulesetInfo, charts));
+
+        foreach (var chart in unavailableSets.SelectMany(set => set.Beatmaps))
+        {
+            if (!previous.TryGetValue(chart.MD5Hash, out var existing))
+                continue;
+
+            // Rebuilding the library must not turn an unchanged missing chart into a new carousel selection.
+            chart.ID = existing.ID;
+            chart.BeatmapSet!.ID = existing.BeatmapSet!.ID;
+        }
+
+        return [..charts, ..unavailableSets.SelectMany(set => set.Beatmaps)];
+    }
+
     private void syncUnavailableEntries()
     {
         BmsRulesetRuntime.EnsureDifficultyTableStore(host, realm);
 
-        foreach (var set in unavailableSets)
-        {
-            foreach (var beatmap in set.Beatmaps)
-                Items.Remove(beatmap);
-        }
+        var charts = Items.Where(chart => !UnavailableTableBeatmapFactory.IsUnavailable(chart)).ToArray();
+        var updated = IncludeUnavailableEntries(charts);
 
-        unavailableSets.Clear();
-
-        var store = BmsRulesetRuntime.DifficultyTableStore;
-        if (store == null)
+        // A difficulty table refresh often follows a beatmap snapshot publication. In that case the
+        // snapshot already contains the current placeholders; replacing the list again would make
+        // realised panels briefly unbind their beatmap and hide their lamp while scores reload.
+        if (Items.Count == updated.Length && Items.Zip(updated).All(pair => equivalent(pair.First, pair.Second)))
             return;
 
-        var additions = UnavailableTableBeatmapFactory.Create(store, new BmsRuleset().RulesetInfo, Items);
-        Items.AddRange(additions.SelectMany(set => set.Beatmaps));
-        unavailableSets.AddRange(additions);
+        replacingUnavailableEntries = true;
+        try
+        {
+            // Missing entries can number in the thousands too; remove them as a range before re-filtering.
+            Items.ReplaceRange(0, Items.Count, updated);
+        }
+        finally
+        {
+            replacingUnavailableEntries = false;
+        }
+
+        static bool equivalent(BeatmapInfo left, BeatmapInfo right) =>
+            left.ID == right.ID
+            && left.BeatmapSet?.ID == right.BeatmapSet?.ID
+            && string.Equals(left.Hash, right.Hash, StringComparison.Ordinal)
+            && string.Equals(left.MD5Hash, right.MD5Hash, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(left.DifficultyName, right.DifficultyName, StringComparison.Ordinal)
+            && left.Hidden == right.Hidden;
     }
 }

@@ -37,6 +37,7 @@ public partial class DifficultyTableStore
 
     private readonly BmsRulesetConfigManager? config;
     private readonly string cacheDirectory;
+    private readonly object indexLock = new();
 
     private readonly Dictionary<string, List<(DifficultyTable table, TableEntry entry)>> md5Index
         = new(StringComparer.OrdinalIgnoreCase);
@@ -66,7 +67,8 @@ public partial class DifficultyTableStore
     public void LoadPersistedTables()
     {
         tables.Clear();
-        md5Index.Clear();
+        lock (indexLock)
+            md5Index.Clear();
 
         var sources = config?.Get<string>(BmsRulesetSetting.DifficultyTableSources) ?? string.Empty;
         if (string.IsNullOrEmpty(sources))
@@ -103,7 +105,7 @@ public partial class DifficultyTableStore
     /// <summary>
     /// User-initiated import: download/read, parse, index, update markers + collections.
     /// </summary>
-    public async Task<ImportResult?> ImportAsync(string source, ProgressNotification notification)
+    public async Task<ImportResult?> ImportAsync(string source, ProgressNotification notification, DifficultyTable? tableToReplace = null)
     {
         if (string.IsNullOrWhiteSpace(source)) return null;
 
@@ -198,7 +200,10 @@ public partial class DifficultyTableStore
             return null;
         }
 
-        AddTable(table, notification);
+        if (tableToReplace == null)
+            AddTable(table, notification);
+        else
+            ReplaceTable(tableToReplace, table, notification);
         notification.Progress = 1;
         return new ImportResult(table);
     }
@@ -241,9 +246,9 @@ public partial class DifficultyTableStore
     public void AddTable(DifficultyTable table, ProgressNotification? notification = null)
     {
         tables.Add(table);
+        addToIndex(table);
         TablesChanged?.Invoke();
         NotifyToRebuildTableList(null);
-        addToIndex(table);
         NotifyToRefreshAllDiffNames(notification);
         persistTableList();
     }
@@ -277,9 +282,9 @@ public partial class DifficultyTableStore
     public void RemoveTable(DifficultyTable table, ProgressNotification? notification = null)
     {
         tables.Remove(table);
+        removeFromIndex(table);
         TablesChanged?.Invoke();
         NotifyToRebuildTableList(table);
-        removeFromIndex(table);
         NotifyToRefreshAllDiffNames(notification);
         persistTableList();
     }
@@ -325,15 +330,28 @@ public partial class DifficultyTableStore
     }
 
     public List<(DifficultyTable table, TableEntry entry)> GetMarkers(string md5Hash)
-        => md5Index.TryGetValue(md5Hash, out var markers)
-            ? markers
-            : [];
+    {
+        lock (indexLock)
+            return md5Index.TryGetValue(md5Hash, out var markers) ? [..markers] : [];
+    }
+
+    internal Dictionary<string, string> GetMarkerNames()
+    {
+        lock (indexLock)
+            return md5Index.ToDictionary(pair => pair.Key, pair => DifficultyNameUpdater.FormatMarkers(pair.Value), StringComparer.OrdinalIgnoreCase);
+    }
 
     #endregion
 
     #region Index management
 
     private void addToIndex(DifficultyTable table)
+    {
+        lock (indexLock)
+            addToIndexLocked(table);
+    }
+
+    private void addToIndexLocked(DifficultyTable table)
     {
         foreach (var entry in table.Entries)
         {
@@ -344,6 +362,12 @@ public partial class DifficultyTableStore
     }
 
     private void removeFromIndex(DifficultyTable table)
+    {
+        lock (indexLock)
+            removeFromIndexLocked(table);
+    }
+
+    private void removeFromIndexLocked(DifficultyTable table)
     {
         foreach (var entry in table.Entries)
         {

@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -227,7 +228,17 @@ internal abstract partial class BmsBeatmapPanel : Panel
 
     protected sealed override void PrepareForUse()
     {
-        ResetBeatmapState();
+        var nextBeatmap = (Item?.Model as GroupedBeatmap)?.Beatmap;
+        var reusingSameBeatmap = CurrentBeatmap != null
+                                  && nextBeatmap != null
+                                  && CurrentBeatmap.ID == nextBeatmap.ID
+                                  && string.Equals(CurrentBeatmap.Hash, nextBeatmap.Hash, StringComparison.Ordinal);
+
+        // Carousel refreshes can prepare an already-realised panel again for the same chart.
+        // Keep its lamp attached during that no-op rebinding so the difficulty tint cannot flash.
+        if (!reusingSameBeatmap)
+            ResetBeatmapState();
+
         base.PrepareForUse();
         PrepareBeatmap();
         computeStarRating();

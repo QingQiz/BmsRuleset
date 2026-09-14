@@ -15,6 +15,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Database;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osuTK;
@@ -102,7 +103,9 @@ internal partial class DifficultyTableSettings : FillFlowContainer
                     RelativeSizeAxes = Axes.X,
                     Current =
                     {
-                        Value = new SettingsNote.Data(BmsStrings.DifficultyTableWarning, SettingsNote.Type.Warning)
+                        Value = BmsBeatmapNotificationPatcher.IsInstalled
+                            ? null
+                            : new SettingsNote.Data(BmsStrings.DifficultyTableWarning, SettingsNote.Type.Warning),
                     },
                 },
             },
@@ -343,11 +346,10 @@ internal partial class DifficultyTableSettings : FillFlowContainer
             };
             Schedule(() => notifications?.Post(notification));
 
-            var importResult = await difficultyTableStore.ImportAsync(table.SourcePath, notification).ConfigureAwait(false);
+            var importResult = await difficultyTableStore.ImportAsync(table.SourcePath, notification, table).ConfigureAwait(false);
 
             if (importResult != null)
             {
-                difficultyTableStore.ReplaceTable(table, importResult.Table);
                 Schedule(() =>
                 {
                     notification.CompletionText = BmsStrings.UpdatedTable(importResult.Table.Name, importResult.Table.Entries.Count);

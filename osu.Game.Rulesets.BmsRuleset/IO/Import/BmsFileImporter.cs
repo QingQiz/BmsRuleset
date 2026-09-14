@@ -13,6 +13,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Database;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -378,6 +379,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     /// </summary>
     private void runImportPipeline(ProgressNotification notification, string[] paths)
     {
+        using var bulkUpdate = BmsBulkBeatmapUpdate.Begin(realm);
         try
         {
             var fileStore = new RealmFileStore(realm, storage);

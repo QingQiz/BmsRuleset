@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Conversion;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Database;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 using osu.Game.Rulesets.BmsRuleset.Editor;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -82,6 +83,7 @@ public partial class BmsRuleset : Ruleset
         BmsEditorPatcher.InstallOnce();
         BmsReplayPatcher.InstallOnce();
         BmsSongSelectEntryPatcher.InstallOnce();
+        BmsBeatmapNotificationPatcher.InstallOnce();
         BmsResultsScreenEntryPatcher.InstallOnce();
         BmsWorkingBeatmapPatcher.InstallOnce();
         BmsBeatmapStatisticsPatcher.InstallOnce();

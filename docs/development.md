@@ -76,18 +76,3 @@ The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets
 | **Skin**      | E-POOR judgement image                                                                   | 3        |
 | **UI**        | Lane cover / skin / movement                                                             | 2        |
 | **Perf**      | Unstable frame rate when disposing of many mines                                   | 4        |
-
-### FIXME
-
-```text
-2026-06-01 15:13:14 [error]: osu.Game.Rulesets.UI.BeatmapInvalidForRulesetException:
-  Beatmap can not be converted for the ruleset
-  (ruleset: osu.Game.Rulesets.Mania.ManiaRuleset, osu.Game.Rulesets.Mania,
-   converter: osu.Game.Rulesets.Mania.Beatmaps.ManiaBeatmapConverter).
-  at osu.Game.Beatmaps.WorkingBeatmap.GetPlayableBeatmap(...)
-  at osu.Game.Screens.Select.BeatmapTitleWedge.DifficultyDisplay.<>c__DisplayClass36_0
-       .<updateCountStatistics>b__0()
-```
-
-Switching from BMS to another ruleset crashes with `BeatmapInvalidForRulesetException`: the beatmap title wedge
-recalculates difficulty with the wrong converter while the carousel selection is stale.

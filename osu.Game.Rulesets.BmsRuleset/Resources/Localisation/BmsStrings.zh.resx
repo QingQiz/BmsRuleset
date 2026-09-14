@@ -127,8 +127,8 @@
   <data name="updating_table" xml:space="preserve"><value>正在更新难度表“{0}”...</value></data>
   <data name="updated_table" xml:space="preserve"><value>已更新难度表：{0}（{1} 张谱面）</value></data>
   <data name="failed_to_update_table" xml:space="preserve"><value>难度表更新失败：{0}</value></data>
-  <data name="delete_table_confirmation" xml:space="preserve"><value>要删除难度表“{0}”（{1} 张谱面）吗？&#10;&#10;⚠ 若在选歌界面操作，界面可能卡顿。请先返回主菜单。</value></data>
-  <data name="update_table_confirmation" xml:space="preserve"><value>要从来源重新获取难度表“{0}”吗？&#10;&#10;⚠ 若在选歌界面操作，界面可能卡顿。请先返回主菜单。</value></data>
+  <data name="delete_table_confirmation" xml:space="preserve"><value>要删除难度表“{0}”（{1} 张谱面）吗？</value></data>
+  <data name="update_table_confirmation" xml:space="preserve"><value>要从来源重新获取难度表“{0}”吗？</value></data>
   <data name="merge_table_confirmation" xml:space="preserve"><value>要将难度表“{0}”重新合并为单个收藏夹吗？</value></data>
   <data name="split_table_confirmation" xml:space="preserve"><value>要将难度表“{0}”按等级拆分为多个收藏夹吗？</value></data>
   <data name="hit_count" xml:space="preserve"><value>{0} 次击打</value></data>
