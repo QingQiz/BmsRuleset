@@ -38,6 +38,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private const float released_alpha = 0.4f;
 
     private readonly BmsLongNoteVisualState visualState = new();
+    private readonly Func<float, float, int> resolveBodyDirection;
     private BmsLongNoteJudgementController controller = new();
 
     private double lastHoldExplosionTime;
@@ -57,6 +58,13 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private IBmsLnScoring? scoring { get; set; }
 
     private double gameplayRate => (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
+
+    public DrawableBmsLongNote()
+    {
+        // A held note resolves its visual head for both culling and geometry every frame.
+        // Keep the instance delegate across pool reuse instead of allocating at each call.
+        resolveBodyDirection = bodyDirectionBeforeTailPasses;
+    }
 
     public override bool TryHit(HitResult result)
     {
@@ -158,7 +166,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         // Observe positions even while culled so a held head can re-enter at its pinned position.
         visualState.UpdateHeadYAtStartTime(y, Time.Current, HitObject.StartTime, ParentColumn?.VisualOffset ?? 0);
         return isHoldingBody()
-            ? visualState.ResolveHeldHeadY(y, endY, Time.Current >= HitObject.StartTime, bodyDirectionBeforeTailPasses)
+            ? visualState.ResolveHeldHeadY(y, endY, Time.Current >= HitObject.StartTime, resolveBodyDirection)
             : y;
     }
 

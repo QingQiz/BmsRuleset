@@ -1,11 +1,15 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
+using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 
@@ -21,9 +25,17 @@ internal sealed class BmsGameplayDiagnosticOptions
 
     public double ScrollSpeed { get; private set; } = 8;
 
+    public double UpdateHz { get; private set; }
+
+    public double DrawHz { get; private set; }
+
     public bool Headless { get; private set; }
 
     public bool AudioOutput { get; private set; }
+
+    public bool Invert { get; private set; }
+
+    public int? InvertRandomSeed { get; private set; }
 
     public BmsTestSkins.SkinKind Skin { get; private set; } = BmsTestSkins.SkinKind.Argon;
 
@@ -38,6 +50,12 @@ internal sealed class BmsGameplayDiagnosticOptions
         for (var i = 0; i < args.Length; i++)
         {
             var argument = args[i];
+            if (argument == "--invert")
+            {
+                result.Invert = true;
+                continue;
+            }
+
             if (argument == "--headless")
             {
                 result.Headless = true;
@@ -68,9 +86,15 @@ internal sealed class BmsGameplayDiagnosticOptions
 
                 case "--scroll-speed": result.ScrollSpeed = number(value, 1, 50); break;
 
+                case "--update-hz": result.UpdateHz = number(value, 0, 10000); break;
+
+                case "--draw-hz": result.DrawHz = number(value, 0, 10000); break;
+
                 case "--skin": result.Skin = enumValue<BmsTestSkins.SkinKind>(value); break;
 
                 case "--long-note-mode": result.LongNoteMode = enumValue<BmsLongNoteMode>(value); break;
+
+                case "--invert-random-seed": result.InvertRandomSeed = int.Parse(value, CultureInfo.InvariantCulture); break;
 
                 case "--reference-bpm":
                     result.ReferenceBpm = enumValue<BmsReferenceBpmMode>(value);
@@ -82,6 +106,8 @@ internal sealed class BmsGameplayDiagnosticOptions
 
         if (filter != "gameplay")
             throw new ArgumentException("Select this diagnostic explicitly with --filter gameplay.");
+        if (result.InvertRandomSeed.HasValue && !result.Invert)
+            throw new ArgumentException("--invert-random-seed requires --invert.");
         if (!File.Exists(result.Chart))
             throw new ArgumentException("--chart must name an existing BMS file with its resources alongside it.");
         if (string.IsNullOrEmpty(result.Output))
@@ -90,6 +116,30 @@ internal sealed class BmsGameplayDiagnosticOptions
             throw new ArgumentException("Use an empty output directory to preserve previous measurements.");
 
         return result;
+    }
+
+    public Mod[] CreateMods()
+    {
+        var mods = new List<Mod>();
+        if (Invert)
+        {
+            mods.Add(new BmsModInvert
+            {
+                RandomiseLength = { Value = InvertRandomSeed.HasValue },
+                Seed = { Value = InvertRandomSeed },
+            });
+        }
+
+        Mod? mode = LongNoteMode switch
+        {
+            BmsLongNoteMode.LongNote => new BmsModLongNote(),
+            BmsLongNoteMode.ChargeNote => new BmsModChargeNote(),
+            BmsLongNoteMode.HellChargeNote => new BmsModHellChargeNote(),
+            _ => null,
+        };
+        if (mode != null)
+            mods.Add(mode);
+        return [.. mods];
     }
 
     private static T enumValue<T>(string value) where T : struct, Enum

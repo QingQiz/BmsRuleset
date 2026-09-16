@@ -8,11 +8,44 @@
       "duration": 180,
       "repeat": 3,
       "scrollSpeed": 8,
+      "updateHz": 0,
+      "drawHz": 0,
       "referenceBpm": "MainBpm",
       "skin": "Argon",
       "longNoteMode": "Undefined",
       "headless": false,
       "audioOutput": false
+    },
+    {
+      "name": "invert-ln-argon",
+      "chart": "D:/charts/replace-with-ordinary-chart.bms",
+      "start": 30,
+      "duration": 30,
+      "repeat": 3,
+      "invert": true,
+      "skin": "Argon",
+      "longNoteMode": "LongNote"
+    },
+    {
+      "name": "invert-cn-classic",
+      "chart": "D:/charts/replace-with-ordinary-chart.bms",
+      "start": 30,
+      "duration": 30,
+      "repeat": 3,
+      "invert": true,
+      "skin": "Classic",
+      "longNoteMode": "ChargeNote"
+    },
+    {
+      "name": "invert-hcn-legacy-random",
+      "chart": "D:/charts/replace-with-ordinary-chart.bms",
+      "start": 30,
+      "duration": 30,
+      "repeat": 3,
+      "invert": true,
+      "invertRandomSeed": 12345,
+      "skin": "Legacy",
+      "longNoteMode": "HellChargeNote"
     },
     {
       "name": "long-notes-hcn-legacy",

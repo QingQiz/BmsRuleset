@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -10,11 +11,13 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
-using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Storyboards;
 using osu.Game.Tests.Visual;
 
@@ -65,8 +68,6 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
             BranchRandomValueSelector = _ => 1,
             ReferenceBpmMode = options.ReferenceBpm,
         }.Convert();
-        if (options.LongNoteMode != BmsLongNoteMode.Undefined)
-            Chart.LockedLongNoteMode = options.LongNoteMode;
         BmsTestBeatmaps.SetupBeatmapInfo(Chart, ruleset);
         Chart.Metadata.Source = Path.GetDirectoryName(options.Chart)!;
         EndTime = Math.Min(Chart.BeatmapInfo.Length - 1000, (options.Start + options.Duration) * 1000);
@@ -83,7 +84,7 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         config.SetValue(BmsRulesetSetting.ScrollSpeed, options.ScrollSpeed);
         config.SetValue(BmsRulesetSetting.ReferenceBpmMode, options.ReferenceBpm);
         loading.Start();
-        LoadPlayer();
+        LoadPlayer(options.CreateMods());
     }
 
     protected override void Update()
@@ -110,6 +111,9 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         if (!Player.LoadedBeatmapSuccessfully)
             throw new InvalidOperationException("Player failed to load the chart.");
 
+        // Conversion mods replace object identities. Reports and completeness checks must use
+        // the same playable objects as the replay and score processor, including IN-generated LNs.
+        Chart = (BmsBeatmap)Player.GameplayState.Beatmap;
         LoadMilliseconds = loading.Elapsed.TotalMilliseconds;
         seekTime = Math.Max(0, options.Start * 1000 - 2000);
         Player.GameplayClockContainer.Stop();
@@ -136,9 +140,23 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         var fullPlayback = options.Start == 0 && EndTime >= Chart.BeatmapInfo.Length - 1000;
         var expected = Chart.HitObjects.Where(h => h is not BmsLandmine
             && (fullPlayback || h.StartTime >= options.Start * 1000 && h.GetEndTime() <= EndTime - 400)).ToHashSet();
-        var judged = Player.Results.Select(r => r.HitObject).Distinct().Count(h => h is BmsHitObject bms && expected.Contains(bms));
+        return CheckJudgementCompleteness(expected, Player.Results);
+    }
+
+    internal static string? CheckJudgementCompleteness(HashSet<BmsHitObject> expected, IReadOnlyList<JudgementResult> results)
+    {
+        var judged = results.Select(r => r.HitObject).Distinct().Count(h => h is BmsHitObject bms && expected.Contains(bms));
         if (judged != expected.Count)
             return $"Playback judged {judged} of {expected.Count} expected playable objects in the interval.";
+
+        // CN/HCN commit their head first and score the tail through a synthetic object. Seeing
+        // the source object alone is not enough to prove the whole long note was processed.
+        var endpoints = results.OfType<BmsLongNoteJudgementResult>().SelectMany(r => r.EndpointResults)
+                               .Where(e => e.Result == HitResult.Perfect).Select(e => (e.Source, e.Kind)).ToHashSet();
+        var incomplete = expected.OfType<BmsLongNote>().Count(ln =>
+            !endpoints.Contains((ln, BmsLongNoteEndpointKind.Head)) || !endpoints.Contains((ln, BmsLongNoteEndpointKind.Tail)));
+        if (incomplete > 0)
+            return $"Playback did not judge both endpoints perfectly for {incomplete} expected long notes in the interval.";
 
         return null;
     }

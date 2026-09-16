@@ -37,6 +37,7 @@ foreach ($case in $spec.cases) {
     foreach ($setting in @(
         @('start', '--start', 0), @('duration', '--duration', 30),
         @('scrollSpeed', '--scroll-speed', 8), @('referenceBpm', '--reference-bpm', 'MainBpm'),
+        @('updateHz', '--update-hz', 0), @('drawHz', '--draw-hz', 0),
         @('skin', '--skin', 'Argon'), @('longNoteMode', '--long-note-mode', 'Undefined')
     )) {
         $value = Get-Setting $case $setting[0] $setting[2]
@@ -44,6 +45,12 @@ foreach ($case in $spec.cases) {
     }
     if (Get-Setting $case 'headless' $false) { $captureArgs += '--headless' }
     if (Get-Setting $case 'audioOutput' $false) { $captureArgs += '--audio-output' }
+    if (Get-Setting $case 'invert' $false) { $captureArgs += '--invert' }
+    $invertSeed = Get-Setting $case 'invertRandomSeed' $null
+    if ($null -ne $invertSeed) {
+        if (!(Get-Setting $case 'invert' $false)) { throw 'invertRandomSeed requires invert: true.' }
+        $captureArgs += '--invert-random-seed', [Convert]::ToString($invertSeed, [Globalization.CultureInfo]::InvariantCulture)
+    }
     $plans += [pscustomobject]@{ Name = $case.name; Repeat = $repeat; Arguments = $captureArgs; Threshold = $threshold }
 }
 

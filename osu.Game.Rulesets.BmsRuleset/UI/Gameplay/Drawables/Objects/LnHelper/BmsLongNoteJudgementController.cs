@@ -22,6 +22,7 @@ internal sealed class BmsLongNoteJudgementController
     private const double passive_poor_lifetime_margin = 100;
     private const double tail_visibility_grace = 50;
     private readonly BmsHellChargeBodyTracker hellChargeTracker = new();
+    private readonly Action<bool, double> applyHellChargeTick;
 
     private IBmsLongNoteHooks hooks = null!;
     private BmsLongNote ln = null!;
@@ -32,6 +33,13 @@ internal sealed class BmsLongNoteJudgementController
     private bool headJudged;
     private double headJudgeOffset;
     private BmsLongNoteEndpointResult? pendingHeadEndpoint;
+
+    public BmsLongNoteJudgementController()
+    {
+        // HCN checks its body every frame. Reuse the callback while reading the current hooks
+        // so rebinding a lifetime entry to another pooled drawable cannot target the old one.
+        applyHellChargeTick = (holding, scale) => hooks.ApplyHellChargeTick(holding, scale);
+    }
 
     public void Bind(BmsLongNote hitObject, IBmsLongNoteHooks hooks)
     {
@@ -186,7 +194,7 @@ internal sealed class BmsLongNoteJudgementController
         if (chargeElapsed <= 0)
             return;
 
-        hellChargeTracker.Update(chargeElapsed, holding, (h, s) => hooks.ApplyHellChargeTick(h, s));
+        hellChargeTracker.Update(chargeElapsed, holding, applyHellChargeTick);
     }
 
     private void refreshMode()

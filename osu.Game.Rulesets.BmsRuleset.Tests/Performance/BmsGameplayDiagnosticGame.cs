@@ -5,11 +5,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using osu.Framework.Allocation;
 using osu.Framework.Configuration;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Platform;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
@@ -25,10 +27,17 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
     private readonly List<object> aliveSnapshots = [];
     private double nextSnapshot;
     private readonly List<object> memorySnapshots = [];
+    private readonly List<object> framePacingChanges = [];
+    private FramePacing? previousPacing;
+    private FrameworkConfigManager frameworkConfig = null!;
+    private Func<bool>? getVerticalSync;
 
     public int ResultCode { get; private set; } = 1;
 
     private readonly record struct Frame(double ChartMs, double SimulationMs, double UpdateMs, double IntervalMs, double GcPauseMs, long AllocatedBytes, int AliveObjects);
+
+    private readonly record struct FramePacing(bool WindowActive, double UpdateClockHz, bool UpdateThrottling,
+                                              double? DrawClockHz, bool? DrawThrottling, bool? RendererVerticalSync);
 
     protected override IDictionary<FrameworkSetting, object> GetFrameworkConfigDefaults() => new Dictionary<FrameworkSetting, object>
     {
@@ -41,6 +50,9 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
     [BackgroundDependencyLoader]
     private void load(FrameworkConfigManager config)
     {
+        frameworkConfig = config;
+        config.SetValue(FrameworkSetting.FrameSync, FrameSync.Unlimited);
+        config.SetValue(FrameworkSetting.ExecutionMode, ExecutionMode.MultiThreaded);
         // Keep real sample scheduling/mixing in the capture while making non-audio runs silent.
         // Explicitly override saved host settings as defaults alone do not mute an existing config.
         config.SetValue(FrameworkSetting.VolumeUniversal, options.AudioOutput ? 1.0 : 0.0);
@@ -48,6 +60,8 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
 
     public override void SetHost(GameHost host)
     {
+        // "Unlimited" otherwise retains the framework's 1000 Hz safety cap.
+        host.AllowBenchmarkUnlimitedFrames = true;
         Storage = host.GetStorage(Path.Combine(options.Output, "storage"));
         base.SetHost(host);
     }
@@ -55,13 +69,32 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
     protected override void LoadComplete()
     {
         base.LoadComplete();
-        Host.MaximumUpdateHz = Host.MaximumInactiveHz = 1000;
-        Host.MaximumDrawHz = 240;
+        // The renderer exposes its actual VSync state internally. Bind the read-only diagnostic
+        // accessor once so recording state changes does not box a reflection result each frame.
+        if (!options.Headless)
+            getVerticalSync = typeof(IRenderer).GetProperty("VerticalSync", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?
+                                              .GetGetMethod(true)?.CreateDelegate<Func<bool>>(Host.Renderer);
+        configureFramePacing();
         Add(scene = new BmsGameplayDiagnosticScene(options));
+    }
+
+    private void configureFramePacing()
+    {
+        // Display-mode changes may reapply the framework limiter. Also set each thread's
+        // inactive rate: a shared 1000 Hz inactive cap would silently increase a 240 Hz draw cap.
+        if (Host.MaximumUpdateHz != options.UpdateHz)
+            Host.MaximumUpdateHz = options.UpdateHz;
+        if (Host.MaximumInactiveHz != options.UpdateHz)
+            Host.MaximumInactiveHz = options.UpdateHz;
+        if (Host.MaximumDrawHz != options.DrawHz)
+            Host.MaximumDrawHz = options.DrawHz;
+        if (Host.DrawThread != null && Host.DrawThread.InactiveHz != options.DrawHz)
+            Host.DrawThread.InactiveHz = options.DrawHz;
     }
 
     public override bool UpdateSubTree()
     {
+        configureFramePacing();
         var start = Stopwatch.GetTimestamp();
         var allocated = GC.GetAllocatedBytesForCurrentThread();
         var gcPause = GC.GetTotalPauseDuration();
@@ -81,6 +114,14 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
 
         if (!scene.Ready || scene.ChartTime < options.Start * 1000)
             return updated;
+
+        var pacing = new FramePacing(Host.IsActive.Value, Host.UpdateThread.Clock.MaximumUpdateHz, Host.UpdateThread.Clock.Throttling,
+            Host.DrawThread?.Clock.MaximumUpdateHz, Host.DrawThread?.Clock.Throttling, getVerticalSync?.Invoke());
+        if (previousPacing != pacing)
+        {
+            framePacingChanges.Add(new { scene.ChartTime, Pacing = pacing });
+            previousPacing = pacing;
+        }
 
         initialCollections ??= [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
         if (previousFrame != 0)
@@ -138,6 +179,15 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
                 Renderer = Host.Renderer.GetType().FullName,
                 AudioOutput = options.Headless ? "no-sound-device" : options.AudioOutput ? "audible" : "muted-master",
                 MasterVolume = Audio?.Volume.Value,
+                FramePacing = new
+                {
+                    RequestedUpdateHz = options.UpdateHz,
+                    RequestedDrawHz = options.DrawHz,
+                    Host.AllowBenchmarkUnlimitedFrames,
+                    FrameSync = frameworkConfig?.Get<FrameSync>(FrameworkSetting.FrameSync).ToString(),
+                    ExecutionMode = frameworkConfig?.Get<ExecutionMode>(FrameworkSetting.ExecutionMode).ToString(),
+                    Changes = framePacingChanges,
+                },
                 Measurement = "Whole game UpdateSubTree CPU wall time; excludes draw-node generation, GPU work and throttle. Interval includes pacing. Headless skips GPU rendering. Seek simulation completes before two seconds of playback warmup.",
                 LoadMs = scene?.LoadMilliseconds,
                 SeekMs = scene?.SeekMilliseconds,
@@ -161,9 +211,13 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
     {
         var updates = source.Select(f => f.UpdateMs).Order().ToArray();
         var intervals = source.Select(f => f.IntervalMs).Order().ToArray();
+        var wallSeconds = intervals.Sum() / 1000;
+        var allocatedBytes = source.Sum(f => f.AllocatedBytes);
         return new
         {
             Frames = source.Count,
+            WallSeconds = wallSeconds,
+            ObservedUpdateHz = wallSeconds > 0 ? source.Count / wallSeconds : 0,
             FirstChartMs = source.Count == 0 ? 0 : source.First().ChartMs,
             LastChartMs = source.Count == 0 ? 0 : source.Last().ChartMs,
             UpdateP50Ms = percentile(updates, 0.5),
@@ -174,7 +228,9 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             IntervalMaxMs = intervals.LastOrDefault(),
             UpdatesOver8Ms = updates.Count(v => v > 8),
             UpdatesOver16Ms = updates.Count(v => v > 16.667),
-            AllocatedBytes = source.Sum(f => f.AllocatedBytes),
+            AllocatedBytes = allocatedBytes,
+            AllocatedBytesPerUpdate = source.Count > 0 ? (double)allocatedBytes / source.Count : 0,
+            AllocatedBytesPerSecond = wallSeconds > 0 ? allocatedBytes / wallSeconds : 0,
             GcPauseDuringUpdatesMs = source.Sum(f => f.GcPauseMs),
             PeakAliveObjects = source.Count == 0 ? 0 : source.Max(f => f.AliveObjects),
             MaxSimulationLagMs = source.Count == 0 ? 0 : source.Max(f => f.ChartMs - f.SimulationMs),

@@ -211,6 +211,22 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
+    public void TestHellChargeTicksFollowReboundHooks()
+    {
+        var (controller, originalHooks) = makeController(BmsLongNoteMode.HellChargeNote, 1000, 1000);
+        controller.TryHit(1000, HitResult.Perfect);
+        controller.UpdatePostResult(1250, 250, true);
+        var ln = originalHooks.AppliedJudgements.Single().endpoints.Single().Source;
+        var reboundHooks = new FakeLongNoteHooks();
+
+        controller.Bind(ln, reboundHooks);
+        controller.UpdatePostResult(1500, 250, true);
+
+        Assert.That(originalHooks.HellChargeTicks, Has.Count.EqualTo(1));
+        Assert.That(reboundHooks.HellChargeTicks.Single(), Is.EqualTo((true, BmsHellChargeBodyTracker.DEFAULT_TICK_SCALE)));
+    }
+
+    [Test]
     public void TestHcnTickAccruesWhileHoldingWithinBody()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.HellChargeNote, 1000, 500);
