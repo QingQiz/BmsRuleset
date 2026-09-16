@@ -68,6 +68,8 @@ public partial class TestSceneBmsPauseRewindCompletion : BmsPlayerTestScene
             Player.GameplayClockContainer.Seek(head_time);
             Player.GameplayClockContainer.Start();
         });
+        // A no-replay player cannot catch up after stopping; wait for simulation before freezing it.
+        AddUntilStep("simulation reaches head", () => Player.DrawableRuleset.FrameStableClock.CurrentTime >= head_time);
         AddStep("stop at head", () => Player.GameplayClockContainer.Stop());
         AddUntilStep("long note alive", () =>
             (initialDrawable = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().SingleOrDefault(d => d.HitObject is BmsLongNote)) != null);
@@ -81,6 +83,7 @@ public partial class TestSceneBmsPauseRewindCompletion : BmsPlayerTestScene
             Player.GameplayClockContainer.Seek(pause_time);
             Player.GameplayClockContainer.Start();
         });
+        AddUntilStep("simulation reaches pause", () => Player.DrawableRuleset.FrameStableClock.CurrentTime >= pause_time);
         AddStep("pause", () => Player.Pause());
         AddStep("capture judgement count", () => judgementsAtPause = Player.ScoreProcessor.JudgedHits);
         AddStep("resume", () => Player.Resume());

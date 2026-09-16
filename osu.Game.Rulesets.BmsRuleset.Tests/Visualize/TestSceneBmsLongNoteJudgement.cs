@@ -116,11 +116,8 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
             CaseSnapshot afterReleasedBody = default;
             CaseSnapshot afterTail = default;
 
-            AddStep($"seek {index + 1:00}: {cases[index].Text}", () =>
-            {
-                var startTime = first_case_time + index * case_spacing;
-                Player.GameplayClockContainer.Seek(startTime - text_lead_time - 50);
-            });
+            var startTime = first_case_time + index * case_spacing;
+            advanceTo($"before {index + 1:00}: {cases[index].Text}", startTime - text_lead_time - 50);
             AddStep($"capture baseline {index + 1:00}", () =>
             {
                 Player.HealthProcessor.Health.Value = 0.5;
@@ -129,23 +126,15 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
             if (firstFastReleaseCheckOffset(cases[index], mode) is { } visibilityCheckOffset)
             {
-                AddUntilStep($"fast release visual state {index + 1:00}", () =>
-                {
-                    var startTime = first_case_time + index * case_spacing;
-                    return Player.GameplayClockContainer.CurrentTime >= startTime + visibilityCheckOffset;
-                });
+                advanceTo($"fast release visual state {index + 1:00}", startTime + visibilityCheckOffset);
                 AddAssert($"fast release visibility {index + 1:00}", () =>
                         isCaseLongNoteAlive(index), $"{modeName} {cases[index].Text}: beatoraja keeps the LN body drawn until the tail passes");
             }
 
             if (cases[index].FirstRepressOffsetAfterFirstRelease is { } repressOffset)
             {
-                AddUntilStep($"first release judged {index + 1:00}", () =>
-                {
-                    var firstReleaseOffset = cases[index].FirstReleaseOffsetAfter(cases[index].FirstPressOffset!.Value, onlyBeforeTail: false)!.Value;
-                    var startTime = first_case_time + index * case_spacing;
-                    return Player.GameplayClockContainer.CurrentTime >= startTime + firstReleaseOffset + 50;
-                });
+                var firstReleaseOffset = cases[index].FirstReleaseOffsetAfter(cases[index].FirstPressOffset!.Value, onlyBeforeTail: false)!.Value;
+                advanceTo($"first release judged {index + 1:00}", startTime + Math.Max(firstReleaseOffset + 50, visibilityCheckOffsetFor(cases[index], mode)));
                 AddStep($"assert first release {index + 1:00}", () =>
                 {
                     var expected = expectedFor(cases[index], mode);
@@ -159,11 +148,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
                 if (mode == BmsLongNoteMode.HellChargeNote && cases[index].TestsHellChargeReleaseRecovery)
                 {
-                    AddUntilStep($"hcn released body damages {index + 1:00}", () =>
-                    {
-                        var startTime = first_case_time + index * case_spacing;
-                        return Player.GameplayClockContainer.CurrentTime >= startTime + repressOffset - 50;
-                    });
+                    advanceTo($"hcn released body damages {index + 1:00}", startTime + repressOffset - 50);
                     AddStep($"assert hcn released damage {index + 1:00}", () =>
                     {
                         afterReleasedBody = takeSnapshot();
@@ -173,11 +158,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
                     });
                 }
 
-                AddUntilStep($"repress does not rejudge {index + 1:00}", () =>
-                {
-                    var startTime = first_case_time + index * case_spacing;
-                    return Player.GameplayClockContainer.CurrentTime >= startTime + repressOffset + 50;
-                });
+                advanceTo($"repress does not rejudge {index + 1:00}", startTime + repressOffset + 50);
                 AddStep($"assert repress no-op {index + 1:00}", () =>
                 {
                     var snapshotAfterRepress = takeSnapshot();
@@ -189,11 +170,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
                 if (mode == BmsLongNoteMode.HellChargeNote && cases[index].TestsHellChargeReleaseRecovery)
                 {
-                    AddUntilStep($"hcn repress recovers {index + 1:00}", () =>
-                    {
-                        var startTime = first_case_time + index * case_spacing;
-                        return Player.GameplayClockContainer.CurrentTime >= startTime + long_note_duration - 50;
-                    });
+                    advanceTo($"hcn repress recovers {index + 1:00}", startTime + long_note_duration - 50);
                     AddStep($"assert hcn repress recovery {index + 1:00}", () =>
                     {
                         var snapshotAfterRecovery = takeSnapshot();
@@ -206,21 +183,13 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
             if (mode == BmsLongNoteMode.HellChargeNote && cases[index].TestsHellChargePostTailStop)
             {
-                AddUntilStep($"hcn post-tail baseline {index + 1:00}", () =>
-                {
-                    var startTime = first_case_time + index * case_spacing;
-                    return Player.GameplayClockContainer.CurrentTime >= startTime + long_note_duration + 60;
-                });
+                advanceTo($"hcn post-tail baseline {index + 1:00}", startTime + long_note_duration + 60);
                 AddStep($"capture hcn post-tail {index + 1:00}", () =>
                 {
                     afterTail = takeSnapshot();
                     Assert.That(isCaseLongNoteAlive(index), Is.False, $"{modeName} {cases[index].Text}: beatoraja stops drawing HCN after the tail passes");
                 });
-                AddUntilStep($"hcn post-tail stable {index + 1:00}", () =>
-                {
-                    var startTime = first_case_time + index * case_spacing;
-                    return Player.GameplayClockContainer.CurrentTime >= startTime + long_note_duration + post_tail_stability_delay;
-                });
+                advanceTo($"hcn post-tail stable {index + 1:00}", startTime + long_note_duration + post_tail_stability_delay);
                 AddStep($"assert hcn post-tail no body tick {index + 1:00}", () =>
                 {
                     var snapshotAfterPostTailWait = takeSnapshot();
@@ -230,11 +199,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
                 });
             }
 
-            AddUntilStep($"finish {index + 1:00}", () =>
-            {
-                var startTime = first_case_time + index * case_spacing;
-                return Player.GameplayClockContainer.CurrentTime >= startTime + long_note_duration + cleanup_release_delay + 100;
-            });
+            advanceTo($"finish {index + 1:00}", startTime + long_note_duration + cleanup_release_delay + 100);
             AddStep($"assert {index + 1:00}", () =>
             {
                 var expected = expectedFor(cases[index], mode);
@@ -242,6 +207,21 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
                 Assert.That(isCaseLongNoteAlive(index), Is.False, $"{modeName} {cases[index].Text}: long note should be gone after the tail-side lifetime");
             });
         }
+    }
+
+    private static double visibilityCheckOffsetFor(LongNoteVisualCase testCase, BmsLongNoteMode mode)
+        => firstFastReleaseCheckOffset(testCase, mode) ?? double.NegativeInfinity;
+
+    private void advanceTo(string description, double time)
+    {
+        // The audio clock can reach a checkpoint while frame-stable simulation is still catching up.
+        // Freeze the target so assertions observe exactly one state regardless of test-runner speed.
+        AddStep(description, () =>
+        {
+            Player.GameplayClockContainer.Stop();
+            Player.GameplayClockContainer.Seek(time);
+        });
+        AddUntilStep($"simulation reached {description}", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < 0.001);
     }
 
     public static IList<ReplayFrame> CreateLongNoteReplayFrames(BmsBeatmap beatmap)
@@ -970,12 +950,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         AddStep("load player in CN mode", () => LoadPlayer([new BmsModChargeNote()]));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
-        AddStep("seek held note after tail", () =>
-        {
-            const double start_time = first_case_time + no_release_case_index * case_spacing;
-            Player.GameplayClockContainer.Seek(start_time + long_note_duration + 260);
-            Player.GameplayClockContainer.Stop();
-        });
+        advanceTo("seek held note after tail", first_case_time + no_release_case_index * case_spacing + long_note_duration + 260);
         AddUntilStep("held long note alive", () => getCaseLongNote(no_release_case_index)?.Alpha > 0);
         AddStep("assert tail moved below judgement line without body reversal", () =>
         {
@@ -1003,18 +978,14 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         AddStep("load player in LN mode", () => LoadPlayer([new BmsModLongNote()]));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
-        AddStep("seek after fast press but before head time", () =>
-        {
-            Player.GameplayClockContainer.Seek(start_time - 40);
-            Player.GameplayClockContainer.Stop();
-        });
+        advanceTo("seek after fast press but before head time", start_time - 40);
         AddUntilStep("fast-hit long note alive", () => getCaseLongNote(fast_press_case_index)?.Alpha > 0);
         AddAssert("fast-hit head remains above judgement line", () =>
         {
             var longNote = getCaseLongNote(fast_press_case_index);
             return longNote != null && headBottomOf(longNote) < Playfield.JudgementLineY() - 1;
         });
-        AddStep("seek past head time", () => Player.GameplayClockContainer.Seek(start_time + 20));
+        advanceTo("seek past head time", start_time + 20);
         AddUntilStep("held head reaches judgement line", () =>
         {
             var longNote = getCaseLongNote(fast_press_case_index);
@@ -1033,11 +1004,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
         AddStep("set visual offset", () => Playfield.VisualOffset.Value = visualOffset);
-        AddStep("seek after head time", () =>
-        {
-            Player.GameplayClockContainer.Seek(start_time + 20);
-            Player.GameplayClockContainer.Stop();
-        });
+        advanceTo("seek after head time", start_time + 20);
         AddUntilStep("fast-hit long note alive", () => getCaseLongNote(fast_press_case_index)?.Alpha > 0);
         AddUntilStep("visual offset moves held head", () =>
         {
@@ -1072,11 +1039,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         AddStep("load player in LN mode", () => LoadPlayer([new BmsModLongNote()]));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
-        AddStep("seek after fast release", () =>
-        {
-            Player.GameplayClockContainer.Seek(start_time + 700);
-            Player.GameplayClockContainer.Stop();
-        });
+        advanceTo("seek after fast release", start_time + 700);
         AddUntilStep("long note enters released state", () =>
         {
             var longNote = getCaseLongNote(very_fast_release_case_index);
