@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
@@ -116,6 +117,7 @@ internal partial class BmsCourseSessionScreen : ScreenWithBeatmapBackground
 internal partial class BmsCoursePlayer : SoloPlayer
 {
     private readonly BmsCourseSession session;
+    private bool abortScorePending;
 
     internal BmsCoursePlayer(BmsCourseSession session)
         : base(new PlayerConfiguration
@@ -190,15 +192,52 @@ internal partial class BmsCoursePlayer : SoloPlayer
 
     public override bool OnExiting(ScreenExitEvent e)
     {
-        if (session.CanContinue && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
+        if (abortScorePending)
+            return true;
+
+        if (LoadedBeatmapSuccessfully && session.CanContinue && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
         {
+            abortScorePending = true;
+            GameplayClockContainer.Stop();
+            DrawableRuleset.SetRecordTarget(null);
             ScoreProcessor.PopulateScore(Score.ScoreInfo);
             ScoreProcessor.FailScore(Score.ScoreInfo);
             Score.ScoreInfo.Date = DateTimeOffset.Now;
-            session.AbortCurrentStage(Score.ScoreInfo, currentGaugeStates);
+
+            // Course history resolves each stage from the score database. The normal player
+            // skips importing aborted plays, so finish this import before recording the course.
+            _ = importAbortedScore(Score.DeepClone(), currentGaugeStates.ToArray());
+            return true;
         }
 
         return base.OnExiting(e);
+    }
+
+    private async Task importAbortedScore(Score score, IReadOnlyList<Scoring.Gauge.BmsGaugeStateSnapshot> gaugeStates)
+    {
+        var imported = false;
+
+        try
+        {
+            await Task.Run(() => ImportScore(score)).ConfigureAwait(false);
+            imported = true;
+        }
+        catch (Exception exception)
+        {
+            BmsLogger.Error(exception, "Failed to import an aborted BMS course score.");
+        }
+
+        Scheduler.Add(() =>
+        {
+            if (imported)
+                session.AbortCurrentStage(score.ScoreInfo, gaugeStates);
+            else
+                session.AbortCurrentStageWithoutScore();
+
+            abortScorePending = false;
+            if (this.IsCurrentScreen())
+                this.Exit();
+        });
     }
 
     private IReadOnlyList<Scoring.Gauge.BmsGaugeStateSnapshot> currentGaugeStates =>

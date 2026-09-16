@@ -325,13 +325,11 @@ internal partial class BmsCourseHistoryArea : VisibilityContainer
 
     }
 
-    private void courseResultChanged(string courseId) => Scheduler.Add(() =>
-    {
-        if (selectedCourse.Value?.Id == courseId)
-            requestRefresh();
-    });
+    // An empty history is hidden, so its scheduler cannot wake it for the first result.
+    // The controller consumes this flag on the update thread, including while we are hidden.
+    private void courseResultChanged(string courseId) => refreshPending = true;
 
-    private void resultStoreChanged() => Scheduler.Add(requestRefresh);
+    private void resultStoreChanged() => refreshPending = true;
 
     private void requestRefresh()
     {
