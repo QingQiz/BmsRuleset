@@ -11,9 +11,11 @@ using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Game.Database;
+using osu.Game.Online.Spectator;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
+using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Menu;
@@ -55,6 +57,8 @@ public static class BmsReplayPatcher
             var mainMenuLogoArrivingPrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(mainMenuLogoArrivingPrefix));
             var performFromScreenTarget = AccessTools.Method(typeof(OsuGame), nameof(OsuGame.PerformFromScreen), [typeof(Action<IScreen>), typeof(IEnumerable<Type>)]);
             var performFromScreenPrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(performFromScreenPrefix));
+            var spectatorHandleFrameTarget = AccessTools.Method(typeof(SpectatorClient), nameof(SpectatorClient.HandleFrame), [typeof(ReplayFrame)]);
+            var spectatorHandleFramePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(spectatorHandleFramePrefix));
 
             playerScoreManagerProperty = AccessTools.Property(typeof(Player), "scoreManager");
             modelManagerRealmProperty = AccessTools.Property(typeof(ModelManager<ScoreInfo>), "Realm");
@@ -77,6 +81,8 @@ public static class BmsReplayPatcher
                 (name: "BmsReplayPatcher.mainMenuLogoArrivingPrefix", member: mainMenuLogoArrivingPrefixMethod),
                 (name: "OsuGame.PerformFromScreen", member: performFromScreenTarget),
                 (name: "BmsReplayPatcher.performFromScreenPrefix", member: performFromScreenPrefixMethod),
+                (name: "SpectatorClient.HandleFrame", member: spectatorHandleFrameTarget),
+                (name: "BmsReplayPatcher.spectatorHandleFramePrefix", member: spectatorHandleFramePrefixMethod),
                 (name: "Player.scoreManager", member: playerScoreManagerProperty),
                 (name: "ModelManager<ScoreInfo>.Realm", member: modelManagerRealmProperty),
                 (name: "RealmArchiveModelImporter<ScoreInfo>.Files", member: scoreImporterFilesField),
@@ -98,6 +104,7 @@ public static class BmsReplayPatcher
             harmony.Patch(replayFailIndicatorDisposeTarget, prefix: new HarmonyMethod(replayFailIndicatorDisposePrefixMethod));
             harmony.Patch(mainMenuLogoArrivingTarget, prefix: new HarmonyMethod(mainMenuLogoArrivingPrefixMethod));
             harmony.Patch(performFromScreenTarget, prefix: new HarmonyMethod(performFromScreenPrefixMethod));
+            harmony.Patch(spectatorHandleFrameTarget, prefix: new HarmonyMethod(spectatorHandleFramePrefixMethod));
             IsInstalled = true;
         }
         catch (Exception e)
@@ -147,6 +154,13 @@ public static class BmsReplayPatcher
     });
 
     // ReSharper disable InconsistentNaming
+    private static bool spectatorHandleFramePrefix(ReplayFrame frame)
+    {
+        // BMS frames cannot be uploaded through the official spectator protocol. Local recording
+        // has already saved the frame; skipping here also avoids scheduling a log for every frame.
+        return frame is not BmsReplayFrame;
+    }
+
     private static void importScorePostfix(Player __instance, Score score, ref Task __result)
     {
         if (!isBmsScore(score.ScoreInfo))
