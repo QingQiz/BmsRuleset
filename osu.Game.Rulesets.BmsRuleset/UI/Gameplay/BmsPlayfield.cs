@@ -59,6 +59,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         skinCache = new BmsGameplaySkinCache(activeSkin);
 
         TotalColumns = Math.Max(1, beatmap.TotalColumns);
+        InitialPoolSizes = BmsHitObjectPoolPlan.Create(beatmap.HitObjects, TotalColumns);
         LayoutVariant = beatmap.LayoutVariant;
         TimingMap = beatmap.TimingMap;
         ScrollController = new BmsGameplayScrollController(TimingMap);
@@ -136,6 +137,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     #region Public properties
 
     public int TotalColumns { get; }
+
+    internal BmsHitObjectPoolPlan.ColumnSizes[] InitialPoolSizes { get; }
 
     public BmsLayoutVariant LayoutVariant { get; }
 

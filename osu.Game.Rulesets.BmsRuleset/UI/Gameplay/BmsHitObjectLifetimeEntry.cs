@@ -52,7 +52,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     ///     Mines only need a single frame to check whether the column is pressed; after that they
     ///     can die shortly afterwards. A 100 ms past-lifetime keeps the check reliable across frame boundaries.
     /// </summary>
-    private const double mine_past_lifetime = 100;
+    internal const double MINE_PAST_LIFETIME = 100;
 
     /// <summary>
     ///     Step-size used when probing backwards from StartTime to find the earliest visible frame.
@@ -98,7 +98,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
         // MaxValue that the framework may latch on to before the follow-up
         // LifetimeEnd set corrects it.
         LifetimeEnd = hitObject is BmsLandmine
-            ? hitObject.StartTime + mine_past_lifetime
+            ? hitObject.StartTime + MINE_PAST_LIFETIME
             : hitObject.GetEndTime() + Math.Max(pastLifetime, slowWindow + lifetime_margin);
         LifetimeStart = lifetimeStart;
 
@@ -245,6 +245,15 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
     private bool isVisibleAt(BmsHitObject hitObject, BmsTimingMap timingMap, double time)
     {
+        if (hitObject is BmsLandmine)
+        {
+            // Reverse-scroll mine art can lie many screens below the judgement line long before
+            // its first appearance. A one-sided test keeps tens of thousands of those mines alive.
+            // Keep a full screen of slack below the line for skin geometry and either SPEED sign.
+            var progress = hitObject.ScrollPositionAtStartTime - timingMap.GetScrollPositionAtTime(time);
+            return Math.Abs(progress) <= visibleScrollDistanceAt(timingMap, time);
+        }
+
         if (isVisibleAtPosition(hitObject.ScrollPositionAtStartTime, timingMap, time))
             return true;
 

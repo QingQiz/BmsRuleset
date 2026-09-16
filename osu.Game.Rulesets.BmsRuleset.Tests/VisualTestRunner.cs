@@ -10,6 +10,7 @@ using osu.Framework;
 using osu.Framework.Configuration;
 using osu.Framework.Platform;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
+using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 using osu.Game.Tests;
 
@@ -20,6 +21,26 @@ public static class VisualTestRunner
     [STAThread]
     public static int Main(string[] args)
     {
+        if (args.FirstOrDefault() == "--gameplay-diagnostic")
+        {
+            var options = BmsGameplayDiagnosticOptions.Parse(args.Skip(1).ToArray());
+            using var diagnosticHost = options.Headless
+                ? new HeadlessGameHost("bms-gameplay-diagnostic", realtime: true)
+                : Host.GetSuitableDesktopHost("bms-gameplay-diagnostic");
+            var diagnostic = new BmsGameplayDiagnosticGame(options);
+            try
+            {
+                diagnosticHost.Run(diagnostic);
+            }
+            catch (Exception error)
+            {
+                diagnostic.Finish(error.ToString());
+                Console.Error.WriteLine(error);
+            }
+
+            return diagnostic.ResultCode;
+        }
+
         if (args.FirstOrDefault() == "--leaderboard-preview")
         {
             using var previewHost = Host.GetSuitableDesktopHost("bms-leaderboard-preview");

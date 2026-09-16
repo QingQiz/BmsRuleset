@@ -87,6 +87,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
     private readonly List<(DrawableBmsHitObject Drawable, BmsJudgementCandidate Candidate)> pressCandidates = [];
     private readonly List<BmsJudgementCandidate> pressJudgementCandidates = [];
 
+    internal BmsHitObjectPoolPlan.ColumnSizes InitialPoolSizes => ParentPlayfield.InitialPoolSizes[Index];
+
     [Resolved]
     private ISkinSource skin { get; set; } = null!;
 

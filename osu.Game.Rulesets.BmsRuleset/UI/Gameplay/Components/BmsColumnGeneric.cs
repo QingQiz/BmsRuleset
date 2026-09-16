@@ -13,8 +13,8 @@ public sealed partial class BmsColumnGeneric<TCol>(int index, BmsPlayfield playf
     [BackgroundDependencyLoader]
     private void load()
     {
-        RegisterPool<BmsNote, DrawableBmsNote<TCol>>(64, int.MaxValue);
-        RegisterPool<BmsLongNote, DrawableBmsLongNote<TCol>>(32, int.MaxValue);
-        RegisterPool<BmsLandmine, DrawableBmsLandmine<TCol>>(32, int.MaxValue);
+        RegisterPool<BmsNote, DrawableBmsNote<TCol>>(InitialPoolSizes.Notes, int.MaxValue);
+        RegisterPool<BmsLongNote, DrawableBmsLongNote<TCol>>(InitialPoolSizes.LongNotes, int.MaxValue);
+        RegisterPool<BmsLandmine, DrawableBmsLandmine<TCol>>(InitialPoolSizes.Mines, int.MaxValue);
     }
 }

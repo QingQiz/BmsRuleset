@@ -37,6 +37,17 @@ dotnet build osu.Game.Rulesets.BmsRuleset -c Release
 The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets.BmsRuleset.dll`. Install it using the
 [README installation steps](../README.md#installation).
 
+## Gameplay Performance
+
+For reusable real Player profiling across charts, skins and long-note modes, see [Gameplay performance template (中文)](gameplay-diagnostic.zh-CN.md).
+
+- Visual culling must preserve passive misses, HCN health ticks and column-owned mine judgements. Long-note visibility must include the full head-to-tail span and a held head's pinned position; rewind and pool reuse must restore visual state.
+- Pool prewarming estimates residence at the default scroll speed. Its weighted budget limits loading-time allocations; pools can still grow under STOP, reverse scrolling and custom speeds. It is not a runtime memory cap.
+- Judgement tests must synchronise with `FrameStableClock`, not only the playback clock. Replay checkpoints stop, seek and wait for simulation; players without replay must catch up before stopping.
+- Mine visibility searches use discrete time steps and can miss very short visible intervals. Synthetic test skins do not cover every custom skin's dimensions or animations, so unusual skins need explicit regression captures.
+
+All active objects are still traversed each frame. Mass activation and pool return can cause spikes through object unbinding, subtree invalidation and allocation. Further optimisation should separate judgement lifetime from visual resource lifetime while preserving judgement and rewind timing.
+
 ## Not Yet Implemented
 
 | Area          | What is missing                                                                          | Priority |
@@ -75,4 +86,4 @@ The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets
 | **Skin**      | `HitGreat` → `HitGreatSlow` / `HitGreatFast` split images                                |
 | **Skin**      | E-POOR judgement image                                                                   | 3        |
 | **UI**        | Lane cover / skin / movement                                                             | 2        |
-| **Perf**      | Unstable frame rate when disposing of many mines                                   | 4        |
+| **Perf**      | Frame spikes during mass gameplay object activation and pool return                       | 4        |

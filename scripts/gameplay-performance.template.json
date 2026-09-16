@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "ordinary-full",
+      "chart": "D:/charts/replace-with-ordinary-chart.bms",
+      "start": 0,
+      "duration": 180,
+      "repeat": 3,
+      "scrollSpeed": 8,
+      "referenceBpm": "MainBpm",
+      "skin": "Argon",
+      "longNoteMode": "Undefined",
+      "headless": false,
+      "audioOutput": false
+    },
+    {
+      "name": "long-notes-hcn-legacy",
+      "chart": "D:/charts/replace-with-long-note-chart.bml",
+      "start": 30,
+      "duration": 30,
+      "repeat": 3,
+      "skin": "Legacy",
+      "longNoteMode": "HellChargeNote",
+      "maxUpdateP99Ms": 8
+    }
+  ]
+}

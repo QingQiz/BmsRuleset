@@ -217,6 +217,30 @@ public partial class BmsGameplayVirtualisationTest
     }
 
     [Test]
+    public void TestReverseScrollMineDoesNotStayAliveWhileFarBelowViewport()
+    {
+        var timingMap = new BmsTimingMap(192,
+            Enumerable.Range(0, 8).Select(i => new BmsMeasureInfo(i, i * 192, 192, 1)),
+            [new BmsBpmEvent(0, 120, 0)], [], [new BmsScrollEvent(0, -1, 0)], [], 120);
+        var mine = new BmsLandmine { StartTime = 10000, Column = 1 };
+        mine.ScrollPositionAtStartTime = timingMap.GetScrollPositionAtTime(mine.StartTime);
+        var beatmap = attachBeatmap(new BmsBeatmap
+        {
+            TotalColumns = 8,
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TimingMap = timingMap,
+            HitObjects = { mine },
+        });
+        var playfield = new BmsPlayfield(beatmap);
+        playfield.Add(mine);
+        playfield.RefreshAllLifetimes();
+
+        var entry = playfield.Stage.Columns[1].HitObjectContainer.Entries.Single();
+        Assert.That(entry.LifetimeStart, Is.EqualTo(mine.StartTime - BmsDrawableRuleset.ComputeScrollTime(8)).Within(1));
+        Assert.That(entry.LifetimeEnd, Is.EqualTo(mine.StartTime + 100));
+    }
+
+    [Test]
     public void TestPositiveVisualOffsetStartsLifetimeEarlier()
     {
         var hitObject = new BmsHitObject

@@ -70,16 +70,18 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             var offset = (float)((startPosition - currentScrollPos) * scale);
             var y = -(hitTarget + offset);
 
-            note.Y = y;
-
             if (note is ILongNoteHolder ln && hitObject is BmsLongNote longNote)
             {
                 var endPosition = double.IsNaN(longNote.VisualScrollPositionAtEndTime)
                     ? longNote.ScrollPositionAtEndTime
                     : longNote.VisualScrollPositionAtEndTime;
                 var endOffset = (float)((endPosition - currentScrollPos) * scale);
-                ln.UpdateBodyGeometry(y, -(hitTarget + endOffset));
+                var endY = -(hitTarget + endOffset);
+                note.UpdateVisualPosition(y, DrawHeight, endY);
+                ln.UpdateBodyGeometry(y, endY);
             }
+            else
+                note.UpdateVisualPosition(y, DrawHeight);
 
             // Keeping judgement controllers frozen avoids replaying misses or resetting an active long note.
             if (!resumeRewinding && note.RequiresColumnFrameUpdate)

@@ -33,8 +33,6 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
             ApplyResult(HitResult.Meh);
     }
 
-    protected override void UpdateInitialTransforms() => Alpha = 1;
-
     protected override void UpdateHitStateTransforms(ArmedState state)
     {
         if (state != ArmedState.Hit)

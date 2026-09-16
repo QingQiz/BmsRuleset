@@ -10,21 +10,32 @@ public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCo
 
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Mine;
 
-    // ReSharper disable once ConvertToAutoPropertyWithPrivateSetter
-    protected override bool SkipFurtherUpdates => mineHandled;
+    // The column owns detonation; a culled mine has no passive POOR check to preserve.
+    protected override bool UsesPassiveResultCheck => false;
+
+    protected override bool SkipFurtherUpdates => mineHandled && Time.Current >= HitObject.StartTime;
 
     private bool mineHandled;
+
+    internal override bool RequiresColumnFrameUpdate => !SkipFurtherUpdates;
 
     protected override void ResetKindState() => mineHandled = false;
 
     protected override bool UpdateKindState()
     {
+        if (mineHandled && Time.Current < HitObject.StartTime)
+        {
+            // A backwards seek can revisit a handled mine before its drawable returns to the pool.
+            mineHandled = false;
+            Alpha = 1;
+        }
+
         if (Judged || mineHandled || Time.Current < HitObject.StartTime)
             return false;
 
         mineHandled = true;
 
-        if (ParentColumn?.IsPressed == true)
+        if (ParentColumn?.IsPressed == true && Time.Current < HitObject.StartTime + BmsHitObjectLifetimeEntry.MINE_PAST_LIFETIME)
         {
             ParentColumn?.DetonateLandmine(HitObject);
             ApplyResult(HitResult.Meh);

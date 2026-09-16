@@ -1,3 +1,4 @@
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -17,17 +18,58 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
 public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObject>
 {
+    private bool visualsSuppressed;
+
+    public override bool IsPresent => !visualsSuppressed && base.IsPresent;
+
+    internal bool VisualsSuppressed => visualsSuppressed;
+
+    public override bool UpdateSubTree()
+    {
+        var updated = base.UpdateSubTree();
+        // CompositeDrawable skips UpdateAfterChildren when culled. Passive judgements must
+        // still run at the same point in the column traversal, rather than waiting for OnKilled.
+        if (UsesPassiveResultCheck && visualsSuppressed && IsLoaded)
+            UpdateResult(false);
+        return updated;
+    }
+
+    internal void UpdateVisualPosition(float y, float columnHeight, float? endY = null)
+    {
+        var headY = GetVisualHeadY(y, endY ?? y);
+        // The full head-to-tail interval includes long-note bodies spanning the viewport.
+        // Oversized skin art needs more slack than a fixed number of screens.
+        var padding = Math.Max(columnHeight, VisualHeight);
+        var suppress = SkipFurtherUpdates || Math.Max(headY, endY ?? headY) < -columnHeight - padding
+                                          || Math.Min(headY, endY ?? headY) > padding;
+        if (visualsSuppressed != suppress)
+        {
+            visualsSuppressed = suppress;
+            Invalidate(Invalidation.Presence);
+        }
+
+        if (!suppress)
+        {
+            ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
+            Y = y;
+        }
+    }
+
+    protected virtual float GetVisualHeadY(float y, float endY) => y;
+
+    protected virtual float VisualHeight => 0;
+
     protected abstract BmsSkinComponents SkinComponent { get; }
 
     protected virtual bool SkipFurtherUpdates => false;
 
     protected virtual bool RequiresResultBeforeKindPostState => false;
 
+    protected virtual bool UsesPassiveResultCheck => true;
+
     internal virtual bool RequiresColumnFrameUpdate => true;
 
     protected BmsLayoutVariant LayoutVariant => ParentColumn?.LayoutVariant ?? HitObject?.Beatmap.LayoutVariant ?? BmsLayoutVariant.Bme7K;
-
-    protected float HitTargetPosition => ParentColumn?.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION;
 
     protected double ScrollSpeedMultiplier => ParentColumn?.ScrollSpeedMultiplier ?? 1;
 
@@ -79,6 +121,9 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
     }
 
+    // BMS objects appear immediately; a zero-duration fade only adds transform tracking and cleanup.
+    protected override void UpdateInitialTransforms() => Alpha = 1;
+
     internal void ApplyNoteHeightScale(float scale)
     {
         if (scale == appliedNoteHeightScale)
@@ -110,6 +155,12 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     protected override void OnApply()
     {
         base.OnApply();
+        if (visualsSuppressed)
+        {
+            visualsSuppressed = false;
+            Invalidate(Invalidation.Presence);
+        }
+
         Alpha = 1;
         ResetKindState();
     }
@@ -168,5 +219,19 @@ public abstract partial class DrawableBmsHitObject<TCol> : DrawableBmsHitObject
         AddInternal(NoteContainer);
     }
 
-    protected float NoteVisualHeight => cachedSkinnableDrawable?.Drawable.DrawHeight ?? 0;
+    protected float NoteVisualHeight
+    {
+        get
+        {
+            var drawable = cachedSkinnableDrawable?.Drawable;
+            if (drawable == null)
+                return 0;
+
+            // Width-relative skins still have an absolute height. Querying DrawHeight also resolves
+            // the parent's width layout, needlessly waking culled skin trees on every frame.
+            return (drawable.RelativeSizeAxes & Axes.Y) == 0 ? drawable.Height : drawable.DrawHeight;
+        }
+    }
+
+    protected override float VisualHeight => NoteVisualHeight * (ParentColumn?.NoteHeightScale ?? 1);
 }

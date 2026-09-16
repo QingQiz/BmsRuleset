@@ -75,19 +75,15 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     /// </summary>
     public void UpdateBodyGeometry(float headY, float endY)
     {
+        if (VisualsSuppressed)
+        {
+            bodyGeometryValid = false;
+            return;
+        }
+
         const float max_piece_height = 4096;
         var holdingBody = isHoldingBody();
-        var visualOffset = ParentColumn?.VisualOffset ?? 0;
-
-        visualState.UpdateHeadYAtStartTime(headY, Time.Current, HitObject.StartTime, visualOffset);
-
-        if (holdingBody)
-        {
-            // Like mania, a fast hit must not stretch the LN by fixing its head
-            // before the chart time reaches it.
-            var canPinHead = Time.Current >= HitObject.StartTime;
-            headY = visualState.ResolveHeldHeadY(headY, endY, canPinHead, bodyDirectionBeforeTailPasses);
-        }
+        headY = GetVisualHeadY(headY, endY);
 
         var myY = Y;
         var headOffset = headY - myY;
@@ -155,6 +151,15 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             longNoteTail.Height = Height;
 
         longNoteTail.Alpha = releasedFast ? released_alpha : 1f;
+    }
+
+    protected override float GetVisualHeadY(float y, float endY)
+    {
+        // Observe positions even while culled so a held head can re-enter at its pinned position.
+        visualState.UpdateHeadYAtStartTime(y, Time.Current, HitObject.StartTime, ParentColumn?.VisualOffset ?? 0);
+        return isHoldingBody()
+            ? visualState.ResolveHeldHeadY(y, endY, Time.Current >= HitObject.StartTime, bodyDirectionBeforeTailPasses)
+            : y;
     }
 
     protected override void ResetKindState()
