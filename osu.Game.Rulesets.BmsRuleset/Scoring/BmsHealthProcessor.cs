@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -47,6 +48,14 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     private readonly List<GaugeState> gaugeStates = [];
     private readonly List<BmsGaugeHistoryEvent> gaugeHistory = [];
+    private readonly List<(double Time, bool Failed, bool EverFailed)> rewindHistory = [];
+    private IReadOnlyList<BmsGaugeStateSnapshot>? initialGaugeStates;
+
+    // The framework only restores this flag from a drawable result. Body ticks and Empty POORs
+    // have no such result, so restore the flag together with our gauge snapshots on a seek.
+    private static readonly Action<HealthProcessor, bool> set_failed = typeof(HealthProcessor)
+        .GetProperty(nameof(HasFailed), BindingFlags.Instance | BindingFlags.Public)!
+        .GetSetMethod(true)!.CreateDelegate<Action<HealthProcessor, bool>>();
 
     private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
     private int activeGaugeIndex;
@@ -75,6 +84,7 @@ public partial class BmsHealthProcessor : HealthProcessor
     {
         ensureInitialized();
         syncActiveStateFromHealth();
+        captureInitialGaugeStates();
 
         for (var i = 0; i < gaugeStates.Count; i++)
         {
@@ -111,6 +121,7 @@ public partial class BmsHealthProcessor : HealthProcessor
     {
         ensureInitialized();
         syncActiveStateFromHealth();
+        captureInitialGaugeStates();
 
         var type = holding ? HitResult.Great : HitResult.Ok;
 
@@ -259,6 +270,8 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.Value = GaugeProfile.InitialHealth;
         HasEverFailed = false;
         gaugeHistory.Clear();
+        rewindHistory.Clear();
+        initialGaugeStates = null;
 
         // Reset all gauge states to their initial values for a fresh play.
         foreach (var state in gaugeStates)
@@ -273,13 +286,38 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     protected override void ApplyResultInternal(JudgementResult result)
     {
+        ensureInitialized();
+        syncActiveStateFromHealth();
+        captureInitialGaugeStates();
         base.ApplyResultInternal(result);
 
         if (!HasEverFailed && Health.Value <= 0)
             HasEverFailed = true;
 
-        recordGaugeHistory(result.TimeAbsolute);
+        recordGaugeHistory(result.TimeAbsolute, Clock?.CurrentTime ?? result.TimeAbsolute);
     }
+
+    internal void Rewind(double time)
+    {
+        // Column result stacks revert independently. Restore all gauge layers after those stacks,
+        // using application time rather than an LN's expected endpoint or clamped judgement time.
+        while (rewindHistory.Count > 0 && rewindHistory[^1].Time > time)
+        {
+            rewindHistory.RemoveAt(rewindHistory.Count - 1);
+            gaugeHistory.RemoveAt(gaugeHistory.Count - 1);
+        }
+
+        var states = gaugeHistory.Count > 0 ? gaugeHistory[^1].States : initialGaugeStates;
+        if (states == null)
+            return;
+
+        RestoreGaugeStates(states);
+        HasEverFailed = rewindHistory.Count > 0 && rewindHistory[^1].EverFailed;
+        set_failed(this, rewindHistory.Count > 0 && rewindHistory[^1].Failed);
+        endResultIndex = activeGaugeIndex;
+    }
+
+    private void captureInitialGaugeStates() => initialGaugeStates ??= CurrentGaugeStates;
 
     protected override HitResult GetSimulatedHitResult(Judgement judgement) => judgement.MaxResult == HitResult.Meh
         ? HitResult.IgnoreMiss
@@ -439,7 +477,7 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.Value = active.CurrentHp;
     }
 
-    private void recordGaugeHistory(double eventTime)
+    private void recordGaugeHistory(double eventTime, double? applicationTime = null)
     {
         if (gaugeStates.Count == 0)
             return;
@@ -455,6 +493,7 @@ public partial class BmsHealthProcessor : HealthProcessor
                 state.GaugeType,
                 state.CurrentHp,
                 state.IsHpFailed)).ToArray()));
+        rewindHistory.Add((applicationTime ?? eventTime, HasFailed, HasEverFailed));
     }
 
     // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract

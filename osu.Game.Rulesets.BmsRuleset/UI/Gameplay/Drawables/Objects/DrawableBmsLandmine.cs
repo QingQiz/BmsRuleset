@@ -21,7 +21,7 @@ public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCo
 
     protected override void ResetKindState() => mineHandled = false;
 
-    protected override bool UpdateKindState()
+    internal override void RestoreRewoundState()
     {
         if (mineHandled && Time.Current < HitObject.StartTime)
         {
@@ -29,7 +29,10 @@ public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCo
             mineHandled = false;
             Alpha = 1;
         }
+    }
 
+    protected override bool UpdateKindState()
+    {
         if (Judged || mineHandled || Time.Current < HitObject.StartTime)
             return false;
 

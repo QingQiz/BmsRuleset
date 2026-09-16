@@ -69,6 +69,10 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     internal virtual bool RequiresColumnFrameUpdate => true;
 
+    internal virtual void RestoreRewoundState()
+    {
+    }
+
     protected BmsLayoutVariant LayoutVariant => ParentColumn?.LayoutVariant ?? HitObject?.Beatmap.LayoutVariant ?? BmsLayoutVariant.Bme7K;
 
     protected double ScrollSpeedMultiplier => ParentColumn?.ScrollSpeedMultiplier ?? 1;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -294,6 +295,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private double resumeRewindInitialVisualOffset;
 
+    private readonly List<(double Time, BmsLongNoteJudgementResult Result)> syntheticResults = [];
+
     private double resumeRewindAnimationElapsed = RESUME_REWIND_ANIMATION_DURATION;
 
     internal double ResumeRewindStartTime { get; private set; } = double.MinValue;
@@ -381,10 +384,30 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // Playfield.Update normally reverts results newer than the clock. During the resume lead-in,
         // those results belong to the completed attempt and must remain authoritative.
         if (!IsResumeRewinding)
+        {
+            if (Time.Elapsed < 0)
+                scoreProcessor?.RewindEmptyPoors(Time.Current);
+
+            while (syntheticResults.Count > 0 && syntheticResults[^1].Time > Time.Current)
+            {
+                var result = syntheticResults[^1].Result;
+                syntheticResults.RemoveAt(syntheticResults.Count - 1);
+                healthProcessor?.RevertResult(result);
+                scoreProcessor?.RevertResult(result);
+            }
+
             base.Update();
+        }
 
         triggerEvents();
         updateStageScale();
+    }
+
+    protected override void UpdateAfterChildren()
+    {
+        base.UpdateAfterChildren();
+        if (Time.Elapsed < 0 && !IsResumeRewinding)
+            healthProcessor?.Rewind(Time.Current);
     }
 
     #endregion
@@ -459,7 +482,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(endpoint);
 
         if (scoreResult != null)
+        {
             healthProcessor?.ApplySyntheticLongNoteEndpoint(scoreResult);
+            // Synthetic endpoints have no drawable entry in the framework's rewind stack.
+            syntheticResults.Add((Time.Current, scoreResult));
+        }
 
         if (endpoint.Kind == BmsLongNoteEndpointKind.Tail && endpoint.Result.IsHit())
         {

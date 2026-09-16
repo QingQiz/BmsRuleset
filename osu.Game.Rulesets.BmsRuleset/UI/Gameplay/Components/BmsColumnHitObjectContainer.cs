@@ -3,6 +3,7 @@ using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.UI;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 
@@ -84,7 +85,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
                 note.UpdateVisualPosition(y, DrawHeight);
 
             // Keeping judgement controllers frozen avoids replaying misses or resetting an active long note.
-            if (!resumeRewinding && note.RequiresColumnFrameUpdate)
+            if (!resumeRewinding && (Clock as IGameplayClock)?.IsRewinding != true && Time.Elapsed >= 0 && note.RequiresColumnFrameUpdate)
                 note.UpdateColumnFrame();
         }
     }
@@ -107,6 +108,26 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             // without applying a result to the parent drawable.
             if (longNote.EndTime <= rewindEndTime || (note.Judged && !longNoteHolder.IsHoldingLongNote))
                 note.Alpha = 0;
+        }
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+        if (Time.Elapsed >= 0 || isResumeRewinding())
+            return;
+
+        // Restore entries before pool activation, including controllers whose drawables were freed.
+        foreach (var entry in Entries)
+        {
+            if (entry is BmsHitObjectLifetimeEntry { LongNoteJudgementController: { } controller })
+                controller.Rewind(Time.Current);
+        }
+
+        foreach (var note in AliveEntries.Values)
+        {
+            if (note is DrawableBmsHitObject bms)
+                bms.RestoreRewoundState();
         }
     }
 }

@@ -192,14 +192,11 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         if (HitObject != null)
         {
+            // The lifetime entry owns judgement state across both rewind and pool reuse.
             controller = Entry is BmsHitObjectLifetimeEntry bmsEntry
                 ? bmsEntry.LongNoteJudgementController ??= new BmsLongNoteJudgementController()
                 : new BmsLongNoteJudgementController();
             controller.Bind((BmsLongNote)HitObject, this);
-
-            // Ordinary seeks replay judgements, but a pause lead-in must retain the original attempt.
-            if (ParentColumn?.IsResumeRewinding != true)
-                controller.Reset();
 
             longNoteBody.SetSkinLookup(LayoutVariant, Column);
         }
@@ -227,6 +224,14 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
                 ComponentAnchor = Anchor.BottomCentre,
             },
         ]);
+    }
+
+    internal override void RestoreRewoundState()
+    {
+        visualState.Reset();
+        bodyGeometryValid = false;
+        lastHoldExplosionTime = Time.Current;
+        RefreshStateTransforms();
     }
 
     protected override void CheckForResult(bool userTriggered, double timeOffset)

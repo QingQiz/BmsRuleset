@@ -226,6 +226,28 @@ public class BmsLongNoteJudgementControllerTest
         Assert.That(reboundHooks.HellChargeTicks.Single(), Is.EqualTo((true, BmsHellChargeBodyTracker.DEFAULT_TICK_SCALE)));
     }
 
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void TestRewindIntoBodyRetainsHeadAndReplaysTail(BmsLongNoteMode mode)
+    {
+        var (controller, hooks) = makeController(mode, 1000, 1000);
+        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, true);
+        controller.TryHit(987, HitResult.Great);
+        controller.TryRelease(2000, 0, tailTable);
+        controller.Rewind(1500);
+
+        Assert.That(controller.LongNoteStarted, Is.True);
+        Assert.That(controller.TailJudged, Is.False);
+        Assert.That(controller.TryHit(1500, HitResult.Perfect), Is.False);
+        Assert.That(controller.TryRelease(2000, 0, tailTable), Is.True);
+        Assert.That(hooks.UserHeadJudgedCount, Is.EqualTo(1));
+
+        controller.Rewind(980);
+        Assert.That(controller.LongNoteStarted, Is.False);
+        Assert.That(controller.TryHit(1000, HitResult.Perfect), Is.True);
+    }
+
     [Test]
     public void TestHcnTickAccruesWhileHoldingWithinBody()
     {

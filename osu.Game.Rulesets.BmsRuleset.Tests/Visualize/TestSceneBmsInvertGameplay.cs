@@ -10,6 +10,8 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Mods;
@@ -48,11 +50,14 @@ public partial class TestSceneBmsInvertGameplay : BmsPlayerTestScene
     }
 
     [Test]
-    public void TestConvertedNotesHoldAndRelease(
+    public void TestConvertedNotesHoldReleaseAndReplay(
         [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode,
         [Values(BmsTestSkins.SkinKind.Argon, BmsTestSkins.SkinKind.Classic, BmsTestSkins.SkinKind.Legacy)] BmsTestSkins.SkinKind skinKind,
         [Values(false, true)] bool randomDoublePlay)
     {
+        BmsGaugeStateSnapshot[] heldGauges = [];
+        BmsGaugeStateSnapshot[] completedGauges = [];
+        var completedGaugeEvents = 0;
         AddStep("load ordinary notes with IN", () =>
         {
             skin = skinKind;
@@ -69,6 +74,8 @@ public partial class TestSceneBmsInvertGameplay : BmsPlayerTestScene
             ]);
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
+        // TestPlayer records applied results only; keep the assertions scoped to the current attempt.
+        AddStep("track reverted results", () => Player.ScoreProcessor.JudgementReverted += result => Player.Results.Remove(result));
         AddAssert("IN converted every non-final column note", () =>
         {
             var chart = (BmsBeatmap)Player.GameplayState.Beatmap;
@@ -79,8 +86,30 @@ public partial class TestSceneBmsInvertGameplay : BmsPlayerTestScene
 
         seek(1550);
         assertHolding();
+        AddStep("capture held gauge states", () => heldGauges = ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates.ToArray());
         seek(5900);
         assertCompleted(mode);
+        AddStep("capture completed gauge states", () =>
+        {
+            completedGauges = ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates.ToArray();
+            completedGaugeEvents = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Count;
+        });
+
+        seek(1550);
+        assertHolding();
+        AddAssert("rewind restores held gauge states", () => ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, () => Is.EqualTo(heldGauges));
+        seek(5900);
+        assertCompleted(mode);
+        AddAssert("replay restores completed gauge states", () => ((BmsHealthProcessor)Player.HealthProcessor).CurrentGaugeStates, () => Is.EqualTo(completedGauges));
+        AddAssert("replay does not duplicate gauge events", () => ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Count, () => Is.EqualTo(completedGaugeEvents));
+
+        seek(0);
+        AddAssert("rewind clears all judgement statistics", () => Player.ScoreProcessor.Statistics.Values.All(count => count == 0));
+        seek(1550);
+        assertHolding();
+        seek(5900);
+        assertCompleted(mode);
+        AddAssert("full replay preserves gauge events", () => ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Count, () => Is.EqualTo(completedGaugeEvents));
     }
 
     private void seek(double time)

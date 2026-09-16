@@ -25,6 +25,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     private readonly Dictionary<JudgementResult, BmsJudgementEvent> eventsByResult = new();
     private readonly List<TimingHitEventEntry> timingHitEventEntries = [];
     private readonly List<HitEvent> timingHitEvents = [];
+    private readonly List<BmsJudgementEvent> emptyPoorEvents = [];
 
     public IReadOnlyList<BmsJudgementEvent> JudgementEvents => judgementEvents;
 
@@ -101,8 +102,20 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
         var source = new BmsJudgementSource(eventTime, column, BmsJudgementSourceKind.EmptyPoor);
         var observation = new BmsTimingObservation(BmsTimingObservationKind.Note, expectedTime, eventTime, 1, HitResult.Miss);
-        addJudgementEvent(new BmsJudgementEvent(source, HitResult.Miss, [observation]));
+        var judgementEvent = new BmsJudgementEvent(source, HitResult.Miss, [observation]);
+        addJudgementEvent(judgementEvent);
+        emptyPoorEvents.Add(judgementEvent);
         EmptyPoorRegistered?.Invoke(observation);
+    }
+
+    internal void RewindEmptyPoors(double time)
+    {
+        while (emptyPoorEvents.Count > 0 && emptyPoorEvents[^1].Source.StartTime > time)
+        {
+            removeJudgementEvent(emptyPoorEvents[^1]);
+            emptyPoorEvents.RemoveAt(emptyPoorEvents.Count - 1);
+            ScoreResultCounts[HitResult.Miss]--;
+        }
     }
 
     /// <summary>
@@ -151,6 +164,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
         base.Reset(storeResults);
         judgementEvents.Clear();
+        emptyPoorEvents.Clear();
         eventsByResult.Clear();
         timingHitEventEntries.Clear();
         timingHitEvents.Clear();

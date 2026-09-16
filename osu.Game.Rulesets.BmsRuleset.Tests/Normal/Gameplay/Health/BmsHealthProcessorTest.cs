@@ -18,6 +18,33 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Health;
 public class BmsHealthProcessorTest
 {
     [Test]
+    public void TestRewindRestoresFailureAndAllGaugeLayers()
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeTypes([BmsGaugeType.Hard, BmsGaugeType.Normal], initialStates:
+        [
+            new(BmsGaugeType.Hard, 0.01, false),
+            new(BmsGaugeType.Normal, 0.2, false),
+        ]);
+        var initial = processor.CurrentGaugeStates.ToArray();
+        processor.RegisterEmptyPoor(1000);
+        var afterMiss = processor.CurrentGaugeStates.ToArray();
+        Assert.That(afterMiss[0].Failed, Is.True);
+
+        processor.ApplyHellChargeTick(false, 100, 1200);
+        Assert.That(processor.HasFailed, Is.True);
+        Assert.That(processor.HasEverFailed, Is.True);
+        processor.Rewind(1100);
+        Assert.That(processor.CurrentGaugeStates, Is.EqualTo(afterMiss));
+        Assert.That(processor.HasFailed, Is.False);
+        Assert.That(processor.HasEverFailed, Is.False);
+        processor.Rewind(500);
+        Assert.That(processor.CurrentGaugeStates, Is.EqualTo(initial));
+        Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.Hard));
+        Assert.That(processor.GaugeHistory, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public void TestEndClearThresholdBoundary(
         [Values(BmsGaugeType.Normal, BmsGaugeType.Easy, BmsGaugeType.AssistEasy)] BmsGaugeType gaugeType,
         [Values] BmsGaugeProfileFamily family,

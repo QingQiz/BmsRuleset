@@ -18,6 +18,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -76,8 +77,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
     internal double VisualOffset => ParentPlayfield.VisualOffset.Value;
 
     internal float NoteHeightScale => ParentPlayfield.Stage.NoteHeightScale;
-
-    internal bool IsResumeRewinding => ParentPlayfield.IsResumeRewinding;
 
     protected BmsPlayfield ParentPlayfield { get; }
 
@@ -300,6 +299,10 @@ public partial class BmsColumn : Playfield, IBmsColumn
     {
         IsPressed = true;
 
+        // Replay input also changes while moving backwards; retain key state without judging it.
+        if ((Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0)
+            return PressOutcome.Empty;
+
         pressCandidates.Clear();
         pressJudgementCandidates.Clear();
 
@@ -359,6 +362,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
             return;
 
         IsPressed = false;
+
+        if ((Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0)
+            return;
 
         // Release: find the earliest held LN in this column and let it judge the key-up.
         // We must include LNs released before the tail window (a fast release is a drop,

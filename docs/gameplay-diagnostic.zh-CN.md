@@ -84,7 +84,7 @@ dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net8.0/osu.Game.Rulesets.B
 ## 定向功能回归
 
 ```powershell
-dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Tests.csproj -c Release --no-build --no-restore --filter "FullyQualifiedName~Normal.Gameplay.Judgement|FullyQualifiedName~BmsGameplayVirtualisationTest|FullyQualifiedName~BmsHitObjectPoolPlanTest|FullyQualifiedName~BmsGameplayDiagnostic|FullyQualifiedName~BmsModInvertTest|FullyQualifiedName~TestSceneBmsInvertGameplay|FullyQualifiedName~TestSceneBmsVisualCulling|FullyQualifiedName~TestSceneBmsMineCulling|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteBodyTint|FullyQualifiedName~TestSceneBmsPauseRewind|FullyQualifiedName~BmsGameplayScrollControllerTest"
+dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Tests.csproj -c Release --no-build --no-restore --filter "FullyQualifiedName~Normal.Gameplay.Judgement|FullyQualifiedName~Normal.Gameplay.Health|FullyQualifiedName~Normal.Gameplay.Scoring|FullyQualifiedName~BmsGameplayVirtualisationTest|FullyQualifiedName~BmsHitObjectPoolPlanTest|FullyQualifiedName~BmsGameplayDiagnostic|FullyQualifiedName~BmsModInvertTest|FullyQualifiedName~TestSceneBmsInvertGameplay|FullyQualifiedName~TestSceneBmsReplayRewind|FullyQualifiedName~TestSceneBmsVisualCulling|FullyQualifiedName~TestSceneBmsMineCulling|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteBodyTint|FullyQualifiedName~TestSceneBmsPauseRewind|FullyQualifiedName~BmsGameplayScrollControllerTest"
 ```
 
 显示裁剪、对象池和测试时钟的设计约束及剩余瓶颈见 [开发文档](development.md#gameplay-performance)。
