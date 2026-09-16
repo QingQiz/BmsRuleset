@@ -413,10 +413,11 @@ public sealed partial class BmsHitScatterStatistic : CompositeDrawable, IBmsResu
             return [];
 
         // Keep one regular Circle in the tree for visual tooling and existing consumers;
-        // the remaining points are submitted by one batched draw node.
+        // the remaining points are submitted by batched draw nodes.
         var drawables = new List<Drawable> { createPoint(data, data.Points[0]) };
 
-        const int max_points_per_batch = ushort.MaxValue / 4;
+        // The renderer limits quads by their six indices, not their four vertices.
+        const int max_points_per_batch = IRenderer.MAX_QUADS;
         for (var start = 1; start < data.Points.Count; start += max_points_per_batch)
             drawables.Add(new ScatterPointBatch(data, start, Math.Min(start + max_points_per_batch, data.Points.Count)));
 

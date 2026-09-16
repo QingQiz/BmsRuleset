@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Primitives;
+using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Rendering.Dummy;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
@@ -1054,6 +1057,69 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
                 .Where(b => Math.Abs(b.Alpha - 0.45f) < 0.001f || Math.Abs(b.Alpha - 0.25f) < 0.001f)
                 .All(b => Math.Abs(b.ScreenSpaceDrawQuad.AABBFloat.Right - plot.Left) < 0.5f);
         });
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    [TestCase(IRenderer.MAX_QUADS + 1)]
+    [TestCase(IRenderer.MAX_QUADS + 2)]
+    [TestCase(IRenderer.MAX_QUADS * 2 + 2)]
+    public void TestHitScatterRendersAcrossBatchBoundaries(int pointCount)
+    {
+        BmsHitScatterStatistic hitScatterStatistic = null!;
+
+        AddStep("load hit scatter statistic", () =>
+        {
+            var hitEvents = Enumerable.Range(0, pointCount)
+                .Select(i => new HitEvent(i % 301 - 150, 1, HitResult.Great, new BmsNote { Column = 0, StartTime = i }, null, null))
+                .ToArray();
+
+            Child = new Container
+            {
+                Width = 720,
+                AutoSizeAxes = Axes.Y,
+                Child = hitScatterStatistic = new BmsHitScatterStatistic(hitEvents, new BmsBeatmap
+                {
+                    LayoutVariant = BmsLayoutVariant.Bms5K,
+                    TotalColumns = BmsLayout.GetTotalColumns(BmsLayoutVariant.Bms5K),
+                }),
+            };
+        });
+
+        AddUntilStep("hit scatter statistic loaded", () => hitScatterStatistic.IsLoaded && hitScatterStatistic.DrawHeight > 0);
+        AddWaitStep("render overall scatter", 5);
+        AddStep("validate overall batch rendering", () => drawScatterBatches(1));
+
+        AddStep("expand key charts", () =>
+        {
+            InputManager.MoveMouseTo(hitScatterStatistic);
+            InputManager.Click(MouseButton.Left);
+        });
+
+        assertHitScatterText("Scratch");
+        AddWaitStep("render per-key scatter", 5);
+        AddStep("validate per-key batch rendering", () => drawScatterBatches(7));
+
+        void drawScatterBatches(int expectedPlotCount)
+        {
+            var plots = hitScatterStatistic.ChildrenOfType<Container>().Where(c => c.Name == "Hit scatter data").ToArray();
+            Assert.That(plots, Has.Length.EqualTo(expectedPlotCount));
+
+            // Headless tests skip drawing, so invoke the batch draw nodes to exercise the renderer's size validation.
+            if (Dependencies.Get<IRenderer>() is not DummyRenderer renderer)
+                return;
+
+            var createDrawNode = typeof(Drawable).GetMethod("CreateDrawNode", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var draw = typeof(DrawNode).GetMethod("Draw", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+            foreach (var batch in plots.SelectMany(plot => plot.Children).Where(child => child is not Circle))
+            {
+                using var node = createDrawNode.CreateDelegate<Func<DrawNode>>(batch)();
+                node.ApplyState();
+                draw.CreateDelegate<Action<IRenderer>>(node)(renderer);
+            }
+        }
     }
 
     [Test]
