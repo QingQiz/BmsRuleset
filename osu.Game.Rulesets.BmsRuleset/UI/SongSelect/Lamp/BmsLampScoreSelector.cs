@@ -45,10 +45,11 @@ public static class BmsLampScoreSelector
     }
 
     internal static bool MatchesSelectedMods(ScoreInfo score, IReadOnlyList<Mod> selectedMods) =>
-        reductionModMatches<BmsModHideScratch>(score.Mods, selectedMods) &&
-        reductionModMatches<BmsModAutoScratch>(score.Mods, selectedMods) &&
-        reductionModMatches<BmsModConstant>(score.Mods, selectedMods) &&
-        rateModsMatch(score.Mods, selectedMods);
+        score.Mods.OfType<IApplicableToScoreSelection>()
+            .All(mod => hasMatchingMod(mod, selectedMods)) &&
+        selectedMods.OfType<IApplicableToScoreSelection>()
+            .Where(mod => mod.Difficulty == IApplicableToScoreSelection.ScoreSelectionDifficulty.Increase)
+            .All(mod => hasMatchingMod(mod, score.Mods));
 
     internal static bool MatchesExactMods(
         IEnumerable<Mod> scoreMods,
@@ -103,32 +104,6 @@ public static class BmsLampScoreSelector
         result.Attempt?.Stages is { Length: > 0 } stages
         && stages.Any(stage => stage.ScoreId is { } scoreId && scoreId != Guid.Empty);
 
-    private static bool reductionModMatches<TMod>(IEnumerable<Mod> scoreMods, IEnumerable<Mod> selectedMods)
-        where TMod : Mod => !has<TMod>(scoreMods) || has<TMod>(selectedMods);
-
-    private static bool has<TMod>(IEnumerable<Mod> mods)
-        where TMod : Mod => mods.Any(mod => mod is TMod);
-
-    private static bool rateModsMatch(IEnumerable<Mod> scoreMods, IEnumerable<Mod> selectedMods)
-    {
-        var scoreRateMod = rateMod(scoreMods);
-        var selectedRateMod = rateMod(selectedMods);
-
-        return scoreRateMod == selectedRateMod ||
-               (scoreRateMod == null && selectedRateMod?.type == typeof(BmsModHalfTime));
-    }
-
-    private static (Type type, double speedChange)? rateMod(IEnumerable<Mod> mods)
-    {
-        foreach (var mod in mods)
-        {
-            if (mod is BmsModHalfTime halfTime)
-                return (typeof(BmsModHalfTime), halfTime.SpeedChange.Value);
-
-            if (mod is BmsModDoubleTime doubleTime)
-                return (typeof(BmsModDoubleTime), doubleTime.SpeedChange.Value);
-        }
-
-        return null;
-    }
+    private static bool hasMatchingMod(IApplicableToScoreSelection mod, IEnumerable<Mod> candidates) =>
+        candidates.Any(candidate => candidate is IApplicableToScoreSelection && mod.MatchesScoreSelection(candidate));
 }

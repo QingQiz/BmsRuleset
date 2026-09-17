@@ -14,7 +14,7 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
 
-public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>, IApplicableAfterBeatmapConversion
+public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>, IApplicableAfterBeatmapConversion, IApplicableToScoreSelection
 {
     public override string Name => "Hide Scratch";
 
@@ -25,6 +25,8 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
     public override LocalisableString Description => BmsStrings.ModHideScratch;
 
     public override ModType Type => ModType.DifficultyReduction;
+
+    public IApplicableToScoreSelection.ScoreSelectionDifficulty Difficulty => IApplicableToScoreSelection.ScoreSelectionDifficulty.Reduction;
 
     public override Type[] IncompatibleMods => [typeof(BmsModSecondPlayer), typeof(BmsModAutoScratch)];
 

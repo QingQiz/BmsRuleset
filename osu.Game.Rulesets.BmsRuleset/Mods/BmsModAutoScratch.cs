@@ -19,7 +19,7 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
 
-public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>, IUpdatableByPlayfield
+public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>, IUpdatableByPlayfield, IApplicableToScoreSelection
 {
     public override string Name => "Auto Scratch";
 
@@ -30,6 +30,8 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
     public override LocalisableString Description => BmsStrings.ModAutoScratch;
 
     public override ModType Type => ModType.Automation;
+
+    public IApplicableToScoreSelection.ScoreSelectionDifficulty Difficulty => IApplicableToScoreSelection.ScoreSelectionDifficulty.Reduction;
 
     private BmsPlayfield playfield = null!;
 

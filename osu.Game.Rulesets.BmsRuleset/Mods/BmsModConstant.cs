@@ -10,7 +10,7 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
 
-public class BmsModConstant : Mod, IApplicableToDrawableRuleset<BmsHitObject>
+public class BmsModConstant : Mod, IApplicableToDrawableRuleset<BmsHitObject>, IApplicableToScoreSelection
 {
     public override string Name => "Constant";
 
@@ -21,6 +21,8 @@ public class BmsModConstant : Mod, IApplicableToDrawableRuleset<BmsHitObject>
     public override LocalisableString Description => BmsStrings.ModConstant;
 
     public override ModType Type => ModType.DifficultyReduction;
+
+    public IApplicableToScoreSelection.ScoreSelectionDifficulty Difficulty => IApplicableToScoreSelection.ScoreSelectionDifficulty.Reduction;
 
     public override Type[] IncompatibleMods => [];
 

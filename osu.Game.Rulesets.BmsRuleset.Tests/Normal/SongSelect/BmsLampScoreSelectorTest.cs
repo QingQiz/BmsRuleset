@@ -15,13 +15,17 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;
 [TestFixture]
 public class BmsScoreSelectorLampTest
 {
-    [Test]
-    public void TestNoSelectedModsExcludesSignificantModScores()
+    [TestCase(typeof(BmsModHideScratch))]
+    [TestCase(typeof(BmsModAutoScratch))]
+    [TestCase(typeof(BmsModConstant))]
+    [TestCase(typeof(BmsModHalfTime))]
+    [TestCase(typeof(BmsModDoubleTime))]
+    public void TestNoSelectedModsExcludesSignificantModScores(Type modType)
     {
         var noModScore = score(900);
-        var hideScratchScore = score(1_000, new BmsModHideScratch());
+        var modScore = score(1_000, create(modType));
 
-        Assert.That(BmsLampScoreSelector.SelectBest([hideScratchScore, noModScore], []), Is.SameAs(noModScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([modScore, noModScore], []), Is.SameAs(noModScore));
     }
 
     [Test]
@@ -60,6 +64,29 @@ public class BmsScoreSelectorLampTest
         var defaultRateScore = score(1_000, create(rateModType));
 
         Assert.That(BmsLampScoreSelector.SelectBest([defaultRateScore, selectedRateScore], [rateMod(rateModType, selectedSpeed)]), Is.SameAs(selectedRateScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([selectedRateScore], [create(rateModType)]), Is.Null);
+    }
+
+    [TestCase(typeof(BmsModHalfTime))]
+    [TestCase(typeof(BmsModDoubleTime))]
+    public void TestRateAdjustModsIgnorePitchSetting(Type rateModType)
+    {
+        var mod = create(rateModType);
+
+        switch (mod)
+        {
+            case BmsModHalfTime halfTime:
+                halfTime.AdjustPitch.Value = true;
+                break;
+
+            case BmsModDoubleTime doubleTime:
+                doubleTime.AdjustPitch.Value = true;
+                break;
+        }
+
+        var existingScore = score(1_000, mod);
+
+        Assert.That(BmsLampScoreSelector.SelectBest([existingScore], [create(rateModType)]), Is.SameAs(existingScore));
     }
 
     [Test]

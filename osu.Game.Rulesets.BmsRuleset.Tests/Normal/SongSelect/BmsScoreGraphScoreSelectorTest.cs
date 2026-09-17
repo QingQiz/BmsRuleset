@@ -36,6 +36,20 @@ public class BmsScoreSelectorGraphTest
     }
 
     [Test]
+    public void TestUsesLampIncreaseModMatching()
+    {
+        var noMod = score(800_000, 8, 0);
+        var doubleTime = score(900_000, 10, 0);
+        doubleTime.Mods = [new BmsModDoubleTime()];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(BmsLampScoreSelector.SelectBest([noMod, doubleTime], [], 100), Is.SameAs(noMod));
+            Assert.That(BmsLampScoreSelector.SelectBest([noMod, doubleTime], [new BmsModDoubleTime()], 100), Is.SameAs(doubleTime));
+        });
+    }
+
+    [Test]
     public void TestMissingStatisticsUsesPersistedAccuracy()
     {
         var lower = new ScoreInfo { Accuracy = 0.75 };
