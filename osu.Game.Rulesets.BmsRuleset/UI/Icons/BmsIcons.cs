@@ -21,5 +21,7 @@ public static class BmsIcons
 
     public static IconUsage NoGreat => get(0xE005);
 
+    public static IconUsage NoMine => get(0xE006);
+
     private static IconUsage get(int codepoint) => new((char)codepoint, font_name);
 }

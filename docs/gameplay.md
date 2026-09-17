@@ -137,6 +137,7 @@ matching the selected mods.
 | Constant (CN)            | Disables scroll-speed changes, including #SPEED/#SCROLL/BPM     |         |
 | Auto Scratch (AS)        | Plays the scratch lane automatically                            |         |
 | Hide Scratch (HS)        | Removes scratch notes and hides the lane                        |         |
+| No Mine (NM)             | Removes all landmines, including those in scratch lanes         |         |
 | Background Keysound (BK) | Plays keysounds as background audio instead of on key press     |         |
 | Lane Random (LR)         | RANDOM: permutes lane columns                                   | Include scratch; seed; lane order                  |
 | Note Random (NR)         | S-RANDOM / H-RANDOM: per-note random                            | Include scratch; mode; seed                        |

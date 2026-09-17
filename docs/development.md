@@ -37,6 +37,11 @@ dotnet build osu.Game.Rulesets.BmsRuleset -c Release
 The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets.BmsRuleset.dll`. Install it using the
 [README installation steps](../README.md#installation).
 
+## Mod Icons
+
+The maintained icon generator is [scripts/bms-icon-font-generator](../scripts/bms-icon-font-generator/README.md).
+Use the repository generator when updating the font.
+
 ## Gameplay Performance
 
 For reusable real Player profiling across charts, skins and long-note modes, see [Gameplay performance template (中文)](gameplay-diagnostic.zh-CN.md).

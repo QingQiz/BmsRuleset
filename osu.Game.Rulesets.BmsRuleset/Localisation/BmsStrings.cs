@@ -654,6 +654,10 @@ public static class BmsStrings
 
     public static LocalisableString ModNoGreat => get("mod_no_great");
 
+    public static LocalisableString ModNoMineName => get("mod_no_mine_name");
+
+    public static LocalisableString ModNoMine => get("mod_no_mine");
+
     public static LocalisableString ModPaused => get("mod_paused");
 
     public static LocalisableString ModRotationRandom => get("mod_rotation_random");

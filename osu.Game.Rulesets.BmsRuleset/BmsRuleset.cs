@@ -149,6 +149,7 @@ public partial class BmsRuleset : Ruleset
             new BmsModEasyGauge(),
 
             new BmsModHideScratch(),
+            new BmsModNoMine(),
 
             new BmsModNoFail(),
             new BmsModHalfTime(),

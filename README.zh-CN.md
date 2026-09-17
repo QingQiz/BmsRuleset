@@ -155,4 +155,4 @@ osu!mania 7K 谱面可使用 BMS 游玩，7 条轨道映射到 BME 键盘列，�
 | [难度表](./docs/difficulty-tables.zh-CN.md)         | 导入和管理 LR2/beatoraja 难度表                            |
 | [皮肤系统](./docs/skin-system.zh-CN.md)             | `skin.ini` 参考、osu!mania 兼容与可编辑组件                   |
 | [BMS 格式支持（英文）](./docs/bms-format-support.md) | Parser 行为、支持的命令与通道、参考资料                           |
-| [开发（英文）](./docs/development.md)                | 从源码编译、缺失功能与已知问题                                    |
+| [开发（英文）](./docs/development.md)                | 从源码编译、图标生成、缺失功能与已知问题                             |

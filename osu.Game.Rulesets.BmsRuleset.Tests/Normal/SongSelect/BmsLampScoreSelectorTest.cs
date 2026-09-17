@@ -16,6 +16,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.SongSelect;
 public class BmsScoreSelectorLampTest
 {
     [TestCase(typeof(BmsModHideScratch))]
+    [TestCase(typeof(BmsModNoMine))]
     [TestCase(typeof(BmsModAutoScratch))]
     [TestCase(typeof(BmsModConstant))]
     [TestCase(typeof(BmsModHalfTime))]
@@ -28,13 +29,14 @@ public class BmsScoreSelectorLampTest
         Assert.That(BmsLampScoreSelector.SelectBest([modScore, noModScore], []), Is.SameAs(noModScore));
     }
 
-    [Test]
-    public void TestSelectedHideScratchKeepsNoModScore()
+    [TestCase(typeof(BmsModHideScratch))]
+    [TestCase(typeof(BmsModNoMine))]
+    public void TestSelectedNoteRemovalModKeepsNoModScore(Type modType)
     {
         var noModScore = score(1_000);
-        var hideScratchScore = score(900, new BmsModHideScratch());
+        var modScore = score(900, create(modType));
 
-        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, hideScratchScore], [new BmsModHideScratch()]), Is.SameAs(noModScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, modScore], [create(modType)]), Is.SameAs(noModScore));
     }
 
     [Test]

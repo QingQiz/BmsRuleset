@@ -164,4 +164,4 @@ Select BMS and enable **Show converts** in the song select filter panel.
 | [Difficulty tables](./docs/difficulty-tables.md)   | Importing and managing LR2/beatoraja difficulty tables                 |
 | [Skin system](./docs/skin-system.md)               | `skin.ini` reference, osu!mania compatibility, and editable components |
 | [BMS format support](./docs/bms-format-support.md) | Parser behavior, supported commands and channels, and reference links  |
-| [Development](./docs/development.md)               | Building from source, missing features, and known issues               |
+| [Development](./docs/development.md)               | Building from source, icon generation, missing features, and known issues |

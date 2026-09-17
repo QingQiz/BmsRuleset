@@ -129,6 +129,7 @@ beatoraja 将谱面辅助（**ASSIST**，深紫）与 Assist Easy 血条（**L-A
 | Constant (CN)            | 禁用滚速变化，包括 #SPEED/#SCROLL/BPM 变化造成的影响 |         |
 | Auto Scratch (AS)        | 自动演奏皿轨                                   |     |
 | Hide Scratch (HS)        | 移除皿音符并隐藏皿轨                       |     |
+| No Mine (NM)             | 移除所有地雷，包括皿轨上的地雷                 |     |
 | Background Keysound (BK) | 将按键音作为背景音播放，不再由按键触发                         |     |
 | Lane Random (LR)         | RANDOM：随机排列轨道列                           | 包含皿；随机种子；轨道顺序       |
 | Note Random (NR)         | S-RANDOM / H-RANDOM：逐音符随机                | 包含皿；模式；随机种子           |
