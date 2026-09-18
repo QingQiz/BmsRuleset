@@ -50,7 +50,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                      .SelectMany(c => c.HitObjectContainer.AliveObjects)
                      .OfType<DrawableBmsHitObject>())
         {
-            if (drawable.HitObject is BmsLandmine)
+            if (drawable.HitObject is BmsLandmine or BmsInvisibleNote)
                 continue;
 
             if (!BmsLayout.IsScratchColumn(drawable.HitObject.Column, playfield.LayoutVariant))

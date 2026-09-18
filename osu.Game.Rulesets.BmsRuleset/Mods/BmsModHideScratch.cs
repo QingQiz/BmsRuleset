@@ -61,5 +61,6 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
 
         b.BackgroundSampleEvents = b.BackgroundSampleEvents.Concat(scratchStartSamples).Concat(scratchEndSamples).ToArray();
         b.HitObjects = [.. b.HitObjects.Where(x => !BmsLayout.IsScratchColumn(x.Column, b.LayoutVariant))];
+        b.InvisibleNotes = [.. b.InvisibleNotes.Where(x => !BmsLayout.IsScratchColumn(x.Column, b.LayoutVariant))];
     }
 }

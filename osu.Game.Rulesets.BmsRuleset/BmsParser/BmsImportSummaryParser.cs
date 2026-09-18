@@ -8,27 +8,47 @@ namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 internal static partial class BmsChartParser
 {
+    private const ushort ch_02 = 2;
+
+    public static BmsImportSummary ParseImportSummary(
+        byte[] content,
+        string? path = null,
+        Func<int, int>? randomValueSelector = null)
+    {
+        var source = decodeText(content);
+        var state = new ImportParseState(randomValueSelector ?? selectRandomValue);
+        var offset = 0;
+
+        // Raw channel slices retain the decoded text, avoiding a string allocation for every
+        // WAV/BMP definition and BGM/BGA line that import will immediately discard.
+        while (offset < source.Length)
+        {
+            var newline = source.AsSpan(offset).IndexOfAny('\r', '\n');
+            var end = newline < 0 ? source.Length : offset + newline;
+            parseImportLine(source, offset, end, state);
+            offset = end + 1;
+            if (offset < source.Length && source[end] == '\r' && source[offset] == '\n')
+                offset++;
+        }
+
+        return createImportSummary(state, path);
+    }
+
     public static BmsImportSummary ParseImportSummary(
         IEnumerable<string> lines,
         string? path = null,
         Func<int, int>? randomValueSelector = null)
     {
-        var state = new ParseState();
-        randomValueSelector ??= selectRandomValue;
-        var frames = new List<ControlFrame>();
-
+        var state = new ImportParseState(randomValueSelector ?? selectRandomValue);
         foreach (var line in lines)
-        {
-            if (tryReadControlCommand(line, out var command, out var value))
-            {
-                applyControlCommand(command, value, frames, randomValueSelector, state.BranchDecisions);
-                continue;
-            }
+            parseImportLine(line, 0, line.Length, state);
 
-            if (isActive(frames))
-                parseImportLine(line, state);
-        }
+        return createImportSummary(state, path);
+    }
 
+    private static BmsImportSummary createImportSummary(ImportParseState import, string? path)
+    {
+        var state = import.Chart;
         var tickResolution = calculateTickResolution(state);
         var measures = calculateMeasures(state, tickResolution);
         var measureStarts = measures.ToDictionary(m => m.Index, m => m.StartTick);
@@ -36,102 +56,110 @@ internal static partial class BmsChartParser
         var stopEvents = collectStopEvents(state, measureStarts, timingEvents);
         timingEvents = applyStopOffsetsToTimingEvents(timingEvents, stopEvents);
 
-        var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel), path);
+        var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel).Concat(import.InvisibleLayoutChannels), path);
         var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
-        var timingMap = new BmsTimingMap(tickResolution, measures, timingEvents, stopEvents);
-        var hitObjects = collectImportHitObjects(state, totalColumns, measureStarts, timingMap);
+        var timing = new BmsTickTimeConverter(tickResolution, timingEvents, stopEvents);
+        var hitObjects = collectImportHitObjects(state, totalColumns, measureStarts, timing);
 
         hitObjects.Sort(default(ImportHitObjectComparer));
 
         var noteTimings = new List<BmsNoteTiming>(hitObjects.Count);
+        var longNoteCount = 0;
+        var scratchCount = 0;
         foreach (var hitObject in hitObjects)
         {
             if (!hitObject.IsMine)
-                noteTimings.Add(new BmsNoteTiming(hitObject.Column, hitObject.StartTime, hitObject.IsLongNote ? hitObject.EndTime : hitObject.StartTime));
+                noteTimings.Add(new BmsNoteTiming(hitObject.Column, hitObject.StartTime, hitObject.EndTime));
+            if (hitObject.IsLongNote)
+                longNoteCount++;
+            if (BmsLayout.IsScratchColumn(hitObject.Column, layoutVariant))
+                scratchCount++;
         }
 
-        var length = hitObjects.Count == 0 ? 0 : hitObjects[^1].EndTime;
-        if (length < 0)
-            length = 0;
+        var length = hitObjects.Count == 0 ? 0 : Math.Max(0, hitObjects[^1].EndTime);
 
         return new BmsImportSummary(
             extractImportMetadata(state, totalColumns, path),
-            computeImportBpm(timingMap.BpmEvents, length),
+            computeImportBpm(timingEvents, length),
             length,
             hitObjects.Count,
-            hitObjects.Count(h => h.IsLongNote),
-            hitObjects.Count(h => BmsLayout.IsScratchColumn(h.Column, layoutVariant)),
+            longNoteCount,
+            scratchCount,
             noteTimings);
     }
 
-    private static void parseImportLine(string line, ParseState state)
+    private static void parseImportLine(string source, int start, int end, ImportParseState import)
     {
-        var start = 0;
-        while (start < line.Length && (line[start] == ' ' || line[start] == '\t')) start++;
-        if (start >= line.Length) return;
-
-        var firstChar = line[start];
-        if (firstChar != '#' && firstChar != '%') return;
-
-        var span = line.AsSpan(start);
-        if (firstChar == '%')
-        {
-            if (span.Length == 1) return;
-
-            var rest = span[1..];
-            if (rest.StartsWith("URL", StringComparison.OrdinalIgnoreCase) && rest.Length > 3 && (rest[3] == ' ' || rest[3] == '\t'))
-                state.Url = rest[4..].Trim().ToString();
-            else if (rest.StartsWith("EMAIL", StringComparison.OrdinalIgnoreCase) && rest.Length > 5 && (rest[5] == ' ' || rest[5] == '\t'))
-                state.Email = rest[6..].Trim().ToString();
-
+        var span = source.AsSpan(start, end - start).TrimStart();
+        if (span.IsEmpty || span[0] != '#')
             return;
-        }
 
-        if (span.Length >= 7)
+        start = end - span.Length;
+        var state = import.Chart;
+        if (span.Length >= 7 && span[1] is >= '0' and <= '9'
+                             && span[2] is >= '0' and <= '9'
+                             && span[3] is >= '0' and <= '9' && span[6] == ':')
         {
-            var d1 = span[1];
-            var d2 = span[2];
-            var d3 = span[3];
-            if (d1 >= '0' && d1 <= '9' && d2 >= '0' && d2 <= '9' && d3 >= '0' && d3 <= '9' && span[6] == ':')
+            if (!isActive(import.Frames))
+                return;
+
+            var channel = EncodePairCi(span[4], span[5]);
+            var invisible = Hi(channel) is 3 or 4;
+            if (channel != ch_02 && !invisible && !isImportChannel(channel))
+                return;
+
+            var payloadStart = start + 7;
+            while (end > payloadStart && source[end - 1] is ' ' or '\t') end--;
+            var payloadLength = end - payloadStart;
+
+            if (invisible)
             {
-                var measure = (d1 - '0') * 100 + (d2 - '0') * 10 + (d3 - '0');
-                var plStart = start + 7;
-                var plEnd = line.Length;
-                while (plEnd > plStart && (line[plEnd - 1] == ' ' || line[plEnd - 1] == '\t')) plEnd--;
-                var plLen = plEnd - plStart;
+                // These channel IDs affect key mode, but their payloads never affect import statistics.
+                if (payloadLength >= 2)
+                    import.InvisibleLayoutChannels.Add(channel);
+                return;
+            }
 
-                if (span[4] == '0' && span[5] == '2')
+            var measure = (span[1] - '0') * 100 + (span[2] - '0') * 10 + span[3] - '0';
+            if (channel == ch_02)
+            {
+                if (tryParseDouble(source.AsSpan(payloadStart, payloadLength), out var length) && length > 0)
                 {
-                    if (plLen > 0 && tryParseDouble(line.AsSpan(plStart, plLen), out var length) && length > 0)
-                    {
-                        state.MeasureLengths[measure] = length;
-                        state.MaxMeasure = Math.Max(state.MaxMeasure, measure);
-                    }
-
-                    return;
-                }
-
-                if (plLen >= 2)
-                {
-                    var channelKey = EncodePairCi(span[4], span[5]);
-                    if (isImportChannel(channelKey))
-                    {
-                        state.ChannelLines.Add(new RawChannelLine(measure, channelKey, line, plStart, plLen, state.NextSequence++ * 4096));
-                        state.MaxMeasure = Math.Max(state.MaxMeasure, measure);
-                    }
+                    state.MeasureLengths[measure] = length;
+                    state.MaxMeasure = Math.Max(state.MaxMeasure, measure);
                 }
 
                 return;
             }
+
+            if (payloadLength >= 2)
+            {
+                state.ChannelLines.Add(new RawChannelLine(measure, channel, source, payloadStart, payloadLength, state.NextSequence++ * 4096));
+                state.MaxMeasure = Math.Max(state.MaxMeasure, measure);
+            }
+
+            return;
         }
 
-        applyCommandLine(span, state, CommandParseMode.ImportSummary);
+        if (tryReadControlCommand(span, out var command, out var value))
+            applyControlCommand(command, value, import.Frames, import.RandomValueSelector, null);
+        else if (isActive(import.Frames))
+            applyCommandLine(span, state, CommandParseMode.ImportSummary);
     }
 
-    private static bool isImportChannel(ushort channel)
+    private static bool isImportChannel(ushort channel) =>
+        channel is CH_03 or CH_08 or CH_09
+        || (Hi(channel) is 1 or 2 or 5 or 6 or 13 or 14 && Lo(channel) is >= 1 and <= 9);
+
+    private sealed class ImportParseState(Func<int, int> randomValueSelector)
     {
-        var hi = Hi(channel);
-        return channel is CH_03 or CH_08 or CH_09 || hi is 1 or 2 or 5 or 6 or 13 or 14;
+        public ParseState Chart { get; } = new();
+
+        public HashSet<ushort> InvisibleLayoutChannels { get; } = [];
+
+        public List<ControlFrame> Frames { get; } = [];
+
+        public Func<int, int> RandomValueSelector { get; } = randomValueSelector;
     }
 
     private static BmsChartMetadata extractImportMetadata(ParseState state, int totalColumns, string? path)
@@ -187,9 +215,9 @@ internal static partial class BmsChartParser
     }
 
     private static List<ImportHitObject> collectImportHitObjects(
-        ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
+        ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts, BmsTickTimeConverter timingMap)
     {
-        var (notes, lnCells, mines) = collectPlayableCells(state, totalColumns, measureStarts);
+        var (notes, lnCells, mines) = collectPlayableCells(state, totalColumns, measureStarts, importOnly: true);
 
         var output = new List<ImportHitObject>(notes.Count + lnCells.Count + mines.Count);
 
@@ -200,7 +228,7 @@ internal static partial class BmsChartParser
 
         collectImportVisibleObjects(notes, state, timingMap, output);
 
-        foreach (var mine in mines.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
+        foreach (var mine in mines)
         {
             var startTime = timingMap.ProjectTickToTime(mine.Tick);
             output.Add(new ImportHitObject(mine.Tick, mine.Column, startTime, startTime, false, true));
@@ -210,12 +238,12 @@ internal static partial class BmsChartParser
     }
 
     private static void collectImportVisibleObjects(
-        IEnumerable<RawCell> notes, ParseState state, BmsTimingMap timingMap,
+        IEnumerable<RawCell> notes, ParseState state, BmsTickTimeConverter timingMap,
         List<ImportHitObject> output)
     {
         if (state.LnObjValues.Count == 0)
         {
-            foreach (var note in notes.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
+            foreach (var note in notes)
                 output.Add(createImportHitObject(note, note.Tick, false, timingMap));
 
             return;
@@ -239,12 +267,12 @@ internal static partial class BmsChartParser
             pendingByColumn[note.Column] = note;
         }
 
-        foreach (var pending in pendingByColumn.Values.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
+        foreach (var pending in pendingByColumn.Values)
             output.Add(createImportHitObject(pending, pending.Tick, false, timingMap));
     }
 
     private static void collectImportLnType1Objects(
-        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap,
+        IEnumerable<RawCell> lnCells, BmsTickTimeConverter timingMap,
         List<ImportHitObject> output)
     {
         var openByColumn = new Dictionary<int, RawCell>();
@@ -264,7 +292,7 @@ internal static partial class BmsChartParser
     }
 
     private static void collectImportLnType2Objects(
-        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap,
+        IEnumerable<RawCell> lnCells, BmsTickTimeConverter timingMap,
         List<ImportHitObject> output)
     {
         foreach (var channelGroup in lnCells.GroupBy(c => c.Channel))
@@ -288,11 +316,11 @@ internal static partial class BmsChartParser
         }
     }
 
-    private static ImportHitObject createImportHitObject(RawCell start, long endTick, bool isLongNote, BmsTimingMap timingMap)
+    private static ImportHitObject createImportHitObject(RawCell start, long endTick, bool isLongNote, BmsTickTimeConverter timingMap)
     {
         var startTime = timingMap.ProjectTickToTime(start.Tick);
-        var endTime = timingMap.ProjectTickToTime(endTick);
-        return new ImportHitObject(start.Tick, start.Column, startTime, isLongNote ? Math.Max(startTime, endTime) : startTime, isLongNote, false);
+        var endTime = isLongNote ? Math.Max(startTime, timingMap.ProjectTickToTime(endTick)) : startTime;
+        return new ImportHitObject(start.Tick, start.Column, startTime, endTime, isLongNote, false);
     }
 
     private readonly record struct ImportHitObject(

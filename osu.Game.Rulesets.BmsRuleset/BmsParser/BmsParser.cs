@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -144,7 +144,10 @@ internal static partial class BmsChartParser
             state.StageFile,
             state.BackBmp,
             state.Banner,
-            state.DefaultExRank);
+            state.DefaultExRank)
+        {
+            InvisibleNotes = collectInvisibleNotes(state, totalColumns, measureStarts, timingMap),
+        };
     }
 
     /// <summary>Encode a 2-char base-62 pair into a 12-bit ushort (case-sensitive).</summary>
@@ -265,6 +268,102 @@ internal static partial class BmsChartParser
         ImportSummary,
     }
 
+    private enum HeaderCommand
+    {
+        None,
+        Title,
+        Artist,
+        Subtitle,
+        PlayLevel,
+        Bpm,
+        LnType,
+        LnMode,
+        Rank,
+        ExRank,
+        Total,
+        Base,
+        LnObj,
+        BpmDefinition,
+        StopDefinition,
+        Genre,
+        SubArtist,
+        Maker,
+        Url,
+        Email,
+        Comment,
+        ExRankDefinition,
+        VolWav,
+        Preview,
+        MidiFile,
+        StageFile,
+        BackBmp,
+        Banner,
+        PoorBga,
+        BaseBpm,
+        WavDefinition,
+        BmpDefinition,
+        BgaDefinition,
+        ScrollDefinition,
+        SpeedDefinition,
+        TextDefinition,
+        SongDefinition,
+    }
+
+    private static HeaderCommand resolveHeaderCommand(ReadOnlySpan<char> name, CommandParseMode mode)
+    {
+        var command = name.Length switch
+        {
+            3 when name.Equals("BPM", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Bpm,
+            4 when name.Equals("BASE", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Base,
+            4 when name.Equals("RANK", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Rank,
+            5 when name.Equals("TITLE", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Title,
+            5 when name.Equals("TOTAL", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Total,
+            5 when name.Equals("LNOBJ", StringComparison.OrdinalIgnoreCase) => HeaderCommand.LnObj,
+            5 when name.StartsWith("BPM", StringComparison.OrdinalIgnoreCase) => HeaderCommand.BpmDefinition,
+            6 when name.Equals("ARTIST", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Artist,
+            6 when name.Equals("LNTYPE", StringComparison.OrdinalIgnoreCase) => HeaderCommand.LnType,
+            6 when name.Equals("LNMODE", StringComparison.OrdinalIgnoreCase) => HeaderCommand.LnMode,
+            6 when name.Equals("EXRANK", StringComparison.OrdinalIgnoreCase) => HeaderCommand.ExRank,
+            6 when name.StartsWith("STOP", StringComparison.OrdinalIgnoreCase) => HeaderCommand.StopDefinition,
+            8 when name.Equals("SUBTITLE", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Subtitle,
+            9 when name.Equals("PLAYLEVEL", StringComparison.OrdinalIgnoreCase) => HeaderCommand.PlayLevel,
+            9 when name.Equals("DEFEXRANK", StringComparison.OrdinalIgnoreCase) => HeaderCommand.ExRank,
+            _ => HeaderCommand.None,
+        };
+
+        // Import stops before gameplay-only dispatch and never examines discarded values.
+        if (command != HeaderCommand.None || mode == CommandParseMode.ImportSummary)
+            return command;
+
+        return name.Length switch
+        {
+            3 when name.Equals("URL", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Url,
+            5 when name.Equals("GENRE", StringComparison.OrdinalIgnoreCase)
+                   || name.Equals("GENLE", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Genre,
+            5 when name.Equals("MAKER", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Maker,
+            5 when name.Equals("EMAIL", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Email,
+            5 when name.StartsWith("WAV", StringComparison.OrdinalIgnoreCase) => HeaderCommand.WavDefinition,
+            5 when name.StartsWith("BMP", StringComparison.OrdinalIgnoreCase) => HeaderCommand.BmpDefinition,
+            5 when name.StartsWith("BGA", StringComparison.OrdinalIgnoreCase) => HeaderCommand.BgaDefinition,
+            6 when name.Equals("VOLWAV", StringComparison.OrdinalIgnoreCase) => HeaderCommand.VolWav,
+            6 when name.Equals("BANNER", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Banner,
+            6 when name.StartsWith("TEXT", StringComparison.OrdinalIgnoreCase) => HeaderCommand.TextDefinition,
+            6 when name.StartsWith("SONG", StringComparison.OrdinalIgnoreCase) => HeaderCommand.SongDefinition,
+            7 when name.Equals("COMMENT", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Comment,
+            7 when name.Equals("PREVIEW", StringComparison.OrdinalIgnoreCase) => HeaderCommand.Preview,
+            7 when name.Equals("BACKBMP", StringComparison.OrdinalIgnoreCase) => HeaderCommand.BackBmp,
+            7 when name.Equals("POORBGA", StringComparison.OrdinalIgnoreCase) => HeaderCommand.PoorBga,
+            7 when name.Equals("BASEBPM", StringComparison.OrdinalIgnoreCase) => HeaderCommand.BaseBpm,
+            7 when name.StartsWith("SPEED", StringComparison.OrdinalIgnoreCase) => HeaderCommand.SpeedDefinition,
+            8 when name.Equals("MIDIFILE", StringComparison.OrdinalIgnoreCase) => HeaderCommand.MidiFile,
+            8 when name.StartsWith("EXRANK", StringComparison.OrdinalIgnoreCase) => HeaderCommand.ExRankDefinition,
+            8 when name.StartsWith("SCROLL", StringComparison.OrdinalIgnoreCase) => HeaderCommand.ScrollDefinition,
+            9 when name.Equals("SUBARTIST", StringComparison.OrdinalIgnoreCase) => HeaderCommand.SubArtist,
+            9 when name.Equals("STAGEFILE", StringComparison.OrdinalIgnoreCase) => HeaderCommand.StageFile,
+            _ => HeaderCommand.None,
+        };
+    }
+
     private static void applyCommandLine(ReadOnlySpan<char> span, ParseState state, CommandParseMode mode)
     {
         var cmdStart = 1;
@@ -275,259 +374,188 @@ internal static partial class BmsChartParser
         while (cmdEnd < span.Length && span[cmdEnd] != ' ' && span[cmdEnd] != '\t') cmdEnd++;
         if (cmdEnd >= span.Length) return;
 
-        applyCommand(span[cmdStart..cmdEnd], span[(cmdEnd + 1)..].Trim(), state, mode);
+        var name = span[cmdStart..cmdEnd];
+        var command = resolveHeaderCommand(name, mode);
+        if (command == HeaderCommand.None)
+            return;
+
+        applyCommand(command, name, span[(cmdEnd + 1)..].Trim(), state);
     }
 
-    private static void applyCommand(ReadOnlySpan<char> cmdSpan, ReadOnlySpan<char> valueSpan, ParseState state, CommandParseMode mode)
+    private static void applyCommand(HeaderCommand command, ReadOnlySpan<char> name, ReadOnlySpan<char> valueSpan, ParseState state)
     {
-        if (cmdSpan.Equals("TITLE", StringComparison.OrdinalIgnoreCase))
+        switch (command)
         {
-            state.Title = valueSpan.ToString();
-            return;
-        }
+            case HeaderCommand.Title:
+                state.Title = valueSpan.ToString();
+                return;
 
-        if (cmdSpan.Equals("ARTIST", StringComparison.OrdinalIgnoreCase))
-        {
-            state.Artist = valueSpan.ToString();
-            return;
-        }
+            case HeaderCommand.Artist:
+                state.Artist = valueSpan.ToString();
+                return;
 
-        if (cmdSpan.Equals("GENRE", StringComparison.OrdinalIgnoreCase)
-            || cmdSpan.Equals("GENLE", StringComparison.OrdinalIgnoreCase))
-        {
-            state.Genre = valueSpan.ToString();
-            return;
-        }
+            case HeaderCommand.Genre:
+                state.Genre = valueSpan.ToString();
+                return;
 
-        if (cmdSpan.Equals("SUBTITLE", StringComparison.OrdinalIgnoreCase))
-        {
-            state.Subtitle = valueSpan.ToString();
-            return;
-        }
+            case HeaderCommand.Subtitle:
+                state.Subtitle = valueSpan.ToString();
+                return;
 
-        if (cmdSpan.Equals("SUBARTIST", StringComparison.OrdinalIgnoreCase))
-        {
-            state.SubArtist = valueSpan.ToString();
-            return;
-        }
+            case HeaderCommand.SubArtist:
+                state.SubArtist = valueSpan.ToString();
+                return;
 
-        if (cmdSpan.Equals("MAKER", StringComparison.OrdinalIgnoreCase))
-        {
-            state.Maker = valueSpan.ToString();
-            return;
-        }
+            case HeaderCommand.Maker:
+                state.Maker = valueSpan.ToString();
+                return;
 
-        if (cmdSpan.Equals("URL", StringComparison.OrdinalIgnoreCase))
-        {
-            state.Url = valueSpan.ToString();
-            return;
-        }
+            case HeaderCommand.Url:
+                state.Url = valueSpan.ToString();
+                return;
 
-        if (cmdSpan.Equals("EMAIL", StringComparison.OrdinalIgnoreCase))
-        {
-            state.Email = valueSpan.ToString();
-            return;
-        }
+            case HeaderCommand.Email:
+                state.Email = valueSpan.ToString();
+                return;
 
-        if (cmdSpan.Equals("COMMENT", StringComparison.OrdinalIgnoreCase))
-        {
-            state.Comment = valueSpan.ToString();
-            return;
-        }
+            case HeaderCommand.Comment:
+                state.Comment = valueSpan.ToString();
+                return;
 
-        if (cmdSpan.Equals("PLAYLEVEL", StringComparison.OrdinalIgnoreCase))
-        {
-            if (tryParseDouble(valueSpan, out var difficulty))
-                state.PlayLevel = (float)difficulty;
-            return;
-        }
+            case HeaderCommand.PlayLevel:
+                if (tryParseDouble(valueSpan, out var difficulty))
+                    state.PlayLevel = (float)difficulty;
+                return;
 
-        if (cmdSpan.Equals("BPM", StringComparison.OrdinalIgnoreCase))
-        {
-            if (tryParseDouble(valueSpan, out var bpm) && bpm != 0)
-                state.InitialBpm = bpm;
-            return;
-        }
+            case HeaderCommand.Bpm:
+                if (tryParseDouble(valueSpan, out var bpm) && bpm != 0)
+                    state.InitialBpm = bpm;
+                return;
 
-        if (cmdSpan.Equals("LNTYPE", StringComparison.OrdinalIgnoreCase))
-        {
-            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnType))
-                state.LnType = lnType;
-            return;
-        }
+            case HeaderCommand.LnType:
+                if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnType))
+                    state.LnType = lnType;
+                return;
 
-        if (cmdSpan.Equals("LNMODE", StringComparison.OrdinalIgnoreCase))
-        {
-            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnMode) && lnMode >= 1 && lnMode <= 3)
-                state.LnMode = (BmsLongNoteMode)lnMode;
-            return;
-        }
+            case HeaderCommand.LnMode:
+                if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lnMode) && lnMode >= 1 && lnMode <= 3)
+                    state.LnMode = (BmsLongNoteMode)lnMode;
+                return;
 
-        if (cmdSpan.Equals("RANK", StringComparison.OrdinalIgnoreCase))
-        {
-            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rank) && rank >= 0 && rank <= 4)
-            {
-                state.Rank = rank;
-                state.DefaultExRank = null;
-            }
+            case HeaderCommand.Rank:
+                if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rank) && rank >= 0 && rank <= 4)
+                {
+                    state.Rank = rank;
+                    state.DefaultExRank = null;
+                }
 
-            return;
-        }
+                return;
 
-        if (cmdSpan.Equals("DEFEXRANK", StringComparison.OrdinalIgnoreCase)
-            || cmdSpan.Equals("EXRANK", StringComparison.OrdinalIgnoreCase))
-        {
-            if (tryParseDouble(valueSpan, out var exRank) && exRank >= 0)
-                state.DefaultExRank = exRank;
-            return;
-        }
+            case HeaderCommand.ExRank:
+                if (tryParseDouble(valueSpan, out var exRank) && exRank >= 0)
+                    state.DefaultExRank = exRank;
+                return;
 
-        if (cmdSpan.Equals("TOTAL", StringComparison.OrdinalIgnoreCase))
-        {
-            if (tryParseDouble(valueSpan, out var total) && total > 0)
-                state.Total = total;
-            return;
-        }
+            case HeaderCommand.Total:
+                if (tryParseDouble(valueSpan, out var total) && total > 0)
+                    state.Total = total;
+                return;
 
-        if (cmdSpan.Equals("BASE", StringComparison.OrdinalIgnoreCase))
-        {
-            if (valueSpan.Length >= 2 && valueSpan[..2].Equals("62", StringComparison.Ordinal))
-                state.UseBase62 = true;
-            return;
-        }
+            case HeaderCommand.Base:
+                if (valueSpan.Length >= 2 && valueSpan[..2].Equals("62", StringComparison.Ordinal))
+                    state.UseBase62 = true;
+                return;
 
-        if (cmdSpan.Equals("LNOBJ", StringComparison.OrdinalIgnoreCase))
-        {
-            if (valueSpan.Length >= 2)
-                state.LnObjValues.Add(encodeValue(state.UseBase62, valueSpan[0], valueSpan[1]));
-            return;
-        }
+            case HeaderCommand.LnObj:
+                if (valueSpan.Length >= 2)
+                    state.LnObjValues.Add(encodeValue(state.UseBase62, valueSpan[0], valueSpan[1]));
+                return;
 
-        // Definition commands: #BPMxx, #WAVxx, #STOPxx, #TEXTxx, #SONGxx
-        if (cmdSpan.Length == 5 && cmdSpan.StartsWith("BPM", StringComparison.OrdinalIgnoreCase)
-                                && tryParseDouble(valueSpan, out var extendedBpm) && extendedBpm != 0)
-        {
-            state.BpmDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = extendedBpm;
-            return;
-        }
+            case HeaderCommand.BpmDefinition:
+                if (tryParseDouble(valueSpan, out var extendedBpm) && extendedBpm != 0)
+                    state.BpmDefinitions[encodeValue(state.UseBase62, name[3], name[4])] = extendedBpm;
+                return;
 
-        if (cmdSpan.Length == 6 && cmdSpan.StartsWith("STOP", StringComparison.OrdinalIgnoreCase)
-                                && tryParseDouble(valueSpan, out var stopValue) && stopValue > 0)
-        {
-            state.StopDefinitions[encodeValue(state.UseBase62, cmdSpan[4], cmdSpan[5])] = stopValue;
-            return;
-        }
+            case HeaderCommand.StopDefinition:
+                if (tryParseDouble(valueSpan, out var stopValue) && stopValue > 0)
+                    state.StopDefinitions[encodeValue(state.UseBase62, name[4], name[5])] = stopValue;
+                return;
 
-        if (cmdSpan.Length == 8 && cmdSpan.StartsWith("EXRANK", StringComparison.OrdinalIgnoreCase)
-                                && tryParseDouble(valueSpan, out var exRankDefinition) && exRankDefinition >= 0)
-        {
-            state.ExRankDefinitions[encodeValue(state.UseBase62, cmdSpan[6], cmdSpan[7])] = exRankDefinition;
-            return;
-        }
+            case HeaderCommand.ExRankDefinition:
+                if (tryParseDouble(valueSpan, out var exRankDefinition) && exRankDefinition >= 0)
+                    state.ExRankDefinitions[encodeValue(state.UseBase62, name[6], name[7])] = exRankDefinition;
+                return;
 
-        if (mode != CommandParseMode.Full)
-            return;
+            case HeaderCommand.VolWav:
+                if (tryParseDouble(valueSpan, out var volume) && double.IsFinite(volume))
+                    state.WavVolume = Math.Max(0, (int)volume);
+                return;
 
-        if (cmdSpan.Equals("VOLWAV", StringComparison.OrdinalIgnoreCase))
-        {
-            if (tryParseDouble(valueSpan, out var volume) && double.IsFinite(volume))
-                state.WavVolume = Math.Max(0, (int)volume);
-            return;
-        }
+            case HeaderCommand.Preview:
+                state.PreviewFile = valueSpan.Trim('"').ToString();
+                return;
 
-        if (cmdSpan.Equals("PREVIEW", StringComparison.OrdinalIgnoreCase))
-        {
-            state.PreviewFile = valueSpan.Trim('"').ToString();
-            return;
-        }
+            case HeaderCommand.MidiFile:
+                state.MidiFile = valueSpan.Trim('"').ToString();
+                return;
 
-        if (cmdSpan.Equals("MIDIFILE", StringComparison.OrdinalIgnoreCase))
-        {
-            state.MidiFile = valueSpan.Trim('"').ToString();
-            return;
-        }
+            case HeaderCommand.StageFile:
+                state.StageFile = valueSpan.Trim('"').ToString();
+                return;
 
-        if (cmdSpan.Equals("STAGEFILE", StringComparison.OrdinalIgnoreCase))
-        {
-            state.StageFile = valueSpan.Trim('"').ToString();
-            return;
-        }
+            case HeaderCommand.BackBmp:
+                state.BackBmp = valueSpan.Trim('"').ToString();
+                return;
 
-        if (cmdSpan.Equals("BACKBMP", StringComparison.OrdinalIgnoreCase))
-        {
-            state.BackBmp = valueSpan.Trim('"').ToString();
-            return;
-        }
+            case HeaderCommand.Banner:
+                state.Banner = valueSpan.Trim('"').ToString();
+                return;
 
-        if (cmdSpan.Equals("BANNER", StringComparison.OrdinalIgnoreCase))
-        {
-            state.Banner = valueSpan.Trim('"').ToString();
-            return;
-        }
+            case HeaderCommand.PoorBga:
+                if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var poorMode)
+                    && poorMode >= 0 && poorMode <= 2)
+                    state.PoorBgaMode = (BmsPoorBgaMode)poorMode;
+                return;
 
-        if (cmdSpan.Equals("POORBGA", StringComparison.OrdinalIgnoreCase))
-        {
-            if (int.TryParse(valueSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var poorMode)
-                && poorMode >= 0 && poorMode <= 2)
-                state.PoorBgaMode = (BmsPoorBgaMode)poorMode;
-            return;
-        }
+            case HeaderCommand.BaseBpm:
+                if (tryParseDouble(valueSpan, out var baseBpm) && baseBpm > 0)
+                    state.BaseBpm = baseBpm;
+                return;
 
-        if (cmdSpan.Equals("BASEBPM", StringComparison.OrdinalIgnoreCase))
-        {
-            if (tryParseDouble(valueSpan, out var baseBpm) && baseBpm > 0)
-                state.BaseBpm = baseBpm;
-            return;
-        }
+            case HeaderCommand.WavDefinition:
+                if (valueSpan.Length > 0)
+                    state.SampleDefinitions[encodeValue(state.UseBase62, name[3], name[4])] = valueSpan.Trim('"').ToString();
+                return;
 
-        if (cmdSpan.Length == 5 && cmdSpan.StartsWith("WAV", StringComparison.OrdinalIgnoreCase)
-                                && valueSpan.Length > 0)
-        {
-            state.SampleDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = valueSpan.Trim('"').ToString();
-            return;
-        }
+            case HeaderCommand.BmpDefinition:
+                if (valueSpan.Length > 0)
+                    state.BitmapDefinitions[encodeValue(state.UseBase62, name[3], name[4])] = valueSpan.Trim('"').ToString();
+                return;
 
-        if (cmdSpan.Length == 5 && cmdSpan.StartsWith("BMP", StringComparison.OrdinalIgnoreCase)
-                                && valueSpan.Length > 0)
-        {
-            state.BitmapDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = valueSpan.Trim('"').ToString();
-            return;
-        }
+            case HeaderCommand.BgaDefinition:
+                if (tryParseBgaDefinition(valueSpan, state.UseBase62, out var bgaDefinition))
+                    state.BgaDefinitions[encodeValue(state.UseBase62, name[3], name[4])] = bgaDefinition;
+                return;
 
-        if (cmdSpan.Length == 5 && cmdSpan.StartsWith("BGA", StringComparison.OrdinalIgnoreCase)
-                                && tryParseBgaDefinition(valueSpan, state.UseBase62, out var bgaDefinition))
-        {
-            state.BgaDefinitions[encodeValue(state.UseBase62, cmdSpan[3], cmdSpan[4])] = bgaDefinition;
-            return;
-        }
+            case HeaderCommand.ScrollDefinition:
+                if (tryParseDouble(valueSpan, out var scrollValue))
+                    state.ScrollDefinitions[encodeValue(state.UseBase62, name[6], name[7])] = scrollValue;
+                return;
 
-        // #SCROLLxx value — 8 chars, 2-char index (e.g. #SCROLL01)
-        if (cmdSpan.Length == 8 && cmdSpan.StartsWith("SCROLL", StringComparison.OrdinalIgnoreCase)
-                                && tryParseDouble(valueSpan, out var scrollValue))
-        {
-            state.ScrollDefinitions[encodeValue(state.UseBase62, cmdSpan[6], cmdSpan[7])] = scrollValue;
-            return;
-        }
+            case HeaderCommand.SpeedDefinition:
+                if (tryParseDouble(valueSpan, out var speedValue))
+                    state.SpeedDefinitions[encodeValue(state.UseBase62, name[5], name[6])] = speedValue;
+                return;
 
-        // #SPEEDxx value — 7 chars, 2-char index (e.g. #SPEED01)
-        if (cmdSpan.Length == 7 && cmdSpan.StartsWith("SPEED", StringComparison.OrdinalIgnoreCase)
-                                && tryParseDouble(valueSpan, out var speedValue))
-        {
-            state.SpeedDefinitions[encodeValue(state.UseBase62, cmdSpan[5], cmdSpan[6])] = speedValue;
-            return;
-        }
+            case HeaderCommand.TextDefinition:
+                if (valueSpan.Length > 0)
+                    state.TextDefinitions[encodeValue(state.UseBase62, name[4], name[5])] = valueSpan.ToString();
+                return;
 
-        if (cmdSpan.Length == 6 && cmdSpan.StartsWith("TEXT", StringComparison.OrdinalIgnoreCase)
-                                && valueSpan.Length > 0)
-        {
-            state.TextDefinitions[encodeValue(state.UseBase62, cmdSpan[4], cmdSpan[5])] = valueSpan.ToString();
-            return;
-        }
-
-        if (cmdSpan.Length == 6 && cmdSpan.StartsWith("SONG", StringComparison.OrdinalIgnoreCase)
-                                && valueSpan.Length > 0)
-        {
-            state.TextDefinitions.TryAdd(encodeValue(state.UseBase62, cmdSpan[4], cmdSpan[5]), valueSpan.ToString());
+            case HeaderCommand.SongDefinition:
+                if (valueSpan.Length > 0)
+                    state.TextDefinitions.TryAdd(encodeValue(state.UseBase62, name[4], name[5]), valueSpan.ToString());
+                return;
         }
     }
 
@@ -984,6 +1012,26 @@ internal static partial class BmsChartParser
             output.Add(createMineHitObject(mine, timingMap, state.WavVolume));
     }
 
+    private static BmsParsedHitObject[] collectInvisibleNotes(
+        ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts, BmsTimingMap timingMap)
+    {
+        // A hidden keysound may coexist with a visible note or LNOBJ on the same lane and tick.
+        var notes = new Dictionary<(long Tick, int Column), RawCell>();
+        foreach (var line in state.ChannelLines)
+        {
+            if (Hi(line.Channel) is not (3 or 4)
+                || !BmsLayout.TryMapPlayableChannel(line.Channel, totalColumns, out var column))
+                continue;
+
+            foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+                notes[(cell.Tick, column)] = cell with { Column = column };
+        }
+
+        return notes.Values.OrderBy(n => n.Tick).ThenBy(n => n.Column)
+            .Select(n => createHitObject(n, n.Tick, false, timingMap, state.SampleDefinitions, state.WavVolume))
+            .ToArray();
+    }
+
     private static List<BmsJudgementRateEvent> collectJudgementRateEvents(
         ParseState state, IReadOnlyDictionary<int, long> measureStarts, BmsLayoutVariant layoutVariant)
     {
@@ -1032,7 +1080,7 @@ internal static partial class BmsChartParser
     }
 
     private static (List<RawCell> Notes, List<RawCell> LnCells, List<RawCell> Mines) collectPlayableCells(
-        ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts)
+        ParseState state, int totalColumns, IReadOnlyDictionary<int, long> measureStarts, bool importOnly = false)
     {
         var notes = new List<RawCell>();
         var lnCells = new List<RawCell>();
@@ -1042,14 +1090,14 @@ internal static partial class BmsChartParser
         {
             if (BmsLayout.TryMapVisibleChannel(line.Channel, totalColumns, out var column))
             {
-                foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62))
+                foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62, decodeValues: !importOnly || state.LnObjValues.Count > 0))
                     notes.Add(cell with { Column = column });
                 continue;
             }
 
             if (tryMapLongNoteChannel(line.Channel, totalColumns, out column))
             {
-                foreach (var cell in expandCells(line, measureStarts, state.LnType == 2, state.UseBase62))
+                foreach (var cell in expandCells(line, measureStarts, state.LnType == 2, state.UseBase62, decodeValues: !importOnly))
                     lnCells.Add(cell with { Column = column });
                 continue;
             }
@@ -1057,7 +1105,7 @@ internal static partial class BmsChartParser
             if (tryMapLandmineChannel(line.Channel, totalColumns, out column))
             {
                 // Mine channels keep their base-36 value semantics regardless of #BASE 62.
-                foreach (var cell in expandCells(line, measureStarts, false, false))
+                foreach (var cell in expandCells(line, measureStarts, false, false, decodeValues: !importOnly))
                     mines.Add(cell with { Column = column });
             }
         }
@@ -1205,7 +1253,7 @@ internal static partial class BmsChartParser
     }
 
     private static IEnumerable<RawCell> expandCells(
-        RawChannelLine line, IReadOnlyDictionary<int, long> measureStarts, bool includeZeroCells, bool useBase62)
+        RawChannelLine line, IReadOnlyDictionary<int, long> measureStarts, bool includeZeroCells, bool useBase62, bool decodeValues = true)
     {
         var pairCount = line.PayloadLength / 2;
 
@@ -1228,7 +1276,10 @@ internal static partial class BmsChartParser
             if (!includeZeroCells && lineStr[pos] == '0' && lineStr[pos + 1] == '0')
                 continue;
 
-            var value = encodeValue(useBase62, lineStr[pos], lineStr[pos + 1]);
+            // Import only needs occupied/empty cells unless a visible value may terminate an LNOBJ.
+            var value = decodeValues
+                ? encodeValue(useBase62, lineStr[pos], lineStr[pos + 1])
+                : (ushort)(lineStr[pos] == '0' && lineStr[pos + 1] == '0' ? 0 : 1);
 
             if (!includeZeroCells && value == 0)
                 continue;

@@ -270,8 +270,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             var path = chartPaths[i];
             var content = bytes[i];
             var md5 = allMd5[i];
-            var lines = BmsChartParser.ReadAllLines(content);
-            var summary = BmsChartParser.ParseImportSummary(lines, path, _ => 1);
+            var summary = BmsChartParser.ParseImportSummary(content, path, _ => 1);
 
             return (
                 Index: i,

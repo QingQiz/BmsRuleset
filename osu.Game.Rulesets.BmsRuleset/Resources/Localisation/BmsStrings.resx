@@ -337,4 +337,10 @@
   <data name="difficulty_attribute" xml:space="preserve"><value>{0}: {1:0.##}</value></data>
   <data name="difficulty_length" xml:space="preserve"><value>Length: {0}</value></data>
   <data name="difficulty_bpm" xml:space="preserve"><value>BPM: {0:0}</value></data>
+  <data name="show_invisible_notes" xml:space="preserve">
+    <value>Show invisible notes</value>
+  </data>
+  <data name="show_invisible_notes_hint" xml:space="preserve">
+    <value>Display invisible keysound notes as yellow outlines. These notes do not affect judgement or score.</value>
+  </data>
 </root>

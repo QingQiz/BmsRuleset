@@ -75,7 +75,7 @@ public class BmsModRotationRandom : Mod, IApplicableAfterBeatmapConversion, IHas
         for (var i = 0; i < count; i++)
             mapping[i] = baseArr[(i - offset + count) % count];
 
-        foreach (var hitObject in bmsBeatmap.HitObjects)
+        foreach (var hitObject in bmsBeatmap.HitObjects.Concat(bmsBeatmap.InvisibleNotes))
         {
             var srcIdx = Array.IndexOf(shuffleCols, hitObject.Column);
             if (srcIdx >= 0)

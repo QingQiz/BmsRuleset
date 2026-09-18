@@ -97,9 +97,12 @@ internal sealed class BmsHitObjectLifetimeEntry(
         // with the current LifetimeEnd would produce an intermediate
         // MaxValue that the framework may latch on to before the follow-up
         // LifetimeEnd set corrects it.
-        LifetimeEnd = hitObject is BmsLandmine
-            ? hitObject.StartTime + MINE_PAST_LIFETIME
-            : hitObject.GetEndTime() + Math.Max(pastLifetime, slowWindow + lifetime_margin);
+        LifetimeEnd = hitObject switch
+        {
+            BmsInvisibleNote => hitObject.StartTime + 1,
+            BmsLandmine => hitObject.StartTime + MINE_PAST_LIFETIME,
+            _ => hitObject.GetEndTime() + Math.Max(pastLifetime, slowWindow + lifetime_margin),
+        };
         LifetimeStart = lifetimeStart;
 
         lifetimeComputed = true;
@@ -178,7 +181,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     /// </summary>
     private static double getFastInputWindow(BmsHitObject hitObject)
     {
-        if (hitObject is BmsLandmine) return 0;
+        if (hitObject is BmsLandmine or BmsInvisibleNote) return 0;
 
         var table = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: false);
         return Math.Max(table.FastWindowFor(HitResult.Ok), table.FastWindowFor(HitResult.Miss));
@@ -245,7 +248,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
     private bool isVisibleAt(BmsHitObject hitObject, BmsTimingMap timingMap, double time)
     {
-        if (hitObject is BmsLandmine)
+        if (hitObject is BmsLandmine or BmsInvisibleNote)
         {
             // Reverse-scroll mine art can lie many screens below the judgement line long before
             // its first appearance. A one-sided test keeps tens of thousands of those mines alive.
@@ -315,6 +318,9 @@ internal sealed class BmsHitObjectLifetimeEntry(
     /// </summary>
     private static double getSlowWindow(BmsHitObject hitObject)
     {
+        if (hitObject is BmsInvisibleNote)
+            return 0;
+
         if (hitObject is BmsLongNote)
         {
             var tailTable = BmsJudgementProfileProvider.GetTable(hitObject.Beatmap.LayoutVariant, hitObject.Column, hitObject.EffectiveJudgementRate, tail: true);

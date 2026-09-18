@@ -33,6 +33,8 @@ internal sealed class BmsGameplayDiagnosticOptions
 
     public bool AudioOutput { get; private set; }
 
+    public bool ShowInvisibleNotes { get; private set; }
+
     public bool Invert { get; private set; }
 
     public int? InvertRandomSeed { get; private set; }
@@ -65,6 +67,12 @@ internal sealed class BmsGameplayDiagnosticOptions
             if (argument == "--audio-output")
             {
                 result.AudioOutput = true;
+                continue;
+            }
+
+            if (argument == "--show-invisible-notes")
+            {
+                result.ShowInvisibleNotes = true;
                 continue;
             }
 

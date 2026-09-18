@@ -94,7 +94,7 @@
 | `D1`–`D9` | Landmine / mine — P1 (base-36 encoded)          |
 | `E1`–`E9` | Landmine / mine — P2 (base-36 encoded)          |
 
-**Not parsed:** invisible note channels (`31`–`39`, `41`–`49`), dynamic option change (`A6`).
+**Not parsed:** dynamic option change (`A6`).
 
 > `#xxx02` sets measure length: `1` = 4/4, `0.5` = half, `2` = double. At a fixed BPM,
 > duration (ms) = `#xxx02 × 240000 / BPM`. The smallest accurately represented value is `1/1024`;
@@ -333,12 +333,19 @@ If a declared audio file is missing, files with the same base name are tried in 
 
 #### 2.5 Invisible Notes
 
-| Channel   | Name                         | Status | Description                           |
-|-----------|------------------------------|--------|---------------------------------------|
-| `31`–`36` | 1P Invisible KEY1–5, SCRATCH | ✗      | Not displayed, not judged, not scored |
-| `38`–`39` | 1P Invisible KEY6–7          | ✗      | 7-key invisible extension             |
-| `41`–`46` | 2P Invisible KEY1–5, SCRATCH | ✗      | P2 invisible notes                    |
-| `48`–`49` | 2P Invisible KEY6–7          | ✗      | P2 7-key invisible extension          |
+| Channel   | Name                        | Status | Description                  |
+|-----------|-----------------------------|--------|------------------------------|
+| `31`–`36` | 1P Invisible KEY1–5, SCRATCH | ✓      | Empty-press keysound changes  |
+| `38`–`39` | 1P Invisible KEY6–7         | ✓      | 7-key invisible extension    |
+| `41`–`46` | 2P Invisible KEY1–5, SCRATCH | ✓      | P2 keysound changes          |
+| `48`–`49` | 2P Invisible KEY6–7         | ✓      | P2 7-key invisible extension |
+
+Invisible notes do not contribute to judgements, score, combo, difficulty or autoplay.
+Once passed, they replace the lane's empty-press keysound until a later note replaces it,
+following beatoraja's invisible-note behaviour. Visible notes take priority at the same time.
+The **Show invisible notes** setting (off by default) displays yellow rectangular outlines.
+PMS uses the corresponding visible-channel lane mapping. Lane and note randomisation also
+remap invisible notes. The lightweight import parser retains only their layout channel IDs.
 
 #### 2.6 Long Notes
 

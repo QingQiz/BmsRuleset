@@ -710,8 +710,6 @@ public partial class BmsGameplayVirtualisationTest
 
     private sealed partial class TestDrawableBmsHitObject : DrawableBmsHitObject
     {
-        protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Note;
-
         public Container TestNoteContainer => NoteContainer;
 
         public TestDrawableBmsHitObject()

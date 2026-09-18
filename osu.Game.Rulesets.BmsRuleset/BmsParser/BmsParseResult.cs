@@ -35,6 +35,8 @@ public sealed record BmsParseResult(
     string? Banner = null,
     double? DefaultExRank = null)
 {
+    public IReadOnlyList<BmsParsedHitObject> InvisibleNotes { get; init; } = [];
+
     internal BmsParseResult ShiftedBy(double offset)
     {
         if (offset == 0)
@@ -46,6 +48,7 @@ public sealed record BmsParseResult(
             BackgroundSampleEvents = BackgroundSampleEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),
             LongNoteTailSampleEvents = LongNoteTailSampleEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),
             HitObjects = HitObjects.Select(h => h with { StartTime = h.StartTime + offset }).ToArray(),
+            InvisibleNotes = InvisibleNotes.Select(h => h with { StartTime = h.StartTime + offset }).ToArray(),
             TextEvents = TextEvents with
             {
                 TextEvents = TextEvents.TextEvents.Select(e => e with { Time = e.Time + offset }).ToArray(),

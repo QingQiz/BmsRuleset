@@ -45,6 +45,7 @@ foreach ($case in $spec.cases) {
     }
     if (Get-Setting $case 'headless' $false) { $captureArgs += '--headless' }
     if (Get-Setting $case 'audioOutput' $false) { $captureArgs += '--audio-output' }
+    if (Get-Setting $case 'showInvisibleNotes' $false) { $captureArgs += '--show-invisible-notes' }
     if (Get-Setting $case 'invert' $false) { $captureArgs += '--invert' }
     $invertSeed = Get-Setting $case 'invertRandomSeed' $null
     if ($null -ne $invertSeed) {

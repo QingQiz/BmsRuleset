@@ -337,4 +337,10 @@
   <data name="difficulty_attribute" xml:space="preserve"><value>{0}: {1:0.##}</value></data>
   <data name="difficulty_length" xml:space="preserve"><value>时长：{0}</value></data>
   <data name="difficulty_bpm" xml:space="preserve"><value>BPM：{0:0}</value></data>
+  <data name="show_invisible_notes" xml:space="preserve">
+    <value>显示不可见音符</value>
+  </data>
+  <data name="show_invisible_notes_hint" xml:space="preserve">
+    <value>将用于切换按键音的不可见音符显示为黄色方框。这些音符不参与判定或计分。</value>
+  </data>
 </root>

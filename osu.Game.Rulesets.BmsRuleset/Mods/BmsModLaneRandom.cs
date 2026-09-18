@@ -51,7 +51,7 @@ public class BmsModLaneRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
         if (!string.IsNullOrWhiteSpace(LaneOrder.Value))
         {
             var mapping = parseLaneOrder(LaneOrder.Value, totalColumns);
-            foreach (var hitObject in bmsBeatmap.HitObjects)
+            foreach (var hitObject in bmsBeatmap.HitObjects.Concat(bmsBeatmap.InvisibleNotes))
                 hitObject.Column = mapping[hitObject.Column];
             return;
         }
@@ -65,7 +65,7 @@ public class BmsModLaneRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
         var subMapping = Enumerable.Range(0, shuffleCols.Length).ToArray();
         shuffle(new Random((int)Seed.Value), subMapping);
 
-        foreach (var hitObject in bmsBeatmap.HitObjects)
+        foreach (var hitObject in bmsBeatmap.HitObjects.Concat(bmsBeatmap.InvisibleNotes))
         {
             var srcIdx = Array.IndexOf(shuffleCols, hitObject.Column);
             if (srcIdx >= 0)

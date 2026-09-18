@@ -28,6 +28,7 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
         SetDefault(BmsRulesetSetting.AutomaticallyAdjustVisualOffset, false);
         SetDefault(BmsRulesetSetting.UseDedicatedPreviewAudio, true);
         SetDefault(BmsRulesetSetting.UnlockFrameRateLimit, false);
+        SetDefault(BmsRulesetSetting.ShowInvisibleNotes, false);
 
         SetDefault(BmsRulesetSetting.ShowBms5K, true);
         SetDefault(BmsRulesetSetting.ShowBme7K, true);
@@ -62,4 +63,5 @@ public enum BmsRulesetSetting
     UseDedicatedPreviewAudio,
     UnlockFrameRateLimit,
     JudgementAlgorithm,
+    ShowInvisibleNotes,
 }

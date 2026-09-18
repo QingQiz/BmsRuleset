@@ -953,11 +953,12 @@ public class BmsBeatmapDecoderTest
                              #001E1:0A
                              """);
 
-        var mine = (BmsHitObject)beatmap.HitObjects.Single();
+        var mine = beatmap.HitObjects.OfType<BmsLandmine>().Single();
 
-        Assert.That(beatmap.HitObjects, Has.Count.EqualTo(1));
+        Assert.That(beatmap.HitObjects, Has.Count.EqualTo(2));
         Assert.That(mine is BmsLandmine, Is.True);
-        Assert.That(mine.Column, Is.EqualTo(6));
+        Assert.That(mine.Column, Is.EqualTo(8));
+        Assert.That(beatmap.HitObjects.OfType<BmsNote>().Single().Column, Is.EqualTo(14));
         Assert.That(mine.SourceChannel, Is.EqualTo(BmsChartParser.Enc("E1")));
         Assert.That((mine as BmsLandmine)?.LandmineDamagePercent ?? 0, Is.EqualTo(5));
     }

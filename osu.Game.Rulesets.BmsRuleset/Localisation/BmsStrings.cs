@@ -15,6 +15,10 @@ public static class BmsStrings
 
     public static LocalisableString Layout => get("layout");
 
+    public static LocalisableString ShowInvisibleNotes => get("show_invisible_notes");
+
+    public static LocalisableString ShowInvisibleNotesHint => get("show_invisible_notes_hint");
+
     public static LocalisableString GaugeHistory => get("gauge_history");
 
     public static LocalisableString Timeline => get("timeline");

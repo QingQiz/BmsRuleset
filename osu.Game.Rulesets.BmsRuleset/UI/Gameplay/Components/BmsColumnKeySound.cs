@@ -11,12 +11,13 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 
-public sealed partial class BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, HitObjectContainer hitObjectContainer)
+public sealed partial class BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, HitObjectContainer hitObjectContainer,
+                                           IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
     : CompositeDrawable
 {
     public override bool IsPresent => false;
 
-    private readonly BmsKeySoundCursor cursor = new(hitObjects);
+    private readonly BmsKeySoundCursor cursor = new(hitObjects, invisibleNotes);
 
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 

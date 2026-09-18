@@ -1,3 +1,4 @@
+using System.Linq;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -29,7 +30,7 @@ public class BmsModMirror : Mod, IApplicableAfterBeatmapConversion
 
     private static void applyMirrorConversion(BmsBeatmap beatmap)
     {
-        foreach (var hitObject in beatmap.HitObjects)
+        foreach (var hitObject in beatmap.HitObjects.Concat(beatmap.InvisibleNotes))
             hitObject.Column = mirrorColumn(hitObject.Column, beatmap.LayoutVariant);
     }
 

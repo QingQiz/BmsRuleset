@@ -62,7 +62,7 @@ public sealed class BmsTimingMap
 
     // ── Tick→time infrastructure (only used during parsing, not gameplay) ──
 
-    private readonly double[] cumulativeStopDurations;
+    private readonly BmsTickTimeConverter tickTimeConverter;
     private int cursor;
     private readonly double timeOffset;
 
@@ -94,7 +94,7 @@ public sealed class BmsTimingMap
         this.speedEvents = speedEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
         ScrollReferenceBpm = baseBpm > 0 ? baseBpm : initialBpm();
         points = buildTimingPoints();
-        cumulativeStopDurations = buildCumulativeStops();
+        tickTimeConverter = new BmsTickTimeConverter(tickResolution, this.bpmEvents, this.stopEvents);
     }
 
     // Backward-compatible overload for tests and fallback paths that don't have scroll/speed events.
@@ -241,25 +241,7 @@ public sealed class BmsTimingMap
     ///     Returns the projected osu! time in milliseconds for a native BMS tick,
     ///     accounting for all BPM changes and STOP segments.
     /// </summary>
-    public double ProjectTickToTime(long tick)
-    {
-        var bpmEvent = bpmEvents[findLastBpmIndex(tick)];
-
-        var firstStop = findFirstStopIndex(bpmEvent.Tick);
-        var pastStop = findFirstStopIndex(tick);
-
-        var stopOffset = 0d;
-
-        if (firstStop < pastStop)
-        {
-            stopOffset = cumulativeStopDurations[pastStop - 1];
-
-            if (firstStop > 0)
-                stopOffset -= cumulativeStopDurations[firstStop - 1];
-        }
-
-        return bpmEvent.Time + ticksToMilliseconds(tick - bpmEvent.Tick, Math.Abs(bpmEvent.Bpm)) + stopOffset;
-    }
+    public double ProjectTickToTime(long tick) => tickTimeConverter.ProjectTickToTime(tick);
 
     // ── Build: precompute all timing points ───────────────────────────────────
 
@@ -418,68 +400,6 @@ public sealed class BmsTimingMap
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
-
-    private double[] buildCumulativeStops()
-    {
-        var prefix = new double[stopEvents.Length];
-        double cumulative = 0;
-
-        for (var i = 0; i < stopEvents.Length; i++)
-        {
-            cumulative += stopEvents[i].Duration;
-            prefix[i] = cumulative;
-        }
-
-        return prefix;
-    }
-
-    private int findLastBpmIndex(long tick)
-    {
-        var lo = 0;
-        var hi = bpmEvents.Length - 1;
-        var result = 0;
-
-        while (lo <= hi)
-        {
-            var mid = lo + (hi - lo) / 2;
-
-            if (bpmEvents[mid].Tick <= tick)
-            {
-                result = mid;
-                lo = mid + 1;
-            }
-            else
-            {
-                hi = mid - 1;
-            }
-        }
-
-        return result;
-    }
-
-    private int findFirstStopIndex(long tick)
-    {
-        var lo = 0;
-        var hi = stopEvents.Length - 1;
-        var result = stopEvents.Length;
-
-        while (lo <= hi)
-        {
-            var mid = lo + (hi - lo) / 2;
-
-            if (stopEvents[mid].Tick >= tick)
-            {
-                result = mid;
-                hi = mid - 1;
-            }
-            else
-            {
-                lo = mid + 1;
-            }
-        }
-
-        return result;
-    }
 
     private double initialBpm()
     {

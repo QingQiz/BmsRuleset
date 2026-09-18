@@ -83,6 +83,7 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         var config = (BmsRulesetConfigManager)RulesetConfigs.GetConfigFor(new BmsRuleset())!;
         config.SetValue(BmsRulesetSetting.ScrollSpeed, options.ScrollSpeed);
         config.SetValue(BmsRulesetSetting.ReferenceBpmMode, options.ReferenceBpm);
+        config.SetValue(BmsRulesetSetting.ShowInvisibleNotes, options.ShowInvisibleNotes);
         loading.Start();
         LoadPlayer(options.CreateMods());
     }
@@ -165,6 +166,7 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
     {
         Chart.Metadata.Title,
         HitObjects = Chart.HitObjects.Count,
+        InvisibleNotes = Chart.InvisibleNotes.Count,
         Mines = Chart.HitObjects.Count(h => h is BmsLandmine),
         LongNotes = Chart.HitObjects.Count(h => h is BmsLongNote),
         Chart.LockedLongNoteMode,
@@ -188,6 +190,8 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
             Alive = objects.Length,
             Present = objects.Count(p => p.Value.IsPresent),
             NotPresent = objects.Count(p => !p.Value.IsPresent),
+            AliveInvisibleNotes = objects.Count(p => p.Key.HitObject is BmsInvisibleNote),
+            PresentInvisibleNotes = objects.Count(p => p.Key.HitObject is BmsInvisibleNote && p.Value.IsPresent),
             AudioVoices = BmsAudioTestAccess.GetActiveVoiceCount(((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback),
             FutureSeconds = objects.GroupBy(p => (int)((p.Key.HitObject.StartTime - ChartTime) / 1000))
                 .OrderBy(g => g.Key).Select(g => new { SecondsAhead = g.Key, Count = g.Count() }).ToArray(),

@@ -56,7 +56,7 @@ internal static partial class BmsChartParser
     /// </summary>
     private static void applyControlCommand(
         string command, string value, List<ControlFrame> frames,
-        Func<int, int> randomValueSelector, ICollection<BmsBranchDecision> decisions)
+        Func<int, int> randomValueSelector, ICollection<BmsBranchDecision>? decisions)
     {
         switch (command)
         {
@@ -145,12 +145,12 @@ internal static partial class BmsChartParser
 
     private static bool isActive(IReadOnlyList<ControlFrame> frames) => frames.Count == 0 || frames[^1].Active;
 
-    private static bool tryReadControlCommand(string rawLine, out string command, out string value)
+    private static bool tryReadControlCommand(ReadOnlySpan<char> rawLine, out string command, out string value)
     {
         command = string.Empty;
         value = string.Empty;
 
-        var span = rawLine.AsSpan().Trim();
+        var span = rawLine.Trim();
 
         if (span.IsEmpty || span[0] != '#')
             return false;
@@ -202,7 +202,7 @@ internal static partial class BmsChartParser
     private static bool tryParseInt(string value, out int result) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
 
-    private static int chooseRandomValue(int max, Func<int, int> randomValueSelector, ICollection<BmsBranchDecision> decisions)
+    private static int chooseRandomValue(int max, Func<int, int> randomValueSelector, ICollection<BmsBranchDecision>? decisions)
     {
         if (max <= 0)
             return 0;
@@ -212,7 +212,7 @@ internal static partial class BmsChartParser
         if (value < 1 || value > max)
             throw new ArgumentOutOfRangeException(nameof(randomValueSelector), value, $@"BMS random selector must return a value in the range 1..{max}.");
 
-        decisions.Add(new BmsBranchDecision(max, value));
+        decisions?.Add(new BmsBranchDecision(max, value));
         return value;
     }
 

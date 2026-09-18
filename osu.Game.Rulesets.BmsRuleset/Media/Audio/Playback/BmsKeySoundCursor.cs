@@ -7,6 +7,7 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 
 /// <summary>
+///     Passed invisible notes select persistent empty-press samples, with newer visible notes taking priority.
 ///     Pure per-column cursor that finds the next hit object whose key-sound should play on an
 ///     empty press. Linear-walks this column's sorted hit-object slice from a cursor that advances
 ///     forward, skipping landmines, notes past their slow BAD window, and notes the caller reports
@@ -17,7 +18,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 ///     host; the caller supplies isFinished (which needs the column's live HitObjectContainer —
 ///     see BmsColumnKeySound.hasNoteFinished).
 /// </summary>
-public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects)
+public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
 {
     private int nextSoundIndex;
     private double lastSoundSearchTime = double.MinValue;
@@ -29,6 +30,28 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects)
     /// </summary>
     public BmsHitObject? Next(double currentTime, Func<BmsHitObject, bool> isFinished)
     {
+        if (invisibleNotes is { Count: > 0 })
+        {
+            var invisibleIndex = findFirstAtOrAfter(invisibleNotes, currentTime) - 1;
+            if (invisibleIndex >= 0)
+            {
+                // Like beatoraja, a passed invisible note replaces the empty-press sample until
+                // a newer visible note takes over. Its sound persists after its drawable expires.
+                var sample = invisibleNotes[invisibleIndex];
+                for (var i = findFirstSoundCandidateIndex(currentTime) - 1; i >= 0; i--)
+                {
+                    var note = hitObjects[i];
+                    if (note.StartTime < sample.StartTime)
+                        break;
+
+                    if (note is not BmsLandmine && !(note is BmsLongNote && isFinished(note)))
+                        return note;
+                }
+
+                return sample;
+            }
+        }
+
         // Reposition only on a backward seek — the linear scan below already advances past notes
         // whose slow BAD window has expired, so forward time progression (normal gaps included)
         // needs no time-threshold reset.
@@ -74,15 +97,17 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects)
     private static double maxLookAhead() => 1000;
 
     /// <summary>Binary search: first index where hitObjects[i].StartTime &gt;= time.</summary>
-    private int findFirstSoundCandidateIndex(double time)
+    private int findFirstSoundCandidateIndex(double time) => findFirstAtOrAfter(hitObjects, time);
+
+    private static int findFirstAtOrAfter(IReadOnlyList<BmsHitObject> notes, double time)
     {
         var low = 0;
-        var high = hitObjects.Count;
+        var high = notes.Count;
 
         while (low < high)
         {
             var middle = low + (high - low) / 2;
-            if (hitObjects[middle].StartTime < time)
+            if (notes[middle].StartTime < time)
                 low = middle + 1;
             else
                 high = middle;

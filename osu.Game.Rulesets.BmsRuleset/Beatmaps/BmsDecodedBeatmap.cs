@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -26,6 +27,8 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
     public IReadOnlyList<BmsSampleEvent> BackgroundSampleEvents { get; set; } = [];
 
     public IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; } = [];
+
+    public IReadOnlyList<BmsInvisibleNote> InvisibleNotes { get; set; } = [];
 
     public IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; } = [];
 
@@ -57,6 +60,15 @@ internal class BmsDecodedBeatmap : Beatmap, IBmsBeatmap
         SampleDefinitions = parseResult.SampleDefinitions;
         BackgroundSampleEvents = parseResult.BackgroundSampleEvents;
         LongNoteTailSampleEvents = parseResult.LongNoteTailSampleEvents;
+        InvisibleNotes = parseResult.InvisibleNotes.Select(n => new BmsInvisibleNote
+        {
+            Beatmap = this,
+            StartTime = n.StartTime,
+            Column = n.Column,
+            SourceChannel = n.SourceChannel,
+            SampleKey = n.SampleKey,
+            SampleVolume = n.SampleVolume,
+        }).ToArray();
         BranchDecisions = parseResult.BranchDecisions;
         TextEvents = parseResult.TextEvents;
         Bga = parseResult.Bga;

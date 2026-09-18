@@ -174,7 +174,7 @@ public class BmsBeatmapConverter(IBeatmap beatmap, Ruleset ruleset) : BeatmapCon
         var timingMap = beatmap.TimingMap;
         if (timingMap == null) return;
 
-        foreach (var hitObject in beatmap.HitObjects)
+        foreach (var hitObject in beatmap.HitObjects.Concat(beatmap.InvisibleNotes))
         {
             hitObject.ScrollPositionAtStartTime = timingMap.GetScrollPositionAtTime(hitObject.StartTime);
             if (hitObject is BmsLongNote ln)

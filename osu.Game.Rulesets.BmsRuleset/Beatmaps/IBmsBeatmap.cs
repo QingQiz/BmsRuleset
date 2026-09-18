@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -32,6 +33,8 @@ public interface IBmsBeatmap
 
     IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; }
 
+    IReadOnlyList<BmsInvisibleNote> InvisibleNotes { get; set; }
+
     IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; }
 
     BmsTextEvents TextEvents { get; set; }
@@ -63,6 +66,7 @@ internal static class BmsBeatmapExtensions
         target.SampleDefinitions = source.SampleDefinitions;
         target.BackgroundSampleEvents = source.BackgroundSampleEvents;
         target.LongNoteTailSampleEvents = source.LongNoteTailSampleEvents;
+        target.InvisibleNotes = source.InvisibleNotes.Select(n => n.CloneForBeatmap(target)).ToArray();
         target.BranchDecisions = source.BranchDecisions;
         target.TextEvents = source.TextEvents;
         target.Bga = source.Bga;

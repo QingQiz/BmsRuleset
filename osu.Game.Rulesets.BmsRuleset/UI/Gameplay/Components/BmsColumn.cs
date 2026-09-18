@@ -168,7 +168,15 @@ public partial class BmsColumn : Playfield, IBmsColumn
             .ThenBy(h => h.Column)
             .ToArray();
 
-        keySound = new BmsColumnKeySound(columnHitObjects, HitObjectContainer);
+        var invisibleNotes = ParentPlayfield.Beatmap.InvisibleNotes
+            .Where(n => n.Column == Index).OrderBy(n => n.StartTime).ToArray();
+        foreach (var note in invisibleNotes)
+            Add(note);
+
+        if (invisibleNotes.Length > 0)
+            ((BmsColumnHitObjectContainer)HitObjectContainer).RefreshAllEntries();
+
+        keySound = new BmsColumnKeySound(columnHitObjects, HitObjectContainer, invisibleNotes);
         AddInternal(keySound);
 
         NewResult += onColumnNewResult;
@@ -310,7 +318,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         {
             if (alive is not DrawableBmsHitObject d
                 || d.Judged
-                || d.HitObject is BmsLandmine)
+                || d.HitObject is BmsLandmine or BmsInvisibleNote)
             {
                 continue;
             }

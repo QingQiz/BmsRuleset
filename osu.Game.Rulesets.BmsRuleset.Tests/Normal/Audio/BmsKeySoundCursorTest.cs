@@ -95,4 +95,37 @@ public class BmsKeySoundCursorTest
         // t=2000: note@1000 past BAD window (2000 > 1280) -> skipped -> null.
         Assert.That(cursor.Next(2000, _ => false), Is.Null);
     }
+
+    [Test]
+    public void InvisibleSamplePersistsUntilLaterVisibleNoteAndSurvivesSeeking()
+    {
+        var hidden = new BmsInvisibleNote { StartTime = 1000 };
+        var visible = note(5000);
+        var cursor = new BmsKeySoundCursor([visible], [hidden]);
+        Assert.That(cursor.Next(1000, _ => false), Is.SameAs(visible));
+        Assert.That(cursor.Next(1001, _ => true), Is.SameAs(hidden));
+        Assert.That(cursor.Next(4000, _ => true), Is.SameAs(hidden));
+        Assert.That(cursor.Next(6000, _ => true), Is.SameAs(visible));
+        Assert.That(cursor.Next(2000, _ => true), Is.SameAs(hidden));
+        Assert.That(cursor.Next(500, _ => false), Is.SameAs(visible));
+    }
+
+    [Test]
+    public void InvisibleOnlyLaneIsSilentUntilPassed()
+    {
+        var hidden = new BmsInvisibleNote { StartTime = 1000 };
+        var cursor = new BmsKeySoundCursor([], [hidden]);
+        Assert.That(cursor.Next(1000, _ => false), Is.Null);
+        Assert.That(cursor.Next(100000, _ => true), Is.SameAs(hidden));
+        Assert.That(cursor.Next(0, _ => false), Is.Null);
+    }
+
+    [Test]
+    public void SimultaneousVisibleNoteWinsAndJudgedLongNotesDoNotReplaceHiddenSample()
+    {
+        var hidden = new BmsInvisibleNote { StartTime = 1000 };
+        var visible = note(1000);
+        var cursor = new BmsKeySoundCursor([visible, new BmsLongNote { StartTime = 2000 }, mine(3000)], [hidden]);
+        Assert.That(cursor.Next(4000, _ => true), Is.SameAs(visible));
+    }
 }

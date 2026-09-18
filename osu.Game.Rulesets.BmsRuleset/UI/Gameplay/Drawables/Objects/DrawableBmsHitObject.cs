@@ -59,8 +59,6 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected virtual float VisualHeight => 0;
 
-    protected abstract BmsSkinComponents SkinComponent { get; }
-
     protected virtual bool SkipFurtherUpdates => false;
 
     protected virtual bool RequiresResultBeforeKindPostState => false;
@@ -196,6 +194,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 public abstract partial class DrawableBmsHitObject<TCol> : DrawableBmsHitObject
     where TCol : struct, IColumnProvider
 {
+    protected abstract BmsSkinComponents SkinComponent { get; }
 
     protected int Column { get; } = default(TCol).Value;
 

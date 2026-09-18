@@ -152,6 +152,12 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
             }),
             new SettingsItemV2(new FormCheckBox
             {
+                Caption = BmsStrings.ShowInvisibleNotes,
+                HintText = BmsStrings.ShowInvisibleNotesHint,
+                Current = manager.GetBindable<bool>(BmsRulesetSetting.ShowInvisibleNotes),
+            }),
+            new SettingsItemV2(new FormCheckBox
+            {
                 Caption = BmsStrings.UnlockFrameRateLimit,
                 HintText = BmsStrings.UnlockFrameRateLimitHint,
                 Current = manager.GetBindable<bool>(BmsRulesetSetting.UnlockFrameRateLimit),

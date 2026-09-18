@@ -33,6 +33,7 @@ dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net8.0/osu.Game.Rulesets.B
 | `--invert-random-seed` | 不随机 | 配合 `--invert` 使用；指定整数种子后启用 IN 随机长度，保证重复采样的谱面一致 |
 | `--headless` | 关闭 | 无参数值；跳过 GPU 渲染，仅用于更新线程诊断 |
 | `--audio-output` | 关闭 | 无参数值；仅在需要听感／音频输出测试时开启 |
+| `--show-invisible-notes` | 关闭 | 无参数值；以黄色方框显示不可见 note，报告记录总数和活动／呈现数量 |
 
 Legacy 是测试资源中的合成皮肤，不是任意用户自定义皮肤。窗口 1280×720，默认桌面运行，配置和数据库均独立。
 
@@ -48,7 +49,7 @@ Legacy 是测试资源中的合成皮肤，不是任意用户自定义皮肤。�
 pwsh -NoProfile -File scripts/Measure-BmsGameplay.ps1 -Cases "D:/perf/cases.json" -Output artifacts/gameplay/candidate
 ```
 
-模板的 `cases` 每项设置 `name`、`chart`，以及可选的 `start`、`duration`、`repeat`（1–20）、`scrollSpeed`、`updateHz`、`drawHz`、`referenceBpm`、`skin`、`longNoteMode`、`invert`、`invertRandomSeed`、`headless`、`audioOutput`。相对谱面路径以清单文件所在目录解析，支持空格和方括号。`name` 只接受字母、数字、横线及下划线，且不能重复。
+模板的 `cases` 每项设置 `name`、`chart`，以及可选的 `start`、`duration`、`repeat`（1–20）、`scrollSpeed`、`updateHz`、`drawHz`、`referenceBpm`、`skin`、`longNoteMode`、`invert`、`invertRandomSeed`、`headless`、`audioOutput`、`showInvisibleNotes`。相对谱面路径以清单文件所在目录解析，支持空格和方括号。`name` 只接受字母、数字、横线及下划线，且不能重复。
 
 可选 `maxUpdateP99Ms` 为该场景的更新耗时 P99 上限；不填时只检查运行与判定完整性。模板里的 8 ms 只是示例，实际应按机器和需求设置。脚本依次启动独立进程，生成 `case/run-XX/capture/summary.json`、`runner.log` 和总表 `matrix.json`，任一运行或阈值失败时返回非零。输出根目录必须不存在，防止覆盖基线；`-Assembly` 可指定独立构建目录中的测试器 DLL。
 

@@ -16,5 +16,6 @@ public sealed partial class BmsColumnGeneric<TCol>(int index, BmsPlayfield playf
         RegisterPool<BmsNote, DrawableBmsNote<TCol>>(InitialPoolSizes.Notes, int.MaxValue);
         RegisterPool<BmsLongNote, DrawableBmsLongNote<TCol>>(InitialPoolSizes.LongNotes, int.MaxValue);
         RegisterPool<BmsLandmine, DrawableBmsLandmine<TCol>>(InitialPoolSizes.Mines, int.MaxValue);
+        RegisterPool<BmsInvisibleNote, DrawableBmsInvisibleNote>(0, int.MaxValue);
     }
 }

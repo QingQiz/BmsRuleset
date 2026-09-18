@@ -35,6 +35,8 @@ public class BmsBeatmap : Beatmap<BmsHitObject>, IBmsBeatmap
 
     public IReadOnlyList<BmsSampleEvent> LongNoteTailSampleEvents { get; set; } = [];
 
+    public IReadOnlyList<BmsInvisibleNote> InvisibleNotes { get; set; } = [];
+
     public IReadOnlyList<BmsBranchDecision> BranchDecisions { get; set; } = [];
 
     public BmsTextEvents TextEvents { get; set; } = new(string.Empty, []);

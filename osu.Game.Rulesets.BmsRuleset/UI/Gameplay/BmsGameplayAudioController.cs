@@ -28,7 +28,7 @@ internal sealed class BmsGameplayAudioController
             beatmap.SampleDefinitions,
             ResolveBeatmapSource(beatmap),
             GetPlaybackRate(mods),
-            getSampleUsages(beatmap));
+            GetSampleUsages(beatmap));
     }
 
     internal BmsBackgroundAudioPlayer CreateBackgroundAudioPlayer(BmsBeatmap beatmap)
@@ -93,10 +93,24 @@ internal sealed class BmsGameplayAudioController
         return rateMod?.SpeedChange.Value ?? 1;
     }
 
-    private static IEnumerable<BmsSampleUsage> getSampleUsages(BmsBeatmap beatmap)
+    internal static IEnumerable<BmsSampleUsage> GetSampleUsages(BmsBeatmap beatmap)
     {
         foreach (var evt in beatmap.BackgroundSampleEvents)
             yield return new BmsSampleUsage(evt.SampleKey, evt.Time, ResumeAfterSeek: true);
+
+        foreach (var invisibleColumn in beatmap.InvisibleNotes.GroupBy(n => n.Column))
+        {
+            // Empty presses can still use these samples long after the notes leave the screen.
+            // Judged LNs do not replace them, so retain them through intervening long notes.
+            var changes = beatmap.HitObjects.Where(n => n.Column == invisibleColumn.Key && n is not (BmsLongNote or BmsLandmine))
+                .Concat(invisibleColumn).OrderBy(n => n.StartTime).ThenBy(n => n is BmsInvisibleNote ? 0 : 1).ToArray();
+            for (var i = 0; i < changes.Length; i++)
+            {
+                if (changes[i].SampleKey is { } key)
+                    yield return new BmsSampleUsage(key, changes[i].StartTime, changes[i].StartTime,
+                        i + 1 < changes.Length ? changes[i + 1].StartTime : double.MaxValue);
+            }
+        }
 
         foreach (var column in beatmap.HitObjects
                      .Where(hitObject => hitObject is not BmsLandmine)

@@ -81,7 +81,6 @@ dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Test
 | **Parser**    | `#CHARSET` — character encoding specification                                            |
 | **Parser**    | `#ExtChr` — BM98 extended character sprite display                                       |
 | **Parser**    | Channel `17` / `27` — free-zone keys                                                     |
-| **Parser**    | Channel `31`–`49` — invisible notes                                                      |
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                |
 | **Renderer**  | Configurable POOR BGA duration — fixed at 500 ms; beatoraja uses `misslayerDuration`     | 3        |
 | **Scoring**   | 24KEYS / 24KEYS DOUBLE judgement profile matching beatoraja `KEYBOARD`                   | 3        |

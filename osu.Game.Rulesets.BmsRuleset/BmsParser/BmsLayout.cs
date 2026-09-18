@@ -38,7 +38,7 @@ public static class BmsLayout
 
     private static readonly ushort[] pms_double_play_only_channels = [C21, C26, C27, C28, C29];
     private static readonly ushort[] second_player_channels = [C21, C22, C23, C24, C25, C26, C28, C29];
-    private static readonly ushort[] seven_key_only_channels = [C18, C19];
+    private static readonly ushort[] seven_key_only_channels = [C18, C19, C28, C29];
 
     public static BmsLayoutVariant InferVariant(IEnumerable<ushort> channels, string? pathOrExtension = null)
     {
@@ -244,9 +244,11 @@ public static class BmsLayout
         _ => column,
     };
 
-    /// <summary>Normalise LN/mine channels to their visible equivalents (5x→1x, 6x→2x, Dx→1x, Ex→2x).</summary>
+    /// <summary>Normalise invisible/LN/mine channels to their visible equivalents.</summary>
     internal static ushort NormaliseChannel(ushort key) => BmsChartParser.Hi(key) switch
     {
+        3 => BmsChartParser.Pack(1, BmsChartParser.Lo(key)),
+        4 => BmsChartParser.Pack(2, BmsChartParser.Lo(key)),
         5 => BmsChartParser.Pack(1, BmsChartParser.Lo(key)),  // 5x → 1x
         6 => BmsChartParser.Pack(2, BmsChartParser.Lo(key)),  // 6x → 2x
         13 => BmsChartParser.Pack(1, BmsChartParser.Lo(key)), // Dx → 1x

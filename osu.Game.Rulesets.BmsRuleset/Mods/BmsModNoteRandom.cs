@@ -57,6 +57,7 @@ public class BmsModNoteRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
 
         Seed.Value ??= RNG.Next();
         var rng = new Random((int)Seed.Value);
+        var invisibleRng = new Random((int)Seed.Value);
 
         var totalColumns = bmsBeatmap.TotalColumns;
         var variant = bmsBeatmap.LayoutVariant;
@@ -74,26 +75,34 @@ public class BmsModNoteRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
 
         // Track columns occupied by active long notes: column → endTime.
         var activeLnColumns = new Dictionary<int, double>();
+        var activeLnMappings = new Dictionary<int, BmsLongNote>();
 
         // Group hit objects by start time and process in chronological order.
-        var timeGroups = bmsBeatmap.HitObjects
+        var timeGroups = bmsBeatmap.HitObjects.Concat(bmsBeatmap.InvisibleNotes)
             .GroupBy(h => h.StartTime)
             .OrderBy(g => g.Key);
 
         foreach (var group in timeGroups)
         {
             var time = group.Key;
-            var notes = group.ToArray();
+            var notes = group.Where(n => n is not BmsInvisibleNote).ToArray();
+            var invisibleNotes = group.OfType<BmsInvisibleNote>().ToArray();
+            var originalColumns = notes.ToDictionary(n => n, n => n.Column);
 
             // Purge long notes that have ended before this time.
             removeExpiredLns(activeLnColumns, time);
+            foreach (var source in activeLnMappings.Where(p => p.Value.EndTime <= time).Select(p => p.Key).ToArray())
+                activeLnMappings.Remove(source);
 
             var notesToShuffle = IncludeScratch.Value
                 ? notes
                 : notes.Where(n => !BmsLayout.IsScratchColumn(n.Column, variant)).ToArray();
 
             if (notesToShuffle.Length == 0)
+            {
+                shuffleInvisibleNotes();
                 continue;
+            }
 
             // Available columns = shuffle columns minus those occupied by active LNs.
             var available = shuffleColumns.Where(c => !activeLnColumns.ContainsKey(c)).ToArray();
@@ -128,8 +137,34 @@ public class BmsModNoteRandom : Mod, IApplicableAfterBeatmapConversion, IHasSeed
                     lastNoteTime[col] = time;
 
                 // If this note is a long note head, mark its column as occupied.
-                if (notesToShuffle[i] is BmsLongNote)
-                    activeLnColumns[col] = ((BmsLongNote)notesToShuffle[i]).EndTime;
+                if (notesToShuffle[i] is BmsLongNote longNote)
+                {
+                    activeLnColumns[col] = longNote.EndTime;
+                    activeLnMappings[originalColumns[longNote]] = longNote;
+                }
+            }
+
+            shuffleInvisibleNotes();
+
+            void shuffleInvisibleNotes()
+            {
+                if (invisibleNotes.Length == 0)
+                    return;
+
+                // Hidden and visible notes on the same source lane share the timeline's mapping.
+                // A separate RNG keeps hidden-only events from changing the playable pattern.
+                var mapping = activeLnMappings.ToDictionary(p => p.Key, p => p.Value.Column);
+                foreach (var note in notes)
+                    mapping[originalColumns[note]] = note.Column;
+
+                var remaining = shuffleColumns.Except(mapping.Values).ToList();
+                shuffle(invisibleRng, remaining);
+                var index = 0;
+                foreach (var source in shuffleColumns.Where(c => !mapping.ContainsKey(c)))
+                    mapping[source] = remaining[index++];
+
+                foreach (var note in invisibleNotes)
+                    note.Column = mapping.GetValueOrDefault(note.Column, note.Column);
             }
         }
     }
