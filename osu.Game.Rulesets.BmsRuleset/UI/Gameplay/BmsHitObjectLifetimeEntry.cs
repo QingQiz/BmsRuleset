@@ -27,6 +27,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     private bool lifetimeComputed;
 
     private double? lifetimeStartWithoutVisualOffset;
+    private double unjudgedLifetimeEnd;
 
     #region Constants
 
@@ -97,12 +98,13 @@ internal sealed class BmsHitObjectLifetimeEntry(
         // with the current LifetimeEnd would produce an intermediate
         // MaxValue that the framework may latch on to before the follow-up
         // LifetimeEnd set corrects it.
-        LifetimeEnd = hitObject switch
+        unjudgedLifetimeEnd = hitObject switch
         {
             BmsInvisibleNote => hitObject.StartTime + 1,
             BmsLandmine => hitObject.StartTime + MINE_PAST_LIFETIME,
             _ => hitObject.GetEndTime() + Math.Max(pastLifetime, slowWindow + lifetime_margin),
         };
+        LifetimeEnd = unjudgedLifetimeEnd;
         LifetimeStart = lifetimeStart;
 
         lifetimeComputed = true;
@@ -141,17 +143,14 @@ internal sealed class BmsHitObjectLifetimeEntry(
     }
 
     /// <summary>
-    ///     <c>DrawableHitObject.UpdateState</c> unconditionally sets
-    ///     <c>LifetimeEnd = double.MaxValue</c> on every state transition.
-    ///     For entries whose state stays Idle until hit — such
-    ///     as mines — the follow-up conditional at line 487 does not fire,
-    ///     leaving the entry alive indefinitely.  Reject the blanket MaxValue
-    ///     when we already hold a correct finite value.
+    ///     State transitions reset the drawable's lifetime to infinity. Use the computed
+    ///     unjudged lifetime so idle objects still expire and reverted hits can be judged again.
     /// </summary>
     protected override void SetLifetimeEnd(double end)
     {
-        if (!lifetimeComputed || end < double.MaxValue - 1)
-            base.SetLifetimeEnd(end);
+        // A reverted hit must not retain its previous hit-time expiry: another replay input
+        // at that same timestamp may arrive only after the container has processed lifetimes.
+        base.SetLifetimeEnd(lifetimeComputed && end >= double.MaxValue - 1 ? unjudgedLifetimeEnd : end);
     }
 
     #endregion
