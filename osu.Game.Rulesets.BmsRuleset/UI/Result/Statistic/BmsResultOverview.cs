@@ -63,7 +63,7 @@ internal partial class BmsResultOverview : CompositeDrawable
             },
         };
         timingContent.Child = new BmsResultFastSlow(score.HitEvents);
-        judgementsContent.Child = new GridContainer
+        var judgements = new GridContainer
         {
             RelativeSizeAxes = Axes.Both,
             Content = results.Select(result => new Drawable[]
@@ -71,6 +71,34 @@ internal partial class BmsResultOverview : CompositeDrawable
                 new BmsResultJudgementRow(result, score.Statistics.GetValueOrDefault(result), totalJudgements),
             }).ToArray(),
         };
+        // Course aggregates use their own history store; a chart comparison would show unrelated scores.
+        judgementsContent.Child = soloHeader == null
+            ? judgements
+            : new GridContainer
+            {
+                RelativeSizeAxes = Axes.Both,
+                RowDimensions = [new Dimension(GridSizeMode.Absolute, 28), new Dimension()],
+                Content = new Drawable[][]
+                {
+                    [
+                        new Container
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Children =
+                            [
+                                new Container
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Padding = new MarginPadding { Right = 36 },
+                                    Child = new BmsResultFittedText(BmsStrings.ResultJudgements, 16),
+                                },
+                                new BmsResultComparisonButton(score) { Anchor = Anchor.CentreRight, Origin = Anchor.CentreRight },
+                            ],
+                        },
+                    ],
+                    [judgements],
+                },
+            };
     }
 
     protected override void UpdateAfterChildren()

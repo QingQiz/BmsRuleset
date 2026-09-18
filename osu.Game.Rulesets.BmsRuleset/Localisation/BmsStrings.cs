@@ -37,6 +37,30 @@ public static class BmsStrings
 
     public static LocalisableString ResultCombo => get("result_combo");
 
+    public static LocalisableString ResultJudgements => get("result_judgements");
+
+    public static LocalisableString ResultCompareBest => get("result_compare_best");
+
+    public static LocalisableString ResultComparisonClose => get("result_comparison_close");
+
+    public static LocalisableString ResultComparisonLoading => get("result_comparison_loading");
+
+    public static LocalisableString ResultComparisonEmpty => get("result_comparison_empty");
+
+    public static LocalisableString ResultComparisonUnavailable => get("result_comparison_unavailable");
+
+    public static LocalisableString ResultComparisonCurrent => get("result_comparison_current");
+
+    public static LocalisableString ResultComparisonBest => get("result_comparison_best");
+
+    public static LocalisableString ResultComparisonDifference => get("result_comparison_difference");
+
+    public static LocalisableString ResultComparisonDifferenceValue(int value) => get("result_comparison_difference_value", value);
+
+    public static LocalisableString ResultComparisonPercentageDifference(double value) => get("result_comparison_percentage_difference", value * 100);
+
+    public static LocalisableString ResultComparisonDate(DateTimeOffset date) => get("result_comparison_date", date);
+
     public static LocalisableString ResultNumber(int value) => get("result_number", value);
 
     public static LocalisableString ResultMaximum(int value) => get("result_maximum", value);
@@ -108,13 +132,9 @@ public static class BmsStrings
 
     public static LocalisableString DifficultyBpm(double bpm) => get("difficulty_bpm", bpm);
 
-    public static LocalisableString Accuracy => get("accuracy");
-
     public static LocalisableString ExScore => get("exscore");
 
     public static LocalisableString MaxCombo => get("max_combo");
-
-    public static LocalisableString PerfectScore => get("perfect_score");
 
     public static LocalisableString StandardDeviation(double value) => get("standard_deviation", value);
 

@@ -5,6 +5,18 @@
   <data name="result_performance" xml:space="preserve"><value>成绩</value></data>
   <data name="result_accuracy" xml:space="preserve"><value>准确率</value></data>
   <data name="result_combo" xml:space="preserve"><value>连击</value></data>
+  <data name="result_judgements" xml:space="preserve"><value>判定统计</value></data>
+  <data name="result_compare_best" xml:space="preserve"><value>对比历史最佳成绩</value></data>
+  <data name="result_comparison_close" xml:space="preserve"><value>关闭对比</value></data>
+  <data name="result_comparison_loading" xml:space="preserve"><value>正在读取历史最佳成绩…</value></data>
+  <data name="result_comparison_empty" xml:space="preserve"><value>这张谱面还没有其他符合 Mod 匹配规则的本地成绩。</value></data>
+  <data name="result_comparison_unavailable" xml:space="preserve"><value>无法读取历史最佳成绩，请关闭后重新打开以重试。</value></data>
+  <data name="result_comparison_current" xml:space="preserve"><value>本次</value></data>
+  <data name="result_comparison_best" xml:space="preserve"><value>历史最佳</value></data>
+  <data name="result_comparison_difference" xml:space="preserve"><value>差值</value></data>
+  <data name="result_comparison_difference_value" xml:space="preserve"><value>{0:+0;-0;0}</value></data>
+  <data name="result_comparison_percentage_difference" xml:space="preserve"><value>{0:+0.00;-0.00;0.00}%</value></data>
+  <data name="result_comparison_date" xml:space="preserve"><value>最佳成绩时间：{0:yyyy-MM-dd HH:mm}</value></data>
   <data name="result_number" xml:space="preserve"><value>{0:0}</value></data>
   <data name="result_maximum" xml:space="preserve"><value>/{0:0}</value></data>
   <data name="result_percentage" xml:space="preserve"><value>{0:0.00%}</value></data>
@@ -23,10 +35,8 @@
   <data name="timeline" xml:space="preserve"><value>时间线</value></data>
   <data name="hit_scatter" xml:space="preserve"><value>击打散点图</value></data>
   <data name="hit_offset" xml:space="preserve"><value>击打偏差</value></data>
-  <data name="accuracy" xml:space="preserve"><value>准确率</value></data>
   <data name="exscore" xml:space="preserve"><value>EX分数</value></data>
   <data name="max_combo" xml:space="preserve"><value>最大连击</value></data>
-  <data name="perfect_score" xml:space="preserve"><value>PERFECT</value></data>
   <data name="standard_deviation" xml:space="preserve"><value>标准差 {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>基准 BPM</value></data>
   <data name="judgement_algorithm" xml:space="preserve"><value>判定选择算法</value></data>

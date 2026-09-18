@@ -12,7 +12,7 @@ internal partial class BmsResultBar : CompositeDrawable
 
     internal double Proportion { get; }
 
-    internal BmsResultBar(double proportion, ColourInfo colour)
+    internal BmsResultBar(double proportion, ColourInfo colour, bool showTrack = true)
     {
         Proportion = Math.Clamp(proportion, 0, 1);
         RelativeSizeAxes = Axes.Both;
@@ -22,7 +22,7 @@ internal partial class BmsResultBar : CompositeDrawable
             {
                 RelativeSizeAxes = Axes.Both,
                 Masking = true,
-                Child = new Box { RelativeSizeAxes = Axes.Both, Colour = colour, Alpha = 0.18f },
+                Child = new Box { RelativeSizeAxes = Axes.Both, Colour = colour, Alpha = showTrack ? 0.18f : 0 },
             },
             new Container
             {
