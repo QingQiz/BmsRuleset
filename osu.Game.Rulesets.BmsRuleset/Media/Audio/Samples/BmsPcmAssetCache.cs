@@ -20,6 +20,7 @@ internal sealed class BmsPcmAssetCache : IDisposable
     private readonly object lifecycleLock = new();
 
     private long residentPcmBytes;
+    private int evictionRequested = 1;
     private bool disposed;
 
     internal BmsPcmAssetCache(
@@ -54,22 +55,35 @@ internal sealed class BmsPcmAssetCache : IDisposable
         if (Interlocked.Read(ref residentPcmBytes) <= default_soft_budget)
             return;
 
-        var candidates = entries
-            .Where(pair => pair.Value.ReferenceCount == 0 && pair.Value.Asset.IsComplete)
-            .OrderBy(pair => pair.Value.LastReleasedTimestamp)
-            .ToArray();
+        // Pinned resources can exceed the soft budget for many frames. Retry only when
+        // completion, release or renewed budget pressure can change the outcome.
+        if (Interlocked.Exchange(ref evictionRequested, 0) == 0)
+            return;
 
-        foreach (var candidate in candidates)
+        lock (lifecycleLock)
         {
-            if (Interlocked.Read(ref residentPcmBytes) <= default_soft_budget)
-                break;
+            if (disposed)
+                return;
 
-            if (!entries.TryRemove(candidate.Key, out var removed) || removed.ReferenceCount != 0)
-                continue;
+            var candidates = entries
+                .Where(pair => pair.Value.ReferenceCount == 0 && pair.Value.Asset.IsComplete)
+                .OrderBy(pair => pair.Value.LastReleasedTimestamp)
+                .ToArray();
 
-            var bytes = removed.Asset.ResidentBytes;
-            removed.Asset.DisposePublishedChunks();
-            Interlocked.Add(ref residentPcmBytes, -bytes);
+            foreach (var candidate in candidates)
+            {
+                if (Interlocked.Read(ref residentPcmBytes) <= default_soft_budget)
+                    break;
+
+                // Share the acquisition lock so a newly acquired lease cannot be detached
+                // from the cache or have its PCM disposed while it is in use.
+                if (candidate.Value.ReferenceCount != 0 || !entries.TryRemove(candidate.Key, out var removed))
+                    continue;
+
+                var bytes = removed.Asset.ResidentBytes;
+                removed.Asset.DisposePublishedChunks();
+                Interlocked.Add(ref residentPcmBytes, -bytes);
+            }
         }
     }
 
@@ -132,7 +146,10 @@ internal sealed class BmsPcmAssetCache : IDisposable
             foreach (var chunk in processor.ProcessChunks(disposalCancellation.Token))
             {
                 entry.Asset.Publish(chunk);
-                Interlocked.Add(ref residentPcmBytes, (long)chunk.Samples.Length * sizeof(float));
+                var bytes = (long)chunk.Samples.Length * sizeof(float);
+                var resident = Interlocked.Add(ref residentPcmBytes, bytes);
+                if (resident > default_soft_budget && resident - bytes <= default_soft_budget)
+                    Interlocked.Exchange(ref evictionRequested, 1);
 
                 if (entry.Asset.PublishedFrameCount >= default_startup_frames)
                 {
@@ -146,6 +163,7 @@ internal sealed class BmsPcmAssetCache : IDisposable
             }
 
             entry.Asset.Complete(entry.Asset.PublishedFrameCount);
+            Interlocked.Exchange(ref evictionRequested, 1);
             entry.MarkReady();
         }
         catch (OperationCanceledException) when (disposalCancellation.IsCancellationRequested)
@@ -168,8 +186,12 @@ internal sealed class BmsPcmAssetCache : IDisposable
 
     private void release(CacheEntry entry)
     {
-        entry.ReleaseReference();
-        EvictUnused();
+        lock (lifecycleLock)
+        {
+            entry.ReleaseReference();
+            // Update coalesces a frame's releases into one eviction pass.
+            Interlocked.Exchange(ref evictionRequested, 1);
+        }
     }
 
     private sealed class CacheEntry(BmsPcmAsset asset)

@@ -248,7 +248,17 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     private void removeJudgementEvent(BmsJudgementEvent judgementEvent)
     {
-        judgementEvents.Remove(judgementEvent);
+        // Rewinds normally remove the newest event. Searching from the end avoids
+        // visiting the entire historical ledger for every reverted judgement.
+        for (var i = judgementEvents.Count - 1; i >= 0; i--)
+        {
+            if (!ReferenceEquals(judgementEvents[i], judgementEvent))
+                continue;
+
+            judgementEvents.RemoveAt(i);
+            break;
+        }
+
         removeTimingHitEvents(judgementEvent);
     }
 
@@ -267,19 +277,29 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     private void removeTimingHitEvents(BmsJudgementEvent judgementEvent)
     {
-        for (var i = timingHitEventEntries.Count - 1; i >= 0; i--)
+        for (var observationIndex = judgementEvent.TimingObservations.Count - 1; observationIndex >= 0; observationIndex--)
         {
-            if (!ReferenceEquals(timingHitEventEntries[i].JudgementEvent, judgementEvent))
-                continue;
+            var time = judgementEvent.TimingObservations[observationIndex].ActualTime;
+            // Normal LN observations can surround other notes. Locate each endpoint
+            // by time and identity rather than scanning all remaining hit events.
+            for (var i = findTimingInsertionIndex(time) - 1; i >= 0 && timingHitEventEntries[i].Observation.ActualTime == time; i--)
+            {
+                if (!ReferenceEquals(timingHitEventEntries[i].JudgementEvent, judgementEvent))
+                    continue;
 
-            timingHitEventEntries.RemoveAt(i);
-            timingHitEvents.RemoveAt(i);
-            repairNextTimingHitEvent(i - 1);
+                timingHitEventEntries.RemoveAt(i);
+                timingHitEvents.RemoveAt(i);
+                repairNextTimingHitEvent(i - 1);
+                break;
+            }
         }
     }
 
     private int findTimingInsertionIndex(double actualTime)
     {
+        if (timingHitEventEntries.Count == 0 || timingHitEventEntries[^1].Observation.ActualTime <= actualTime)
+            return timingHitEventEntries.Count;
+
         var low = 0;
         var high = timingHitEventEntries.Count;
 

@@ -68,6 +68,26 @@ public class BmsBassFixedRatePcmProcessorTest
 
     }
 
+    [Test]
+    public async Task ReleasedAssetBecomesEvictableWhenDecodingCompletes()
+    {
+        var data = new TaskCompletionSource<byte[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cache = new BmsPcmAssetCache((_, token) => data.Task.WaitAsync(token), 1);
+        using var lease = cache.Acquire("delayed.wav");
+        typeof(BmsPcmAssetCache).GetField("residentPcmBytes", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(cache, 513L * 1024 * 1024);
+        lease.Dispose();
+        cache.EvictUnused();
+        Assert.That(lease.Asset.State, Is.EqualTo(BmsPcmAssetState.Preparing));
+
+        // The first eviction finds no eligible resource. Completion must request a new pass
+        // even though no further leases are released and the budget was already exceeded.
+        data.SetResult(createWave(44100, 1024, 440));
+        await lease.Ready.WaitAsync(TimeSpan.FromSeconds(5));
+        cache.EvictUnused();
+        Assert.That(lease.Asset.State, Is.EqualTo(BmsPcmAssetState.Disposed));
+    }
+
     private static byte[] createWave(int sampleRate, int frames, double frequency)
     {
         const short channels = 1;

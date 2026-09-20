@@ -268,7 +268,9 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             nextLifetimeIndex++;
         }
 
-        foreach (var (sampleKey, pending) in pendingPlays.ToArray())
+        // Dictionary removal preserves active enumerators on .NET 8; copying these collections
+        // every frame creates garbage even when no pending play or lease changes.
+        foreach (var (sampleKey, pending) in pendingPlays)
         {
             if (!tryGetReadyAsset(sampleKey, out var asset))
                 continue;
@@ -278,7 +280,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             submitSingle(asset, sampleKey, pending.Volume, pending.Offset + elapsed);
         }
 
-        foreach (var (sampleKey, lease) in leases.ToArray())
+        foreach (var (sampleKey, lease) in leases)
         {
             rememberSampleLength(sampleKey, lease.Asset);
 

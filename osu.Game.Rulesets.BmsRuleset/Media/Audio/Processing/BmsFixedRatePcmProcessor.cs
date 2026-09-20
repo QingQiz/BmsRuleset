@@ -92,15 +92,6 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
 
                 producedFrames++;
                 sourcePosition += sourceFramesPerOutputFrame;
-
-                var retainFrom = Math.Max(pendingStartFrame, (long)Math.Floor(sourcePosition) - 1);
-                var removableFrames = retainFrom - pendingStartFrame;
-
-                if (removableFrames > 0)
-                {
-                    pendingSamples.RemoveRange(0, checked((int)(removableFrames * sourceChannels)));
-                    pendingStartFrame = retainFrom;
-                }
             }
 
             if (producedFrames == 0)
@@ -126,6 +117,17 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
             while (sourceFramesRead <= requiredFrame && !sourceEnded)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                // Compact only at refill boundaries. The current interpolation pair may straddle
+                // two reads, so retain its first frame until both samples have been consumed.
+                var retainFrom = Math.Clamp((long)Math.Floor(sourcePosition), pendingStartFrame, sourceFramesRead);
+                var removableFrames = retainFrom - pendingStartFrame;
+                if (removableFrames > 0)
+                {
+                    pendingSamples.RemoveRange(0, checked((int)(removableFrames * sourceChannels)));
+                    pendingStartFrame = retainFrom;
+                }
+
                 var samplesRead = source.Read(inputBuffer, 0, inputBuffer.Length);
 
                 if (samplesRead < 0 || samplesRead > inputBuffer.Length)

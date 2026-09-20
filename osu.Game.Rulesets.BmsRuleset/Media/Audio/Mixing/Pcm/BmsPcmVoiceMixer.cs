@@ -132,7 +132,7 @@ internal sealed class BmsPcmVoiceMixer
                     {
                         ref var voice = ref segment.Voices[voiceIndex];
                         var asset = voice.Asset!;
-                        if (voice.SourceFrame >= voice.EndFrame || !asset.TryReadStereoFrame(voice.SourceFrame, out var voiceLeft, out var voiceRight))
+                        if (voice.SourceFrame >= voice.EndFrame || !asset.TryReadStereoFrame(voice.SourceFrame, ref voice.ReadCursor, out var voiceLeft, out var voiceRight))
                         {
                             releaseVoice(segment, voiceIndex);
                             continue;
@@ -429,6 +429,7 @@ internal sealed class BmsPcmVoiceMixer
     {
         public BmsPcmVoiceState State;
         public BmsPcmAsset? Asset;
+        public BmsPcmAsset.ReadCursor ReadCursor;
         public BmsTerminationDomain Domain;
         public long SourceFrame;
         public long EndFrame;

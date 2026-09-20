@@ -9,6 +9,36 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 public class BmsPcmVoiceMixerTest
 {
     [Test]
+    public void IndependentVoiceCursorsPreserveExactOutputAcrossChunks()
+    {
+        var samples = new float[2000];
+        for (var i = 0; i < samples.Length; i++)
+            samples[i] = (float)Math.Sin(i * 0.1) * 0.01f;
+        var whole = BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, samples.Length / 2, samples)]);
+        var split = new BmsPcmAsset(44100, 2);
+        for (var frame = 0; frame < 1000;)
+        {
+            var count = Math.Min(13 + frame % 11, 1000 - frame);
+            split.Publish(new BmsPcmChunk(frame, count, samples.AsSpan(frame * 2, count * 2).ToArray()));
+            frame += count;
+        }
+
+        split.Complete(1000);
+        Assert.That(render(split, 31), Is.EqualTo(render(whole, 127)));
+
+        static float[] render(BmsPcmAsset asset, int blockSize)
+        {
+            var mixer = new BmsPcmVoiceMixer();
+            mixer.SubmitPlayBatch([
+                new BmsVoicePlay(asset, new BmsTerminationDomain(1), 0),
+                new BmsVoicePlay(asset, new BmsTerminationDomain(2), 0, SourceOffsetFrame: 71),
+                new BmsVoicePlay(asset, new BmsTerminationDomain(1), 100, SourceOffsetFrame: 217),
+            ]);
+            return BmsPcmTestHelpers.RenderFrames(mixer, 1100, blockSize);
+        }
+    }
+
+    [Test]
     public void SameDomainRetriggerFadesOldVoiceWithoutDelayingNewVoice()
     {
         var asset = createConstantAsset(500, 1);

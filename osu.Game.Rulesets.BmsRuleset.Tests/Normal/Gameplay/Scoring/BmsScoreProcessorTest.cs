@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -16,6 +17,33 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Scoring;
 [TestFixture]
 public partial class BmsScoreProcessorTest
 {
+    [Test]
+    public void TestArbitraryRevertsPreserveInterleavedAndEqualTimeObservations()
+    {
+        var (processor, source) = createLongNoteProcessor();
+        var results = Enumerable.Range(0, 24).Select(i => createLongNoteResult(
+            new BmsLongNote { StartTime = 1000 + i * 10, Duration = 500, Column = i % 8, Beatmap = source.Beatmap },
+            1100 + i % 4 * 10, i % 3 == 0 ? 1100 + i % 4 * 10 : 1600 + i % 4 * 10)).ToArray();
+        foreach (var result in results)
+            processor.ApplyResult(result);
+        var ledger = processor.JudgementEvents.ToArray();
+        var remaining = ledger.ToList();
+        var score = new ScoreInfo();
+        processor.PopulateScore(score);
+        var random = new Random(20260920);
+        foreach (var index in Enumerable.Range(0, results.Length).OrderBy(_ => random.Next()))
+        {
+            processor.RevertResult(results[index]);
+            remaining.Remove(ledger[index]);
+            var expected = BmsJudgementEventProjection.CreateTimingHitEvents(remaining);
+            Assert.That(processor.JudgementEvents, Is.EqualTo(remaining));
+            Assert.That(score.HitEvents.Select(e => (e.HitObject.StartTime, e.TimeOffset, e.Result, ((BmsHitObject)e.HitObject).Column)),
+                Is.EqualTo(expected.Select(e => (e.HitObject.StartTime, e.TimeOffset, e.Result, ((BmsHitObject)e.HitObject).Column))));
+            for (var i = 0; i < score.HitEvents.Count; i++)
+                Assert.That(score.HitEvents[i].LastHitObject, Is.SameAs(i == 0 ? null : score.HitEvents[i - 1].HitObject));
+        }
+        processor.Dispose();
+    }
 
     private static BmsLongNoteJudgementResult createLongNoteResult(BmsLongNote source, double headEventTime, double tailEventTime)
         => new(source, source.CreateJudgement(),

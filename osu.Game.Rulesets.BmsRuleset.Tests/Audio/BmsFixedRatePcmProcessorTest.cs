@@ -31,12 +31,16 @@ public class BmsFixedRatePcmProcessorTest
         Assert.That(estimateFrequency(output, 44100, 2), Is.EqualTo(440).Within(1));
     }
 
-    [Test]
-    public void SourceChunkSizeDoesNotChangePcm()
+    [TestCase(8000, 1)]
+    [TestCase(32000, 2)]
+    [TestCase(44100, 2)]
+    [TestCase(48000, 1)]
+    [TestCase(192000, 2)]
+    public void SourceChunkSizeDoesNotChangePcm(int sampleRate, int channels)
     {
-        var input = createSine(32000, 3200, 523.25, 2);
-        using var fineProcessor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 32000, 2, 2), 1);
-        using var coarseProcessor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, 32000, 2, 317), 1);
+        var input = createSine(sampleRate, 10003, 523.25, channels);
+        using var fineProcessor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, sampleRate, channels, channels), 1);
+        using var coarseProcessor = new BmsFixedRatePcmProcessor(new ArrayPcmSource(input, sampleRate, channels, 4096 * channels), 1);
 
         var fine = BmsPcmTestHelpers.ProcessChunks(fineProcessor).SelectMany(chunk => chunk.Samples).ToArray();
         var coarse = BmsPcmTestHelpers.ProcessChunks(coarseProcessor).SelectMany(chunk => chunk.Samples).ToArray();

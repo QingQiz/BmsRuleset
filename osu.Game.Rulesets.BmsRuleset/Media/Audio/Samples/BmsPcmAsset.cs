@@ -131,19 +131,63 @@ internal sealed class BmsPcmAsset
 
     internal bool TryReadStereoFrame(long frame, out float left, out float right)
     {
-        if (frame < 0 || frame >= PublishedFrameCount)
+        var cursor = new ReadCursor();
+        return TryReadStereoFrame(frame, ref cursor, out left, out right);
+    }
+
+    internal struct ReadCursor
+    {
+        internal BmsPcmAsset? Owner;
+        internal BmsPcmChunk Chunk;
+    }
+
+    internal bool TryReadStereoFrame(long frame, ref ReadCursor cursor, out float left, out float right)
+    {
+        if (State == BmsPcmAssetState.Disposed)
         {
             left = right = 0;
             return false;
         }
 
+        // Voices advance sequentially but may share an asset at different offsets. Keep
+        // the published chunk on each voice, avoiding a search for every sample frame.
+        var chunk = cursor.Chunk;
+        if (!ReferenceEquals(cursor.Owner, this) || frame < chunk.StartFrame || frame >= chunk.EndFrame)
+        {
+            if (!tryFindChunk(frame, out chunk))
+            {
+                left = right = 0;
+                return false;
+            }
+
+            cursor.Owner = this;
+            cursor.Chunk = chunk;
+        }
+
+        var index = checked((int)((frame - chunk.StartFrame) * Channels));
+        left = chunk.Samples[index];
+        right = Channels == 1 ? left : chunk.Samples[index + 1];
+        return true;
+    }
+
+    private bool tryFindChunk(long frame, out BmsPcmChunk chunk)
+    {
+        chunk = default;
+        if (frame < 0 || frame >= PublishedFrameCount)
+            return false;
+
         var low = 0;
         var high = Volatile.Read(ref publishedChunkCount) - 1;
+        var pages = Volatile.Read(ref chunkPages);
 
         while (low <= high)
         {
             var middle = low + (high - low) / 2;
-            var chunk = getPublishedChunk(middle);
+            var pageIndex = middle / chunks_per_page;
+            if (pageIndex >= pages.Length || pages[pageIndex] is not { } page)
+                return false;
+
+            chunk = page[middle % chunks_per_page];
 
             if (frame < chunk.StartFrame)
             {
@@ -157,19 +201,9 @@ internal sealed class BmsPcmAsset
                 continue;
             }
 
-            var index = checked((int)((frame - chunk.StartFrame) * Channels));
-            left = chunk.Samples[index];
-            right = Channels == 1 ? left : chunk.Samples[index + 1];
             return true;
         }
 
-        left = right = 0;
         return false;
-    }
-
-    private BmsPcmChunk getPublishedChunk(int index)
-    {
-        var pages = Volatile.Read(ref chunkPages);
-        return pages[index / chunks_per_page]![index % chunks_per_page];
     }
 }
