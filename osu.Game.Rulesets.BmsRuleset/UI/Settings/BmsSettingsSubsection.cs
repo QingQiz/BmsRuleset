@@ -31,8 +31,6 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Settings;
 
 public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettingsSubsection(ruleset)
 {
-    protected override LocalisableString Header => "BMS";
-
     [Cached]
     private OverlayColourProvider colourProvider = new(OverlayColourScheme.Purple);
 

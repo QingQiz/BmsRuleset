@@ -322,7 +322,7 @@ internal abstract partial class BmsBeatmapPanel : Panel
 
         var rulesetInstance = Ruleset.Value.CreateInstance();
 
-        if (rulesetInstance.AvailableVariants.Count() > 1)
+        if (rulesetInstance.GameplayVariants.Count() > 1)
         {
             var variant = rulesetInstance.GetVariantForBeatmap(CurrentBeatmap, Mods.Value);
             KeyCountText.Alpha = 1;

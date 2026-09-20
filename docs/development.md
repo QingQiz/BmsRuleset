@@ -8,7 +8,7 @@
 
 ## Build Manually
 
-Install [Git](https://git-scm.com/) and the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0), then clone
+Install [Git](https://git-scm.com/) and the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), then clone
 this repository and osu! into sibling directories. Sparse checkout skips the large test-song folder:
 
 ```bash
@@ -17,15 +17,19 @@ git -C BmsRuleset sparse-checkout set --no-cone '/*' '!bms_test_songs'
 git clone --filter=blob:none https://github.com/ppy/osu.git
 ```
 
-Read `OsuBase` in `BmsRuleset/Directory.Build.props`, then check out the matching osu! tag. For example,
-`OsuBase` `2026.711` requires:
+Read `OsuVersion` in `BmsRuleset/Directory.Build.props`, then check out the matching osu! tag. For example,
+`OsuVersion` `2026.920.0` requires:
 
 ```bash
-git -C osu checkout 2026.711.0-lazer
+git -C osu checkout 2026.920.0-lazer
 ```
 
 `UseLocalOsu` is enabled by default and references the sibling `osu` checkout. The `ppy.osu.Game` NuGet package
 can lag behind osu!lazer releases, so building against the matching tag keeps the API version in sync.
+Pass `-p:OsuSourcePath=/absolute/path/to/osu` to use a separate checkout when the sibling repository must remain read-only.
+
+Release versions use `<OsuVersion>-<RulesetRevision>`, with the ruleset counter starting at zero for each
+official osu! version. Assembly and file versions use the same four components separated by dots.
 
 Build the ruleset in Release configuration:
 
@@ -34,7 +38,7 @@ cd BmsRuleset
 dotnet build osu.Game.Rulesets.BmsRuleset -c Release
 ```
 
-The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net8.0/osu.Game.Rulesets.BmsRuleset.dll`. Install it using the
+The output is `osu.Game.Rulesets.BmsRuleset/bin/Release/net10.0/osu.Game.Rulesets.BmsRuleset.dll`. Install it using the
 [README installation steps](../README.md#installation).
 
 ## Mod Icons

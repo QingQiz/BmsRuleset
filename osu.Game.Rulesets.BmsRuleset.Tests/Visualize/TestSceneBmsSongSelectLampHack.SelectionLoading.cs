@@ -7,13 +7,80 @@ using NUnit.Framework;
 using osu.Framework.Screens;
 using osu.Framework.Statistics;
 using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
+using osu.Game.Screens;
 using osu.Game.Screens.Select;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 public partial class TestSceneBmsSongSelectLampHack
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestPresentBeatmapClearsScopeAndCancelsPendingSelection(bool loadStarted)
+    {
+        ControlledSongSelect controlled = null!;
+        WorkingBeatmap external = null!;
+        WorkingBeatmap pending = null!;
+        importLampBeatmapSet();
+        AddStep("import external beatmap set", () =>
+        {
+            var imported = beatmaps.Import(createBeatmapSet(Ruleset.Value));
+            Assert.That(imported, Is.Not.Null);
+            external = beatmaps.GetWorkingBeatmap(imported!.Value.Beatmaps.First().Detach());
+        });
+        loadSongSelect(() => controlled = new ControlledSongSelect());
+        AddUntilStep("scoped selection settled", () => carousel.CurrentGroupedBeatmap?.Beatmap.ID == controlled.Beatmap.Value.BeatmapInfo.ID);
+        AddStep("present external beatmap while another selection is pending", () =>
+        {
+            pending = beatmaps.GetWorkingBeatmap(lampBeatmapSet.Beatmaps.First(beatmap => beatmap.ID != controlled.Beatmap.Value.BeatmapInfo.ID));
+            controlled.DelayLoads = true;
+            if (loadStarted)
+                controlled.LoadBeatmapSelection(pending.BeatmapInfo);
+            else
+                carousel.Activate(carousel.GetCarouselItems()!.First(item => item.Model is GroupedBeatmap grouped && grouped.Beatmap.ID == pending.BeatmapInfo.ID));
+
+            ((IHandlePresentBeatmap)controlled).PresentBeatmap(external, Ruleset.Value);
+        });
+        AddAssert("scope cleared immediately", () => controlled.ScopedBeatmapSet.Value == null);
+        AddAssert("external beatmap selected immediately", () => ReferenceEquals(controlled.Beatmap.Value, external));
+        if (loadStarted)
+        {
+            AddAssert("pending load cancelled", () => controlled.Requests.Single().Token.IsCancellationRequested);
+            AddStep("finish obsolete load", () => controlled.Requests.Single().Completion.SetResult(pending));
+        }
+
+        AddUntilStep("all beatmaps visible", () => !controlled.IsFiltering
+                                                   && carousel.Criteria?.SelectedBeatmapSet == null
+                                                   && carousel.MatchedBeatmapsCount == all_lamps.Length * 2);
+        AddWaitStep("allow selection and old load to settle", 3);
+        AddAssert("external selection retained", () => ReferenceEquals(controlled.Beatmap.Value, external));
+        AddAssert("carousel selects external beatmap", () => carousel.CurrentGroupedBeatmap?.Beatmap.ID, () => Is.EqualTo(external.BeatmapInfo.ID));
+        AddAssert("no obsolete selection queued", () => controlled.Requests.Count, () => Is.EqualTo(loadStarted ? 1 : 0));
+    }
+
+    [Test]
+    public void TestUnscopeRestoresPreviousSelection()
+    {
+        BeatmapInfo previous = null!;
+        BeatmapInfo next = null!;
+        importLampBeatmapSet();
+        AddStep("remember selection before scoping", () => previous = Beatmap.Value.BeatmapInfo);
+        loadSongSelect();
+        AddUntilStep("scoped selection settled", () => carousel.CurrentGroupedBeatmap?.Beatmap.ID == previous.ID);
+        AddStep("select another scoped difficulty", () =>
+        {
+            next = lampBeatmapSet.Beatmaps.First(beatmap => beatmap.ID != previous.ID);
+            carousel.Activate(carousel.GetCarouselItems()!.First(item => item.Model is GroupedBeatmap grouped && grouped.Beatmap.ID == next.ID));
+        });
+        AddUntilStep("new difficulty selected", () => songSelect.Beatmap.Value.BeatmapInfo.ID, () => Is.EqualTo(next.ID));
+        AddStep("exit scoped view", () => songSelect.UnscopeBeatmapSet());
+        AddUntilStep("scope filter removed", () => !songSelect.IsFiltering && carousel.Criteria?.SelectedBeatmapSet == null);
+        AddUntilStep("previous selection restored", () => songSelect.Beatmap.Value.BeatmapInfo.ID, () => Is.EqualTo(previous.ID));
+        AddAssert("carousel restores previous selection", () => carousel.CurrentGroupedBeatmap?.Beatmap.ID, () => Is.EqualTo(previous.ID));
+    }
+
     [Test]
     public void TestBeatmapSelectionDiscardsStaleLoads()
     {

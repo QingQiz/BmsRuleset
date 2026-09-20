@@ -1349,6 +1349,7 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
 
     void IHandlePresentBeatmap.PresentBeatmap(WorkingBeatmap workingBeatmap, RulesetInfo ruleset)
     {
+        unscopeBeatmapSet(restorePreviousSelection: false);
         CancelBeatmapSelection();
         cancelDebounceSelection();
 
@@ -1438,12 +1439,14 @@ public abstract partial class BmsSongSelect : ScreenWithBeatmapBackground, IKeyB
         scopedBeatmapSet.Value = beatmapSet;
     }
 
-    public void UnscopeBeatmapSet()
+    public void UnscopeBeatmapSet() => unscopeBeatmapSet(restorePreviousSelection: true);
+
+    private void unscopeBeatmapSet(bool restorePreviousSelection)
     {
         if (scopedBeatmapSet.Value == null)
             return;
 
-        if (beforeScopedSelection != null)
+        if (beforeScopedSelection != null && restorePreviousSelection)
             queueBeatmapSelection(beforeScopedSelection);
 
         scopedBeatmapSet.Value = null;

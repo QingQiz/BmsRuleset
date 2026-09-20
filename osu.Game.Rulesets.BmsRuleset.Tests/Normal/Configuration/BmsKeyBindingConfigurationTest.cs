@@ -11,6 +11,17 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Configuration;
 public class BmsKeyBindingConfigurationTest
 {
     [Test]
+    public void TestEditorVariantDoesNotRegisterGameplayBindings()
+    {
+        var ruleset = new BmsRuleset();
+
+        Assert.That(ruleset.GameplayVariants, Does.Not.Contain(Ruleset.EDITOR_VARIANT));
+        Assert.That(ruleset.AllVariants, Does.Contain(Ruleset.EDITOR_VARIANT));
+        Assert.That(ruleset.GetDefaultKeyBindings(Ruleset.EDITOR_VARIANT), Is.Empty);
+        Assert.That(ruleset.GameplayVariants.All(variant => ruleset.GetDefaultKeyBindings(variant).Any()), Is.True);
+    }
+
+    [Test]
     public void TestDefaultKeyBindingsIncludeDoublePlayActions()
     {
         var bindings = BmsKeyBindingConfiguration.GetDefaultKeyBindings((int)BmsLayoutVariant.Bme7KDouble).ToArray();

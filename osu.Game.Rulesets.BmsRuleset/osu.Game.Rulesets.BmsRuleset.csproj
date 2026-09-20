@@ -1,13 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup Label="Project">
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
         <AssemblyTitle>osu.Game.Rulesets.BmsRuleset</AssemblyTitle>
         <OutputType>Library</OutputType>
         <PlatformTarget>AnyCPU</PlatformTarget>
         <RootNamespace>osu.Game.Rulesets.BmsRuleset</RootNamespace>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <Version>$(OsuBase).$(RulesetRevision)</Version>
+        <Version>$(OsuVersion)-$(RulesetRevision)</Version>
+        <AssemblyVersion>$(OsuVersion).$(RulesetRevision)</AssemblyVersion>
+        <FileVersion>$(OsuVersion).$(RulesetRevision)</FileVersion>
         <LangVersion>14</LangVersion>
         <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     </PropertyGroup>
@@ -20,7 +22,6 @@
         <PackageReference Include="FFmpeg.AutoGen" Version="4.3.0.1" />
         <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.45" PrivateAssets="all" />
         <PackageReference Include="Lib.Harmony" Version="2.4.2"/>
-        <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0"/>
     </ItemGroup>
     <!-- Keep the ruleset DLL portable by embedding every native backend as a Brotli-compressed
          resource. The runtime loader only decompresses the backend that matches the current OS. -->
@@ -28,7 +29,7 @@
         <BmsNativeBrotliToolConfiguration Condition="'$(BmsNativeBrotliToolConfiguration)' == ''">Release</BmsNativeBrotliToolConfiguration>
         <BmsNativeBrotliToolProject>$(MSBuildThisFileDirectory)..\osu.Game.Rulesets.BmsRuleset.Native\osu.Game.Rulesets.BmsRuleset.Native.csproj</BmsNativeBrotliToolProject>
         <BmsNativeBrotliToolProgram>$(MSBuildThisFileDirectory)..\osu.Game.Rulesets.BmsRuleset.Native\Program.cs</BmsNativeBrotliToolProgram>
-        <BmsNativeBrotliToolPath>$(MSBuildThisFileDirectory)..\osu.Game.Rulesets.BmsRuleset.Native\bin\$(BmsNativeBrotliToolConfiguration)\net8.0\osu.Game.Rulesets.BmsRuleset.Native.dll</BmsNativeBrotliToolPath>
+        <BmsNativeBrotliToolPath>$(MSBuildThisFileDirectory)..\osu.Game.Rulesets.BmsRuleset.Native\bin\$(BmsNativeBrotliToolConfiguration)\net10.0\osu.Game.Rulesets.BmsRuleset.Native.dll</BmsNativeBrotliToolPath>
     </PropertyGroup>
     <ItemGroup>
         <BmsNativeBackendToCompress Include="..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\windows-x64\bms-ffmpeg.dll" Condition="Exists('..\osu.Game.Rulesets.BmsRuleset.Native\ffmpeg\windows-x64\bms-ffmpeg.dll')">
@@ -48,7 +49,7 @@
         <PackageReference Include="ppy.osu.Game" Version="$(OsuVersion)"/>
     </ItemGroup>
     <ItemGroup Condition="'$(UseLocalOsu)' == 'true'">
-        <ProjectReference Include="..\..\osu\osu.Game\osu.Game.csproj"/>
+        <ProjectReference Include="$(OsuSourcePath)\osu.Game\osu.Game.csproj"/>
     </ItemGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="osu.Game.Rulesets.BmsRuleset.Tests"/>

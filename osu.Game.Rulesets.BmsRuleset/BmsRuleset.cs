@@ -53,7 +53,7 @@ public partial class BmsRuleset : Ruleset
 
     public override string RulesetAPIVersionSupported => CURRENT_RULESET_API_VERSION;
 
-    public override IEnumerable<int> AvailableVariants => BmsKeyBindingConfiguration.AvailableVariants;
+    public override IEnumerable<int> GameplayVariants => BmsKeyBindingConfiguration.AvailableVariants;
 
     public override LocalisableString VariantDescription => BmsStrings.Layout;
 
@@ -126,7 +126,7 @@ public partial class BmsRuleset : Ruleset
     }
 
     public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0) =>
-        BmsKeyBindingConfiguration.GetDefaultKeyBindings(variant);
+        variant == EDITOR_VARIANT ? [] : BmsKeyBindingConfiguration.GetDefaultKeyBindings(variant);
 
     public override ScoreProcessor CreateScoreProcessor() =>
         new BmsScoreProcessor();

@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory)][string] $Cases,
     [Parameter(Mandatory)][string] $Output,
-    [string] $Assembly = (Join-Path $PSScriptRoot '../osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net8.0/osu.Game.Rulesets.BmsRuleset.Tests.dll')
+    [string] $Assembly = (Join-Path $PSScriptRoot '../osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net10.0/osu.Game.Rulesets.BmsRuleset.Tests.dll')
 )
 
 $ErrorActionPreference = 'Stop'

@@ -293,7 +293,7 @@ internal partial class BmsPanelBeatmap : Panel
 
         var rulesetInstance = ruleset.Value.CreateInstance();
 
-        if (rulesetInstance.AvailableVariants.Count() > 1)
+        if (rulesetInstance.GameplayVariants.Count() > 1)
         {
             var variant = rulesetInstance.GetVariantForBeatmap(beatmap, mods.Value);
             var variantName = rulesetInstance.GetVariantName(variant);

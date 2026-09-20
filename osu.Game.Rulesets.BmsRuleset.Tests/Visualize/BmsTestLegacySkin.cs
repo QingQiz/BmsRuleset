@@ -76,19 +76,19 @@ public static class BmsTestLegacySkin
     public static Color4 ExpectedComboBreakColour => toColour(combo_break_colour);
 
     // The 480 is the skin.ini coordinate-space height hardcoded in BmsSkinConfiguration.getPositionFromBottom.
-    public static float ExpectedHitPosition => (480 - hit_position) * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR;
+    public static float ExpectedHitPosition => (480 - hit_position) * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
 
-    public static float ExpectedLightPosition => (480 - light_position) * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR;
+    public static float ExpectedLightPosition => (480 - light_position) * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
 
-    public static float ExpectedScorePosition => score_position * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR;
+    public static float ExpectedScorePosition => score_position * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
 
-    public static float ExpectedComboPosition => combo_position * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR;
+    public static float ExpectedComboPosition => combo_position * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
 
     public static float ExpectedBarlineHeight => barline_height;
 
-    public static float ExpectedWidthForNoteHeightScale => width_for_note_height_scale * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR;
+    public static float ExpectedWidthForNoteHeightScale => width_for_note_height_scale * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
 
-    public static float ExpectedMinimumColumnWidth => column_width.Min() * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR;
+    public static float ExpectedMinimumColumnWidth => column_width.Min() * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
 
     public static int ExpectedLightFramePerSecond => light_frame_per_second;
 
@@ -177,13 +177,13 @@ public static class BmsTestLegacySkin
 
     public static Color4 ExpectedColumnLightColour(int column) => toColour(column_light_colour[column]);
 
-    public static float ExpectedColumnWidth(int column) => column_width[column] * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR;
+    public static float ExpectedColumnWidth(int column) => column_width[column] * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
 
-    // Spacing is scaled by POSITION_SCALE_FACTOR then halved (each gap is split left/right); line widths are raw.
+    // Each scaled gap is split left/right; line widths remain in skin units.
     // Left spacing is null for the leftmost column (no gap to its left), so it is only asserted for columns >= 1.
-    public static float ExpectedLeftColumnSpacing(int column) => column_spacing[column - 1] * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR / 2;
+    public static float ExpectedLeftColumnSpacing(int column) => column_spacing[column - 1] * LegacySkin.STABLE_MAGIC_SCALE_FACTOR / 2;
 
-    public static float ExpectedRightColumnSpacing(int column) => column_spacing[column] * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR / 2;
+    public static float ExpectedRightColumnSpacing(int column) => column_spacing[column] * LegacySkin.STABLE_MAGIC_SCALE_FACTOR / 2;
 
     public static float ExpectedLeftLineWidth(int column) => column_line_width[column];
 

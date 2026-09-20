@@ -16,7 +16,7 @@ dotnet build osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Tes
 ## 单次采样
 
 ```powershell
-dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net8.0/osu.Game.Rulesets.BmsRuleset.Tests.dll --gameplay-diagnostic --filter gameplay --chart "D:/charts/example/chart.bms" --start 0 --duration 180 --output artifacts/gameplay/example
+dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net10.0/osu.Game.Rulesets.BmsRuleset.Tests.dll --gameplay-diagnostic --filter gameplay --chart "D:/charts/example/chart.bms" --start 0 --duration 180 --output artifacts/gameplay/example
 ```
 
 `--chart`、`--output` 和 `--filter gameplay` 必填。输出目录必须为空。`--start` / `--duration` 单位为秒，默认 0 / 30，duration 范围 3–3600；超过谱面长度时自动在结束前收尾。
@@ -60,7 +60,7 @@ pwsh -NoProfile -File scripts/Measure-BmsGameplay.ps1 -Cases "D:/perf/cases.json
 模板包含 IN + LN/CN/HCN 三个示例，填入普通谱即可复用；`longNoteMode` 只改变判定模式，必须同时启用 `invert` 才会把普通音符转成长条。IN 和模式 mod 通过 Player 的正常转换流程应用，自动回放、报告物件数与完整性检查均使用转换后的谱面。未启用 IN 的同谱场景可作为普通物件对照，但优化前后应比较参数完全相同的场景。
 
 ```powershell
-dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net8.0/osu.Game.Rulesets.BmsRuleset.Tests.dll --gameplay-diagnostic --filter gameplay --chart "D:/charts/example/chart.bms" --invert --invert-random-seed 12345 --long-note-mode HellChargeNote --skin Legacy --start 30 --duration 30 --output artifacts/gameplay/in-hcn
+dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net10.0/osu.Game.Rulesets.BmsRuleset.Tests.dll --gameplay-diagnostic --filter gameplay --chart "D:/charts/example/chart.bms" --invert --invert-random-seed 12345 --long-note-mode HellChargeNote --skin Legacy --start 30 --duration 30 --output artifacts/gameplay/in-hcn
 ```
 
 建议同时使用固定长度与固定种子的随机长度，并保留原生 LN 谱：IN 无法代替原生长条的尾音、重叠或特殊声明覆盖。含地雷的谱面经 IN 转换后可能产生长条与同列地雷重叠，自动回放会为避雷提前松开，无法保证全 Perfect；完整性检查仍会报失败，此类运行不能充当通过验证的性能基线。

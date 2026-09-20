@@ -101,7 +101,7 @@ public sealed class BmsSkinConfiguration(BmsSkinConfigurationSection section)
         if (!Values.TryGetValue(key, out var raw) || !float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
             return null;
 
-        return scale ? result * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR : result;
+        return scale ? result * LegacySkin.STABLE_MAGIC_SCALE_FACTOR : result;
     }
 
     private int? getIntValue(string key)
@@ -123,7 +123,7 @@ public sealed class BmsSkinConfiguration(BmsSkinConfigurationSection section)
     private float? getPositionFromBottom(string key, float min = float.MinValue, float max = float.MaxValue)
     {
         var raw = getFloatValue(key, false);
-        return raw == null ? null : (480 - Math.Clamp(raw.Value, min, max)) * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR;
+        return raw == null ? null : (480 - Math.Clamp(raw.Value, min, max)) * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
     }
 
     private Color4? getColourValue(string key) => Colours.TryGetValue(key, out var result) ? result : null;
@@ -139,7 +139,7 @@ public sealed class BmsSkinConfiguration(BmsSkinConfigurationSection section)
         if (index.Value >= values.Length || !float.TryParse(values[index.Value], NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
             return null;
 
-        return scale ? result * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR : result;
+        return scale ? result * LegacySkin.STABLE_MAGIC_SCALE_FACTOR : result;
     }
 
     private float? getMinimumColumnWidth()
@@ -148,7 +148,7 @@ public sealed class BmsSkinConfiguration(BmsSkinConfigurationSection section)
             return null;
 
         var values = raw.Split(',')
-            .Select(v => float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) ? f * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR : (float?)null)
+            .Select(v => float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) ? f * LegacySkin.STABLE_MAGIC_SCALE_FACTOR : (float?)null)
             .Where(v => v != null)
             .Select(v => v!.Value)
             .ToArray();
