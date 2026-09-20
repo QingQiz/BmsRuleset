@@ -131,12 +131,13 @@ public partial class BmsFileImporterTest
     [Test]
     public void TestHandledExtensions()
     {
-        using var storage = new TemporaryNativeStorage($"{nameof(BmsFileImporterTest)}-{Guid.NewGuid()}");
-        using var realm = new RealmAccess(storage, "client.realm");
-
-        var importer = new BmsFileImporter(realm, storage);
-
-        Assert.That(importer.HandledExtensions, Is.EquivalentTo(new[] { ".bms", ".bme", ".bml", ".pms" }));
+        // Even metadata-only assertions need Realm callbacks on the host's update thread.
+        runImportTest((realm, storage) =>
+        {
+            var importer = new BmsFileImporter(realm, storage);
+            Assert.That(importer.HandledExtensions, Is.EquivalentTo(new[] { ".bms", ".bme", ".bml", ".pms" }));
+            return Task.CompletedTask;
+        });
     }
 
     [Test]
@@ -247,12 +248,14 @@ public partial class BmsFileImporterTest
                 return (
                     BeatmapCount: set.Beatmaps.Count,
                     FileCount: set.Files.Count,
+                    FileName: set.Files.Single().Filename,
                     DistinctMd5Count: set.Beatmaps.Select(b => b.MD5Hash).Distinct(StringComparer.OrdinalIgnoreCase).Count());
             });
 
             Assert.That(result.BeatmapCount, Is.EqualTo(1));
             Assert.That(result.FileCount, Is.EqualTo(1));
             Assert.That(result.DistinctMd5Count, Is.EqualTo(1));
+            Assert.That(result.FileName, Is.EqualTo("first.bms"));
         });
     }
 

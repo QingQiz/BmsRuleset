@@ -11,14 +11,16 @@ internal readonly struct BmsTickTimeConverter(
     IReadOnlyList<BmsStopEvent> stopEvents)
 {
     private readonly double[] cumulativeStopDurations = buildCumulativeStops(stopEvents);
+    private readonly int[] firstStopByBpm = buildFirstStops(bpmEvents, stopEvents);
 
     // Events must already be ordered by tick, then source sequence, with STOP offsets applied to BPM times.
 
     public double ProjectTickToTime(long tick)
     {
-        var bpmEvent = bpmEvents[findLastBpmIndex(tick)];
+        var bpmIndex = findLastBpmIndex(tick);
+        var bpmEvent = bpmEvents[bpmIndex];
 
-        var firstStop = findFirstStopIndex(bpmEvent.Tick);
+        var firstStop = firstStopByBpm.Length == 0 ? 0 : firstStopByBpm[bpmIndex];
         var pastStop = findFirstStopIndex(tick);
 
         var stopOffset = 0d;
@@ -46,6 +48,23 @@ internal readonly struct BmsTickTimeConverter(
         }
 
         return prefix;
+    }
+
+    private static int[] buildFirstStops(IReadOnlyList<BmsBpmEvent> bpms, IReadOnlyList<BmsStopEvent> stops)
+    {
+        if (stops.Count == 0)
+            return [];
+
+        // A BPM event's STOP origin is invariant across every note projected in that segment.
+        var firstStops = new int[bpms.Count];
+        var stopIndex = 0;
+        for (var i = 0; i < bpms.Count; i++)
+        {
+            while (stopIndex < stops.Count && stops[stopIndex].Tick < bpms[i].Tick)
+                stopIndex++;
+            firstStops[i] = stopIndex;
+        }
+        return firstStops;
     }
 
     private int findLastBpmIndex(long tick)

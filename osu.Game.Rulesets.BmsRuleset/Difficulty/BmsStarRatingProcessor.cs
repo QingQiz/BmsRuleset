@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using System.Threading;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
 namespace osu.Game.Rulesets.BmsRuleset.Difficulty;
@@ -34,6 +35,7 @@ public class BmsStarRatingProcessor
     private double[] aCorners = [];
     private double[] allCorners = [];
     private double[] anchorCountsScratch = [];
+    private CancellationToken cancellationToken;
 
     // One owner per compute call keeps pooled scratch tied to the stages that share it, so new buffers do not have to replicate return logic in every helper.
     private sealed class ComputeWorkspace : IDisposable
@@ -106,8 +108,6 @@ public class BmsStarRatingProcessor
 
         public double[] IRelease { get; }
 
-        public double[] NoteHitTimes { get; }
-
         public double[] EffectiveWeights { get; }
 
         public (double time, double change)[] LnEvents { get; }
@@ -118,7 +118,7 @@ public class BmsStarRatingProcessor
 
         public double[] LnValues { get; }
 
-        public ComputeWorkspace(int baseCount, int aCount, int allCount, int totalColumns, int noteCount, int tailCount, int lnCount)
+        public ComputeWorkspace(int baseCount, int aCount, int allCount, int totalColumns, int tailCount, int lnCount)
         {
             ActiveColumnMask = ArrayPool<ulong>.Shared.Rent(baseCount);
             KeyUsage400 = ArrayPool<double>.Shared.Rent(totalColumns * baseCount);
@@ -154,7 +154,6 @@ public class BmsStarRatingProcessor
             AStep = ArrayPool<double>.Shared.Rent(aCount);
             RStep = ArrayPool<double>.Shared.Rent(baseCount);
             IRelease = ArrayPool<double>.Shared.Rent(tailCount);
-            NoteHitTimes = ArrayPool<double>.Shared.Rent(noteCount);
             EffectiveWeights = ArrayPool<double>.Shared.Rent(allCount);
 
             var lnEventCount = lnCount * 3;
@@ -171,7 +170,6 @@ public class BmsStarRatingProcessor
             ArrayPool<double>.Shared.Return(LnPointCandidates);
             ArrayPool<(double time, double change)>.Shared.Return(LnEvents);
             ArrayPool<double>.Shared.Return(EffectiveWeights);
-            ArrayPool<double>.Shared.Return(NoteHitTimes);
             ArrayPool<double>.Shared.Return(IRelease);
             ArrayPool<double>.Shared.Return(RStep);
             ArrayPool<double>.Shared.Return(AStep);
@@ -209,13 +207,28 @@ public class BmsStarRatingProcessor
         }
     }
 
-    public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null)
-        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate);
+    public BmsStarRatingResult Compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null, CancellationToken cancellationToken = default)
+        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate, cancellationToken);
 
-    public double ComputeStarRating(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null)
-        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate).StarRating;
+    public double ComputeStarRating(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate = 1.0, BmsLayoutVariant? layout = null, double? judgementRate = null, CancellationToken cancellationToken = default)
+        => compute(noteTimings, totalColumns, rank, clockRate, layout ?? BmsLayout.VariantFromTotalColumns(totalColumns), judgementRate, cancellationToken).StarRating;
 
-    private BmsStarRatingResult compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate)
+    private BmsStarRatingResult compute(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        this.cancellationToken = cancellationToken;
+        try
+        {
+            return computeCore(noteTimings, totalColumns, rank, clockRate, layout, judgementRate);
+        }
+        finally
+        {
+            clearWorkingState();
+            this.cancellationToken = default;
+        }
+    }
+
+    private BmsStarRatingResult computeCore(IReadOnlyList<BmsNoteTiming> noteTimings, int totalColumns, int rank, double clockRate, BmsLayoutVariant layout, double? judgementRate)
     {
         // === Basic Setup and Parsing ===
         if (totalColumns > 64)
@@ -223,12 +236,14 @@ public class BmsStarRatingProcessor
 
         TotalColumns = totalColumns;
         preprocessFile(noteTimings, rank, clockRate, layout, judgementRate);
+        cancellationToken.ThrowIfCancellationRequested();
         getCorners();
+        cancellationToken.ThrowIfCancellationRequested();
 
         var baseCount = baseCorners.Length;
         var aCount = aCorners.Length;
         var allCount = allCorners.Length;
-        using var workspace = new ComputeWorkspace(baseCount, aCount, allCount, TotalColumns, noteSeq.Length, tailSeq.Length, lnSeq.Length);
+        using var workspace = new ComputeWorkspace(baseCount, aCount, allCount, TotalColumns, tailSeq.Length, lnSeq.Length);
 
         getActiveColumnMaskInto(workspace.ActiveColumnMask);
         getKeyUsage400Into(workspace.KeyUsage400);
@@ -261,8 +276,7 @@ public class BmsStarRatingProcessor
             WeightedMean = weightedMean,
         };
 
-        clearWorkingState();
-
+        cancellationToken.ThrowIfCancellationRequested();
         return Result;
     }
 
@@ -609,6 +623,7 @@ public class BmsStarRatingProcessor
         var sortedNotes = new List<(int column, double head, double tail, int order)>(noteTimings.Count);
         for (var i = 0; i < noteTimings.Count; i++)
         {
+            if ((i & 255) == 0) cancellationToken.ThrowIfCancellationRequested();
             var obj = noteTimings[i];
             var head = Math.Floor(obj.StartTime / clockRate);
             var tail = obj.EndTime > obj.StartTime ? Math.Floor(obj.EndTime / clockRate) : -1;
@@ -727,6 +742,7 @@ public class BmsStarRatingProcessor
         var writeCount = 0;
         foreach (var note in noteSeq)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             rawBase[writeCount] = note.Head;
             rawA[writeCount++] = note.Head;
             if (note.Tail >= 0)
@@ -742,11 +758,13 @@ public class BmsStarRatingProcessor
 
     private void getActiveColumnMaskInto(ulong[] usage)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Array.Clear(usage, 0, baseCorners.Length);
 
         var leftHint = 0;
         foreach (var note in noteSeq)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var start = Math.Max(note.Head - 150, 0);
             var end = note.Tail < 0 ? note.Head + 150 : Math.Min(note.Tail + 150, TotalTimeT - 1);
 
@@ -761,6 +779,7 @@ public class BmsStarRatingProcessor
 
     private void getKeyUsage400Into(double[] usage)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var nCols = TotalColumns;
         var baseCount = baseCorners.Length;
         Array.Clear(usage, 0, nCols * baseCount);
@@ -768,6 +787,7 @@ public class BmsStarRatingProcessor
         int leftHint = 0, left400Hint = 0;
         foreach (var note in noteSeq)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var start = Math.Max(note.Head, 0);
             var end = note.Tail < 0 ? note.Head : Math.Min(note.Tail, TotalTimeT - 1);
 
@@ -794,6 +814,7 @@ public class BmsStarRatingProcessor
 
     private void computeAnchorInto(double[] keyUsage400, double[] result)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var nCols = TotalColumns;
         var baseCount = baseCorners.Length;
         if (anchorCountsScratch.Length < nCols)
@@ -838,6 +859,7 @@ public class BmsStarRatingProcessor
 
     private void computeJbarInto(ComputeWorkspace workspace)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var nCols = TotalColumns;
         var baseCount = baseCorners.Length;
         var jbar = workspace.Jbar;
@@ -864,6 +886,7 @@ public class BmsStarRatingProcessor
 
         for (var k = 0; k < nCols; k++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var noteStart = getColumnNoteStart(k);
             var noteCount = getColumnNoteCount(k);
             var dksOffset = k * baseCount;
@@ -911,6 +934,7 @@ public class BmsStarRatingProcessor
 
     private void computeXbarInto(ComputeWorkspace workspace)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var nCols = TotalColumns;
         var baseCount = baseCorners.Length;
         var crossCoeff = generateCrossCoeffs(nCols);
@@ -931,6 +955,7 @@ public class BmsStarRatingProcessor
 
         for (var k = 0; k <= nCols; k++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Array.Clear(xks, 0, baseCount);
             Array.Clear(fastCrossCurrent, 0, baseCount);
 
@@ -1041,6 +1066,8 @@ public class BmsStarRatingProcessor
 
     private void computePbarInto(ComputeWorkspace workspace)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         double streamBooster(double delta)
         {
             var r = 7.5 / delta;
@@ -1109,6 +1136,7 @@ public class BmsStarRatingProcessor
 
     private void computeAbarInto(ComputeWorkspace workspace)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var nCols = TotalColumns;
         var baseCount = baseCorners.Length;
         var abar = workspace.Abar;
@@ -1144,10 +1172,11 @@ public class BmsStarRatingProcessor
             }
         }
 
+        var idx = 0;
         for (var i = 0; i < aCorners.Length; i++)
         {
-            var idx = searchSortedLeft(baseCorners, aCorners[i]);
-            if (idx >= baseCorners.Length) idx = baseCorners.Length - 1;
+            while (idx < baseCorners.Length - 1 && baseCorners[idx] < aCorners[i])
+                idx++;
 
             var mask = activeColumnMask[idx];
             var prevActive = -1;
@@ -1176,6 +1205,7 @@ public class BmsStarRatingProcessor
 
     private void computeRbarInto(ComputeWorkspace workspace)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var baseCount = baseCorners.Length;
         var rbar = workspace.Rbar;
         var rStep = workspace.RStep;
@@ -1223,19 +1253,21 @@ public class BmsStarRatingProcessor
 
     private void computeCAndKsInto(ComputeWorkspace workspace)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var cArr = workspace.CArr;
         var ksArr = workspace.KsArr;
-        var noteHitTimes = workspace.NoteHitTimes;
         var activeColumnMask = workspace.ActiveColumnMask;
-        for (var i = 0; i < noteSeq.Length; i++)
-            noteHitTimes[i] = noteSeq[i].Head;
-
+        var left = 0;
+        var right = 0;
         for (var i = 0; i < baseCorners.Length; i++)
         {
             var low = baseCorners[i] - 500;
             var high = baseCorners[i] + 500;
-            var cnt = searchSortedLeft(noteHitTimes, noteSeq.Length, high) - searchSortedLeft(noteHitTimes, noteSeq.Length, low);
-            cArr[i] = cnt;
+            while (left < noteSeq.Length && noteSeq[left].Head < low)
+                left++;
+            while (right < noteSeq.Length && noteSeq[right].Head < high)
+                right++;
+            cArr[i] = right - left;
         }
 
         for (var i = 0; i < baseCorners.Length; i++)
@@ -1259,6 +1291,7 @@ public class BmsStarRatingProcessor
 
     private void computeDifficulty(ComputeWorkspace workspace)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var d = workspace.D;
         var jbar = workspace.Jbar;
         var xbar = workspace.Xbar;
@@ -1343,6 +1376,7 @@ public class BmsStarRatingProcessor
 
     private double computeStarRating(ComputeWorkspace workspace)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var d = workspace.D;
         var cArr = workspace.CArr;
         var baseInterpIdx = workspace.BaseInterpIdx;
@@ -1409,6 +1443,7 @@ public class BmsStarRatingProcessor
 
     private (double[] points, int pointCount, double[] cumsum, double[] values) lnBodiesCountSparseRepresentation(ComputeWorkspace workspace)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var eventCount = lnSeq.Length * 3;
         var events = workspace.LnEvents;
         var pointCandidates = workspace.LnPointCandidates;

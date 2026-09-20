@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using osu.Game.Rulesets.BmsRuleset.Difficulty;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -13,16 +14,19 @@ internal static partial class BmsChartParser
     public static BmsImportSummary ParseImportSummary(
         byte[] content,
         string? path = null,
-        Func<int, int>? randomValueSelector = null)
+        Func<int, int>? randomValueSelector = null,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var source = decodeText(content);
-        var state = new ImportParseState(randomValueSelector ?? selectRandomValue);
+        var state = new ImportParseState(randomValueSelector ?? selectRandomValue, cancellationToken);
         var offset = 0;
 
         // Raw channel slices retain the decoded text, avoiding a string allocation for every
         // WAV/BMP definition and BGM/BGA line that import will immediately discard.
         while (offset < source.Length)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var newline = source.AsSpan(offset).IndexOfAny('\r', '\n');
             var end = newline < 0 ? source.Length : offset + newline;
             parseImportLine(source, offset, end, state);
@@ -37,11 +41,16 @@ internal static partial class BmsChartParser
     public static BmsImportSummary ParseImportSummary(
         IEnumerable<string> lines,
         string? path = null,
-        Func<int, int>? randomValueSelector = null)
+        Func<int, int>? randomValueSelector = null,
+        CancellationToken cancellationToken = default)
     {
-        var state = new ImportParseState(randomValueSelector ?? selectRandomValue);
+        cancellationToken.ThrowIfCancellationRequested();
+        var state = new ImportParseState(randomValueSelector ?? selectRandomValue, cancellationToken);
         foreach (var line in lines)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             parseImportLine(line, 0, line.Length, state);
+        }
 
         return createImportSummary(state, path);
     }
@@ -49,12 +58,14 @@ internal static partial class BmsChartParser
     private static BmsImportSummary createImportSummary(ImportParseState import, string? path)
     {
         var state = import.Chart;
+        state.CancellationToken.ThrowIfCancellationRequested();
         var tickResolution = calculateTickResolution(state);
         var measures = calculateMeasures(state, tickResolution);
         var measureStarts = measures.ToDictionary(m => m.Index, m => m.StartTick);
         var timingEvents = collectTimingEvents(state, measureStarts, tickResolution);
         var stopEvents = collectStopEvents(state, measureStarts, timingEvents);
         timingEvents = applyStopOffsetsToTimingEvents(timingEvents, stopEvents);
+        state.CancellationToken.ThrowIfCancellationRequested();
 
         var layoutVariant = BmsLayout.InferVariant(state.ChannelLines.Select(l => l.Channel).Concat(import.InvisibleLayoutChannels), path);
         var totalColumns = BmsLayout.GetTotalColumns(layoutVariant);
@@ -62,12 +73,14 @@ internal static partial class BmsChartParser
         var hitObjects = collectImportHitObjects(state, totalColumns, measureStarts, timing);
 
         hitObjects.Sort(default(ImportHitObjectComparer));
+        state.CancellationToken.ThrowIfCancellationRequested();
 
         var noteTimings = new List<BmsNoteTiming>(hitObjects.Count);
         var longNoteCount = 0;
         var scratchCount = 0;
         foreach (var hitObject in hitObjects)
         {
+            state.CancellationToken.ThrowIfCancellationRequested();
             if (!hitObject.IsMine)
                 noteTimings.Add(new BmsNoteTiming(hitObject.Column, hitObject.StartTime, hitObject.EndTime));
             if (hitObject.IsLongNote)
@@ -151,9 +164,9 @@ internal static partial class BmsChartParser
         channel is CH_03 or CH_08 or CH_09
         || (Hi(channel) is 1 or 2 or 5 or 6 or 13 or 14 && Lo(channel) is >= 1 and <= 9);
 
-    private sealed class ImportParseState(Func<int, int> randomValueSelector)
+    private sealed class ImportParseState(Func<int, int> randomValueSelector, CancellationToken cancellationToken)
     {
-        public ParseState Chart { get; } = new();
+        public ParseState Chart { get; } = new() { CancellationToken = cancellationToken };
 
         public HashSet<ushort> InvisibleLayoutChannels { get; } = [];
 
@@ -219,17 +232,18 @@ internal static partial class BmsChartParser
     {
         var (notes, lnCells, mines) = collectPlayableCells(state, totalColumns, measureStarts, importOnly: true);
 
-        var output = new List<ImportHitObject>(notes.Count + lnCells.Count + mines.Count);
+        var output = new List<ImportHitObject>(notes.Count + lnCells.Count / 2 + mines.Count);
 
         if (state.LnType == 2)
-            collectImportLnType2Objects(lnCells, timingMap, output);
+            collectImportLnType2Objects(lnCells, timingMap, output, state.CancellationToken);
         else
-            collectImportLnType1Objects(lnCells, timingMap, output);
+            collectImportLnType1Objects(lnCells, timingMap, output, state.CancellationToken);
 
         collectImportVisibleObjects(notes, state, timingMap, output);
 
         foreach (var mine in mines)
         {
+            state.CancellationToken.ThrowIfCancellationRequested();
             var startTime = timingMap.ProjectTickToTime(mine.Tick);
             output.Add(new ImportHitObject(mine.Tick, mine.Column, startTime, startTime, false, true));
         }
@@ -238,21 +252,25 @@ internal static partial class BmsChartParser
     }
 
     private static void collectImportVisibleObjects(
-        IEnumerable<RawCell> notes, ParseState state, BmsTickTimeConverter timingMap,
+        List<RawCell> notes, ParseState state, BmsTickTimeConverter timingMap,
         List<ImportHitObject> output)
     {
         if (state.LnObjValues.Count == 0)
         {
             foreach (var note in notes)
+            {
+                state.CancellationToken.ThrowIfCancellationRequested();
                 output.Add(createImportHitObject(note, note.Tick, false, timingMap));
+            }
 
             return;
         }
 
         var pendingByColumn = new Dictionary<int, RawCell>();
 
-        foreach (var note in notes.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
+        foreach (var note in sortCells(notes))
         {
+            state.CancellationToken.ThrowIfCancellationRequested();
             if (state.LnObjValues.Contains(note.Value))
             {
                 if (pendingByColumn.Remove(note.Column, out var start) && note.Tick > start.Tick)
@@ -272,13 +290,14 @@ internal static partial class BmsChartParser
     }
 
     private static void collectImportLnType1Objects(
-        IEnumerable<RawCell> lnCells, BmsTickTimeConverter timingMap,
-        List<ImportHitObject> output)
+        List<RawCell> lnCells, BmsTickTimeConverter timingMap,
+        List<ImportHitObject> output, CancellationToken cancellationToken)
     {
         var openByColumn = new Dictionary<int, RawCell>();
 
-        foreach (var cell in lnCells.OrderBy(c => c.Tick).ThenBy(c => c.Sequence))
+        foreach (var cell in sortCells(lnCells))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (openByColumn.Remove(cell.Column, out var start))
             {
                 if (cell.Tick > start.Tick)
@@ -293,7 +312,7 @@ internal static partial class BmsChartParser
 
     private static void collectImportLnType2Objects(
         IEnumerable<RawCell> lnCells, BmsTickTimeConverter timingMap,
-        List<ImportHitObject> output)
+        List<ImportHitObject> output, CancellationToken cancellationToken)
     {
         foreach (var channelGroup in lnCells.GroupBy(c => c.Channel))
         {
@@ -301,6 +320,7 @@ internal static partial class BmsChartParser
 
             foreach (var cell in channelGroup.OrderBy(c => c.Tick).ThenBy(c => c.Sequence))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (cell.Value != 0)
                 {
                     openRun ??= cell;

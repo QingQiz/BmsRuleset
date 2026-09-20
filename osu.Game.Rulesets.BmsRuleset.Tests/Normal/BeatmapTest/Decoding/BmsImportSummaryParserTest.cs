@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 
@@ -10,6 +11,29 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
 [TestFixture]
 public class BmsImportSummaryParserTest
 {
+    [Test]
+    public void TestCancellationInterruptsParsingBeforeReadingRemainingLines()
+    {
+        using var cancellation = new CancellationTokenSource();
+        Assert.Throws<OperationCanceledException>(() => BmsChartParser.ParseImportSummary(lines(), cancellationToken: cancellation.Token));
+
+        IEnumerable<string> lines()
+        {
+            yield return "#TITLE Cancel";
+            cancellation.Cancel();
+            yield return "#BPM 120";
+            Assert.Fail("Parsing continued after cancellation.");
+        }
+    }
+
+    [Test]
+    public void TestCancelledByteInputIsRejectedBeforeDecoding()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() => BmsChartParser.ParseImportSummary((byte[])null, cancellationToken: cancellation.Token));
+    }
+
     [TestCase(1, "chart.bms")]
     [TestCase(2, "chart.bms")]
     [TestCase(1, "chart.pms")]

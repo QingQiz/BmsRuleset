@@ -72,29 +72,53 @@ public sealed class BmsTimingMap
                         IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
                         IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents,
                         double baseBpm = 0)
-        : this(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, speedEvents, baseBpm, 0)
+        : this(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, speedEvents, baseBpm, false)
     {
     }
 
     private BmsTimingMap(int tickResolution, IEnumerable<BmsMeasureInfo> measures,
                          IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
                          IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents,
-                         double baseBpm, double timeOffset)
+                         double baseBpm, bool alreadySorted)
     {
         TickResolution = tickResolution;
-        this.timeOffset = timeOffset;
-        this.measures = measures.OrderBy(m => m.Index).ToArray();
-        this.bpmEvents = bpmEvents
-            .Select(e => e with { Time = e.Time + timeOffset })
-            .OrderBy(e => e.Tick)
-            .ThenBy(e => e.Sequence)
-            .ToArray();
-        this.stopEvents = stopEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
-        this.scrollEvents = scrollEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
-        this.speedEvents = speedEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence).ToArray();
+        this.measures = (alreadySorted ? measures : measures.OrderBy(m => m.Index)).ToArray();
+        this.bpmEvents = (alreadySorted ? bpmEvents : bpmEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence)).ToArray();
+        this.stopEvents = (alreadySorted ? stopEvents : stopEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence)).ToArray();
+        this.scrollEvents = (alreadySorted ? scrollEvents : scrollEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence)).ToArray();
+        this.speedEvents = (alreadySorted ? speedEvents : speedEvents.OrderBy(e => e.Tick).ThenBy(e => e.Sequence)).ToArray();
         ScrollReferenceBpm = baseBpm > 0 ? baseBpm : initialBpm();
         points = buildTimingPoints();
         tickTimeConverter = new BmsTickTimeConverter(tickResolution, this.bpmEvents, this.stopEvents);
+    }
+
+    internal static BmsTimingMap FromSortedEvents(int tickResolution, IEnumerable<BmsMeasureInfo> measures,
+        IEnumerable<BmsBpmEvent> bpmEvents, IEnumerable<BmsStopEvent> stopEvents,
+        IEnumerable<BmsScrollEvent> scrollEvents, IEnumerable<BmsSpeedEvent> speedEvents, double baseBpm) =>
+        new(tickResolution, measures, bpmEvents, stopEvents, scrollEvents, speedEvents, baseBpm, true);
+
+    private BmsTimingMap(BmsTimingMap original, double offset)
+    {
+        TickResolution = original.TickResolution;
+        ScrollReferenceBpm = original.ScrollReferenceBpm;
+        timeOffset = offset;
+        // Lead-in only changes absolute times. The ordered tick-domain data and scroll coordinates
+        // are immutable, so sharing them avoids sorting and constructing the same segments twice.
+        measures = original.measures;
+        stopEvents = original.stopEvents;
+        scrollEvents = original.scrollEvents;
+        speedEvents = original.speedEvents;
+        bpmEvents = new BmsBpmEvent[original.bpmEvents.Length];
+        for (var i = 0; i < bpmEvents.Length; i++)
+            bpmEvents[i] = original.bpmEvents[i] with { Time = original.bpmEvents[i].Time + offset };
+        points = new TimingPoint[original.points.Length];
+        for (var i = 0; i < points.Length; i++)
+        {
+            var point = original.points[i];
+            points[i] = new TimingPoint(point.Time + offset, point.NextTime + offset, point.ScrollPos,
+                point.Bpm, point.ScrollFactor, point.SpeedFactor, point.ScrollDir, point.IsStop);
+        }
+        tickTimeConverter = new BmsTickTimeConverter(TickResolution, bpmEvents, stopEvents);
     }
 
     // Backward-compatible overload for tests and fallback paths that don't have scroll/speed events.
@@ -114,15 +138,7 @@ public sealed class BmsTimingMap
         if (timeOffset != 0)
             throw new InvalidOperationException("A BMS timing map cannot be shifted more than once.");
 
-        return new BmsTimingMap(
-            TickResolution,
-            measures,
-            bpmEvents,
-            stopEvents,
-            scrollEvents,
-            speedEvents,
-            ScrollReferenceBpm,
-            offset);
+        return new BmsTimingMap(this, offset);
     }
 
     // ── Time-based queries ────────────────────────────────────────────────────
@@ -247,13 +263,6 @@ public sealed class BmsTimingMap
 
     private TimingPoint[] buildTimingPoints()
     {
-        // Collect all change ticks: BPM, STOP, SCROLL, and SPEED.
-        var eventTicks = bpmEvents.Select(e => e.Tick)
-            .Concat(stopEvents.Select(e => e.Tick))
-            .Concat(scrollEvents.Select(e => e.Tick))
-            .Concat(speedEvents.Select(e => e.Tick))
-            .Distinct().OrderBy(t => t).ToArray();
-
         var result = new List<TimingPoint>();
 
         var currentTick = 0L;
@@ -273,8 +282,15 @@ public sealed class BmsTimingMap
         var scrollIndex = 0;
         var speedIndex = 0;
 
-        foreach (var tick in eventTicks)
+        // All four event streams are ordered; consume their union directly instead of hashing
+        // and sorting another copy of the ticks. Coincident events retain the processing order below.
+        while (bpmIndex < bpmEvents.Length || stopIndex < stopEvents.Length || scrollIndex < scrollEvents.Length || speedIndex < speedEvents.Length)
         {
+            var tick = Math.Min(
+                Math.Min(bpmIndex < bpmEvents.Length ? bpmEvents[bpmIndex].Tick : long.MaxValue,
+                    stopIndex < stopEvents.Length ? stopEvents[stopIndex].Tick : long.MaxValue),
+                Math.Min(scrollIndex < scrollEvents.Length ? scrollEvents[scrollIndex].Tick : long.MaxValue,
+                    speedIndex < speedEvents.Length ? speedEvents[speedIndex].Tick : long.MaxValue));
             if (tick > currentTick)
             {
                 var duration = ticksToMilliseconds(tick - currentTick, currentBpm);

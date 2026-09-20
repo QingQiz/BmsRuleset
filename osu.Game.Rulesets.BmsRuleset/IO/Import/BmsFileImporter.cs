@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
@@ -24,6 +25,10 @@ namespace osu.Game.Rulesets.BmsRuleset.IO.Import;
 
 public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotificationOverlay? notifications = null, BeatmapManager? beatmaps = null) : ICanAcceptFiles
 {
+    // Each star-rating workspace can occupy tens of MB. Share the budget across import requests,
+    // including single directories with many charts, without multiplying nested parallel loops.
+    private static readonly int preparation_concurrency = Math.Clamp(Environment.ProcessorCount / 2, 1, 4);
+    private static readonly SemaphoreSlim preparation_slots = new(preparation_concurrency);
 
     public IEnumerable<string> HandledExtensions => Constant.BMS_EXTENSIONS;
 
@@ -173,26 +178,36 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     /// Fast discovery pass: walk the input paths, collect chart files, and group them by directory.
     /// Performs no file reading or hashing, so it returns quickly and yields an accurate total count.
     /// </summary>
-    private static ImportGroup[] discoverChartGroups(IEnumerable<string> paths)
+    private static ImportGroup[] discoverChartGroups(IEnumerable<string> paths, CancellationToken cancellationToken)
     {
         var chartPaths = paths.AsParallel()
-            .SelectMany(expandPathToCharts)
+            .WithCancellation(cancellationToken)
+            .SelectMany(path => expandPathToCharts(path, cancellationToken))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         return chartPaths
             .GroupBy(Path.GetDirectoryName, StringComparer.OrdinalIgnoreCase)
             .Where(g => !string.IsNullOrWhiteSpace(g.Key))
-            .Select(g => new ImportGroup(g.Key!, g.ToArray()))
+            .Select(g => new ImportGroup(g.Key!, g.OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(p => p, StringComparer.OrdinalIgnoreCase).ToArray()))
             .ToArray();
     }
 
-    private static IEnumerable<string> expandPathToCharts(string path)
+    private static IEnumerable<string> expandPathToCharts(string path, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (Directory.Exists(path))
-            return Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories).Where(Constant.IsChartFile);
-
-        return File.Exists(path) && Constant.IsChartFile(path) ? [path] : [];
+        {
+            foreach (var file in Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (Constant.IsChartFile(file))
+                    yield return file;
+            }
+        }
+        else if (File.Exists(path) && Constant.IsChartFile(path))
+            yield return path;
     }
 
     /// <summary>Compute a deterministic set hash from sorted unique beatmap MD5 hashes.</summary>
@@ -221,93 +236,33 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         return new ConcurrentDictionary<string, byte>(hashes, StringComparer.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Reads, parses and hashes every chart in a directory
-    /// </summary>
-    private static PreparedDirectory? readPreparedDirectory(
-        ImportGroup group,
-        RealmAccess realmAccess,
+    private static ChartImport? readPreparedChart(
+        string path,
+        byte[]? content,
+        string md5,
+        Realm workerRealm,
         RealmFileStore fileStore,
-        ConcurrentDictionary<string, byte> importedBeatmapMd5Hashes)
+        CancellationToken cancellationToken)
     {
-        var chartPaths = group.ChartPaths
-            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        var bytes = chartPaths.AsParallel().AsOrdered().Select(File.ReadAllBytes).ToArray();
-        var allMd5 = bytes.AsParallel().AsOrdered().Select(b => Convert.ToHexString(MD5.HashData(b)).ToLowerInvariant()).ToArray();
-
-        var uniqueChartIndexes = new List<int>(allMd5.Length);
-        var seenMd5 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        for (var i = 0; i < allMd5.Length; i++)
-        {
-            if (seenMd5.Add(allMd5[i]) && importedBeatmapMd5Hashes.TryAdd(allMd5[i], 0))
-                uniqueChartIndexes.Add(i);
-        }
-
-        if (uniqueChartIndexes.Count == 0)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (content == null)
             return null;
 
-        var setHash = calculateSetHash(uniqueChartIndexes.Select(i => allMd5[i]));
+        var summary = BmsChartParser.ParseImportSummary(content, path, _ => 1, cancellationToken);
+        var starRating = computeStarRating(summary, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        var existing = realmAccess.Run(r =>
-        {
-            var existingSet = r.All<BeatmapSetInfo>()
-                .Filter("Hash == $0", setHash)
-                .FirstOrDefault();
-
-            return existingSet != null && !existingSet.DeletePending;
-        });
-
-        if (existing)
-            return null;
-
-        // Step 1 — Parallel: parse chart, compute all statistics (pure data, no Realm).
-        var parsedCharts = uniqueChartIndexes.AsParallel().AsOrdered().Select(i =>
-        {
-            var path = chartPaths[i];
-            var content = bytes[i];
-            var md5 = allMd5[i];
-            var summary = BmsChartParser.ParseImportSummary(content, path, _ => 1);
-
-            return (
-                Index: i,
-                Content: content,
-                Md5: md5,
-                StarRating: computeStarRating(summary),
-                summary.Metadata,
-                summary.Bpm,
-                summary.Length,
-                summary.TotalObjectCount,
-                summary.EndTimeObjectCount,
-                summary.ScratchObjectCount
-            );
-        }).ToArray();
-
-        // Step 2 — Sequential: write to disk (Realm-thread-bound), build ChartImport.
-        var charts = realmAccess.Run(r => parsedCharts.Select(parsed =>
-        {
-            var path = chartPaths[parsed.Index];
-            using var stream = new MemoryBackedFileStream(path, parsed.Content);
-            var fileHash =
-                fileStore.Add(stream, r, addToRealm: false, preferHardLinks: true).Hash;
-
-            return new ChartImport(
-                path, parsed.Md5, fileHash,
-                parsed.Metadata, parsed.StarRating, parsed.Bpm, parsed.Length,
-                parsed.TotalObjectCount, parsed.EndTimeObjectCount, parsed.ScratchObjectCount);
-        }).ToArray());
-
-        return new PreparedDirectory(group.Directory, charts);
+        using var stream = new MemoryBackedFileStream(path, content);
+        var fileHash = fileStore.Add(stream, workerRealm, addToRealm: false, preferHardLinks: true).Hash;
+        return new ChartImport(path, md5, fileHash, summary.Metadata, starRating, summary.Bpm, summary.Length,
+            summary.TotalObjectCount, summary.EndTimeObjectCount, summary.ScratchObjectCount);
     }
 
     /// <summary>
     ///     Compute star rating from an already-parsed chart.  Returns 0 on failure
     ///     (malformed chart, unsupported layout) — the import continues regardless.
     /// </summary>
-    private static double computeStarRating(BmsImportSummary summary)
+    private static double computeStarRating(BmsImportSummary summary, CancellationToken cancellationToken)
     {
         try
         {
@@ -320,8 +275,12 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 : BmsJudgementProfileProvider.RateForRank(layout, summary.Metadata.Rank);
 
             return new BmsStarRatingProcessor()
-                .Compute(summary.StarRatingNoteTimings, summary.Metadata.KeyCount, summary.Metadata.Rank, layout: layout, judgementRate: judgementRate)
+                .Compute(summary.StarRatingNoteTimings, summary.Metadata.KeyCount, summary.Metadata.Rank, layout: layout, judgementRate: judgementRate, cancellationToken: cancellationToken)
                 .StarRating;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception e)
         {
@@ -379,12 +338,13 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     private void runImportPipeline(ProgressNotification notification, string[] paths)
     {
         using var bulkUpdate = BmsBulkBeatmapUpdate.Begin(realm);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(notification.CancellationToken);
         try
         {
             var fileStore = new RealmFileStore(realm, storage);
 
             notification.Text = BmsStrings.ScanningFiles;
-            var groups = discoverChartGroups(paths);
+            var groups = discoverChartGroups(paths, cancellation.Token);
 
             if (groups.Length == 0)
             {
@@ -395,12 +355,23 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
             notification.Text = BmsStrings.PreparingImport;
 
-            // we only import .bms files, so the size will be very small
-            var pool = new BlockingCollection<PreparedDirectory?>(1024);
+            using var pool = new BlockingCollection<PreparedDirectory?>(preparation_concurrency * 2);
             var importedBeatmapMd5Hashes = createImportedBeatmapMd5Lookup();
+            var producer = launchProducer(groups, fileStore, pool, importedBeatmapMd5Hashes, cancellation.Token);
+            (int imported, int processed, bool cancelled) result;
+            try
+            {
+                result = drainConsumer(notification, groups, pool, cancellation.Token);
+            }
+            finally
+            {
+                // A consumer failure must also release producers blocked on a full queue. Do not
+                // dispose the queue or finish the bulk-update scope while workers can still write.
+                cancellation.Cancel();
+                producer.GetAwaiter().GetResult();
+            }
 
-            var producer = launchProducer(notification, groups, fileStore, pool, importedBeatmapMd5Hashes);
-            var (imported, processed, cancelled) = drainConsumer(notification, groups, pool, producer);
+            var (imported, processed, cancelled) = result;
 
             if (cancelled) return; // drainConsumer already set the notification state
 
@@ -422,34 +393,59 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         }
     }
 
-    /// <summary>
-    /// Launch producer tasks that read, parse, and write chart/resource files to disk
-    /// in parallel, one directory per worker.
-    /// </summary>
     private Task launchProducer(
-        ProgressNotification notification,
         ImportGroup[] groups,
         RealmFileStore fileStore,
         BlockingCollection<PreparedDirectory?> pool,
-        ConcurrentDictionary<string, byte> importedBeatmapMd5Hashes)
+        ConcurrentDictionary<string, byte> importedBeatmapMd5Hashes,
+        CancellationToken cancellationToken)
     {
         return Task.Run(() =>
         {
             try
             {
-                Parallel.ForEach(groups, new ParallelOptions
+                // Admit hashes in filename order so identical files with different names/extensions
+                // retain the same metadata winner. No buffering keeps only worker-owned bytes alive.
+                var charts = Partitioner.Create(readCharts(), EnumerablePartitionerOptions.NoBuffering);
+                var partitions = charts.GetPartitions(preparation_concurrency);
+                try
                 {
-                    CancellationToken = notification.CancellationToken,
-                }, group =>
+                    // Realm contexts are thread-bound and costly to reopen for every chart.
+                    Parallel.ForEach(partitions, new ParallelOptions
+                    {
+                        CancellationToken = cancellationToken,
+                        MaxDegreeOfParallelism = preparation_concurrency,
+                    }, partition => realm.Run(workerRealm =>
+                    {
+                        while (partition.MoveNext())
+                        {
+                            var chart = partition.Current;
+                            preparation_slots.Wait(cancellationToken);
+                            try
+                            {
+                                chart.directory.Charts[chart.index] = readPreparedChart(chart.path, chart.content, chart.md5, workerRealm, fileStore, cancellationToken);
+                            }
+                            finally
+                            {
+                                preparation_slots.Release();
+                            }
+
+                            if (Interlocked.Decrement(ref chart.directory.Remaining) == 0)
+                            {
+                                var preparedCharts = chart.directory.Charts.OfType<ChartImport>().ToArray();
+                                pool.Add(preparedCharts.Length == 0 ? null : new PreparedDirectory(chart.directory.Group.Directory, preparedCharts), cancellationToken);
+                            }
+                        }
+                    }));
+                }
+                finally
                 {
-                    var prepared = readPreparedDirectory(group, realm, fileStore, importedBeatmapMd5Hashes);
-                    pool.Add(prepared, notification.CancellationToken);
-                });
+                    foreach (var partition in partitions)
+                        partition.Dispose();
+                }
             }
-            catch (OperationCanceledException e)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                // Producer cancelled — items already queued will still be consumed.
-                BmsLogger.Log($"BMS import: producer error: {e.Message}");
             }
             catch (Exception e)
             {
@@ -458,6 +454,23 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
             finally
             {
                 pool.CompleteAdding();
+            }
+
+            IEnumerable<(DirectoryPreparation directory, int index, string path, byte[]? content, string md5)> readCharts()
+            {
+                foreach (var group in groups)
+                {
+                    var directory = new DirectoryPreparation(group);
+                    for (var index = 0; index < group.ChartPaths.Length; index++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var path = group.ChartPaths[index];
+                        var content = File.ReadAllBytes(path);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var md5 = Convert.ToHexString(MD5.HashData(content)).ToLowerInvariant();
+                        yield return (directory, index, path, importedBeatmapMd5Hashes.TryAdd(md5, 0) ? content : null, md5);
+                    }
+                }
             }
         });
     }
@@ -471,21 +484,21 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
         ProgressNotification notification,
         ImportGroup[] groups,
         BlockingCollection<PreparedDirectory?> pool,
-        Task producer)
+        CancellationToken cancellationToken)
     {
         var imported = 0;
         var processed = 0;
 
         try
         {
-            foreach (var prepared in pool.GetConsumingEnumerable())
+            foreach (var prepared in pool.GetConsumingEnumerable(cancellationToken))
             {
                 realm.Run(r =>
                 {
                     var rulesetInfo = r.Find<RulesetInfo>(Constant.SHORT_NAME)!;
                     notification.CancellationToken.ThrowIfCancellationRequested();
 
-                    // ── Fast path: skip if the set hash already exists (prepared == null) ──
+                    // Directories containing only known hashes still count towards progress.
                     if (prepared == null)
                     {
                         processed++;
@@ -503,8 +516,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
                 });
             }
 
-            producer.GetAwaiter().GetResult();
-            pool.Dispose();
+            cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException)
         {
@@ -662,6 +674,15 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
 
     private sealed record ImportGroup(string Directory, string[] ChartPaths);
 
+    private sealed class DirectoryPreparation(ImportGroup group)
+    {
+        public ImportGroup Group { get; } = group;
+
+        public ChartImport?[] Charts { get; } = new ChartImport?[group.ChartPaths.Length];
+
+        public int Remaining = group.ChartPaths.Length;
+    }
+
     private sealed record ChartImport(
         string Path,
         string Md5Hash,
@@ -684,7 +705,7 @@ public partial class BmsFileImporter(RealmAccess realm, Storage storage, INotifi
     /// <para>
     /// This lets <see cref="RealmFileStore.Add"/> take its hard-link fast path (which requires the stream
     /// to be a <see cref="FileStream"/> and reads <c>Name</c>) without re-reading the file from disk for
-    /// hashing — the bytes were already read in parallel before the write transaction.
+    /// hashing — the bytes were already read for MD5 and parsing.
     /// </para>
     /// </summary>
     private sealed class MemoryBackedFileStream(string path, byte[] content)

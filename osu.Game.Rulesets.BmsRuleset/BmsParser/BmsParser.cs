@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
@@ -85,7 +86,7 @@ internal static partial class BmsChartParser
 
         var scrollReferenceBpm = resolveScrollReferenceBpm(state, timingEvents, measureStarts, totalColumns, referenceBpmMode);
 
-        var timingMap = new BmsTimingMap(
+        var timingMap = BmsTimingMap.FromSortedEvents(
             tickResolution,
             measures,
             timingEvents,
@@ -698,6 +699,7 @@ internal static partial class BmsChartParser
         var resolution = base_tick_resolution;
         foreach (var line in state.ChannelLines)
         {
+            state.CancellationToken.ThrowIfCancellationRequested();
             var pairCount = line.PayloadLength / 2;
             if (pairCount > 0)
                 resolution = lcmChecked(resolution, pairCount);
@@ -736,6 +738,7 @@ internal static partial class BmsChartParser
 
         foreach (var line in state.ChannelLines)
         {
+            state.CancellationToken.ThrowIfCancellationRequested();
             if (line.Channel != CH_03 && line.Channel != CH_08)
                 continue;
 
@@ -749,6 +752,7 @@ internal static partial class BmsChartParser
 
             for (var i = 0; i < pairCount; i++)
             {
+                if ((i & 255) == 0) state.CancellationToken.ThrowIfCancellationRequested();
                 var offset = i * 2;
                 // Channel 03 is always hex — unaffected by #BASE 62 (which is case-sensitive).
                 // Hex uses 0-9/A-F/a-f; we always fold case via EncodePairCi so "1a" and "1A"
@@ -853,6 +857,7 @@ internal static partial class BmsChartParser
 
         foreach (var line in state.ChannelLines)
         {
+            state.CancellationToken.ThrowIfCancellationRequested();
             if (line.Channel != CH_09) continue;
 
             var pairCount = line.PayloadLength / 2;
@@ -865,6 +870,7 @@ internal static partial class BmsChartParser
 
             for (var i = 0; i < pairCount; i++)
             {
+                if ((i & 255) == 0) state.CancellationToken.ThrowIfCancellationRequested();
                 var offset = i * 2;
                 var value = encodeValue(useBase62, payload[offset], payload[offset + 1]);
                 if (value == 0) continue; // 0 = "00"
@@ -954,42 +960,15 @@ internal static partial class BmsChartParser
         if (stopEvents.Count == 0)
             return timingEvents;
 
-        // Prefix sum of stop durations — replaces O(T × S) Where+Sum with O(S + T log S).
-        var prefix = new double[stopEvents.Count];
         double cumulative = 0;
-
-        for (var i = 0; i < stopEvents.Count; i++)
-        {
-            cumulative += stopEvents[i].Duration;
-            prefix[i] = cumulative;
-        }
-
+        var stopIndex = 0;
         for (var i = 0; i < timingEvents.Count; i++)
         {
             var e = timingEvents[i];
-
-            // Binary search: find the last stop whose Tick is strictly before e.Tick.
-            var lo = 0;
-            var hi = stopEvents.Count - 1;
-            var idx = -1;
-
-            while (lo <= hi)
-            {
-                var mid = lo + (hi - lo) / 2;
-
-                if (stopEvents[mid].Tick < e.Tick)
-                {
-                    idx = mid;
-                    lo = mid + 1;
-                }
-                else
-                {
-                    hi = mid - 1;
-                }
-            }
-
-            var stopDuration = idx >= 0 ? prefix[idx] : 0;
-            timingEvents[i] = e with { Time = e.Time + stopDuration };
+            // A STOP at the BPM's own tick belongs after that tick, so the bound is strict.
+            while (stopIndex < stopEvents.Count && stopEvents[stopIndex].Tick < e.Tick)
+                cumulative += stopEvents[stopIndex++].Duration;
+            timingEvents[i] = e with { Time = e.Time + cumulative };
         }
 
         return timingEvents;
@@ -1000,6 +979,7 @@ internal static partial class BmsChartParser
         List<BmsParsedHitObject> output)
     {
         var (notes, lnCells, mines) = collectPlayableCells(state, totalColumns, measureStarts);
+        output.EnsureCapacity(notes.Count + lnCells.Count / 2 + mines.Count);
 
         if (state.LnType == 2)
             collectLnType2Objects(lnCells, timingMap, state.SampleDefinitions, state.WavVolume, output);
@@ -1008,7 +988,7 @@ internal static partial class BmsChartParser
 
         collectVisibleObjects(notes, state, timingMap, output);
 
-        foreach (var mine in mines.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
+        foreach (var mine in sortCells(mines))
             output.Add(createMineHitObject(mine, timingMap, state.WavVolume));
     }
 
@@ -1088,16 +1068,17 @@ internal static partial class BmsChartParser
 
         foreach (var line in state.ChannelLines)
         {
+            state.CancellationToken.ThrowIfCancellationRequested();
             if (BmsLayout.TryMapVisibleChannel(line.Channel, totalColumns, out var column))
             {
-                foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62, decodeValues: !importOnly || state.LnObjValues.Count > 0))
+                foreach (var cell in expandCells(line, measureStarts, false, state.UseBase62, decodeValues: !importOnly || state.LnObjValues.Count > 0, cancellationToken: state.CancellationToken))
                     notes.Add(cell with { Column = column });
                 continue;
             }
 
             if (tryMapLongNoteChannel(line.Channel, totalColumns, out column))
             {
-                foreach (var cell in expandCells(line, measureStarts, state.LnType == 2, state.UseBase62, decodeValues: !importOnly))
+                foreach (var cell in expandCells(line, measureStarts, state.LnType == 2, state.UseBase62, decodeValues: !importOnly, cancellationToken: state.CancellationToken))
                     lnCells.Add(cell with { Column = column });
                 continue;
             }
@@ -1105,7 +1086,7 @@ internal static partial class BmsChartParser
             if (tryMapLandmineChannel(line.Channel, totalColumns, out column))
             {
                 // Mine channels keep their base-36 value semantics regardless of #BASE 62.
-                foreach (var cell in expandCells(line, measureStarts, false, false, decodeValues: !importOnly))
+                foreach (var cell in expandCells(line, measureStarts, false, false, decodeValues: !importOnly, cancellationToken: state.CancellationToken))
                     mines.Add(cell with { Column = column });
             }
         }
@@ -1114,12 +1095,12 @@ internal static partial class BmsChartParser
     }
 
     private static void collectVisibleObjects(
-        IEnumerable<RawCell> notes, ParseState state, BmsTimingMap timingMap,
+        List<RawCell> notes, ParseState state, BmsTimingMap timingMap,
         List<BmsParsedHitObject> output)
     {
         if (state.LnObjValues.Count == 0)
         {
-            foreach (var note in notes.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
+            foreach (var note in sortCells(notes))
                 output.Add(createHitObject(note, note.Tick, false, timingMap, state.SampleDefinitions, state.WavVolume));
 
             return;
@@ -1127,7 +1108,7 @@ internal static partial class BmsChartParser
 
         var pendingByColumn = new Dictionary<int, RawCell>();
 
-        foreach (var note in notes.OrderBy(n => n.Tick).ThenBy(n => n.Sequence))
+        foreach (var note in sortCells(notes))
         {
             if (state.LnObjValues.Contains(note.Value))
             {
@@ -1148,12 +1129,12 @@ internal static partial class BmsChartParser
     }
 
     private static void collectLnType1Objects(
-        IEnumerable<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions, int wavVolume,
+        List<RawCell> lnCells, BmsTimingMap timingMap, IReadOnlyDictionary<ushort, string> sampleDefinitions, int wavVolume,
         List<BmsParsedHitObject> output)
     {
         var openByColumn = new Dictionary<int, RawCell>();
 
-        foreach (var cell in lnCells.OrderBy(c => c.Tick).ThenBy(c => c.Sequence))
+        foreach (var cell in sortCells(lnCells))
         {
             if (openByColumn.Remove(cell.Column, out var start))
             {
@@ -1200,7 +1181,7 @@ internal static partial class BmsChartParser
         ushort tailCellValue = 0)
     {
         var startTime = timingMap.ProjectTickToTime(start.Tick);
-        var endTime = timingMap.ProjectTickToTime(endTick);
+        var endTime = endTick == start.Tick ? startTime : timingMap.ProjectTickToTime(endTick);
 
         // Resolve tail sample from the terminating cell's value.
         // 0 ("00") is a control value (no note), so treat it as "no tail sample".
@@ -1253,7 +1234,8 @@ internal static partial class BmsChartParser
     }
 
     private static IEnumerable<RawCell> expandCells(
-        RawChannelLine line, IReadOnlyDictionary<int, long> measureStarts, bool includeZeroCells, bool useBase62, bool decodeValues = true)
+        RawChannelLine line, IReadOnlyDictionary<int, long> measureStarts, bool includeZeroCells, bool useBase62, bool decodeValues = true,
+        CancellationToken cancellationToken = default)
     {
         var pairCount = line.PayloadLength / 2;
 
@@ -1269,6 +1251,7 @@ internal static partial class BmsChartParser
 
         for (var i = 0; i < pairCount; i++)
         {
+            if ((i & 255) == 0) cancellationToken.ThrowIfCancellationRequested();
             var offset = i * 2;
             var pos = plStart + offset;
 
@@ -1472,6 +1455,8 @@ internal static partial class BmsChartParser
 
     private sealed class ParseState
     {
+        public CancellationToken CancellationToken { get; init; }
+
         public Dictionary<int, double> MeasureLengths { get; } = new();
 
         public Dictionary<ushort, double> BpmDefinitions { get; } = new();

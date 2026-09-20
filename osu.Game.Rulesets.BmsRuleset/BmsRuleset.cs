@@ -88,6 +88,7 @@ public partial class BmsRuleset : Ruleset
         BmsWorkingBeatmapPatcher.InstallOnce();
         BmsBeatmapStatisticsPatcher.InstallOnce();
         BmsFrameStatisticsPatcher.InstallOnce();
+        BmsDifficultyCalculationPatcher.InstallOnce();
     }
 
     public override ScoreMultiplierCalculator CreateScoreMultiplierCalculator(ScoreMultiplierContext context) =>

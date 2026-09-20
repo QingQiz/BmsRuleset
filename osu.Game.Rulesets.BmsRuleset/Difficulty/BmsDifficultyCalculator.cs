@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -18,8 +19,11 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 {
     public BmsStarRatingProcessor StarRatingProcessor { get; } = new();
 
+    internal CancellationToken CalculationCancellationToken { get; set; }
+
     protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills)
     {
+        CalculationCancellationToken.ThrowIfCancellationRequested();
         var clockRate = ModUtils.CalculateRateWithMods(mods);
         var bmsBeatmap = beatmap as BmsBeatmap;
         var storedDifficulty = bmsBeatmap == null ? BmsDifficultyInfo.FromOsuDifficulty(beatmap.Difficulty) : default;
@@ -51,7 +55,7 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
                 var judgementRate = exRank is { } exRankValue
                     ? BmsJudgementProfileProvider.RateForExRank(layout, exRankValue)
                     : BmsJudgementProfileProvider.RateForRank(layout, rank);
-                var result = StarRatingProcessor.Compute(noteTimings, totalColumns, rank, clockRate, layout, judgementRate);
+                var result = StarRatingProcessor.Compute(noteTimings, totalColumns, rank, clockRate, layout, judgementRate, CalculationCancellationToken);
                 sr = result.StarRating;
             }
         }
@@ -62,17 +66,8 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
         };
     }
 
-    protected override IEnumerable<DifficultyHitObject> CreateDifficultyHitObjects(IBeatmap beatmap, Mod[] mods)
-    {
-        var clockRate = ModUtils.CalculateRateWithMods(mods);
-        var objects = beatmap.HitObjects.OrderBy(h => h.StartTime).ToList();
-        var difficultyObjects = new List<DifficultyHitObject>();
-
-        for (var i = 1; i < objects.Count; i++)
-            difficultyObjects.Add(new DifficultyHitObject(objects[i], objects[i - 1], clockRate, difficultyObjects, difficultyObjects.Count));
-
-        return difficultyObjects;
-    }
+    // Required by the base class; BMS computes attributes without Skills or their object wrappers.
+    protected override IEnumerable<DifficultyHitObject> CreateDifficultyHitObjects(IBeatmap beatmap, Mod[] mods) => [];
 
     protected override Skill[] CreateSkills(IBeatmap beatmap, Mod[] mods) => [];
 }
