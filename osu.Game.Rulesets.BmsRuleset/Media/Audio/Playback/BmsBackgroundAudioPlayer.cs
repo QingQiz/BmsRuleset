@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.UI;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 
@@ -32,6 +33,10 @@ public partial class BmsBackgroundAudioPlayer(
     private bool hasSeenFrame;
     private bool playbackBlocked;
     private bool resyncRequired;
+    private bool resetVoicesRequired;
+    private bool seeking;
+    private double seekStartTime;
+    private double seekTargetTime;
 
     [Resolved]
     private BmsSamplePlayback samplePlayback { get; set; } = null!;
@@ -39,8 +44,13 @@ public partial class BmsBackgroundAudioPlayer(
     [Resolved(CanBeNull = true)]
     private IFrameStableClock? gameplayClock { get; set; }
 
+    [Resolved(CanBeNull = true)]
+    private GameplayClockContainer? sourceGameplayClock { get; set; }
+
     protected override void Dispose(bool isDisposing)
     {
+        if (sourceGameplayClock != null)
+            sourceGameplayClock.OnSeek -= onSourceSeek;
         samplePlayback.StopAll();
         base.Dispose(isDisposing);
     }
@@ -56,6 +66,8 @@ public partial class BmsBackgroundAudioPlayer(
     protected override void LoadComplete()
     {
         base.LoadComplete();
+        if (sourceGameplayClock != null)
+            sourceGameplayClock.OnSeek += onSourceSeek;
         LifetimeStart = double.MinValue;
         LifetimeEnd = double.MaxValue;
     }
@@ -64,6 +76,8 @@ public partial class BmsBackgroundAudioPlayer(
     {
         base.Update();
 
+        if (seeking && (seekTargetTime >= seekStartTime ? Time.Current >= seekTargetTime : Time.Current <= seekTargetTime))
+            seeking = false;
         updatePlaybackBlocked();
 
         if (playbackBlocked)
@@ -80,17 +94,24 @@ public partial class BmsBackgroundAudioPlayer(
             hasSeenFrame = true;
             previousTime = Time.Current;
             handleSeek(Time.Current);
+            resyncRequired = resetVoicesRequired = false;
             return;
         }
 
         var seeked = resyncRequired
                      || Math.Abs(Time.Current - previousTime) >= allowable_late_start
                      || (nextIndex < sortedEvents.Count && IsEventTooLateForDirectStart(sortedEvents[nextIndex].Time, Time.Current));
-        previousTime = Time.Current;
-        resyncRequired = false;
-
         if (seeked)
-            handleSeek(Time.Current);
+        {
+            // Forward simulation recovery must not erase keysound tails. Only unconsumed BGM
+            // events need reconstruction; a pause, stopped seek or rewind replaces the timeline.
+            var preserveVoices = !resetVoicesRequired && Time.Current >= previousTime
+                                                      && gameplayClock is { IsRunning: true, IsRewinding: false };
+            handleSeek(Time.Current, resetVoices: !preserveVoices);
+        }
+
+        previousTime = Time.Current;
+        resyncRequired = resetVoicesRequired = false;
 
         while (nextIndex < sortedEvents.Count)
         {
@@ -127,9 +148,11 @@ public partial class BmsBackgroundAudioPlayer(
         samplePlaybackDisabled.BindValueChanged(_ => updatePlaybackBlocked(), true);
     }
 
-    private void handleSeek(double currentTime)
+    private void handleSeek(double currentTime, bool resetVoices = true)
     {
-        samplePlayback.StopAll();
+        var firstEventIndex = resetVoices ? 0 : nextIndex;
+        if (resetVoices)
+            samplePlayback.StopAll();
         nextIndex = findFirstEventAfter(currentTime);
 
         foreach (var seeked in SelectEventsForSeek(
@@ -137,7 +160,8 @@ public partial class BmsBackgroundAudioPlayer(
                      nextIndex,
                      currentTime,
                      samplePlayback.MaxSampleLengthMilliseconds,
-                     samplePlayback.GetSampleLength))
+                     samplePlayback.GetSampleLength,
+                     firstEventIndex))
         {
             samplePlayback.Play(seeked.Event.SampleKey, seeked.Event.Volume, seeked.Offset);
         }
@@ -148,7 +172,8 @@ public partial class BmsBackgroundAudioPlayer(
         int nextEventIndex,
         double currentTime,
         double maxLength,
-        Func<ushort, double> getLength)
+        Func<ushort, double> getLength,
+        int firstEventIndex = 0)
     {
         var result = new List<SeekedBgm>();
 
@@ -157,7 +182,7 @@ public partial class BmsBackgroundAudioPlayer(
 
         var seenKeys = new HashSet<ushort>();
 
-        for (var i = nextEventIndex - 1; i >= 0; i--)
+        for (var i = nextEventIndex - 1; i >= firstEventIndex; i--)
         {
             var evt = events[i];
             var offset = currentTime - evt.Time;
@@ -206,14 +231,16 @@ public partial class BmsBackgroundAudioPlayer(
 
     private void updatePlaybackBlocked()
     {
-        var blocked = sourceIsPaused.Value || samplePlaybackDisabled.Value;
+        // The framework mutes samples during any catch-up, including sustained rendering lag.
+        // Our live batch already coalesces retriggers per definition, so keep it audible while
+        // moving forward normally. Explicit seeks must still discard historical replay input.
+        var forwardCatchUp = !seeking && gameplayClock is { IsRunning: true, IsRewinding: false }
+                                      && gameplayClock.IsCatchingUp.Value;
+        var blocked = seeking || sourceIsPaused.Value || (samplePlaybackDisabled.Value && !forwardCatchUp);
+        samplePlayback.SetPlaybackBlocked(blocked);
 
-        // As with non-looping framework samples, a forward simulation catch-up must not
-        // abruptly cut every sounding voice. Explicit pauses, stopped seeks and rewinds still
-        // pause the mixer; stale triggers remain blocked until the timeline can be reconstructed.
-        var keepExistingVoices = !sourceIsPaused.Value && gameplayClock is { IsRunning: true, IsRewinding: false }
-                                                       && gameplayClock.IsCatchingUp.Value;
-        samplePlayback.SetPlaybackBlocked(blocked, keepExistingVoices);
+        // Remember a pause/seek until reconstruction, including changes between blocking causes.
+        resetVoicesRequired |= blocked;
 
         if (blocked == playbackBlocked)
             return;
@@ -243,5 +270,16 @@ public partial class BmsBackgroundAudioPlayer(
         }
 
         samplePlayback.ResumeAll();
+    }
+
+    private void onSourceSeek() => NotifySeek(sourceGameplayClock!.CurrentTime);
+
+    internal void NotifySeek(double targetTime)
+    {
+        seekStartTime = Time.Current;
+        seekTargetTime = targetTime;
+        seeking = true;
+        resyncRequired = resetVoicesRequired = true;
+        updatePlaybackBlocked();
     }
 }

@@ -37,6 +37,10 @@ public class BmsGameplayDiagnosticOptionsTest
         Assert.That(options.Start, Is.EqualTo(12.5));
         Assert.That(options.Headless, Is.True);
         Assert.That(options.AudioOutput, Is.False);
+        Assert.That(options.CaptureAudio, Is.False);
+        var capture = BmsGameplayDiagnosticOptions.Parse([.. required, "--capture-audio"]);
+        Assert.That(capture.CaptureAudio, Is.True);
+        Assert.That(capture.AudioOutput, Is.False, "Recording alone must keep diagnostic output muted.");
         Assert.That(BmsGameplayDiagnosticOptions.Parse([.. required, "--audio-output"]).AudioOutput, Is.True);
     }
 

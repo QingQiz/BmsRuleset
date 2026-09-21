@@ -173,6 +173,7 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
         try
         {
             Directory.CreateDirectory(options.Output);
+            scene?.SaveAudioCapture();
             using (var writer = new StreamWriter(Path.Combine(options.Output, "frames.csv")))
             {
                 writer.WriteLine("chart_ms,simulation_ms,update_ms,interval_ms,gc_pause_ms,allocated_bytes,alive_objects,audio_blocked,audio_paused");
@@ -191,7 +192,8 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
                 OS = RuntimeInformation.OSDescription,
                 Environment.ProcessorCount,
                 Renderer = Host.Renderer.GetType().FullName,
-                AudioOutput = options.Headless ? "no-sound-device" : options.AudioOutput ? "audible" : "muted-master",
+                AudioOutput = options.Headless ? "no-sound-device" : options.AudioOutput ? "audible" : options.CaptureAudio ? "muted-after-capture" : "muted-master",
+                AudioCaptureStartChartMs = scene?.AudioCaptureStartChartMs,
                 MasterVolume = Audio?.Volume.Value,
                 FramePacing = new
                 {

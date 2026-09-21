@@ -298,6 +298,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private bool visualUpdatePending;
 
+    internal bool HasPendingVisualUpdate => visualUpdatePending;
+
     internal void BeginGameplayFrame()
     {
         skinCache.RefreshIdleSkins();

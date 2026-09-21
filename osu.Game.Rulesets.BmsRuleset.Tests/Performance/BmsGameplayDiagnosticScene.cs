@@ -36,6 +36,9 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
     private double seekTime;
     private Func<bool>? readAudioBlocked;
     private Func<bool>? readAudioPaused;
+    private BmsAudioCaptureSession? audioCapture;
+
+    public double? AudioCaptureStartChartMs { get; private set; }
 
     public bool AudioBlocked => readAudioBlocked?.Invoke() ?? true;
     public bool AudioPaused => readAudioPaused?.Invoke() ?? true;
@@ -105,6 +108,15 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
             // audio clock earlier would count that catch-up as gameplay inside the requested interval.
             if (!playbackStarted && Math.Abs(SimulationTime - seekTime) < 0.001)
             {
+                if (options.CaptureAudio)
+                {
+                    var mixer = BmsAudioTestAccess.GetOutputMixer(((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback)
+                                ?? throw new InvalidOperationException("The gameplay PCM mixer is unavailable.");
+                    audioCapture = BmsAudioCaptureSession.Start(mixer, TimeSpan.FromSeconds(options.Duration + 30), !options.AudioOutput);
+                    AudioCaptureStartChartMs = ChartTime;
+                    // Capture non-zero PCM before muting the diagnostic output, without changing system volume.
+                    Audio.Volume.Value = 1;
+                }
                 SeekMilliseconds = Stopwatch.GetElapsedTime(seekTimestamp).TotalMilliseconds;
                 Player.GameplayClockContainer.Start();
                 playbackTimestamp = Stopwatch.GetTimestamp();
@@ -128,6 +140,22 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         Player.GameplayClockContainer.Seek(seekTime);
         seekTimestamp = Stopwatch.GetTimestamp();
         sought = true;
+    }
+
+    public void SaveAudioCapture()
+    {
+        if (audioCapture == null)
+            return;
+
+        audioCapture.Dispose();
+        audioCapture.WriteWave(Path.Combine(options.Output, "audio.wav"), 0);
+        audioCapture = null;
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        audioCapture?.Dispose();
+        base.Dispose(isDisposing);
     }
 
     public int AliveObjects()

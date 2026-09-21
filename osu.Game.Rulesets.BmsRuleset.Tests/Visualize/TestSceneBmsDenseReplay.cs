@@ -39,8 +39,12 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     private static int noteMaskingUpdates;
     private static int explosionMaskingUpdates;
     private static int passiveDeadlineReads;
+    private bool allNotesVisible;
     private ScopedMethodProbe? probe;
     private ScopedMethodProbe? maskingProbe;
+
+    [SetUp]
+    public void ResetChartOptions() => allNotesVisible = false;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
         => CreateBmsPlayer(b => new BmsAutoGenerator(b).Generate().Frames.ToList());
@@ -50,9 +54,39 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
         var chart = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 3 };
         for (var i = 0; i < note_count; i++)
             chart.HitObjects.Add(new BmsNote { StartTime = 3000 + i * 0.0001, Column = i % 8 });
-        chart.HitObjects.Add(new BmsNote { StartTime = 60000, Column = 1 });
+        if (!allNotesVisible)
+            chart.HitObjects.Add(new BmsNote { StartTime = 60000, Column = 1 });
         BmsTestBeatmaps.SetupBeatmapInfo(chart, ruleset);
         return chart;
+    }
+
+    [Test]
+    public void FullyActivatedTapChartCatchesUpWithoutRepeatedSkinTraversal()
+    {
+        AddStep("load chart with all taps visible", () => { allNotesVisible = true; LoadPlayer(); });
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
+        seek(2999);
+        AddStep("advance within one frame beyond the visual deferral budget", () =>
+        {
+            var column = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
+            using var counter = new ScopedMethodProbe(typeof(BmsColumnHitObjectContainer).GetMethod("UpdateAfterChildrenLife", BindingFlags.Instance | BindingFlags.NonPublic),
+                typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countUpdate), BindingFlags.Static | BindingFlags.NonPublic));
+            var manual = new osu.Framework.Timing.ManualClock { CurrentTime = 2999, IsRunning = true };
+            var framed = new osu.Framework.Timing.FramedClock(manual);
+            var previousClock = column.Clock;
+            column.Clock = framed;
+            columnUpdates = 0;
+            column.BeginGameplayFrame();
+            for (var time = 3000; time <= 3040; time += 10)
+            {
+                manual.CurrentTime = time;
+                framed.ProcessFrame();
+                column.UpdateSubTree();
+            }
+            column.EndGameplayFrame();
+            column.Clock = previousClock;
+            Assert.That(columnUpdates, Is.EqualTo(1), "All candidates already exist; update their skins at the final timestamp.");
+        });
     }
 
     [Test]
@@ -368,6 +402,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
 
     private static void countPassiveDeadline() => passiveDeadlineReads++;
 
+    // ReSharper disable once InconsistentNaming
     private static void countMasking(CompositeDrawable __instance)
     {
         if (__instance is DrawableBmsHitObject)

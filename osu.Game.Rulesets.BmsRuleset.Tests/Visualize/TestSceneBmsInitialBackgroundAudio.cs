@@ -68,6 +68,26 @@ public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
             && Player.GameplayClockContainer.CurrentTime < Player.GameplayState.Beatmap.HitObjects[0].StartTime);
     }
 
+    [Test]
+    public void TestRunningSeekBlocksAudioUntilSimulationReachesTarget()
+    {
+        Func<bool> isBlocked = null!;
+        var target = 0d;
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("player and PCM ready", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully
+                                                  && getSamplePlayback().IsSampleReady(backgroundKey));
+        AddUntilStep("background is sounding", () => BmsAudioTestAccess.GetActiveVoiceCount(getSamplePlayback()) > 0);
+        AddStep("seek while playing", () =>
+        {
+            isBlocked = BmsAudioTestAccess.CreatePlaybackBlockedReader(getSamplePlayback());
+            target = Player.GameplayClockContainer.CurrentTime + 500;
+            Player.Seek(target);
+            Assert.That(isBlocked(), Is.True, "The real source-clock seek event must suppress historical replay samples immediately.");
+        });
+        AddUntilStep("simulation reaches seek target", () => Player.DrawableRuleset.FrameStableClock.CurrentTime >= target && !isBlocked());
+        AddUntilStep("background resumes at target", () => BmsAudioTestAccess.GetActiveVoiceCount(getSamplePlayback()) > 0);
+    }
+
     private BmsSamplePlayback getSamplePlayback() =>
         ((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback;
 

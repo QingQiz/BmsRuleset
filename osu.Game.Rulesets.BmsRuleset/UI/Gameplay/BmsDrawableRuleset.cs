@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -67,6 +69,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     private BmsGameplayPauseController? pauseController;
     private BmsGameplayCompletionController? completionController;
     private BmsGameplaySettingsController? settingsController;
+    private double previousVisualUpdateMs;
 
     [Cached]
     private readonly BmsSamplePlayback samplePlayback;
@@ -186,7 +189,23 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     {
         base.UpdateAfterChildren();
 
+        // A ten-millisecond replay slice cannot recover if each deferred visual pass costs
+        // much longer. Give simulation a bounded share of that cost before visiting skins again.
+        var catchUpStart = Stopwatch.GetTimestamp();
+        var catchUpBudget = Math.Min(50, previousVisualUpdateMs);
+        while (ReplayScore != null && FrameStableClock is FrameStabilityContainer { IsRunning: true, IsRewinding: false } stability
+               && FrameStableClock.IsCatchingUp.Value && ((BmsPlayfield)Playfield).HasPendingVisualUpdate
+               && Stopwatch.GetElapsedTime(catchUpStart).TotalMilliseconds < catchUpBudget)
+        {
+            var previousTime = stability.CurrentTime;
+            stability.UpdateSubTree();
+            if (stability.CurrentTime <= previousTime)
+                break;
+        }
+
+        var visualStart = Stopwatch.GetTimestamp();
         ((BmsPlayfield)Playfield).EndGameplayFrame();
+        previousVisualUpdateMs = Stopwatch.GetElapsedTime(visualStart).TotalMilliseconds;
         samplePlayback.EndGameplayFrame();
 
         // Columns receive input independently while the playfield updates. Submitting here preserves

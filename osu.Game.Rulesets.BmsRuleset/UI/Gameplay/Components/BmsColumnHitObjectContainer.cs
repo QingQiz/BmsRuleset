@@ -24,12 +24,19 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private bool updatePending;
     private double lastFullUpdateTime;
     private double nextPassiveUpdateTime;
+    private double latestLifetimeStart = double.PositiveInfinity;
     private bool passiveDeadlineDirty = true;
     private readonly SortedSet<(double Time, long Id, DrawableBmsHitObject Note)> pendingTaps = [];
     private readonly Dictionary<DrawableBmsHitObject, long> tapIds = [];
     private long nextTapId;
 
     internal DrawableBmsHitObject? FirstPendingTap => canBatchTapUpdates && pendingTaps.Count > 0 ? pendingTaps.Min.Note : null;
+
+    public override void Add(HitObjectLifetimeEntry entry)
+    {
+        base.Add(entry);
+        latestLifetimeStart = double.PositiveInfinity;
+    }
 
     internal BmsColumnHitObjectContainer(
         BmsGameplayScrollController scrollController,
@@ -101,7 +108,9 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
     internal bool CanDeferUpdate => canBatchTapUpdates && frameOpen && hasUpdated && Time.Elapsed >= 0
                                     && (Clock as IGameplayClock)?.IsRewinding != true && !isResumeRewinding()
-                                    && Time.Current >= lastFullUpdateTime && Time.Current - lastFullUpdateTime < MAX_DEFERRED_UPDATE_TIME && Time.Current <= nextPassiveUpdateTime;
+                                    && Time.Current >= lastFullUpdateTime
+                                    && (Time.Current - lastFullUpdateTime < MAX_DEFERRED_UPDATE_TIME || lastFullUpdateTime >= latestLifetimeStart)
+                                    && Time.Current <= nextPassiveUpdateTime;
 
     public override bool UpdateSubTree()
     {
@@ -141,10 +150,14 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     /// </summary>
     public void RefreshAllEntries(double? currentTime = null)
     {
+        latestLifetimeStart = double.NegativeInfinity;
         foreach (var entry in Entries)
         {
             if (entry is BmsHitObjectLifetimeEntry bmsEntry)
                 bmsEntry.RefreshLifetime(currentTime);
+            // Once every candidate has been activated, no future input needs another lifetime
+            // pass. Full skin traversal on each catch-up step can otherwise prevent recovery.
+            latestLifetimeStart = Math.Max(latestLifetimeStart, entry.LifetimeStart);
         }
     }
 

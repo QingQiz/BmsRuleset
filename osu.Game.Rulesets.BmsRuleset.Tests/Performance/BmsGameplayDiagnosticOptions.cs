@@ -37,6 +37,8 @@ internal sealed class BmsGameplayDiagnosticOptions
 
     public bool AudioOutput { get; private set; }
 
+    public bool CaptureAudio { get; private set; }
+
     public bool ShowInvisibleNotes { get; private set; }
 
     public bool Invert { get; private set; }
@@ -71,6 +73,12 @@ internal sealed class BmsGameplayDiagnosticOptions
             if (argument == "--audio-output")
             {
                 result.AudioOutput = true;
+                continue;
+            }
+
+            if (argument == "--capture-audio")
+            {
+                result.CaptureAudio = true;
                 continue;
             }
 

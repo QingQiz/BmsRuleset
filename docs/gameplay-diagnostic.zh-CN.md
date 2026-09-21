@@ -33,6 +33,7 @@ dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net10.0/osu.Game.Rulesets.
 | `--invert-random-seed` | 不随机 | 配合 `--invert` 使用；指定整数种子后启用 IN 随机长度，保证重复采样的谱面一致 |
 | `--headless` | 关闭 | 无参数值；跳过 GPU 渲染，仅用于更新线程诊断 |
 | `--audio-output` | 关闭 | 无参数值；仅在需要听感／音频输出测试时开启 |
+| `--capture-audio` | 关闭 | 从 seek 完成、开始播放时录制真实玩法混音，保存为报告目录下的 `audio.wav`；默认在录制后静音，配合 `--audio-output` 才会外放 |
 | `--show-invisible-notes` | 关闭 | 无参数值；以黄色方框显示不可见 note，报告记录总数和活动／呈现数量 |
 | `--hit-explosion-limit` | 0 | 仅诊断实验；0 不启用，1–256 限制每列每种光效的叠加数和普通光效预热容量 |
 | `--hit-explosion-policy` | KeepExisting | 仅配合非零实验上限；KeepExisting / ReplaceOldest |
@@ -82,8 +83,9 @@ dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net10.0/osu.Game.Rulesets.
 - `frames.csv` 包含播放时钟、模拟时钟、整个游戏 `UpdateSubTree` 耗时、更新帧间隔、GC 暂停差值、该更新线程分配字节数和活动物件数。
 - `summary.json` 包含谱面 SHA256、程序集 MVID、运行参数/平台/渲染器、谱面构成、判定结果、总体及逐秒 P50/P95/P99/最大值、超过 8/16.667 ms 的帧数、GC 次数与最大模拟落后。
 - `StartupMaxUpdateMs` 和 `StartupSlowFrames` 记录加载、seek 及两秒预热阶段的主线程停顿。它们不等于 loading screen 的可见持续时间；`LoadMs` 记录真实 Player 加载至可用的耗时。
-- `audio_blocked` / `AudioBlockedFrames` / `AudioBlockedMs` 记录共享 PCM 控制器禁止新触发的状态；`audio_paused` / `AudioPausedFrames` / `AudioPausedMs` 记录控制器是否要求暂停已有声音。时长按对应更新帧间隔求和，是状态采样估计，不能直接当成声卡实际静音长度。正常暂停、跳转和回放追赶可能禁止新触发；向前追赶时已有声音继续自然播放。旧版本没有独立的 `voicesPaused` 字段，诊断器回退到原有 `playbackBlocked` 状态（旧行为会同时暂停全部声音）。
+- `audio_blocked` / `AudioBlockedFrames` / `AudioBlockedMs` 记录共享 PCM 控制器禁止新触发的状态；`audio_paused` / `AudioPausedFrames` / `AudioPausedMs` 记录控制器是否要求暂停已有声音。时长按对应更新帧间隔求和，是状态采样估计，不能直接当成声卡实际静音长度。暂停、显式跳转和回退会禁止新触发；正常播放因卡顿而向前追赶时，同帧合并后的新键音与已有声音继续播放。声音跟随实际处理的判定，不能据此推断模拟没有落后。旧版本可能在向前追赶时也禁止新触发；若没有独立的 `voicesPaused` 字段，诊断器回退到原有 `playbackBlocked` 状态。
 - `Audio` 通过诊断专用方法探针测量原生混音回调：回调次数、输出帧数、最大执行耗时以及执行耗时超过该缓冲区时长的次数。无超时只能排除已观测到的回调执行超时，不能证明没有声卡调度延迟或主观听感问题。探针同时用于基线和候选版本，普通测试和正式游戏不启用。
+- `--capture-audio` 记录混音输出，不是扬声器回录。`AudioCaptureStartChartMs` 标记录音开始时的谱面时间；包含预热阶段，受音频缓冲延迟影响，不能按录音采样点直接断言逐音符同步精度。录制缓冲区占用额外内存，性能对比双方应使用相同录制设置。
 - `FramePacing` 记录请求的更新/绘制上限、框架不限速开关、执行模式，以及采样期间窗口活动状态、线程时钟实际限制、节流开关、VSync 的变化。`ObservedUpdateHz` 按实际更新间隔计算，`AllocatedBytesPerUpdate` 与 `AllocatedBytesPerSecond` 分别反映单次更新开销和单位时间分配压力。
 - 每十秒记录活动/呈现物件数、音频 voice 数、托管堆大小、进程私有内存与工作集。内存快照并非精确堆峰值；进程峰值工作集包含加载阶段。诊断器自身的帧数组和宿主也占用内存。
 
