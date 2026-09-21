@@ -86,12 +86,19 @@ public partial class TestSceneBmsResultScreenStatistics
         AddAssert("current excluded and EXSCORE difference shown", () => popovers.CurrentPopover.ChildrenOfType<SpriteText>().Any(text => text.Text.ToString() == "-8"));
         AddAssert("judgement counts are compared or marked unknown", () => popovers.CurrentPopover.ChildrenOfType<SpriteText>()
             .Any(text => text.Text.ToString() == (missingStatistics ? "-" : "+11")));
+        AddAssert("EXSCORE accuracy and combo are proportional to their achievable maximums", () =>
+        {
+            var rows = popovers.CurrentPopover.ChildrenOfType<BmsResultComparisonRow>().Take(3).ToArray();
+            Assert.That(rows.Select(row => row.ChildrenOfType<BmsResultBar>().Single(bar => bar.Name == "Current comparison bar").Proportion),
+                Is.EqualTo([1542.0 / 1970, 1542.0 / 1970, 653.0 / 985]).Within(0.000001));
+            Assert.That(rows.Select(row => row.ChildrenOfType<BmsResultBar>().Single(bar => bar.Name == "Best comparison bar").Proportion),
+                Is.EqualTo([1550.0 / 1970, 1550.0 / 1970, 690.0 / 985]).Within(0.000001));
+            return true;
+        });
         AddAssert("judgement categories and scores share the same count scale", () =>
         {
             var rows = popovers.CurrentPopover.ChildrenOfType<BmsResultComparisonRow>().ToArray();
-            var exScoreBars = rows[0].ChildrenOfType<BmsResultBar>().OrderByDescending(bar => bar.Name).ToArray();
             var perfectBars = rows[3].ChildrenOfType<BmsResultBar>().OrderByDescending(bar => bar.Name).ToArray();
-            Assert.That(exScoreBars.Select(bar => bar.Proportion), Is.EqualTo([1542.0 / 1550, 1.0]).Within(0.000001));
             Assert.That(perfectBars.Select(bar => bar.Proportion), Is.EqualTo(missingStatistics ? [1.0] : new[] { 1.0, 610.0 / 621 }).Within(0.000001));
             var judgementRows = rows.Skip(3).ToArray();
             Assert.That(judgementRows.Select(row => row.ChildrenOfType<BmsResultBar>().Single(bar => bar.Name == "Current comparison bar").Proportion),

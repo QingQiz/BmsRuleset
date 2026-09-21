@@ -144,11 +144,12 @@ internal partial class BmsResultComparisonPopover : OsuPopover
     private Drawable createComparison(ScoreInfo best)
     {
         var maximum = Math.Max(BmsExScore.Calculate(score.MaximumStatistics), BmsExScore.Calculate(best.MaximumStatistics));
+        var maximumCombo = Math.Max(score.GetMaximumAchievableCombo(), best.GetMaximumAchievableCombo());
         var rows = new List<Drawable>
         {
-            new BmsResultComparisonRow(BmsStrings.ExScore, exScore(score), exScore(best), true),
-            new BmsResultComparisonRow(BmsStrings.ResultAccuracy, score.Accuracy, best.Accuracy, true, percentage: true),
-            new BmsResultComparisonRow(BmsStrings.ResultCombo, score.MaxCombo, best.MaxCombo, true),
+            new BmsResultComparisonRow(BmsStrings.ExScore, exScore(score), exScore(best), true, scaleMaximum: maximum),
+            new BmsResultComparisonRow(BmsStrings.ResultAccuracy, score.Accuracy, best.Accuracy, true, percentage: true, scaleMaximum: 1),
+            new BmsResultComparisonRow(BmsStrings.ResultCombo, score.MaxCombo, best.MaxCombo, true, scaleMaximum: maximumCombo),
             new Container
             {
                 RelativeSizeAxes = Axes.X,
