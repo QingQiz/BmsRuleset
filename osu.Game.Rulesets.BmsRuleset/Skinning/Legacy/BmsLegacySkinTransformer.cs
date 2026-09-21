@@ -197,7 +197,7 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
             BmsSkinComponents.Mine
                 => createNoteFactory(bmsLookup),
             BmsSkinComponents.HitExplosion
-                => new BmsResolvedDrawableFactory(() => new LegacyBmsHitExplosion(this, bmsLookup)),
+                => createHitExplosionFactory(bmsLookup),
             BmsSkinComponents.StageBackground
                 => new BmsResolvedDrawableFactory(() => new LegacyBmsStageBackground(this)),
             BmsSkinComponents.StageForeground
@@ -215,6 +215,14 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
         var textures = BmsLegacyTextureResolver.ResolveNoteTextures(this, lookup);
         var widthForNoteHeightScale = GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale)?.Value;
         return new BmsResolvedDrawableFactory(() => new BmsResolvedNotePiece(lookup, textures, widthForNoteHeightScale));
+    }
+
+    private BmsResolvedDrawableFactory createHitExplosionFactory(BmsSkinComponentLookup lookup)
+    {
+        // The pool may grow during a dense LN burst. Resolve frames once per skin/column so new
+        // pulses share texture uploads while retaining independent animation and fade phases.
+        var textures = this.GetTextures(GetHitExplosionImageName(lookup), default, default, true, "-", null, out _);
+        return new BmsResolvedDrawableFactory(() => new LegacyBmsHitExplosion(this, lookup, textures));
     }
 
     private bool hasAnimation(string name) => GetLegacyAnimation(name) != null;

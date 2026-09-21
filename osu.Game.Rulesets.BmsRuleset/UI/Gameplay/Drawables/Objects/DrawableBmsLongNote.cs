@@ -51,6 +51,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private float noteHeightScale = 1;
     private bool lastHoldingBody;
     private bool lastReleasedFast;
+    private double lastSimulationTime = double.NaN;
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private BmsCachedSkinnableDrawable longNoteTail = null!;
 
@@ -58,6 +59,19 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private IBmsLnScoring? scoring { get; set; }
 
     private double gameplayRate => (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
+
+    internal override bool HasPendingHead => !controller.HeadJudged;
+
+    internal override double NextPassiveJudgementTime => controller.NextHeadJudgementTime;
+
+    internal override bool RequiresActiveLongNoteUpdate => controller.LongNoteStarted || controller.IsChargeMode && controller.HeadJudged && !controller.TailJudged;
+
+    internal override void UpdateDeferredLongNote(float y, float endY)
+    {
+        // Pin the held head at the simulation timestamp even when skins wait for the final frame.
+        GetVisualHeadY(y, endY);
+        UpdateColumnFrame();
+    }
 
     public DrawableBmsLongNote()
     {
@@ -172,6 +186,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     protected override void ResetKindState()
     {
+        lastSimulationTime = double.NaN;
         IsAutomaticallyHeld = false;
         visualState.Reset();
         bodyGeometryValid = false;
@@ -228,6 +243,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     internal override void RestoreRewoundState()
     {
+        lastSimulationTime = double.NaN;
         visualState.Reset();
         bodyGeometryValid = false;
         lastHoldExplosionTime = Time.Current;
@@ -262,6 +278,13 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             return;
         }
 
+        if (state == ArmedState.Hit)
+        {
+            Alpha = 0;
+            LifetimeEnd = Time.Current;
+            return;
+        }
+
         base.UpdateHitStateTransforms(state);
     }
 
@@ -269,6 +292,12 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     {
         if (HitObject == null)
             return;
+
+        // The final visual traversal can revisit the same simulation timestamp. HCN elapsed
+        // time and hold-light pulses must only be applied once at that timestamp.
+        if (lastSimulationTime == Time.Current)
+            return;
+        lastSimulationTime = Time.Current;
 
         // Hold-explosion pulse runs first, matching the original per-frame order (pulse, then
         // charge-tail passive miss, retire, HCN tick). It reads pre-mutation controller state.
@@ -303,6 +332,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     {
         visualState.PrepareHeadPin();
         lastHoldExplosionTime = Time.Current - hold_explosion_interval;
+        NotifyHeadJudged();
     }
 
     void IBmsLongNoteHooks.OnHellChargeHeadPoor(double eventTime, double lifetimeEnd)
@@ -310,6 +340,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         visualState.PrepareHeadPin();
         Alpha = 1;
         LifetimeEnd = lifetimeEnd;
+        NotifyHeadJudged();
     }
 
     void IBmsLongNoteHooks.ApplyJudgementResult(HitResult result, System.Collections.Generic.IReadOnlyList<BmsLongNoteEndpointResult> endpoints)
@@ -329,7 +360,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         visualState.Reset();
         longNoteBody.Alpha = 0;
         longNoteTail.Alpha = 0;
-        this.FadeOut();
+        Alpha = 0;
         LifetimeEnd = Time.Current;
     }
 
@@ -338,7 +369,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     void IBmsLongNoteHooks.Retire()
     {
-        this.FadeOut();
+        Alpha = 0;
         LifetimeEnd = Time.Current;
     }
 

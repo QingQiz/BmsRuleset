@@ -14,6 +14,10 @@ internal sealed class BmsLongNoteJudgementController
 
     public bool IsChargeMode { get; private set; }
 
+    public bool HeadJudged => headJudged;
+
+    public double NextHeadJudgementTime => headJudged ? double.PositiveInfinity : ln.StartTime + headTable.SlowWindowFor(HitResult.Ok);
+
     public bool ShouldShowHeldVisual(bool keyPressed)
         => LongNoteStarted
            && keyPressed

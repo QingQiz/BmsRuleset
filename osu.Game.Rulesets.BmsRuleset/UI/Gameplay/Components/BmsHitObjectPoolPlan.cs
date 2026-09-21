@@ -18,7 +18,6 @@ internal static class BmsHitObjectPoolPlan
 
     internal static int[] CreateHitExplosionSizes(IEnumerable<BmsHitObject> hitObjects, int columns)
     {
-        const int prewarm_budget = 8192;
         var times = new List<double>[columns];
         for (var i = 0; i < columns; i++)
             times[i] = [];
@@ -45,13 +44,62 @@ internal static class BmsHitObjectPoolPlan
             }
         }
 
+        applyHitExplosionBudget(sizes, 2);
+        return sizes;
+    }
+
+    internal static int[] CreateLongNoteHitExplosionSizes(IEnumerable<BmsHitObject> hitObjects, int columns)
+    {
+        const double residence = 200 + BmsColumnHitObjectContainer.MAX_DEFERRED_UPDATE_TIME;
+        var events = new List<(double Time, int Delta)>[columns];
+        for (var column = 0; column < columns; column++)
+            events[column] = [];
+
+        foreach (var note in hitObjects)
+        {
+            if (note is not BmsLongNote ln || note.Column < 0 || note.Column >= columns)
+                continue;
+
+            var columnEvents = events[note.Column];
+            // Charge heads and the first hold pulse can coincide; tails add another pulse.
+            // Long bodies reserve three overlapping 80 ms pulses without enumerating their duration.
+            columnEvents.Add((ln.StartTime, 2));
+            columnEvents.Add((ln.StartTime + residence, -2));
+            columnEvents.Add((ln.EndTime, 1));
+            columnEvents.Add((ln.EndTime + residence, -1));
+            if (ln.Duration >= 80)
+            {
+                columnEvents.Add((ln.StartTime + 80, 3));
+                columnEvents.Add((ln.EndTime + residence, -3));
+            }
+        }
+
+        var sizes = new int[columns];
+        for (var column = 0; column < columns; column++)
+        {
+            events[column].Sort((a, b) => a.Time != b.Time ? a.Time.CompareTo(b.Time) : b.Delta.CompareTo(a.Delta));
+            var alive = 0;
+            sizes[column] = 3;
+            foreach (var point in events[column])
+            {
+                alive += point.Delta;
+                sizes[column] = Math.Max(sizes[column], alive);
+            }
+        }
+
+        applyHitExplosionBudget(sizes, 3);
+        return sizes;
+    }
+
+    private static void applyHitExplosionBudget(int[] sizes, int minimum)
+    {
+        const int prewarm_budget = 8192;
         var total = sizes.Sum();
         if (total > prewarm_budget)
         {
-            for (var i = 0; i < columns; i++)
-                sizes[i] = 2 + (int)((long)(sizes[i] - 2) * Math.Max(0, prewarm_budget - columns * 2) / (total - columns * 2));
+            for (var i = 0; i < sizes.Length; i++)
+                sizes[i] = minimum + (int)((long)(sizes[i] - minimum) * Math.Max(0, prewarm_budget - sizes.Length * minimum) / (total - sizes.Length * minimum));
         }
-        return sizes;
     }
 
     internal static ColumnSizes[] Create(IEnumerable<BmsHitObject> hitObjects, int columns)

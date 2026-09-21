@@ -62,6 +62,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         TotalColumns = Math.Max(1, beatmap.TotalColumns);
         InitialPoolSizes = BmsHitObjectPoolPlan.Create(beatmap.HitObjects, TotalColumns);
         InitialHitExplosionSizes = BmsHitObjectPoolPlan.CreateHitExplosionSizes(beatmap.HitObjects, TotalColumns);
+        InitialLongNoteHitExplosionSizes = BmsHitObjectPoolPlan.CreateLongNoteHitExplosionSizes(beatmap.HitObjects, TotalColumns);
         LayoutVariant = beatmap.LayoutVariant;
         TimingMap = beatmap.TimingMap;
         ScrollController = new BmsGameplayScrollController(TimingMap);
@@ -143,6 +144,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     internal BmsHitObjectPoolPlan.ColumnSizes[] InitialPoolSizes { get; }
 
     internal int[] InitialHitExplosionSizes { get; }
+
+    internal int[] InitialLongNoteHitExplosionSizes { get; }
 
     public BmsLayoutVariant LayoutVariant { get; }
 
@@ -331,8 +334,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             canDefer &= ((BmsColumnHitObjectContainer)column.HitObjectContainer).CanDeferUpdate;
         if (canDefer)
         {
-            // Input is dispatched by our parent before this traversal. When all lanes are idle
-            // taps, defer the stage/skin work too, then refresh at the final simulation timestamp.
+            updateScrollPosition();
+            // Input is dispatched by our parent before this traversal. Holds still need passive
+            // tails, HCN ticks and light pulses at every timestamp, without visiting future skins.
+            foreach (var column in Stage.Columns)
+                ((BmsColumnHitObjectContainer)column.HitObjectContainer).UpdateDeferredLongNotes();
             visualUpdatePending = true;
             return true;
         }
@@ -425,9 +431,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (IsResumeRewindAnimating && Time.Elapsed > 0)
             resumeRewindAnimationElapsed += Time.Elapsed / Math.Max(Math.Abs(Clock.Rate), 0.01);
 
-        var resumeRewindOffset = ComputeResumeRewindVisualOffset(resumeRewindInitialVisualOffset, resumeRewindAnimationElapsed);
-        DisplayTime = ComputeDisplayTime(Time.Current, VisualOffset.Value, ScrollController.PlaybackRate, resumeRewindOffset);
-        ScrollController.Update(DisplayTime);
+        updateScrollPosition();
 
         // Playfield.Update normally reverts results newer than the clock. During the resume lead-in,
         // those results belong to the completed attempt and must remain authoritative.
@@ -449,6 +453,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         triggerEvents();
         updateStageScale();
+    }
+
+    private void updateScrollPosition()
+    {
+        var resumeRewindOffset = ComputeResumeRewindVisualOffset(resumeRewindInitialVisualOffset, resumeRewindAnimationElapsed);
+        DisplayTime = ComputeDisplayTime(Time.Current, VisualOffset.Value, ScrollController.PlaybackRate, resumeRewindOffset);
+        ScrollController.Update(DisplayTime);
     }
 
     protected override void UpdateAfterChildren()

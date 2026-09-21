@@ -18,7 +18,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private readonly Func<float> getHitTargetPosition;
     private readonly Func<bool> isResumeRewinding;
     private readonly Func<double> getResumeRewindEndTime;
-    private readonly bool canBatchTapUpdates;
+    private readonly bool canBatchUpdates;
     private bool frameOpen;
     private bool hasUpdated;
     private bool updatePending;
@@ -26,11 +26,30 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private double nextPassiveUpdateTime;
     private double latestLifetimeStart = double.PositiveInfinity;
     private bool passiveDeadlineDirty = true;
-    private readonly SortedSet<(double Time, long Id, DrawableBmsHitObject Note)> pendingTaps = [];
-    private readonly Dictionary<DrawableBmsHitObject, long> tapIds = [];
-    private long nextTapId;
+    private readonly SortedSet<(double Time, long Id, DrawableBmsHitObject Note)> pendingHeads = [];
+    private readonly Dictionary<DrawableBmsHitObject, long> headIds = [];
+    private long nextHeadId;
+    private readonly List<DrawableBmsHitObject> activeLongNotes = [];
 
-    internal DrawableBmsHitObject? FirstPendingTap => canBatchTapUpdates && pendingTaps.Count > 0 ? pendingTaps.Min.Note : null;
+    internal DrawableBmsHitObject? FirstPendingHead
+    {
+        get
+        {
+            if (!canBatchUpdates || pendingHeads.Count == 0)
+                return null;
+
+            var first = pendingHeads.Min.Note;
+            // Normal LN heads remain uncommitted until release. An overlapping hold may still
+            // win the legacy/Lowest selector, so keep its original slow-path selection semantics.
+            foreach (var held in activeLongNotes)
+            {
+                if (!held.Judged && held.HitObject.StartTime <= first.HitObject.StartTime)
+                    return null;
+            }
+
+            return first;
+        }
+    }
 
     public override void Add(HitObjectLifetimeEntry entry)
     {
@@ -43,53 +62,72 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         Func<float> getHitTargetPosition,
         Func<bool> isResumeRewinding,
         Func<double> getResumeRewindEndTime,
-        bool canBatchTapUpdates = false)
+        bool canBatchUpdates = false)
     {
         this.scrollController = scrollController;
         this.getHitTargetPosition = getHitTargetPosition;
         this.isResumeRewinding = isResumeRewinding;
         this.getResumeRewindEndTime = getResumeRewindEndTime;
-        this.canBatchTapUpdates = canBatchTapUpdates;
+        this.canBatchUpdates = canBatchUpdates;
         RelativeSizeAxes = Axes.Both;
     }
 
     protected override void AddDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
     {
         base.AddDrawable(entry, drawable);
-        if (!canBatchTapUpdates || drawable is not DrawableBmsHitObject note || entry.HitObject is not BmsNote)
+        if (!canBatchUpdates || drawable is not DrawableBmsHitObject note || entry.HitObject is not (BmsNote or BmsLongNote))
             return;
 
-        var id = ++nextTapId;
-        tapIds.Add(note, id);
-        if (!note.Judged)
-            pendingTaps.Add((note.HitObject.StartTime, id, note));
+        var id = ++nextHeadId;
+        headIds.Add(note, id);
+        if (note.HasPendingHead)
+            pendingHeads.Add((note.HitObject.StartTime, id, note));
+        trackActiveLongNote(note);
         passiveDeadlineDirty = true;
-        note.OnNewResult += removeJudgedTap;
-        note.OnRevertResult += restoreTap;
+        note.OnNewResult += removeJudgedHead;
+        note.OnRevertResult += restoreHead;
+        note.HeadJudged += onHeadJudged;
     }
 
     protected override void RemoveDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
     {
-        if (drawable is DrawableBmsHitObject note && tapIds.Remove(note, out var id))
+        if (drawable is DrawableBmsHitObject note && headIds.Remove(note, out var id))
         {
-            pendingTaps.Remove((note.HitObject.StartTime, id, note));
-            note.OnNewResult -= removeJudgedTap;
-            note.OnRevertResult -= restoreTap;
+            pendingHeads.Remove((note.HitObject.StartTime, id, note));
+            note.OnNewResult -= removeJudgedHead;
+            note.OnRevertResult -= restoreHead;
+            note.HeadJudged -= onHeadJudged;
+            activeLongNotes.Remove(note);
         }
 
         base.RemoveDrawable(entry, drawable);
     }
 
-    private void removeJudgedTap(DrawableHitObject drawable, JudgementResult result)
+    private void removeJudgedHead(DrawableHitObject drawable, JudgementResult result)
     {
         var note = (DrawableBmsHitObject)drawable;
-        pendingTaps.Remove((note.HitObject.StartTime, tapIds[note], note));
+        pendingHeads.Remove((note.HitObject.StartTime, headIds[note], note));
+        trackActiveLongNote(note);
     }
 
-    private void restoreTap(DrawableHitObject drawable, JudgementResult result)
+    private void onHeadJudged(DrawableBmsHitObject note)
+    {
+        pendingHeads.Remove((note.HitObject.StartTime, headIds[note], note));
+        trackActiveLongNote(note);
+    }
+
+    private void trackActiveLongNote(DrawableBmsHitObject note)
+    {
+        if (note.RequiresActiveLongNoteUpdate && !activeLongNotes.Contains(note))
+            activeLongNotes.Add(note);
+    }
+
+    private void restoreHead(DrawableHitObject drawable, JudgementResult result)
     {
         var note = (DrawableBmsHitObject)drawable;
-        pendingTaps.Add((note.HitObject.StartTime, tapIds[note], note));
+        if (note.HasPendingHead)
+            pendingHeads.Add((note.HitObject.StartTime, headIds[note], note));
+        trackActiveLongNote(note);
         passiveDeadlineDirty = true;
     }
 
@@ -106,7 +144,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             UpdateSubTree();
     }
 
-    internal bool CanDeferUpdate => canBatchTapUpdates && frameOpen && hasUpdated && Time.Elapsed >= 0
+    internal bool CanDeferUpdate => canBatchUpdates && frameOpen && hasUpdated && Time.Elapsed >= 0
                                     && (Clock as IGameplayClock)?.IsRewinding != true && !isResumeRewinding()
                                     && Time.Current >= lastFullUpdateTime
                                     && (Time.Current - lastFullUpdateTime < MAX_DEFERRED_UPDATE_TIME || lastFullUpdateTime >= latestLifetimeStart)
@@ -115,12 +153,13 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     public override bool UpdateSubTree()
     {
         var now = Time.Current;
-        // Replay input is still dispatched for every timestamp. Plain taps have no held state,
-        // so between passive-POOR deadlines their skin trees only need the final frame's update.
+        // Replay input and active holds still advance at every timestamp. Between unjudged-head
+        // POOR deadlines, the remaining skin trees only need the final frame's update.
         // Lifetimes include this deferral budget so even the earliest E-POOR input finds its note.
         if (CanDeferUpdate)
         {
             updatePending = true;
+            UpdateDeferredLongNotes();
             return true;
         }
 
@@ -130,18 +169,44 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         lastFullUpdateTime = now;
         // Removing/judging a note can only make this bound conservative. Rescan when the bound
         // expires or activation/rewind introduces an earlier candidate, not on every render update.
-        if (canBatchTapUpdates && (passiveDeadlineDirty || now > nextPassiveUpdateTime))
+        if (canBatchUpdates && (passiveDeadlineDirty || now > nextPassiveUpdateTime))
         {
             passiveDeadlineDirty = false;
             nextPassiveUpdateTime = double.PositiveInfinity;
             foreach (var drawable in AliveEntries.Values)
             {
-                if (drawable is DrawableBmsHitObject note && !note.Judged)
+                if (drawable is DrawableBmsHitObject note && note.HasPendingHead)
                     nextPassiveUpdateTime = Math.Min(nextPassiveUpdateTime, note.NextPassiveJudgementTime);
             }
         }
 
         return updated;
+    }
+
+    internal void UpdateDeferredLongNotes()
+    {
+        if (activeLongNotes.Count == 0)
+            return;
+
+        var hitTarget = getHitTargetPosition();
+        var scale = scrollController.ScrollSpeedMultiplier / Math.Max(1.0, scrollController.ScrollRange)
+                    * Math.Max(1f, DrawHeight - hitTarget);
+        var currentScrollPos = scrollController.CurrentScrollPosition;
+        for (var i = activeLongNotes.Count - 1; i >= 0; i--)
+        {
+            var note = activeLongNotes[i];
+            if (note.RequiresActiveLongNoteUpdate)
+            {
+                var ln = (BmsLongNote)note.HitObject;
+                var startPosition = scrollController.GetVisualScrollPosition(ln.StartTime, ln.ScrollPositionAtStartTime);
+                var endPosition = double.IsNaN(ln.VisualScrollPositionAtEndTime) ? ln.ScrollPositionAtEndTime : ln.VisualScrollPositionAtEndTime;
+                note.UpdateDeferredLongNote(-(hitTarget + (float)((startPosition - currentScrollPos) * scale)),
+                    -(hitTarget + (float)((endPosition - currentScrollPos) * scale)));
+            }
+
+            if (!note.RequiresActiveLongNoteUpdate)
+                activeLongNotes.RemoveAt(i);
+        }
     }
 
     /// <summary>
@@ -249,5 +314,18 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             if (note is DrawableBmsHitObject bms)
                 bms.RestoreRewoundState();
         }
+
+        // Normal LN heads are not committed results until their tails. Rewind can undo a head
+        // without OnRevertResult, so rebuild the input/hold indexes from the restored controllers.
+        pendingHeads.Clear();
+        activeLongNotes.Clear();
+        foreach (var (note, id) in headIds)
+        {
+            if (note.HasPendingHead)
+                pendingHeads.Add((note.HitObject.StartTime, id, note));
+            trackActiveLongNote(note);
+        }
+
+        passiveDeadlineDirty = true;
     }
 }

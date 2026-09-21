@@ -82,7 +82,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     private BmsColumnKeySound? keySound;
     private readonly bool hasLongNotes;
-    private readonly bool canBatchTapUpdates;
+    private readonly bool canBatchUpdates;
     private readonly BmsHitExplosionPool normalHitExplosionPool;
     private readonly BmsHitExplosionPool longNoteHitExplosionPool;
     private readonly List<(DrawableBmsHitObject Drawable, BmsJudgementCandidate Candidate)> pressCandidates = [];
@@ -100,7 +100,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         LayoutVariant = playfield.LayoutVariant;
         IsScratch = BmsLayout.IsScratchColumn(index, LayoutVariant);
         hasLongNotes = playfield.Beatmap.HitObjects.Any(h => h.Column == index && h is BmsLongNote);
-        canBatchTapUpdates = playfield.Beatmap.HitObjects.All(h => h.Column != index || h is BmsNote);
+        canBatchUpdates = playfield.Beatmap.HitObjects.All(h => h.Column != index || h is BmsNote or BmsLongNote);
 
         RelativeSizeAxes = Axes.Y;
         Width = defaultColumnWidth(index, LayoutVariant);
@@ -109,8 +109,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         normalHitExplosionPool = new BmsHitExplosionPool(
             new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, LayoutVariant, Index), playfield.InitialHitExplosionSizes[index]);
         longNoteHitExplosionPool = new BmsHitExplosionPool(
-            // Head, first hold pulse, and tail can overlap within the explosion fade lifetime.
-            new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, LayoutVariant, Index, true), 3);
+            new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, LayoutVariant, Index, true), playfield.InitialLongNoteHitExplosionSizes[index]);
 
         InternalChildren =
         [
@@ -152,14 +151,14 @@ public partial class BmsColumn : Playfield, IBmsColumn
             () => HitTargetPosition,
             () => ParentPlayfield.IsResumeRewinding,
             () => ParentPlayfield.ResumeRewindEndTime,
-            canBatchTapUpdates);
+            canBatchUpdates);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
         => new BmsHitObjectLifetimeEntry(
             hitObject,
             ParentPlayfield.ScrollController,
             () => ParentPlayfield.VisualOffset.Value,
-            canBatchTapUpdates ? BmsColumnHitObjectContainer.MAX_DEFERRED_UPDATE_TIME : 0);
+            canBatchUpdates ? BmsColumnHitObjectContainer.MAX_DEFERRED_UPDATE_TIME : 0);
 
     protected override void LoadComplete()
     {
@@ -319,10 +318,10 @@ public partial class BmsColumn : Playfield, IBmsColumn
         if ((Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0)
             return PressOutcome.Empty;
 
-        // The earliest pending exact-time tap wins every judgement algorithm. The ordered
+        // The earliest pending exact-time head wins every judgement algorithm. The ordered
         // live index avoids sorting thousands of future candidates for every replay press.
-        if (((BmsColumnHitObjectContainer)HitObjectContainer).FirstPendingTap is { } first
-            && first.HitObject.StartTime == time && !first.Judged
+        if (((BmsColumnHitObjectContainer)HitObjectContainer).FirstPendingHead is { } first
+            && first.HitObject.StartTime == time && first.HasPendingHead
             && BmsJudgementProfileProvider.GetTable(LayoutVariant, Index, first.HitObject.EffectiveJudgementRate, false).ResultForOffset(0) == HitResult.Perfect
             && first.TryHit(HitResult.Perfect))
         {

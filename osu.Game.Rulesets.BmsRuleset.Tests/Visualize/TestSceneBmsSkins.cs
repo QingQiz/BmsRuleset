@@ -329,6 +329,15 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         AddAssert("explosion factory produces resolved explosion",
             () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1))?.Create(),
             Is.TypeOf<LegacyBmsHitExplosion>);
+        AddAssert("hold light factory shares textures between independent pulses", () =>
+        {
+            var factory = factorySource()!.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1, true))!;
+            using var first = factory.Create()!;
+            using var second = factory.Create()!;
+            var firstSprite = first.ChildrenOfType<Sprite>().Single();
+            var secondSprite = second.ChildrenOfType<Sprite>().Single();
+            return !ReferenceEquals(firstSprite, secondSprite) && ReferenceEquals(firstSprite.Texture, secondSprite.Texture);
+        });
         AddAssert("key area factory produces legacy key area",
             () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.KeyArea, BmsLayoutVariant.Bme7K, 1))?.Create(),
             Is.TypeOf<LegacyBmsKeyArea>);

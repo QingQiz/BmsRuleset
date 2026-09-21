@@ -15,6 +15,8 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
+using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
@@ -25,6 +27,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
@@ -359,10 +362,24 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
         AddAssert("replacement skin tree is already loaded", () => skin.Drawable.LoadState >= LoadState.Ready);
     }
 
-    [Test]
-    public void SubMillisecondReplayKeepsEveryJudgementWithoutRepeatingVisualTraversal()
+    [TestCase(BmsLongNoteMode.Undefined)]
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void SubMillisecondReplayKeepsEveryJudgementWithoutRepeatingVisualTraversal(BmsLongNoteMode mode)
     {
-        AddStep("load dense replay", () => LoadPlayer());
+        AddStep("load dense replay", () =>
+        {
+            allNotesVisible = true;
+            Mod[] mods = mode switch
+            {
+                BmsLongNoteMode.LongNote => [new BmsModInvert(), new BmsModLongNote()],
+                BmsLongNoteMode.ChargeNote => [new BmsModInvert(), new BmsModChargeNote()],
+                BmsLongNoteMode.HellChargeNote => [new BmsModInvert(), new BmsModHellChargeNote()],
+                _ => [],
+            };
+            LoadPlayer(mods);
+        });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         for (var run = 0; run < 2; run++)
         {
@@ -382,13 +399,21 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             AddStep("stop counting", () => { probe?.Dispose(); probe = null; maskingProbe?.Dispose(); maskingProbe = null; });
             AddStep("all burst notes judged perfectly at their exact replay times", () =>
             {
-                Assert.That(Player.Results.Count, Is.EqualTo(note_count));
+                var expectedResults = mode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote ? note_count * 2 - 8 : note_count;
+                Assert.That(Player.Results.Count, Is.EqualTo(expectedResults));
                 Assert.That(Player.Results.All(r => r.Type == HitResult.Perfect), Is.True);
-                Assert.That(Player.Results.Max(r => Math.Abs(r.TimeOffset)), Is.LessThan(0.000001));
+                var chart = (BmsBeatmap)Player.GameplayState.Beatmap;
+                Assert.That(BmsGameplayDiagnosticScene.CheckJudgementCompleteness(chart.HitObjects.ToHashSet(), Player.Results), Is.Null);
+                if (mode == BmsLongNoteMode.Undefined)
+                    Assert.That(Player.Results.Max(r => Math.Abs(r.TimeOffset)), Is.LessThan(0.000001));
+                else
+                    Assert.That(Player.Results.OfType<BmsLongNoteJudgementResult>().SelectMany(r => r.EndpointResults)
+                        .Max(e => Math.Abs(e.TimeOffset)), Is.LessThan(0.000001));
             });
             AddAssert("visual traversal is bounded per game frame", () => columnUpdates < note_count);
             AddAssert("masking does not traverse notes for every replay timestamp", () => noteMaskingUpdates < note_count * 16);
-            AddAssert("masking does not traverse overlapping pulses for every replay timestamp", () => explosionMaskingUpdates < note_count * 16);
+            var pulsesPerNote = mode == BmsLongNoteMode.Undefined ? 1 : mode == BmsLongNoteMode.LongNote ? 2 : 3;
+            AddAssert("masking does not traverse overlapping pulses for every replay timestamp", () => explosionMaskingUpdates, () => Is.LessThan(note_count * pulsesPerNote * 16));
         }
     }
 

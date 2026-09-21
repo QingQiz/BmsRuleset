@@ -8,6 +8,23 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
 public class BmsHitObjectPoolPlanTest
 {
     [Test]
+    public void ShortLongNoteBurstsPreloadHeadHoldAndTailPulses()
+    {
+        var objects = Enumerable.Range(0, 100).Select(i => new BmsLongNote { Column = 1, StartTime = i * 0.001, Duration = 0.0005 });
+        Assert.That(BmsHitObjectPoolPlan.CreateLongNoteHitExplosionSizes(objects, 3), Is.EqualTo(new[] { 3, 300, 3 }));
+    }
+
+    [Test]
+    public void LongHoldPulsePrewarmingIsBoundedRegardlessOfDuration()
+    {
+        var objects = Enumerable.Range(0, 16).SelectMany(column =>
+            Enumerable.Range(0, 9000).Select(_ => new BmsLongNote { Column = column, Duration = 1e100 }));
+        var sizes = BmsHitObjectPoolPlan.CreateLongNoteHitExplosionSizes(objects, 16);
+        Assert.That(sizes.Sum(), Is.InRange(8100, 8192));
+        Assert.That(BmsHitObjectPoolPlan.CreateLongNoteHitExplosionSizes([new BmsLongNote { Duration = 1000 }], 1)[0], Is.EqualTo(5));
+    }
+
+    [Test]
     public void SparseChartsKeepSmallHitExplosionPools()
     {
         var sizes = BmsHitObjectPoolPlan.CreateHitExplosionSizes(Enumerable.Range(0, 100)

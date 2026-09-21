@@ -43,11 +43,19 @@ public sealed class BmsLongNoteJudgementResult : JudgementResult
 
         var source = endpoints[0].Source;
 
-        if (endpoints.Any(e => !ReferenceEquals(e.Source, source)))
-            throw new ArgumentException(@"All endpoints must belong to the same long note.", nameof(endpointResults));
+        // Usually one or two endpoints are committed per note. Avoid allocating LINQ iterators,
+        // a closure and a distinct set for every head/tail in a dense LN replay.
+        for (var i = 0; i < endpoints.Length; i++)
+        {
+            if (!ReferenceEquals(endpoints[i].Source, source))
+                throw new ArgumentException(@"All endpoints must belong to the same long note.", nameof(endpointResults));
 
-        if (endpoints.Select(e => e.Kind).Distinct().Count() != endpoints.Length)
-            throw new ArgumentException(@"Endpoint kinds cannot be duplicated.", nameof(endpointResults));
+            for (var previous = 0; previous < i; previous++)
+            {
+                if (endpoints[i].Kind == endpoints[previous].Kind)
+                    throw new ArgumentException(@"Endpoint kinds cannot be duplicated.", nameof(endpointResults));
+            }
+        }
 
         EndpointResults = endpoints;
     }

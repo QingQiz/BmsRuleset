@@ -66,9 +66,17 @@ pwsh -NoProfile -File scripts/Measure-BmsGameplay.ps1 -Cases "D:/perf/cases.json
 
 同一份清单分别运行基线与候选构建，比较多次运行的 P99、最大值、慢帧比例、加载/seek 时间和内存。建议至少包含普通密集谱、LN/CN/HCN、STOP/反向 SCROLL、地雷与双侧谱；组合 Argon、Classic、Legacy，并固定相同速度和 BPM 设置。
 
+轻量谱面应另外使用固定更新与绘制上限验收，例如 `updateHz: 1000` / `drawHz: 240`，并加入未启用 IN 的普通音符对照。基线和候选应使用相同自动回放修复、谱面、区间、皮肤与测试宿主，交替运行顺序并至少重复三次；只有两版均通过区间完整性检查后，才能比较相同工作量。除 P99 外，使用 `frames.csv` 中 `update_ms` 总和除以 `Summary.WallSeconds` 得到每秒累计更新耗时，同时比较每秒分配、超过帧预算的更新数、模拟落后和内存。保留每次结果及中位数，避免把单次最大值或 GC 时机差异当作稳定回退。
+
+内存快照包含音频、BGA、宿主和诊断器；`ManagedBytes` 也没有在采样前强制 GC，不能视为精确的存活对象大小。比较时应对齐快照对应的谱面时刻：结束边界处某次运行可能多记录一个快照，直接比较各自最大值会混入不同的采样覆盖范围。全曲按更新次数计算的 P99 可能被大量低成本更新稀释，仍需查看密集段逐秒结果和最坏更新，不能单凭全曲 P99 判断流畅度。
+
 ## 使用 IN 扩展长条覆盖
 
 模板包含 IN + LN/CN/HCN 三个示例，填入普通谱即可复用；`longNoteMode` 只改变判定模式，必须同时启用 `invert` 才会把普通音符转成长条。IN 和模式 mod 通过 Player 的正常转换流程应用，自动回放、报告物件数与完整性检查均使用转换后的谱面。未启用 IN 的同谱场景可作为普通物件对照，但优化前后应比较参数完全相同的场景。
+
+IN 可能生成不足 1 ms 的长条；自动回放必须在实际尾部松键，不能套用普通音符的 10 ms 松键延迟，否则会吞掉后续同列按键。比较 LN 性能时，应先确认基线和候选均使用正确的回放输入；未通过完整性检查的报告可用于复现卡顿，但不能当作完成相同判定工作量的吞吐量比较。
+
+仅包含普通音符和长条的列会合并同一游戏更新内的皮肤遍历。已开始长条的被动尾判定、HCN 血条变化、头部固定位置和按住光效仍逐个模拟时间戳推进；未判定头部的 POOR 截止时间、物件激活和回退会强制完整更新。LN 光效预热有独立的全场 8192 对象预算，超出后仍按需增长，因此应同时观察加载时间、内存和密集段尖峰。
 
 ```powershell
 dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net10.0/osu.Game.Rulesets.BmsRuleset.Tests.dll --gameplay-diagnostic --filter gameplay --chart "D:/charts/example/chart.bms" --invert --invert-random-seed 12345 --long-note-mode HellChargeNote --skin Legacy --start 30 --duration 30 --output artifacts/gameplay/in-hcn

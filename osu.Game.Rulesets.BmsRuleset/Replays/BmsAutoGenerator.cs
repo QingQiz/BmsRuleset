@@ -64,7 +64,9 @@ public class BmsAutoGenerator(BmsBeatmap beatmap) : AutoGenerator<BmsReplayFrame
             if (nextObject is BmsLandmine mineAfterLn && mineAfterLn.StartTime <= endTime + 1)
                 return Math.Max(current.StartTime, mineAfterLn.StartTime - 1);
 
-            return Math.Max(endTime, current.StartTime + RELEASE_DELAY);
+            // IN can create sub-millisecond holds. Extending them by the tap release delay
+            // swallows the next press in the same column and also mistimes charge-note tails.
+            return endTime;
         }
 
         // Non-LN: prefer the default RELEASE_DELAY, but pull the release in to before

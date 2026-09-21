@@ -68,6 +68,18 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     internal virtual double NextPassiveJudgementTime => double.NegativeInfinity;
 
+    internal virtual bool HasPendingHead => !Judged;
+
+    internal virtual bool RequiresActiveLongNoteUpdate => false;
+
+    internal event Action<DrawableBmsHitObject>? HeadJudged;
+
+    protected void NotifyHeadJudged() => HeadJudged?.Invoke(this);
+
+    internal virtual void UpdateDeferredLongNote(float y, float endY)
+    {
+    }
+
     internal virtual void RestoreRewoundState()
     {
     }

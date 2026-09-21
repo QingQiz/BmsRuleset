@@ -11,6 +11,28 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.AutoGeneration;
 [TestFixture]
 public class BmsAutoGeneratorTest
 {
+    [TestCase(0.0001)]
+    [TestCase(1)]
+    [TestCase(9)]
+    public void TestShortLongNotesReleaseAtTailBeforeNextPress(double duration)
+    {
+        var beatmap = new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+            HitObjects =
+            {
+                new BmsLongNote { StartTime = 1000, Column = 1, Duration = duration },
+                new BmsLongNote { StartTime = 1000 + duration * 2, Column = 1, Duration = duration },
+            },
+        };
+
+        var frames = new BmsAutoGenerator(beatmap).Generate().Frames.OfType<BmsReplayFrame>().ToArray();
+        Assert.That(frames.Single(f => f.Time == 1000 + duration).Actions, Does.Not.Contain(BmsAction.Key1));
+        Assert.That(frames.Single(f => f.Time == 1000 + duration * 2).Actions, Contains.Item(BmsAction.Key1));
+        Assert.That(frames.Single(f => f.Time == 1000 + duration * 2 + duration).Actions, Does.Not.Contain(BmsAction.Key1));
+    }
+
     [Test]
     public void TestAutoplayGeneratesPressAndReleaseFrames()
     {

@@ -1,8 +1,9 @@
 ﻿using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.Textures;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -29,7 +30,7 @@ internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
 
     private Drawable? hitExplosion;
 
-    public LegacyBmsHitExplosion(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup)
+    public LegacyBmsHitExplosion(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup, Texture[] textures)
     {
         RelativeSizeAxes = Axes.Both;
 
@@ -43,7 +44,7 @@ internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
         hitPosition = transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? BmsStage.HIT_TARGET_POSITION;
         ResolvedScale = scale;
 
-        setAnimation(frameLength => transformer.GetAnimation(imageName, true, false, frameLength: frameLength));
+        setTextures(textures);
     }
 
     [BackgroundDependencyLoader]
@@ -51,21 +52,32 @@ internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
     {
         if (hitExplosion == null)
         {
-            setAnimation(frameLength => skin.GetAnimation(imageName, true, false, frameLength: frameLength));
+            setTextures(skin.GetTextures(imageName, default, default, true, "-", null, out _));
             if (hitExplosion == null)
                 InternalChild = Empty();
         }
     }
 
-    private void setAnimation(Func<double, Drawable?> getAnimation)
+    private void setTextures(Texture[] textures)
     {
-        var tmp = getAnimation(0);
-        double frameLength = 0;
+        if (textures.Length == 0)
+            return;
 
-        if (tmp is IFramedAnimation tmpAnimation && tmpAnimation.FrameCount > 0)
-            frameLength = Math.Max(1000 / 60.0, 170.0 / tmpAnimation.FrameCount);
+        if (textures.Length == 1)
+            hitExplosion = new Sprite { Texture = textures[0] };
+        else
+        {
+            var animation = new LegacySkinExtensions.SkinnableTextureAnimation
+            {
+                DefaultFrameLength = Math.Max(1000 / 60.0, 170.0 / textures.Length),
+                Loop = false,
+            };
+            foreach (var texture in textures)
+                animation.AddFrame(texture);
+            hitExplosion = animation;
+        }
 
-        hitExplosion = getAnimation(frameLength)?.With(d =>
+        hitExplosion.With(d =>
         {
             d.Anchor = Anchor.BottomCentre;
             d.Origin = Anchor.Centre;
@@ -75,7 +87,6 @@ internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
             d.Scale = new Vector2(ResolvedScale);
         });
 
-        if (hitExplosion != null)
-            InternalChild = hitExplosion;
+        InternalChild = hitExplosion;
     }
 }
