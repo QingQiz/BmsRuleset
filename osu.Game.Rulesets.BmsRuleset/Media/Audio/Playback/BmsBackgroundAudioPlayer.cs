@@ -5,6 +5,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
+using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 
@@ -35,6 +36,9 @@ public partial class BmsBackgroundAudioPlayer(
     [Resolved]
     private BmsSamplePlayback samplePlayback { get; set; } = null!;
 
+    [Resolved(CanBeNull = true)]
+    private IFrameStableClock? gameplayClock { get; set; }
+
     protected override void Dispose(bool isDisposing)
     {
         samplePlayback.StopAll();
@@ -59,6 +63,8 @@ public partial class BmsBackgroundAudioPlayer(
     protected override void Update()
     {
         base.Update();
+
+        updatePlaybackBlocked();
 
         if (playbackBlocked)
         {
@@ -202,11 +208,17 @@ public partial class BmsBackgroundAudioPlayer(
     {
         var blocked = sourceIsPaused.Value || samplePlaybackDisabled.Value;
 
+        // As with non-looping framework samples, a forward simulation catch-up must not
+        // abruptly cut every sounding voice. Explicit pauses, stopped seeks and rewinds still
+        // pause the mixer; stale triggers remain blocked until the timeline can be reconstructed.
+        var keepExistingVoices = !sourceIsPaused.Value && gameplayClock is { IsRunning: true, IsRewinding: false }
+                                                       && gameplayClock.IsCatchingUp.Value;
+        samplePlayback.SetPlaybackBlocked(blocked, keepExistingVoices);
+
         if (blocked == playbackBlocked)
             return;
 
         playbackBlocked = blocked;
-        samplePlayback.SetPlaybackBlocked(playbackBlocked);
 
         if (playbackBlocked)
         {

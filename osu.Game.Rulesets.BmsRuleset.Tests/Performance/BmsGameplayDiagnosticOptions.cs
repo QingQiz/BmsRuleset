@@ -29,6 +29,10 @@ internal sealed class BmsGameplayDiagnosticOptions
 
     public double DrawHz { get; private set; }
 
+    public int HitExplosionLimit { get; private set; }
+
+    public BmsHitExplosionOverflowPolicy HitExplosionPolicy { get; private set; }
+
     public bool Headless { get; private set; }
 
     public bool AudioOutput { get; private set; }
@@ -97,6 +101,15 @@ internal sealed class BmsGameplayDiagnosticOptions
                 case "--update-hz": result.UpdateHz = number(value, 0, 10000); break;
 
                 case "--draw-hz": result.DrawHz = number(value, 0, 10000); break;
+
+                case "--hit-explosion-limit":
+                    var limit = number(value, 0, 256);
+                    if (limit != Math.Truncate(limit))
+                        throw new ArgumentException("Hit explosion limit must be an integer.");
+                    result.HitExplosionLimit = (int)limit;
+                    break;
+
+                case "--hit-explosion-policy": result.HitExplosionPolicy = enumValue<BmsHitExplosionOverflowPolicy>(value); break;
 
                 case "--skin": result.Skin = enumValue<BmsTestSkins.SkinKind>(value); break;
 

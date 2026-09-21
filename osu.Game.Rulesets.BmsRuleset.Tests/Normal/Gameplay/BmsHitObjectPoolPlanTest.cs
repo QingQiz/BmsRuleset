@@ -8,6 +8,52 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;
 public class BmsHitObjectPoolPlanTest
 {
     [Test]
+    public void SparseChartsKeepSmallHitExplosionPools()
+    {
+        var sizes = BmsHitObjectPoolPlan.CreateHitExplosionSizes(Enumerable.Range(0, 100)
+            .Select(i => new BmsNote { Column = 1, StartTime = i * 10000 }), 3);
+        Assert.That(sizes, Is.EqualTo(new[] { 2, 2, 2 }));
+    }
+
+    [TestCase(216, 3)]
+    [TestCase(216.001, 2)]
+    public void HitExplosionOverlapIncludesOneDeferredFrame(double lastTime, int expected)
+    {
+        BmsHitObject[] objects =
+        [
+            new BmsNote { StartTime = lastTime },
+            new BmsNote { StartTime = 0 },
+            new BmsNote { StartTime = 100 },
+        ];
+        Assert.That(BmsHitObjectPoolPlan.CreateHitExplosionSizes(objects, 1)[0], Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void HitExplosionPoolsSeparateColumnsAndIgnoreOtherObjects()
+    {
+        var objects = Enumerable.Range(0, 8).SelectMany(i => new BmsHitObject[]
+        {
+            new BmsNote { Column = 1, StartTime = i * 1000 },
+            new BmsNote { Column = 2, StartTime = 100 },
+            new BmsLongNote { Column = 0, StartTime = 100, Duration = 1000 },
+            new BmsLandmine { Column = 0, StartTime = 100 },
+            new BmsNote { Column = -1 },
+            new BmsNote { Column = 3 },
+        }).Reverse();
+        Assert.That(BmsHitObjectPoolPlan.CreateHitExplosionSizes(objects, 3), Is.EqualTo(new[] { 2, 2, 8 }));
+    }
+
+    [Test]
+    public void HitExplosionPreloadingRespectsWholePlayfieldBudget()
+    {
+        var sizes = BmsHitObjectPoolPlan.CreateHitExplosionSizes(Enumerable.Range(0, 16).SelectMany(column =>
+            Enumerable.Range(0, column < 8 ? 9000 : 0).Select(_ => new BmsNote { Column = column })), 16);
+        Assert.That(sizes.Sum(), Is.InRange(8100, 8192));
+        Assert.That(sizes.Take(8), Is.All.GreaterThan(2));
+        Assert.That(sizes.Skip(8), Is.All.EqualTo(2));
+    }
+
+    [Test]
     public void SparseChartsKeepSmallPools()
     {
         var sizes = BmsHitObjectPoolPlan.Create(Enumerable.Range(0, 100)

@@ -30,6 +30,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private readonly Dictionary<ushort, double> sampleLengths = [];
     private readonly Dictionary<ushort, PendingPlay> pendingPlays = [];
     private readonly List<PendingLivePlay> livePlays = [];
+    private readonly Dictionary<ushort, int> livePlayIndices = [];
 
     private BmsAudioResourceStore? resourceStore;
     private BmsPcmAssetCache? assetCache;
@@ -38,6 +39,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private int epoch;
     private float lastMasterGain;
     private bool playbackBlocked;
+    private bool voicesPaused;
     private bool disposed;
 
     internal bool IsInitialised => assetCache != null;
@@ -151,7 +153,16 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             return;
 
         ensureLease(sampleKey);
-        livePlays.Add(new PendingLivePlay(sampleKey, volume, Math.Max(0, offset)));
+        var play = new PendingLivePlay(sampleKey, volume, Math.Max(0, offset));
+        // All live events in a game frame share one mixer target. The mixer already keeps only
+        // the last trigger per definition; coalesce before allocating its command batch.
+        if (livePlayIndices.TryGetValue(sampleKey, out var index))
+            livePlays[index] = play;
+        else
+        {
+            livePlayIndices.Add(sampleKey, livePlays.Count);
+            livePlays.Add(play);
+        }
     }
 
     internal void SubmitLivePlayBatch()
@@ -161,7 +172,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         if (playbackBlocked)
         {
-            livePlays.Clear();
+            clearLivePlays();
             return;
         }
 
@@ -172,9 +183,13 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         {
             if (!tryGetReadyAsset(pending.SampleKey, out var asset))
             {
+                // Decoder contention must not turn a live key/BGM event into permanent silence.
+                // Keep only the newest trigger for a definition, just as the mixer retriggers it.
+                pendingPlays[pending.SampleKey] = new PendingPlay(pending.Volume, pending.Offset, currentTime());
                 continue;
             }
 
+            pendingPlays.Remove(pending.SampleKey);
             var sourceOffset = clockMapper.MapSourceOffset(pending.Offset);
             if (asset.TotalFrameCount >= 0 && sourceOffset >= asset.TotalFrameCount)
                 continue;
@@ -182,7 +197,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             plays.Add(createPlay(asset, pending.SampleKey, pending.Volume, targetFrame, sourceOffset));
         }
 
-        livePlays.Clear();
+        clearLivePlays();
 
         if (plays.Count > 0)
             mixer.SubmitPlayBatch(plays.ToArray());
@@ -219,18 +234,22 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         mixer.SubmitPlayBatch([createPlay(asset, sampleKey, volume, targetFrame, 0)]);
     }
 
-    internal void SetPlaybackBlocked(bool blocked)
+    internal void SetPlaybackBlocked(bool blocked, bool keepExistingVoices = false)
     {
-        if (blocked == playbackBlocked)
+        if (blocked != playbackBlocked)
+        {
+            playbackBlocked = blocked;
+            clearLivePlays();
+            if (!blocked)
+                clockMapper.Rebase(currentTime(), mixer.RenderedFrames);
+        }
+
+        var pauseVoices = blocked && !keepExistingVoices;
+        if (pauseVoices == voicesPaused)
             return;
 
-        playbackBlocked = blocked;
-        livePlays.Clear();
-
-        if (!blocked)
-            clockMapper.Rebase(currentTime(), mixer.RenderedFrames);
-
-        mixer.SubmitControl(blocked ? BmsVoiceCommandType.Pause : BmsVoiceCommandType.Resume, mixer.RenderedFrames, epoch);
+        voicesPaused = pauseVoices;
+        mixer.SubmitControl(pauseVoices ? BmsVoiceCommandType.Pause : BmsVoiceCommandType.Resume, mixer.RenderedFrames, epoch);
     }
 
     internal void ResumeAll()
@@ -244,7 +263,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     internal void StopAll()
     {
-        livePlays.Clear();
+        clearLivePlays();
         pendingPlays.Clear();
         epoch++;
         mixer.SubmitControl(BmsVoiceCommandType.ReplaceEpoch, mixer.RenderedFrames, epoch);
@@ -272,6 +291,11 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         // every frame creates garbage even when no pending play or lease changes.
         foreach (var (sampleKey, pending) in pendingPlays)
         {
+            // The mixer discards Play commands while paused. Keep decoder completions pending
+            // until resume, or StopAll clears them when a seek replaces the playback epoch.
+            if (playbackBlocked)
+                break;
+
             if (!tryGetReadyAsset(sampleKey, out var asset))
                 continue;
 
@@ -309,7 +333,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         leases.Clear();
         pendingPlays.Clear();
-        livePlays.Clear();
+        clearLivePlays();
         assetCache?.Dispose();
         assetCache = null;
         resourceStore?.Dispose();
@@ -326,6 +350,12 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
         var targetFrame = mixer.RenderedFrames;
         mixer.SubmitPlayBatch([createPlay(asset, sampleKey, volume, targetFrame, sourceOffset)]);
+    }
+
+    private void clearLivePlays()
+    {
+        livePlays.Clear();
+        livePlayIndices.Clear();
     }
 
     private BmsVoicePlay createPlay(BmsPcmAsset asset, ushort sampleKey, int volume, long targetFrame, long sourceOffset) =>

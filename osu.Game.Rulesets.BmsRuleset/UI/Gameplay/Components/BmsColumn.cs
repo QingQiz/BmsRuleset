@@ -81,6 +81,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
     protected BmsPlayfield ParentPlayfield { get; }
 
     private BmsColumnKeySound? keySound;
+    private readonly bool hasLongNotes;
+    private readonly bool canBatchTapUpdates;
     private readonly BmsHitExplosionPool normalHitExplosionPool;
     private readonly BmsHitExplosionPool longNoteHitExplosionPool;
     private readonly List<(DrawableBmsHitObject Drawable, BmsJudgementCandidate Candidate)> pressCandidates = [];
@@ -97,13 +99,15 @@ public partial class BmsColumn : Playfield, IBmsColumn
         Index = index;
         LayoutVariant = playfield.LayoutVariant;
         IsScratch = BmsLayout.IsScratchColumn(index, LayoutVariant);
+        hasLongNotes = playfield.Beatmap.HitObjects.Any(h => h.Column == index && h is BmsLongNote);
+        canBatchTapUpdates = playfield.Beatmap.HitObjects.All(h => h.Column != index || h is BmsNote);
 
         RelativeSizeAxes = Axes.Y;
         Width = defaultColumnWidth(index, LayoutVariant);
         HitObjectContainer.Depth = HIT_OBJECT_DEPTH;
 
         normalHitExplosionPool = new BmsHitExplosionPool(
-            new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, LayoutVariant, Index), 2);
+            new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, LayoutVariant, Index), playfield.InitialHitExplosionSizes[index]);
         longNoteHitExplosionPool = new BmsHitExplosionPool(
             // Head, first hold pulse, and tail can overlap within the explosion fade lifetime.
             new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, LayoutVariant, Index, true), 3);
@@ -147,13 +151,15 @@ public partial class BmsColumn : Playfield, IBmsColumn
             ParentPlayfield.ScrollController,
             () => HitTargetPosition,
             () => ParentPlayfield.IsResumeRewinding,
-            () => ParentPlayfield.ResumeRewindEndTime);
+            () => ParentPlayfield.ResumeRewindEndTime,
+            canBatchTapUpdates);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
         => new BmsHitObjectLifetimeEntry(
             hitObject,
             ParentPlayfield.ScrollController,
-            () => ParentPlayfield.VisualOffset.Value);
+            () => ParentPlayfield.VisualOffset.Value,
+            canBatchTapUpdates ? BmsColumnHitObjectContainer.MAX_DEFERRED_UPDATE_TIME : 0);
 
     protected override void LoadComplete()
     {
@@ -254,7 +260,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
     public void TriggerHitExplosion(bool isLongNote)
     {
         var pool = isLongNote ? longNoteHitExplosionPool : normalHitExplosionPool;
-        HitExplosionArea.Add(pool.Get(explosion => explosion.ApplyPositionOffset(ParentPlayfield.Stage.HitTargetPositionOffset)));
+        var explosion = pool.Get();
+        explosion.ApplyPositionOffset(ParentPlayfield.Stage.HitTargetPositionOffset);
+        HitExplosionArea.Add(explosion);
     }
 
     private sealed partial class BmsHitExplosionPool(BmsSkinComponentLookup lookup, int initialSize)
@@ -310,6 +318,17 @@ public partial class BmsColumn : Playfield, IBmsColumn
         // Replay input also changes while moving backwards; retain key state without judging it.
         if ((Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0)
             return PressOutcome.Empty;
+
+        // The earliest pending exact-time tap wins every judgement algorithm. The ordered
+        // live index avoids sorting thousands of future candidates for every replay press.
+        if (((BmsColumnHitObjectContainer)HitObjectContainer).FirstPendingTap is { } first
+            && first.HitObject.StartTime == time && !first.Judged
+            && BmsJudgementProfileProvider.GetTable(LayoutVariant, Index, first.HitObject.EffectiveJudgementRate, false).ResultForOffset(0) == HitResult.Perfect
+            && first.TryHit(HitResult.Perfect))
+        {
+            keySound?.PlaySample(first.HitObject.SampleKey, first.HitObject.SampleVolume);
+            return PressOutcome.Hit;
+        }
 
         pressCandidates.Clear();
         pressJudgementCandidates.Clear();
@@ -372,6 +391,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
         IsPressed = false;
 
         if ((Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0)
+            return;
+
+        if (!hasLongNotes)
             return;
 
         // Release: find the earliest held LN in this column and let it judge the key-up.

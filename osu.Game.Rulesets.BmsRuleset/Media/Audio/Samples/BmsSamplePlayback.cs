@@ -21,6 +21,16 @@ public partial class BmsSamplePlayback(
     IEnumerable<BmsSampleUsage>? sampleUsages = null) : Component
 {
     private BmsPcmPlaybackSession? playbackSession;
+    private bool gameplayFrameOpen;
+    private bool maintainedInFrame;
+
+    internal void BeginGameplayFrame()
+    {
+        gameplayFrameOpen = true;
+        maintainedInFrame = false;
+    }
+
+    internal void EndGameplayFrame() => gameplayFrameOpen = false;
 
     private BmsPcmPlaybackController? controller => playbackSession?.Controller;
 
@@ -55,9 +65,9 @@ public partial class BmsSamplePlayback(
     internal void SchedulePlay(ushort sampleKey, int volume, double targetTime) =>
         controller?.SchedulePlay(sampleKey, volume, targetTime);
 
-    internal void SetPlaybackBlocked(bool blocked)
+    internal void SetPlaybackBlocked(bool blocked, bool keepExistingVoices = false)
     {
-        controller?.SetPlaybackBlocked(blocked);
+        controller?.SetPlaybackBlocked(blocked, keepExistingVoices);
     }
 
     internal void ResumeAll()
@@ -73,6 +83,13 @@ public partial class BmsSamplePlayback(
     protected override void Update()
     {
         base.Update();
+
+        // Assets are prefetched ten seconds ahead. Walking every lease for each sub-millisecond
+        // replay input cannot improve readiness; the outer gameplay update is sufficient.
+        if (gameplayFrameOpen && maintainedInFrame)
+            return;
+
+        maintainedInFrame = true;
 
         var now = Time.Current;
         playbackSession?.Update(now);

@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 using osu.Framework.Audio.Mixing;
@@ -13,6 +14,20 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 internal static class BmsAudioTestAccess
 {
     private const BindingFlags instance_flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+    internal static Func<bool> CreatePlaybackBlockedReader(BmsSamplePlayback playback, bool voicesPaused = false)
+    {
+        var session = getSession(playback);
+        var controller = session == null ? null : getOptionalPropertyValue<object>(session, "Controller");
+        if (controller == null)
+            return () => true;
+
+        // Bind once so per-frame diagnostics don't box reflection results or change allocations.
+        var field = voicesPaused ? findField(controller.GetType(), "voicesPaused") : null;
+        // Older baselines used the trigger-blocked flag to pause every voice as well.
+        field ??= findField(controller.GetType(), "playbackBlocked")!;
+        return Expression.Lambda<Func<bool>>(Expression.Field(Expression.Constant(controller), field)).Compile();
+    }
 
     internal static AudioMixer? GetOutputMixer(BmsSamplePlayback playback)
     {

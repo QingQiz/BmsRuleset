@@ -16,6 +16,8 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
 
     private double passivePoorOffset;
 
+    internal override double NextPassiveJudgementTime => HitObject.StartTime + passivePoorOffset;
+
     protected override void OnApply()
     {
         base.OnApply();

@@ -18,18 +18,17 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
 public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObject>
 {
-    private bool visualsSuppressed;
 
-    public override bool IsPresent => !visualsSuppressed && base.IsPresent;
+    public override bool IsPresent => !VisualsSuppressed && base.IsPresent;
 
-    internal bool VisualsSuppressed => visualsSuppressed;
+    internal bool VisualsSuppressed { get; private set; }
 
     public override bool UpdateSubTree()
     {
         var updated = base.UpdateSubTree();
         // CompositeDrawable skips UpdateAfterChildren when culled. Passive judgements must
         // still run at the same point in the column traversal, rather than waiting for OnKilled.
-        if (UsesPassiveResultCheck && visualsSuppressed && IsLoaded)
+        if (UsesPassiveResultCheck && VisualsSuppressed && IsLoaded)
             UpdateResult(false);
         return updated;
     }
@@ -42,9 +41,9 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         var padding = Math.Max(columnHeight, VisualHeight);
         var suppress = SkipFurtherUpdates || Math.Max(headY, endY ?? headY) < -columnHeight - padding
                                           || Math.Min(headY, endY ?? headY) > padding;
-        if (visualsSuppressed != suppress)
+        if (VisualsSuppressed != suppress)
         {
-            visualsSuppressed = suppress;
+            VisualsSuppressed = suppress;
             Invalidate(Invalidation.Presence);
         }
 
@@ -66,6 +65,8 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     protected virtual bool UsesPassiveResultCheck => true;
 
     internal virtual bool RequiresColumnFrameUpdate => true;
+
+    internal virtual double NextPassiveJudgementTime => double.NegativeInfinity;
 
     internal virtual void RestoreRewoundState()
     {
@@ -123,6 +124,15 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
     }
 
+    protected override void LoadAsyncComplete()
+    {
+        base.LoadAsyncComplete();
+        // All BMS voices use the shared PCM mixer. Activating the framework's empty per-note
+        // sound binds thousands of unused audio adjustments whenever a dense pool is populated.
+        Samples.LifetimeStart = double.PositiveInfinity;
+        Samples.LifetimeEnd = double.PositiveInfinity;
+    }
+
     // BMS objects appear immediately; a zero-duration fade only adds transform tracking and cleanup.
     protected override void UpdateInitialTransforms() => Alpha = 1;
 
@@ -157,9 +167,9 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     protected override void OnApply()
     {
         base.OnApply();
-        if (visualsSuppressed)
+        if (VisualsSuppressed)
         {
-            visualsSuppressed = false;
+            VisualsSuppressed = false;
             Invalidate(Invalidation.Presence);
         }
 

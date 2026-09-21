@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -26,6 +25,8 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
     private readonly Dictionary<HitResult, SkinnableDrawable> drawableCache = new();
     private readonly Container drawablePool;
     private readonly Container displayArea;
+    private HitResult? pendingJudgement;
+    private SkinnableDrawable? displayedDrawable;
 
     [Cached(typeof(ISkinSource))]
     private readonly BmsEmbeddedSkinSource activeSkin = new();
@@ -123,17 +124,29 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
         if (result == HitResult.Miss && !ShowEmptyPoor.Value)
             return;
 
+        // Intermediate replay judgements cannot be displayed within the same HUD frame.
+        // Keep the final result while scoring and timing observations still receive every event.
+        pendingJudgement = result;
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+        if (pendingJudgement is not { } result)
+            return;
+
+        pendingJudgement = null;
         if (!drawableCache.TryGetValue(result, out var drawable))
             return;
 
-        var evicted = displayArea.ToArray();
-        displayArea.Clear(false);
-
-        foreach (var child in evicted)
-            drawablePool.Add(child);
-
-        drawablePool.Remove(drawable, false);
-        displayArea.Add(drawable);
+        if (displayedDrawable != drawable)
+        {
+            displayArea.Clear(false);
+            if (displayedDrawable != null)
+                drawablePool.Add(displayedDrawable);
+            drawablePool.Remove(drawable, false);
+            displayArea.Add(displayedDrawable = drawable);
+        }
 
         if (drawable.Drawable is IAnimatableJudgement animatable)
         {

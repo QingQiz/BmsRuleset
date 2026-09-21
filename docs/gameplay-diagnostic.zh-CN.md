@@ -34,12 +34,22 @@ dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net10.0/osu.Game.Rulesets.
 | `--headless` | 关闭 | 无参数值；跳过 GPU 渲染，仅用于更新线程诊断 |
 | `--audio-output` | 关闭 | 无参数值；仅在需要听感／音频输出测试时开启 |
 | `--show-invisible-notes` | 关闭 | 无参数值；以黄色方框显示不可见 note，报告记录总数和活动／呈现数量 |
+| `--hit-explosion-limit` | 0 | 仅诊断实验；0 不启用，1–256 限制每列每种光效的叠加数和普通光效预热容量 |
+| `--hit-explosion-policy` | KeepExisting | 仅配合非零实验上限；KeepExisting / ReplaceOldest |
 
 Legacy 是测试资源中的合成皮肤，不是任意用户自定义皮肤。窗口 1280×720，默认桌面运行，配置和数据库均独立。
 
 **默认更新与绘制均不限速、VSync 关闭，并固定多线程执行**。测试器启用框架的 `AllowBenchmarkUnlimitedFrames`，否则 `FrameSync.Unlimited` 仍可能被框架钳到 1000 Hz。更新、绘制线程的前台与后台上限相同，避免失焦改变这两类负载。需要模拟固定帧率时，显式使用如 `--update-hz 1000 --draw-hz 240`；仅诊断更新线程时可使用 `--headless --update-hz 0`。两种限制都设为 0 才是软件层面的更新与绘制不限速；只解除更新限制而保留绘制上限也是单独一种负载，比较前后时必须一致。
 
 加载后先停止播放时钟，seek 到起点前两秒（最低 0），等待回放模拟追上，再启动播放并预热两秒真实时间。加载与 seek 追赶分别记录为 `LoadMs` / `SeekMs`。起点为 0 时，前两秒不计入稳态样本；完整性检查仍覆盖整曲。报告记录实际采样范围。
+
+## 叠加上限实验（仅诊断进程）
+
+`--hit-explosion-limit 64 --hit-explosion-policy KeepExisting` 会在独立诊断进程中安装方法探针，让已有光效自然播完、跳过超限新增光效。`ReplaceOldest` 则回收最旧光效并从头播放新光效。上限按每列、普通 / 长条光效分别计算；两种策略都会有意识地改变超限时的亮度与动画相位，不修改音符判定或直接跳过 KeySound。
+
+默认值 0 不安装此探针，正式游戏默认行为和用户配置均不改变。`summary.json` 中的 `HitExplosionExperiment` 记录上限、策略、触发次数、替换 / 跳过的视觉脉冲数量、每列每种光效的峰值、原始预热计划；未启用时为 null。这些计数覆盖探针存活期间，包含 seek 和预热，不等于单独采样区间的事件数。反射和探针自身有开销，实验收益不能直接当作最终集成后的精确成本。
+
+这两个参数目前用于单次 CLI 入口，不属于下面 JSON 清单脚本的可选字段。
 
 ## 复用模板与阈值
 
@@ -71,6 +81,9 @@ dotnet osu.Game.Rulesets.BmsRuleset.Tests/bin/Release/net10.0/osu.Game.Rulesets.
 - 整曲检查全部非地雷物件是否获得结果，并要求每个长条的头尾均有 Perfect 记录（包括 CN/HCN 的独立尾判定）；区间检查起点后开始且在终点前至少 400 ms 结束的物件。跨区间边界的长音不计入此项缺失检查。Perfect 和物件计数不等于逐帧画面或地雷伤害验证，后者由功能测试覆盖。
 - `frames.csv` 包含播放时钟、模拟时钟、整个游戏 `UpdateSubTree` 耗时、更新帧间隔、GC 暂停差值、该更新线程分配字节数和活动物件数。
 - `summary.json` 包含谱面 SHA256、程序集 MVID、运行参数/平台/渲染器、谱面构成、判定结果、总体及逐秒 P50/P95/P99/最大值、超过 8/16.667 ms 的帧数、GC 次数与最大模拟落后。
+- `StartupMaxUpdateMs` 和 `StartupSlowFrames` 记录加载、seek 及两秒预热阶段的主线程停顿。它们不等于 loading screen 的可见持续时间；`LoadMs` 记录真实 Player 加载至可用的耗时。
+- `audio_blocked` / `AudioBlockedFrames` / `AudioBlockedMs` 记录共享 PCM 控制器禁止新触发的状态；`audio_paused` / `AudioPausedFrames` / `AudioPausedMs` 记录控制器是否要求暂停已有声音。时长按对应更新帧间隔求和，是状态采样估计，不能直接当成声卡实际静音长度。正常暂停、跳转和回放追赶可能禁止新触发；向前追赶时已有声音继续自然播放。旧版本没有独立的 `voicesPaused` 字段，诊断器回退到原有 `playbackBlocked` 状态（旧行为会同时暂停全部声音）。
+- `Audio` 通过诊断专用方法探针测量原生混音回调：回调次数、输出帧数、最大执行耗时以及执行耗时超过该缓冲区时长的次数。无超时只能排除已观测到的回调执行超时，不能证明没有声卡调度延迟或主观听感问题。探针同时用于基线和候选版本，普通测试和正式游戏不启用。
 - `FramePacing` 记录请求的更新/绘制上限、框架不限速开关、执行模式，以及采样期间窗口活动状态、线程时钟实际限制、节流开关、VSync 的变化。`ObservedUpdateHz` 按实际更新间隔计算，`AllocatedBytesPerUpdate` 与 `AllocatedBytesPerSecond` 分别反映单次更新开销和单位时间分配压力。
 - 每十秒记录活动/呈现物件数、音频 voice 数、托管堆大小、进程私有内存与工作集。内存快照并非精确堆峰值；进程峰值工作集包含加载阶段。诊断器自身的帧数组和宿主也占用内存。
 

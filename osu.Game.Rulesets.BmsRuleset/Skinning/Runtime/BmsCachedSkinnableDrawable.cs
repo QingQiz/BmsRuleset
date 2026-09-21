@@ -19,6 +19,24 @@ internal partial class BmsCachedSkinnableDrawable : SkinReloadableDrawable
     [Resolved(CanBeNull = true)]
     private BmsGameplaySkinCache? gameplaySkinCache { get; set; }
 
+    [BackgroundDependencyLoader]
+    private void load() => gameplaySkinCache?.Register(this);
+
+    protected override void Dispose(bool isDisposing)
+    {
+        gameplaySkinCache?.Unregister(this);
+        base.Dispose(isDisposing);
+    }
+
+    internal void PreparePendingSkin()
+    {
+        if (IsDisposed || LoadState < LoadState.Ready)
+            return;
+        FlushPendingSkinChanges();
+        if (Drawable.LoadState < LoadState.Ready)
+            LoadComponent(Drawable);
+    }
+
     public BmsCachedSkinnableDrawable(BmsSkinComponentLookup lookup, Func<BmsSkinComponentLookup, Drawable>? defaultImplementation = null)
     {
         componentLookup = lookup;

@@ -3,12 +3,14 @@ using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Testing;
+using osu.Framework.Graphics.Pooling;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
@@ -85,6 +87,54 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
             }
         });
         AddUntilStep("visuals culled", () => !drawable.IsPresent);
+    }
+
+    [Test]
+    public void TestHitFeedbackReusesExpiredDrawables()
+    {
+        var poolSize = 0;
+        load();
+        AddStep("warm overlapping feedback", () =>
+        {
+            for (var i = 0; i < 32; i++)
+                ((BmsColumn)Playfield.Stage.Columns[1]).TriggerHitExplosion(false);
+        });
+        AddStep("record warmed pool", () => poolSize = ((BmsColumn)Playfield.Stage.Columns[1]).ChildrenOfType<DrawablePool<BmsHitExplosion>>().Sum(p => p.CurrentPoolSize));
+        seek(4850);
+        AddAssert("every pulse remains visible", () => ((BmsColumn)Playfield.Stage.Columns[1]).HitExplosionArea.AliveChildren.Count(d => d.Alpha > 0) == 32);
+        seek(5100);
+        AddUntilStep("pulses expire", () => !((BmsColumn)Playfield.Stage.Columns[1]).HitExplosionArea.AliveChildren.Any());
+        AddStep("trigger another burst", () =>
+        {
+            var column = (BmsColumn)Playfield.Stage.Columns[1];
+            for (var i = 0; i < 32; i++)
+                column.TriggerHitExplosion(false);
+        });
+        AddAssert("expired drawables are reused", () => ((BmsColumn)Playfield.Stage.Columns[1]).ChildrenOfType<DrawablePool<BmsHitExplosion>>().Sum(p => p.CurrentPoolSize) == poolSize);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestHitFeedbackPreservesOverlappingPulseBrightness(bool isLongNote)
+    {
+        load();
+        for (var pulse = 0; pulse < 4; pulse++)
+        {
+            seek(4800 + pulse * 50);
+            AddStep("trigger independent pulse", () => ((BmsColumn)Playfield.Stage.Columns[1]).TriggerHitExplosion(isLongNote));
+        }
+
+        seek(4990);
+        AddStep("all four pulses retain their original fade phase", () =>
+        {
+            var pulses = ((BmsColumn)Playfield.Stage.Columns[1]).HitExplosionArea.AliveChildren.OrderBy(d => d.LifetimeStart).ToArray();
+            Assert.That(pulses, Has.Length.EqualTo(4));
+            double[] expected = [10d / 120, 60d / 120, 110d / 120, 40d / 80];
+            for (var i = 0; i < pulses.Length; i++)
+                Assert.That(pulses[i].Alpha, Is.EqualTo(expected[i]).Within(0.001), $"pulse {i}");
+        });
+        seek(5200);
+        AddUntilStep("all pulses expire", () => !((BmsColumn)Playfield.Stage.Columns[1]).HitExplosionArea.AliveChildren.Any());
     }
 
     [Test]

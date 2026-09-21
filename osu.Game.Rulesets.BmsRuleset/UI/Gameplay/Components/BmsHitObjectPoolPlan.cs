@@ -16,6 +16,44 @@ internal static class BmsHitObjectPoolPlan
 
     internal readonly record struct ColumnSizes(int Notes, int LongNotes, int Mines);
 
+    internal static int[] CreateHitExplosionSizes(IEnumerable<BmsHitObject> hitObjects, int columns)
+    {
+        const int prewarm_budget = 8192;
+        var times = new List<double>[columns];
+        for (var i = 0; i < columns; i++)
+            times[i] = [];
+        foreach (var note in hitObjects)
+        {
+            if (note is BmsNote && note.Column >= 0 && note.Column < columns)
+                times[note.Column].Add(note.StartTime);
+        }
+
+        var sizes = new int[columns];
+        for (var column = 0; column < columns; column++)
+        {
+            var starts = times[column];
+            starts.Sort();
+            var first = 0;
+            sizes[column] = 2;
+            for (var last = 0; last < starts.Count; last++)
+            {
+                // Preserve every pulse; this only moves predictable skin construction into loading.
+                // Include one deferred visual update in the 200 ms fade's overlap estimate.
+                while (starts[last] - starts[first] > 200 + BmsColumnHitObjectContainer.MAX_DEFERRED_UPDATE_TIME)
+                    first++;
+                sizes[column] = Math.Max(sizes[column], last - first + 1);
+            }
+        }
+
+        var total = sizes.Sum();
+        if (total > prewarm_budget)
+        {
+            for (var i = 0; i < columns; i++)
+                sizes[i] = 2 + (int)((long)(sizes[i] - 2) * Math.Max(0, prewarm_budget - columns * 2) / (total - columns * 2));
+        }
+        return sizes;
+    }
+
     internal static ColumnSizes[] Create(IEnumerable<BmsHitObject> hitObjects, int columns)
     {
         var intervals = new List<(double Time, int Delta)>[columns * 3];

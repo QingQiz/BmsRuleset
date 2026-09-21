@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Graphics.Rendering;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -17,6 +18,10 @@ internal sealed class BmsGameplaySkinCache : IDisposable
     private readonly Dictionary<BmsDrawableFactoryCacheKey, BmsResolvedNoteMetrics> noteMetrics = new();
     private readonly Dictionary<BmsLongNoteBodyCacheKey, BmsLongNoteBodyTextureSet?> longNoteBodyTextureSets = new();
     private readonly BmsLongNoteBodySource.BmsLongNoteBodyTextureCache rawLongNoteBodyTextures = new();
+    private readonly object drawableLock = new();
+    private readonly HashSet<BmsCachedSkinnableDrawable> cachedDrawables = [];
+    private readonly Queue<BmsCachedSkinnableDrawable> pendingRefreshes = [];
+    private volatile bool hasPendingRefreshes;
 
     public BmsGameplaySkinCache(ISkinSource skin)
     {
@@ -29,10 +34,54 @@ internal sealed class BmsGameplaySkinCache : IDisposable
     public void Dispose()
     {
         skin.SourceChanged -= clear;
-        clear();
+        clearResources();
+        lock (drawableLock)
+        {
+            cachedDrawables.Clear();
+            pendingRefreshes.Clear();
+            hasPendingRefreshes = false;
+        }
     }
 
     #endregion
+
+    internal void Register(BmsCachedSkinnableDrawable drawable)
+    {
+        lock (drawableLock)
+            cachedDrawables.Add(drawable);
+    }
+
+    internal void Unregister(BmsCachedSkinnableDrawable drawable)
+    {
+        lock (drawableLock)
+            cachedDrawables.Remove(drawable);
+    }
+
+    internal void RefreshIdleSkins()
+    {
+        if (!hasPendingRefreshes)
+            return;
+
+        var started = Stopwatch.GetTimestamp();
+        while (true)
+        {
+            BmsCachedSkinnableDrawable drawable;
+            lock (drawableLock)
+            {
+                if (!pendingRefreshes.TryDequeue(out drawable!))
+                {
+                    hasPendingRefreshes = false;
+                    return;
+                }
+                hasPendingRefreshes = pendingRefreshes.Count > 0;
+            }
+            drawable.PreparePendingSkin();
+            // SkinReloadableDrawable otherwise waits until first use. A dense burst can then
+            // rebuild thousands of already-preloaded trees in one update. Spread that work out.
+            if (Stopwatch.GetElapsedTime(started).TotalMilliseconds >= 0.5)
+                return;
+        }
+    }
 
     public BmsResolvedDrawableFactory? GetDrawableFactory(BmsSkinComponentLookup lookup)
     {
@@ -87,6 +136,18 @@ internal sealed class BmsGameplaySkinCache : IDisposable
     }
 
     private void clear()
+    {
+        clearResources();
+        lock (drawableLock)
+        {
+            pendingRefreshes.Clear();
+            foreach (var drawable in cachedDrawables)
+                pendingRefreshes.Enqueue(drawable);
+            hasPendingRefreshes = pendingRefreshes.Count > 0;
+        }
+    }
+
+    private void clearResources()
     {
         drawableFactories.Clear();
         noteMetrics.Clear();

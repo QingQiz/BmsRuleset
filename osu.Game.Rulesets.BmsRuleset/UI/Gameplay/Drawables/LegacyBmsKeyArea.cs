@@ -20,6 +20,7 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
 
     private Drawable? upSprite;
     private Drawable? downSprite;
+    private double releaseTime = double.NegativeInfinity;
 
     public LegacyBmsKeyArea(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup)
     {
@@ -71,8 +72,7 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
         if (downSprite == null)
             return false;
 
-        upSprite?.FadeTo(0);
-        downSprite.FadeTo(1);
+        releaseTime = double.PositiveInfinity;
         return false;
     }
 
@@ -81,7 +81,19 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
         if (lookup.ColumnIndex == null || BmsKeyBindingConfiguration.ActionToColumn(e.Action, lookup.LayoutVariant) != lookup.ColumnIndex)
             return;
 
-        upSprite?.Delay(BmsLegacySkinTransformer.HIT_EXPLOSION_FADE_IN_DURATION).FadeTo(1);
-        downSprite?.Delay(BmsLegacySkinTransformer.HIT_EXPLOSION_FADE_IN_DURATION).FadeTo(0);
+        releaseTime = Time.Current;
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+        // Preserve the key-up delay without allocating two transforms for every replay action.
+        if (downSprite == null)
+            return;
+
+        var pressed = Time.Current < releaseTime + BmsLegacySkinTransformer.HIT_EXPLOSION_FADE_IN_DURATION;
+        if (upSprite != null)
+            upSprite.Alpha = pressed ? 0 : 1;
+        downSprite.Alpha = pressed ? 1 : 0;
     }
 }

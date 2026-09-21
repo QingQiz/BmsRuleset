@@ -31,10 +31,14 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
     private FramePacing? previousPacing;
     private FrameworkConfigManager frameworkConfig = null!;
     private Func<bool>? getVerticalSync;
+    private BmsGameplayAudioProbe? audioProbe;
+    private BmsHitExplosionLimitProbe? hitExplosionLimitProbe;
+    private readonly List<object> startupSlowFrames = [];
+    private double startupMaxUpdateMs;
 
     public int ResultCode { get; private set; } = 1;
 
-    private readonly record struct Frame(double ChartMs, double SimulationMs, double UpdateMs, double IntervalMs, double GcPauseMs, long AllocatedBytes, int AliveObjects);
+    private readonly record struct Frame(double ChartMs, double SimulationMs, double UpdateMs, double IntervalMs, double GcPauseMs, long AllocatedBytes, int AliveObjects, bool AudioBlocked, bool AudioPaused);
 
     private readonly record struct FramePacing(bool WindowActive, double UpdateClockHz, bool UpdateThrottling,
                                               double? DrawClockHz, bool? DrawThrottling, bool? RendererVerticalSync);
@@ -75,6 +79,9 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             getVerticalSync = typeof(IRenderer).GetProperty("VerticalSync", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?
                                               .GetGetMethod(true)?.CreateDelegate<Func<bool>>(Host.Renderer);
         configureFramePacing();
+        audioProbe = new BmsGameplayAudioProbe();
+        if (options.HitExplosionLimit > 0)
+            hitExplosionLimitProbe = new BmsHitExplosionLimitProbe(options.HitExplosionLimit, options.HitExplosionPolicy);
         Add(scene = new BmsGameplayDiagnosticScene(options));
     }
 
@@ -112,6 +119,13 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             return updated;
         }
 
+        if (!scene.Ready)
+        {
+            startupMaxUpdateMs = Math.Max(startupMaxUpdateMs, elapsed);
+            if (elapsed > 16.667)
+                startupSlowFrames.Add(new { WallMs = timeout.Elapsed.TotalMilliseconds, scene.ChartTime, scene.SimulationTime, UpdateMs = elapsed, AllocatedBytes = allocated });
+        }
+
         if (!scene.Ready || scene.ChartTime < options.Start * 1000)
             return updated;
 
@@ -126,7 +140,7 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
         initialCollections ??= [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
         if (previousFrame != 0)
             frames.Add(new Frame(scene.ChartTime, scene.SimulationTime, elapsed, Stopwatch.GetElapsedTime(previousFrame, start).TotalMilliseconds,
-                gcPause.TotalMilliseconds, allocated, scene.AliveObjects()));
+                gcPause.TotalMilliseconds, allocated, scene.AliveObjects(), scene.AudioBlocked, scene.AudioPaused));
         previousFrame = start;
 
         if (scene.ChartTime >= nextSnapshot)
@@ -161,9 +175,9 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             Directory.CreateDirectory(options.Output);
             using (var writer = new StreamWriter(Path.Combine(options.Output, "frames.csv")))
             {
-                writer.WriteLine("chart_ms,simulation_ms,update_ms,interval_ms,gc_pause_ms,allocated_bytes,alive_objects");
+                writer.WriteLine("chart_ms,simulation_ms,update_ms,interval_ms,gc_pause_ms,allocated_bytes,alive_objects,audio_blocked,audio_paused");
                 foreach (var frame in frames)
-                    writer.WriteLine(FormattableString.Invariant($"{frame.ChartMs:F3},{frame.SimulationMs:F3},{frame.UpdateMs:F6},{frame.IntervalMs:F6},{frame.GcPauseMs:F6},{frame.AllocatedBytes},{frame.AliveObjects}"));
+                    writer.WriteLine(FormattableString.Invariant($"{frame.ChartMs:F3},{frame.SimulationMs:F3},{frame.UpdateMs:F6},{frame.IntervalMs:F6},{frame.GcPauseMs:F6},{frame.AllocatedBytes},{frame.AliveObjects},{frame.AudioBlocked},{frame.AudioPaused}"));
             }
 
             var report = new
@@ -191,6 +205,10 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
                 Measurement = "Whole game UpdateSubTree CPU wall time; excludes draw-node generation, GPU work and throttle. Interval includes pacing. Headless skips GPU rendering. Seek simulation completes before two seconds of playback warmup.",
                 LoadMs = scene?.LoadMilliseconds,
                 SeekMs = scene?.SeekMilliseconds,
+                StartupMaxUpdateMs = startupMaxUpdateMs,
+                StartupSlowFrames = startupSlowFrames,
+                Audio = audioProbe?.Snapshot(),
+                HitExplosionExperiment = hitExplosionLimitProbe?.Snapshot(),
                 Chart = scene?.Chart == null ? null : scene.DescribeChart(),
                 Summary = summarise(frames),
                 AliveSnapshots = aliveSnapshots,
@@ -205,6 +223,13 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
         {
             Exit();
         }
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        base.Dispose(isDisposing);
+        audioProbe?.Dispose();
+        hitExplosionLimitProbe?.Dispose();
     }
 
     private static object summarise(IReadOnlyCollection<Frame> source)
@@ -234,6 +259,10 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             GcPauseDuringUpdatesMs = source.Sum(f => f.GcPauseMs),
             PeakAliveObjects = source.Count == 0 ? 0 : source.Max(f => f.AliveObjects),
             MaxSimulationLagMs = source.Count == 0 ? 0 : source.Max(f => f.ChartMs - f.SimulationMs),
+            AudioBlockedFrames = source.Count(f => f.AudioBlocked),
+            AudioBlockedMs = source.Where(f => f.AudioBlocked).Sum(f => f.IntervalMs),
+            AudioPausedFrames = source.Count(f => f.AudioPaused),
+            AudioPausedMs = source.Where(f => f.AudioPaused).Sum(f => f.IntervalMs),
         };
     }
 

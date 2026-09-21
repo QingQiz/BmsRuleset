@@ -12,7 +12,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 internal sealed class BmsHitObjectLifetimeEntry(
     HitObject hitObject,
     BmsGameplayScrollController scrollController,
-    Func<double> getVisualOffset)
+    Func<double> getVisualOffset,
+    double activationLeadTime = 0)
     : HitObjectLifetimeEntry(hitObject)
 {
 
@@ -85,7 +86,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
         var futureLifetime = computeFutureLifetime(hitObject);
         var pastLifetime = computePastLifetime();
         var slowWindow = getSlowWindow(hitObject);
-        var baseLifetimeStart = hitObject.StartTime - futureLifetime;
+        var baseLifetimeStart = hitObject.StartTime - futureLifetime - activationLeadTime;
         lifetimeStartWithoutVisualOffset = baseLifetimeStart;
         var lifetimeStart = computeLifetimeStartWithVisualOffset(baseLifetimeStart);
 
@@ -202,6 +203,11 @@ internal sealed class BmsHitObjectLifetimeEntry(
         // keeps the search bounded when a stationary timing segment remains visible indefinitely.
         var earliestSearchTime = Math.Min(0, hitObject.StartTime
                                              - BmsGameplayScrollController.MAX_TIME_RANGE * currentScrollRangeScale() * scrollController.PlaybackRate);
+
+        if (scrollController.HasMonotonicVisibility)
+            return isVisibleAt(hitObject, timingMap, earliestSearchTime)
+                ? earliestSearchTime
+                : refineVisibleWindowStart(hitObject, timingMap, earliestSearchTime, hitObject.StartTime);
 
         for (var probeTime = hitObject.StartTime; probeTime > earliestSearchTime;)
         {

@@ -34,6 +34,11 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
     private long seekTimestamp;
     private long playbackTimestamp;
     private double seekTime;
+    private Func<bool>? readAudioBlocked;
+    private Func<bool>? readAudioPaused;
+
+    public bool AudioBlocked => readAudioBlocked?.Invoke() ?? true;
+    public bool AudioPaused => readAudioPaused?.Invoke() ?? true;
 
     public bool Ready => playbackStarted && Stopwatch.GetElapsedTime(playbackTimestamp).TotalSeconds >= 2;
 
@@ -115,6 +120,8 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         // Conversion mods replace object identities. Reports and completeness checks must use
         // the same playable objects as the replay and score processor, including IN-generated LNs.
         Chart = (BmsBeatmap)Player.GameplayState.Beatmap;
+        readAudioBlocked = BmsAudioTestAccess.CreatePlaybackBlockedReader(((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback);
+        readAudioPaused = BmsAudioTestAccess.CreatePlaybackBlockedReader(((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback, voicesPaused: true);
         LoadMilliseconds = loading.Elapsed.TotalMilliseconds;
         seekTime = Math.Max(0, options.Start * 1000 - 2000);
         Player.GameplayClockContainer.Stop();

@@ -1,3 +1,4 @@
+using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Pooling;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
@@ -17,6 +18,7 @@ public sealed partial class BmsHitExplosion : PoolableDrawable
     public BmsHitExplosion(BmsSkinComponentLookup lookup, float positionOffset = 0)
     {
         RelativeSizeAxes = Axes.Both;
+        AlwaysPresent = true;
         ApplyPositionOffset(positionOffset);
 
         InternalChild = skinnableExplosion = new BmsCachedSkinnableDrawable(lookup)
@@ -31,11 +33,18 @@ public sealed partial class BmsHitExplosion : PoolableDrawable
     protected override void PrepareForUse()
     {
         base.PrepareForUse();
-
         ClearTransforms();
         skinnableExplosion.ResetAnimation();
         LifetimeStart = Time.Current;
-        this.FadeInFromZero(80).Then().FadeOut(120).Expire();
+        LifetimeEnd = Time.Current + 200;
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+        // Keep each overlapping pulse's original envelope without allocating fade transforms.
+        var elapsed = Time.Current - LifetimeStart;
+        Alpha = (float)Math.Clamp(elapsed < 80 ? elapsed / 80 : (200 - elapsed) / 120, 0, 1);
     }
 
     protected override void FreeAfterUse()

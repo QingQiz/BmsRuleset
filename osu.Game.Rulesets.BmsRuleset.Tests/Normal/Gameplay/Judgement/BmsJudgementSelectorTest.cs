@@ -1,16 +1,41 @@
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
 [TestFixture]
 public class BmsJudgementSelectorTest
 {
+    private static int tableQueries;
+
+    [TestCase(BmsJudgementAlgorithm.Combo)]
+    [TestCase(BmsJudgementAlgorithm.Duration)]
+    [TestCase(BmsJudgementAlgorithm.Lowest)]
+    [TestCase(BmsJudgementAlgorithm.Score)]
+    [TestCase(null)]
+    [NonParallelizable]
+    public void ExactPerfectDoesNotInspectEveryFutureCandidate(BmsJudgementAlgorithm? algorithm)
+    {
+        using var probe = new ScopedMethodProbe(typeof(BmsJudgementProfileProvider).GetMethod("getTable", BindingFlags.NonPublic | BindingFlags.Static),
+            typeof(BmsJudgementSelectorTest).GetMethod(nameof(countTableQuery), BindingFlags.NonPublic | BindingFlags.Static));
+        var candidates = Enumerable.Range(0, 1000).Select(i => note(1000 + i * 0.0001)).Reverse().ToArray();
+        tableQueries = 0;
+        var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, candidates, 1000, algorithm);
+        Assert.That(selection.Candidate?.StartTime, Is.EqualTo(1000));
+        Assert.That(selection.Result, Is.EqualTo(HitResult.Perfect));
+        Assert.That(tableQueries, Is.LessThan(10));
+    }
+
+    private static void countTableQuery() => tableQueries++;
+
     private static double rankRate(int rank) => BmsJudgementProfileProvider.RateForRank(rank);
 
     [TestCase(BmsJudgementAlgorithm.Combo, 1000, HitResult.Good)]

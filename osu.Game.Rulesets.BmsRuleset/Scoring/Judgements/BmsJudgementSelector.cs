@@ -81,6 +81,11 @@ public static class BmsJudgementSelector
                     selectedTable = table;
                 }
 
+                // No later candidate can replace an exact-time Perfect under any selector.
+                // This matters for bursts with thousands of future notes inside the hit window.
+                if (selectedResult == HitResult.Perfect && selected?.StartTime == inputTime)
+                    break;
+
                 continue;
             }
 

@@ -61,6 +61,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         TotalColumns = Math.Max(1, beatmap.TotalColumns);
         InitialPoolSizes = BmsHitObjectPoolPlan.Create(beatmap.HitObjects, TotalColumns);
+        InitialHitExplosionSizes = BmsHitObjectPoolPlan.CreateHitExplosionSizes(beatmap.HitObjects, TotalColumns);
         LayoutVariant = beatmap.LayoutVariant;
         TimingMap = beatmap.TimingMap;
         ScrollController = new BmsGameplayScrollController(TimingMap);
@@ -140,6 +141,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     public int TotalColumns { get; }
 
     internal BmsHitObjectPoolPlan.ColumnSizes[] InitialPoolSizes { get; }
+
+    internal int[] InitialHitExplosionSizes { get; }
 
     public BmsLayoutVariant LayoutVariant { get; }
 
@@ -292,6 +295,49 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     #endregion
 
     #region Lifecycle
+
+    private bool visualUpdatePending;
+
+    internal void BeginGameplayFrame()
+    {
+        skinCache.RefreshIdleSkins();
+        visualUpdatePending = false;
+        foreach (var column in Stage.Columns)
+            ((BmsColumnHitObjectContainer)column.HitObjectContainer).BeginGameplayFrame();
+    }
+
+    internal void EndGameplayFrame()
+    {
+        foreach (var column in Stage.Columns)
+            ((BmsColumnHitObjectContainer)column.HitObjectContainer).EndGameplayFrame(!visualUpdatePending);
+        if (visualUpdatePending)
+            base.UpdateSubTree();
+        visualUpdatePending = false;
+    }
+
+    public override bool UpdateSubTreeMasking()
+    {
+        // Frame stability requests masking after every replay input. While visual traversal is
+        // deferred, the final game-frame pass will mask the complete, current set of pulses.
+        return !visualUpdatePending && base.UpdateSubTreeMasking();
+    }
+
+    public override bool UpdateSubTree()
+    {
+        var canDefer = IsLoaded;
+        foreach (var column in Stage.Columns)
+            canDefer &= ((BmsColumnHitObjectContainer)column.HitObjectContainer).CanDeferUpdate;
+        if (canDefer)
+        {
+            // Input is dispatched by our parent before this traversal. When all lanes are idle
+            // taps, defer the stage/skin work too, then refresh at the final simulation timestamp.
+            visualUpdatePending = true;
+            return true;
+        }
+
+        visualUpdatePending = false;
+        return base.UpdateSubTree();
+    }
 
     private double resumeRewindInitialVisualOffset;
 

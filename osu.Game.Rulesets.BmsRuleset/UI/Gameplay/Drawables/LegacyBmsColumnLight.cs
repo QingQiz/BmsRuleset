@@ -1,3 +1,4 @@
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -25,6 +26,10 @@ internal sealed partial class LegacyBmsColumnLight : CompositeDrawable, IKeyBind
     private readonly float lightPosition;
 
     private Drawable? light;
+    private double releaseTime = double.NegativeInfinity;
+    private float releaseStrength;
+
+    private float currentStrength => (float)(releaseStrength * (1 - Math.Clamp((Time.Current - releaseTime) / 250, 0, 1)));
 
     [Resolved(CanBeNull = true)]
     private BmsPlayfield? playfield { get; set; }
@@ -86,8 +91,8 @@ internal sealed partial class LegacyBmsColumnLight : CompositeDrawable, IKeyBind
         if (lookup.ColumnIndex == null || BmsKeyBindingConfiguration.ActionToColumn(e.Action, lookup.LayoutVariant) != lookup.ColumnIndex)
             return false;
 
-        light?.FadeIn();
-        light?.ScaleTo(Vector2.One);
+        releaseTime = double.PositiveInfinity;
+        releaseStrength = 1;
         return false;
     }
 
@@ -96,7 +101,18 @@ internal sealed partial class LegacyBmsColumnLight : CompositeDrawable, IKeyBind
         if (lookup.ColumnIndex == null || BmsKeyBindingConfiguration.ActionToColumn(e.Action, lookup.LayoutVariant) != lookup.ColumnIndex)
             return;
 
-        light?.FadeTo(0, 250);
-        light?.ScaleTo(new Vector2(1, 0), 250);
+        releaseStrength = currentStrength;
+        releaseTime = Time.Current;
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+        if (light == null)
+            return;
+
+        // Only the final input state is drawn; interpolation keeps the original 250 ms release.
+        light.Alpha = currentStrength;
+        light.Scale = new Vector2(1, currentStrength);
     }
 }

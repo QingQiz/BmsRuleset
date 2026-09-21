@@ -118,6 +118,112 @@ public class BmsPcmMaintenanceTest
         return controller;
     }
 
+    [Test]
+    public void LiveBatchCoalescesRetriggersBeforeAllocatingMixerCommands()
+    {
+        using var controller = CreateController(1);
+        Field<Dictionary<ushort, string>>(controller, "resolvedResources")[0] = "sample";
+        var mixer = Field<BmsPcmVoiceMixer>(controller, "mixer");
+        var output = new float[2];
+        controller.QueueLivePlay(0, 100);
+        controller.SubmitLivePlayBatch();
+        mixer.Render(output);
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1000; i++)
+            controller.QueueLivePlay(0, i == 999 ? 0 : 100);
+        controller.SubmitLivePlayBatch();
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        mixer.Render(output);
+        Assert.That(output[0], Is.Zero, "The final retrigger's volume wins at the shared output frame.");
+        Assert.That(allocated, Is.LessThan(32_000));
+    }
+
+    [Test]
+    public void CatchUpSustainsExistingAudioButPauseAndSeekStillStopIt()
+    {
+        using var controller = CreateController(1);
+        Field<Dictionary<ushort, string>>(controller, "resolvedResources")[0] = "sample";
+        var leases = Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        leases[0].Dispose();
+        leases[0] = new BmsPcmAssetLease(BmsPcmTestHelpers.CreateAsset([new BmsPcmChunk(0, 8, Enumerable.Repeat(0.1f, 16).ToArray())]), Task.CompletedTask, () => { });
+        var mixer = Field<BmsPcmVoiceMixer>(controller, "mixer");
+        var output = new float[2];
+        controller.Play(0, 100, 0);
+        mixer.Render(output);
+        Assert.That(output[0], Is.GreaterThan(0));
+
+        controller.SetPlaybackBlocked(true, keepExistingVoices: true);
+        controller.QueueLivePlay(0, 100);
+        controller.SubmitLivePlayBatch();
+        Assert.That(Field<IList>(controller, "livePlays"), Is.Empty);
+        mixer.Render(output);
+        Assert.That(output[0], Is.GreaterThan(0), "Catch-up suppresses stale triggers without cutting existing audio.");
+
+        controller.SetPlaybackBlocked(true);
+        mixer.Render(output);
+        Assert.That(output[0], Is.Zero, "A user pause during catch-up still pauses the mixer.");
+        controller.SetPlaybackBlocked(true, keepExistingVoices: true);
+        mixer.Render(output);
+        Assert.That(output[0], Is.GreaterThan(0));
+        controller.StopAll();
+        BmsPcmTestHelpers.RenderFrames(mixer, 256);
+        mixer.Render(output);
+        Assert.That(output[0], Is.Zero, "A seek still replaces all old voices.");
+    }
+
+    [Test]
+    public void DeferredLivePlaySurvivesPreparationCompletingDuringPause()
+    {
+        using var controller = CreateController(1);
+        Field<Dictionary<ushort, string>>(controller, "resolvedResources")[0] = "sample";
+        var leases = Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        leases[0].Dispose();
+        var asset = new BmsPcmAsset(44100, 2);
+        leases[0] = new BmsPcmAssetLease(asset, Task.CompletedTask, () => { });
+        controller.QueueLivePlay(0, 100);
+        controller.SubmitLivePlayBatch();
+        controller.SetPlaybackBlocked(true);
+        asset.Publish(new BmsPcmChunk(0, 1, [0.1f, 0.1f]));
+        asset.Complete(1);
+        controller.Update(0);
+        var mixer = Field<BmsPcmVoiceMixer>(controller, "mixer");
+        var output = new float[2];
+        mixer.Render(output);
+        Assert.That(output[0], Is.Zero);
+        controller.SetPlaybackBlocked(false);
+        controller.Update(0);
+        mixer.Render(output);
+        Assert.That(output[0], Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void LiveChordWaitsForPreparingAssetsInsteadOfLosingThem()
+    {
+        using var controller = CreateController(2);
+        var resources = Field<Dictionary<ushort, string>>(controller, "resolvedResources");
+        var leases = Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        for (ushort key = 0; key < 2; key++)
+        {
+            resources[key] = key.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            leases[key].Dispose();
+            leases[key] = new BmsPcmAssetLease(new BmsPcmAsset(44100, 2), Task.CompletedTask, () => { });
+            controller.QueueLivePlay(key, 100);
+        }
+
+        controller.SubmitLivePlayBatch();
+        foreach (var lease in leases.Values)
+        {
+            lease.Asset.Publish(new BmsPcmChunk(0, 1, [0.1f, 0.1f]));
+            lease.Asset.Complete(1);
+        }
+
+        controller.Update(0);
+        controller.SubmitLivePlayBatch();
+        var output = new float[2];
+        Field<BmsPcmVoiceMixer>(controller, "mixer").Render(output);
+        Assert.That(output[0], Is.GreaterThan(0), "Decoder contention must not permanently discard a live chord.");
+    }
+
     internal static (BmsPcmAssetCache Cache, BmsPcmAssetLease[] Leases) CreatePinnedCache(int count)
     {
         var cache = new BmsPcmAssetCache((_, _) => throw new InvalidOperationException("Unexpected resource load"), 1);

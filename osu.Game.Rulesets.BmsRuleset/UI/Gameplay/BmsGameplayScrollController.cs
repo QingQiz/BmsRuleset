@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
@@ -10,6 +11,14 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
     public const double MAX_TIME_RANGE = 11485;
 
     public BmsTimingMap? TimingMap { get; } = timingMap;
+
+    // With forward-only scroll and a fixed SPEED, visibility has a single boundary. STOPs and
+    // positive BPM/SCROLL changes preserve that ordering, so searching all earlier times is wasteful.
+    internal bool HasMonotonicVisibility { get; } =
+        timingMap != null
+        && timingMap.SpeedEvents.Count == 0
+        && timingMap.BpmEvents.All(e => double.IsFinite(e.Bpm) && e.Bpm > 0)
+        && timingMap.ScrollEvents.All(e => double.IsFinite(e.Factor) && e.Factor >= 0);
 
     public double ScrollRange => ComputeScrollTime(default_scroll_speed) * ScrollRangeScale * PlaybackRate;
 

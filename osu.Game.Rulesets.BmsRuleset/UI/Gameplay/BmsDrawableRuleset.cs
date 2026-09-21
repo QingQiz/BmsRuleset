@@ -178,11 +178,16 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         base.Update();
 
         audioController.Update();
+        samplePlayback.BeginGameplayFrame();
+        ((BmsPlayfield)Playfield).BeginGameplayFrame();
     }
 
     protected override void UpdateAfterChildren()
     {
         base.UpdateAfterChildren();
+
+        ((BmsPlayfield)Playfield).EndGameplayFrame();
+        samplePlayback.EndGameplayFrame();
 
         // Columns receive input independently while the playfield updates. Submitting here preserves
         // one mixer target for every keysound produced by the same ruleset update.

@@ -84,6 +84,10 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     private double fastPoorDisplayOffset;
     private double slowPoorDisplayOffset;
     private double floatingAverage;
+    private readonly (double Offset, HitResult Result)[] pendingJudgements = new (double, HitResult)[max_concurrent_judgements];
+    private int pendingJudgementCount;
+    private int nextPendingJudgement;
+    private bool averageUpdatePending;
     private BmsScoreProcessor? scoreProcessor;
 
     private SpriteIcon arrow = null!;
@@ -221,6 +225,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     {
         base.Update();
         rotatedContent.Size = new Vector2(Height, Width);
+        flushPendingJudgements();
     }
 
     protected override void LoadComplete()
@@ -425,8 +430,37 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     private void addJudgement(double timeOffset, HitResult result, bool affectMovingAverage)
     {
-        const int arrow_move_duration = 800;
+        // Only the last fifty markers survive a HUD frame, but every observation still
+        // contributes to the moving average and remains in the score's timing history.
+        pendingJudgements[nextPendingJudgement] = (timeOffset, result);
+        nextPendingJudgement = (nextPendingJudgement + 1) % max_concurrent_judgements;
+        pendingJudgementCount = Math.Min(max_concurrent_judgements, pendingJudgementCount + 1);
+        if (affectMovingAverage)
+        {
+            floatingAverage = floatingAverage * 0.9 + timeOffset * 0.1;
+            averageUpdatePending = true;
+        }
+    }
 
+    private void flushPendingJudgements()
+    {
+        var first = (nextPendingJudgement - pendingJudgementCount + max_concurrent_judgements) % max_concurrent_judgements;
+        for (var i = 0; i < pendingJudgementCount; i++)
+        {
+            var pending = pendingJudgements[(first + i) % max_concurrent_judgements];
+            displayJudgement(pending.Offset, pending.Result);
+        }
+
+        pendingJudgementCount = 0;
+        if (averageUpdatePending)
+        {
+            averageUpdatePending = false;
+            arrow.MoveToY(domain.RelativePosition(floatingAverage), 800, Easing.OutQuint);
+        }
+    }
+
+    private void displayJudgement(double timeOffset, HitResult result)
+    {
         if (judgementsContainer.Count >= max_concurrent_judgements)
         {
             var old = judgementsContainer.FirstOrDefault();
@@ -445,11 +479,6 @@ public partial class BmsHitErrorMeter : HitErrorMeter
             judgementsContainer.Add(drawableJudgement);
         });
 
-        if (affectMovingAverage)
-        {
-            floatingAverage = floatingAverage * 0.9 + timeOffset * 0.1;
-            arrow.MoveToY(domain.RelativePosition(floatingAverage), arrow_move_duration, Easing.OutQuint);
-        }
     }
 
     internal static IReadOnlyList<BmsHitErrorTimingObservation> GetTimingObservations(JudgementResult judgement)
@@ -498,6 +527,8 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     public override void Clear()
     {
+        pendingJudgementCount = 0;
+        averageUpdatePending = false;
         foreach (var judgement in judgementsContainer)
         {
             judgement.ClearTransforms();

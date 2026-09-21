@@ -70,6 +70,20 @@ public class BmsGameplayDiagnosticOptionsTest
         Assert.That(limited.DrawHz, Is.EqualTo(240));
     }
 
+    [Test]
+    public void HitExplosionLimitIsExplicitAndDefaultsToUnlimited()
+    {
+        Assert.That(BmsGameplayDiagnosticOptions.Parse(required).HitExplosionLimit, Is.Zero);
+        Assert.That(BmsGameplayDiagnosticOptions.Parse([.. required, "--hit-explosion-limit", "64"]).HitExplosionLimit, Is.EqualTo(64));
+        Assert.That(BmsGameplayDiagnosticOptions.Parse([.. required, "--hit-explosion-limit", "0"]).HitExplosionLimit, Is.Zero);
+        Assert.That(BmsGameplayDiagnosticOptions.Parse([.. required, "--hit-explosion-limit", "64", "--hit-explosion-policy", "ReplaceOldest"]).HitExplosionPolicy,
+            Is.EqualTo(BmsHitExplosionOverflowPolicy.ReplaceOldest));
+    }
+
+    [TestCase("--hit-explosion-limit", "-1")]
+    [TestCase("--hit-explosion-limit", "257")]
+    [TestCase("--hit-explosion-limit", "1.5")]
+    [TestCase("--hit-explosion-policy", "missing")]
     [TestCase("--duration", "NaN")]
     [TestCase("--start", "-1")]
     [TestCase("--duration", "2")]

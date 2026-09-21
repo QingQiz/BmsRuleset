@@ -51,7 +51,9 @@ public sealed partial class BmsComboCounter : BmsHudComponent
     private const double fade_out_duration = 100;
     private const double rolling_duration = 20;
 
-    private int previousValue;
+    private bool countUpdatePending;
+    private bool countIncrementPending;
+    private int? pendingBrokenCombo;
 
     private bool autoHidden;
     private ScheduledDelegate? autoHideTask;
@@ -69,7 +71,13 @@ public sealed partial class BmsComboCounter : BmsHudComponent
         displayedCountText.Text = Current.Value.ToString(CultureInfo.InvariantCulture);
         popOutCountText.Text = Current.Value.ToString(CultureInfo.InvariantCulture);
 
-        Current.BindValueChanged(combo => updateCount(combo.NewValue == 0), true);
+        Current.BindValueChanged(combo =>
+        {
+            countUpdatePending = true;
+            countIncrementPending = combo.NewValue == combo.OldValue + 1;
+            if (combo.NewValue == 0 && combo.OldValue > 0)
+                pendingBrokenCombo = combo.OldValue;
+        }, true);
 
         counterContainer.Size = displayedCountText.Size;
     }
@@ -123,9 +131,6 @@ public sealed partial class BmsComboCounter : BmsHudComponent
 
     private void updateCount(bool rolling)
     {
-        var prev = previousValue;
-        previousValue = Current.Value;
-
         if (!IsLoaded)
             return;
 
@@ -133,7 +138,7 @@ public sealed partial class BmsComboCounter : BmsHudComponent
         {
             FinishTransforms(false, nameof(DisplayedCount));
 
-            if (prev + 1 == Current.Value)
+            if (countIncrementPending)
                 onCountIncrement();
             else
                 onCountChange();
@@ -142,6 +147,28 @@ public sealed partial class BmsComboCounter : BmsHudComponent
             onCountRolling();
 
         scheduleAutoHide();
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+        if (!countUpdatePending)
+            return;
+
+        // Thousands of replay judgements may land before the next HUD frame. Building glyphs
+        // and scheduling pop/auto-hide transforms for intermediate counts cannot be seen.
+        countUpdatePending = false;
+        if (pendingBrokenCombo is { } brokenCombo)
+        {
+            // A break's red flash survives later hits in the same frame. The final transition
+            // also distinguishes a real +1 from a restored count after seeking.
+            if (Current.Value == 0)
+                DisplayedCount = brokenCombo;
+            else
+                displayedCountText.FlashColour(breakColour, 2000, Easing.OutQuint);
+            pendingBrokenCombo = null;
+        }
+        updateCount(Current.Value == 0);
     }
 
     private void scheduleAutoHide()
