@@ -80,6 +80,43 @@ internal partial class BmsBeatmapCarousel : BeatmapCarousel
     protected override bool HandleItemsChanged(NotifyCollectionChangedEventArgs args) =>
         replacingUnavailableEntries || base.HandleItemsChanged(args);
 
+    internal bool TryQueueMetadataUpdate(NotifyCollectionChangedEventArgs change)
+    {
+        if (change.Action != NotifyCollectionChangedAction.Replace
+            || change.OldItems is not { Count: 1 } || change.NewItems is not { Count: 1 }
+            || change.OldItems[0] is not BeatmapSetInfo previous || change.NewItems[0] is not BeatmapSetInfo updated
+            || previous.ID != updated.ID || previous.Beatmaps.Count != updated.Beatmaps.Count)
+            return false;
+
+        var replacements = updated.Beatmaps.ToDictionary(beatmap => beatmap.ID);
+        if (previous.Beatmaps.Any(beatmap => !replacements.ContainsKey(beatmap.ID)))
+            return false;
+
+        // LastPlayed notifications wait here throughout gameplay. The upstream handler scans
+        // and shifts the entire library for each difficulty, then queries Realm on the first resumed frame.
+        Schedule(() =>
+        {
+            if (IsDisposed)
+                return;
+
+            var selected = CurrentBeatmap;
+            for (var i = 0; i < Items.Count; i++)
+            {
+                if (replacements.TryGetValue(Items[i].ID, out var replacement))
+                    Items[i] = replacement;
+            }
+
+            // Playback history needs carousel sorting updates, but must not queue a new selection
+            // or cancel the fresh metadata query that song select already starts on resume.
+            if (selected != null && replacements.TryGetValue(selected.ID, out var refreshed)
+                                 && (selected.Hash != refreshed.Hash
+                                     || selected.DifficultyName != refreshed.DifficultyName
+                                     || selected.Hidden != refreshed.Hidden))
+                BeatmapMetadataUpdated?.Invoke(refreshed);
+        });
+        return true;
+    }
+
     internal BeatmapInfo[] IncludeUnavailableEntries(BeatmapInfo[] charts)
     {
         var previous = unavailableSets.SelectMany(set => set.Beatmaps).ToDictionary(chart => chart.MD5Hash, StringComparer.OrdinalIgnoreCase);

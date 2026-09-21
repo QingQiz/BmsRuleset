@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -164,11 +165,11 @@ internal static class BmsBeatmapNotificationPatcher
         stores.Remove(__instance);
     }
 
-    private static bool carouselChangedPrefix(BeatmapCarousel __instance, object? beatmaps)
+    private static bool carouselChangedPrefix(BeatmapCarousel __instance, object? beatmaps, NotifyCollectionChangedEventArgs changed)
     {
         var state = carousels.GetOrCreateValue(__instance);
         if (!publishingSnapshot && state.Snapshot == null)
-            return true;
+            return __instance is not BmsBeatmapCarousel bms || !bms.TryQueueMetadataUpdate(changed);
 
         if (beatmaps is not IEnumerable<BeatmapSetInfo> sets)
             return true;

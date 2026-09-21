@@ -13,20 +13,84 @@ using NUnit.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Screens;
+using osu.Framework.Statistics;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.IO.Import;
 using osu.Game.Rulesets.BmsRuleset.Database;
 using osu.Game.Screens.Select;
+using osu.Game.Screens.Select.Filter;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 public partial class TestSceneBmsSongSelectLampHack
 {
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestResumeAppliesPlayedMetadataWithoutUpdateThreadQueries(bool sortByLastPlayed)
+    {
+        ControlledSongSelect controlled = null!;
+        BeatmapInfo selected = null!;
+        var playedAt = DateTimeOffset.UtcNow;
+        BindableList<BeatmapInfo> items = null!;
+        var applied = false;
+        var readsAtResume = 0;
+        var readsAtReplacement = 0;
+
+        importLampBeatmapSet();
+        if (sortByLastPlayed)
+        {
+            AddStep("group and sort by last played", () =>
+            {
+                // Grouping by sets orders their difficulties separately from the set's last-played time.
+                config.SetValue(OsuSetting.SongSelectSortingMode, SortMode.LastPlayed);
+                config.SetValue(OsuSetting.SongSelectGroupMode, GroupMode.LastPlayed);
+            });
+        }
+
+        loadSongSelect(() => controlled = new ControlledSongSelect());
+        AddStep("suspend before recording gameplay", () =>
+        {
+            selected = controlled.Beatmap.Value.BeatmapInfo;
+            items = (BindableList<BeatmapInfo>)carousel_items_field.GetValue(carousel)!;
+            items.CollectionChanged += (_, change) =>
+            {
+                if (change.NewItems?.OfType<BeatmapInfo>().Any(beatmap => beatmap.ID == selected.ID && beatmap.LastPlayed == playedAt) != true)
+                    return;
+
+                applied = true;
+                readsAtReplacement = GlobalStatistics.Get<int>("Realm", "Reads (Update)").Value;
+            };
+            controlled.Push(new ResumeTestScreen());
+        });
+        AddUntilStep("child loaded", () => Stack.CurrentScreen is ResumeTestScreen { IsLoaded: true });
+        AddStep("record last played", () => Realm.Write(r => r.Find<BeatmapInfo>(selected.ID)!.LastPlayed = playedAt));
+        AddUntilStep("detached store has playback history", () => beatmapStore.GetBeatmapSets(null)
+            .SelectMany(set => set.Beatmaps).Any(beatmap => beatmap.ID == selected.ID && beatmap.LastPlayed == playedAt));
+        AddStep("resume with validation held pending", () =>
+        {
+            controlled.DelayLoads = true;
+            Stack.Exit();
+            readsAtResume = GlobalStatistics.Get<int>("Realm", "Reads (Update)").Value;
+        });
+        AddUntilStep("carousel receives playback history", () => applied);
+        AddAssert("notification does not query Realm on update thread", () => readsAtReplacement, () => Is.EqualTo(readsAtResume));
+        AddAssert("resume validation is still pending", () => controlled.Requests.Count == 1 && !controlled.Requests[0].Token.IsCancellationRequested);
+        AddStep("finish resume validation", () => controlled.Requests[0].Completion.SetResult(beatmaps.GetWorkingBeatmap(selected, true)));
+        AddUntilStep("refreshed selection receives playback history", () => controlled.Beatmap.Value.BeatmapInfo.LastPlayed == playedAt);
+        AddUntilStep("carousel has settled", () => !controlled.IsFiltering);
+        AddAssert("selected chart retained", () => carousel.CurrentBeatmap?.ID, () => Is.EqualTo(selected.ID));
+        if (sortByLastPlayed)
+            AddAssert("played chart sorts first", () => carousel.GetCarouselItems()!.Select(item => item.Model).OfType<GroupedBeatmap>().First().Beatmap.ID,
+                () => Is.EqualTo(selected.ID));
+    }
+
     private const int storm_charts_per_set = 3;
 
     // A final snapshot may require a clear and an add; its notification count must not grow with the library.
@@ -325,8 +389,8 @@ public partial class TestSceneBmsSongSelectLampHack
         AddStep("select a chart from the removable set", () =>
         {
             var chart = Realm.Run(r => r.All<BeatmapInfo>().AsEnumerable()
-                                            .First(b => b.Metadata.Source.StartsWith(directory, StringComparison.Ordinal) && !b.BeatmapSet!.DeletePending)
-                                            .Detach());
+                .First(b => b.Metadata.Source.StartsWith(directory, StringComparison.Ordinal) && !b.BeatmapSet!.DeletePending)
+                .Detach());
             selectedId = chart.ID;
             selectedSetId = chart.BeatmapSet!.ID;
             songSelect.ScopeToBeatmapSet(chart.BeatmapSet);
@@ -394,7 +458,7 @@ public partial class TestSceneBmsSongSelectLampHack
             songSelect.LoadBeatmapSelection(beatmaps.GetWorkingBeatmap(songSelect.Beatmap.Value.BeatmapInfo, true).BeatmapInfo);
         });
         AddUntilStep("selection metadata ready", () => songSelect.Beatmap.Value.BeatmapInfo.ID == selected
-                                                        && (songSelect.Beatmap.Value.BeatmapInfo.OnlineID > 0) == online && !songSelect.IsFiltering);
+                                                       && (songSelect.Beatmap.Value.BeatmapInfo.OnlineID > 0) == online && !songSelect.IsFiltering);
         AddStep("replace selected chart with a new local GUID", () =>
         {
             using var bulk = BmsBulkBeatmapUpdate.Begin(Realm);
