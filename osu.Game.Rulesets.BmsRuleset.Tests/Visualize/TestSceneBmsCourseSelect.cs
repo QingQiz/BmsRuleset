@@ -1,20 +1,21 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
-using osu.Framework.Statistics;
 using osu.Framework.Testing;
-using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Configuration;
@@ -61,7 +62,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
     private static int nextTestId;
 
     private RealmRulesetStore rulesets = null!;
-    private BeatmapManager beatmaps = null!;
+    private TestBeatmapManager beatmaps = null!;
     private ScoreManager scoreManager = null!;
     private RealmDetachedBeatmapStore beatmapStore = null!;
     private OsuConfigManager config = null!;
@@ -112,7 +113,7 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
 
         dependencies.Cache(rulesets = new RealmRulesetStore(Realm));
         dependencies.Cache(Realm);
-        dependencies.Cache(beatmaps = new BeatmapManager(LocalStorage, Realm, null, Dependencies.Get<AudioManager>(), Resources, Dependencies.Get<GameHost>(), Beatmap.Default));
+        dependencies.CacheAs<BeatmapManager>(beatmaps = new TestBeatmapManager(LocalStorage, Realm, Dependencies.Get<AudioManager>(), Resources, Dependencies.Get<GameHost>(), Beatmap.Default));
         dependencies.Cache(config = new OsuConfigManager(LocalStorage));
         dependencies.Cache(scoreManager = new ScoreManager(rulesets, () => beatmaps, LocalStorage, Realm, API, config));
         dependencies.CacheAs<BeatmapStore>(beatmapStore = new RealmDetachedBeatmapStore());
@@ -610,9 +611,9 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddStep("select user mod", () => normalSongSelect.Mods.Value = [new BmsModDoubleTime()]);
         AddStep("switch to course mode", () => controller.ToggleMode());
         AddUntilStep("course song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
-                                                         && current != normalSongSelect
-                                                         && current.IsLoaded
-                                                         && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == true);
+                                                        && current != normalSongSelect
+                                                        && current.IsLoaded
+                                                        && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == true);
         AddStep("capture course song select", () => songSelect = courseSongSelect = (BmsSoloSongSelect)Stack.CurrentScreen);
         AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
                                                        && !controller.CourseCarousel.IsFiltering);
@@ -621,16 +622,16 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("non-first course selected", () => controller.SelectedCourse?.Id, () => Is.EqualTo("stella-1"));
         AddStep("return with escape", () => InputManager.Key(Key.Escape));
         AddUntilStep("fresh normal song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
-                                                                && current != courseSongSelect
-                                                                && current.IsLoaded
-                                                                && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == false);
+                                                              && current != courseSongSelect
+                                                              && current.IsLoaded
+                                                              && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == false);
         AddStep("capture restored normal song select", () => songSelect = restoredNormalSongSelect = (BmsSoloSongSelect)Stack.CurrentScreen);
         AddAssert("user mods restored", () => restoredNormalSongSelect.Mods.Value, () => Has.Exactly(1).TypeOf<BmsModDoubleTime>());
         AddStep("re-enter course mode", () => controller.ToggleMode());
         AddUntilStep("replacement course song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
-                                                                     && current != restoredNormalSongSelect
-                                                                     && current.IsLoaded
-                                                                     && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == true);
+                                                                    && current != restoredNormalSongSelect
+                                                                    && current.IsLoaded
+                                                                    && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == true);
         AddStep("capture replacement course song select", () => songSelect = (BmsSoloSongSelect)Stack.CurrentScreen);
         AddUntilStep("course selection restored", () => controller.SelectedCourse?.Id, () => Is.EqualTo("stella-1"));
     }
@@ -906,9 +907,9 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("original beatmap selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(originalBeatmap.Hash));
         AddStep("switch to course mode", () => controller.ToggleMode());
         AddUntilStep("course song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
-                                                         && current != normalSongSelect
-                                                         && current.IsLoaded
-                                                         && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == true);
+                                                        && current != normalSongSelect
+                                                        && current.IsLoaded
+                                                        && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == true);
         AddStep("capture course song select", () => songSelect = courseSongSelect = (BmsSoloSongSelect)Stack.CurrentScreen);
         AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
                                                        && !controller.CourseCarousel.IsFiltering);
@@ -929,9 +930,9 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
             .SingleOrDefault()?.ResolvedBeatmap?.Hash, () => Is.EqualTo(previewBeatmaps[2].Hash));
         AddStep("return to normal song select", () => controller.ToggleMode());
         AddUntilStep("fresh normal song select loaded", () => Stack.CurrentScreen is BmsSoloSongSelect current
-                                                                && current != courseSongSelect
-                                                                && current.IsLoaded
-                                                                && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == false);
+                                                              && current != courseSongSelect
+                                                              && current.IsLoaded
+                                                              && current.ChildrenOfType<BmsCourseSongSelectController>().SingleOrDefault()?.IsCourseMode == false);
         AddUntilStep("original beatmap restored", () => ((BmsSoloSongSelect)Stack.CurrentScreen).Beatmap.Value.BeatmapInfo.Hash,
             () => Is.EqualTo(originalBeatmap.Hash));
 
@@ -949,9 +950,6 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         const int beatmap_count = 120;
 
         BeatmapInfo[] importedBeatmaps = null!;
-        ScheduledDelegate cacheTracker = null!;
-        var baselineCacheCount = 0;
-        var peakCacheCount = 0;
 
         AddStep("import distant course preview beatmaps", () =>
         {
@@ -989,18 +987,52 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
         AddStep("show course mode", () => controller.ShowCourseMode());
         AddUntilStep("first course preview selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(importedBeatmaps[0].Hash));
-        AddStep("start cache tracking", () =>
-        {
-            var cachedWorkingBeatmaps = GlobalStatistics.Get<int>("Beatmaps", $"Cached {nameof(WorkingBeatmap)}s");
-            baselineCacheCount = peakCacheCount = cachedWorkingBeatmaps.Value;
-            cacheTracker = Scheduler.AddDelayed(() => peakCacheCount = Math.Max(peakCacheCount, cachedWorkingBeatmaps.Value), 0, true);
-        });
+        // GlobalStatistics is shared by every cache and can report another manager's count.
+        // Record this manager's requests instead, independently of weak-reference collection.
+        AddStep("start cache tracking", () => beatmaps.WorkingCache.RequestedBeatmaps.Clear());
         AddStep("select distant course", () => controller.CourseCarousel.Activate(controller.CourseCarousel.GetCarouselItems()!
             .Single(item => item.Model is BmsGroupedCourse { Course.Id: "preview-last" })));
         AddUntilStep("distant course preview selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(importedBeatmaps[^1].Hash));
         AddWaitStep("allow hidden carousel to settle", 120);
-        AddStep("stop cache tracking", () => cacheTracker.Cancel());
-        AddAssert("intermediate beatmaps were not cached", () => peakCacheCount - baselineCacheCount, () => Is.LessThanOrEqualTo(8));
+        AddAssert("target preview was requested", () => beatmaps.WorkingCache.RequestedBeatmaps.ContainsKey(importedBeatmaps[^1].ID));
+        AddAssert("intermediate beatmaps were not requested", () => beatmaps.WorkingCache.RequestedBeatmaps.Count, () => Is.LessThanOrEqualTo(8));
+    }
+
+    private sealed class TestBeatmapManager(
+        Storage storage,
+        RealmAccess realm,
+        AudioManager audioManager,
+        IResourceStore<byte[]> resources,
+        GameHost host,
+        WorkingBeatmap defaultBeatmap)
+        : BeatmapManager(storage, realm, null, audioManager, resources, host, defaultBeatmap)
+    {
+        public RecordingWorkingBeatmapCache WorkingCache { get; private set; } = null!;
+
+        protected override WorkingBeatmapCache CreateWorkingBeatmapCache(AudioManager audioManager, IResourceStore<byte[]> resources,
+                                                                         IResourceStore<byte[]> storage, WorkingBeatmap defaultBeatmap, GameHost host)
+            => WorkingCache = new RecordingWorkingBeatmapCache(BeatmapTrackStore, audioManager, resources, storage, defaultBeatmap, host, Realm);
+    }
+
+    private sealed class RecordingWorkingBeatmapCache(
+        ITrackStore tracks,
+        AudioManager audioManager,
+        IResourceStore<byte[]> resources,
+        IResourceStore<byte[]> files,
+        WorkingBeatmap defaultBeatmap,
+        GameHost host,
+        RealmAccess realm)
+        : WorkingBeatmapCache(tracks, audioManager, resources, files, defaultBeatmap, host, realm)
+    {
+        public readonly ConcurrentDictionary<Guid, byte> RequestedBeatmaps = new();
+
+        public override WorkingBeatmap GetWorkingBeatmap(BeatmapInfo beatmapInfo)
+        {
+            if (beatmapInfo != null)
+                RequestedBeatmaps.TryAdd(beatmapInfo.ID, 0);
+
+            return base.GetWorkingBeatmap(beatmapInfo);
+        }
     }
 
     private partial class TestParentScreen : OsuScreen

@@ -66,8 +66,9 @@
             <BmsHarmonyAssembly Include="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == '0Harmony'" />
             <BmsRepackLibraryPath Include="@(ReferencePath->'%(RootDir)%(Directory)')" />
             <BmsRepackLibraryPath Include="$(TargetDir)" />
-            <BmsRepackInternalizeExclude Include="^HarmonyLib\." />
-            <BmsRepackInternalizeExclude Include="^MonoMod\." />
+            <!-- MSBuild normalises backslashes in item paths on Unix, including regex escapes. -->
+            <BmsRepackInternalizeExclude Include="^HarmonyLib[.]" />
+            <BmsRepackInternalizeExclude Include="^MonoMod[.]" />
             <BmsRepackInputAssemblies Include="$(TargetPath)" />
             <BmsRepackInputAssemblies Include="@(BmsHarmonyAssembly)" />
         </ItemGroup>
