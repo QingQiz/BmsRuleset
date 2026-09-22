@@ -115,6 +115,10 @@
   <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>在误差条最偏慢的一端显示 POOR 判定。</value></data>
   <data name="hit_error_meter_fade_duration" xml:space="preserve"><value>判定线淡出时间</value></data>
   <data name="hit_error_meter_fade_duration_description" xml:space="preserve"><value>判定线完成淡出所需的秒数。</value></data>
+  <data name="hit_error_meter_line_thickness" xml:space="preserve"><value>判定线粗细</value></data>
+  <data name="hit_error_meter_line_thickness_description" xml:space="preserve"><value>调整误差条中判定线的粗细。</value></data>
+  <data name="hit_error_meter_background_opacity" xml:space="preserve"><value>背景不透明度</value></data>
+  <data name="hit_error_meter_background_opacity_description" xml:space="preserve"><value>调整误差条黑色背景的不透明度。</value></data>
   <data name="judgement_display_show_empty_poor" xml:space="preserve"><value>显示 E-POOR</value></data>
   <data name="judgement_display_show_empty_poor_description" xml:space="preserve"><value>在判定 HUD 中显示空 POOR 判定。</value></data>
   <data name="key" xml:space="preserve"><value>按键 {0}</value></data>

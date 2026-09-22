@@ -456,6 +456,14 @@ public static class BmsStrings
 
     public static LocalisableString HitErrorMeterFadeDurationDescription => get("hit_error_meter_fade_duration_description");
 
+    public static LocalisableString HitErrorMeterLineThickness => get("hit_error_meter_line_thickness");
+
+    public static LocalisableString HitErrorMeterLineThicknessDescription => get("hit_error_meter_line_thickness_description");
+
+    public static LocalisableString HitErrorMeterBackgroundOpacity => get("hit_error_meter_background_opacity");
+
+    public static LocalisableString HitErrorMeterBackgroundOpacityDescription => get("hit_error_meter_background_opacity_description");
+
     public static LocalisableString JudgementDisplayShowEmptyPoor => get("judgement_display_show_empty_poor");
 
     public static LocalisableString JudgementDisplayShowEmptyPoorDescription => get("judgement_display_show_empty_poor_description");

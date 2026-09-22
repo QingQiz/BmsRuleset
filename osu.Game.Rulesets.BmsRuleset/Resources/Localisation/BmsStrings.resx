@@ -115,6 +115,10 @@
   <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>Shows POOR judgements at the latest end of the meter.</value></data>
   <data name="hit_error_meter_fade_duration" xml:space="preserve"><value>Judgement fade duration</value></data>
   <data name="hit_error_meter_fade_duration_description" xml:space="preserve"><value>Seconds taken for judgement lines to fade out.</value></data>
+  <data name="hit_error_meter_line_thickness" xml:space="preserve"><value>Judgement line thickness</value></data>
+  <data name="hit_error_meter_line_thickness_description" xml:space="preserve"><value>Adjusts the thickness of judgement lines in the hit error meter.</value></data>
+  <data name="hit_error_meter_background_opacity" xml:space="preserve"><value>Background opacity</value></data>
+  <data name="hit_error_meter_background_opacity_description" xml:space="preserve"><value>Adjusts the opacity of the hit error meter's black background.</value></data>
   <data name="judgement_display_show_empty_poor" xml:space="preserve"><value>Show E-POOR</value></data>
   <data name="judgement_display_show_empty_poor_description" xml:space="preserve"><value>Shows empty POOR judgements in the judgement HUD.</value></data>
   <data name="key" xml:space="preserve"><value>Key {0}</value></data>

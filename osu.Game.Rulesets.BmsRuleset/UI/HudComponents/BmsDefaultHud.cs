@@ -135,7 +135,6 @@ public static class BmsDefaultHud
                 {
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
-                    Scale = new Vector2(2),
                 },
                 new ArgonScoreCounter
                 {

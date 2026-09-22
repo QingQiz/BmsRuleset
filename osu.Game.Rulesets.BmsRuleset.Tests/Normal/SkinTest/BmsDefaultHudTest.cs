@@ -110,12 +110,16 @@ public class BmsDefaultHudTest
         Assert.Multiple(() =>
         {
             Assert.That(meter.AutoSizeAxes, Is.EqualTo(Axes.None));
-            Assert.That(meter.Size, Is.EqualTo(new Vector2(204, 26)));
+            Assert.That(meter.Width, Is.Zero);
+            Assert.That(meter.Height, Is.EqualTo(12 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR));
+            Assert.That(meter.Scale, Is.EqualTo(Vector2.One));
             Assert.That(meter.Rotation, Is.Zero);
             Assert.That(meter.Origin, Is.EqualTo(Anchor.BottomCentre));
             Assert.That(meter.ShowEmptyPoor.Value, Is.True);
             Assert.That(meter.ShowPoor.Value, Is.True);
-            Assert.That(meter.JudgementFadeDuration.Value, Is.EqualTo(5));
+            Assert.That(meter.JudgementFadeDuration.Value, Is.EqualTo(10));
+            Assert.That(meter.JudgementLineThickness.Value, Is.EqualTo(3));
+            Assert.That(meter.BackgroundOpacity.Value, Is.EqualTo(0.6f));
         });
     }
 
@@ -144,19 +148,40 @@ public class BmsDefaultHudTest
         {
             Width = 320,
             Height = 52,
+            Scale = new Vector2(2),
+            Position = new Vector2(25, -10),
+            Rotation = 90,
+            Anchor = Anchor.BottomCentre,
+            Origin = Anchor.BottomCentre,
         };
         meter.ShowEmptyPoor.Value = false;
         meter.ShowPoor.Value = false;
         meter.JudgementFadeDuration.Value = 1.5f;
+        meter.BackgroundOpacity.Value = 0.25f;
 
-        var restored = (BmsHitErrorMeter)meter.CreateSerialisedInfo().CreateInstance();
+        var saved = meter.CreateSerialisedInfo();
+        saved.Settings["judgement_line_thickness"] = 8f;
+        saved.Settings["colour_bar_visibility"] = false;
+        saved.Settings["show_moving_average"] = false;
+        saved.Settings["centre_marker_style"] = 1;
+        saved.Settings["label_style"] = 2;
+        var restored = (BmsHitErrorMeter)saved.CreateInstance();
+        string[] expectedSettings = ["judgement_line_thickness", "background_opacity", "judgement_fade_duration", "show_empty_poor", "show_poor"];
 
         Assert.Multiple(() =>
         {
             Assert.That(restored.Size, Is.EqualTo(new Vector2(320, 52)));
+            Assert.That(restored.Scale, Is.EqualTo(meter.Scale));
+            Assert.That(restored.Position, Is.EqualTo(meter.Position));
+            Assert.That(restored.Rotation, Is.EqualTo(meter.Rotation));
+            Assert.That(restored.Anchor, Is.EqualTo(meter.Anchor));
+            Assert.That(restored.Origin, Is.EqualTo(meter.Origin));
             Assert.That(restored.ShowEmptyPoor.Value, Is.False);
             Assert.That(restored.ShowPoor.Value, Is.False);
             Assert.That(restored.JudgementFadeDuration.Value, Is.EqualTo(1.5f));
+            Assert.That(restored.JudgementLineThickness.Value, Is.EqualTo(8));
+            Assert.That(restored.BackgroundOpacity.Value, Is.EqualTo(0.25f));
+            Assert.That(restored.CreateSerialisedInfo().Settings.Keys, Is.EquivalentTo(expectedSettings));
         });
     }
 }

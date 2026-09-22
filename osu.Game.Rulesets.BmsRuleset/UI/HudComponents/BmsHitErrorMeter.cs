@@ -10,13 +10,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Sprites;
-using osu.Framework.Localisation;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
-using osu.Game.Localisation.HUD;
+using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -28,6 +23,7 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
+using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
@@ -35,27 +31,30 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 [Cached]
 public partial class BmsHitErrorMeter : HitErrorMeter
 {
-    [SettingSource(typeof(BarHitErrorMeterStrings), nameof(BarHitErrorMeterStrings.JudgementLineThickness), nameof(BarHitErrorMeterStrings.JudgementLineThicknessDescription))]
-    public BindableNumber<float> JudgementLineThickness { get; } = new(4)
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.HitErrorMeterLineThickness), nameof(BmsStrings.HitErrorMeterLineThicknessDescription))]
+    public BindableNumber<float> JudgementLineThickness { get; } = new BindableFloat(3)
     {
         MinValue = 1,
         MaxValue = 8,
         Precision = 0.1f,
     };
 
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.HitErrorMeterBackgroundOpacity), nameof(BmsStrings.HitErrorMeterBackgroundOpacityDescription),
+        SettingControlType = typeof(SettingsPercentageSlider<float>))]
+    public BindableNumber<float> BackgroundOpacity { get; } = new BindableFloat(0.6f)
+    {
+        MinValue = 0,
+        MaxValue = 1,
+        Precision = 0.01f,
+    };
+
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.HitErrorMeterFadeDuration), nameof(BmsStrings.HitErrorMeterFadeDurationDescription))]
-    public BindableNumber<float> JudgementFadeDuration { get; } = new BindableFloat(5)
+    public BindableNumber<float> JudgementFadeDuration { get; } = new BindableFloat(10)
     {
         MinValue = 0.1f,
         MaxValue = 20,
         Precision = 0.1f,
     };
-
-    [SettingSource(typeof(BarHitErrorMeterStrings), nameof(BarHitErrorMeterStrings.ColourBarVisibility))]
-    public Bindable<bool> ColourBarVisibility { get; } = new BindableBool(true);
-
-    [SettingSource(typeof(BarHitErrorMeterStrings), nameof(BarHitErrorMeterStrings.ShowMovingAverage), nameof(BarHitErrorMeterStrings.ShowMovingAverageDescription))]
-    public Bindable<bool> ShowMovingAverage { get; } = new BindableBool(true);
 
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.HitErrorMeterShowEmptyPoor), nameof(BmsStrings.HitErrorMeterShowEmptyPoorDescription))]
     public Bindable<bool> ShowEmptyPoor { get; } = new BindableBool(true);
@@ -63,73 +62,29 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.HitErrorMeterShowPoor), nameof(BmsStrings.HitErrorMeterShowPoorDescription))]
     public Bindable<bool> ShowPoor { get; } = new BindableBool(true);
 
-    [SettingSource(typeof(BarHitErrorMeterStrings), nameof(BarHitErrorMeterStrings.CentreMarkerStyle), nameof(BarHitErrorMeterStrings.CentreMarkerStyleDescription))]
-    public Bindable<BarHitErrorMeter.CentreMarkerStyles> CentreMarkerStyle { get; } = new(BarHitErrorMeter.CentreMarkerStyles.Circle);
+    private const float bar_height = 3;
 
-    [SettingSource(typeof(BarHitErrorMeterStrings), nameof(BarHitErrorMeterStrings.LabelStyle), nameof(BarHitErrorMeterStrings.LabelStyleDescription))]
-    public Bindable<BarHitErrorMeter.LabelStyles> LabelStyle { get; } = new(BarHitErrorMeter.LabelStyles.Icons);
-
-    private const int judgement_line_width = 14;
-    private const int max_concurrent_judgements = 50;
-    private const int centre_marker_size = 8;
-    private const float chevron_size = 8;
-    private const float component_padding = 2;
-    private const float default_bar_length = 200;
-    private const float minimum_width = 44;
-    private const float minimum_height = component_padding * 2 + chevron_size + centre_marker_size;
-
-    private readonly DrawablePool<JudgementLine> judgementLinePool = new(max_concurrent_judgements);
+    private readonly DrawablePool<JudgementLine> judgementLinePool = new(50);
 
     private BmsHitErrorMeterDomain domain;
     private double fastPoorDisplayOffset;
     private double slowPoorDisplayOffset;
     private double floatingAverage;
-    private readonly (double Offset, HitResult Result)[] pendingJudgements = new (double, HitResult)[max_concurrent_judgements];
-    private int pendingJudgementCount;
-    private int nextPendingJudgement;
-    private bool averageUpdatePending;
     private BmsScoreProcessor? scoreProcessor;
 
-    private SpriteIcon arrow = null!;
-    private Container rotatedContent = null!;
-    private Container arrowContainer = null!;
-    private Container colourBars = null!;
-    private Container windowColourBar = null!;
+    private Triangle arrow = null!;
+    private Box background = null!;
     private Box emptyPoorColourBar = null!;
     private Container judgementsContainer = null!;
-    private UprightAspectMaintainingContainer labelFast = null!;
-    private UprightAspectMaintainingContainer labelSlow = null!;
-    private Drawable[]? centreMarkerDrawables;
-
-    public override Vector2 Size
-    {
-        get => base.Size;
-        set => base.Size = new Vector2(Math.Max(minimum_width, value.X), Math.Max(minimum_height, value.Y));
-    }
-
-    public override float Width
-    {
-        get => base.Width;
-        set => base.Width = Math.Max(minimum_width, value);
-    }
-
-    public override float Height
-    {
-        get => base.Height;
-        set => base.Height = Math.Max(minimum_height, value);
-    }
 
     public BmsHitErrorMeter()
     {
-        AutoSizeAxes = Axes.None;
-        Size = new Vector2(component_padding * 2 + default_bar_length, component_padding * 2 + chevron_size + judgement_line_width);
+        Height = bar_height * 4 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
     }
 
     [BackgroundDependencyLoader(true)]
     private void load(DrawableRuleset? drawableRuleset, ScoreProcessor? scoreProcessor)
     {
-        const int colour_bar_width = 2;
-
         var beatmap = (drawableRuleset as BmsDrawableRuleset)?.Beatmap as BmsBeatmap;
         this.scoreProcessor = scoreProcessor as BmsScoreProcessor;
         var layout = beatmap?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
@@ -141,91 +96,54 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         fastPoorDisplayOffset = -headWindows.FastWindowFor(HitResult.Ok);
         slowPoorDisplayOffset = headWindows.SlowWindowFor(HitResult.Ok);
 
-        InternalChild = rotatedContent = new Container
-        {
-            Anchor = Anchor.Centre,
-            Origin = Anchor.Centre,
-            Rotation = -90,
-            Size = new Vector2(Height, Width),
-            Child = new Container
+        // Use legacy's time-to-width scale by default while respecting dimensions saved in user skins.
+        if (Width == 0)
+            Width = (float)(domain.SlowOffset - domain.FastOffset) / 2 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
+
+        Container windowColourBar;
+        InternalChildren =
+        [
+            background = new Box
             {
+                Name = "background",
                 RelativeSizeAxes = Axes.Both,
-                Padding = new MarginPadding(component_padding),
-                Children =
-                [
-                    judgementLinePool,
-                    colourBars = new Container
-                    {
-                        Name = "colour axis",
-                        RelativeSizeAxes = Axes.Both,
-                        Padding = new MarginPadding { Left = chevron_size },
-                        Children =
-                        [
-                            windowColourBar = new Container
-                            {
-                                Name = "judgement windows",
-                                Anchor = Anchor.TopCentre,
-                                Origin = Anchor.TopCentre,
-                                Width = colour_bar_width,
-                                RelativeSizeAxes = Axes.Y,
-                            },
-                            judgementsContainer = new Container
-                            {
-                                Name = "judgements",
-                                Anchor = Anchor.TopCentre,
-                                Origin = Anchor.TopCentre,
-                                RelativeSizeAxes = Axes.Both,
-                            },
-                            labelFast = new UprightAspectMaintainingContainer
-                            {
-                                Name = "fast label",
-                                AutoSizeAxes = Axes.Both,
-                                Anchor = Anchor.TopCentre,
-                                Origin = Anchor.Centre,
-                                Y = -10,
-                            },
-                            labelSlow = new UprightAspectMaintainingContainer
-                            {
-                                Name = "slow label",
-                                AutoSizeAxes = Axes.Both,
-                                Anchor = Anchor.BottomCentre,
-                                Origin = Anchor.Centre,
-                                Y = 10,
-                            },
-                        ],
-                    },
-                    arrowContainer = new Container
-                    {
-                        Name = "average chevron",
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreRight,
-                        Width = chevron_size,
-                        X = chevron_size,
-                        RelativeSizeAxes = Axes.Y,
-                        Alpha = 0,
-                        Scale = new Vector2(0, 1),
-                        Child = arrow = new SpriteIcon
-                        {
-                            Anchor = Anchor.TopCentre,
-                            Origin = Anchor.Centre,
-                            RelativePositionAxes = Axes.Y,
-                            Y = domain.RelativePosition(0),
-                            Icon = FontAwesome.Solid.ChevronRight,
-                            Size = new Vector2(chevron_size),
-                        },
-                    },
-                ],
+                Colour = Colour4.Black,
             },
-        };
+            windowColourBar = new Container
+            {
+                Name = "judgement windows",
+                RelativeSizeAxes = Axes.X,
+                Height = bar_height * LegacySkin.STABLE_MAGIC_SCALE_FACTOR,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+            },
+            new Box
+            {
+                Name = "centre marker",
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                RelativeSizeAxes = Axes.Y,
+                Width = 1.5f * LegacySkin.STABLE_MAGIC_SCALE_FACTOR,
+                Height = 1,
+            },
+            judgementLinePool,
+            judgementsContainer = new Container
+            {
+                Name = "judgements",
+                RelativeSizeAxes = Axes.Both,
+            },
+            arrow = new Triangle
+            {
+                Name = "average arrow",
+                Size = new Vector2(17, 8) * 0.6f,
+                Origin = Anchor.BottomCentre,
+                RelativePositionAxes = Axes.X,
+                X = domain.RelativePosition(0),
+                Scale = new Vector2(1, -1),
+            },
+        ];
 
         createColourBar(windowColourBar, headWindows);
-    }
-
-    protected override void Update()
-    {
-        base.Update();
-        rotatedContent.Size = new Vector2(Height, Width);
-        flushPendingJudgements();
     }
 
     protected override void LoadComplete()
@@ -235,175 +153,43 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         if (scoreProcessor != null)
             scoreProcessor.EmptyPoorRegistered += onEmptyPoorRegistered;
 
-        colourBars.Height = 0;
-        colourBars.ResizeHeightTo(1, 800, Easing.OutQuint);
-
-        CentreMarkerStyle.BindValueChanged(style => recreateCentreMarker(style.NewValue), true);
-        LabelStyle.BindValueChanged(style => recreateLabels(style.NewValue), true);
-        ShowEmptyPoor.BindValueChanged(visible =>
-        {
-            emptyPoorColourBar.FadeTo(visible.NewValue ? 1 : 0, 500, Easing.OutQuint);
-        }, true);
-        ColourBarVisibility.BindValueChanged(visible =>
-        {
-            windowColourBar.FadeTo(visible.NewValue ? 1 : 0, 500, Easing.OutQuint);
-        }, true);
-
-        using (arrowContainer.BeginDelayedSequence(450))
-        {
-            ShowMovingAverage.BindValueChanged(visible =>
-            {
-                arrowContainer.FadeTo(visible.NewValue ? 1 : 0, 250, Easing.OutQuint);
-                arrowContainer.ScaleTo(visible.NewValue ? Vector2.One : new Vector2(0, 1), 250, Easing.OutQuint);
-            }, true);
-        }
+        ShowEmptyPoor.BindValueChanged(visible => emptyPoorColourBar.Alpha = visible.NewValue ? 1 : 0, true);
+        BackgroundOpacity.BindValueChanged(opacity => background.Alpha = opacity.NewValue, true);
     }
 
     private void createColourBar(Container target, BmsJudgementWindowTable windows)
     {
         HitResult[] results = [HitResult.Ok, HitResult.Good, HitResult.Great, HitResult.Perfect];
 
-        var emptyPoorTop = domain.RelativePosition(-windows.FastWindowFor(HitResult.Miss));
-        var emptyPoorBottom = domain.RelativePosition(-windows.FastWindowFor(HitResult.Ok));
+        var emptyPoorStart = domain.RelativePosition(-windows.FastWindowFor(HitResult.Miss));
+        var emptyPoorEnd = domain.RelativePosition(-windows.FastWindowFor(HitResult.Ok));
 
         target.Add(emptyPoorColourBar = new Box
         {
             Name = "empty poor window",
-            RelativePositionAxes = Axes.Y,
+            RelativePositionAxes = Axes.X,
             RelativeSizeAxes = Axes.Both,
-            Y = emptyPoorTop,
-            Height = Math.Max(0, emptyPoorBottom - emptyPoorTop),
+            X = emptyPoorStart,
+            Width = Math.Max(0, emptyPoorEnd - emptyPoorStart),
             Colour = BmsHitResultColours.ForHitResult(HitResult.Miss),
         });
 
         foreach (var result in results)
         {
-            var top = domain.RelativePosition(-windows.FastWindowFor(result));
-            var bottom = domain.RelativePosition(windows.SlowWindowFor(result));
+            var start = domain.RelativePosition(-windows.FastWindowFor(result));
+            var end = domain.RelativePosition(windows.SlowWindowFor(result));
 
             target.Add(new Box
             {
                 Name = $"{result} window",
-                RelativePositionAxes = Axes.Y,
+                RelativePositionAxes = Axes.X,
                 RelativeSizeAxes = Axes.Both,
-                Y = top,
-                Height = Math.Max(0, bottom - top),
+                X = start,
+                Width = Math.Max(0, end - start),
                 Colour = BmsHitResultColours.ForHitResult(result),
             });
         }
     }
-
-    private void recreateCentreMarker(BarHitErrorMeter.CentreMarkerStyles style)
-    {
-        if (centreMarkerDrawables != null)
-        {
-            foreach (var drawable in centreMarkerDrawables)
-            {
-                drawable.ScaleTo(0, 500, Easing.OutQuint).FadeOut(500, Easing.OutQuint);
-                drawable.Expire();
-            }
-
-            centreMarkerDrawables = null;
-        }
-
-        var position = domain.RelativePosition(0);
-
-        switch (style)
-        {
-            case BarHitErrorMeter.CentreMarkerStyles.None:
-                break;
-
-            case BarHitErrorMeter.CentreMarkerStyles.Circle:
-                centreMarkerDrawables =
-                [
-                    createCentreCircle("middle marker behind", centre_marker_size, Colour4.White, float.MaxValue, position),
-                    createCentreCircle("middle marker in front", centre_marker_size / 2f, Colour4.White, float.MinValue, position),
-                ];
-                break;
-
-            case BarHitErrorMeter.CentreMarkerStyles.Line:
-                const float border_size = 1.5f;
-                centreMarkerDrawables =
-                [
-                    createCentreLine("middle marker behind", judgement_line_width, centre_marker_size / 3f, Colour4.White, float.MaxValue, position),
-                    createCentreLine("middle marker in front", judgement_line_width - border_size, centre_marker_size / 3f - border_size,
-                        Colour4.White, float.MinValue, position),
-                ];
-                break;
-
-            default:
-                throw new ArgumentOutOfRangeException(nameof(style), style, null);
-        }
-
-        if (centreMarkerDrawables == null)
-            return;
-
-        foreach (var drawable in centreMarkerDrawables)
-        {
-            colourBars.Add(drawable);
-            drawable.FadeInFromZero(500).ScaleTo(0).ScaleTo(1, 1000, Easing.OutElasticHalf);
-        }
-    }
-
-    private static Circle createCentreCircle(string name, float size, Colour4 colour, float depth, float position) => new()
-    {
-        Name = name,
-        Colour = colour,
-        Anchor = Anchor.TopCentre,
-        Origin = Anchor.Centre,
-        RelativePositionAxes = Axes.Y,
-        Y = position,
-        Depth = depth,
-        Size = new Vector2(size),
-    };
-
-    private static Box createCentreLine(string name, float width, float height, Colour4 colour, float depth, float position) => new()
-    {
-        Name = name,
-        Colour = colour,
-        Anchor = Anchor.TopCentre,
-        Origin = Anchor.Centre,
-        RelativePositionAxes = Axes.Y,
-        Y = position,
-        Depth = depth,
-        Size = new Vector2(width, height),
-    };
-
-    private void recreateLabels(BarHitErrorMeter.LabelStyles style)
-    {
-        const float icon_size = 14;
-
-        switch (style)
-        {
-            case BarHitErrorMeter.LabelStyles.None:
-                labelFast.Clear();
-                labelSlow.Clear();
-                break;
-
-            case BarHitErrorMeter.LabelStyles.Icons:
-                labelFast.Child = new SpriteIcon { Size = new Vector2(icon_size), Icon = OsuIcon.Hare };
-                labelSlow.Child = new SpriteIcon { Size = new Vector2(icon_size), Icon = OsuIcon.Tortoise };
-                break;
-
-            case BarHitErrorMeter.LabelStyles.Text:
-                labelFast.Child = createLabel(BmsStrings.Fast);
-                labelSlow.Child = createLabel(BmsStrings.Slow);
-                break;
-
-            default:
-                throw new ArgumentOutOfRangeException(nameof(style), style, null);
-        }
-
-        labelFast.FadeInFromZero(500);
-        labelSlow.FadeInFromZero(500);
-    }
-
-    private static OsuSpriteText createLabel(LocalisableString text) => new()
-    {
-        Text = text,
-        Font = OsuFont.Default.With(size: 10),
-        Height = 12,
-    };
 
     protected override void OnNewJudgement(JudgementResult judgement)
     {
@@ -430,55 +216,20 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     private void addJudgement(double timeOffset, HitResult result, bool affectMovingAverage)
     {
-        // Only the last fifty markers survive a HUD frame, but every observation still
-        // contributes to the moving average and remains in the score's timing history.
-        pendingJudgements[nextPendingJudgement] = (timeOffset, result);
-        nextPendingJudgement = (nextPendingJudgement + 1) % max_concurrent_judgements;
-        pendingJudgementCount = Math.Min(max_concurrent_judgements, pendingJudgementCount + 1);
-        if (affectMovingAverage)
-        {
-            floatingAverage = floatingAverage * 0.9 + timeOffset * 0.1;
-            averageUpdatePending = true;
-        }
-    }
-
-    private void flushPendingJudgements()
-    {
-        var first = (nextPendingJudgement - pendingJudgementCount + max_concurrent_judgements) % max_concurrent_judgements;
-        for (var i = 0; i < pendingJudgementCount; i++)
-        {
-            var pending = pendingJudgements[(first + i) % max_concurrent_judgements];
-            displayJudgement(pending.Offset, pending.Result);
-        }
-
-        pendingJudgementCount = 0;
-        if (averageUpdatePending)
-        {
-            averageUpdatePending = false;
-            arrow.MoveToY(domain.RelativePosition(floatingAverage), 800, Easing.OutQuint);
-        }
-    }
-
-    private void displayJudgement(double timeOffset, HitResult result)
-    {
-        if (judgementsContainer.Count >= max_concurrent_judgements)
-        {
-            var old = judgementsContainer.FirstOrDefault();
-
-            if (old != null)
-            {
-                old.ClearTransforms();
-                judgementsContainer.Remove(old, disposeImmediately: false);
-            }
-        }
+        var relativePosition = domain.RelativePosition(timeOffset);
 
         judgementLinePool.Get(drawableJudgement =>
         {
-            drawableJudgement.Y = domain.RelativePosition(timeOffset);
+            drawableJudgement.X = relativePosition;
             drawableJudgement.Colour = BmsHitResultColours.ForHitResult(result);
             judgementsContainer.Add(drawableJudgement);
         });
 
+        if (affectMovingAverage)
+        {
+            floatingAverage = floatingAverage * 0.8 + (relativePosition - 0.5f) * 0.2;
+            arrow.MoveToX((float)floatingAverage + 0.5f, 800, Easing.Out);
+        }
     }
 
     internal static IReadOnlyList<BmsHitErrorTimingObservation> GetTimingObservations(JudgementResult judgement)
@@ -527,8 +278,6 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     public override void Clear()
     {
-        pendingJudgementCount = 0;
-        averageUpdatePending = false;
         foreach (var judgement in judgementsContainer)
         {
             judgement.ClearTransforms();
@@ -536,7 +285,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         }
 
         floatingAverage = 0;
-        arrow.MoveToY(domain.RelativePosition(0));
+        arrow.MoveToX(domain.RelativePosition(0));
     }
 
     protected override void Dispose(bool isDisposing)
@@ -549,42 +298,37 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     internal partial class JudgementLine : PoolableDrawable
     {
-        public readonly BindableNumber<float> JudgementLineThickness = new BindableFloat();
+        private readonly BindableNumber<float> judgementLineThickness = new BindableFloat();
 
         [Resolved]
         private BmsHitErrorMeter hitErrorMeter { get; set; } = null!;
 
         public JudgementLine()
         {
-            RelativeSizeAxes = Axes.X;
-            RelativePositionAxes = Axes.Y;
+            RelativeSizeAxes = Axes.Y;
+            Height = 1;
+            RelativePositionAxes = Axes.X;
             Blending = BlendingParameters.Additive;
+            Anchor = Anchor.CentreLeft;
             Origin = Anchor.Centre;
-            Anchor = Anchor.TopCentre;
-            InternalChild = new Circle { RelativeSizeAxes = Axes.Both };
+            InternalChild = new Box { RelativeSizeAxes = Axes.Both };
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            JudgementLineThickness.BindTo(hitErrorMeter.JudgementLineThickness);
-            JudgementLineThickness.BindValueChanged(thickness => Height = thickness.NewValue, true);
+
+            judgementLineThickness.BindTo(hitErrorMeter.JudgementLineThickness);
+            judgementLineThickness.BindValueChanged(thickness => Width = thickness.NewValue, true);
         }
 
         protected override void PrepareForUse()
         {
             base.PrepareForUse();
 
-            const int judgement_fade_in_duration = 100;
-            var judgementFadeOutDuration = hitErrorMeter.JudgementFadeDuration.Value * 1000;
-
-            Alpha = 0;
-            Width = 0;
-            this.FadeTo(0.6f, judgement_fade_in_duration, Easing.OutQuint)
-                .ResizeWidthTo(1, judgement_fade_in_duration, Easing.OutQuint)
+            this.FadeTo(0.4f)
                 .Then()
-                .FadeOut(judgementFadeOutDuration)
-                .ResizeWidthTo(0, judgementFadeOutDuration, Easing.InQuint)
+                .FadeOut(hitErrorMeter.JudgementFadeDuration.Value * 1000)
                 .Expire();
         }
     }

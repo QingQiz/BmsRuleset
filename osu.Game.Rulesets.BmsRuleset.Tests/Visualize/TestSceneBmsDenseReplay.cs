@@ -240,7 +240,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     }
 
     [Test]
-    public void HitErrorBurstKeepsLatestMarkersAndEveryTimingObservation()
+    public void HitErrorBurstKeepsEveryMarkerAndTimingObservation()
     {
         BmsHitErrorMeter meter = null!;
         var onJudgement = typeof(BmsHitErrorMeter).GetMethod("OnNewJudgement", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -259,19 +259,19 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
                 onJudgement(meter, result);
             }
         });
-        AddUntilStep("last fifty markers rendered", () => meter.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count(d => d.IsAlive) == 50);
+        AddUntilStep("all hundred markers rendered", () => meter.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count(d => d.IsAlive) == 100);
         AddStep("markers and average retain timing semantics", () =>
         {
             var domain = BmsHitErrorMeter.CreateDomain(BmsLayoutVariant.Bme7K, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate);
-            var expected = Enumerable.Range(50, 50).Select(i => domain.RelativePosition(i - 50)).Order().ToArray();
-            Assert.That(meter.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Where(d => d.IsAlive).Select(d => d.Y).Order(), Is.EqualTo(expected).Within(0.00001));
-            var average = Enumerable.Range(0, 100).Aggregate(0d, (value, i) => value * 0.9 + (i - 50) * 0.1);
+            var expected = Enumerable.Range(0, 100).Select(i => domain.RelativePosition(i - 50)).Order().ToArray();
+            Assert.That(meter.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Where(d => d.IsAlive).Select(d => d.X).Order(), Is.EqualTo(expected).Within(0.00001));
+            var average = Enumerable.Range(0, 100).Aggregate(0d, (value, i) => value * 0.8 + (domain.RelativePosition(i - 50) - 0.5f) * 0.2);
             Assert.That(typeof(BmsHitErrorMeter).GetField("floatingAverage", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(meter), Is.EqualTo(average).Within(0.000001));
             var note = Playfield.Beatmap.HitObjects[0];
             onJudgement(meter, new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
             meter.Clear();
         });
-        AddUntilStep("clear also discards queued marker", () => meter.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().All(d => !d.IsAlive));
+        AddUntilStep("clear removes every marker", () => !meter.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Any());
     }
 
     [Test]
