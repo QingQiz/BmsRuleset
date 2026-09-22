@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
@@ -22,12 +23,14 @@ using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
@@ -39,12 +42,15 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
 {
     private const int note_count = 512;
     private static int columnUpdates;
-    private static int noteMaskingUpdates;
-    private static int explosionMaskingUpdates;
+    private static readonly FrameTraversalCounter columnTraversals = new();
+    private static readonly FrameTraversalCounter noteMaskingTraversals = new();
+    private static readonly FrameTraversalCounter explosionMaskingTraversals = new();
     private static int passiveDeadlineReads;
     private bool allNotesVisible;
     private ScopedMethodProbe? probe;
     private ScopedMethodProbe? maskingProbe;
+    private ScopedMethodProbe? noteMaskingProbe;
+    private ScopedMethodProbe? frameProbe;
 
     [SetUp]
     public void ResetChartOptions() => allNotesVisible = false;
@@ -384,19 +390,25 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
         for (var run = 0; run < 2; run++)
         {
             seek(2999);
-            AddStep("count column visual traversals", () =>
+            AddStep("count visual traversals while seeking forward", () =>
             {
                 Player.Results.Clear();
                 probe = new ScopedMethodProbe(typeof(BmsColumnHitObjectContainer).GetMethod("UpdateAfterChildrenLife", BindingFlags.Instance | BindingFlags.NonPublic),
-                    typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countUpdate), BindingFlags.Static | BindingFlags.NonPublic));
-                columnUpdates = 0;
+                    typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countColumnTraversal), BindingFlags.Static | BindingFlags.NonPublic));
                 maskingProbe = new ScopedMethodProbe(typeof(CompositeDrawable).GetMethod(nameof(CompositeDrawable.UpdateSubTreeMasking)),
                     typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countMasking), BindingFlags.Static | BindingFlags.NonPublic));
-                noteMaskingUpdates = 0;
-                explosionMaskingUpdates = 0;
+                // Hit objects bypass CompositeDrawable's masking method, so they need their own probe.
+                noteMaskingProbe = new ScopedMethodProbe(typeof(DrawableHitObject).GetMethod(nameof(DrawableHitObject.UpdateSubTreeMasking)),
+                    typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countMasking), BindingFlags.Static | BindingFlags.NonPublic));
+                columnTraversals.Reset();
+                noteMaskingTraversals.Reset();
+                explosionMaskingTraversals.Reset();
+                frameProbe = new ScopedMethodProbe(typeof(BmsPlayfield).GetMethod("BeginGameplayFrame", BindingFlags.Instance | BindingFlags.NonPublic),
+                    typeof(TestSceneBmsDenseReplay).GetMethod(nameof(beginGameplayFrame), BindingFlags.Static | BindingFlags.NonPublic));
+                Player.GameplayClockContainer.Seek(3001);
             });
-            seek(3001);
-            AddStep("stop counting", () => { probe?.Dispose(); probe = null; maskingProbe?.Dispose(); maskingProbe = null; });
+            AddUntilStep("simulation reached target", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 3001) < 0.000001);
+            AddStep("stop counting", stopCounting);
             AddStep("all burst notes judged perfectly at their exact replay times", () =>
             {
                 var expectedResults = mode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote ? note_count * 2 - 8 : note_count;
@@ -410,10 +422,9 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
                     Assert.That(Player.Results.OfType<BmsLongNoteJudgementResult>().SelectMany(r => r.EndpointResults)
                         .Max(e => Math.Abs(e.TimeOffset)), Is.LessThan(0.000001));
             });
-            AddAssert("visual traversal is bounded per game frame", () => columnUpdates < note_count);
-            AddAssert("masking does not traverse notes for every replay timestamp", () => noteMaskingUpdates < note_count * 16);
-            var pulsesPerNote = mode == BmsLongNoteMode.Undefined ? 1 : mode == BmsLongNoteMode.LongNote ? 2 : 3;
-            AddAssert("masking does not traverse overlapping pulses for every replay timestamp", () => explosionMaskingUpdates, () => Is.LessThan(note_count * pulsesPerNote * 16));
+            AddAssert("each column is traversed at most once per game frame", () => columnTraversals.MaxPerFrame, () => Is.EqualTo(1));
+            AddAssert("each note is masked at most once per game frame", () => noteMaskingTraversals.MaxPerFrame, () => Is.EqualTo(1));
+            AddAssert("each overlapping pulse is masked at most once per game frame", () => explosionMaskingTraversals.MaxPerFrame, () => Is.EqualTo(1));
         }
     }
 
@@ -425,21 +436,67 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
 
     private static void countUpdate() => columnUpdates++;
 
+    // Catch-up uses a wall-clock budget, so the same seek can span more frames on a slower runner.
+    // Measure each drawable within its game frame to detect repeated work independently of that budget.
+    private static void beginGameplayFrame()
+    {
+        columnTraversals.BeginFrame();
+        noteMaskingTraversals.BeginFrame();
+        explosionMaskingTraversals.BeginFrame();
+    }
+
+    // ReSharper disable once InconsistentNaming
+    private static void countColumnTraversal(BmsColumnHitObjectContainer __instance) => columnTraversals.Count(__instance);
+
     private static void countPassiveDeadline() => passiveDeadlineReads++;
 
     // ReSharper disable once InconsistentNaming
     private static void countMasking(CompositeDrawable __instance)
     {
         if (__instance is DrawableBmsHitObject)
-            noteMaskingUpdates++;
+            noteMaskingTraversals.Count(__instance);
         if (__instance is BmsHitExplosion)
-            explosionMaskingUpdates++;
+            explosionMaskingTraversals.Count(__instance);
+    }
+
+    private void stopCounting()
+    {
+        probe?.Dispose();
+        probe = null;
+        maskingProbe?.Dispose();
+        maskingProbe = null;
+        noteMaskingProbe?.Dispose();
+        noteMaskingProbe = null;
+        frameProbe?.Dispose();
+        frameProbe = null;
+        beginGameplayFrame();
     }
 
     protected override void Dispose(bool isDisposing)
     {
-        probe?.Dispose();
-        maskingProbe?.Dispose();
+        stopCounting();
         base.Dispose(isDisposing);
+    }
+
+    private sealed class FrameTraversalCounter
+    {
+        private readonly Dictionary<CompositeDrawable, int> counts = [];
+
+        public int MaxPerFrame { get; private set; }
+
+        public void Reset()
+        {
+            BeginFrame();
+            MaxPerFrame = 0;
+        }
+
+        public void BeginFrame() => counts.Clear();
+
+        public void Count(CompositeDrawable drawable)
+        {
+            counts.TryGetValue(drawable, out var count);
+            counts[drawable] = ++count;
+            MaxPerFrame = Math.Max(MaxPerFrame, count);
+        }
     }
 }
