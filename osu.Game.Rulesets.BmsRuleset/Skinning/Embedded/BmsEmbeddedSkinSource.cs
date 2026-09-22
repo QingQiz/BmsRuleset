@@ -81,17 +81,13 @@ public sealed class BmsEmbeddedSkinSource : ISkinSource, IDisposable, IBmsGamepl
                 () => parent?.GetDrawableComponent(lookup) ?? embeddedFallbacks?.GetDrawableComponent(lookup), out var mainHud))
             return mainHud;
 
-        var drawable = lookup is
+        return lookup is
             BmsSkinComponentLookup or
             SkinComponentLookup<HitResult> or
             GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents, Ruleset: not null }
             ? parent?.GetDrawableComponent(lookup)
               ?? embeddedFallbacks?.GetDrawableComponent(lookup)
             : parent?.GetDrawableComponent(lookup);
-
-        return lookup is GlobalSkinnableContainerLookup { Lookup: GlobalSkinnableContainers.MainHUDComponents }
-            ? BmsDefaultHud.GetDrawableComponent(lookup)
-            : drawable;
     }
 
     /// <summary>Looks up a texture, falling through parent → primary → fallback.</summary>

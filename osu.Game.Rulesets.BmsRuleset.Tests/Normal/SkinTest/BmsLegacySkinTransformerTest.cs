@@ -384,12 +384,14 @@ public class BmsLegacySkinTransformerTest
         return drawable!;
     }
 
-    private static ISkinComponentLookup createUserMainHudLookup()
+    private static ISkinComponentLookup createUserMainHudLookup() => createUserLookup(
+        new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo));
+
+    private static ISkinComponentLookup createUserLookup(GlobalSkinnableContainerLookup lookup)
     {
         var type = typeof(Skin).Assembly.GetType("osu.Game.Skinning.UserSkinComponentLookup");
         Assert.That(type, Is.Not.Null);
 
-        var lookup = new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents, new BmsRuleset().RulesetInfo);
         var instance = Activator.CreateInstance(type!, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, [lookup], null);
 
         Assert.That(instance, Is.InstanceOf<ISkinComponentLookup>());
@@ -638,6 +640,87 @@ public class BmsLegacySkinTransformerTest
     public void TestBmsHealthDisplayDoesNotInheritOsuHealthDisplay()
     {
         Assert.That(new BmsHealthDisplay(), Is.Not.InstanceOf<HealthDisplay>());
+    }
+
+    [Test]
+    public void TestBuiltInGlobalHudKeepsNativeComponents()
+    {
+        Skin[] skins =
+        [
+            new ArgonSkin(ArgonSkin.CreateInfo(), storage_resources),
+            new ArgonProSkin(ArgonProSkin.CreateInfo(), storage_resources),
+            new TrianglesSkin(TrianglesSkin.CreateInfo(), storage_resources),
+            new DefaultLegacySkin(DefaultLegacySkin.CreateInfo(), storage_resources),
+            new RetroSkin(RetroSkin.CreateInfo(), storage_resources),
+        ];
+        var lookup = new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents);
+
+        foreach (var skin in skins)
+        {
+            using (skin)
+            using (var expected = (Container)skin.GetDrawableComponent(lookup)!)
+            using (var actual = (Container)new BmsBuiltInSkinTransformer(skin).GetDrawableComponent(lookup)!)
+            {
+                var expectedTypes = expected.OfType<ISerialisableDrawable>().Select(component => component.GetType()).ToArray();
+                Assert.That(expectedTypes, Is.Not.Empty, skin.GetType().Name);
+                Assert.That(actual.OfType<ISerialisableDrawable>().Select(component => component.GetType()), Is.EqualTo(expectedTypes), skin.GetType().Name);
+                Assert.That(actual.Alpha, Is.EqualTo(expected.Alpha), skin.GetType().Name);
+                Assert.That(actual.AlwaysPresent, Is.EqualTo(expected.AlwaysPresent), skin.GetType().Name);
+            }
+        }
+    }
+
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void TestGlobalHudPassesThroughSkinSourcesUnchanged(bool builtIn, bool savedLayout)
+    {
+        using var original = new Container
+        {
+            Alpha = 0.8f,
+            Children =
+            [
+                new ArgonScoreCounter { X = 135, Y = 42, Alpha = 0.7f },
+                new ArgonAccuracyCounter { X = 215, Y = 84 },
+            ],
+        };
+        var components = original.Children.ToArray();
+        var skin = new TestDrawableSkin { Drawable = original };
+        ISkin transformer = builtIn ? new BmsBuiltInSkinTransformer(skin) : new BmsLegacySkinTransformer(skin, createBeatmap());
+        using var source = new BmsEmbeddedSkinSource();
+        source.SetSources(new TestSkinSource(transformer), null);
+        ISkinComponentLookup lookup = new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents);
+        if (savedLayout)
+            lookup = createUserLookup((GlobalSkinnableContainerLookup)lookup);
+
+        var actual = (Container)source.GetDrawableComponent(lookup)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual, Is.SameAs(original));
+            Assert.That(actual.Children, Is.EqualTo(components));
+            Assert.That(actual.AlwaysPresent, Is.False);
+            Assert.That(actual.Alpha, Is.EqualTo(0.8f));
+            Assert.That(components[0].X, Is.EqualTo(135));
+            Assert.That(components[0].Y, Is.EqualTo(42));
+            Assert.That(components[0].Alpha, Is.EqualTo(0.7f));
+        });
+    }
+
+    [Test]
+    public void TestMissingGlobalHudFallsThroughToParentSkin()
+    {
+        var lookup = new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MainHUDComponents);
+        using var source = new BmsEmbeddedSkinSource();
+        source.SetSources(new TestSkinSource(new BmsLegacySkinTransformer(new TestDrawableSkin(), createBeatmap())), null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(BmsDefaultHud.GetDrawableComponent(lookup), Is.Null);
+            Assert.That(source.GetDrawableComponent(lookup), Is.Null);
+            Assert.That(source.GetDrawableComponent(createUserLookup(lookup)), Is.Null);
+        });
     }
 
     [Test]

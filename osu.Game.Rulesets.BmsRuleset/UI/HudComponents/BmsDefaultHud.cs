@@ -36,7 +36,7 @@ public static class BmsDefaultHud
         switch (containerLookup.Lookup)
         {
             case GlobalSkinnableContainers.MainHUDComponents:
-                return containerLookup.Ruleset == null ? gHud() : bmsHud();
+                return containerLookup.Ruleset == null ? null : bmsHud();
 
             case GlobalSkinnableContainers.Playfield:
                 return bmsPlayfield();
@@ -149,22 +149,6 @@ public static class BmsDefaultHud
                     Y = 60,
                 },
             ],
-        };
-    }
-
-    /// <summary>
-    /// hud. hud in this can NOT resolve DI in BmsDrawableRuleset
-    /// </summary>
-    /// <returns></returns>
-    private static Drawable gHud()
-    {
-        return new DefaultSkinComponentsContainer(container =>
-        {
-            foreach (var d in container.OfType<ISerialisableDrawable>())
-                d.UsesFixedAnchor = true;
-        })
-        {
-            Children = [],
         };
     }
 }
