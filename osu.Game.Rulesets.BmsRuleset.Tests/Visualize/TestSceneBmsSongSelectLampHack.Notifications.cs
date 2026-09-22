@@ -16,6 +16,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
 using osu.Framework.Statistics;
 using osu.Framework.Testing;
+using osu.Framework.Testing.Drawables.Steps;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
@@ -532,8 +533,47 @@ public partial class TestSceneBmsSongSelectLampHack
 
     private void waitForNotificationStormWork(string name, Func<Task> getWork)
     {
-        AddUntilStep($"{name} completes", () => getWork().IsCompleted);
-        AddStep($"{name} succeeded", () => getWork().GetAwaiter().GetResult());
+        // Real imports perform hundreds of file and database operations on shared CI disks.
+        // Their completion needs a separate budget from the framework's ten-second UI waits.
+        AddStep(new BackgroundWorkStep(getWork)
+        {
+            Text = $"{name} completes",
+            IsSetupStep = false,
+        });
+    }
+
+    private partial class BackgroundWorkStep : StepButton
+    {
+        private readonly Stopwatch elapsed = new();
+        private bool completed;
+
+        public override int RequiredRepetitions => completed ? 1 : int.MaxValue;
+
+        public BackgroundWorkStep(Func<Task> getWork)
+        {
+            Action = () =>
+            {
+                elapsed.Start();
+                var work = getWork();
+                if (work.IsCompleted)
+                {
+                    work.GetAwaiter().GetResult();
+                    completed = true;
+                    Success();
+                    TestContext.Out.WriteLine($"{Text}: completed in {elapsed.Elapsed.TotalSeconds:F1}s");
+                    return;
+                }
+
+                Assert.That(elapsed.Elapsed, Is.LessThan(TimeSpan.FromMinutes(1)), $"{Text}: task status {work.Status}");
+            };
+        }
+
+        public override void Reset()
+        {
+            base.Reset();
+            elapsed.Reset();
+            completed = false;
+        }
     }
 
     private string createNotificationStormCharts(int setCount)
