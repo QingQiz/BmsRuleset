@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  build-and-test:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: ruleset
+    steps:
+      - name: Check out ruleset
+        uses: actions/checkout@v6
+        with:
+          path: ruleset
+          persist-credentials: false
+
+      - name: Read osu! version
+        id: osu-version
+        run: |
+          [xml]$props = Get-Content Directory.Build.props -Raw
+          $version = [string]$props.SelectSingleNode('/Project/PropertyGroup/OsuVersion').InnerText
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid OsuVersion: $version"
+          }
+          "tag=$version-lazer" >> $env:GITHUB_OUTPUT
+
+      # Official lazer releases can precede their NuGet packages.
+      - name: Check out matching osu! source
+        uses: actions/checkout@v6
+        with:
+          repository: ppy/osu
+          ref: ${{ steps.osu-version.outputs.tag }}
+          path: osu
+          persist-credentials: false
+
+      - name: Install .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('ruleset/**/*.csproj', 'ruleset/Directory.Build.props', 'osu/osu.Game/osu.Game.csproj', 'osu/Directory.Build.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore osu.Game.Rulesets.BmsRuleset.sln -p:UseLocalOsu=true
+
+      - name: Build Release
+        id: build
+        run: dotnet build osu.Game.Rulesets.BmsRuleset.sln -c Release --no-restore -p:UseLocalOsu=true
+
+      - name: Run regression tests
+        run: >-
+          dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Tests.csproj
+          -c Release --no-build --no-restore -p:UseLocalOsu=true
+          --filter "FullyQualifiedName!~.Performance.&FullyQualifiedName!~Benchmark&TestCategory!=Performance&TestCategory!=Benchmark"
+          --logger "trx;LogFileName=tests.trx"
+          --results-directory TestResults
+          --blame-hang-timeout 5m
+          -- NUnit.ConsoleOut=0 NUnit.ExplicitMode=None
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.os }}
+          path: ruleset/TestResults/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload ruleset DLL
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: bms-ruleset-${{ matrix.os }}
+          path: ruleset/osu.Game.Rulesets.BmsRuleset/bin/Release/net10.0/osu.Game.Rulesets.BmsRuleset.dll
+          if-no-files-found: error
+          retention-days: 7
