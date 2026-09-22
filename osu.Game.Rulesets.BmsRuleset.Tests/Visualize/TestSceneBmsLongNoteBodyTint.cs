@@ -110,8 +110,8 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
-        AddStep("seek before long note", () => Player.GameplayClockContainer.Seek(start_time - 100));
-        AddUntilStep("held body before release", () => Player.GameplayClockContainer.CurrentTime >= start_time + 300);
+        seek(start_time - 100);
+        seek(start_time + 300);
         AddUntilStep("held body and tail are fully opaque", () =>
         {
             var longNote = Playfield.GetAliveObjectAtTime(start_time);
@@ -136,7 +136,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
             var bodyEdgeNearHead = Math.Abs(bodyTop - headCentre) < Math.Abs(bodyBottom - headCentre) ? bodyTop : bodyBottom;
             return Math.Abs(bodyEdgeNearHead - headCentre) <= 1;
         });
-        AddUntilStep("released body before tail", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + fast_release_offset + 120);
+        seek(start_time + duration + fast_release_offset + 120);
         // A fast release fades body+tail together (matches DrawableBmsLongNote.released_alpha) instead
         // of greying only the body, so a coloured tail no longer clashes with a grey body.
         AddUntilStep("released body and tail are faded", () =>
@@ -146,7 +146,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
                    && longNoteBodyOf(longNote).Alpha == 0.4f
                    && longNoteTailOf(longNote).Alpha == 0.4f;
         });
-        AddUntilStep("pressed again after failed release", () => Player.GameplayClockContainer.CurrentTime >= start_time + duration + repress_offset + 120);
+        seek(start_time + duration + repress_offset + 120);
         AddUntilStep("failed repress has mode-specific alpha", () =>
         {
             var longNote = Playfield.GetAliveObjectAtTime(start_time);
@@ -176,8 +176,20 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
-        AddStep("seek before normal tail", () => Player.GameplayClockContainer.Seek(second_start_time - 100));
-        AddUntilStep("past tail release", () => Player.GameplayClockContainer.CurrentTime >= second_start_time + duration + 20);
+        seek(second_start_time - 100);
+        seek(second_start_time + duration + 20);
         AddUntilStep("tail non-poor clears long note", () => Playfield.GetAliveObjectAtTime(second_start_time) == null);
+    }
+
+    private void seek(double time)
+    {
+        // These visual states last only until the next replay input or tail. Keep the clock fixed
+        // while assertions run, and wait for replay simulation rather than just the parent clock.
+        AddStep($"seek to {time}", () =>
+        {
+            Player.GameplayClockContainer.Stop();
+            Player.GameplayClockContainer.Seek(time);
+        });
+        AddUntilStep("simulation reached target", () => Player.DrawableRuleset.FrameStableClock.CurrentTime, () => Is.EqualTo(time).Within(0.000001));
     }
 }

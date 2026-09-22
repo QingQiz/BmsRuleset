@@ -249,21 +249,48 @@ public partial class TestSceneBmsSongSelectLampHack
     [Test]
     public void TestDifficultyMarkerRefreshWithoutChangesDoesNotNotifySongSelect()
     {
+        const int set_count = 16;
         var directory = string.Empty;
         Task work = null!;
 
         importLampBeatmapSet();
-        AddStep("import offline BMS fixture", () =>
+        AddStep("seed offline beatmap metadata", () =>
         {
-            directory = createNotificationStormCharts(16);
-            work = new BmsFileImporter(Realm, LocalStorage).Import(directory);
+            // The no-op refresh only reads metadata. Preparing it directly keeps chart parsing,
+            // star calculation and file import outside this notification test's setup deadline.
+            directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"unchanged-markers-{Guid.NewGuid():N}");
+            Realm.Write(r =>
+            {
+                var ruleset = r.Find<RulesetInfo>(Constant.SHORT_NAME)!;
+                for (var setIndex = 0; setIndex < set_count; setIndex++)
+                {
+                    var set = new BeatmapSetInfo { OnlineID = -1, Hash = Guid.NewGuid().ToString("N") };
+                    for (var chartIndex = 0; chartIndex < storm_charts_per_set; chartIndex++)
+                    {
+                        var hash = Guid.NewGuid().ToString("N");
+                        set.Beatmaps.Add(new BeatmapInfo(ruleset)
+                        {
+                            OnlineID = -1,
+                            BeatmapSet = set,
+                            Hash = hash,
+                            MD5Hash = hash,
+                            DifficultyName = $"Difficulty {chartIndex}",
+                            Metadata = new BeatmapMetadata
+                            {
+                                Title = $"Unchanged markers {setIndex}",
+                                Source = Path.Combine(directory, $"set-{setIndex:D3}"),
+                            },
+                        });
+                    }
+                    r.Add(set);
+                }
+            });
         });
-        waitForNotificationStormWork("fixture import", () => work);
         loadSongSelect();
         observeNotificationStorm(() => directory);
         AddStep("refresh unchanged difficulty names", () =>
         {
-            Assert.That(notificationStormProbe!.Charts, Has.Length.EqualTo(16 * storm_charts_per_set));
+            Assert.That(notificationStormProbe!.Charts, Has.Length.EqualTo(set_count * storm_charts_per_set));
             var store = new DifficultyTableStore(null, Path.Combine(directory, "empty-table-cache"));
             work = Task.Run(() => new DifficultyNameUpdater(Realm, store).RefreshAllMarkers());
         });
