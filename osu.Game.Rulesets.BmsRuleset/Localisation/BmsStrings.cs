@@ -294,6 +294,22 @@ public static class BmsStrings
 
     public static LocalisableString ScoreGraphTargetColourDescription => get("score_graph_target_colour_description");
 
+    public static LocalisableString ScoreGraphBackgroundColour => get("score_graph_background_colour");
+
+    public static LocalisableString ScoreGraphBackgroundColourDescription => get("score_graph_background_colour_description");
+
+    public static LocalisableString ScoreGraphBackgroundOpacity => get("score_graph_background_opacity");
+
+    public static LocalisableString ScoreGraphBackgroundOpacityDescription => get("score_graph_background_opacity_description");
+
+    public static LocalisableString ScoreGraphSectionBackgroundColour => get("score_graph_section_background_colour");
+
+    public static LocalisableString ScoreGraphSectionBackgroundColourDescription => get("score_graph_section_background_colour_description");
+
+    public static LocalisableString ScoreGraphSectionBackgroundOpacity => get("score_graph_section_background_opacity");
+
+    public static LocalisableString ScoreGraphSectionBackgroundOpacityDescription => get("score_graph_section_background_opacity_description");
+
     public static LocalisableString ScoreGraphShowBars => get("score_graph_show_bars");
 
     public static LocalisableString ScoreGraphShowBarsDescription => get("score_graph_show_bars_description");

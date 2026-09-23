@@ -357,4 +357,28 @@
   <data name="show_invisible_notes_hint" xml:space="preserve">
     <value>将用于切换按键音的不可见音符显示为黄色方框。这些音符不参与判定或计分。</value>
   </data>
+  <data name="score_graph_background_colour" xml:space="preserve">
+    <value>整体背景颜色</value>
+  </data>
+  <data name="score_graph_background_colour_description" xml:space="preserve">
+    <value>整个分数图的背景颜色。</value>
+  </data>
+  <data name="score_graph_background_opacity" xml:space="preserve">
+    <value>整体背景不透明度</value>
+  </data>
+  <data name="score_graph_background_opacity_description" xml:space="preserve">
+    <value>调整整体背景的不透明度。</value>
+  </data>
+  <data name="score_graph_section_background_colour" xml:space="preserve">
+    <value>区域背景颜色</value>
+  </data>
+  <data name="score_graph_section_background_colour_description" xml:space="preserve">
+    <value>柱状图、分数行和判定对比区域共用的背景颜色。</value>
+  </data>
+  <data name="score_graph_section_background_opacity" xml:space="preserve">
+    <value>区域背景不透明度</value>
+  </data>
+  <data name="score_graph_section_background_opacity_description" xml:space="preserve">
+    <value>调整所有区域背景的不透明度。</value>
+  </data>
 </root>

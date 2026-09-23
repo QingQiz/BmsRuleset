@@ -242,6 +242,9 @@ counts from PGREAT to E-POOR. Personal-best judgement counts show as unavailable
 - **Current score colour** changes the live EX-score bar and current-score accents.
 - **Personal best colour** changes the personal-best bar, its final-score ghost, and personal-best accents.
 - **Target colour** changes the target bar, its final-score ghost, and target accents.
+- **Overall background colour** and **Overall background opacity** control the full component background.
+- **Section background colour** and **Section background opacity** control the shared background of all sections.
+  Both opacity settings are independent and do not affect bars or text.
 - **Show score bars**, **Show score differences**, and **Show judgement comparison** toggle each section.
   At least one must stay visible.
 

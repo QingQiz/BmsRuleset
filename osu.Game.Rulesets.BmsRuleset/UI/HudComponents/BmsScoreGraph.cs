@@ -11,6 +11,7 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
@@ -32,7 +33,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
     private const float footer_gap = 4;
     private const float plot_top_padding = 8;
     private const float minimum_plot_height = 62;
-    private const float horizontal_padding = 12;
+    private const float horizontal_padding = 8;
     private const float minimum_width = 160;
     private const float absolute_minimum_height = footer_bottom_padding + plot_top_padding + minimum_plot_height;
 
@@ -64,6 +65,30 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ScoreGraphTargetColour), nameof(BmsStrings.ScoreGraphTargetColourDescription))]
     public BindableColour4 TargetColour { get; } = new(new Color4(255, 70, 75, 255));
 
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ScoreGraphBackgroundColour), nameof(BmsStrings.ScoreGraphBackgroundColourDescription))]
+    public BindableColour4 BackgroundColour { get; } = new(new Color4(13, 16, 20, 255));
+
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ScoreGraphBackgroundOpacity), nameof(BmsStrings.ScoreGraphBackgroundOpacityDescription),
+        SettingControlType = typeof(SettingsPercentageSlider<float>))]
+    public BindableNumber<float> BackgroundOpacity { get; } = new BindableFloat(0.2f)
+    {
+        MinValue = 0,
+        MaxValue = 1,
+        Precision = 0.01f,
+    };
+
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ScoreGraphSectionBackgroundColour), nameof(BmsStrings.ScoreGraphSectionBackgroundColourDescription))]
+    public BindableColour4 SectionBackgroundColour { get; } = new(new Color4(22, 26, 32, 255));
+
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ScoreGraphSectionBackgroundOpacity), nameof(BmsStrings.ScoreGraphSectionBackgroundOpacityDescription),
+        SettingControlType = typeof(SettingsPercentageSlider<float>))]
+    public BindableNumber<float> SectionBackgroundOpacity { get; } = new BindableFloat(0.4f)
+    {
+        MinValue = 0,
+        MaxValue = 1,
+        Precision = 0.01f,
+    };
+
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ScoreGraphShowBars), nameof(BmsStrings.ScoreGraphShowBarsDescription))]
     public BindableBool ShowBars { get; } = new(true);
 
@@ -73,6 +98,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ScoreGraphShowJudgementComparison), nameof(BmsStrings.ScoreGraphShowJudgementComparisonDescription))]
     public BindableBool ShowJudgementComparison { get; } = new(true);
 
+    private readonly List<Box> sectionBackgrounds = [];
     private readonly Container plotContainer;
     private readonly Container currentScoreRow;
     private readonly Container personalBestScoreRow;
@@ -152,21 +178,17 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         var plotBackground = new Box
         {
             RelativeSizeAxes = Axes.Both,
-            Colour = new Color4(7, 9, 12, 255),
         };
         var judgementBackground = new Box
         {
             RelativeSizeAxes = Axes.Both,
-            Colour = new Color4(18, 22, 27, 255),
         };
+
+        var background = new Box { RelativeSizeAxes = Axes.Both };
 
         InternalChildren =
         [
-            new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-                Colour = new Color4(13, 16, 20, 242),
-            },
+            background,
             plotContainer = new Container
             {
                 RelativeSizeAxes = Axes.Both,
@@ -252,6 +274,20 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
                 ],
             },
         ];
+
+        sectionBackgrounds.AddRange([plotBackground, judgementBackground]);
+        BackgroundColour.BindValueChanged(colour => background.Colour = colour.NewValue, true);
+        BackgroundOpacity.BindValueChanged(opacity => background.Alpha = opacity.NewValue, true);
+        SectionBackgroundColour.BindValueChanged(colour =>
+        {
+            foreach (var sectionBackground in sectionBackgrounds)
+                sectionBackground.Colour = colour.NewValue;
+        }, true);
+        SectionBackgroundOpacity.BindValueChanged(opacity =>
+        {
+            foreach (var sectionBackground in sectionBackgrounds)
+                sectionBackground.Alpha = opacity.NewValue;
+        }, true);
 
         CurrentColour.BindValueChanged(colour =>
         {
@@ -642,7 +678,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         ],
     };
 
-    private static Container createScoreRow(
+    private Container createScoreRow(
         LocalisableString label,
         bool showDifference,
         out Box accent,
@@ -650,7 +686,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         out OsuSpriteText differenceText) =>
         createScoreRow(label, showDifference, out accent, out scoreText, out differenceText, out _);
 
-    private static Container createScoreRow(
+    private Container createScoreRow(
         LocalisableString label,
         bool showDifference,
         out Box accent,
@@ -658,6 +694,9 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         out OsuSpriteText differenceText,
         out OsuSpriteText labelText)
     {
+        var background = new Box { RelativeSizeAxes = Axes.Both };
+        sectionBackgrounds.Add(background);
+
         var row = new Container
         {
             Anchor = Anchor.BottomLeft,
@@ -666,11 +705,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             Height = score_row_height,
             Children =
             [
-                new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = new Color4(22, 26, 32, 255),
-                },
+                background,
                 accent = new Box
                 {
                     RelativeSizeAxes = Axes.Y,
