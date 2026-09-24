@@ -31,6 +31,10 @@ Supports `.bms`, `.bme`, `.bml`, and `.pms` charts in single-play and double-pla
    folder if it does not exist.
 3. Restart osu!. **BMS** will appear in the ruleset selector.
 
+To try the latest development build, open [CI runs](https://github.com/QingQiz/BmsRuleset/actions/workflows/ci.yml),
+select the latest successful run on the `dev` branch, and download `bms-ruleset` from **Artifacts** (GitHub sign-in required).
+Extract the DLL and install it as above. CI artifacts are retained for 7 days.
+
 ## Importing BMS Charts
 
 1. Open **Settings → BMS → Import BMS files**.

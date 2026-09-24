@@ -30,6 +30,10 @@
    不存在，请手动创建。
 3. 重启 osu!，规则集选择器中会出现 **BMS**。
 
+如需体验最新开发版，可打开 [CI 运行记录](https://github.com/QingQiz/BmsRuleset/actions/workflows/ci.yml)，
+选择 `dev` 分支最新一次成功的运行，在 **Artifacts** 中下载 `bms-ruleset`（需要登录 GitHub）。
+解压后按上述步骤安装 DLL。CI 产物保留 7 天。
+
 ## 导入 BMS 谱面
 
 1. 打开**设置 → BMS → 导入 BMS 文件**。
