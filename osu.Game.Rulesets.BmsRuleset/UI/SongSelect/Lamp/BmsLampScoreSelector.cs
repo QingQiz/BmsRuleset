@@ -45,11 +45,10 @@ public static class BmsLampScoreSelector
     }
 
     internal static bool MatchesSelectedMods(ScoreInfo score, IReadOnlyList<Mod> selectedMods) =>
-        score.Mods.OfType<IApplicableToScoreSelection>()
-            .All(mod => hasMatchingMod(mod, selectedMods)) &&
-        selectedMods.OfType<IApplicableToScoreSelection>()
-            .Where(mod => mod.Difficulty == IApplicableToScoreSelection.ScoreSelectionDifficulty.Increase)
-            .All(mod => hasMatchingMod(mod, score.Mods));
+        score.Mods.Concat(selectedMods)
+            .OfType<IApplicableToScoreSelection>()
+            .DistinctBy(rule => rule.ScoreSelectionRuleType)
+            .All(rule => rule.IsScoreEligible(score.Mods, selectedMods));
 
     internal static bool MatchesExactMods(
         IEnumerable<Mod> scoreMods,
@@ -103,7 +102,4 @@ public static class BmsLampScoreSelector
     private static bool hasHistoricalStage(BmsCourseResult result) =>
         result.Attempt?.Stages is { Length: > 0 } stages
         && stages.Any(stage => stage.ScoreId is { } scoreId && scoreId != Guid.Empty);
-
-    private static bool hasMatchingMod(IApplicableToScoreSelection mod, IEnumerable<Mod> candidates) =>
-        candidates.Any(candidate => candidate is IApplicableToScoreSelection && mod.MatchesScoreSelection(candidate));
 }

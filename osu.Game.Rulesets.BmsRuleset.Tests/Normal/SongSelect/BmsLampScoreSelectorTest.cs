@@ -20,7 +20,6 @@ public class BmsScoreSelectorLampTest
     [TestCase(typeof(BmsModAutoScratch))]
     [TestCase(typeof(BmsModConstant))]
     [TestCase(typeof(BmsModHalfTime))]
-    [TestCase(typeof(BmsModDoubleTime))]
     public void TestNoSelectedModsExcludesSignificantModScores(Type modType)
     {
         var noModScore = score(900);
@@ -50,12 +49,12 @@ public class BmsScoreSelectorLampTest
 
     [TestCase(typeof(BmsModHalfTime), typeof(BmsModDoubleTime))]
     [TestCase(typeof(BmsModDoubleTime), typeof(BmsModHalfTime))]
-    public void TestRateAdjustModsMatchExactly(Type selectedRateModType, Type otherRateModType)
+    public void TestRateAdjustModsAcceptFasterScores(Type selectedRateModType, Type otherRateModType)
     {
         var selectedRateScore = score(900, create(selectedRateModType));
         var otherRateScore = score(1_000, create(otherRateModType));
 
-        Assert.That(BmsLampScoreSelector.SelectBest([otherRateScore, selectedRateScore], [create(selectedRateModType)]), Is.SameAs(selectedRateScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([otherRateScore, selectedRateScore], [create(selectedRateModType)]), Is.SameAs(selectedRateModType == typeof(BmsModHalfTime) ? otherRateScore : selectedRateScore));
     }
 
     [TestCase(typeof(BmsModHalfTime), 0.80)]
@@ -66,7 +65,7 @@ public class BmsScoreSelectorLampTest
         var defaultRateScore = score(1_000, create(rateModType));
 
         Assert.That(BmsLampScoreSelector.SelectBest([defaultRateScore, selectedRateScore], [rateMod(rateModType, selectedSpeed)]), Is.SameAs(selectedRateScore));
-        Assert.That(BmsLampScoreSelector.SelectBest([selectedRateScore], [create(rateModType)]), Is.Null);
+        Assert.That(BmsLampScoreSelector.SelectBest([selectedRateScore], [create(rateModType)]), Is.SameAs(selectedRateScore));
     }
 
     [TestCase(typeof(BmsModHalfTime))]

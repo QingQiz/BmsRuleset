@@ -44,7 +44,7 @@ public class BmsScoreSelectorGraphTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(BmsLampScoreSelector.SelectBest([noMod, doubleTime], [], 100), Is.SameAs(noMod));
+            Assert.That(BmsLampScoreSelector.SelectBest([noMod, doubleTime], [], 100), Is.SameAs(doubleTime));
             Assert.That(BmsLampScoreSelector.SelectBest([noMod, doubleTime], [new BmsModDoubleTime()], 100), Is.SameAs(doubleTime));
         });
     }

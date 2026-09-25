@@ -34,7 +34,7 @@ public class BmsScoreSelectorCourseTest
         Assert.That(BmsLampScoreSelector.SelectBestCourse([doubleTimeResult, noModResult], [new BmsModDoubleTime()]),
             Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.A)));
         Assert.That(BmsLampScoreSelector.SelectBestCourse([doubleTimeResult, noModResult], []),
-            Is.EqualTo((BmsLamp.Clear, (ScoreRank?)ScoreRank.S)));
+            Is.EqualTo((BmsLamp.ExHardClear, (ScoreRank?)ScoreRank.S)));
     }
 
     [Test]
