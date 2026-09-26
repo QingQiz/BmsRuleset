@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Mods;
@@ -106,13 +105,14 @@ public class BmsScoreSelectionModTest
     [Test]
     public void TestSharedRuleEvaluatedOnceAcrossBothLists()
     {
-        var first = new CountingRuleMod();
-        var second = new OtherCountingRuleMod();
-        var selected = new CountingRuleMod();
+        var rule = new CountingRule();
+        var first = new CountingRuleMod(rule);
+        var second = new OtherCountingRuleMod(rule);
+        var selected = new CountingRuleMod(rule);
         var score = new ScoreInfo { Mods = [first, second] };
 
         Assert.That(BmsLampScoreSelector.MatchesSelectedMods(score, [selected]), Is.True);
-        Assert.That(first.Calls + second.Calls + selected.Calls, Is.EqualTo(1));
+        Assert.That(rule.Calls, Is.EqualTo(1));
     }
 
     [Test]
@@ -120,14 +120,21 @@ public class BmsScoreSelectionModTest
     {
         IApplicableToScoreSelection doubleTime = new BmsModDoubleTime();
         IApplicableToScoreSelection halfTime = new BmsModHalfTime();
-        Assert.That(doubleTime.ScoreSelectionRuleType, Is.EqualTo(halfTime.ScoreSelectionRuleType));
+        Assert.That(doubleTime.ScoreSelectionRule, Is.SameAs(halfTime.ScoreSelectionRule));
     }
 
-    private class CountingRuleMod : BmsModMirror, IApplicableToScoreSelection
+    private class CountingRuleMod(IScoreSelectionRule rule) : BmsModMirror, IApplicableToScoreSelection
+    {
+        public IScoreSelectionRule ScoreSelectionRule => rule;
+    }
+
+    private class OtherCountingRuleMod(IScoreSelectionRule rule) : CountingRuleMod(rule)
+    {
+    }
+
+    private class CountingRule : IScoreSelectionRule
     {
         public int Calls { get; private set; }
-        public Type ScoreSelectionRuleType => typeof(CountingRuleMod);
-        public IApplicableToScoreSelection.ScoreSelectionDifficulty Difficulty => IApplicableToScoreSelection.ScoreSelectionDifficulty.Reduction;
 
         public bool IsScoreEligible(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods)
         {
@@ -136,17 +143,13 @@ public class BmsScoreSelectionModTest
         }
     }
 
-    private class OtherCountingRuleMod : CountingRuleMod
-    {
-    }
-
     private class DifficultyIncreaseMod : BmsModMirror, IApplicableToScoreSelection
     {
-        public IApplicableToScoreSelection.ScoreSelectionDifficulty Difficulty => IApplicableToScoreSelection.ScoreSelectionDifficulty.Increase;
+        public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<DifficultyIncreaseMod>.EXACT;
     }
 
     private class DifficultyReductionMod : BmsModMirror, IApplicableToScoreSelection
     {
-        public IApplicableToScoreSelection.ScoreSelectionDifficulty Difficulty => IApplicableToScoreSelection.ScoreSelectionDifficulty.Reduction;
+        public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<DifficultyReductionMod>.REDUCTION;
     }
 }

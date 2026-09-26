@@ -31,7 +31,7 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
 
     public override ModType Type => ModType.Automation;
 
-    public IApplicableToScoreSelection.ScoreSelectionDifficulty Difficulty => IApplicableToScoreSelection.ScoreSelectionDifficulty.Reduction;
+    public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModAutoScratch>.REDUCTION;
 
     private BmsPlayfield playfield = null!;
 

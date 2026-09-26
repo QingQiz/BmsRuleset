@@ -22,7 +22,7 @@ public class BmsModConstant : Mod, IApplicableToDrawableRuleset<BmsHitObject>, I
 
     public override ModType Type => ModType.DifficultyReduction;
 
-    public IApplicableToScoreSelection.ScoreSelectionDifficulty Difficulty => IApplicableToScoreSelection.ScoreSelectionDifficulty.Reduction;
+    public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModConstant>.REDUCTION;
 
     public override Type[] IncompatibleMods => [];
 

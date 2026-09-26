@@ -21,7 +21,7 @@ public class BmsModNoMine : Mod, IApplicableAfterBeatmapConversion, IApplicableT
 
     public override ModType Type => ModType.DifficultyReduction;
 
-    public IApplicableToScoreSelection.ScoreSelectionDifficulty Difficulty => IApplicableToScoreSelection.ScoreSelectionDifficulty.Reduction;
+    public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModNoMine>.REDUCTION;
 
     public void ApplyToBeatmap(IBeatmap beatmap)
     {

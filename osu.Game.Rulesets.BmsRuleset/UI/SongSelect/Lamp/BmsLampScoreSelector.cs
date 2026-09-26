@@ -47,7 +47,8 @@ public static class BmsLampScoreSelector
     internal static bool MatchesSelectedMods(ScoreInfo score, IReadOnlyList<Mod> selectedMods) =>
         score.Mods.Concat(selectedMods)
             .OfType<IApplicableToScoreSelection>()
-            .DistinctBy(rule => rule.ScoreSelectionRuleType)
+            .Select(mod => mod.ScoreSelectionRule)
+            .Distinct<IScoreSelectionRule>(ReferenceEqualityComparer.Instance)
             .All(rule => rule.IsScoreEligible(score.Mods, selectedMods));
 
     internal static bool MatchesExactMods(

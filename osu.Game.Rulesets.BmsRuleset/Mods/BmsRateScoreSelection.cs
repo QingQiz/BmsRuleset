@@ -3,9 +3,15 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BmsRuleset.Mods;
 
-internal static class BmsRateScoreSelection
+internal sealed class BmsRateScoreSelection : IScoreSelectionRule
 {
-    public static bool IsScoreEligible(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods) =>
+    public static readonly BmsRateScoreSelection INSTANCE = new();
+
+    private BmsRateScoreSelection()
+    {
+    }
+
+    public bool IsScoreEligible(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods) =>
         rateFor(scoreMods) >= rateFor(selectedMods);
 
     private static double rateFor(IReadOnlyList<Mod> mods)
