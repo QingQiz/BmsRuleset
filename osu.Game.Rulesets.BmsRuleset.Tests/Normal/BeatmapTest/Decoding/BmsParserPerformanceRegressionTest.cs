@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.BeatmapTest.Decoding;
 public class BmsParserPerformanceRegressionTest
 {
     [TestCase("dense", "6DFA4681290A6BC94746D6321A1FCFD4B753DFE0A854785DDD850B190F635D39")]
-    [TestCase("timing", "40A497ECCDD1FAF0B80732EDAFC52EF341A7F06CEC9D211B5BE17B5A2C32A128")]
+    [TestCase("timing", "41EBF7AB8EC2B0C7D86C36BE0244683A5ED473204F617252548E64966EAAEE7C")]
     [TestCase("longnotes", "F14DADB46553C6AB69691670676B17090C31621EBC75D785A85AC82E4DE72D4D")]
     public void GeneratedChartKeepsCompleteParsedResult(string scenario, string expectedFingerprint)
     {

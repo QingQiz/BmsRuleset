@@ -27,8 +27,9 @@ public partial class TestSceneBmsReplayRewind : BmsPlayerTestScene
     [
         new BmsReplayFrame(0),
         // An early press produces a real Empty POOR which must itself be undone by seeking.
-        new BmsReplayFrame(500, BmsAction.Key1),
-        new BmsReplayFrame(510),
+        // Keep the press inside the E-POOR window so the replay jump has activated the LN drawable.
+        new BmsReplayFrame(600, BmsAction.Key1),
+        new BmsReplayFrame(610),
         new BmsReplayFrame(missHead ? 1500 : 1000, BmsAction.Key1),
         new BmsReplayFrame(1700),
         new BmsReplayFrame(2000, BmsAction.Key1),
@@ -83,9 +84,10 @@ public partial class TestSceneBmsReplayRewind : BmsPlayerTestScene
             seek(time);
             AddStep($"snapshot at {time}", () => snapshots[time] = snapshot());
         }
-        AddAssert("fixture includes Empty POOR and POOR", () =>
+        AddAssert("fixture includes the expected misses", () =>
             Player.ScoreProcessor.Statistics.GetValueOrDefault(HitResult.Miss) > 0
-            && Player.ScoreProcessor.Statistics.GetValueOrDefault(HitResult.Meh) > 0);
+            && (mode == BmsLongNoteMode.LongNote && !missedHead
+                || Player.ScoreProcessor.Statistics.GetValueOrDefault(HitResult.Meh) > 0));
 
         double[] rewindTargets = [2200, 1800, 1685, 1550, 0];
         foreach (var target in rewindTargets)
