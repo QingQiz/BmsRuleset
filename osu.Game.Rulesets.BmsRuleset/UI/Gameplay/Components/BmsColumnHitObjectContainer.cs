@@ -30,6 +30,10 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private readonly Dictionary<DrawableBmsHitObject, long> headIds = [];
     private long nextHeadId;
     private readonly List<DrawableBmsHitObject> activeLongNotes = [];
+    private readonly List<DrawableBmsHitObject> orderedActiveLongNotes = [];
+    private readonly List<DrawableBmsHitObject> landmines = [];
+    private bool activeLongNoteOrderDirty;
+    private bool landmineOrderDirty;
 
     internal DrawableBmsHitObject? FirstPendingHead
     {
@@ -75,12 +79,22 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     protected override void AddDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
     {
         base.AddDrawable(entry, drawable);
-        if (!canBatchUpdates || drawable is not DrawableBmsHitObject note || entry.HitObject is not (BmsNote or BmsLongNote))
+        if (drawable is not DrawableBmsHitObject note)
+            return;
+
+        if (entry.HitObject is BmsLandmine)
+        {
+            landmines.Add(note);
+            landmineOrderDirty = true;
+        }
+
+        // Holds also need an index in columns containing mines or invisible notes.
+        if (entry.HitObject is not BmsLongNote && (!canBatchUpdates || entry.HitObject is not BmsNote))
             return;
 
         var id = ++nextHeadId;
         headIds.Add(note, id);
-        if (note.HasPendingHead)
+        if (canBatchUpdates && note.HasPendingHead)
             pendingHeads.Add((note.HitObject.StartTime, id, note));
         trackActiveLongNote(note);
         passiveDeadlineDirty = true;
@@ -97,8 +111,11 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             note.OnNewResult -= removeJudgedHead;
             note.OnRevertResult -= restoreHead;
             note.HeadJudged -= onHeadJudged;
-            activeLongNotes.Remove(note);
+            activeLongNoteOrderDirty |= activeLongNotes.Remove(note);
         }
+
+        if (drawable is DrawableBmsHitObject { HitObject: BmsLandmine } mine)
+            landmineOrderDirty |= landmines.Remove(mine);
 
         base.RemoveDrawable(entry, drawable);
     }
@@ -119,13 +136,16 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private void trackActiveLongNote(DrawableBmsHitObject note)
     {
         if (note.RequiresActiveLongNoteUpdate && !activeLongNotes.Contains(note))
+        {
             activeLongNotes.Add(note);
+            activeLongNoteOrderDirty = true;
+        }
     }
 
     private void restoreHead(DrawableHitObject drawable, JudgementResult result)
     {
         var note = (DrawableBmsHitObject)drawable;
-        if (note.HasPendingHead)
+        if (canBatchUpdates && note.HasPendingHead)
             pendingHeads.Add((note.HitObject.StartTime, headIds[note], note));
         trackActiveLongNote(note);
         passiveDeadlineDirty = true;
@@ -183,6 +203,91 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         return updated;
     }
 
+    internal void UpdateLandmines(bool holding)
+    {
+        // Lifetime enumeration order is unspecified. Cache it only when membership changes
+        // so simultaneous judgements keep their previous order without a per-frame scan.
+        if (landmineOrderDirty && landmines.Count > 1)
+        {
+            landmines.Clear();
+            foreach (var drawable in AliveEntries.Values)
+            {
+                if (drawable is DrawableBmsHitObject { HitObject: BmsLandmine } mine)
+                    landmines.Add(mine);
+            }
+        }
+        landmineOrderDirty = false;
+
+        foreach (var mine in landmines)
+            mine.UpdateLandmine(holding);
+    }
+
+    internal void UpdateHellChargeBodies(bool holding)
+    {
+        pruneInactiveLongNotes();
+        foreach (var note in canBatchUpdates ? activeLongNotes : getOrderedActiveLongNotes())
+            note.UpdateHellChargeBody(holding);
+    }
+
+    internal void CompleteLongNotesAtPause(double currentTime)
+    {
+        pruneInactiveLongNotes();
+
+        // Resume rewind keeps completed results authoritative. Finalising active holds here
+        // means the rewind does not need to reconstruct an intermediate LN controller state.
+        foreach (var note in getOrderedActiveLongNotes())
+        {
+            if (note is ILongNoteHolder longNote)
+                longNote.CompleteAtPause(currentTime);
+        }
+    }
+
+    internal DrawableBmsHitObject? TryRepress(double time, bool reverseScratch)
+    {
+        pruneInactiveLongNotes();
+        foreach (var note in getOrderedActiveLongNotes())
+        {
+            if (note is ILongNoteHolder holder && holder.TryRepress(time, reverseScratch))
+                return note;
+        }
+
+        return null;
+    }
+
+    private void pruneInactiveLongNotes()
+    {
+        for (var i = activeLongNotes.Count - 1; i >= 0; i--)
+        {
+            if (activeLongNotes[i].RequiresActiveLongNoteUpdate)
+                continue;
+
+            activeLongNotes.RemoveAt(i);
+            activeLongNoteOrderDirty = true;
+        }
+    }
+
+    private List<DrawableBmsHitObject> getOrderedActiveLongNotes()
+    {
+        if (!activeLongNoteOrderDirty)
+            return orderedActiveLongNotes;
+
+        orderedActiveLongNotes.Clear();
+        if (activeLongNotes.Count <= 1)
+            orderedActiveLongNotes.AddRange(activeLongNotes);
+        else
+        {
+            // Overlapping holds must keep the same input winner as the former alive scan.
+            // Rebuild on activation/retirement/rewind, rather than on every key or frame.
+            foreach (var drawable in AliveEntries.Values)
+            {
+                if (drawable is DrawableBmsHitObject { RequiresActiveLongNoteUpdate: true } note)
+                    orderedActiveLongNotes.Add(note);
+            }
+        }
+        activeLongNoteOrderDirty = false;
+        return orderedActiveLongNotes;
+    }
+
     internal void UpdateDeferredLongNotes()
     {
         if (activeLongNotes.Count == 0)
@@ -205,7 +310,10 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             }
 
             if (!note.RequiresActiveLongNoteUpdate)
+            {
                 activeLongNotes.RemoveAt(i);
+                activeLongNoteOrderDirty = true;
+            }
         }
     }
 
@@ -305,8 +413,12 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         // Restore entries before pool activation, including controllers whose drawables were freed.
         foreach (var entry in Entries)
         {
-            if (entry is BmsHitObjectLifetimeEntry { LongNoteJudgementController: { } controller })
-                controller.Rewind(Time.Current);
+            if (entry is not BmsHitObjectLifetimeEntry bmsEntry)
+                continue;
+
+            bmsEntry.LongNoteJudgementController?.Rewind(Time.Current);
+            if (bmsEntry.LandmineHandledTime is { } handledTime && Time.Current < handledTime)
+                bmsEntry.LandmineHandledTime = null;
         }
 
         foreach (var note in AliveEntries.Values)
@@ -319,9 +431,10 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         // without OnRevertResult, so rebuild the input/hold indexes from the restored controllers.
         pendingHeads.Clear();
         activeLongNotes.Clear();
+        activeLongNoteOrderDirty = true;
         foreach (var (note, id) in headIds)
         {
-            if (note.HasPendingHead)
+            if (canBatchUpdates && note.HasPendingHead)
                 pendingHeads.Add((note.HitObject.StartTime, id, note));
             trackActiveLongNote(note);
         }

@@ -6,6 +6,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Tests.Visual;
 
@@ -78,5 +79,35 @@ public partial class TestSceneBmsPauseRewindLongNote : BmsPlayerTestScene
         AddAssert("rewind remains active", () => Playfield.IsResumeRewinding);
         AddAssert("judgement survives rewind", () => longNote!.Judged);
         AddAssert("completed long note hidden", () => longNote!.Alpha, () => Is.Zero);
+    }
+
+    [Test]
+    public void TestActiveLongNoteCompletesAtPauseBeforeResumeRewind()
+    {
+        AddStep("load player", LoadPlayer);
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Playfield.Stage.IsLoaded);
+        AddStep("seek to long note head", () =>
+        {
+            Player.GameplayClockContainer.Stop();
+            Player.GameplayClockContainer.Seek(long_note_time);
+            Player.GameplayClockContainer.Start();
+        });
+        AddStep("stop at long note head", () => Player.GameplayClockContainer.Stop());
+        AddUntilStep("long note alive", () => Playfield.AllColumnAliveObjects().Any(drawable => drawable.HitObject is BmsLongNote));
+        AddStep("judge long note head", () => Playfield.Stage.Columns[2].HandlePress(long_note_time));
+        AddStep("seek into long note body", () =>
+        {
+            Player.GameplayClockContainer.Seek(long_note_time + 100);
+            Player.GameplayClockContainer.Start();
+        });
+        AddUntilStep("simulation reaches pause boundary", () => Player.DrawableRuleset.FrameStableClock.CurrentTime >= long_note_time + 100);
+        AddStep("pause", () => Player.Pause());
+        AddAssert("active long note completed at pause", () => Player.ScoreProcessor.JudgedHits, () => Is.EqualTo(1));
+        AddStep("resume", () => Player.Resume());
+        AddUntilStep("resume rewind active", () => Playfield.IsResumeRewinding);
+        AddAssert("pause judgement survives resume rewind", () => Player.ScoreProcessor.JudgedHits, () => Is.EqualTo(1));
+        AddUntilStep("resume lead-in finished", () => !Playfield.IsResumeRewinding);
+        AddAssert("pause completion is not replayed", () => ((BmsScoreProcessor)Player.ScoreProcessor).ScoringJudgementEventCount,
+            () => Is.EqualTo(1));
     }
 }

@@ -45,16 +45,17 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     private static readonly double? very_fast_press = -260;
     private static readonly double? slow_press = 80;
     private static readonly double? very_slow_press = 340;
-    private static readonly double? bad_fast_press = -200;
-    private static readonly double? bad_slow_press = 240;
-    private const double bad_fast_edge = -220;
-    private const double before_bad_fast_edge = -221;
-    private const double bad_slow_edge = 280;
-    private const double after_bad_slow_edge = 281;
+    private static readonly double? bad_fast_press = -150;
+    private static readonly double? bad_slow_press = 180;
+    private const double bad_fast_edge = -165;
+    private const double before_bad_fast_edge = -166;
+    private const double bad_slow_edge = 210;
+    private const double after_bad_slow_edge = 211;
 
     private static readonly double? normal_release = 0;
-    private static readonly double? fast_release = -180;
-    private static readonly double? very_fast_release = -280;
+    private static readonly double? fast_release = -160;
+    // Keep the release away from a 200ms HCN tick boundary after a frame-rounded head miss.
+    private static readonly double? very_fast_release = -260;
     private static readonly double? slow_release = 180;
     private static readonly double? very_slow_release = 320;
 
@@ -359,8 +360,8 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         ]));
         longNoteVisualCases.Add(new LongNoteVisualCase("normal press + very fast release, long gap, repress through tail", [
             new RelativeInput(0, true),
-            new RelativeInput(150, false),
-            new RelativeInput(680, true),
+            new RelativeInput(50, false),
+            new RelativeInput(430, true),
             new RelativeInput(long_note_duration, false),
         ], TestsHellChargeReleaseRecovery: true));
         longNoteVisualCases.Add(new LongNoteVisualCase("bad fast press + no release, LN auto tail uses head offset", [
@@ -516,7 +517,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
             Player.ScoreProcessor.Combo.Value,
             Player.HealthProcessor.Health.Value);
 
-    private static void assertCaseDelta(string modeName, LongNoteVisualCase testCase, CaseExpectation expected, CaseSnapshot before, CaseSnapshot after)
+    private void assertCaseDelta(string modeName, LongNoteVisualCase testCase, CaseExpectation expected, CaseSnapshot before, CaseSnapshot after)
     {
         assertJudgementDelta(modeName, testCase, expected, before, after);
         assertScoreComboDelta(modeName, testCase, expected, before, after);
@@ -544,9 +545,11 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         Assert.That(after.Combo, Is.EqualTo(expected.ComboAfter(before.Combo)), $"{modeName} {testCase.Text}: combo");
     }
 
-    private static void assertHealthDelta(string modeName, LongNoteVisualCase testCase, CaseExpectation expected, CaseSnapshot before, CaseSnapshot after)
+    private void assertHealthDelta(string modeName, LongNoteVisualCase testCase, CaseExpectation expected, CaseSnapshot before, CaseSnapshot after)
     {
-        Assert.That(after.Health, Is.EqualTo(expected.HealthAfter(before.Health)).Within(0.000001), $"{modeName} {testCase.Text}: health");
+        var history = ((osu.Game.Rulesets.BmsRuleset.Scoring.BmsHealthProcessor)Player.HealthProcessor).GaugeHistory;
+        var recent = string.Join(", ", history.TakeLast(12).Select(e => $"{e.Time}:{e.States[0].Health}"));
+        Assert.That(after.Health, Is.EqualTo(expected.HealthAfter(before.Health)).Within(0.000001), $"{modeName} {testCase.Text}: health; {recent}");
     }
 
     private static void assertNoJudgementScoreComboChange(string modeName, LongNoteVisualCase testCase, CaseSnapshot before, CaseSnapshot after)
@@ -584,7 +587,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         var expectedHealthEvents = healthEvents(testCase, mode, sequence).ToArray();
         var resultCounts = sequence.GroupBy(r => r).ToDictionary(g => g.Key, g => g.Count());
 
-        return new CaseExpectation(resultCounts, sequence, expectedHealthEvents);
+        return new CaseExpectation(resultCounts, sequence, expectedHealthEvents, mode);
     }
 
     // beatoraja judges an auto-tail with the stored head result. A manual release uses the wider
@@ -602,21 +605,6 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
         if (headResult == HitResult.None)
         {
-            if (mode == BmsLongNoteMode.HellChargeNote)
-            {
-                var sequence = new List<HitResult>();
-
-                if (headTable.IsEmptyPoorOffset(firstPress.Value))
-                    sequence.Add(HitResult.Miss);
-
-                sequence.Add(HitResult.Meh);
-
-                var missedHeadTailRelease = testCase.FirstReleaseOffsetAfter(firstPress.Value, onlyBeforeTail: false);
-                sequence.Add(tailResultForRelease(missedHeadTailRelease, tailTable));
-
-                return sequence;
-            }
-
             return missedLongNoteSequence(mode, headTable.IsEmptyPoorOffset(firstPress.Value));
         }
 
@@ -627,13 +615,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
             if (releaseBeforeTail == null)
                 return [headResult];
 
-            var releaseOffsetFromTail = releaseBeforeTail.Value - long_note_duration;
-            var judgeOffset = Math.Abs(firstPress.Value) > Math.Abs(releaseOffsetFromTail)
-                ? firstPress.Value
-                : releaseOffsetFromTail;
-
-            var result = tailTable.ResultForOffset(judgeOffset);
-            return [result == HitResult.None ? HitResult.Meh : result];
+            return [tailResultForRelease(mode, firstPress.Value, releaseBeforeTail.Value, tailTable)];
         }
 
         var tailRelease = testCase.FirstReleaseOffsetAfter(firstPress.Value, onlyBeforeTail: false);
@@ -663,10 +645,12 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
             return tailResultForRelease(releaseFromHead, tailTable);
 
         var tailOffset = releaseFromHead - long_note_duration;
+        var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
+        var headResult = headTable.ResultForOffset(firstPress);
+        var releaseResult = tailTable.ResultForOffset(tailOffset);
+        var result = (HitResult)Math.Min((int)headResult, (int)(releaseResult == HitResult.None ? HitResult.Meh : releaseResult));
         var heldOffset = Math.Abs(firstPress) > Math.Abs(tailOffset) ? firstPress : tailOffset;
-        var result = tailTable.ResultForOffset(heldOffset);
-
-        return result == HitResult.None ? HitResult.Meh : result;
+        return heldOffset < 0 && result is HitResult.Meh or HitResult.Ok ? HitResult.Ok : result;
     }
 
     // Miss pattern per beatoraja: emptyPoor (Miss) when offset lands in MS window,
@@ -703,9 +687,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
             yield return new HealthEvent(headPoorOffset, sequence[sequenceIndex++], 1);
 
-            var tailEventRelease = firstPress == null ? null : testCase.FirstReleaseOffsetAfter(firstPress.Value, onlyBeforeTail: false);
-            var tailEventOffset = tailEventRelease ?? long_note_duration + tailTable.SlowWindowFor(HitResult.Ok) + 0.001;
-            yield return new HealthEvent(tailEventOffset, sequence[sequenceIndex], 1);
+            yield return new HealthEvent(headPoorOffset, sequence[sequenceIndex], 1);
 
             foreach (var result in hcnBodyTickEvents(testCase, headPoorOffset))
                 yield return result;
@@ -808,7 +790,9 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         if (firstReleaseBeforeTail == null || firstReleaseBeforeTail.Value > offset)
             return false;
 
-        return tailTable.ResultForOffset(firstReleaseBeforeTail.Value - long_note_duration) is HitResult.Perfect or HitResult.Great or HitResult.Good;
+        var headTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, columns[0], rank: 2, tail: false);
+        return headTable.ResultForOffset(firstPress.Value) != HitResult.None
+               && tailTable.ResultForOffset(firstReleaseBeforeTail.Value - long_note_duration) is HitResult.Perfect or HitResult.Great or HitResult.Good;
     }
 
     private static IReadOnlyList<LongNoteVisualCase> cases { get; } = createCases();
@@ -840,11 +824,11 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     private sealed record CaseExpectation(
         IReadOnlyDictionary<HitResult, int> ResultCounts,
         IReadOnlyList<HitResult> JudgementSequence,
-        IReadOnlyList<HealthEvent> HealthEvents)
+        IReadOnlyList<HealthEvent> HealthEvents, BmsLongNoteMode Mode)
     {
         public double HealthAfter(double startingHealth)
         {
-            var calculator = new BmsGaugeCalculator(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal), 160, cases.Count);
+            var calculator = new BmsGaugeCalculator(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal), 160, cases.Count * (Mode == BmsLongNoteMode.LongNote ? 1 : 2));
             var health = startingHealth;
 
             foreach (var result in HealthEvents.OrderBy(e => e.Offset))
@@ -950,7 +934,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         AddStep("load player in CN mode", () => LoadPlayer([new BmsModChargeNote()]));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
-        advanceTo("seek held note after tail", first_case_time + no_release_case_index * case_spacing + long_note_duration + 260);
+        advanceTo("seek held note after tail", first_case_time + no_release_case_index * case_spacing + long_note_duration + 180);
         AddUntilStep("held long note alive", () => getCaseLongNote(no_release_case_index)?.Alpha > 0);
         AddStep("assert tail moved below judgement line without body reversal", () =>
         {
@@ -1036,7 +1020,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         const int very_fast_release_case_index = 2;
         const double start_time = first_case_time + very_fast_release_case_index * case_spacing;
 
-        AddStep("load player in LN mode", () => LoadPlayer([new BmsModLongNote()]));
+        AddStep("load player in CN mode", () => LoadPlayer([new BmsModChargeNote()]));
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("bms stage loaded", () => Playfield.Stage.IsLoaded);
         advanceTo("seek after fast release", start_time + 700);

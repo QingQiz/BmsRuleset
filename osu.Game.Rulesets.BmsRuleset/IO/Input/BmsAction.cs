@@ -156,4 +156,11 @@ public enum BmsAction
     [Description("Decrease Scroll Speed")]
     [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionDecreaseScrollSpeed))]
     DecreaseScrollSpeed,
+
+    // Append actions so existing key bindings and replay action numbers remain stable.
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionScratchReverse))]
+    ScratchReverse,
+
+    [LocalisableDescription(typeof(BmsStrings), nameof(BmsStrings.ActionP2ScratchReverse))]
+    P2ScratchReverse,
 }

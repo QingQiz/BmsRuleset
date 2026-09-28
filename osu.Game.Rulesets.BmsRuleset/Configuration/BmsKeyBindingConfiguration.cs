@@ -54,10 +54,20 @@ public static class BmsKeyBindingConfiguration
         _ => null,
     };
 
+    public static bool IsReverseScratch(BmsAction action) => action is BmsAction.ScratchReverse or BmsAction.P2ScratchReverse;
+
+    public static BmsAction? ReverseScratchAction(BmsAction action) => action switch
+    {
+        BmsAction.Scratch => BmsAction.ScratchReverse,
+        BmsAction.P2Scratch => BmsAction.P2ScratchReverse,
+        _ => null,
+    };
+
     private static KeyBinding[] bindings5K() =>
     [
         ..scrollSpeedBindings(),
         new(InputKey.LShift, BmsAction.Scratch),
+        new(InputKey.LControl, BmsAction.ScratchReverse),
         new(InputKey.Z, BmsAction.Key1),
         new(InputKey.S, BmsAction.Key2),
         new(InputKey.X, BmsAction.Key3),
@@ -69,6 +79,7 @@ public static class BmsKeyBindingConfiguration
     [
         ..scrollSpeedBindings(),
         new(InputKey.LShift, BmsAction.Scratch),
+        new(InputKey.LControl, BmsAction.ScratchReverse),
         new(InputKey.Z, BmsAction.Key1),
         new(InputKey.S, BmsAction.Key2),
         new(InputKey.X, BmsAction.Key3),
@@ -82,6 +93,7 @@ public static class BmsKeyBindingConfiguration
     [
         ..bindings5K(),
         new(InputKey.RShift, BmsAction.P2Scratch),
+        new(InputKey.RControl, BmsAction.P2ScratchReverse),
         new(InputKey.Keypad1, BmsAction.P2Key1),
         new(InputKey.Keypad2, BmsAction.P2Key2),
         new(InputKey.Keypad3, BmsAction.P2Key3),
@@ -93,6 +105,7 @@ public static class BmsKeyBindingConfiguration
     [
         ..bindings7K(),
         new(InputKey.RShift, BmsAction.P2Scratch),
+        new(InputKey.RControl, BmsAction.P2ScratchReverse),
         new(InputKey.Keypad1, BmsAction.P2Key1),
         new(InputKey.Keypad2, BmsAction.P2Key2),
         new(InputKey.Keypad3, BmsAction.P2Key3),
@@ -138,7 +151,7 @@ public static class BmsKeyBindingConfiguration
 
     private static int? map5K(BmsAction action) => action switch
     {
-        BmsAction.Scratch => 0,
+        BmsAction.Scratch or BmsAction.ScratchReverse => 0,
         BmsAction.Key1 => 1,
         BmsAction.Key2 => 2,
         BmsAction.Key3 => 3,
@@ -149,7 +162,7 @@ public static class BmsKeyBindingConfiguration
 
     private static int? map7K(BmsAction action) => action switch
     {
-        BmsAction.Scratch => 0,
+        BmsAction.Scratch or BmsAction.ScratchReverse => 0,
         BmsAction.Key1 => 1,
         BmsAction.Key2 => 2,
         BmsAction.Key3 => 3,
@@ -167,7 +180,7 @@ public static class BmsKeyBindingConfiguration
         BmsAction.P2Key3 => 8,
         BmsAction.P2Key4 => 9,
         BmsAction.P2Key5 => 10,
-        BmsAction.P2Scratch => 11,
+        BmsAction.P2Scratch or BmsAction.P2ScratchReverse => 11,
         _ => null,
     };
 
@@ -180,7 +193,7 @@ public static class BmsKeyBindingConfiguration
         BmsAction.P2Key5 => 12,
         BmsAction.P2Key6 => 13,
         BmsAction.P2Key7 => 14,
-        BmsAction.P2Scratch => 15,
+        BmsAction.P2Scratch or BmsAction.P2ScratchReverse => 15,
         _ => null,
     };
 
@@ -295,6 +308,7 @@ public static class BmsKeyBindingConfiguration
         new(InputKey.D, BmsAction.Key4),
         new(InputKey.C, BmsAction.Key5),
         new(InputKey.RShift, BmsAction.Scratch),
+        new(InputKey.RControl, BmsAction.ScratchReverse),
     ];
 
     private static KeyBinding[] bindings7K2P() =>
@@ -308,5 +322,6 @@ public static class BmsKeyBindingConfiguration
         new(InputKey.F, BmsAction.Key6),
         new(InputKey.V, BmsAction.Key7),
         new(InputKey.RShift, BmsAction.Scratch),
+        new(InputKey.RControl, BmsAction.ScratchReverse),
     ];
 }

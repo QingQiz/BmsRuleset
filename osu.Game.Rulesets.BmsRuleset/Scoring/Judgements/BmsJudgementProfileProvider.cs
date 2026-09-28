@@ -34,7 +34,9 @@ public static class BmsJudgementProfileProvider
 
     public static double RateForRank(BmsLayoutVariant layout, int rank) => rateForLayoutRank(layout, Math.Clamp(rank, 0, 4));
 
-    public static double RateForExRank(BmsLayoutVariant layout, double exRank) => RateForRank(layout, 2) * exRank / 100d;
+    public static double RateForExRank(BmsLayoutVariant layout, double exRank)
+        // BMSPlayerRule first converts DEFEXRANK to an integer percentage.
+        => exRank > 0 ? Math.Truncate(Math.Truncate(exRank) * Math.Round(RateForRank(layout, 2) * 100) / 100) / 100 : RateForRank(layout, 2);
 
     private static BmsJudgementWindowTable getTable(BmsLayoutVariant layout, int column, double judgementRate, bool tail)
     {
@@ -74,6 +76,12 @@ public static class BmsJudgementProfileProvider
 
     private readonly record struct ProfileKey(BmsLayoutVariant Layout, double Rate);
 
+    public static bool IsPms(BmsLayoutVariant layout)
+        => layout is BmsLayoutVariant.Pms9K or BmsLayoutVariant.Pms9K2P or BmsLayoutVariant.Pms9KDouble;
+
+    public static bool EmptyPoorBreaksCombo(BmsLayoutVariant layout)
+        => IsPms(layout) || layout is BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bms5KDouble;
+
     private static BmsJudgementProfile fiveKeys(double rate) => new(
         head(rate, (-20, 20), (-50, 50), (-100, 100), (-150, 150), (-150, 500)),
         head(rate, (-30, 30), (-60, 60), (-110, 110), (-160, 160), (-160, 500)),
@@ -98,28 +106,16 @@ public static class BmsJudgementProfileProvider
         (double slow, double fast) great,
         (double slow, double fast) good,
         (double slow, double fast) bad,
-        (double slow, double fast) miss) => new([
-        fixedWindow(HitResult.Perfect, perfect),
-        scaled(HitResult.Great, great, rate),
-        scaled(HitResult.Good, good, rate),
-        fixedWindow(HitResult.Ok, bad),
-        fixedWindow(HitResult.Miss, miss),
-    ]);
+        (double slow, double fast) miss)
+        => createTable(rate, true, perfect, great, good, bad, miss);
 
-    /// <summary>
-    /// PMS tail uses rank-scaled perfect/great/good (unlike head where PGREAT is fixed).
-    /// </summary>
     private static BmsJudgementWindowTable pmsTail(
         double rate,
         (double slow, double fast) perfect,
         (double slow, double fast) great,
         (double slow, double fast) good,
-        (double slow, double fast) bad) => new([
-        scaled(HitResult.Perfect, perfect, rate),
-        scaled(HitResult.Great, great, rate),
-        scaled(HitResult.Good, good, rate),
-        fixedWindow(HitResult.Ok, bad),
-    ]);
+        (double slow, double fast) bad)
+        => createTable(rate, true, perfect, great, good, bad);
 
     private static BmsJudgementWindowTable head(
         double rate,
@@ -127,29 +123,51 @@ public static class BmsJudgementProfileProvider
         (double slow, double fast) great,
         (double slow, double fast) good,
         (double slow, double fast) bad,
-        (double slow, double fast) miss) => new([
-        scaled(HitResult.Perfect, perfect, rate),
-        scaled(HitResult.Great, great, rate),
-        scaled(HitResult.Good, good, rate),
-        fixedWindow(HitResult.Ok, bad),
-        fixedWindow(HitResult.Miss, miss),
-    ]);
+        (double slow, double fast) miss)
+        => createTable(rate, false, perfect, great, good, bad, miss);
 
     private static BmsJudgementWindowTable tail(
         double rate,
         (double slow, double fast) perfect,
         (double slow, double fast) great,
         (double slow, double fast) good,
-        (double slow, double fast) bad) => new([
-        scaled(HitResult.Perfect, perfect, rate),
-        scaled(HitResult.Great, great, rate),
-        scaled(HitResult.Good, good, rate),
-        fixedWindow(HitResult.Ok, bad),
-    ]);
+        (double slow, double fast) bad)
+        => createTable(rate, false, perfect, great, good, bad);
 
-    private static BmsJudgementWindow scaled(HitResult result, (double slow, double fast) row, double rate)
-        => new(result, row.slow * rate, row.fast * rate);
+    private static BmsJudgementWindowTable createTable(double rate, bool pms,
+                                                       params (double slow, double fast)[] rows)
+    {
+        HitResult[] results = [HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok, HitResult.Miss];
+        var windows = new BmsJudgementWindow[rows.Length];
+        for (var i = 0; i < rows.Length; i++)
+        {
+            var fixedWindow = i == 4 || pms && i is 0 or 3;
+            // beatoraja stores integral microseconds, including after rank multiplication.
+            var slow = fixedWindow ? rows[i].slow : Math.Truncate(rows[i].slow * 1000 * rate) / 1000;
+            var fast = fixedWindow ? rows[i].fast : Math.Truncate(rows[i].fast * 1000 * rate) / 1000;
+            if (pms && i is 1 or 2)
+            {
+                slow = Math.Clamp(slow, rows[3].slow, rows[0].slow);
+                fast = Math.Clamp(fast, rows[0].fast, rows[3].fast);
+            }
 
-    private static BmsJudgementWindow fixedWindow(HitResult result, (double slow, double fast) row)
-        => new(result, row.slow, row.fast);
+            windows[i] = new BmsJudgementWindow(results[i], slow, fast);
+        }
+
+        // Keep nested windows even for the unusual 5K long-scratch GOOD row.
+        for (var i = 0; i < 3; i++)
+        {
+            var slow = Math.Max(windows[i].SlowDTime, windows[3].SlowDTime);
+            var fast = Math.Min(windows[i].FastDTime, windows[3].FastDTime);
+            if (i > 0)
+            {
+                slow = Math.Min(slow, windows[i - 1].SlowDTime);
+                fast = Math.Max(fast, windows[i - 1].FastDTime);
+            }
+
+            windows[i] = new BmsJudgementWindow(results[i], slow, fast);
+        }
+
+        return new BmsJudgementWindowTable(windows);
+    }
 }

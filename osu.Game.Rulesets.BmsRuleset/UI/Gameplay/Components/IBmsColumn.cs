@@ -28,7 +28,7 @@ public interface IBmsColumn
 
     void PlaySample(ushort? sampleKey, int volume);
 
-    PressOutcome HandlePress(double time);
+    PressOutcome HandlePress(double time, bool reverseScratch = false);
 
-    void HandleRelease(double time);
+    void HandleRelease(double time, bool reverseScratch = false);
 }

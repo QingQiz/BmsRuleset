@@ -10,45 +10,49 @@ public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCo
 
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Mine;
 
-    // The column owns detonation; a culled mine has no passive POOR check to preserve.
+    // The playfield's passing phase owns detonation so it precedes every HCN body.
     protected override bool UsesPassiveResultCheck => false;
 
-    protected override bool SkipFurtherUpdates => mineHandled && Time.Current >= HitObject.StartTime;
+    protected override bool SkipFurtherUpdates => mineHandledTime.HasValue && Time.Current >= HitObject.StartTime;
 
-    private bool mineHandled;
+    private double? mineHandledTime;
 
-    internal override bool RequiresColumnFrameUpdate => !SkipFurtherUpdates;
+    internal override bool RequiresColumnFrameUpdate => false;
 
-    protected override void ResetKindState() => mineHandled = false;
+    protected override void ResetKindState() => mineHandledTime = (Entry as BmsHitObjectLifetimeEntry)?.LandmineHandledTime;
 
     internal override void RestoreRewoundState()
     {
-        if (mineHandled && Time.Current < HitObject.StartTime)
+        if (mineHandledTime.HasValue && Time.Current < mineHandledTime.Value)
         {
-            // A backwards seek can revisit a handled mine before its drawable returns to the pool.
-            mineHandled = false;
+            // Processing can follow StartTime, so detonated and avoided mines must both
+            // rewind at the actual frame, matching the host's RawTime result boundary.
+            mineHandledTime = null;
             Alpha = 1;
         }
     }
 
-    protected override bool UpdateKindState()
+    internal override void UpdateLandmine(bool holding)
     {
-        if (Judged || mineHandled || Time.Current < HitObject.StartTime)
-            return false;
+        if (Judged || mineHandledTime.HasValue || Time.Current < HitObject.StartTime)
+            return;
 
-        mineHandled = true;
+        mineHandledTime = Time.Current;
+        if (Entry is BmsHitObjectLifetimeEntry entry)
+            entry.LandmineHandledTime = mineHandledTime;
 
-        if (ParentColumn?.IsPressed == true && Time.Current < HitObject.StartTime + BmsHitObjectLifetimeEntry.MINE_PAST_LIFETIME)
+        if (holding && Time.Current < HitObject.StartTime + BmsHitObjectLifetimeEntry.MINE_PAST_LIFETIME)
         {
             ParentColumn?.DetonateLandmine(HitObject);
             ApplyResult(HitResult.Meh);
+            // Passing judgements now precede the column's lifetime pass. Keep the hidden
+            // mine until its normal expiry so this same traversal cannot free its result.
+            LifetimeEnd = HitObject.StartTime + BmsHitObjectLifetimeEntry.MINE_PAST_LIFETIME;
         }
         else
         {
             Alpha = 0;
         }
-
-        return true;
     }
 
     protected override void CheckForResult(bool userTriggered, double timeOffset)

@@ -19,6 +19,12 @@
 - All user-facing text must use the `BmsStrings` localisation system; do not hard-code labels, abbreviations, formatted values, or units in UI code.
 - Keep the English base resource and all supported `.resx` translations in sync when adding or changing user-facing text.
 
+## Documentation and In-Game Descriptions
+
+- When settings, mods, or gameplay behaviour change, update the corresponding sections of the documentation as part of the same change.
+- Write documentation for players: explain how to use features and their effects on gameplay, without implementation details.
+- In documentation and in-game descriptions, describe what a feature does. Avoid describing what it does not do.
+
 ## Test Rules
 
 - Do NOT run benchmark tests without asking. Benchmarks can take minutes and consume significant resources.

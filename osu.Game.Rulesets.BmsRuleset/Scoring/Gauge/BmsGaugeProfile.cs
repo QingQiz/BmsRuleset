@@ -15,4 +15,7 @@ public sealed record BmsGaugeProfile(
     double EmptyPoorDelta,
     BmsGaugeDisplayProfile Display,
     IReadOnlyList<BmsGaugeGutsRule> GutsRules
-);
+)
+{
+    public double MinHealth => Algorithm == BmsGaugeAlgorithm.Total ? 0.02 : 0;
+}

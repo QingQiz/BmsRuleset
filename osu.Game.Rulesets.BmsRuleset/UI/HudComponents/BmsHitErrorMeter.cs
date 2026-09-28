@@ -151,7 +151,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         base.LoadComplete();
 
         if (scoreProcessor != null)
-            scoreProcessor.EmptyPoorRegistered += onEmptyPoorRegistered;
+            scoreProcessor.NonConsumingJudgementRegistered += onNonConsumingJudgementRegistered;
 
         ShowEmptyPoor.BindValueChanged(visible => emptyPoorColourBar.Alpha = visible.NewValue ? 1 : 0, true);
         BackgroundOpacity.BindValueChanged(opacity => background.Alpha = opacity.NewValue, true);
@@ -207,11 +207,11 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         }
     }
 
-    private void onEmptyPoorRegistered(BmsTimingObservation observation)
+    private void onNonConsumingJudgementRegistered(BmsTimingObservation observation)
         => Schedule(() =>
         {
-            if (ShowEmptyPoor.Value)
-                addJudgement(observation.TimeOffset, observation.Result, affectMovingAverage: false);
+            if (observation.Result != HitResult.Miss || ShowEmptyPoor.Value)
+                addJudgement(observation.TimeOffset, observation.Result, AffectsMovingAverage(observation.Result));
         });
 
     private void addJudgement(double timeOffset, HitResult result, bool affectMovingAverage)
@@ -234,6 +234,9 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     internal static IReadOnlyList<BmsHitErrorTimingObservation> GetTimingObservations(JudgementResult judgement)
     {
+        if (judgement is BmsJudgementResult { SuppressPenalty: true })
+            return [];
+
         if (judgement is BmsLongNoteJudgementResult longNoteResult)
         {
             return longNoteResult.EndpointResults
@@ -291,7 +294,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     protected override void Dispose(bool isDisposing)
     {
         if (scoreProcessor != null)
-            scoreProcessor.EmptyPoorRegistered -= onEmptyPoorRegistered;
+            scoreProcessor.NonConsumingJudgementRegistered -= onNonConsumingJudgementRegistered;
 
         base.Dispose(isDisposing);
     }

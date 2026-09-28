@@ -32,7 +32,7 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
             return;
 
         if (timeOffset > passivePoorOffset)
-            ApplyResult(HitResult.Meh);
+            ApplyBmsResult(HitResult.Meh);
     }
 
     protected override void UpdateHitStateTransforms(ArmedState state)

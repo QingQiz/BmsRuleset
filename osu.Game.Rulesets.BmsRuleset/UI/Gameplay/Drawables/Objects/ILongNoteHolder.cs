@@ -11,7 +11,14 @@ public interface ILongNoteHolder
 
     bool IsAutomaticallyHeld { get; set; }
 
-    bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable);
+    bool TryRepress(double currentTime, bool reverseScratch = false) => false;
+
+    bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable, bool reverseScratch = false);
+
+    /// <summary>
+    ///     Completes an active long-note judgement when gameplay is paused.
+    /// </summary>
+    bool CompleteAtPause(double currentTime) => false;
 
     void UpdateBodyGeometry(float headY, float endY);
 }

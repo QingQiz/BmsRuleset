@@ -69,16 +69,15 @@ public class BmsAutoGenerator(BmsBeatmap beatmap) : AutoGenerator<BmsReplayFrame
             return endTime;
         }
 
-        // Non-LN: prefer the default RELEASE_DELAY, but pull the release in to before
-        // the next same-column object so we don't accidentally hold a key into a mine.
-        var maxHoldUntil = nextObject is BmsLandmine mine
-            ? mine.StartTime - 1
-            : double.PositiveInfinity;
-
-        return nextObject == null || nextObject.StartTime > endTime + RELEASE_DELAY
-            ? Math.Min(endTime + RELEASE_DELAY, maxHoldUntil)
-            : Math.Min(endTime + (nextObject.StartTime - endTime) * 0.9, maxHoldUntil);
+        return calculateTapReleaseTime(endTime, nextObject);
     }
+
+    private static double calculateTapReleaseTime(double pressTime, HitObject? nextObject)
+        // A tail reversal is a tap too: it must stop before the next head or mine, even
+        // for sub-millisecond gaps, so the following reversal can form a new key-down.
+        => nextObject == null
+            ? pressTime + RELEASE_DELAY
+            : Math.Min(pressTime + RELEASE_DELAY, pressTime + (nextObject.StartTime - pressTime) * 0.9);
 
     private IEnumerable<ActionPoint> generateActionPoints()
     {
@@ -95,7 +94,18 @@ public class BmsAutoGenerator(BmsBeatmap beatmap) : AutoGenerator<BmsReplayFrame
                 continue;
 
             yield return new ActionPoint(current.StartTime, action, true);
-            yield return new ActionPoint(calculateReleaseTime(current, GetNextObject(i)), action, false);
+
+            var nextObject = GetNextObject(i);
+            var releaseTime = calculateReleaseTime(current, nextObject);
+            yield return new ActionPoint(releaseTime, action, false);
+
+            if (current is BmsLongNote
+                && Beatmap.LockedLongNoteMode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote
+                && BmsKeyBindingConfiguration.ReverseScratchAction(action) is { } reverseAction)
+            {
+                yield return new ActionPoint(releaseTime, reverseAction, true);
+                yield return new ActionPoint(calculateTapReleaseTime(releaseTime, nextObject), reverseAction, false);
+            }
         }
     }
 }

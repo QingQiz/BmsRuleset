@@ -30,6 +30,7 @@ public enum BmsJudgementSourceKind
     LongNote,
     Landmine,
     EmptyPoor,
+    NonConsumingBad,
 }
 
 public readonly record struct BmsJudgementSource(
@@ -68,12 +69,15 @@ public sealed record BmsJudgementEvent
 
     public HitResult Result { get; }
 
+    public bool SuppressPenalty { get; }
+
     public IReadOnlyList<BmsTimingObservation> TimingObservations { get; }
 
     public BmsJudgementEvent(
         BmsJudgementSource source,
         HitResult result,
-        IEnumerable<BmsTimingObservation> timingObservations)
+        IEnumerable<BmsTimingObservation> timingObservations,
+        bool suppressPenalty = false)
     {
         ArgumentNullException.ThrowIfNull(timingObservations);
 
@@ -83,6 +87,7 @@ public sealed record BmsJudgementEvent
 
         Source = source;
         Result = result;
+        SuppressPenalty = suppressPenalty;
         TimingObservations = Array.AsReadOnly(observations);
     }
 }

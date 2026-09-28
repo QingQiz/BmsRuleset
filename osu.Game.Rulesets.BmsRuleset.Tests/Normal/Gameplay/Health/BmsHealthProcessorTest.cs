@@ -32,8 +32,8 @@ public class BmsHealthProcessorTest
         Assert.That(afterMiss[0].Failed, Is.True);
 
         processor.ApplyHellChargeTick(false, 100, 1200);
-        Assert.That(processor.HasFailed, Is.True);
-        Assert.That(processor.HasEverFailed, Is.True);
+        Assert.That(processor.HasFailed, Is.False);
+        Assert.That(processor.HasEverFailed, Is.False);
         processor.Rewind(1100);
         Assert.That(processor.CurrentGaugeStates, Is.EqualTo(afterMiss));
         Assert.That(processor.HasFailed, Is.False);
@@ -373,7 +373,7 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
-    public void TestEmptyPoorClampsAtZero()
+    public void TestEmptyPoorClampsAtTwoPercent()
     {
         var processor = new BmsHealthProcessor();
         var beatmap = new BmsBeatmap
@@ -387,7 +387,7 @@ public class BmsHealthProcessorTest
         processor.Health.Value = 0.01;
         processor.RegisterEmptyPoor();
 
-        Assert.That(processor.Health.Value, Is.Zero);
+        Assert.That(processor.Health.Value, Is.EqualTo(0.02));
     }
 
     [Test]
@@ -682,10 +682,12 @@ public class BmsHealthProcessorTest
         Assert.That(processor.Health.Value, Is.EqualTo(1.0).Within(0.001));
     }
 
-    [Test]
-    public void TestLandmineZzForcesFailure()
+    [TestCase(BmsGaugeType.Normal, 0.02, false)]
+    [TestCase(BmsGaugeType.Hard, 0, true)]
+    public void TestLandmineZzRespectsGaugeFloor(BmsGaugeType type, double expectedHealth, bool failed)
     {
         var processor = new BmsHealthProcessor();
+        processor.SetGaugeType(type);
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -704,8 +706,8 @@ public class BmsHealthProcessorTest
             Type = HitResult.Meh,
         });
 
-        Assert.That(processor.Health.Value, Is.Zero);
-        Assert.That(processor.HasFailed, Is.True);
+        Assert.That(processor.Health.Value, Is.EqualTo(expectedHealth).Within(1e-9));
+        Assert.That(processor.HasFailed, Is.EqualTo(failed));
     }
 
     [Test]

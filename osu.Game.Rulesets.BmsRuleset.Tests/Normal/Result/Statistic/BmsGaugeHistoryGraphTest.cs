@@ -356,7 +356,7 @@ public class BmsGaugeHistoryGraphTest
     }
 
     [Test]
-    public void TestGrooveGaugeFailurePointIsRecordedAtZeroHealthEvent()
+    public void TestGrooveGaugeCanRecoverFromMinimumHealth()
     {
         var series = BmsGaugeHistoryGraph.CreateSeries(
             new ScoreInfo
@@ -372,9 +372,9 @@ public class BmsGaugeHistoryGraphTest
             },
             createBeatmap()).Single();
 
-        Assert.That(series.FailurePoint, Is.Not.Null);
-        Assert.That(series.FailurePoint!.Value.Time, Is.EqualTo(0.8f).Within(0.001));
-        Assert.That(series.FailurePoint.Value.Health, Is.Zero);
+        Assert.That(series.FailurePoint, Is.Null);
+        Assert.That(series.Points.Min(p => p.Health), Is.EqualTo(0.02f).Within(0.001));
+        Assert.That(series.Points.Last().Health, Is.GreaterThanOrEqualTo(0.8f));
     }
 
     [Test]

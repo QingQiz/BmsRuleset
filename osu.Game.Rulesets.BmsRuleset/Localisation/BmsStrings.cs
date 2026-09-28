@@ -600,6 +600,10 @@ public static class BmsStrings
 
     public static LocalisableString ActionScratch => get("action_scratch");
 
+    public static LocalisableString ActionScratchReverse => get("action_scratch_reverse");
+
+    public static LocalisableString ActionP2ScratchReverse => get("action_p2_scratch_reverse");
+
     public static LocalisableString ActionKey1 => get("action_key_1");
 
     public static LocalisableString ActionKey2 => get("action_key_2");

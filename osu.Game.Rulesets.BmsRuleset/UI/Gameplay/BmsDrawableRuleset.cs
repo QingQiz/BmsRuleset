@@ -124,6 +124,9 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     {
         base.SetReplayScore(replayScore);
 
+        if (Playfield is BmsPlayfield bmsPlayfield)
+            bmsPlayfield.SetReplayPlayback(replayScore != null);
+
         updateJudgementAlgorithm();
 
         if (replayScore != null && Beatmap is BmsBeatmap bmsBeatmap)
@@ -145,7 +148,9 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         windowMods = Mods.OfType<IApplicableToJudgementWindow>().ToArray();
         BmsJudgementProfileProvider.SetActiveWindowMods(windowMods);
 
-        return new BmsPlayfield((BmsBeatmap)Beatmap);
+        var playfield = new BmsPlayfield((BmsBeatmap)Beatmap);
+        playfield.SetReplayPlayback(ReplayScore != null);
+        return playfield;
     }
 
     protected override void LoadComplete()

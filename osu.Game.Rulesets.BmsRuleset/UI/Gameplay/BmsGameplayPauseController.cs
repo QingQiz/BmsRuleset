@@ -48,6 +48,9 @@ internal sealed class BmsGameplayPauseController : IDisposable
         if (paused.NewValue)
         {
             pendingResumeRewindFrom = gameplayClock.CurrentTime;
+            // Resume rewind preserves results from the paused attempt. Finalise active holds
+            // before seeking so no long-note controller state has to survive that rewind.
+            playfield.CompleteLongNotesAtPause(pendingResumeRewindFrom.Value);
             return;
         }
 

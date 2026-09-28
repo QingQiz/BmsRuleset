@@ -5,6 +5,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Objects;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -80,6 +81,14 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     {
     }
 
+    internal virtual void UpdateLandmine(bool holding)
+    {
+    }
+
+    internal virtual void UpdateHellChargeBody(bool holding)
+    {
+    }
+
     internal virtual void RestoreRewoundState()
     {
     }
@@ -108,8 +117,14 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         if (Judged || result == HitResult.None)
             return false;
 
-        ApplyResult(result);
+        ApplyBmsResult(result);
         return true;
+    }
+
+    protected void ApplyBmsResult(HitResult result)
+    {
+        ((BmsJudgementResult)Result).SuppressPenalty = result == HitResult.Meh && ParentColumn?.HasPmsMistake(HitObject) == true;
+        ApplyResult(result);
     }
 
     public override void PlaySamples()
@@ -206,7 +221,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         }
     }
 
-    protected override JudgementResult CreateResult(Judgement judgement) => new(HitObject, judgement);
+    protected override JudgementResult CreateResult(Judgement judgement) => new BmsJudgementResult(HitObject, judgement);
 
     protected override void LoadSamples()
     {

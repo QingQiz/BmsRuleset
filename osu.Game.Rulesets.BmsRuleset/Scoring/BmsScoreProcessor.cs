@@ -6,6 +6,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Judgements;
@@ -18,6 +20,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Scoring;
 public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 {
     private static readonly Action<JudgementResult, int> set_combo_after = createComboAfterSetter();
+    private static readonly Action<JudgementResult, int> set_highest_combo_after = typeof(JudgementResult)
+        .GetProperty(nameof(JudgementResult.HighestComboAfterJudgement))!.GetSetMethod(true)!.CreateDelegate<Action<JudgementResult, int>>();
 
     private double latestEndTime = double.MaxValue;
     private int maximumScoringJudgementCount;
@@ -25,7 +29,9 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     private readonly Dictionary<JudgementResult, BmsJudgementEvent> eventsByResult = new();
     private readonly List<TimingHitEventEntry> timingHitEventEntries = [];
     private readonly List<HitEvent> timingHitEvents = [];
-    private readonly List<BmsJudgementEvent> emptyPoorEvents = [];
+    private readonly List<BmsJudgementEvent> nonConsumingEvents = [];
+    private readonly List<int> nonConsumingComboChanges = [];
+    private BmsLayoutVariant layout = BmsLayoutVariant.Bme7K;
 
     public IReadOnlyList<BmsJudgementEvent> JudgementEvents => judgementEvents;
 
@@ -33,8 +39,11 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     public event Action<BmsTimingObservation>? EmptyPoorRegistered;
 
+    public event Action<BmsTimingObservation>? NonConsumingJudgementRegistered;
+
     public override void ApplyBeatmap(IBeatmap beatmap)
     {
+        layout = (beatmap as BmsBeatmap)?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
         base.ApplyBeatmap(beatmap);
 
         if (beatmap.HitObjects.Count == 0)
@@ -85,7 +94,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     ///     Increments the Empty POOR counter stored under
     ///     <see cref="HitResult.Miss"/> in the score statistics so it
     ///     appears in the results-screen statistics and the live HUD judgement counter.
-    ///     Empty POORs do not affect EX-score, accuracy, or combo.
+    ///     Empty POORs do not affect EX-score or accuracy; combo behavior depends on the layout.
     /// </summary>
     public void RegisterEmptyPoor()
     {
@@ -97,36 +106,47 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         => RegisterEmptyPoor(eventTime, eventTime, 0);
 
     public void RegisterEmptyPoor(double eventTime, double expectedTime, int column)
-    {
-        ScoreResultCounts[HitResult.Miss] = ScoreResultCounts.GetValueOrDefault(HitResult.Miss) + 1;
+        => RegisterNonConsumingJudgement(HitResult.Miss, eventTime, expectedTime, column);
 
-        var source = new BmsJudgementSource(eventTime, column, BmsJudgementSourceKind.EmptyPoor);
-        var observation = new BmsTimingObservation(BmsTimingObservationKind.Note, expectedTime, eventTime, 1, HitResult.Miss);
-        var judgementEvent = new BmsJudgementEvent(source, HitResult.Miss, [observation]);
+    public void RegisterNonConsumingJudgement(HitResult result, double eventTime, double expectedTime, int column)
+    {
+        ScoreResultCounts[result] = ScoreResultCounts.GetValueOrDefault(result) + 1;
+        var comboChange = result == HitResult.Ok || BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout) ? -Combo.Value : 0;
+        Combo.Value += comboChange;
+        nonConsumingComboChanges.Add(comboChange);
+        var source = new BmsJudgementSource(eventTime, column,
+            result == HitResult.Ok ? BmsJudgementSourceKind.NonConsumingBad : BmsJudgementSourceKind.EmptyPoor);
+        var observation = new BmsTimingObservation(BmsTimingObservationKind.Note, expectedTime, eventTime, 1, result);
+        var judgementEvent = new BmsJudgementEvent(source, result, [observation]);
         addJudgementEvent(judgementEvent);
-        emptyPoorEvents.Add(judgementEvent);
-        EmptyPoorRegistered?.Invoke(observation);
+        nonConsumingEvents.Add(judgementEvent);
+        NonConsumingJudgementRegistered?.Invoke(observation);
+        if (result == HitResult.Miss)
+            EmptyPoorRegistered?.Invoke(observation);
     }
 
     internal void RewindEmptyPoors(double time)
     {
-        while (emptyPoorEvents.Count > 0 && emptyPoorEvents[^1].Source.StartTime > time)
+        while (nonConsumingEvents.Count > 0 && nonConsumingEvents[^1].Source.StartTime > time)
         {
-            removeJudgementEvent(emptyPoorEvents[^1]);
-            emptyPoorEvents.RemoveAt(emptyPoorEvents.Count - 1);
-            ScoreResultCounts[HitResult.Miss]--;
+            removeJudgementEvent(nonConsumingEvents[^1]);
+            ScoreResultCounts[nonConsumingEvents[^1].Result]--;
+            nonConsumingEvents.RemoveAt(nonConsumingEvents.Count - 1);
+            Combo.Value -= nonConsumingComboChanges[^1];
+            nonConsumingComboChanges.RemoveAt(nonConsumingComboChanges.Count - 1);
         }
     }
 
     /// <summary>
     ///     Applies a separate CN/HCN endpoint without requiring the source drawable to complete.
     /// </summary>
-    public BmsLongNoteJudgementResult ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpointResult)
+    public BmsLongNoteJudgementResult ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpointResult, bool suppressPenalty = false)
     {
         var endpoint = endpointResult.Source.CreateSyntheticEndpoint(endpointResult.ExpectedTime);
         var result = new BmsLongNoteJudgementResult(endpoint, endpoint.CreateJudgement(), [endpointResult])
         {
             Type = endpointResult.Result,
+            SuppressPenalty = suppressPenalty,
         };
         ApplyResult(result);
         return result;
@@ -164,7 +184,8 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
         base.Reset(storeResults);
         judgementEvents.Clear();
-        emptyPoorEvents.Clear();
+        nonConsumingEvents.Clear();
+        nonConsumingComboChanges.Clear();
         eventsByResult.Clear();
         timingHitEventEntries.Clear();
         timingHitEvents.Clear();
@@ -194,16 +215,31 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         if (result.HitObject is BmsHitObject and not BmsLandmine)
             ScoringJudgementEventCount++;
 
+        if (result is BmsJudgementResult { SuppressPenalty: true })
+        {
+            ScoreResultCounts[result.Type]--;
+            Combo.Value = result.ComboAtJudgement;
+            HighestCombo.Value = result.HighestComboAtJudgement;
+            set_combo_after(result, result.ComboAtJudgement);
+            set_highest_combo_after(result, result.HighestComboAtJudgement);
+            return;
+        }
+
         if (result.Type is HitResult.Ok or HitResult.Meh)
         {
             Combo.Value = 0;
+            // Framework hit results temporarily increment both counters before this hook.
+            HighestCombo.Value = result.HighestComboAtJudgement;
             set_combo_after(result, 0);
+            set_highest_combo_after(result, result.HighestComboAtJudgement);
         }
     }
 
     protected override void RemoveScoreChange(JudgementResult result)
     {
         base.RemoveScoreChange(result);
+        if (result is BmsJudgementResult { SuppressPenalty: true })
+            ScoreResultCounts[result.Type]++;
 
         if (result.HitObject is BmsHitObject and not BmsLandmine)
             ScoringJudgementEventCount--;
@@ -218,6 +254,9 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         var judgementEvent = createJudgementEvent(result);
         addJudgementEvent(judgementEvent);
         eventsByResult.Add(result, judgementEvent);
+
+        if (judgementEvent.SuppressPenalty)
+            return frameworkEvent;
 
         return BmsJudgementEventProjection.CreateTimingHitEvent(
             judgementEvent.Source,
@@ -264,6 +303,9 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     private void addTimingHitEvents(BmsJudgementEvent judgementEvent)
     {
+        if (judgementEvent.SuppressPenalty)
+            return;
+
         foreach (var observation in judgementEvent.TimingObservations)
         {
             var insertionIndex = findTimingInsertionIndex(observation.ActualTime);
@@ -277,6 +319,9 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     private void removeTimingHitEvents(BmsJudgementEvent judgementEvent)
     {
+        if (judgementEvent.SuppressPenalty)
+            return;
+
         for (var observationIndex = judgementEvent.TimingObservations.Count - 1; observationIndex >= 0; observationIndex--)
         {
             var time = judgementEvent.TimingObservations[observationIndex].ActualTime;
@@ -380,7 +425,8 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             return new BmsJudgementEvent(
                 BmsJudgementSource.From(longNoteResult.EndpointResults.Count > 1 ? source : result.HitObject),
                 result.Type,
-                observations);
+                observations,
+                longNoteResult.SuppressPenalty);
         }
 
         var expectedTime = result.HitObject.GetEndTime();
@@ -392,7 +438,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
                 expectedTime + result.TimeOffset,
                 result.GameplayRate,
                 result.Type),
-        ]);
+        ], result is BmsJudgementResult { SuppressPenalty: true });
     }
 
     private class JudgementOrderComparer : IComparer<HitObject>

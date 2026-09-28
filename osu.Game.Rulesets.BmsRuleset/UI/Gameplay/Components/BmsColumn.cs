@@ -78,9 +78,28 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal float NoteHeightScale => ParentPlayfield.Stage.NoteHeightScale;
 
+    internal bool PreserveLongNoteHistory => ParentPlayfield.PreserveLongNoteHistory;
+
     protected BmsPlayfield ParentPlayfield { get; }
 
+    internal float GetLongNoteHeadYAtStartTime(BmsLongNote note)
+    {
+        var scroll = ParentPlayfield.ScrollController;
+        var displayTime = note.StartTime + VisualOffset * scroll.PlaybackRate;
+        var displayPosition = scroll.ConstantScrollActive
+            ? displayTime
+            : scroll.TimingMap?.GetScrollPositionAtTime(displayTime) ?? displayTime;
+        var headPosition = scroll.GetVisualScrollPosition(note.StartTime, note.ScrollPositionAtStartTime);
+        return -(HitTargetPosition + (float)((headPosition - displayPosition)
+                                            * scroll.ScrollCoordinateScale(HitObjectContainer.DrawHeight, HitTargetPosition)));
+    }
+
     private BmsColumnKeySound? keySound;
+    private readonly BmsNotePressHistory pressHistory = new();
+    private readonly BmsHitObject[] columnNotes;
+
+    internal bool HasPmsMistake(BmsHitObject note) => BmsJudgementProfileProvider.IsPms(LayoutVariant) && pressHistory.Get(note).Mistake;
+
     private readonly bool hasLongNotes;
     private readonly bool canBatchUpdates;
     private readonly BmsHitExplosionPool normalHitExplosionPool;
@@ -99,6 +118,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         Index = index;
         LayoutVariant = playfield.LayoutVariant;
         IsScratch = BmsLayout.IsScratchColumn(index, LayoutVariant);
+        columnNotes = playfield.Beatmap.HitObjects.Where(h => h.Column == index && h is not BmsLandmine and not BmsInvisibleNote).OrderBy(h => h.StartTime).ToArray();
         hasLongNotes = playfield.Beatmap.HitObjects.Any(h => h.Column == index && h is BmsLongNote);
         canBatchUpdates = playfield.Beatmap.HitObjects.All(h => h.Column != index || h is BmsNote or BmsLongNote);
 
@@ -191,7 +211,11 @@ public partial class BmsColumn : Playfield, IBmsColumn
     {
         // Each column owns its result stack, so it must suppress the framework's rewind reversion too.
         if (!ParentPlayfield.IsResumeRewinding)
+        {
+            if (Time.Elapsed < 0)
+                pressHistory.Rewind(Time.Current);
             base.Update();
+        }
     }
 
     private static float defaultColumnWidth(int index, BmsLayoutVariant layoutVariant) =>
@@ -296,6 +320,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
         if (bmsHitObject.HitObject is BmsLandmine)
             return;
 
+        pressHistory.Record(bmsHitObject.HitObject, Time.Current, true);
+
         // BMS POOR is represented by framework Meh, which IsHit() considers successful even though
         // it must not produce the hit feedback reserved for BAD and better judgements.
         if (ShouldTriggerHitExplosion(result.Type))
@@ -308,15 +334,33 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     #region Input
 
-    public bool IsPressed { get; private set; }
+    public bool IsPressed => pressedDirections != 0;
 
-    public PressOutcome HandlePress(double time)
+    private int pressedDirections;
+
+    internal int PressedDirections
     {
-        IsPressed = true;
+        get => pressedDirections;
+        set => pressedDirections = value;
+    }
+
+    internal bool LastPressWasReverseScratch { get; private set; }
+
+    public PressOutcome HandlePress(double time, bool reverseScratch = false)
+    {
+        LastPressWasReverseScratch = IsScratch && reverseScratch;
+        pressedDirections |= LastPressWasReverseScratch ? 2 : 1;
 
         // Replay input also changes while moving backwards; retain key state without judging it.
         if ((Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0)
             return PressOutcome.Empty;
+
+        if (hasLongNotes && ((BmsColumnHitObjectContainer)HitObjectContainer).TryRepress(time, LastPressWasReverseScratch) is { } repressed)
+        {
+            if (repressed is ILongNoteHolder { IsHoldingLongNote: false } && repressed.HitObject is BmsLongNote held)
+                keySound?.PlaySample(held.TailSampleKey, held.TailSampleVolume);
+            return PressOutcome.Hit;
+        }
 
         // The earliest pending exact-time head wins every judgement algorithm. The ordered
         // live index avoids sorting thousands of future candidates for every replay press.
@@ -325,6 +369,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             && BmsJudgementProfileProvider.GetTable(LayoutVariant, Index, first.HitObject.EffectiveJudgementRate, false).ResultForOffset(0) == HitResult.Perfect
             && first.TryHit(HitResult.Perfect))
         {
+            pressHistory.Record(first.HitObject, time, true);
             keySound?.PlaySample(first.HitObject.SampleKey, first.HitObject.SampleVolume);
             return PressOutcome.Hit;
         }
@@ -346,9 +391,33 @@ public partial class BmsColumn : Playfield, IBmsColumn
                 d.HitObject.GetEndTime(),
                 d.HitObject.Column,
                 d.HitObject.EffectiveJudgementRate,
-                d.HitObject is BmsLongNote);
+                d.HitObject is BmsLongNote,
+                !d.HasPendingHead,
+                pressHistory.Get(d.HitObject).Mistake);
             pressCandidates.Add((d, candidate));
             pressJudgementCandidates.Add(candidate);
+        }
+
+        // Consumed notes may already be pooled. Search the chart's fixed empty-POOR interval
+        // rather than retaining drawables or scanning the complete judgement history.
+        var low = 0;
+        var high = columnNotes.Length;
+        while (low < high)
+        {
+            var middle = low + (high - low) / 2;
+            if (columnNotes[middle].StartTime < time - 175)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        for (var i = low; i < columnNotes.Length && columnNotes[i].StartTime <= time + 500; i++)
+        {
+            var note = columnNotes[i];
+            var state = pressHistory.Get(note);
+            if (state.Judged)
+                pressJudgementCandidates.Add(new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), note.Column,
+                    note.EffectiveJudgementRate, note is BmsLongNote, true, state.Mistake));
         }
 
         var selection = BmsJudgementSelector.SelectPress(LayoutVariant, Index, pressJudgementCandidates, time, ParentPlayfield.JudgementAlgorithm);
@@ -368,8 +437,17 @@ public partial class BmsColumn : Playfield, IBmsColumn
             if (target == null)
                 return PressOutcome.Empty;
 
+            if (selection.Result == HitResult.Ok && BmsJudgementProfileProvider.IsPms(LayoutVariant))
+            {
+                pressHistory.Record(target.HitObject, time, false, true);
+                ParentPlayfield.RegisterNonConsumingBad(target.HitObject.StartTime, Index);
+                keySound?.PlaySample(target.HitObject.SampleKey, target.HitObject.SampleVolume);
+                return PressOutcome.Hit;
+            }
+
             if (target.TryHit(selection.Result))
             {
+                pressHistory.Record(target.HitObject, time, true);
                 keySound?.PlaySample(target.HitObject.SampleKey, target.HitObject.SampleVolume);
                 return PressOutcome.Hit;
             }
@@ -377,17 +455,27 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
         keySound?.PlayKeySound();
 
-        return selection is { IsEmptyPoor: true, Candidate: { } emptyPoorCandidate }
-            ? PressOutcome.ForEmptyPoor(emptyPoorCandidate.StartTime, emptyPoorCandidate.Column)
-            : PressOutcome.Empty;
+        if (selection is { IsEmptyPoor: true, Candidate: { } emptyPoorCandidate })
+        {
+            foreach (var candidate in pressCandidates)
+            {
+                if (candidate.Candidate.Equals(emptyPoorCandidate))
+                    pressHistory.Record(candidate.Drawable.HitObject, time, false, true);
+            }
+
+            return PressOutcome.ForEmptyPoor(emptyPoorCandidate.StartTime, emptyPoorCandidate.Column);
+        }
+
+        return PressOutcome.Empty;
     }
 
-    public void HandleRelease(double time)
+    public void HandleRelease(double time, bool reverseScratch = false)
     {
-        if (!IsPressed)
+        var direction = IsScratch && reverseScratch ? 2 : 1;
+        if ((pressedDirections & direction) == 0)
             return;
 
-        IsPressed = false;
+        pressedDirections &= ~direction;
 
         if ((Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0)
             return;
@@ -416,7 +504,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
             var tailTable = BmsJudgementProfileProvider.GetTable(LayoutVariant, Index, heldNote.HitObject.EffectiveJudgementRate, tail: true);
             var releaseOffset = time - heldNote.HitObject.GetEndTime();
 
-            if (ln2.TryRelease(releaseOffset, tailTable) && heldNote.HitObject is BmsLongNote ln)
+            if (ln2.TryRelease(releaseOffset, tailTable, reverseScratch) && heldNote.HitObject is BmsLongNote ln)
                 keySound?.PlaySample(ln.TailSampleKey, ln.TailSampleVolume);
         }
     }

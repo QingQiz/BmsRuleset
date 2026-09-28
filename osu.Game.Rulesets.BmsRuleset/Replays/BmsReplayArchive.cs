@@ -164,6 +164,8 @@ public static class BmsReplayArchive
     {
         public HitResult Result { get; init; }
 
+        public bool SuppressPenalty { get; init; }
+
         public JudgementSourceData Source { get; init; } = new();
 
         public List<TimingObservationData> TimingObservations { get; init; } = [];
@@ -171,6 +173,7 @@ public static class BmsReplayArchive
         public static JudgementEventData From(BmsJudgementEvent judgementEvent) => new()
         {
             Result = judgementEvent.Result,
+            SuppressPenalty = judgementEvent.SuppressPenalty,
             Source = JudgementSourceData.From(judgementEvent.Source),
             TimingObservations = judgementEvent.TimingObservations.Select(TimingObservationData.From).ToList(),
         };
@@ -178,7 +181,8 @@ public static class BmsReplayArchive
         public BmsJudgementEvent ToJudgementEvent() => new(
             Source.ToJudgementSource(),
             Result,
-            TimingObservations.Select(observation => observation.ToTimingObservation()));
+            TimingObservations.Select(observation => observation.ToTimingObservation()),
+            SuppressPenalty);
     }
 
     private class TimingObservationData

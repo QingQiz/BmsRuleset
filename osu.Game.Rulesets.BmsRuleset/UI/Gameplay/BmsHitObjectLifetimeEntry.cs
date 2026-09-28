@@ -20,6 +20,9 @@ internal sealed class BmsHitObjectLifetimeEntry(
     // A resume rewind may return the drawable to its pool while its head/tail judgements remain valid.
     internal BmsLongNoteJudgementController? LongNoteJudgementController { get; set; }
 
+    // Avoided mines have no result, so their crossing must survive drawable pooling separately.
+    internal double? LandmineHandledTime { get; set; }
+
     /// <summary>
     ///     Set to true once <see cref="RefreshLifetime"/> has run.
     ///     Guards against framework code overwriting our

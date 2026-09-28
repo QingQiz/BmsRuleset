@@ -70,6 +70,29 @@ public class BmsReplayArchiveTest
     }
 
     [Test]
+    public void TestMissingSuppressionFieldDefaultsToFalse()
+    {
+        var original = createScore();
+        BmsJudgementEventStore.Set(original.ScoreInfo,
+        [new BmsJudgementEvent(BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 1 }), HitResult.Meh,
+            [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 1200, 1, HitResult.Meh)], suppressPenalty: true)]);
+        var restored = BmsTestReplayArchive.RoundTrip(original, json =>
+        {
+            var parsed = Newtonsoft.Json.Linq.JObject.Parse(json);
+            var fields = parsed.Descendants().OfType<Newtonsoft.Json.Linq.JProperty>()
+                .Where(p => p.Name.Replace("_", "").Equals("SuppressPenalty", StringComparison.OrdinalIgnoreCase)).ToArray();
+            Assert.That(fields, Has.Length.EqualTo(1));
+            fields[0].Remove();
+            return parsed.ToString();
+        });
+        Assert.That(BmsJudgementEventStore.TryGet(restored.ScoreInfo, out var events), Is.True);
+        Assert.That(events.Single().SuppressPenalty, Is.False);
+        Assert.That(events.Single().Source.IsScoring, Is.True);
+        Assert.That(restored.ScoreInfo.HitEvents.Single().Result, Is.EqualTo(HitResult.Meh));
+        Assert.That(restored.Replay.Frames.Single().Time, Is.EqualTo(1234));
+    }
+
+    [Test]
     public void TestArchiveIsGzipCompressed()
     {
         using var archive = BmsReplayArchive.Create(createScore());

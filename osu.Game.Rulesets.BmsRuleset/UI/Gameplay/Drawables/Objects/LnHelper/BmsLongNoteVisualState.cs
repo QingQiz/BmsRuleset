@@ -12,6 +12,8 @@ internal sealed class BmsLongNoteVisualState
 
     public void PrepareHeadPin() => heldBodyDirection = null;
 
+    public void RestoreHeadYAtStartTime(float y) => headYAtStartTime = y;
+
     public void UpdateHeadYAtStartTime(float realHeadY, double currentTime, double startTime, double visualOffset)
     {
         var visualOffsetChanged = previousVisualOffset != visualOffset;

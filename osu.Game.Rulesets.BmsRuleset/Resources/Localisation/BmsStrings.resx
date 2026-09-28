@@ -219,8 +219,8 @@
   <data name="main_bpm" xml:space="preserve"><value>Main BPM</value></data>
   <data name="min_bpm" xml:space="preserve"><value>Min BPM</value></data>
   <data name="mod_second_player" xml:space="preserve"><value>Switches to second-player cabinet layout (scratch on right).</value></data>
-  <data name="mod_auto_scratch" xml:space="preserve"><value>Automatically hits scratch notes.</value></data>
-  <data name="mod_background_keysound" xml:space="preserve"><value>Play all keysounds as background audio instead of on key press.</value></data>
+  <data name="mod_auto_scratch" xml:space="preserve"><value>Automatically plays scratch notes, holds, and CN/HCN tail reversals.</value></data>
+  <data name="mod_background_keysound" xml:space="preserve"><value>Play all keysounds automatically with the song.</value></data>
   <data name="mod_branch_replay" xml:space="preserve"><value>Stores BMS random/switch branch decisions for replay playback.</value></data>
   <data name="mod_constant" xml:space="preserve"><value>Disables BPM-based scroll speed changes.</value></data>
   <data name="mod_hide_scratch" xml:space="preserve"><value>Remove scratch notes and scratch columns.</value></data>
@@ -234,9 +234,9 @@
   <data name="mod_no_mine" xml:space="preserve"><value>Removes all landmines.</value></data>
   <data name="mod_paused" xml:space="preserve"><value>The play was paused and resumed.</value></data>
   <data name="mod_rotation_random" xml:space="preserve"><value>R-RANDOM: randomly rotates columns, with 50% chance of also mirroring.</value></data>
-  <data name="mod_long_note" xml:space="preserve"><value>Standard hold-note: single endpoint judged at the tail using worst offset.</value></data>
-  <data name="mod_charge_note" xml:space="preserve"><value>Two-endpoint note: head and tail judged separately with independent combo.</value></data>
-  <data name="mod_hell_charge_note" xml:space="preserve"><value>Charge-note with continuous body gauge drain: hold to recover, release to damage.</value></data>
+  <data name="mod_long_note" xml:space="preserve"><value>Hold from head to tail for one result. Holding through uses the head judgement; an early release combines the head and release judgements.</value></data>
+  <data name="mod_charge_note" xml:space="preserve"><value>Judge the head and tail separately. Release keys or reverse scratch direction at the tail.</value></data>
+  <data name="mod_hell_charge_note" xml:space="preserve"><value>Judge the head and tail separately, with gauge recovery building while held and damage building while released.</value></data>
   <data name="mod_auto_gauge" xml:space="preserve"><value>Start with the hardest gauge. When you fail, drop to the next tier.</value></data>
   <data name="gauge_description" xml:space="preserve"><value>Use the {0} BMS gauge.</value></data>
   <data name="song_progress_colour" xml:space="preserve"><value>Indicator colour</value></data>
@@ -389,5 +389,11 @@
   </data>
   <data name="mod_no_bad" xml:space="preserve">
     <value>Remove the BAD judgement window.</value>
+  </data>
+  <data name="action_scratch_reverse" xml:space="preserve">
+    <value>Reverse Scratch</value>
+  </data>
+  <data name="action_p2_scratch_reverse" xml:space="preserve">
+    <value>P2 Reverse Scratch</value>
   </data>
 </root>

@@ -7,6 +7,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 
@@ -57,7 +58,6 @@ public partial class BmsHealthProcessor : HealthProcessor
         .GetProperty(nameof(HasFailed), BindingFlags.Instance | BindingFlags.Public)!
         .GetSetMethod(true)!.CreateDelegate<Action<HealthProcessor, bool>>();
 
-    private const double max_landmine_damage_percent = (36 * 36 - 1) / 2d;
     private int activeGaugeIndex;
     private int endResultIndex;
 
@@ -80,7 +80,9 @@ public partial class BmsHealthProcessor : HealthProcessor
     /// <summary>
     ///     Applies an Empty POOR gauge penalty directly — no note is consumed.
     /// </summary>
-    public void RegisterEmptyPoor(double? eventTime = null)
+    public void RegisterEmptyPoor(double? eventTime = null) => RegisterNonConsumingJudgement(HitResult.Miss, eventTime);
+
+    public void RegisterNonConsumingJudgement(HitResult result, double? eventTime = null)
     {
         ensureInitialized();
         syncActiveStateFromHealth();
@@ -91,7 +93,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             var state = gaugeStates[i];
             if (state.IsHpFailed) continue;
 
-            var delta = state.Calculator!.GetDeltaFor(HitResult.Miss, state.CurrentHp);
+            var delta = state.Calculator!.GetDeltaFor(result, state.CurrentHp);
             state.CurrentHp = state.Calculator.ApplyDelta(state.CurrentHp, delta);
 
             if (state.CurrentHp <= 0)
@@ -294,7 +296,12 @@ public partial class BmsHealthProcessor : HealthProcessor
         if (!HasEverFailed && Health.Value <= 0)
             HasEverFailed = true;
 
-        recordGaugeHistory(result.TimeAbsolute, Clock?.CurrentTime ?? result.TimeAbsolute);
+        // A PMS release is observed at key-up but takes effect after its grace period.
+        // Synthetic results have no framework RawTime, so retain that application time explicitly.
+        var applicationTime = result is BmsLongNoteJudgementResult longNoteResult
+            ? longNoteResult.EndpointResults[^1].ApplicationTime ?? result.TimeAbsolute
+            : result.TimeAbsolute;
+        recordGaugeHistory(applicationTime, Clock?.CurrentTime ?? applicationTime);
     }
 
     internal void Rewind(double time)
@@ -325,6 +332,9 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     protected override double GetHealthIncreaseFor(JudgementResult result)
     {
+        if (result is BmsJudgementResult { SuppressPenalty: true })
+            return 0;
+
         ensureInitialized();
         syncActiveStateFromHealth();
 
@@ -339,26 +349,13 @@ public partial class BmsHealthProcessor : HealthProcessor
             if (result.Type != HitResult.Meh)
                 return 0;
 
-            // z.z landmine: instant-kill all layers.
-            if (mine.LandmineDamagePercent >= max_landmine_damage_percent)
-            {
-                foreach (var state in gaugeStates)
-                {
-                    state.CurrentHp = 0;
-                    state.IsHpFailed = true;
-                }
-
-                resolveActiveState();
-                return Health.Value - oldHealth;
-            }
-
-            // Regular landmine: apply damage fraction to all non-failed states.
+            // Mines use the same gauge bounds, including the recovery gauges' 2% floor.
             var damageFraction = mine.LandmineDamagePercent / 100.0;
             foreach (var state in gaugeStates)
             {
                 if (state.IsHpFailed) continue;
 
-                state.CurrentHp = Math.Max(0, state.CurrentHp - damageFraction);
+                state.CurrentHp = state.Calculator!.ApplyDelta(state.CurrentHp, -damageFraction);
                 if (state.CurrentHp <= 0)
                     state.IsHpFailed = true;
             }
@@ -421,7 +418,8 @@ public partial class BmsHealthProcessor : HealthProcessor
             });
         }
 
-        var noteCount = beatmap?.HitObjects.Count(h => h is not BmsLandmine) ?? 0;
+        var noteCount = beatmap?.HitObjects.Where(h => h is not BmsLandmine and not BmsInvisibleNote)
+            .Sum(h => h is BmsLongNote && beatmap is BmsBeatmap { LockedLongNoteMode: BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote } ? 2 : 1) ?? 0;
         if (noteCount == 0) noteCount = 1;
 
         double total = 0;

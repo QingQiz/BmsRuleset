@@ -42,6 +42,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private BmsLongNoteJudgementController controller = new();
 
     private double lastHoldExplosionTime;
+    private bool restoreHeadPin;
     private bool bodyGeometryValid;
     private float lastHeadOffset;
     private float lastBodyTailOffset;
@@ -85,11 +86,24 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (Judged || HitObject == null)
             return false;
 
-        return controller.TryHit(Time.Current, result, gameplayRate);
+        return controller.TryHit(Time.Current, result, gameplayRate, ParentColumn?.LastPressWasReverseScratch == true);
     }
 
-    public bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable)
-        => HitObject != null && controller.TryRelease(Time.Current, releaseOffset, tailTable, gameplayRate);
+    public bool TryRepress(double currentTime, bool reverseScratch = false)
+    {
+        return controller.TryRepress(currentTime, reverseScratch, gameplayRate);
+    }
+
+    public bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable, bool reverseScratch = false)
+    {
+        if (HitObject == null)
+            return false;
+
+        return controller.TryRelease(Time.Current, releaseOffset, tailTable, gameplayRate, reverseScratch);
+    }
+
+    public bool CompleteAtPause(double currentTime)
+        => HitObject != null && controller.CompleteAtPause(currentTime, gameplayRate);
 
     /// <summary>
     /// Called by BmsColumnHitObjectContainer every frame with pre-computed
@@ -177,6 +191,15 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     protected override float GetVisualHeadY(float y, float endY)
     {
+        if (restoreHeadPin)
+        {
+            // Seeking into a hold can reactivate it without observing its head cross the line.
+            // Reconstruct that position once, including visual offset, before resuming the pin.
+            if (Time.Current >= HitObject.StartTime && ParentColumn != null)
+                visualState.RestoreHeadYAtStartTime(ParentColumn.GetLongNoteHeadYAtStartTime(ln));
+            restoreHeadPin = false;
+        }
+
         // Observe positions even while culled so a held head can re-enter at its pinned position.
         visualState.UpdateHeadYAtStartTime(y, Time.Current, HitObject.StartTime, ParentColumn?.VisualOffset ?? 0);
         return isHoldingBody()
@@ -211,7 +234,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             controller = Entry is BmsHitObjectLifetimeEntry bmsEntry
                 ? bmsEntry.LongNoteJudgementController ??= new BmsLongNoteJudgementController()
                 : new BmsLongNoteJudgementController();
-            controller.Bind((BmsLongNote)HitObject, this);
+            controller.Bind((BmsLongNote)HitObject, this, ParentColumn?.PreserveLongNoteHistory ?? true);
+            restoreHeadPin = controller.LongNoteStarted;
 
             longNoteBody.SetSkinLookup(LayoutVariant, Column);
         }
@@ -245,6 +269,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     {
         lastSimulationTime = double.NaN;
         visualState.Reset();
+        restoreHeadPin = controller.LongNoteStarted;
         bodyGeometryValid = false;
         lastHoldExplosionTime = Time.Current;
         RefreshStateTransforms();
@@ -297,10 +322,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         // time and hold-light pulses must only be applied once at that timestamp.
         if (lastSimulationTime == Time.Current)
             return;
+
         lastSimulationTime = Time.Current;
 
-        // Hold-explosion pulse runs first, matching the original per-frame order (pulse, then
-        // charge-tail passive miss, retire, HCN tick). It reads pre-mutation controller state.
         if (controller.LongNoteStarted && !controller.TailJudged
                                        && Time.Current >= HitObject.StartTime && Time.Current <= ln.EndTime
                                        && Time.Current - lastHoldExplosionTime >= hold_explosion_interval)
@@ -311,6 +335,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         controller.UpdatePostResult(Time.Current, Time.Elapsed, isKeyHeld(), gameplayRate);
     }
+
+    internal override void UpdateHellChargeBody(bool holding)
+        => controller.UpdateHellChargeBody(Time.Current, Time.Elapsed, holding || IsAutomaticallyHeld);
 
     private bool isHoldingBody()
         => HitObject != null && controller.ShouldShowHeldVisual(isKeyHeld());
@@ -346,7 +373,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     void IBmsLongNoteHooks.ApplyJudgementResult(HitResult result, System.Collections.Generic.IReadOnlyList<BmsLongNoteEndpointResult> endpoints)
     {
         ((BmsLongNoteJudgementResult)Result).SetEndpointResults(endpoints);
-        ApplyResult(result);
+        ApplyBmsResult(result);
     }
 
     void IBmsLongNoteHooks.ApplySyntheticEndpoint(HitResult result, BmsLongNoteEndpointResult endpoint)

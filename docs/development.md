@@ -60,7 +60,7 @@ dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Test
 |---------------|------------------------------------------------------------------------------------------|----------|
 | **Audio**     | `#WAVCMD` (MacBeat) — pitch/volume/playback-time per WAV slot                            |
 | **Audio**     | `#EXWAVxx` (nanasi) — pan/volume/frequency per WAV file                                  |
-| **Input**     | Turntable input — scratch currently behaves as a column key                    |
+| **Input**     | Analogue turntable-axis input; see [current scratch controls](./gameplay.md#input-and-key-bindings) for bindable directions |
 | **Mods**      | DP only mods (FLIP / BATTLE / SP -> DP / SYNCHRONIZE RANDOM / SYMMETRY RANDOM)           |          |
 | **Parser**    | `#@BGAxx` — 9-field BGA crop with destination width/height; only 7-field `#BGAxx` is parsed | 2        |
 | **Parser**    | `#SWBGAxx` — switchable BGA definition                                                   | 3        |

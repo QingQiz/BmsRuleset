@@ -17,7 +17,7 @@ public class BmsLongNoteJudgementControllerTest
     // --- helpers (shared by all tasks) ---
 
     private static (BmsLongNoteJudgementController controller, FakeLongNoteHooks hooks) makeController(
-        BmsLongNoteMode mode, double start, double duration, int column = 1, int rank = 2)
+        BmsLongNoteMode mode, double start, double duration, int column = 1, int rank = 2, BmsLayoutVariant layout = BmsLayoutVariant.Bme7K)
     {
         var ln = new BmsLongNote
         {
@@ -26,7 +26,7 @@ public class BmsLongNoteJudgementControllerTest
             Column = column,
             Beatmap = new BmsBeatmap
             {
-                LayoutVariant = BmsLayoutVariant.Bme7K,
+                LayoutVariant = layout,
                 TotalColumns = 8,
                 Rank = rank,
                 LockedLongNoteMode = mode,
@@ -36,6 +36,155 @@ public class BmsLongNoteJudgementControllerTest
         var controller = new BmsLongNoteJudgementController();
         controller.Bind(ln, hooks);
         return (controller, hooks);
+    }
+
+    [Test]
+    public void TestNormalTailCannotImproveGreatHead()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
+        controller.TryHit(1040, HitResult.Great);
+        controller.TryRelease(1500, 0, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, true));
+        Assert.That(hooks.AppliedResults, Is.EqualTo([HitResult.Great]));
+    }
+
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    public void TestPmsEarlyReleaseCanBeRescuedWithinMargin(BmsLongNoteMode mode)
+    {
+        var (controller, hooks) = makeController(mode, 1000, 2000, layout: BmsLayoutVariant.Pms9K);
+        controller.TryHit(1000, HitResult.Perfect);
+        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, 1, 2, true);
+        controller.TryRelease(1500, -1500, table);
+        controller.UpdatePostResult(1699, 199, false);
+        Assert.That(controller.TailJudged, Is.False);
+        Assert.That(controller.TryRepress(1699), Is.True);
+        controller.UpdatePostResult(1701, 2, true);
+        Assert.That(controller.TailJudged, Is.False);
+        controller.TryRelease(3000, 0, table);
+        Assert.That(controller.TailJudged, Is.True);
+        Assert.That(mode == BmsLongNoteMode.LongNote ? hooks.AppliedResults.Last() : hooks.SyntheticJudgements.Last().result, Is.EqualTo(HitResult.Perfect));
+    }
+
+    [Test]
+    public void TestPmsReleaseMarginRestoresAfterRewind()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 2000, layout: BmsLayoutVariant.Pms9K);
+        controller.TryHit(1000, HitResult.Perfect);
+        controller.TryRelease(1500, -1500, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, 1, 2, true));
+        controller.TryRepress(1600);
+        controller.Rewind(1550);
+        controller.UpdatePostResult(1700, 150, false);
+        Assert.That(hooks.AppliedResults, Is.EqualTo([HitResult.Ok]));
+    }
+
+    [Test]
+    public void TestHellChargeSuccessfulEarlyTailKeepsRecovering()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.HellChargeNote, 1000, 1000, rank: 3);
+        controller.TryHit(1000, HitResult.Perfect);
+        controller.UpdatePostResult(1800, 800, true);
+        controller.TryRelease(1890, -110, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 3, true));
+        hooks.HellChargeTicks.Clear();
+        controller.UpdatePostResult(1999, 199, false);
+        Assert.That(hooks.HellChargeTicks, Is.EqualTo(new[] { (true, 0.5) }));
+        Assert.That(controller.LongNoteStarted, Is.True);
+        Assert.That(hooks.ClearedTails, Is.Empty);
+    }
+
+    [TestCase(-50, HitResult.Perfect, true)]
+    [TestCase(-110, HitResult.Great, true)]
+    [TestCase(-140, HitResult.Good, true)]
+    [TestCase(-160, HitResult.Ok, false)]
+    [TestCase(-400, HitResult.Meh, false)]
+    public void TestHellChargeReleasedVisualFollowsTailResult(double offset, HitResult result, bool heldVisual)
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.HellChargeNote, 1000, 1000);
+        controller.TryHit(1000, HitResult.Perfect);
+        controller.TryRelease(2000 + offset, offset, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, true));
+
+        Assert.That(hooks.SyntheticJudgements.Single().result, Is.EqualTo(result));
+        Assert.That(controller.ShouldShowHeldVisual(false), Is.EqualTo(heldVisual));
+        Assert.That(controller.ShouldShowHeldVisual(true), Is.True, "Reholding a failed HCN must still pin its remaining body.");
+    }
+
+    [Test]
+    public void TestHellChargeCompletedVisualEndsAtTailAcrossRewind()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.HellChargeNote, 1000, 1000);
+        controller.TryHit(1000, HitResult.Perfect);
+        controller.TryRelease(1910, -90, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, true));
+        controller.UpdatePostResult(1999, 89, false);
+        Assert.That(hooks.RetireCount, Is.Zero);
+        Assert.That(controller.ShouldShowHeldVisual(false), Is.True);
+
+        controller.UpdatePostResult(2000, 1, false);
+        Assert.That(hooks.RetireCount, Is.EqualTo(1));
+        Assert.That(controller.ShouldShowHeldVisual(false), Is.False);
+        controller.UpdatePostResult(2050, 50, false);
+        Assert.That(hooks.RetireCount, Is.EqualTo(1));
+
+        controller.Rewind(2000);
+        Assert.That(controller.LongNoteStarted, Is.False);
+        controller.Rewind(1999);
+        Assert.That(controller.ShouldShowHeldVisual(false), Is.True);
+        controller.UpdatePostResult(2000, 1, false);
+        Assert.That(hooks.RetireCount, Is.EqualTo(2));
+
+        controller.Rewind(1900);
+        Assert.That(controller.TailJudged, Is.False);
+        Assert.That(controller.ShouldShowHeldVisual(false), Is.False);
+        Assert.That(controller.ShouldShowHeldVisual(true), Is.True);
+    }
+
+    [Test]
+    public void TestHellChargeLateTailRemainsJudgeableAcrossRewind()
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.HellChargeNote, 1000, 1000);
+        var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, true);
+        controller.TryHit(1000, HitResult.Perfect);
+        controller.UpdatePostResult(2100, 100, true);
+        Assert.That(controller.TailJudged, Is.False);
+        Assert.That(hooks.RetireCount, Is.Zero);
+        Assert.That(controller.TryRelease(2140, 140, table), Is.True);
+        Assert.That(hooks.SyntheticJudgements.Last().result, Is.EqualTo(HitResult.Good));
+        controller.UpdatePostResult(2140, 40, false);
+        Assert.That(hooks.RetireCount, Is.EqualTo(1));
+
+        controller.Rewind(2100);
+        Assert.That(controller.TailJudged, Is.False);
+        Assert.That(controller.TryRelease(2110, 110, table), Is.True);
+        Assert.That(hooks.SyntheticJudgements.Last().result, Is.EqualTo(HitResult.Great));
+    }
+
+    [TestCase(1699, false)]
+    [TestCase(1700, true)]
+    [TestCase(1701, true)]
+    public void TestPmsReleaseExpiresAtExactlyTwoHundredMilliseconds(double time, bool expired)
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 2000, layout: BmsLayoutVariant.Pms9K);
+        controller.TryHit(1000, HitResult.Perfect);
+        controller.TryRelease(1500, -1500, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, 1, 2, true));
+        controller.UpdatePostResult(time, time - 1500, false);
+        Assert.That(controller.TailJudged, Is.EqualTo(expired));
+        Assert.That(hooks.AppliedResults, Is.EqualTo(expired ? new[] { HitResult.Ok } : System.Array.Empty<HitResult>()));
+        if (expired)
+        {
+            Assert.That(controller.TryRepress(time), Is.False);
+            controller.CheckPassiveResult(3300);
+            Assert.That(hooks.AppliedResults, Is.EqualTo(new[] { HitResult.Ok }), "expiry must judge only once");
+        }
+    }
+
+    [TestCase(1683, false)]
+    [TestCase(1683.001, true)]
+    public void TestPmsChargeTailTimeoutUsesHeadWindow(double time, bool expired)
+    {
+        var (controller, hooks) = makeController(BmsLongNoteMode.ChargeNote, 1000, 500, layout: BmsLayoutVariant.Pms9K);
+        controller.TryHit(1000, HitResult.Perfect);
+        controller.CheckPassiveResult(time);
+        Assert.That(controller.TailJudged, Is.EqualTo(expired));
+        Assert.That(hooks.SyntheticJudgements.Select(j => j.result),
+            Is.EqualTo(expired ? new[] { HitResult.Meh } : System.Array.Empty<HitResult>()));
     }
 
     private sealed class FakeLongNoteHooks : IBmsLongNoteHooks
@@ -143,14 +292,12 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
-    public void TestChargeLifetimeEndUsesTailOkWindow()
+    public void TestChargeLifetimeEndUsesHeadBadWindow()
     {
-        var (controller, _) = makeController(BmsLongNoteMode.ChargeNote, 1000, 500);
+        var (controller, _) = makeController(BmsLongNoteMode.ChargeNote, 1000, 500, layout: BmsLayoutVariant.Pms9K);
 
-        var lifetimeEnd = controller.ChargeTailLifetimeEnd();
-
-        var tailTable = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, true);
-        Assert.That(lifetimeEnd, Is.EqualTo(1500 + tailTable.SlowWindowFor(HitResult.Ok) + 100));
+        // PMS head BAD ends at 183ms, unlike the 283ms tail BAD window.
+        Assert.That(controller.ChargeTailLifetimeEnd(), Is.EqualTo(1783));
     }
 
     [Test]
@@ -176,7 +323,7 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
-    public void TestFastReleaseBeforeTailWindowRecordsFastPoorOffset()
+    public void TestFastReleaseBeforeTailWindowRecordsFastBadOffset()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.LongNote, 1000, 500);
         controller.TryHit(1000, HitResult.Perfect);
@@ -188,7 +335,7 @@ public class BmsLongNoteJudgementControllerTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(hooks.AppliedJudgements.Single().result, Is.EqualTo(HitResult.Meh));
+            Assert.That(hooks.AppliedJudgements.Single().result, Is.EqualTo(HitResult.Ok));
             Assert.That(tailEndpoint.Kind, Is.EqualTo(BmsLongNoteEndpointKind.Tail));
             Assert.That(tailEndpoint.TimeOffset, Is.EqualTo(-300));
         });
@@ -248,6 +395,32 @@ public class BmsLongNoteJudgementControllerTest
         Assert.That(controller.TryHit(1000, HitResult.Perfect), Is.True);
     }
 
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void TestPauseCompletesActiveLongNote(BmsLongNoteMode mode)
+    {
+        var (controller, hooks) = makeController(mode, 1000, 1000);
+        controller.TryHit(1000, HitResult.Perfect);
+
+        Assert.That(controller.CompleteAtPause(1200), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(controller.TailJudged, Is.True);
+            Assert.That(controller.LongNoteStarted, Is.False);
+            Assert.That(controller.TryRelease(2000, 0,
+                BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, true)), Is.False);
+            Assert.That(mode == BmsLongNoteMode.LongNote ? hooks.AppliedResults.Count : hooks.SyntheticJudgements.Count,
+                Is.EqualTo(1));
+            if (mode == BmsLongNoteMode.HellChargeNote)
+            {
+                hooks.HellChargeTicks.Clear();
+                controller.UpdatePostResult(1400, 200, true);
+                Assert.That(hooks.HellChargeTicks, Is.Empty);
+            }
+        });
+    }
+
     [Test]
     public void TestHcnTickAccruesWhileHoldingWithinBody()
     {
@@ -263,18 +436,18 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
-    public void TestLongChargeHeadMissDoesNotCreateExtremeFastTailOffset()
+    public void TestLongChargeHeadMissImmediatelyJudgesBothEndpoints()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.ChargeNote, 1000, 10_000);
 
         controller.CheckPassiveResult(1281);
 
         Assert.That(hooks.AppliedEndpoints, Is.EqualTo([(1000d, 1281d, HitResult.Meh)]));
-        Assert.That(hooks.SyntheticEndpoints, Is.Empty);
+        Assert.That(hooks.SyntheticEndpoints, Is.EqualTo([(11_000d, 1281d, HitResult.Meh)]));
 
         controller.UpdatePostResult(11_281, 16, false);
 
-        Assert.That(hooks.SyntheticEndpoints, Is.EqualTo([(11_000d, 11_281d, HitResult.Meh)]));
+        Assert.That(hooks.SyntheticEndpoints, Is.EqualTo([(11_000d, 1281d, HitResult.Meh)]));
     }
 
     [Test]
@@ -358,19 +531,19 @@ public class BmsLongNoteJudgementControllerTest
     }
 
     [Test]
-    public void TestPassiveHeadMissChargeWaitsForTailPoorWindow()
+    public void TestPassiveHeadMissChargeJudgesTailImmediately()
     {
         var (controller, hooks) = makeController(BmsLongNoteMode.ChargeNote, 1000, 500);
 
         controller.CheckPassiveResult(1000 + 600);
 
         Assert.That(hooks.AppliedResults, Is.EqualTo([HitResult.Meh]));
-        Assert.That(hooks.SyntheticEndpoints, Is.Empty);
-        Assert.That(controller.TailJudged, Is.False);
+        Assert.That(hooks.SyntheticEndpoints, Is.EqualTo([(1500d, 1600d, HitResult.Meh)]));
+        Assert.That(controller.TailJudged, Is.True);
 
         controller.UpdatePostResult(1500 + 600, 16, false);
 
-        Assert.That(hooks.SyntheticEndpoints, Is.EqualTo([(1500d, 2100d, HitResult.Meh)]));
+        Assert.That(hooks.SyntheticEndpoints, Is.EqualTo([(1500d, 1600d, HitResult.Meh)]));
         Assert.That(controller.TailJudged, Is.True);
     }
 

@@ -138,7 +138,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         {
             // The playfield's display event can precede scoring; beatoraja checks combo after the judgement.
             scoreProcessor.NewJudgement += onNewJudgement;
-            scoreProcessor.EmptyPoorRegistered += onEmptyPoorRegistered;
+            scoreProcessor.NonConsumingJudgementRegistered += onNonConsumingJudgementRegistered;
         }
     }
 
@@ -267,7 +267,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         if (scoreProcessor != null)
         {
             scoreProcessor.NewJudgement -= onNewJudgement;
-            scoreProcessor.EmptyPoorRegistered -= onEmptyPoorRegistered;
+            scoreProcessor.NonConsumingJudgementRegistered -= onNonConsumingJudgementRegistered;
         }
 
         base.Dispose(isDisposing);
@@ -672,9 +672,13 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
 
     private static bool isVideo(string path) => video_extensions.Contains(Path.GetExtension(path));
 
-    private void onNewJudgement(JudgementResult result) => tryShowPoorLayer();
+    private void onNewJudgement(JudgementResult result)
+    {
+        if (result is not Scoring.Judgements.BmsJudgementResult { SuppressPenalty: true })
+            tryShowPoorLayer();
+    }
 
-    private void onEmptyPoorRegistered(BmsTimingObservation observation) => tryShowPoorLayer();
+    private void onNonConsumingJudgementRegistered(BmsTimingObservation observation) => tryShowPoorLayer();
 
     private void tryShowPoorLayer()
     {

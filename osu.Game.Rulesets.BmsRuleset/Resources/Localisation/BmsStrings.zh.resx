@@ -219,8 +219,8 @@
   <data name="main_bpm" xml:space="preserve"><value>主要 BPM</value></data>
   <data name="min_bpm" xml:space="preserve"><value>最低 BPM</value></data>
   <data name="mod_second_player" xml:space="preserve"><value>切换为街机二号玩家布局（皿在右侧）。</value></data>
-  <data name="mod_auto_scratch" xml:space="preserve"><value>自动击打皿。</value></data>
-  <data name="mod_background_keysound" xml:space="preserve"><value>将所有按键音作为背景音频播放，而非按键时播放。</value></data>
+  <data name="mod_auto_scratch" xml:space="preserve"><value>自动完成皿音符、长皿保持和 CN/HCN 尾部反向操作。</value></data>
+  <data name="mod_background_keysound" xml:space="preserve"><value>随歌曲自动播放所有按键音。</value></data>
   <data name="mod_branch_replay" xml:space="preserve"><value>保存 BMS 随机与分支选择，以供回放时重现。</value></data>
   <data name="mod_constant" xml:space="preserve"><value>禁用由 BPM 引起的滚动速度变化。</value></data>
   <data name="mod_hide_scratch" xml:space="preserve"><value>移除皿和对应轨道。</value></data>
@@ -234,9 +234,9 @@
   <data name="mod_no_mine" xml:space="preserve"><value>移除所有地雷。</value></data>
   <data name="mod_paused" xml:space="preserve"><value>本次游玩曾暂停并继续。</value></data>
   <data name="mod_rotation_random" xml:space="preserve"><value>R-RANDOM：随机旋转轨道，并有 50% 概率同时镜像。</value></data>
-  <data name="mod_long_note" xml:space="preserve"><value>标准长按音符：在尾端以首尾两次偏差中较差的一次进行单次判定。</value></data>
-  <data name="mod_charge_note" xml:space="preserve"><value>双端点音符：首端和尾端分别判定，并独立计算连击。</value></data>
-  <data name="mod_hell_charge_note" xml:space="preserve"><value>带持续血量变化的充能音符：按住恢复，松开扣血。</value></data>
+  <data name="mod_long_note" xml:space="preserve"><value>从头部保持至尾部，结算一次判定。保持到尾部时采用头部判定，提前松开时综合头部和松键判定。</value></data>
+  <data name="mod_charge_note" xml:space="preserve"><value>头尾分别判定；在尾部松开按键，或将皿切换至相反方向。</value></data>
+  <data name="mod_hell_charge_note" xml:space="preserve"><value>头尾分别判定，主体期间按住积累血量回复，松开积累扣血。</value></data>
   <data name="mod_auto_gauge" xml:space="preserve"><value>从最难的血条开始；失败后自动降至下一档。</value></data>
   <data name="gauge_description" xml:space="preserve"><value>使用 BMS {0} 血条。</value></data>
   <data name="song_progress_colour" xml:space="preserve"><value>指示块颜色</value></data>
@@ -389,5 +389,11 @@
   </data>
   <data name="mod_no_bad" xml:space="preserve">
     <value>移除 BAD 判定区。</value>
+  </data>
+  <data name="action_scratch_reverse" xml:space="preserve">
+    <value>反向转盘</value>
+  </data>
+  <data name="action_p2_scratch_reverse" xml:space="preserve">
+    <value>P2 反向转盘</value>
   </data>
 </root>

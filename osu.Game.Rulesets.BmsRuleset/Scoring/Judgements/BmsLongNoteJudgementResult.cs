@@ -6,7 +6,7 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 
-public sealed class BmsLongNoteJudgementResult : JudgementResult
+public sealed class BmsLongNoteJudgementResult : BmsJudgementResult
 {
     public IReadOnlyList<BmsLongNoteEndpointResult> EndpointResults { get; private set; } = Array.Empty<BmsLongNoteEndpointResult>();
 

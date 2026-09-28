@@ -7,24 +7,49 @@
 Use **Up/Down** to temporarily increase/decrease scroll speed during play. Rebind controls in
 **Settings → Key Bindings → osu!BMS**.
 
-Each key press plays the next note's keysound in that column, regardless of the judgement.
+Key presses play the keysounds assigned to their column.
+
+Scratch has two directions, bound to **Scratch** and **Reverse Scratch**. Either direction can hit a scratch note.
+For long scratches, press one direction at the head and follow the [long-note rules](#long-notes) at the tail.
+
+| Layout / side | Scratch | Reverse Scratch |
+|---------------|---------|-----------------|
+| 5K / 7K, 1P | Left Shift | Left Ctrl |
+| 5K / 7K, 2P layout | Right Shift | Right Ctrl |
+| Double play, P1 | Left Shift | Left Ctrl |
+| Double play, P2 | Right Shift | Right Ctrl |
+
+For keyboard play, bind both directions to comfortable keys. In CN and HCN, press the opposite direction near the
+tail to complete a long scratch. **Auto Scratch** handles scratch notes, holds, and tail reversals automatically.
 
 ## Judgements and Scoring
 
-**Judgement tiers (beatoraja timing windows, from `#RANK` / EXRANK):**
+**Judgement tiers:** timing windows follow beatoraja. The example below is for a **7K key lane at `#RANK 2` (Normal)**
+with default judgement settings.
+Negative offsets mean early presses; positive offsets mean late presses. Each press receives the best judgement
+whose window contains it.
 
 | Name       | EX pts | Combo        | RANK 2 (Normal) window           |
 |------------|--------|--------------|----------------------------------|
 | **PGREAT** | 2      | kept         | ±15 ms                           |
 | **GREAT**  | 1      | kept         | ±45 ms                           |
 | **GOOD**   | 0      | kept         | ±112.5 ms                        |
-| **BAD**    | 0      | reset        | -220ms / +280ms                  |
-| **POOR**   | 0      | reset        | > +280ms                         |
-| **E-POOR** | 0      | **no break** | [-500ms,-220ms], no note consume |
+| **BAD**    | 0      | reset        | -165 ms / +210 ms                 |
+| **POOR**   | 0      | reset        | Missed past +210 ms               |
+| **E-POOR** | 0      | kept in 7K   | Empty presses near a note; see below |
 
-`#RANK` 0 = Very Hard (±5/15/37.5 ms, BAD -220/+280 ms) → 4 = Very Easy (±25/75/187.5 ms, BAD -220/+280 ms).
+For 7K key lanes, `#RANK` 0 = Very Hard (±5/15/37.5 ms, BAD -55/+70 ms) → 4 = Very Easy
+(±25/75/187.5 ms, BAD -275/+350 ms). Scratch lanes, long-note tails, 5K, and PMS use their own windows.
 `#DEFEXRANK` and unnumbered `#EXRANK` set the initial window width as a percentage; `100` equals Normal (`#RANK 2`).
-Channel `A0` applies indexed `#EXRANKxx` values mid-chart. Undefined references leave the window unchanged.
+Channel `A0` applies indexed `#EXRANKxx` values mid-chart.
+
+**E-POOR** is an empty-press penalty that reduces the gauge. An early empty press can trigger it between the early
+BAD boundary and just under 500 ms before a note. In 5K and 7K, extra presses near an already judged note can also
+trigger E-POOR. E-POOR keeps combo in 7K and resets combo in 5K and PMS.
+
+**PMS** records the first BAD or E-POOR associated with a note and keeps that note available for a GOOD, GREAT, or
+PGREAT rehit. The initial mistake remains in the result alongside a successful rehit. At `#RANK 2`, PMS key windows
+are PGREAT ±20 ms, GREAT ±35 ms, GOOD ±81.9 ms, and BAD ±183 ms.
 
 **Score:** `total EX score / max EX score × 1,000,000`
 
@@ -47,44 +72,81 @@ gives the first note GOOD under Combo or Earliest note priority; Time difference
 note for PGREAT.
 
 Selection applies to normal notes and long-note heads, including scratch. Each note uses the windows determined by
-its layout, RANK/EXRANK, and active judgement-window mods. Long-note release rules are unchanged; E-POOR consumes no note.
+its layout, RANK/EXRANK, and active judgement-window mods.
 
-The algorithm is fixed at play start; setting changes apply to the next play. Replays use the recorded algorithm
-regardless of the viewer's settings. Replays recorded before this setting existed use the original selection behaviour.
+The algorithm is fixed at play start; setting changes apply to the next play. Replays use the recorded algorithm.
+Replays recorded before this setting existed use the original selection behaviour.
+
+### Long Notes
+
+The chart and the **Long Note (L1)**, **Charge Note (L2)**, or **Hell Charge Note (L3)** mod determine the long-note mode.
+
+| Mode | How to play | Judgement |
+|------|-------------|-----------|
+| **LN** | Press at the head and hold through the tail. | One result per long note. Holding through the tail uses the head judgement; an early release combines the head and release judgements, taking the worse result. A very early drop gives BAD. |
+| **CN** | Press at the head and release at the tail. | Head and tail each contribute their own judgement, EX score, combo, and gauge change. Missing the head gives POOR for both ends. |
+| **HCN** | Use CN timing, and keep holding through the body. | Head and tail are scored separately. During the body, holding builds recovery and releasing builds damage; reholding after a mistake can recover gauge. |
+
+For **CN and HCN long scratches**, the tail action is a new press in the direction opposite to the head. You can
+release the original direction within the tail window and then press the opposite direction; the opposite press's
+timing determines the tail judgement. You can also press the opposite direction while still holding the first key.
+An early reversal completes the tail immediately, so aim the reversal at the tail. Releasing the original direction
+before the tail window gives POOR. For an ordinary **LN long scratch**, hold the head's direction through the tail;
+an early release of that direction judges the drop.
+
+HCN recovery and damage build up over time, with held and released time cancelling each other. During a steady hold
+or release, gauge changes start after more than 200 ms and continue roughly every 200 ms. A tail judged GOOD or
+better keeps recovery active through the remaining body. After a missed head, holding the body can still recover gauge.
+After a successful early tail judgement, the remaining HCN body stays anchored at the judgement line and shrinks
+until the tail reaches it, then disappears.
+
+PMS provides a **200 ms rehold grace period** for an early release that would give BAD or worse. Repress within that
+period to continue the hold. Once the period expires, the release is judged using its original timing.
+
+### Pausing and Resuming
+
+Pausing completes the tail judgement of each started long note whose tail is still pending. The pause time acts as
+the release time, so pausing early can give BAD or POOR. A PMS release already in its grace period uses the original
+release time. An HCN completed by pausing ends its body gauge changes at that point.
+
+Resuming gives up to **five seconds of lead-in**, while retaining the judgements already earned. Continue with the
+remaining notes when play reaches the pause point. The saved score receives the **Paused (PA)** marker.
 
 ## Gauge
 
 Choose from 6 regular gauges (Groove or Survival) and 3 course gauges through mods. Normal is the default:
 
 > [!NOTE]
-> The gauge values and algorithms are adapted from **beatoraja** (SEVENKEYS mode), itself a reimplementation of the
-> LR2 groove gauge. The `(2 × #TOTAL − 320) / notes` recovery scaling on survival gauges (H1/H2) follows beatoraja's
-> `LIMIT_INCREMENT` modifier. Landmine damage uses the BMS spec formula.
+> Gauge recovery, damage, and clear thresholds follow **beatoraja**. The selected gauge determines how mistakes
+> affect your chance of clearing the chart.
 
-| Mod         | Acronym     | Type                 | Algorithm       | Initial HP | Clear   | Bar              |
+| Mod         | Acronym     | Type                 | Recovery        | Initial HP | Clear   | Bar              |
 |-------------|-------------|----------------------|-----------------|------------|---------|------------------|
-| Assist Easy | **E2**      | Difficulty Reduction | TOTAL (#TOTAL)  | 20%        | ≥ 60%   | Groove (dynamic) |
-| Easy        | **E1**      | Difficulty Reduction | TOTAL (#TOTAL)  | 20%        | ≥ 80%   | Groove (dynamic) |
-| Normal      | *(default)* | —                    | TOTAL (#TOTAL)  | 20%        | ≥ 80%   | Groove (dynamic) |
-| Hard        | **H1**      | Difficulty Increase  | Limit Increment | 100%       | Survive | Fixed red        |
-| EX Hard     | **H2**      | Difficulty Increase  | Limit Increment | 100%       | Survive | Fixed purple     |
-| Hazard      | **H3**      | Difficulty Increase  | Fixed           | 100%       | Survive | Fixed gold       |
-| Class       | **C1**      | Course                | Fixed           | 100%       | Survive | Fixed red        |
-| EX Class    | **C2**      | Course                | Fixed           | 100%       | Survive | Fixed purple     |
-| EX Hard Class | **C3**      | Course                | Fixed           | 100%       | Survive | Fixed gold       |
+| Assist Easy | **E2**      | Difficulty Reduction | Chart's TOTAL   | 20%        | ≥ 60%   | Groove (dynamic) |
+| Easy        | **E1**      | Difficulty Reduction | Chart's TOTAL   | 20%        | ≥ 80%   | Groove (dynamic) |
+| Normal      | *(default)* | —                    | Chart's TOTAL   | 20%        | ≥ 80%   | Groove (dynamic) |
+| Hard        | **H1**      | Difficulty Increase  | Small, chart-dependent | 100% | Survive | Fixed red       |
+| EX Hard     | **H2**      | Difficulty Increase  | Small, chart-dependent | 100% | Survive | Fixed purple    |
+| Hazard      | **H3**      | Difficulty Increase  | Starting gauge  | 100%       | Survive | Fixed gold       |
+| Class       | **C1**      | Course               | Fixed per hit   | 100%       | Survive | Fixed red        |
+| EX Class    | **C2**      | Course               | Fixed per hit   | 100%       | Survive | Fixed purple     |
+| EX Hard Class | **C3**    | Course               | Fixed per hit   | 100%       | Survive | Fixed gold       |
 
-- **Groove gauges** (E2/E1/Normal): recoverable, start at 20%, must reach clear threshold by song end. Bar colour
+- **Groove gauges** (E2/E1/Normal): start at 20%, have a 2% minimum, and can recover throughout the song.
+  Reach the clear threshold by song end. Bar colour
   transitions from red (< 20%) → amber (< clear) → green (≥ clear) based on the active gauge's threshold.
-- **Survival gauges** (H1/H2/H3): start at 100% and fail at 0%. H3 has no recovery. The bar uses a fixed colour with
-  no clear line.
+- **Survival gauges** (H1/H2/H3): start at 100% and fail at 0%. Hard and EX Hard reward successful hits with recovery;
+  Hazard requires preserving the starting gauge. Each uses a fixed bar colour.
 - **Course gauges** (C1/C2/C3): Survival gauges that carry HP between stages; reaching 0% fails the course. Bars are
   red, purple, or gold. The selected regular gauge maps to the corresponding Class tier.
 - Hard (H1) has **guts protection**: below each HP threshold, damage is reduced (below 50% → ×0.8, below 40% → ×0.7,
   …, below 10% → ×0.4).
-- `#TOTAL` controls the maximum gain rate for TOTAL-algorithm gauges. When it is omitted, 5-key, 7-key, PMS, and LR2
-  layouts use `max(7.605 × N / (0.01 × N + 6.5), 260)`. 24-key layouts use
-  `max(7.605 × (N + 100) / (0.01 × N + 6.5), 300)` (where N = total playable notes).
-- Landmine damage: base-36 value ÷ 2 percent (e.g., `ZZ` = 647.5% → instant wipe).
+- `#TOTAL` controls gauge recovery. The chart's recovery is shared across its scored notes: an LN counts once,
+  while CN and HCN count the head and tail separately. The game chooses a default recovery amount based on the
+  chart's layout and note count when `#TOTAL` is omitted.
+- Holding a lane as a landmine passes triggers its chart-defined damage. Scratch mines check either direction.
+  Damage respects the gauge's minimum: even a maximum-damage mine leaves a Groove gauge at 2%, while a Survival
+  gauge can reach 0% and fail.
 
 ## Lamps
 
@@ -135,10 +197,10 @@ matching the selected mods.
 | Invert (IN)              | Converts each note except the lane's last into a hold note      | Randomise LN length; seed                          |
 | 2P                       | Switches the layout from 1P to 2P                               |         |
 | Constant (CN)            | Disables scroll-speed changes, including #SPEED/#SCROLL/BPM     |         |
-| Auto Scratch (AS)        | Plays the scratch lane automatically                            |         |
+| Auto Scratch (AS)        | Plays scratch notes, holds, and CN/HCN tail reversals automatically |         |
 | Hide Scratch (HS)        | Removes scratch notes and hides the lane                        |         |
 | No Mine (NM)             | Removes all landmines, including those in scratch lanes         |         |
-| Background Keysound (BK) | Plays keysounds as background audio instead of on key press     |         |
+| Background Keysound (BK) | Plays keysounds automatically with the song                     |         |
 | Lane Random (LR)         | RANDOM: permutes lane columns                                   | Include scratch; seed; lane order                  |
 | Note Random (NR)         | S-RANDOM / H-RANDOM: per-note random                            | Include scratch; mode; seed                        |
 | Rotation Random (RR)     | R-RANDOM: rotate + optional mirror                              | Include scratch; seed                              |
@@ -151,9 +213,9 @@ matching the selected mods.
 | No Good (NG)             | Removes the GOOD judgement window                               |         |
 | No Great (NE)            | Removes the GREAT and GOOD judgement windows                    |         |
 | No Bad (NB)              | Removes the BAD judgement window                           |         |
-| Long Note (L1)           | LN: judges only the tail                                       |         |
+| Long Note (L1)           | LN: hold from head to tail for one combined judgement           |         |
 | Charge Note (L2)         | CN: judges head and tail separately                            |         |
-| Hell Charge Note (L3)    | HCN: CN with gauge drain/recovery during the body              |         |
+| Hell Charge Note (L3)    | HCN: separate head/tail judgements, plus body recovery and damage |         |
 
 ## Settings
 
@@ -162,10 +224,10 @@ matching the selected mods.
 | Scroll speed | 8.0 | 1.0–50.0, step 0.1 | Note fall speed; in-game controls adjust it temporarily. |
 | Reference BPM                 | Main BPM | Start BPM, Max BPM, Main BPM, or Min BPM   | Scroll-speed reference used when a chart has no `#BASEBPM`. Main BPM uses the BPM containing the most playable notes; ties use the earliest occurrence.                                       |
 | Judgement selection algorithm | Combo priority (LR2) | Combo priority (LR2), Time difference priority (AC), Earliest note priority, Score priority | Selects which note receives a press when windows overlap. See [selection rules](#judgement-selection-algorithms). |
-| BGA dim | 70% | 0%–100% | 0% keeps full brightness; 100% hides the BGA without stopping playback. |
+| BGA dim | 70% | 0%–100% | 0% keeps full brightness; 100% fully darkens the BGA. |
 | Unlock frame rate limit       | Off      | On / off                                  | Removes osu!'s 1000 Hz frame and input polling cap during BMS gameplay. Higher GC and GPU pressure may cause extra stutters; disable this option if that happens. |
 | Visual offset | 0 ms | -500–500 ms, step 1 ms | Positive values display notes earlier (for more Slow judgements); negative values display them later (for more Fast judgements). |
-| LN tail visual offset | 0 ms | 0–1000 ms, step 1 ms | Advances long-note tails visually, shortening notes without moving tails before their heads. |
+| LN tail visual offset | 0 ms | 0–1000 ms, step 1 ms | Advances long-note tails visually, making holds look shorter. |
 | Adjust visual offset automatically | Off | On / off | Applies each valid local play's suggested offset. See [calibration](#visual-offset-calibration). |
 | Use dedicated preview audio   | On       | On / off                                   | Uses `#PREVIEW` or `preview.*` when available. When disabled, song-select previews are synthesized only from BGM and keysound samples.                                                        |
 | Show BMS 5K                   | On       | On / off                                   | Shows or hides single-play BMS 5K charts in song select.                                                                                                                                       |
@@ -181,11 +243,12 @@ The BMS settings also provide chart import, cleanup, and [difficulty-table manag
 
 ### Visual Offset Calibration
 
-Visual offset and LN tail visual offset affect only the display; audio, judgements, scoring, and keysounds stay unchanged.
+Visual offset adjusts when notes appear at the judgement line. LN tail visual offset makes holds look shorter by
+advancing their displayed tails.
 
-Local plays generate suggestions from their median hit error. Apply the average of recent suggestions in the BMS
-settings, or enable **Adjust visual offset automatically** to apply each new suggestion after a play.
-Replays, automatic play, and plays with fewer than 50 timed hits are excluded.
+Manual local plays with at least 50 timed hits generate suggestions from their median hit error. Apply the average
+of recent suggestions in the BMS settings, or enable **Adjust visual offset automatically** to apply each new
+suggestion after a play.
 
 ## Song Select Search
 

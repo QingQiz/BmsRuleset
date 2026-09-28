@@ -70,7 +70,14 @@ public static class BmsJudgementSelector
 
             var table = BmsJudgementProfileProvider.GetTable(layout, candidate.Column, candidate.JudgementRate, tail: false);
             var offset = inputTime - candidate.StartTime;
-            var result = table.ResultForOffset(offset);
+            // beatoraja stops its candidate search before the inclusive E-POOR table edge.
+            if (offset <= -500)
+                break;
+
+            var result = candidate.IsJudged ? HitResult.None : table.ResultForOffset(offset);
+            if (BmsJudgementProfileProvider.IsPms(layout)
+                && (candidate.IsJudged || (candidate.HasMistake && result is not (HitResult.Perfect or HitResult.Great or HitResult.Good))))
+                continue;
 
             if (result != HitResult.None)
             {
@@ -89,8 +96,9 @@ public static class BmsJudgementSelector
                 continue;
             }
 
-            if (table.IsEmptyPoorOffset(offset))
-                emptyPoorCandidate ??= candidate;
+            if (table.EPoorWindow?.ContainsOffset(offset) == true
+                && (emptyPoorCandidate == null || Math.Abs(offset) < Math.Abs(inputTime - emptyPoorCandidate.Value.StartTime)))
+                emptyPoorCandidate = candidate;
         }
 
         if (selected != null)

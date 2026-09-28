@@ -25,8 +25,8 @@ public class BmsModNoGoodNoGreatTest
             Assert.That(table.ResultForOffset(-20), Is.EqualTo(HitResult.Great));
             Assert.That(table.ResultForOffset(60), Is.EqualTo(HitResult.Ok));
             Assert.That(table.ResultForOffset(-60), Is.EqualTo(HitResult.Ok));
-            Assert.That(table.ResultForOffset(220), Is.EqualTo(HitResult.Ok));
-            Assert.That(table.ResultForOffset(-220), Is.EqualTo(HitResult.Ok));
+            Assert.That(table.ResultForOffset(210), Is.EqualTo(HitResult.Ok));
+            Assert.That(table.ResultForOffset(-165), Is.EqualTo(HitResult.Ok));
         });
     }
 
@@ -45,8 +45,8 @@ public class BmsModNoGoodNoGreatTest
             Assert.That(table.ResultForOffset(-20), Is.EqualTo(HitResult.Ok));
             Assert.That(table.ResultForOffset(60), Is.EqualTo(HitResult.Ok));
             Assert.That(table.ResultForOffset(-60), Is.EqualTo(HitResult.Ok));
-            Assert.That(table.ResultForOffset(220), Is.EqualTo(HitResult.Ok));
-            Assert.That(table.ResultForOffset(-220), Is.EqualTo(HitResult.Ok));
+            Assert.That(table.ResultForOffset(210), Is.EqualTo(HitResult.Ok));
+            Assert.That(table.ResultForOffset(-165), Is.EqualTo(HitResult.Ok));
         });
     }
 
@@ -59,8 +59,8 @@ public class BmsModNoGoodNoGreatTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(table.IsPastPassivePoorOffset(280), Is.False);
-            Assert.That(table.IsPastPassivePoorOffset(281), Is.True);
+            Assert.That(table.IsPastPassivePoorOffset(210), Is.False);
+            Assert.That(table.IsPastPassivePoorOffset(210.001), Is.True);
             Assert.That(table.IsEmptyPoorOffset(-221), Is.True);
             Assert.That(table.IsEmptyPoorOffset(-501), Is.False);
         });

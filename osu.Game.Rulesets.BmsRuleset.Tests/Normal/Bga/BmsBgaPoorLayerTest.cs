@@ -186,6 +186,41 @@ public partial class BmsBgaPoorLayerTest
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
     }
 
+    [Test]
+    public void TestPmsNonConsumingBadAndSuppressedPoorDoNotExtendLayer()
+    {
+        beatmap.LayoutVariant = BmsLayoutVariant.Pms9K;
+        scoreProcessor.ApplyBeatmap(beatmap);
+        advanceTo(850);
+        scoreProcessor.RegisterNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
+        Assert.That(scoreProcessor.ScoringJudgementEventCount, Is.Zero);
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
+        advanceTo(1200);
+        var note = beatmap.HitObjects[0];
+        var suppressed = new BmsJudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh, SuppressPenalty = true };
+        scoreProcessor.ApplyResult(suppressed);
+        Assert.That(getDisplayField<double>("poorLayerUntil"), Is.EqualTo(1350));
+        advanceTo(1350);
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
+        advanceTo(1351);
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
+        scoreProcessor.RevertResult(suppressed);
+        scoreProcessor.ApplyResult(suppressed);
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero, "suppressed replay must not restart an expired poor layer");
+        advanceTo(800);
+        scoreProcessor.RevertResult(suppressed);
+        scoreProcessor.RewindEmptyPoors(800);
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
+        advanceTo(850);
+        scoreProcessor.RegisterNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.EqualTo(1));
+        advanceTo(1000);
+        applyResult(0, HitResult.Perfect);
+        Assert.That(getDisplayField<double>("poorLayerUntil"), Is.EqualTo(1350), "successful rehit must not extend failure feedback");
+        advanceTo(1351);
+        Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
+    }
+
     private void applyResult(int index, HitResult type)
     {
         var note = beatmap.HitObjects[index];

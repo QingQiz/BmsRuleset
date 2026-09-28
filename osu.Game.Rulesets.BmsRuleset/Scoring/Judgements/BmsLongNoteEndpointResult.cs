@@ -14,7 +14,8 @@ public readonly record struct BmsLongNoteEndpointResult(
     BmsLongNoteEndpointKind Kind,
     double EventTime,
     double GameplayRate,
-    HitResult Result)
+    HitResult Result,
+    double? ApplicationTime = null)
 {
     public double ExpectedTime => Kind == BmsLongNoteEndpointKind.Head ? Source.StartTime : Source.EndTime;
 

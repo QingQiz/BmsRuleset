@@ -26,7 +26,7 @@ public class BmsGaugeCalculator
             ? total
             : CalculateDefaultTotal(NoteCount, profileFamily);
 
-        var perNoteMaxPercent = Math.Max(Math.Min(0.15, (2 * Total - 320) / noteCount), 0);
+        var perNoteMaxPercent = Math.Max(Math.Min(0.15, (2 * Total - 320) / NoteCount), 0);
         limitIncrementScale = perNoteMaxPercent / 0.15;
     }
 
@@ -59,7 +59,7 @@ public class BmsGaugeCalculator
     }
 
     public double ApplyDelta(double currentHealth, double delta)
-        => Math.Clamp(currentHealth + delta, 0, Profile.MaxHealth);
+        => currentHealth <= 0 ? 0 : Math.Clamp(currentHealth + delta, Profile.MinHealth, Profile.MaxHealth);
 
     private double gain(double value)
     {

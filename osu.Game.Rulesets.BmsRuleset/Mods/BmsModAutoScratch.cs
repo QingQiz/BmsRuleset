@@ -79,7 +79,10 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                 else if (now >= ((BmsLongNote)note).EndTime)
                 {
                     var tailTable = BmsJudgementProfileProvider.GetTable(playfield.LayoutVariant, note.Column, note.EffectiveJudgementRate, tail: true);
-                    if (longNote.TryRelease(now - ((BmsLongNote)note).EndTime, tailTable) && note is BmsLongNote ln)
+                    var tailJudged = ((BmsLongNote)note).Beatmap.LockedLongNoteMode is BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote
+                        ? longNote.TryRepress(now, reverseScratch: true)
+                        : longNote.TryRelease(now - ((BmsLongNote)note).EndTime, tailTable);
+                    if (tailJudged && note is BmsLongNote ln)
                     {
                         longNote.IsAutomaticallyHeld = false;
                         playfield.Stage.Columns[note.Column].PlaySample(ln.TailSampleKey, ln.TailSampleVolume);

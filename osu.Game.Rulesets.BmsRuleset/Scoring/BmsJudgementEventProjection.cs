@@ -10,7 +10,7 @@ public static class BmsJudgementEventProjection
 {
     public static List<HitEvent> CreateScoringHitEvents(IEnumerable<BmsJudgementEvent> judgementEvents)
     {
-        var events = judgementEvents.ToArray();
+        var events = judgementEvents.Where(e => !e.SuppressPenalty).ToArray();
 
         var hitEvents = new List<HitEvent>(events.Length);
         HitObject? lastHitObject = null;
@@ -42,6 +42,7 @@ public static class BmsJudgementEventProjection
     public static List<HitEvent> CreateTimingHitEvents(IEnumerable<BmsJudgementEvent> judgementEvents)
     {
         var observations = judgementEvents
+            .Where(e => !e.SuppressPenalty)
             .SelectMany(judgementEvent => judgementEvent.TimingObservations.Select(observation => (judgementEvent.Source, Observation: observation)))
             .OrderBy(item => item.Observation.ActualTime)
             .ToArray();
@@ -71,6 +72,9 @@ public static class BmsJudgementEventProjection
 
     private static HitObject createScoringHitObject(BmsJudgementSource source, BmsTimingObservation observation)
     {
+        if (source.Kind == BmsJudgementSourceKind.NonConsumingBad)
+            return createNote(source, observation.ExpectedTime);
+
         if (source.Kind == BmsJudgementSourceKind.LongNote
             && observation.Kind == BmsTimingObservationKind.LongNoteHead)
             return createNote(source, observation.ExpectedTime);
@@ -80,6 +84,9 @@ public static class BmsJudgementEventProjection
 
     private static HitObject createObservationHitObject(BmsJudgementSource source, BmsTimingObservation observation)
     {
+        if (source.Kind == BmsJudgementSourceKind.NonConsumingBad)
+            return createNote(source, observation.ExpectedTime);
+
         if (source.Kind == BmsJudgementSourceKind.LongNote
             && observation.Kind is BmsTimingObservationKind.LongNoteHead or BmsTimingObservationKind.LongNoteTail)
             return createNote(source, observation.ExpectedTime);

@@ -17,16 +17,16 @@ public class BmsHitWindowsTest
         Assert.That(windows.WindowFor(HitResult.Perfect), Is.EqualTo(15).Within(0.001));
         Assert.That(windows.WindowFor(HitResult.Great), Is.EqualTo(45).Within(0.001));
         Assert.That(windows.WindowFor(HitResult.Good), Is.EqualTo(112.5).Within(0.001));
-        Assert.That(windows.WindowFor(HitResult.Ok), Is.EqualTo(280).Within(0.001));
-        Assert.That(windows.WindowFor(HitResult.Meh), Is.EqualTo(280).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Ok), Is.EqualTo(210).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Meh), Is.EqualTo(210).Within(0.001));
     }
 
     [Test]
-    [TestCase(0, 5, 15, 37.5, 280)]
-    [TestCase(1, 10, 30, 75, 280)]
-    [TestCase(2, 15, 45, 112.5, 280)]
+    [TestCase(0, 5, 15, 37.5, 70)]
+    [TestCase(1, 10, 30, 75, 140)]
+    [TestCase(2, 15, 45, 112.5, 210)]
     [TestCase(3, 20, 60, 150, 280)]
-    [TestCase(4, 25, 75, 187.5, 280)]
+    [TestCase(4, 25, 75, 187.5, 350)]
     public void TestHitWindowRank(int rank, double expectedPerfect, double expectedGreat, double expectedGood, double expectedBad)
     {
         var windows = new BmsHitWindows(rank);
@@ -48,7 +48,7 @@ public class BmsHitWindowsTest
         Assert.That(windows.WindowFor(HitResult.Perfect), Is.EqualTo(30).Within(0.001));
         Assert.That(windows.WindowFor(HitResult.Great), Is.EqualTo(90).Within(0.001));
         Assert.That(windows.WindowFor(HitResult.Good), Is.EqualTo(225).Within(0.001));
-        Assert.That(windows.WindowFor(HitResult.Ok), Is.EqualTo(280).Within(0.001));
+        Assert.That(windows.WindowFor(HitResult.Ok), Is.EqualTo(420).Within(0.001));
     }
 
     [Test]

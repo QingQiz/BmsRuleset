@@ -61,6 +61,15 @@ Judgements use beatoraja-compatible timing windows and
 [four selectable algorithms](./docs/gameplay.md#judgement-selection-algorithms), with six gauge types and
 traditional EX score alongside osu!'s normalized score.
 
+### Long Notes and Scratch
+
+Choose LN for one combined hold judgement, CN for separate head and tail judgements, or HCN for additional
+gauge recovery and damage during the hold. Scratch has two bindable directions; CN and HCN long scratches
+finish with a reversal at the tail. Auto Scratch handles these actions automatically.
+
+Pausing completes active long-note tail judgements at the pause point. Resuming provides up to five seconds of
+lead-in and retains your earned judgements. See [long-note controls and pause rules](./docs/gameplay.md#long-notes).
+
 ### osu!mania Skin Support
 
 Use an existing osu!mania skin, add a dedicated `[BMS]` configuration, or use the built-in skin.

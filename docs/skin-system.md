@@ -219,11 +219,14 @@ segments. POOR has no finite late boundary, so it appears at the Slow end.
 - **Judgement fade duration** controls how many seconds a timing line takes to fade out, from 0.1 to 20 seconds
   (default 5 seconds).
 - **Show colour bars** toggles the judgement-window bar.
-- **Show moving average** toggles the average-position chevron. POOR and E-POOR never affect this average.
+- **Show moving average** toggles the average-position chevron, using PGREAT, GREAT, GOOD, and BAD timings.
 - **Show E-POOR** toggles both E-POOR timing lines and the additional grey Fast-side segment. It is enabled by default.
 - **Show POOR** toggles POOR timing lines at the final Slow position. It is enabled by default.
 - **Centre marker style** selects a circle, line, or no marker at 0 ms. Both visible styles use white.
 - **Label style** selects Fast/Slow icons, text labels, or no labels.
+
+PMS displays the first BAD or E-POOR on a note and the timing of a successful rehit as separate observations.
+See [judgements and scoring](./gameplay.md#judgements-and-scoring) for the rehit rules.
 
 Horizontal resizing changes the length of the timing axis. Vertical resizing changes the span of the judgement lines;
 the two directions can be adjusted independently.
@@ -282,7 +285,8 @@ The track sits at the Stage's left edge by default; its height determines the ma
 
 Displays the chart's base, layer 1, layer 2, and POOR BGA layers, including crop and opacity events. A judgement
 that leaves combo at zero shows the POOR layer for 500 ms according to the chart's POOR BGA mode. This includes
-BAD and POOR, plus E-POOR when combo is already zero. Each trigger restarts the duration.
+BAD and POOR. E-POOR triggers it when combo is zero after the press: in 5K and PMS it resets combo, while in 7K it
+keeps the existing combo. PMS's first BAD or E-POOR on a note follows the same rule. Each trigger restarts the duration.
 
 The BGA scales to fit the component's rectangle while preserving its aspect ratio. It stays behind the playfield
 and remains visible when the gameplay HUD is hidden.
