@@ -140,6 +140,14 @@ public static class BmsStrings
 
     public static LocalisableString ReferenceBpm => get("reference_bpm");
 
+    public static LocalisableString SoftConstant => get("soft_constant");
+
+    public static LocalisableString SoftConstantHint => get("soft_constant_hint");
+
+    public static LocalisableString SoftConstantFadeIn => get("soft_constant_fade_in");
+
+    public static LocalisableString SoftConstantFadeInHint => get("soft_constant_fade_in_hint");
+
     public static LocalisableString JudgementAlgorithm => get("judgement_algorithm");
 
     public static LocalisableString JudgementAlgorithmHint => get("judgement_algorithm_hint");
@@ -329,6 +337,8 @@ public static class BmsStrings
     public static LocalisableString UnlockFrameRateLimit => get("unlock_frame_rate_limit");
 
     public static LocalisableString UnlockFrameRateLimitHint => get("unlock_frame_rate_limit_hint");
+
+    public static LocalisableString BeatmapManagement => get("beatmap_management");
 
     public static LocalisableString ShowBms5K => get("show_bms_5k");
 

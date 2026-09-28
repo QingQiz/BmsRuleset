@@ -28,7 +28,7 @@ public sealed partial class DrawableBmsInvisibleNote : DrawableBmsHitObject
     {
         config?.BindWith(BmsRulesetSetting.ShowInvisibleNotes, showInvisibleNotes);
 
-        AddInternal(NoteContainer = new Container
+        Visuals.Add(NoteContainer = new Container
         {
             RelativeSizeAxes = Axes.X,
             Child = new Container

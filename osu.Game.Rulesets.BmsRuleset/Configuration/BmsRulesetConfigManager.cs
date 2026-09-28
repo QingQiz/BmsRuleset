@@ -21,6 +21,8 @@ public class BmsRulesetConfigManager(SettingsStore? settings, RulesetInfo rulese
         SetDefault(BmsRulesetSetting.LastImportPath, "C:\\");
         SetDefault(BmsRulesetSetting.ScrollSpeed, DEFAULT_SCROLL_SPEED, 1.0, MAX_SCROLL_SPEED, 0.1);
         SetDefault(BmsRulesetSetting.ReferenceBpmMode, BmsReferenceBpmMode.MainBpm);
+        SetDefault(BmsRulesetSetting.SoftConstant, false);
+        SetDefault(BmsRulesetSetting.SoftConstantFadeIn, 0.0, -1000.0, 1000.0, 1.0);
         SetDefault(BmsRulesetSetting.JudgementAlgorithm, BmsJudgementAlgorithm.Combo);
         SetDefault(BmsRulesetSetting.BgaDim, 0.7, 0, 1, 0.01);
         SetDefault(BmsRulesetSetting.VisualOffset, 0.0, MIN_VISUAL_OFFSET, MAX_VISUAL_OFFSET, 1.0);
@@ -64,4 +66,6 @@ public enum BmsRulesetSetting
     UnlockFrameRateLimit,
     JudgementAlgorithm,
     ShowInvisibleNotes,
+    SoftConstant,
+    SoftConstantFadeIn,
 }

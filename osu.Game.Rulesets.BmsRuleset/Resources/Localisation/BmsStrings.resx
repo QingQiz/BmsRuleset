@@ -39,6 +39,10 @@
   <data name="max_combo" xml:space="preserve"><value>MAX COMBO</value></data>
   <data name="standard_deviation" xml:space="preserve"><value>SD {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>Reference BPM</value></data>
+  <data name="soft_constant" xml:space="preserve"><value>Fixed note visibility duration</value></data>
+  <data name="soft_constant_hint" xml:space="preserve"><value>Reveal notes in slow sections closer to the judgement line, using the visible time at your reference scroll speed.</value></data>
+  <data name="soft_constant_fade_in" xml:space="preserve"><value>Note fade-in duration</value></data>
+  <data name="soft_constant_fade_in_hint" xml:space="preserve"><value>Positive values make notes start appearing earlier and gradually become clear. Negative values start the fade at the default appearance time, so notes become fully visible later. Larger absolute values give a longer fade. Set to 0 for instant appearance at the time determined by your reference scroll speed.</value></data>
   <data name="judgement_algorithm" xml:space="preserve"><value>Judgement selection algorithm</value></data>
   <data name="judgement_algorithm_hint" xml:space="preserve"><value>Choose which note receives a press when judgement windows overlap in the same column. Combo / Score priority switches to a later note when the earlier note is past GOOD / GREAT and the later note is within the early GOOD / GREAT limit. Time difference priority chooses the nearest note; earliest note priority keeps the first eligible note. Changes apply from the next play.</value></data>
   <data name="judgement_algorithm_combo" xml:space="preserve"><value>Combo priority (LR2)</value></data>
@@ -65,6 +69,7 @@
   <data name="dedicated_preview_audio_hint" xml:space="preserve"><value>Use #PREVIEW or preview.* files when available. Disable this to synthesize song-select previews only from BGM and keysound samples.</value></data>
   <data name="unlock_frame_rate_limit" xml:space="preserve"><value>Unlock frame rate limit</value></data>
   <data name="unlock_frame_rate_limit_hint" xml:space="preserve"><value>Remove osu!'s 1000 Hz frame and input polling cap during BMS gameplay. Higher GC and GPU pressure may cause extra stutters; disable this option if that happens.</value></data>
+  <data name="beatmap_management" xml:space="preserve"><value>Beatmap management</value></data>
   <data name="show_bms_5k" xml:space="preserve"><value>Show BMS 5K</value></data>
   <data name="show_bme_7k" xml:space="preserve"><value>Show BME 7K</value></data>
   <data name="show_pms_9k" xml:space="preserve"><value>Show PMS 9K</value></data>

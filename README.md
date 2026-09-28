@@ -32,7 +32,7 @@ Supports `.bms`, `.bme`, `.bml`, and `.pms` charts in single-play and double-pla
 3. Restart osu!. **BMS** will appear in the ruleset selector.
 
 To try the latest development build, open [CI runs](https://github.com/QingQiz/BmsRuleset/actions/workflows/ci.yml),
-select the latest successful run on the `dev` branch, and download `bms-ruleset` from **Artifacts** (GitHub sign-in required).
+select the latest run on the `dev` branch, and download `bms-ruleset` from **Artifacts** (GitHub sign-in required).
 Extract the DLL and install it as above. CI artifacts are retained for 7 days.
 
 ## Importing BMS Charts
@@ -60,15 +60,6 @@ Supports BPM/STOP changes, long notes, mines, random branches, scroll changes, B
 Judgements use beatoraja-compatible timing windows and
 [four selectable algorithms](./docs/gameplay.md#judgement-selection-algorithms), with six gauge types and
 traditional EX score alongside osu!'s normalized score.
-
-### Long Notes and Scratch
-
-Choose LN for one combined hold judgement, CN for separate head and tail judgements, or HCN for additional
-gauge recovery and damage during the hold. Scratch has two bindable directions; CN and HCN long scratches
-finish with a reversal at the tail. Auto Scratch handles these actions automatically.
-
-Pausing completes active long-note tail judgements at the pause point. Resuming provides up to five seconds of
-lead-in and retains your earned judgements. See [long-note controls and pause rules](./docs/gameplay.md#long-notes).
 
 ### osu!mania Skin Support
 
@@ -168,6 +159,14 @@ Note timing, holds, BPM, time signatures, offsets, and scroll-velocity changes a
 are not supported.
 
 Select BMS and enable **Show converts** in the song select filter panel.
+
+### Fixed Note Visibility Duration
+
+Enable **Fixed note visibility duration** in BMS settings to reveal notes in slow sections closer to the judgement
+line, keeping their visible time consistent with your reference scroll speed.
+
+Enabling it reveals a **Note fade-in duration** slider: positive values start the fade earlier, negative values
+make notes fully visible later, and 0 makes them appear instantly. See [settings](./docs/gameplay.md#settings).
 
 ## Documentation
 

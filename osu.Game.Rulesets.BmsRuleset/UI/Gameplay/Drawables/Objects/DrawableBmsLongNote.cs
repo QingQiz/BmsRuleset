@@ -243,7 +243,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     protected override void AddKindDrawablesBeforeNote()
     {
-        AddRangeInternal([
+        Visuals.AddRange([
             longNoteBody = new BmsSegmentedLongNoteBody
             {
                 Anchor = Anchor.TopLeft,

@@ -226,10 +226,12 @@ matching the selected mods.
 | Judgement selection algorithm | Combo priority (LR2) | Combo priority (LR2), Time difference priority (AC), Earliest note priority, Score priority | Selects which note receives a press when windows overlap. See [selection rules](#judgement-selection-algorithms). |
 | BGA dim | 70% | 0%–100% | 0% keeps full brightness; 100% fully darkens the BGA. |
 | Unlock frame rate limit       | Off      | On / off                                  | Removes osu!'s 1000 Hz frame and input polling cap during BMS gameplay. Higher GC and GPU pressure may cause extra stutters; disable this option if that happens. |
+| Use dedicated preview audio   | On       | On / off                                   | Uses `#PREVIEW` or `preview.*` when available. When disabled, song-select previews are synthesized only from BGM and keysound samples.                                                        |
+| Fixed note visibility duration | Off | On / off | Reveals notes in slow sections closer to the judgement line, using the visible time at your reference scroll speed. |
+| Note fade-in duration | 0 ms | -1000–1000 ms, step 1 ms | Positive values make notes start appearing earlier; negative values start the fade at the default appearance time, making notes fully visible later. Larger absolute values give a longer fade; 0 reveals notes instantly at the time determined by your reference scroll speed. |
 | Visual offset | 0 ms | -500–500 ms, step 1 ms | Positive values display notes earlier (for more Slow judgements); negative values display them later (for more Fast judgements). |
 | LN tail visual offset | 0 ms | 0–1000 ms, step 1 ms | Advances long-note tails visually, making holds look shorter. |
 | Adjust visual offset automatically | Off | On / off | Applies each valid local play's suggested offset. See [calibration](#visual-offset-calibration). |
-| Use dedicated preview audio   | On       | On / off                                   | Uses `#PREVIEW` or `preview.*` when available. When disabled, song-select previews are synthesized only from BGM and keysound samples.                                                        |
 | Show BMS 5K                   | On       | On / off                                   | Shows or hides single-play BMS 5K charts in song select.                                                                                                                                       |
 | Show BME 7K                   | On       | On / off                                   | Shows or hides single-play BME 7K charts in song select.                                                                                                                                       |
 | Show PMS 9K                   | On       | On / off                                   | Shows or hides single-play PMS 9K charts in song select.                                                                                                                                       |
@@ -239,7 +241,7 @@ matching the selected mods.
 
 Layout filters take effect immediately in song select.
 
-The BMS settings also provide chart import, cleanup, and [difficulty-table management](./difficulty-tables.md).
+The **Beatmap management** group at the bottom of BMS settings contains chart visibility filters and import, cleanup, and deletion actions. [Difficulty-table management](./difficulty-tables.md) appears above it.
 
 ### Visual Offset Calibration
 

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
@@ -38,6 +39,33 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
     }
 
     public bool ConstantScrollActive { get; set; }
+
+    public BindableBool SoftConstant { get; } = new();
+
+    public BindableDouble SoftConstantFadeIn { get; } = new();
+
+    private double displayTime;
+    private bool softConstantActive;
+    private double softConstantDuration;
+    private double softConstantFadeIn;
+
+    public float GetSoftConstantAlpha(double startTime)
+    {
+        if (!softConstantActive || scrollSpeedMultiplierLocked)
+            return 1;
+
+        // Use the same visual clock and real-time units as scroll positioning, including
+        // visual offset and playback rate. Chart slowdowns only change the reveal position.
+        var remaining = (startTime - displayTime) / PlaybackRate;
+        var duration = softConstantDuration;
+        var fadeIn = softConstantFadeIn;
+
+        if (fadeIn == 0)
+            return remaining < duration ? 1 : 0;
+
+        var fadeStart = duration + Math.Max(0, fadeIn);
+        return (float)Math.Clamp((fadeStart - remaining) / Math.Abs(fadeIn), 0, 1);
+    }
 
     /// <summary>
     ///     Whether the in-play scroll speed multiplier is locked to its default value,
@@ -112,6 +140,7 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 
     public void Update(double currentTime)
     {
+        displayTime = currentTime;
         CurrentScrollPosition = ConstantScrollActive
             ? currentTime
             : TimingMap?.GetScrollPositionAtTime(currentTime) ?? currentTime;
@@ -119,6 +148,15 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
         ChartSpeedFactor = ConstantScrollActive
             ? 1.0
             : TimingMap?.GetSpeedFactorAtTime(currentTime) ?? 1.0;
+
+        // These values are shared by every alive note in the frame; cache them once to avoid
+        // repeated bindable reads and scroll-time calculations during per-note layout.
+        softConstantActive = SoftConstant.Value;
+        if (softConstantActive)
+        {
+            softConstantDuration = ComputeScrollTime(ScrollSpeed) * ScrollRangeScale;
+            softConstantFadeIn = SoftConstantFadeIn.Value;
+        }
     }
 
     public double GetVisualScrollPosition(double time, double mappedScrollPosition) =>

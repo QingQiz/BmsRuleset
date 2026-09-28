@@ -99,6 +99,12 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected Container NoteContainer = null!;
 
+    // A separate visual layer lets appearance fades compose with hit/miss transforms
+    // and long-note release opacity without changing judgement updates.
+    protected Container Visuals { get; } = new() { RelativeSizeAxes = Axes.X };
+
+    internal void UpdateSoftConstantVisibility(float alpha) => Visuals.Alpha = alpha;
+
     private float appliedNoteHeightScale = float.NaN;
 
     [Resolved(CanBeNull = true)]
@@ -110,6 +116,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         Anchor = Anchor.BottomLeft;
         Origin = Anchor.BottomLeft;
         RelativeSizeAxes = Axes.X;
+        AddInternal(Visuals);
     }
 
     public virtual bool TryHit(HitResult result)
@@ -201,6 +208,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         }
 
         Alpha = 1;
+        Visuals.Alpha = 1;
         ResetKindState();
     }
 
@@ -256,7 +264,7 @@ public abstract partial class DrawableBmsHitObject<TCol> : DrawableBmsHitObject
         };
 
         NoteContainer.Add(cachedSkinnableDrawable);
-        AddInternal(NoteContainer);
+        Visuals.Add(NoteContainer);
     }
 
     protected float NoteVisualHeight

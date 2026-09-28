@@ -39,6 +39,10 @@
   <data name="max_combo" xml:space="preserve"><value>最大连击</value></data>
   <data name="standard_deviation" xml:space="preserve"><value>标准差 {0:0.0} ms</value></data>
   <data name="reference_bpm" xml:space="preserve"><value>基准 BPM</value></data>
+  <data name="soft_constant" xml:space="preserve"><value>固定音符可见时长</value></data>
+  <data name="soft_constant_hint" xml:space="preserve"><value>让减速段音符在更接近判定线的位置出现，可见时间以当前基准滚速为准。</value></data>
+  <data name="soft_constant_fade_in" xml:space="preserve"><value>音符淡入时长</value></data>
+  <data name="soft_constant_fade_in_hint" xml:space="preserve"><value>正值让音符更早开始出现，并逐渐变清晰；负值让音符从默认出现时机开始淡入，更晚完全显示。绝对值越大，淡入过程越长。设为 0 时，音符会在当前基准滚速对应的时机直接出现。</value></data>
   <data name="judgement_algorithm" xml:space="preserve"><value>判定选择算法</value></data>
   <data name="judgement_algorithm_hint" xml:space="preserve"><value>同一轨道有多个音符的判定窗口重叠时，决定本次按键判定哪个音符。连击／分数优先：前一个音符已晚于 GOOD／GREAT 窗口，且后一个音符未早于对应窗口时，选择后者。时间差优先：选择时间最近的音符。最早音符优先：选择最早可判定的音符。更改从下一局生效。</value></data>
   <data name="judgement_algorithm_combo" xml:space="preserve"><value>连击优先（LR2）</value></data>
@@ -65,6 +69,7 @@
   <data name="dedicated_preview_audio_hint" xml:space="preserve"><value>存在 #PREVIEW 或 preview.* 文件时优先使用。关闭后，选歌预览将仅由 BGM 和按键音样本合成。</value></data>
   <data name="unlock_frame_rate_limit" xml:space="preserve"><value>解除帧率上限</value></data>
   <data name="unlock_frame_rate_limit_hint" xml:space="preserve"><value>在 BMS 游玩期间解除 osu! 的 1000 Hz 帧率与输入轮询上限。更大的 GC 和 GPU 压力可能造成额外卡顿，遇到时请关闭此选项。</value></data>
+  <data name="beatmap_management" xml:space="preserve"><value>谱面管理</value></data>
   <data name="show_bms_5k" xml:space="preserve"><value>显示 BMS 5K</value></data>
   <data name="show_bme_7k" xml:space="preserve"><value>显示 BME 7K</value></data>
   <data name="show_pms_9k" xml:space="preserve"><value>显示 PMS 9K</value></data>

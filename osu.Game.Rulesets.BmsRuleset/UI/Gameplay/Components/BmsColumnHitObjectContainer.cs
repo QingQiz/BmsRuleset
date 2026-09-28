@@ -360,6 +360,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
                 continue;
 
             var hitObject = note.HitObject!;
+            note.UpdateSoftConstantVisibility(scrollController.GetSoftConstantAlpha(hitObject.StartTime));
             var startPosition = scrollController.GetVisualScrollPosition(hitObject.StartTime, hitObject.ScrollPositionAtStartTime);
             var offset = (float)((startPosition - currentScrollPos) * scale);
             var y = -(hitTarget + offset);

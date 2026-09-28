@@ -113,6 +113,7 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
         var bindable7KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowBme7KDouble);
         var bindable9KDp = manager.GetBindable<bool>(BmsRulesetSetting.ShowPms9KDouble);
         var useDedicatedPreviewAudio = manager.GetBindable<bool>(BmsRulesetSetting.UseDedicatedPreviewAudio);
+        var softConstant = manager.GetBindable<bool>(BmsRulesetSetting.SoftConstant);
 
         bindable5K.BindValueChanged(_ => onLayoutSettingChanged());
         bindable7K.BindValueChanged(_ => onLayoutSettingChanged());
@@ -166,62 +167,19 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 HintText = BmsStrings.DedicatedPreviewAudioHint,
                 Current = useDedicatedPreviewAudio,
             }),
-            new SettingsItemV2(new FormCheckBox
+            new ExpandableSettingsGroup(new SettingsItemV2(new FormCheckBox
             {
-                Caption = BmsStrings.ShowBms5K,
-                Current = bindable5K,
-            }),
-            new SettingsItemV2(new FormCheckBox
+                Caption = BmsStrings.SoftConstant,
+                HintText = BmsStrings.SoftConstantHint,
+                Current = softConstant,
+            }), new SettingsItemV2(new FormSliderBar<double>
             {
-                Caption = BmsStrings.ShowBme7K,
-                Current = bindable7K,
-            }),
-            new SettingsItemV2(new FormCheckBox
-            {
-                Caption = BmsStrings.ShowPms9K,
-                Current = bindable9K,
-            }),
-            new SettingsItemV2(new FormCheckBox
-            {
-                Caption = BmsStrings.ShowBms5KDp,
-                Current = bindable5KDp,
-            }),
-            new SettingsItemV2(new FormCheckBox
-            {
-                Caption = BmsStrings.ShowBme7KDp,
-                Current = bindable7KDp,
-            }),
-            new SettingsItemV2(new FormCheckBox
-            {
-                Caption = BmsStrings.ShowPms9KDp,
-                Current = bindable9KDp,
-            }),
-            new RoundedButton
-            {
-                Text = BmsStrings.ImportBmsFiles,
-                RelativeSizeAxes = Axes.X,
-                Height = 36,
-                Action = () => { performer?.PerformFromScreen(menu => menu.Push(new BmsFileImportScreen(manager))); },
-                Padding = SettingsPanel.CONTENT_PADDING,
-            },
-            new RoundedButton
-            {
-                Text = BmsStrings.CleanupOrphanedSets,
-                TooltipText = BmsStrings.CleanupOrphanedSetsTooltip,
-                BackgroundColour = colours.YellowDarker,
-                RelativeSizeAxes = Axes.X,
-                Height = 36,
-                Action = confirmCleanupOrphans,
-                Padding = SettingsPanel.CONTENT_PADDING,
-            },
-            new DangerousRoundedButton
-            {
-                Text = BmsStrings.DeleteAllImportedFiles,
-                RelativeSizeAxes = Axes.X,
-                Height = 36,
-                Action = confirmDeleteAllBmsFiles,
-                Padding = SettingsPanel.CONTENT_PADDING,
-            },
+                Caption = BmsStrings.SoftConstantFadeIn,
+                HintText = BmsStrings.SoftConstantFadeInHint,
+                Current = manager.GetBindable<double>(BmsRulesetSetting.SoftConstantFadeIn),
+                KeyboardStep = 1,
+                LabelFormat = BmsStrings.OffsetMilliseconds,
+            }), softConstant),
             new OsuSpriteText
             {
                 Text = BmsStrings.BmsVisualOffset,
@@ -249,7 +207,74 @@ public partial class BmsSettingsSubsection(BmsRuleset ruleset) : RulesetSettings
                 Current = manager.GetBindable<bool>(BmsRulesetSetting.AutomaticallyAdjustVisualOffset),
             }),
             new DifficultyTableSettings(manager),
+            new BeatmapManagementSettings
+            {
+                Children =
+                [
+                    new SettingsItemV2(new FormCheckBox
+                    {
+                        Caption = BmsStrings.ShowBms5K,
+                        Current = bindable5K,
+                    }),
+                    new SettingsItemV2(new FormCheckBox
+                    {
+                        Caption = BmsStrings.ShowBme7K,
+                        Current = bindable7K,
+                    }),
+                    new SettingsItemV2(new FormCheckBox
+                    {
+                        Caption = BmsStrings.ShowPms9K,
+                        Current = bindable9K,
+                    }),
+                    new SettingsItemV2(new FormCheckBox
+                    {
+                        Caption = BmsStrings.ShowBms5KDp,
+                        Current = bindable5KDp,
+                    }),
+                    new SettingsItemV2(new FormCheckBox
+                    {
+                        Caption = BmsStrings.ShowBme7KDp,
+                        Current = bindable7KDp,
+                    }),
+                    new SettingsItemV2(new FormCheckBox
+                    {
+                        Caption = BmsStrings.ShowPms9KDp,
+                        Current = bindable9KDp,
+                    }),
+                    new RoundedButton
+                    {
+                        Text = BmsStrings.ImportBmsFiles,
+                        RelativeSizeAxes = Axes.X,
+                        Height = 36,
+                        Action = () => { performer?.PerformFromScreen(menu => menu.Push(new BmsFileImportScreen(manager))); },
+                        Padding = SettingsPanel.CONTENT_PADDING,
+                    },
+                    new RoundedButton
+                    {
+                        Text = BmsStrings.CleanupOrphanedSets,
+                        TooltipText = BmsStrings.CleanupOrphanedSetsTooltip,
+                        BackgroundColour = colours.YellowDarker,
+                        RelativeSizeAxes = Axes.X,
+                        Height = 36,
+                        Action = confirmCleanupOrphans,
+                        Padding = SettingsPanel.CONTENT_PADDING,
+                    },
+                    new DangerousRoundedButton
+                    {
+                        Text = BmsStrings.DeleteAllImportedFiles,
+                        RelativeSizeAxes = Axes.X,
+                        Height = 36,
+                        Action = confirmDeleteAllBmsFiles,
+                        Padding = SettingsPanel.CONTENT_PADDING,
+                    },
+                ],
+            },
         ];
+    }
+
+    private sealed partial class BeatmapManagementSettings : SettingsSubsection
+    {
+        protected override LocalisableString Header => BmsStrings.BeatmapManagement;
     }
 
     private void reloadCurrentPreview()
