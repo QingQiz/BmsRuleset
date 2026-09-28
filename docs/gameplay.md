@@ -110,7 +110,8 @@ the release time, so pausing early can give BAD or POOR. A PMS release already i
 release time. An HCN completed by pausing ends its body gauge changes at that point.
 
 Resuming gives up to **five seconds of lead-in**, while retaining the judgements already earned. Continue with the
-remaining notes when play reaches the pause point. The saved score receives the **Paused (PA)** marker.
+remaining notes when play reaches the pause point. Empty POOR penalties also resume at that point, so you can
+warm up your keys during the lead-in. The saved score receives the **Paused (PA)** marker.
 
 ## Gauge
 

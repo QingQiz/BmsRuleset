@@ -457,6 +457,10 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
         if (selection is { IsEmptyPoor: true, Candidate: { } emptyPoorCandidate })
         {
+            // Lead-in key presses are preparation input, including for PMS mistake tracking.
+            if (ParentPlayfield.IsResumeRewinding)
+                return PressOutcome.Empty;
+
             foreach (var candidate in pressCandidates)
             {
                 if (candidate.Candidate.Equals(emptyPoorCandidate))
