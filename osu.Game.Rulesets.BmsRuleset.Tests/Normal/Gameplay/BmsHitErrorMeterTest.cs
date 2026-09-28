@@ -2,6 +2,7 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Scoring;
@@ -60,26 +61,67 @@ public class BmsHitErrorMeterTest
         });
     }
 
-    [Test]
-    public void TestPoorUsesBadWindowEdgeMatchingTimingDirectionOnlyWhenEnabled()
+    [TestCase(false, false, 0, -165, 210)]
+    [TestCase(false, false, 1, -165, 210)]
+    [TestCase(false, false, 2, -165, 210)]
+    [TestCase(false, true, 0, -500, 210)]
+    [TestCase(false, true, 1, -500, 210)]
+    [TestCase(false, true, 2, -500, 210)]
+    [TestCase(true, false, 0, -112.5, 112.5)]
+    [TestCase(true, false, 1, -45, 45)]
+    [TestCase(true, false, 2, -15, 15)]
+    [TestCase(true, true, 0, -500, 150)]
+    [TestCase(true, true, 1, -500, 150)]
+    [TestCase(true, true, 2, -500, 150)]
+    public void TestPoorUsesVisibleWindowEdges(bool noBad, bool showEmptyPoor, int constraint, double expectedFast, double expectedSlow)
     {
         var windows = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 0.75, tail: false);
-        // JudgeProperty SEVENKEYS BAD (-280000, 220000) at integer rank 75.
-        var badWindowFastEdge = -windows.FastWindowFor(HitResult.Ok);
-        var badWindowSlowEdge = windows.SlowWindowFor(HitResult.Ok);
+
+        if (noBad)
+            windows = new BmsModNoBad().ApplyToJudgementWindow(windows);
+
+        windows = constraint switch
+        {
+            1 => new BmsModNoGood().ApplyToJudgementWindow(windows),
+            2 => new BmsModNoGreat().ApplyToJudgementWindow(windows),
+            _ => windows,
+        };
+
+        var (fastEdge, slowEdge) = BmsHitErrorMeter.GetPoorDisplayOffsets(windows, showEmptyPoor);
         var fastPoor = new BmsHitErrorTimingObservation(-281, HitResult.Meh);
         var slowPoor = new BmsHitErrorTimingObservation(281, HitResult.Meh);
 
         Assert.Multiple(() =>
         {
-            Assert.That(badWindowFastEdge, Is.EqualTo(-165));
-            Assert.That(badWindowSlowEdge, Is.EqualTo(210));
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(fastPoor, badWindowFastEdge, badWindowSlowEdge, showPoor: false), Is.Null);
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(fastPoor, badWindowFastEdge, badWindowSlowEdge, showPoor: true), Is.EqualTo(badWindowFastEdge));
-            Assert.That(BmsHitErrorMeter.GetDisplayOffset(slowPoor, badWindowFastEdge, badWindowSlowEdge, showPoor: true), Is.EqualTo(badWindowSlowEdge));
+            Assert.That(fastEdge, Is.EqualTo(expectedFast));
+            Assert.That(slowEdge, Is.EqualTo(expectedSlow));
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(fastPoor, fastEdge, slowEdge, showPoor: false), Is.Null);
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(slowPoor, fastEdge, slowEdge, showPoor: false), Is.Null);
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(fastPoor, fastEdge, slowEdge, showPoor: true), Is.EqualTo(expectedFast));
+            Assert.That(BmsHitErrorMeter.GetDisplayOffset(slowPoor, fastEdge, slowEdge, showPoor: true), Is.EqualTo(expectedSlow));
             Assert.That(BmsHitErrorMeter.GetDisplayOffset(
-                new BmsHitErrorTimingObservation(-12, HitResult.Perfect), badWindowFastEdge, badWindowSlowEdge, showPoor: false), Is.EqualTo(-12));
+                new BmsHitErrorTimingObservation(-12, HitResult.Perfect), fastEdge, slowEdge, showPoor: false), Is.EqualTo(-12));
         });
+    }
+
+    [TestCase(0, 187.5)]
+    [TestCase(1, 150)]
+    [TestCase(2, 150)]
+    public void TestNoBadUsesOutermostSlowWindowAtEasyRank(int constraint, double expectedSlow)
+    {
+        var windows = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 1.25, tail: false);
+        windows = new BmsModNoBad().ApplyToJudgementWindow(windows);
+        windows = constraint switch
+        {
+            1 => new BmsModNoGood().ApplyToJudgementWindow(windows),
+            2 => new BmsModNoGreat().ApplyToJudgementWindow(windows),
+            _ => windows,
+        };
+
+        var (fastEdge, slowEdge) = BmsHitErrorMeter.GetPoorDisplayOffsets(windows, showEmptyPoor: true);
+
+        Assert.That(fastEdge, Is.EqualTo(-500));
+        Assert.That(slowEdge, Is.EqualTo(expectedSlow));
     }
 
     [TestCase(HitResult.Perfect, true)]

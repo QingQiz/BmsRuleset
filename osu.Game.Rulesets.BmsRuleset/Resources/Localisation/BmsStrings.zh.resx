@@ -112,7 +112,7 @@
   <data name="hit_error_meter_show_empty_poor" xml:space="preserve"><value>显示 E-POOR</value></data>
   <data name="hit_error_meter_show_empty_poor_description" xml:space="preserve"><value>显示 E-POOR 判定及其灰色判定区间。</value></data>
   <data name="hit_error_meter_show_poor" xml:space="preserve"><value>显示 POOR</value></data>
-  <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>在误差条最偏慢的一端显示 POOR 判定。</value></data>
+  <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>在当前显示的判定区域两端显示偏早和偏晚的 POOR 判定。</value></data>
   <data name="hit_error_meter_fade_duration" xml:space="preserve"><value>判定线淡出时间</value></data>
   <data name="hit_error_meter_fade_duration_description" xml:space="preserve"><value>判定线完成淡出所需的秒数。</value></data>
   <data name="hit_error_meter_line_thickness" xml:space="preserve"><value>判定线粗细</value></data>

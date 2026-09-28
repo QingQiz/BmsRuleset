@@ -75,6 +75,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     private readonly DrawablePool<JudgementLine> judgementLinePool = new(50);
 
     private BmsHitErrorMeterDomain domain;
+    private BmsJudgementWindowTable headWindows = null!;
     private double fastPoorDisplayOffset;
     private double slowPoorDisplayOffset;
     private double floatingAverage;
@@ -101,9 +102,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
                             ?? BmsJudgementProfileProvider.RateForRank(layout, beatmap?.Rank ?? 2);
         domain = CreateDomain(layout, judgementRate);
 
-        var headWindows = BmsJudgementProfileProvider.GetTable(layout, 1, judgementRate, tail: false);
-        fastPoorDisplayOffset = -headWindows.FastWindowFor(HitResult.Ok);
-        slowPoorDisplayOffset = headWindows.SlowWindowFor(HitResult.Ok);
+        headWindows = BmsJudgementProfileProvider.GetTable(layout, 1, judgementRate, tail: false);
 
         // Use legacy's time-to-width scale by default while respecting dimensions saved in user skins.
         if (Width == 0)
@@ -161,7 +160,17 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         if (scoreProcessor != null)
             scoreProcessor.NonConsumingJudgementRegistered += onNonConsumingJudgementRegistered;
 
-        ShowEmptyPoor.BindValueChanged(visible => emptyPoorColourBar.Alpha = visible.NewValue ? 1 : 0, true);
+        ShowEmptyPoor.BindValueChanged(visible =>
+        {
+            emptyPoorColourBar.Alpha = visible.NewValue ? 1 : 0;
+            (fastPoorDisplayOffset, slowPoorDisplayOffset) = GetPoorDisplayOffsets(headWindows, visible.NewValue);
+
+            foreach (var line in judgementsContainer.OfType<JudgementLine>())
+            {
+                if (line.PoorIsFast is { } isFast)
+                    line.X = domain.RelativePosition(isFast ? fastPoorDisplayOffset : slowPoorDisplayOffset);
+            }
+        }, true);
         BackgroundOpacity.BindValueChanged(opacity => background.Alpha = opacity.NewValue, true);
         ColourBarHeight.BindValueChanged(height =>
         {
@@ -218,7 +227,8 @@ public partial class BmsHitErrorMeter : HitErrorMeter
             if (displayOffset == null)
                 continue;
 
-            addJudgement(displayOffset.Value, observation.Result, AffectsMovingAverage(observation.Result));
+            addJudgement(displayOffset.Value, observation.Result, AffectsMovingAverage(observation.Result),
+                observation.Result == HitResult.Meh ? observation.TimeOffset < 0 : null);
         }
     }
 
@@ -229,13 +239,14 @@ public partial class BmsHitErrorMeter : HitErrorMeter
                 addJudgement(observation.TimeOffset, observation.Result, AffectsMovingAverage(observation.Result));
         });
 
-    private void addJudgement(double timeOffset, HitResult result, bool affectMovingAverage)
+    private void addJudgement(double timeOffset, HitResult result, bool affectMovingAverage, bool? poorIsFast = null)
     {
         var relativePosition = domain.RelativePosition(timeOffset);
 
         judgementLinePool.Get(drawableJudgement =>
         {
             drawableJudgement.X = relativePosition;
+            drawableJudgement.PoorIsFast = poorIsFast;
             drawableJudgement.Colour = BmsHitResultColours.ForHitResult(result);
             judgementsContainer.Add(drawableJudgement);
         });
@@ -268,7 +279,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         double slowPoorDisplayOffset,
         bool showPoor)
     {
-        // POOR has no finite miss-side edge, so retain its timing direction at the corresponding BAD boundary.
+        // POOR has no finite miss-side edge, so retain its timing direction at the displayed colour bar boundary.
         if (observation.Result == HitResult.Meh)
             return showPoor
                 ? observation.TimeOffset < 0 ? fastPoorDisplayOffset : slowPoorDisplayOffset
@@ -278,6 +289,30 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     }
 
     internal static bool AffectsMovingAverage(HitResult result) => result.IsHit() && result != HitResult.Meh;
+
+    internal static (double FastOffset, double SlowOffset) GetPoorDisplayOffsets(BmsJudgementWindowTable windows, bool showEmptyPoor)
+    {
+        var fastOffset = 0d;
+        var slowOffset = 0d;
+
+        foreach (var window in windows.HitWindows)
+        {
+            // NB retains an inverted BAD interval for passive POOR timing, but that interval has no colour bar.
+            if (window.SlowDTime > window.FastDTime)
+                continue;
+
+            fastOffset = Math.Min(fastOffset, -window.FastOffset);
+            slowOffset = Math.Max(slowOffset, window.SlowOffset);
+        }
+
+        if (showEmptyPoor && windows.EPoorWindow is { } emptyPoor)
+        {
+            fastOffset = Math.Min(fastOffset, -emptyPoor.FastOffset);
+            slowOffset = Math.Max(slowOffset, emptyPoor.SlowOffset);
+        }
+
+        return (fastOffset, slowOffset);
+    }
 
     internal static BmsHitErrorMeterDomain CreateDomain(BmsLayoutVariant layout, double judgementRate)
     {
@@ -316,6 +351,8 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     internal partial class JudgementLine : PoolableDrawable
     {
+        public bool? PoorIsFast { get; set; }
+
         private readonly BindableNumber<float> judgementLineThickness = new BindableFloat();
 
         [Resolved]

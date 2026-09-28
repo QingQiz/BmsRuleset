@@ -271,26 +271,65 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
     }
 
     [Test]
-    public void TestPoorLineUsesBadWindowEnd()
+    public void TestPoorLinesFollowVisibleWindowEnds([Values(false, true)] bool noBad, [Values(0, 1, 2)] int constraint)
     {
         BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
-        Box badWindow() => meter().ChildrenOfType<Box>().Single(child => child.Name == $"{HitResult.Ok} window");
-        BmsHitErrorMeter.JudgementLine poorLine() => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Single();
+        Box window(HitResult result) => meter().ChildrenOfType<Box>().Single(child =>
+            child.Name == (result == HitResult.Miss ? "empty poor window" : $"{result} window"));
 
-        AddStep("load player", LoadPlayer);
+        AddStep("load player", () =>
+        {
+            Mod[] mods = constraint switch
+            {
+                1 => [new BmsModNoGood()],
+                2 => [new BmsModNoGreat()],
+                _ => [],
+            };
+            LoadPlayer(noBad ? [..mods, new BmsModNoBad()] : mods);
+        });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddUntilStep("hit error meter loaded", () => meter().IsLoaded);
-        AddStep("register POOR", () =>
+        AddStep("stop gameplay clock", () => Player.GameplayClockContainer.Stop());
+        AddStep("register Fast and Slow POOR", registerPoors);
+        AddUntilStep("both POOR lines appear", () => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 2);
+        AddStep("POOR lines match visible outer edges", () => assertEnds(showEmptyPoor: true));
+        AddStep("hide E-POOR", () => meter().ShowEmptyPoor.Value = false);
+        AddStep("existing POOR lines follow remaining hit windows", () => assertEnds(showEmptyPoor: false));
+        AddStep("clear lines", () => meter().Clear());
+        AddUntilStep("lines returned to pool", () => !meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Any());
+        AddStep("register POOR with E-POOR hidden", registerPoors);
+        AddUntilStep("both POOR lines appear again", () => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 2);
+        AddStep("new POOR lines use remaining hit windows", () => assertEnds(showEmptyPoor: false));
+        AddStep("show E-POOR", () => meter().ShowEmptyPoor.Value = true);
+        AddStep("existing POOR lines return to outer edges", () => assertEnds(showEmptyPoor: true));
+
+        void registerPoors()
         {
-            var hitObject = Player.GameplayState.Beatmap.HitObjects.OfType<BmsNote>().First();
-            Player.GameplayState.ScoreProcessor.ApplyResult(new JudgementResult(hitObject, hitObject.CreateJudgement())
+            var notes = Player.GameplayState.Beatmap.HitObjects.OfType<BmsNote>().Take(2).ToArray();
+            for (var i = 0; i < notes.Length; i++)
             {
-                Type = HitResult.Meh,
-            });
-        });
-        AddUntilStep("POOR line appears", () => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 1);
-        AddAssert("POOR line uses BMS colour", () => poorLine().Colour == BmsHitResultColours.ForHitResult(HitResult.Meh));
-        AddAssert("POOR line is at BAD window end", () =>
-            Math.Abs(poorLine().ScreenSpaceDrawQuad.Centre.X - badWindow().ScreenSpaceDrawQuad.AABBFloat.Right) < 0.5f);
+                var result = new JudgementResult(notes[i], notes[i].CreateJudgement()) { Type = HitResult.Meh };
+                typeof(JudgementResult).GetProperty(nameof(JudgementResult.TimeOffset))!.SetValue(result, i == 0 ? -281d : 281d);
+                Player.GameplayState.ScoreProcessor.ApplyResult(result);
+            }
+        }
+
+        void assertEnds(bool showEmptyPoor)
+        {
+            var hitResult = !noBad ? HitResult.Ok : constraint switch
+            {
+                1 => HitResult.Great,
+                2 => HitResult.Perfect,
+                _ => HitResult.Good,
+            };
+            var left = window(showEmptyPoor ? HitResult.Miss : hitResult).ScreenSpaceDrawQuad.AABBFloat.Left;
+            var right = window(showEmptyPoor && noBad ? HitResult.Miss : hitResult).ScreenSpaceDrawQuad.AABBFloat.Right;
+            var lines = meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().OrderBy(line => line.X).ToArray();
+
+            Assert.That(lines, Has.Length.EqualTo(2));
+            Assert.That(lines.All(line => line.Colour == BmsHitResultColours.ForHitResult(HitResult.Meh)), Is.True);
+            Assert.That(lines[0].ScreenSpaceDrawQuad.Centre.X, Is.EqualTo(left).Within(0.5f));
+            Assert.That(lines[1].ScreenSpaceDrawQuad.Centre.X, Is.EqualTo(right).Within(0.5f));
+        }
     }
 }

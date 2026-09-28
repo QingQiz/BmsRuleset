@@ -112,7 +112,7 @@
   <data name="hit_error_meter_show_empty_poor" xml:space="preserve"><value>Show E-POOR</value></data>
   <data name="hit_error_meter_show_empty_poor_description" xml:space="preserve"><value>Shows E-POOR judgements and their grey timing regions.</value></data>
   <data name="hit_error_meter_show_poor" xml:space="preserve"><value>Show POOR</value></data>
-  <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>Shows POOR judgements at the latest end of the meter.</value></data>
+  <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>Shows Fast and Slow POOR judgements at the outer edges of the displayed judgement regions.</value></data>
   <data name="hit_error_meter_fade_duration" xml:space="preserve"><value>Judgement fade duration</value></data>
   <data name="hit_error_meter_fade_duration_description" xml:space="preserve"><value>Seconds taken for judgement lines to fade out.</value></data>
   <data name="hit_error_meter_line_thickness" xml:space="preserve"><value>Judgement line thickness</value></data>

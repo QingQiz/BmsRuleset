@@ -23,6 +23,7 @@
 
 - When settings, mods, or gameplay behaviour change, update the corresponding sections of the documentation as part of the same change.
 - Write documentation for players: explain how to use features and their effects on gameplay, without implementation details.
+- Keep documentation brief and focused on essential usage and effects. Cover edge cases, mod combinations, and detailed behaviour only when explicitly requested.
 - In documentation and in-game descriptions, describe what a feature does. Avoid describing what it does not do.
 
 ## Test Rules

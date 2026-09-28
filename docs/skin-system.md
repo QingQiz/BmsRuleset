@@ -209,32 +209,20 @@ Edit the skin image files to change the artwork or animation.
 
 ### Hit Error Meter
 
-Shows timing errors with Fast on the left and Slow on the right. The white 0 ms marker stays centred. Both sides
-have equal space; asymmetric windows leave unused space on the shorter side.
+Shows Fast on the left, Slow on the right, and 0 ms in the centre. Colours mark judgement windows; grey marks
+E-POOR. The triangle shows average timing.
 
-The coloured horizontal axis shows the normal-key judgement windows. Grey marks E-POOR regions. With NO BAD,
-the parts of the former BAD region that allow E-POOR become grey, up to E-POOR's own timing limits.
-The triangle tracks the moving average of PGREAT, GREAT, GOOD, and BAD timings.
+| Setting | Range / effect | Default |
+|---------|----------------|---------|
+| Judgement line thickness | 1–8 | 3 |
+| Colour bar height | 0–20; 0 hides the coloured axis | 3 |
+| Background opacity | 0%–100% | 60% |
+| Judgement fade duration | 0.1–20 seconds | 10 seconds |
+| Show E-POOR | E-POOR lines and grey regions | On |
+| Show POOR | POOR lines at the visible colour bar's ends | On |
 
-- **Judgement line thickness** controls the width of each displayed timing line from 1 to 8 (default 3).
-- **Colour bar height** controls the height of the coloured horizontal axis from 0 to 20 (default 3).
-  Set it to 0 to hide the axis.
-- **Background opacity** controls the black background from 0% to 100% (default 60%).
-- **Judgement fade duration** controls how many seconds a timing line takes to fade out, from 0.1 to 20 seconds
-  (default 10 seconds).
-- **Show E-POOR** toggles both E-POOR timing lines and grey timing regions. It is enabled by default.
-- **Show POOR** toggles POOR timing lines at the corresponding Fast or Slow boundary. It is enabled by default.
-
-PMS displays the first BAD or E-POOR on a note and the timing of a successful rehit as separate observations.
-See [judgements and scoring](./gameplay.md#judgements-and-scoring) for the rehit rules.
-
-Horizontal resizing changes the length of the timing axis. Vertical resizing changes the span of the judgement lines;
-the two directions can be adjusted independently.
-
-The initial width follows the widest timing window, including scratch and long-note tail windows. With standard
-RANK values, E-POOR's 500 ms Fast limit sets a centred range of -500 to +500 ms, so RANK changes the coloured
-segments within that range. Wider custom windows can increase the initial width. A width saved in the skin takes
-precedence, and the timing windows scale to fit it.
+Resize horizontally for axis length and vertically for judgement-line height. The initial width follows the timing
+range; a width saved in the skin takes precedence.
 
 ### Score Graph
 
