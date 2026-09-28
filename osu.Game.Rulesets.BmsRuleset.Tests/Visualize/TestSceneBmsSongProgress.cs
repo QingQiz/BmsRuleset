@@ -9,10 +9,12 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
@@ -120,6 +122,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
     {
         BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
         Box badWindow() => meter().ChildrenOfType<Box>().Single(child => child.Name == $"{HitResult.Ok} window");
+        Container colourBar() => meter().ChildrenOfType<Container>().Single(child => child.Name == "judgement windows");
         Container judgements() => meter().ChildrenOfType<Container>().Single(child => child.Name == "judgements");
 
         float originalWindowWidth = 0;
@@ -148,6 +151,16 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddAssert("background is fully opaque", () => meter().ChildrenOfType<Box>().Single(child => child.Name == "background").Alpha == 1);
         AddStep("restore background opacity", () => meter().BackgroundOpacity.SetDefault());
         AddAssert("meter has one window bar", () => meter().ChildrenOfType<Container>().Count(child => child.Name == "judgement windows") == 1);
+        AddStep("thicken colour bar", () => meter().ColourBarHeight.Value = 5.5f);
+        AddAssert("colour bar uses configured height", () => Math.Abs(colourBar().DrawHeight - 5.5f * LegacySkin.STABLE_MAGIC_SCALE_FACTOR) < 0.001);
+        AddStep("hide colour bar", () => meter().ColourBarHeight.Value = 0);
+        AddAssert("zero height hides colour bar and preserves timing overlay", () =>
+            colourBar().DrawHeight == 0 && !colourBar().IsPresent
+            && meter().ChildrenOfType<Box>().Single(child => child.Name == "centre marker").IsPresent
+            && judgements().IsPresent && meter().ChildrenOfType<Triangle>().Single().IsPresent);
+        AddStep("restore colour bar height", () => meter().ColourBarHeight.SetDefault());
+        AddAssert("colour bar becomes visible at default height", () =>
+            colourBar().IsPresent && Math.Abs(colourBar().DrawHeight - 3 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR) < 0.001);
         AddAssert("window bars use BMS judgement colours", () =>
         {
             HitResult[] results = [HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok];
@@ -187,6 +200,52 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             badWindow().ScreenSpaceDrawQuad.AABBFloat.Width > originalWindowWidth);
         AddStep("stretch vertically", () => meter().Height = 52);
         AddAssert("vertical stretch widens judgement lines", () => judgements().ScreenSpaceDrawQuad.AABBFloat.Height > originalJudgementHeight);
+    }
+
+    [Test]
+    public void TestColourBarMatchesJudgements([Values(false, true)] bool noBad, [Values(0, 1, 2)] int constraint)
+    {
+        BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
+
+        AddStep("load window mods", () =>
+        {
+            Mod[] mods = constraint switch
+            {
+                1 => [new BmsModNoGood()],
+                2 => [new BmsModNoGreat()],
+                _ => [],
+            };
+            LoadPlayer(noBad ? [..mods, new BmsModNoBad()] : mods);
+        });
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddUntilStep("meter loaded", () => meter().IsLoaded);
+        AddStep("check visible colours against playable windows", () =>
+        {
+            var windows = BmsJudgementProfileProvider.GetTable(Playfield.Beatmap.LayoutVariant, 1,
+                Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate, tail: false);
+            var bars = meter().ChildrenOfType<Container>().Single(child => child.Name == "judgement windows").Children.OfType<Box>().ToArray();
+
+            // Quarter-millisecond samples avoid shared inclusive boundaries while covering both sides
+            // and the unused space beyond E-POOR's finite slow boundary.
+            for (var offset = -499.75; offset < 500; offset++)
+            {
+                var result = windows.ResultForOffset(offset);
+                if (result == HitResult.None && windows.IsEmptyPoorOffset(offset))
+                    result = HitResult.Miss;
+
+                var position = (float)((offset + 500) / 1000);
+                var visible = bars.LastOrDefault(bar => bar.Width > 0 && position > bar.X && position < bar.X + bar.Width);
+                if (result == HitResult.None)
+                    Assert.That(visible, Is.Null, $"no judgement region at {offset} ms");
+                else
+                    Assert.That(visible != null && visible.Colour == BmsHitResultColours.ForHitResult(result), Is.True, $"{result} at {offset} ms");
+            }
+
+            Assert.That(meter().Width, Is.EqualTo(500 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR).Within(0.001));
+        });
+        AddStep("hide E-POOR regions", () => meter().ShowEmptyPoor.Value = false);
+        AddAssert("E-POOR background is hidden", () =>
+            !meter().ChildrenOfType<Box>().Single(child => child.Name == "empty poor window").IsPresent);
     }
 
     [Test]

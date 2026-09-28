@@ -39,6 +39,14 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         Precision = 0.1f,
     };
 
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.HitErrorMeterColourBarHeight), nameof(BmsStrings.HitErrorMeterColourBarHeightDescription))]
+    public BindableNumber<float> ColourBarHeight { get; } = new BindableFloat(bar_height)
+    {
+        MinValue = 0,
+        MaxValue = 20,
+        Precision = 0.1f,
+    };
+
     [SettingSource(typeof(BmsStrings), nameof(BmsStrings.HitErrorMeterBackgroundOpacity), nameof(BmsStrings.HitErrorMeterBackgroundOpacityDescription),
         SettingControlType = typeof(SettingsPercentageSlider<float>))]
     public BindableNumber<float> BackgroundOpacity { get; } = new BindableFloat(0.6f)
@@ -75,6 +83,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     private Triangle arrow = null!;
     private Box background = null!;
     private Box emptyPoorColourBar = null!;
+    private Container windowColourBar = null!;
     private Container judgementsContainer = null!;
 
     public BmsHitErrorMeter()
@@ -100,7 +109,6 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         if (Width == 0)
             Width = (float)(domain.SlowOffset - domain.FastOffset) / 2 * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
 
-        Container windowColourBar;
         InternalChildren =
         [
             background = new Box
@@ -155,14 +163,21 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
         ShowEmptyPoor.BindValueChanged(visible => emptyPoorColourBar.Alpha = visible.NewValue ? 1 : 0, true);
         BackgroundOpacity.BindValueChanged(opacity => background.Alpha = opacity.NewValue, true);
+        ColourBarHeight.BindValueChanged(height =>
+        {
+            windowColourBar.Height = height.NewValue * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
+            windowColourBar.Alpha = height.NewValue > 0 ? 1 : 0;
+        }, true);
     }
 
     private void createColourBar(Container target, BmsJudgementWindowTable windows)
     {
         HitResult[] results = [HitResult.Ok, HitResult.Good, HitResult.Great, HitResult.Perfect];
 
+        // Layer valid hit windows over the full E-POOR interval so removing BAD exposes only
+        // offsets inside E-POOR, including its finite slow-side limit.
         var emptyPoorStart = domain.RelativePosition(-windows.FastWindowFor(HitResult.Miss));
-        var emptyPoorEnd = domain.RelativePosition(-windows.FastWindowFor(HitResult.Ok));
+        var emptyPoorEnd = domain.RelativePosition(windows.SlowWindowFor(HitResult.Miss));
 
         target.Add(emptyPoorColourBar = new Box
         {

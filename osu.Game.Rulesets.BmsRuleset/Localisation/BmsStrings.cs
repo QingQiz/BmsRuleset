@@ -480,6 +480,10 @@ public static class BmsStrings
 
     public static LocalisableString HitErrorMeterBackgroundOpacityDescription => get("hit_error_meter_background_opacity_description");
 
+    public static LocalisableString HitErrorMeterColourBarHeight => get("hit_error_meter_colour_bar_height");
+
+    public static LocalisableString HitErrorMeterColourBarHeightDescription => get("hit_error_meter_colour_bar_height_description");
+
     public static LocalisableString JudgementDisplayShowEmptyPoor => get("judgement_display_show_empty_poor");
 
     public static LocalisableString JudgementDisplayShowEmptyPoorDescription => get("judgement_display_show_empty_poor_description");

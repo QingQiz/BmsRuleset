@@ -120,6 +120,7 @@ public class BmsDefaultHudTest
             Assert.That(meter.JudgementFadeDuration.Value, Is.EqualTo(10));
             Assert.That(meter.JudgementLineThickness.Value, Is.EqualTo(3));
             Assert.That(meter.BackgroundOpacity.Value, Is.EqualTo(0.6f));
+            Assert.That(meter.ColourBarHeight.Value, Is.EqualTo(3));
         });
     }
 
@@ -141,8 +142,9 @@ public class BmsDefaultHudTest
         Assert.That(restored.ShowEmptyPoor.Value, Is.False);
     }
 
-    [Test]
-    public void TestHitErrorMeterIndependentSizeSurvivesLayoutRoundTrip()
+    [TestCase(0)]
+    [TestCase(5.5f)]
+    public void TestHitErrorMeterIndependentSizeSurvivesLayoutRoundTrip(float colourBarHeight)
     {
         var meter = new BmsHitErrorMeter
         {
@@ -158,6 +160,7 @@ public class BmsDefaultHudTest
         meter.ShowPoor.Value = false;
         meter.JudgementFadeDuration.Value = 1.5f;
         meter.BackgroundOpacity.Value = 0.25f;
+        meter.ColourBarHeight.Value = colourBarHeight;
 
         var saved = meter.CreateSerialisedInfo();
         saved.Settings["judgement_line_thickness"] = 8f;
@@ -166,7 +169,7 @@ public class BmsDefaultHudTest
         saved.Settings["centre_marker_style"] = 1;
         saved.Settings["label_style"] = 2;
         var restored = (BmsHitErrorMeter)saved.CreateInstance();
-        string[] expectedSettings = ["judgement_line_thickness", "background_opacity", "judgement_fade_duration", "show_empty_poor", "show_poor"];
+        string[] expectedSettings = ["judgement_line_thickness", "background_opacity", "judgement_fade_duration", "show_empty_poor", "show_poor", "colour_bar_height"];
 
         Assert.Multiple(() =>
         {
@@ -181,6 +184,7 @@ public class BmsDefaultHudTest
             Assert.That(restored.JudgementFadeDuration.Value, Is.EqualTo(1.5f));
             Assert.That(restored.JudgementLineThickness.Value, Is.EqualTo(8));
             Assert.That(restored.BackgroundOpacity.Value, Is.EqualTo(0.25f));
+            Assert.That(restored.ColourBarHeight.Value, Is.EqualTo(colourBarHeight));
             Assert.That(restored.CreateSerialisedInfo().Settings.Keys, Is.EquivalentTo(expectedSettings));
         });
     }

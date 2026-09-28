@@ -110,7 +110,7 @@
   <data name="fast" xml:space="preserve"><value>fast</value></data>
   <data name="slow" xml:space="preserve"><value>slow</value></data>
   <data name="hit_error_meter_show_empty_poor" xml:space="preserve"><value>Show E-POOR</value></data>
-  <data name="hit_error_meter_show_empty_poor_description" xml:space="preserve"><value>Shows E-POOR judgements and their grey timing window on the fast side.</value></data>
+  <data name="hit_error_meter_show_empty_poor_description" xml:space="preserve"><value>Shows E-POOR judgements and their grey timing regions.</value></data>
   <data name="hit_error_meter_show_poor" xml:space="preserve"><value>Show POOR</value></data>
   <data name="hit_error_meter_show_poor_description" xml:space="preserve"><value>Shows POOR judgements at the latest end of the meter.</value></data>
   <data name="hit_error_meter_fade_duration" xml:space="preserve"><value>Judgement fade duration</value></data>
@@ -119,6 +119,8 @@
   <data name="hit_error_meter_line_thickness_description" xml:space="preserve"><value>Adjusts the thickness of judgement lines in the hit error meter.</value></data>
   <data name="hit_error_meter_background_opacity" xml:space="preserve"><value>Background opacity</value></data>
   <data name="hit_error_meter_background_opacity_description" xml:space="preserve"><value>Adjusts the opacity of the hit error meter's black background.</value></data>
+  <data name="hit_error_meter_colour_bar_height" xml:space="preserve"><value>Colour bar height</value></data>
+  <data name="hit_error_meter_colour_bar_height_description" xml:space="preserve"><value>Adjusts the height of the coloured judgement area. Set to 0 to hide it.</value></data>
   <data name="judgement_display_show_empty_poor" xml:space="preserve"><value>Show E-POOR</value></data>
   <data name="judgement_display_show_empty_poor_description" xml:space="preserve"><value>Shows empty POOR judgements in the judgement HUD.</value></data>
   <data name="key" xml:space="preserve"><value>Key {0}</value></data>

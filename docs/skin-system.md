@@ -212,24 +212,29 @@ Edit the skin image files to change the artwork or animation.
 Shows timing errors with Fast on the left and Slow on the right. The white 0 ms marker stays centred. Both sides
 have equal space; asymmetric windows leave unused space on the shorter side.
 
-Judgement windows form a continuous colour bar. E-POOR adds a grey segment beyond Fast BAD without shortening other
-segments. POOR has no finite late boundary, so it appears at the Slow end.
+The coloured horizontal axis shows the normal-key judgement windows. Grey marks E-POOR regions. With NO BAD,
+the parts of the former BAD region that allow E-POOR become grey, up to E-POOR's own timing limits.
+The triangle tracks the moving average of PGREAT, GREAT, GOOD, and BAD timings.
 
-- **Judgement line thickness** controls the width of each displayed timing line from 1 to 8 (default 4).
+- **Judgement line thickness** controls the width of each displayed timing line from 1 to 8 (default 3).
+- **Colour bar height** controls the height of the coloured horizontal axis from 0 to 20 (default 3).
+  Set it to 0 to hide the axis.
+- **Background opacity** controls the black background from 0% to 100% (default 60%).
 - **Judgement fade duration** controls how many seconds a timing line takes to fade out, from 0.1 to 20 seconds
-  (default 5 seconds).
-- **Show colour bars** toggles the judgement-window bar.
-- **Show moving average** toggles the average-position chevron, using PGREAT, GREAT, GOOD, and BAD timings.
-- **Show E-POOR** toggles both E-POOR timing lines and the additional grey Fast-side segment. It is enabled by default.
-- **Show POOR** toggles POOR timing lines at the final Slow position. It is enabled by default.
-- **Centre marker style** selects a circle, line, or no marker at 0 ms. Both visible styles use white.
-- **Label style** selects Fast/Slow icons, text labels, or no labels.
+  (default 10 seconds).
+- **Show E-POOR** toggles both E-POOR timing lines and grey timing regions. It is enabled by default.
+- **Show POOR** toggles POOR timing lines at the corresponding Fast or Slow boundary. It is enabled by default.
 
 PMS displays the first BAD or E-POOR on a note and the timing of a successful rehit as separate observations.
 See [judgements and scoring](./gameplay.md#judgements-and-scoring) for the rehit rules.
 
 Horizontal resizing changes the length of the timing axis. Vertical resizing changes the span of the judgement lines;
 the two directions can be adjusted independently.
+
+The initial width follows the widest timing window, including scratch and long-note tail windows. With standard
+RANK values, E-POOR's 500 ms Fast limit sets a centred range of -500 to +500 ms, so RANK changes the coloured
+segments within that range. Wider custom windows can increase the initial width. A width saved in the skin takes
+precedence, and the timing windows scale to fit it.
 
 ### Score Graph
 
