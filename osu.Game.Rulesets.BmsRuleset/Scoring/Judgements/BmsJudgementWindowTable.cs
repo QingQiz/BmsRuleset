@@ -12,18 +12,18 @@ public sealed class BmsJudgementWindowTable
 
     public IReadOnlyList<BmsJudgementWindow> HitWindows { get; }
 
-    public BmsJudgementWindow? MissWindow { get; }
+    public BmsJudgementWindow? EPoorWindow { get; }
 
     public BmsJudgementWindowTable(IEnumerable<BmsJudgementWindow> rows)
     {
         var allRows = rows as BmsJudgementWindow[] ?? rows.ToArray();
         var hitCount = 0;
-        BmsJudgementWindow? miss = null;
+        BmsJudgementWindow? epoor = null;
 
         foreach (var row in allRows)
         {
             if (row.Result == HitResult.Miss)
-                miss ??= row;
+                epoor ??= row;
             else
                 hitCount++;
         }
@@ -46,7 +46,7 @@ public sealed class BmsJudgementWindowTable
         }
 
         HitWindows = hits;
-        MissWindow = miss;
+        EPoorWindow = epoor;
     }
 
     public double GoodFastDTime => goodFastDTime ?? throw new InvalidOperationException("Sequence contains no matching element");
@@ -64,7 +64,7 @@ public sealed class BmsJudgementWindowTable
 
     public bool IsEmptyPoorOffset(double timeOffset)
     {
-        if (MissWindow == null || !MissWindow.Value.ContainsOffset(timeOffset))
+        if (EPoorWindow == null || !EPoorWindow.Value.ContainsOffset(timeOffset))
             return false;
 
         return ResultForOffset(timeOffset) == HitResult.None;
@@ -98,7 +98,7 @@ public sealed class BmsJudgementWindowTable
     private BmsJudgementWindow? rowFor(HitResult result)
     {
         if (result == HitResult.Miss)
-            return MissWindow;
+            return EPoorWindow;
 
         foreach (var row in HitWindows)
         {

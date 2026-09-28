@@ -30,8 +30,8 @@ public class BmsModNoGood : Mod, IApplicableToJudgementWindow
             ? row with { SlowDTime = 0, FastDTime = 0 }
             : row);
 
-        return table.MissWindow is { } miss
-            ? new BmsJudgementWindowTable(rows.Append(miss))
+        return table.EPoorWindow is { } ep
+            ? new BmsJudgementWindowTable(rows.Append(ep))
             : new BmsJudgementWindowTable(rows);
     }
 }

@@ -20,7 +20,7 @@ public class BmsModNoBadTest
         var original = BmsJudgementProfileProvider.GetTable(layout, column, rank, tail);
         var table = new BmsModNoBad().ApplyToJudgementWindow(original);
 
-        Assert.That(table.MissWindow, Is.EqualTo(original.MissWindow));
+        Assert.That(table.EPoorWindow, Is.EqualTo(original.EPoorWindow));
         Assert.That(table.HitWindows.Where(row => row.Result != HitResult.Ok),
             Is.EqualTo(original.HitWindows.Where(row => row.Result != HitResult.Ok)));
         Assert.That(table.SlowWindowFor(HitResult.Ok), Is.EqualTo(original.SlowWindowFor(HitResult.Ok)));
@@ -30,7 +30,7 @@ public class BmsModNoBadTest
             var result = original.ResultForOffset(offset);
             Assert.That(table.ResultForOffset(offset), Is.EqualTo(result == HitResult.Ok ? HitResult.None : result), $"offset {offset}");
             Assert.That(table.IsEmptyPoorOffset(offset),
-                Is.EqualTo(original.MissWindow is { } miss && miss.ContainsOffset(offset) && result is HitResult.None or HitResult.Ok),
+                Is.EqualTo(original.EPoorWindow is { } miss && miss.ContainsOffset(offset) && result is HitResult.None or HitResult.Ok),
                 $"empty POOR at {offset}");
             Assert.That(table.IsPastPassivePoorOffset(offset), Is.EqualTo(original.IsPastPassivePoorOffset(offset)), $"passive POOR at {offset}");
         }

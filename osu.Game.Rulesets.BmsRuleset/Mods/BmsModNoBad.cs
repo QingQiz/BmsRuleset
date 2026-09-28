@@ -27,6 +27,6 @@ public class BmsModNoBad : Mod, IApplicableToJudgementWindow, IApplicableToScore
     {
         // An inverted interval removes BAD hits while retaining its passive POOR deadline.
         var rows = table.HitWindows.Select(row => row.Result == HitResult.Ok ? row with { FastDTime = double.NegativeInfinity } : row);
-        return new BmsJudgementWindowTable(table.MissWindow is { } miss ? rows.Append(miss) : rows);
+        return new BmsJudgementWindowTable(table.EPoorWindow is { } ep ? rows.Append(ep) : rows);
     }
 }
