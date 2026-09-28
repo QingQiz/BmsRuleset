@@ -439,13 +439,12 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestCourseModsKeepNoFailButDropAutoplay()
+    public void TestCourseModsDropAutoplay()
     {
-        var mods = BmsCourseSession.CreateCourseMods([new BmsModNoFail(), new BmsModAutoplay()], BmsGaugeType.Class);
+        var mods = BmsCourseSession.CreateCourseMods([new BmsModAutoplay()], BmsGaugeType.Class);
 
         Assert.Multiple(() =>
         {
-            Assert.That(mods, Has.One.TypeOf<BmsModNoFail>());
             Assert.That(mods, Has.None.TypeOf<BmsModAutoplay>());
             Assert.That(mods, Has.One.TypeOf<BmsModClassGauge>());
         });
@@ -781,10 +780,11 @@ public class BmsCourseSessionTest
         });
     }
 
-    [Test]
-    public void TestNoFailKeepsFailedStageButAllowsCourseToContinue()
+    [TestCase(1)]
+    [TestCase(2)]
+    public void TestFailedStageEndsCourse(int stageCount)
     {
-        var session = createSession(mods: [new BmsModNoFail()]);
+        var session = createSession(stageCount);
 
         session.BeginCurrentStage();
         session.CompleteCurrentStage(createScore(false, 100), gaugeStates(0, true));
@@ -793,30 +793,14 @@ public class BmsCourseSessionTest
         {
             Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Failed));
             Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Failed));
+            Assert.That(session.CanContinue, Is.False);
+            Assert.That(session.AdvanceRequested, Is.False);
+            Assert.That(session.CurrentStageIndex, Is.Zero);
         });
 
-        session.RequestAdvance();
-        session.Advance();
-        Assert.That(session.CurrentStageIndex, Is.EqualTo(1));
-
-        session.BeginCurrentStage();
-        session.CompleteCurrentStage(createScore(true, 200), gaugeStates(0.75));
-        Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Failed));
-    }
-
-    [Test]
-    public void TestNoFailStillFailsCourseAfterFinalFailedStage()
-    {
-        var session = createSession(1, [new BmsModNoFail()]);
-
-        session.BeginCurrentStage();
-        session.CompleteCurrentStage(createScore(false, 100), gaugeStates(0, true));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(session.CurrentStage.Status, Is.EqualTo(BmsCourseStageStatus.Failed));
-            Assert.That(session.Status, Is.EqualTo(BmsCourseStatus.Failed));
-        });
+        Assert.Throws<InvalidOperationException>(session.RequestAdvance);
+        Assert.Throws<InvalidOperationException>(session.Advance);
+        Assert.Throws<InvalidOperationException>(session.AbortAfterStageResult);
     }
 
     [Test]

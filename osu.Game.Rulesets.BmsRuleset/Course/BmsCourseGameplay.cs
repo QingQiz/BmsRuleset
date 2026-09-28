@@ -60,16 +60,6 @@ internal partial class BmsCourseSessionScreen : ScreenWithBeatmapBackground
         if (session.Status == BmsCourseStatus.InProgress)
             return;
 
-        if (session.Status == BmsCourseStatus.Failed
-            && !session.SummaryShown
-            && session.HasNoFail
-            && session.CurrentStage.Status == BmsCourseStageStatus.Failed
-            && session.CurrentStageIndex < session.Stages.Count - 1)
-        {
-            this.Push(createStageResults());
-            return;
-        }
-
         if (session.SummaryShown)
         {
             this.Exit();
@@ -78,17 +68,6 @@ internal partial class BmsCourseSessionScreen : ScreenWithBeatmapBackground
 
         session.SummaryShown = true;
         this.Push(new BmsCourseResultsScreen(session));
-    }
-
-    private BmsCourseStageResultsScreen createStageResults()
-    {
-        var score = session.CurrentStage.Score
-                    ?? throw new InvalidOperationException("A stage result requires a stage score.");
-
-        return new BmsCourseStageResultsScreen(
-            score,
-            () => session.RequestAdvance(),
-            () => session.AbortAfterStageResult());
     }
 
     public override bool OnExiting(ScreenExitEvent e)

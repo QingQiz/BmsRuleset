@@ -111,11 +111,11 @@ public class BmsScoreSelectorLampTest
     [Test]
     public void TestOtherModsDoNotAffectMatching()
     {
-        var noFailScore = score(1_000, new BmsModNoFail());
+        var mirrorScore = score(1_000, new BmsModMirror());
         var noModScore = score(900);
 
-        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, noFailScore], []), Is.SameAs(noFailScore));
-        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, noFailScore], [new BmsModNoFail()]), Is.SameAs(noFailScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, mirrorScore], []), Is.SameAs(mirrorScore));
+        Assert.That(BmsLampScoreSelector.SelectBest([noModScore, mirrorScore], [new BmsModMirror()]), Is.SameAs(mirrorScore));
     }
 
     [Test]

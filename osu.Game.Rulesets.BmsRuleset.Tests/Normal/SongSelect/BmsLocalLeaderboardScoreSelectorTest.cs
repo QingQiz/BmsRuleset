@@ -47,25 +47,25 @@ public class BmsLocalLeaderboardServiceTest
     public void TestExactModsFilterUsesNativeLocalLeaderboardSemantics()
     {
         var noModScore = score("target-hash", Constant.SHORT_NAME, 900_000);
-        var noFailScore = score("target-hash", Constant.SHORT_NAME, 800_000, mods: new BmsModNoFail());
-        var noFailMirrorScore = score("target-hash", Constant.SHORT_NAME, 1_000_000, mods: [new BmsModNoFail(), new BmsModMirror()]);
+        var noMineScore = score("target-hash", Constant.SHORT_NAME, 800_000, mods: new BmsModNoMine());
+        var noMineMirrorScore = score("target-hash", Constant.SHORT_NAME, 1_000_000, mods: [new BmsModNoMine(), new BmsModMirror()]);
 
         var noModSelected = BmsLocalLeaderboardService.SelectScores(
-            [noFailScore, noModScore],
+            [noMineScore, noModScore],
             "target-hash",
             Constant.SHORT_NAME,
             [],
             LeaderboardSortMode.Score);
 
-        var noFailSelected = BmsLocalLeaderboardService.SelectScores(
-            [noFailMirrorScore, noModScore, noFailScore],
+        var noMineSelected = BmsLocalLeaderboardService.SelectScores(
+            [noMineMirrorScore, noModScore, noMineScore],
             "target-hash",
             Constant.SHORT_NAME,
-            [new BmsModNoFail()],
+            [new BmsModNoMine()],
             LeaderboardSortMode.Score);
 
         Assert.That(noModSelected, Is.EqualTo([noModScore]));
-        Assert.That(noFailSelected, Is.EqualTo([noFailScore]));
+        Assert.That(noMineSelected, Is.EqualTo([noMineScore]));
     }
 
     [Test]

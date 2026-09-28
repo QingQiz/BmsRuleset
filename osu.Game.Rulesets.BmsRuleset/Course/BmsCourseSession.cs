@@ -65,9 +65,7 @@ internal sealed class BmsCourseSession
 
     internal BmsCourseStatus Status { get; private set; } = BmsCourseStatus.InProgress;
 
-    internal bool HasNoFail => Mods.Any(mod => mod is BmsModNoFail);
-
-    internal bool CanContinue => Status == BmsCourseStatus.InProgress || (HasNoFail && Status == BmsCourseStatus.Failed);
+    internal bool CanContinue => Status == BmsCourseStatus.InProgress;
 
     internal int CurrentStageIndex { get; private set; }
 
@@ -149,7 +147,7 @@ internal sealed class BmsCourseSession
             return;
         }
 
-        if (CurrentStageIndex == stages.Length - 1 && Status == BmsCourseStatus.InProgress)
+        if (CurrentStageIndex == stages.Length - 1)
             Status = BmsCourseStatus.Passed;
     }
 
@@ -178,8 +176,7 @@ internal sealed class BmsCourseSession
     {
         ensureCanContinue();
 
-        if (CurrentStage.Status != BmsCourseStageStatus.Passed
-            && !(HasNoFail && CurrentStage.Status == BmsCourseStageStatus.Failed))
+        if (CurrentStage.Status != BmsCourseStageStatus.Passed)
             throw new InvalidOperationException("A BMS course can only be abandoned from results after completing the current stage.");
 
         Status = BmsCourseStatus.Aborted;
@@ -189,8 +186,7 @@ internal sealed class BmsCourseSession
     {
         ensureCanContinue();
 
-        var canAdvanceAfterFailure = HasNoFail && CurrentStage.Status == BmsCourseStageStatus.Failed;
-        if ((CurrentStage.Status != BmsCourseStageStatus.Passed && !canAdvanceAfterFailure) || CurrentStageIndex >= stages.Length - 1)
+        if (CurrentStage.Status != BmsCourseStageStatus.Passed || CurrentStageIndex >= stages.Length - 1)
             throw new InvalidOperationException("The BMS course cannot advance from its current state.");
 
         AdvanceRequested = true;

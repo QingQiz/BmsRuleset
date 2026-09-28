@@ -192,7 +192,6 @@ matching the selected mods.
 |--------------------------|-----------------------------------------------------------------|----------------------------------------------------|
 | Autoplay                 | Plays automatically                                             |         |
 | Double Time / Half Time  |                                                                 | Speed; adjust pitch                                |
-| No Fail                  |                                                                 |         |
 | Mirror                   | Mirrors the key layout                                          |         |
 | Invert (IN)              | Converts each note except the lane's last into a hold note      | Randomise LN length; seed                          |
 | 2P                       | Switches the layout from 1P to 2P                               |         |

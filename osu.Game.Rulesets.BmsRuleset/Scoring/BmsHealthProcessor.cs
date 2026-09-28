@@ -28,8 +28,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             : BmsGaugeType.Normal;
 
     /// <summary>
-    /// Whether HP ever dropped to 0 during this play.
-    /// to determine gauge-failed rank even when NF mod prevents mid-song failure.
+    /// Retains zero-HP failure for end-of-song validation even if HP later recovers.
     /// </summary>
     public bool HasEverFailed { get; private set; }
 

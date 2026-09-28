@@ -153,7 +153,6 @@ public partial class BmsRuleset : Ruleset
             new BmsModNoMine(),
             new BmsModNoBad(),
 
-            new BmsModNoFail(),
             new BmsModHalfTime(),
             new BmsModConstant(),
         ],
