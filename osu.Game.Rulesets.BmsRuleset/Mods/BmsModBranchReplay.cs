@@ -3,7 +3,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Beatmaps;
-using osu.Game.Graphics;
+using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.Mods;
 
@@ -15,7 +15,7 @@ public class BmsModBranchReplay : Mod, IApplicableToBeatmapConverter
 
     public override string Acronym => "BR";
 
-    public override IconUsage? Icon => OsuIcon.ModRepel;
+    public override IconUsage? Icon => BmsIcons.BranchReplay;
 
     public override LocalisableString Description => BmsStrings.ModBranchReplay;
 

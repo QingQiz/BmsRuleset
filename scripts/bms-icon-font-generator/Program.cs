@@ -18,6 +18,7 @@ Action<float, float>[] glyphs =
     drawNoGood,
     drawNoGreat,
     drawNoMine,
+    drawBranchReplay,
 ];
 
 width = glyphs.Length * glyph_size;
@@ -88,6 +89,39 @@ void drawNoMine(float cx, float cy)
     // Separate the deletion stroke from the filled body so it stays readable at small sizes.
     clearLine(cx - 24, cy - 24, cx + 24, cy + 24, 10);
     drawLine(cx - 24, cy - 24, cx + 24, cy + 24, 5);
+}
+
+void drawBranchReplay(float cx, float cy)
+{
+    drawLine(cx, cy + 19, cx, cy + 8, 6);
+    drawBranch(-1);
+    drawBranch(1);
+
+    drawRoundedBar(cx - 8, cy + 11, 16, 16, 8);
+    drawRoundedBar(cx - 25, cy - 27, 16, 16, 8);
+    drawRoundedBar(cx + 9, cy - 27, 16, 16, 8);
+
+    // Cut holes after joining the silhouettes so line caps cannot intrude into the rings.
+    clearCircle(cx, cy + 19, 4);
+    clearCircle(cx - 17, cy - 19, 4);
+
+    void drawBranch(float direction)
+    {
+        var previousX = cx;
+        var previousY = cy + 8;
+
+        // Vertical tangents blend into both the shared stem and the terminal nodes.
+        for (var step = 1; step <= 64; step++)
+        {
+            var t = step / 64f;
+            var u = 1 - t;
+            var x = cx + direction * 17 * (3 * u * t * t + t * t * t);
+            var y = cy + 8 * u * u * u - 15 * u * u * t - 9 * u * t * t - 19 * t * t * t;
+            drawLine(previousX, previousY, x, y, 6);
+            previousX = x;
+            previousY = y;
+        }
+    }
 }
 
 void drawJudgementArc(float cx, float cy, bool removeGreat, bool removeGood)

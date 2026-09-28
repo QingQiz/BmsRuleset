@@ -23,5 +23,7 @@ public static class BmsIcons
 
     public static IconUsage NoMine => get(0xE006);
 
+    public static IconUsage BranchReplay => get(0xE007);
+
     private static IconUsage get(int codepoint) => new((char)codepoint, font_name);
 }
