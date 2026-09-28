@@ -21,6 +21,8 @@ public static class BmsIcons
 
     public static IconUsage NoGreat => get(0xE005);
 
+    public static IconUsage NoBad => get(0xE008);
+
     public static IconUsage NoMine => get(0xE006);
 
     public static IconUsage BranchReplay => get(0xE007);

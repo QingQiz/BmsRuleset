@@ -700,6 +700,12 @@ public static class BmsStrings
 
     public static LocalisableString ModNoGood => get("mod_no_good");
 
+    public static LocalisableString ModNoBadName => get("mod_no_bad_name");
+
+    public static LocalisableString ModNoBadAcronym => get("mod_no_bad_acronym");
+
+    public static LocalisableString ModNoBad => get("mod_no_bad");
+
     public static LocalisableString ModNoGreat => get("mod_no_great");
 
     public static LocalisableString ModNoMineName => get("mod_no_mine_name");

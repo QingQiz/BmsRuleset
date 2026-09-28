@@ -142,6 +142,7 @@ beatoraja 将谱面辅助（**ASSIST**，深紫）与 Assist Easy 血条（**L-A
 | Auto Gauge (AG)          | 从最难血量起；失败时降一档                            |     |
 | No Good (NG)             | 移除 GOOD 判定窗口                             |     |
 | No Great (NE)            | 移除 GREAT 和 GOOD 判定窗口                     |     |
+| No Bad (NB)              | 移除 BAD 判定窗口                            |     |
 | Long Note (L1)           | LN：仅在尾部判定                       |     |
 | Charge Note (L2)         | CN：头尾分别判定                     |     |
 | Hell Charge Note (L3)    | HCN：CN 加上长音符持续期间的扣血与回复               |     |

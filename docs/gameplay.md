@@ -150,6 +150,7 @@ matching the selected mods.
 | Auto Gauge (AG)          | Start with the hardest gauge; drop a tier on failure            |         |
 | No Good (NG)             | Removes the GOOD judgement window                               |         |
 | No Great (NE)            | Removes the GREAT and GOOD judgement windows                    |         |
+| No Bad (NB)              | Removes the BAD judgement window                           |         |
 | Long Note (L1)           | LN: judges only the tail                                       |         |
 | Charge Note (L2)         | CN: judges head and tail separately                            |         |
 | Hell Charge Note (L3)    | HCN: CN with gauge drain/recovery during the body              |         |

@@ -381,4 +381,13 @@
   <data name="score_graph_section_background_opacity_description" xml:space="preserve">
     <value>Opacity of all section backgrounds.</value>
   </data>
+  <data name="mod_no_bad_name" xml:space="preserve">
+    <value>No Bad</value>
+  </data>
+  <data name="mod_no_bad_acronym" xml:space="preserve">
+    <value>NB</value>
+  </data>
+  <data name="mod_no_bad" xml:space="preserve">
+    <value>Remove the BAD judgement window.</value>
+  </data>
 </root>

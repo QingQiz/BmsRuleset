@@ -19,6 +19,7 @@ Action<float, float>[] glyphs =
     drawNoGreat,
     drawNoMine,
     drawBranchReplay,
+    drawNoBad,
 ];
 
 width = glyphs.Length * glyph_size;
@@ -124,7 +125,9 @@ void drawBranchReplay(float cx, float cy)
     }
 }
 
-void drawJudgementArc(float cx, float cy, bool removeGreat, bool removeGood)
+void drawNoBad(float cx, float cy) => drawJudgementArc(cx, cy, removeGreat: false, removeGood: false, removeBad: true);
+
+void drawJudgementArc(float cx, float cy, bool removeGreat, bool removeGood, bool removeBad = false)
 {
     const float outerRadius = 26;
     const float innerRadius = 16;
@@ -144,7 +147,7 @@ void drawJudgementArc(float cx, float cy, bool removeGreat, bool removeGood)
             (start: boundaries[0], end: boundaries[1], draw: true),
             (start: boundaries[1], end: boundaries[2], draw: !removeGreat),
             (start: boundaries[2], end: boundaries[3], draw: !removeGreat && !removeGood),
-            (start: badStart, end: max, draw: true),
+            (start: badStart, end: max, draw: !removeBad),
         };
 
         foreach (var region in regions)

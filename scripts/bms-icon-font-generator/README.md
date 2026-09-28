@@ -12,7 +12,7 @@ From the repository root:
 dotnet run --project scripts/bms-icon-font-generator/BmsIconFontGenerator.csproj -- osu.Game.Rulesets.BmsRuleset/Resources/Fonts/bmsIcons_0.png osu.Game.Rulesets.BmsRuleset/Resources/Fonts/bmsIcons.fnt
 ```
 
-The outputs are a horizontal RGBA sprite sheet and BMFont binary v3 metadata. Each glyph occupies a 64×64 cell; the seven current glyphs produce a 448×64 page. Visible pixels are white, with antialiased alpha; the game supplies the display colour.
+The outputs are a horizontal RGBA sprite sheet and BMFont binary v3 metadata. Each glyph occupies a 64×64 cell; the nine current glyphs produce a 576×64 page. Visible pixels are white, with antialiased alpha; the game supplies the display colour.
 
 ## Integration
 
@@ -24,6 +24,8 @@ Append new draw functions to `glyphs` in [Program.cs](Program.cs) to preserve ex
 
 No Mine uses a filled bomb with a deletion stroke matching Hide Scratch's direction and weight. A transparent gap separates the stroke from the bomb body at small sizes.
 
+No Good, No Great, and No Bad share a segmented judgement arc. No Good expands the BAD segments over GOOD; No Great expands them over GREAT and GOOD. No Bad removes the BAD segments at both ends while retaining the PGREAT, GREAT, and GOOD segments.
+
 | Codepoint | Glyph |
 | --- | --- |
 | U+E000 | Scratch |
@@ -33,6 +35,8 @@ No Mine uses a filled bomb with a deletion stroke matching Hide Scratch's direct
 | U+E004 | No Good |
 | U+E005 | No Great |
 | U+E006 | No Mine |
+| U+E007 | Branch Replay |
+| U+E008 | No Bad |
 
 ## Verification
 
