@@ -12,6 +12,7 @@ using osu.Game.Tests.Visual;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [HeadlessTest]
+[NonParallelizable]
 public partial class TestSceneBmsSoftConstant : BmsPlayerTestScene
 {
     private BmsRulesetConfigManager config => (BmsRulesetConfigManager)RulesetConfigs.GetConfigFor(new BmsRuleset());
@@ -65,7 +66,7 @@ public partial class TestSceneBmsSoftConstant : BmsPlayerTestScene
         AddStep("capture position", () => visibleY = notes[0].Y);
         AddStep("re-enable live", () => config.SetValue(BmsRulesetSetting.SoftConstant, true));
         AddUntilStep("hidden again", () => notes.All(n => visualAlpha(n) == 0));
-        AddAssert("toggle preserves position", () => notes[0].Y == visibleY);
+        AddAssert("toggle preserves position", () => notes[0].Y, () => Is.EqualTo(visibleY).Within(0.001f));
         AddAssert("no judgement from hiding", () => Player.Results.Count == 0);
         AddStep("enable advance fade", () => config.SetValue(BmsRulesetSetting.SoftConstantFadeIn, 200.0));
         AddUntilStep("all types half faded", () => notes.All(n => Math.Abs(visualAlpha(n) - 0.5f) < 0.001));

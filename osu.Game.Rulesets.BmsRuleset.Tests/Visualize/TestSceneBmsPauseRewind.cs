@@ -14,6 +14,7 @@ using osuTK.Input;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [HeadlessTest]
+[NonParallelizable]
 public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
 {
     private const double judged_note_time = 9000;
