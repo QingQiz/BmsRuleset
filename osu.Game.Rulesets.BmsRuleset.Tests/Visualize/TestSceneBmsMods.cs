@@ -65,7 +65,8 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
         AddUntilStep("scratch LN is automatically held", () =>
             Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SCENARIO_START_TIME + BmsTestBeatmaps.LN_SCENARIO_DURATION / 2
             && Playfield.GetAliveObjectAtTime(BmsTestBeatmaps.LN_SCENARIO_START_TIME)?.HitObject is BmsLongNote note
-            && ((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements.IsAutomaticallyHeld(note));
+            && ((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements.PressedDirections != 0
+            && ((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements.GetLongNoteState(note).HeadJudged);
 
         AddUntilStep("scratch LN tail is judged", () =>
             Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SCENARIO_START_TIME + BmsTestBeatmaps.LN_SCENARIO_DURATION + 100);

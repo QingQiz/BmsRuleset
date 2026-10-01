@@ -24,7 +24,7 @@ using osu.Game.Rulesets.UI;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 /// <summary>
-/// Observes production scheduling, with optional automation checkpoints. Probes are scoped to non-parallel scenes.
+/// Observes production scheduling. Probes are scoped to non-parallel scenes.
 /// </summary>
 internal sealed class BmsCoreSchedulingRecorder : IDisposable
 {
@@ -49,7 +49,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
     internal int ReplayPolls { get; private set; }
     internal int StabilityUpdates { get; private set; }
 
-    internal BmsCoreSchedulingRecorder(BmsPlayfield playfield, BmsScoreProcessor score, BmsHealthProcessor health, bool observeAutomation = false)
+    internal BmsCoreSchedulingRecorder(BmsPlayfield playfield, BmsScoreProcessor score, BmsHealthProcessor health)
     {
         if (current != null)
             throw new InvalidOperationException("Checkpoint probes require a non-parallel scope.");
@@ -71,8 +71,6 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             probe(typeof(BmsPlayfield), "Update", "playfield.update");
             probe(typeof(BmsJudgementEngine), "QueueInput", "input.queue");
             probe(typeof(BmsJudgementEngine), "ProcessFrame", "batch");
-            if (observeAutomation)
-                probe(typeof(BmsColumnJudgementRuntime), "UpdateAutoScratch", "auto");
             probe(typeof(BmsFramedReplayInputHandler), "CollectReplayInputs", "replay.poll");
             probe(typeof(FrameStabilityContainer), "UpdateSubTree", "stability");
             probe(typeof(BmsColumnHitObjectContainer), "UpdateAfterChildrenLife", "column.layout");
@@ -149,12 +147,6 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         }
 
         var name = recorder!.names[__originalMethod];
-        if (name == "auto" && __instance is BmsColumnJudgementRuntime automaticColumn
-            && !automaticColumn.HasPendingAutomaticStep)
-        {
-            __state = false;
-            return;
-        }
         if (name == "frame.begin") recorder.frame++;
         if (name == "simulation") recorder.step++;
         if (name == "batch") recorder.batch++;
@@ -266,9 +258,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             Array.IndexOf(playfield.Stage.Columns[column].HitObjectContainer.AliveEntries.Values.ToArray(), drawable),
             Array.IndexOf(playfield.Stage.Columns[column].HitObjectContainer.AliveObjects.ToArray(), drawable),
             playfield.Stage.Columns[column].HitObjectContainer.IndexOf(drawable));
-        var states = name == "auto"
-            ? string.Join(";", playfield.Stage.Columns[0].HitObjectContainer.AliveObjects.OfType<DrawableBmsHitObject>().Select(state))
-            : drawable == null ? "-" : state(drawable);
+        var states = drawable == null ? "-" : state(drawable);
         var pending = string.Join(",", playfield.Stage.Columns.Take(2).Cast<BmsColumn>()
             .Select(c => c.Judgements.FirstPendingNote is { } first ? identities[first] : -1));
         var active = string.Join("/", playfield.Stage.Columns.Take(2).Cast<BmsColumn>()
@@ -298,9 +288,9 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             return "unbound";
         var state = drawable.HitObject is BmsLongNote note && hasLongNoteObservation(drawable)
             ? ((BmsColumn)playfield.Stage.Columns[note.Column]).Judgements.GetLongNoteState(note) : (BmsLongNoteState?)null;
+        // Retain the unused legacy automation slot for frozen non-AS traces; inputs have their own column.
         return string.Join(",", identities[drawable.HitObject], drawable.Result?.Type,
-            state?.HeadJudged, state?.TailJudged, drawable.HitObject is BmsLongNote held
-                ? ((BmsColumn)playfield.Stage.Columns[held.Column]).Judgements.IsAutomaticallyHeld(held) : (bool?)null);
+            state?.HeadJudged, state?.TailJudged, drawable.HitObject is BmsLongNote ? false : (bool?)null);
     }
 
     private bool hasLongNoteObservation(DrawableBmsHitObject drawable)

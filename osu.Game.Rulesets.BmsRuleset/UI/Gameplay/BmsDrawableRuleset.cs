@@ -238,6 +238,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         updateJudgementAlgorithm();
 
         Overlays.Add(StageHudController);
+        ((BmsInputManager)KeyBindingInputManager).ConfigureInputMods(Mods);
 
         // Sample playback follows the gameplay clock to load PCM samples before their first use.
         FrameStableComponents.Add(samplePlayback);

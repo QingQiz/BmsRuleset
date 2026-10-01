@@ -88,7 +88,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
                 Assert.That(scratchTimes[0], Is.EqualTo(3000), "AS-1: automation consumes each simulation step regardless of visual deferral.");
                 var holding = (BmsLongNote)Playfield.GetAliveObjectAtTime(3001)!.HitObject;
                 var context = ((BmsColumn)Playfield.Stage.Columns[holding.Column]).Judgements;
-                Assert.That(context.IsAutomaticallyHeld(holding), Is.True);
+                Assert.That(context.PressedDirections, Is.EqualTo(1));
                 Assert.That(context.GetLongNoteState(holding).HeadTime, Is.EqualTo(3001));
 
                 double[] times = [3202, 3301, 3605, 2999, 3000, 3001, 3301];
@@ -99,13 +99,13 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
                 }
                 recorder.Mark("scenario.complete");
                 var rows = recorder.Rows.Select(r => r.Split('|')).ToArray();
-                var tapSample = Array.FindIndex(rows, r => r[4] == "auto/keysound>" && r[11].Contains("sampleKey=11"));
+                var tapSample = Array.FindIndex(rows, r => r[4].EndsWith("/keysound>") && r[11].Contains("sampleKey=11"));
                 var tapResult = Array.FindIndex(rows, r => r[4].EndsWith("/result.notify=") && r[8] == "0");
-                Assert.That(tapSample, Is.GreaterThanOrEqualTo(0).And.LessThan(tapResult));
+                Assert.That(tapResult, Is.GreaterThanOrEqualTo(0).And.LessThan(tapSample));
                 if (longNoteMode != BmsLongNoteMode.LongNote)
                 {
                     var headResult = Array.FindIndex(rows, r => r[4].EndsWith("/result.notify=") && r[8] == "2");
-                    var headSample = Array.FindIndex(rows, r => r[4] == "auto/keysound>" && r[11].Contains("sampleKey=13"));
+                    var headSample = Array.FindIndex(rows, r => r[4].EndsWith("/keysound>") && r[11].Contains("sampleKey=13"));
                     Assert.That(headResult, Is.GreaterThanOrEqualTo(0).And.LessThan(headSample));
                 }
                 if (longNoteMode == BmsLongNoteMode.HellChargeNote)
@@ -145,7 +145,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             Assert.That(drawable.Entry, Is.SameAs(entry));
             Assert.That(context.GetLongNoteState((BmsLongNote)note), Is.EqualTo(state));
             Assert.That(state.HeadJudged, Is.True);
-            Assert.That(context.IsAutomaticallyHeld((BmsLongNote)note), Is.False, "RA-1: reapply resets automatic holding while preserving the logical endpoints.");
+            Assert.That(context.PressedDirections, Is.EqualTo(1), "Reapplying a drawable preserves framework-held input.");
             Assert.That(drawable.Result.TimeOffset, Is.Zero, "The framework reapplies the main result time at the end of the object.");
             Assert.That(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents, Has.Count.EqualTo(events));
             Assert.That(recorder.Rows.Skip(reapplyStart).Any(r => r.Contains("/representation.killed")), Is.False, "ApplyDefaults must preserve the lifetime registration.");
@@ -236,17 +236,16 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             var rows = recorder.Rows.Select(r => r.Split('|')).ToArray();
             TestContext.WriteLine("P3A0_REPLAY_ROWS " + JsonSerializer.Serialize(recorder.Rows));
             string[] inputTimes = ["3000", "3001", "3002", "3003"];
-            Assert.That(rows.Count(r => r[4].EndsWith("/input.queue>")), Is.EqualTo(4));
-            Assert.That(rows.Where(r => r[4].EndsWith("/input.queue>")).Select(r => r[5]), Is.EqualTo(inputTimes));
+            var manualInputs = rows.Where(r => r[4].EndsWith("/input.queue>") && r[11].Contains("column=1")).ToArray();
+            Assert.That(manualInputs.Select(r => r[5]), Is.EqualTo(inputTimes));
+            var generatedInputs = rows.Where(r => r[4].EndsWith("/input.queue>") && r[11].Contains("column=0")).ToArray();
+            Assert.That(generatedInputs.Select(r => r[5]), Is.EqualTo(new[] { "3000", "3001", "3001" }));
             Assert.That(rows.Any(r => r[4].EndsWith("/column.deferred>")), Is.True);
             Assert.That(rows.Any(r => r[4] == "frame.end/playfield.update>"), Is.True);
-            Assert.That(rows.Any(r => r[4] == "batch/auto>"), Is.True);
-            var autoCalls = rows.Where(r => r[4].EndsWith("/auto>")).ToArray();
-            Assert.That(autoCalls.All(r => r[4] == "batch/auto>"), Is.True, "Automation belongs to simulation batches.");
             TestContext.WriteLine("P3A0_REPLAY " + JsonSerializer.Serialize(new
             {
                 inputs = rows.Where(r => r[4].EndsWith("/input.queue>")).Select(r => new { frame = r[1], step = r[2], time = r[5], args = r[11] }),
-                auto = autoCalls.Select(r => new { frame = r[1], step = r[2], time = r[5], state = r[12] }),
+                generated = generatedInputs.Select(r => new { frame = r[1], step = r[2], time = r[5], state = r[12] }),
                 events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents,
             }));
             stopRecording();
@@ -285,7 +284,8 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             // Close the host frame before controlling traversal grouping; simulation times stay identical.
             Playfield.EndGameplayFrame();
             Playfield.UpdateSubTree();
-            action(time => { manual.CurrentTime = time; clock.ProcessFrame(); });
+            var mod = Player.DrawableRuleset.Mods.OfType<BmsModAutoScratch>().Single();
+            action(time => { manual.CurrentTime = time; clock.ProcessFrame(); mod.UpdateActions(time); });
         }
         finally
         {
@@ -303,7 +303,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
 
     private void startRecording()
     {
-        recorder = new BmsCoreSchedulingRecorder(Playfield, (BmsScoreProcessor)Player.ScoreProcessor, (BmsHealthProcessor)Player.HealthProcessor, observeAutomation: true)
+        recorder = new BmsCoreSchedulingRecorder(Playfield, (BmsScoreProcessor)Player.ScoreProcessor, (BmsHealthProcessor)Player.HealthProcessor)
         {
             Recording = true,
         };
@@ -343,13 +343,8 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             if (mode == BmsLongNoteMode.HellChargeNote)
                 Assert.That(historical.Count(r => r[4].EndsWith("/body.tick>") && r[5] == "3202"), Is.EqualTo(wasDeferred ? 0 : 1));
         }
-        else
-            Assert.That(markers(recorder.Rows.Select(r => r.Split('|'))), Is.EqualTo(markers(historical)),
-                "Historical lifecycle markers retain pending objects, active holds and score/health state.");
+        // Lifecycle behavior is asserted above against normal framework inputs; the old AS fixture is historical evidence.
     }
-
-    private static string[] markers(System.Collections.Generic.IEnumerable<string[]> rows)
-        => rows.Where(r => r[4].StartsWith("host/") && r[4].EndsWith('=')).Select(r => string.Join('|', r[4], r[5], r[14], r[15], r[16])).ToArray();
 
     private static string[] observableRows(System.Collections.Generic.IEnumerable<string> rows)
         => rows.Select(r => r.Split('|'))

@@ -192,7 +192,7 @@ matching the selected mods.
 | Mod                      | Description                                                     | Options                                            |
 |--------------------------|-----------------------------------------------------------------|----------------------------------------------------|
 | Autoplay                 | Plays automatically                                             |         |
-| Auto Scratch (AS)        | Plays scratch notes, holds and CN/HCN tail reversals automatically |         |
+| Auto Scratch (AS)        | Automatically presses, holds and releases scratch inputs, including CN/HCN tail reversals |         |
 | Double Time / Half Time  |                                                                 | Speed; adjust pitch                                |
 | Mirror                   | Mirrors the key layout                                          |         |
 | Invert (IN)              | Converts each note except the lane's last into a hold note      | Randomise LN length; seed                          |

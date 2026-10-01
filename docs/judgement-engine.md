@@ -14,12 +14,11 @@ The code has three dependency boundaries:
 
 | Component | Responsibility |
 | --- | --- |
-| `BmsJudgementEngine` | Shares stateless rules across columns, queues physical inputs, and orders simulation batches. |
+| `BmsJudgementEngine` | Shares stateless rules across columns, queues action inputs, and orders simulation batches. |
 | `BmsColumnJudgementRuntime` | Coordinates one column's input selection, history and checkpoints; owns its component instances and stable chart slots. |
 | `BmsColumnNoteIndex` | Owns active membership, traversal ranks, pending heads/tails, active bodies and passive deadlines. Exposes read-only views. |
 | `BmsHoldRegistry` | Resolves stable note slots to immutable hold bindings; mode-specific shared operation adapters own typed LN/CN/HCN state. |
 | `BmsLandmineRegistry` | Owns landmine state and active traversal order, and calls the independent landmine rule. |
-| `BmsAutoScratchController` | Owns automatic holds and cached traversal plans; exists only for enabled scratch columns. |
 | `BmsCoreJudgementSchedule` | Executes passive and long-note completion phases using binding tokens and simulation-step stamps. |
 | Note, LN, CN, HCN and landmine rules | Implement their own state transitions, judgement windows, endpoints and rewind behaviour. |
 | `BmsJudgementExecutionContext` | Coordinates output calls with the core's history and index checkpoints. |
@@ -32,13 +31,21 @@ Normal notes use slot data and shared operation delegates. Each long note has on
 
 LN, CN and HCN have separate runtime types; only HCN owns a body accumulator and its lossless rewind history. Pooling a drawable does not discard the object's logical history. Framework main results remain authoritative.
 
-Activation order is validated before it replaces the live index. Cached ranks provide constant-time order lookup when sorting pending tails, mixed-column bodies and equal-time automatic notes. Direct start-time changes refresh pending-head keys, the sorted historical lookup and the automatic plan. They invalidate the passive deadline immediately so an earlier head cannot wait behind an obsolete cached bound.
+Activation order is validated before it replaces the live index. Cached ranks provide constant-time order lookup when sorting pending tails and mixed-column bodies. Direct start-time changes refresh pending-head keys and the sorted historical lookup. They invalidate the passive deadline immediately so an earlier head cannot wait behind an obsolete cached bound.
+
+## AutoScratch input
+
+`BmsModAutoScratch` owns its scratch action timeline, cursor, held directions and next action time. It reuses Autoplay's action points at setup and implements `IBmsActionProducer.UpdateActions(time)`. The input manager caches implementing mods once and calls this interface after device/replay input at each simulation frame. The mod compares the time with its cached deadline; due transitions call the framework's `TriggerPressed`/`TriggerReleased` before playfield judgement. Forward updates visit only crossed frames, preserve same-time release/press transitions, and unchanged frames allocate nothing. No separate updating component or shared action schedule is created.
+
+Ordinary rewind locates the target input state with a binary search; resume rewind preserves the existing hold until gameplay catches up. Reapplying a drawable leaves framework input state intact. The mod also implements `IBmsActionFilter` to decide physical and replay input ownership. The input manager applies those generic decisions before framework action tracking; it contains no scratch-specific actions or replay policy. Manual scratch keys therefore cannot suppress generated presses or block their releases.
+
+Generated actions are recorded through the normal replay recorder. A first-frame marker distinguishes recordings containing these actions from legacy AS recordings, which still generate scratch input locally. Marked recordings and live replay streams use their supplied actions. Note samples, hold bodies, mines and tail reversals all use the ordinary input rules.
 
 ## Frame and result contracts
 
-Each input batch samples its final physical key state for all columns. The engine updates all landmines, then all HCN bodies, then consumes physical transitions in order. AutoScratch runs after those transitions. Inputs queued by synchronous feedback remain for the next batch, including another batch at the same timestamp.
+Each input batch samples its final action-held state for all columns. The engine updates all landmines, then all HCN bodies, then consumes transitions in order. Generated scratch actions enter this same batch. Inputs queued by synchronous feedback remain for the next batch, including another batch at the same timestamp.
 
-`InputTime` identifies the physical transition. `BmsFrameContext.SimulationTime` identifies the application frame; `GameplayRate` carries its rate. Framework main results use the representation's matching frame and rate. Supplementary endpoints retain separate event, application and expected times. Resume rewind freezes completed judgement state while presentations follow the lead-in clock.
+`InputTime` identifies the action transition. `BmsFrameContext.SimulationTime` identifies the application frame; `GameplayRate` carries its rate. Framework main results use the representation's matching frame and rate. Supplementary endpoints retain separate event, application and expected times. Resume rewind freezes completed judgement state while presentations follow the lead-in clock.
 
 Passive and completion plans preserve the host's observed traversal order. Tokens invalidate replaced bindings, while epoch/step stamps prevent repeated completion in the same simulation step. Removal first drops the object from candidates, then performs its final passive check while its representation remains available. `ApplyDefaults` replaces a binding without replaying removal or discarding applicable history.
 

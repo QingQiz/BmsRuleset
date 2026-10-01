@@ -12,9 +12,9 @@
 
 本次调整以生产实现为先，不为运行尚未迁完的测试增加中间适配层。以下行为、架构和性能要求保持为最终验收条件，不作为中间提交或 Mod 迁移前的测试门槛。
 
-当前在 `codex/hitobject-judgement-refactor` 分支完成核心、Mod 与生产消费者迁移。纯核心移至 `Gameplay/Judgement`，框架适配位于 `UI/Gameplay/Judgement`，表现映射位于 Drawable 的 `Presentation` 目录。`BmsColumnJudgementRuntime` 是列级协调入口；活跃索引、长按绑定与类型状态、地雷状态、自动演奏分别由独立组件拥有。`BmsJudgementBridge` 明确承接生命周期输入和结果/反馈输出。通用 Drawable 基类已移除长按专用空钩子，具体长按在绑定时注册模拟步骤反馈。规则、权威结果、同步观察顺序和调度代次契约保持不变。
+当前在 `codex/hitobject-judgement-refactor` 分支完成核心、Mod 与生产消费者迁移。纯核心移至 `Gameplay/Judgement`，框架适配位于 `UI/Gameplay/Judgement`，表现映射位于 Drawable 的 `Presentation` 目录。`BmsColumnJudgementRuntime` 是列级协调入口；活跃索引、长按绑定与类型状态、地雷状态分别由独立组件拥有。自动演奏输入由 Mod 本体拥有。`BmsJudgementBridge` 明确承接生命周期输入和结果/反馈输出。通用 Drawable 基类已移除长按专用空钩子，具体长按在绑定时注册模拟步骤反馈。规则、权威结果、同步观察顺序和调度代次契约保持不变。
 
-测试消费者已直接迁到正式入口，旧 Controller 记录器已删除；Note、LN、CN、HCN 执行测试使用框架出口与记录出口对照。AutoScratch 已迁到核心模拟步骤，Mod 注册已恢复。共享记录器覆盖自动化并保留原 AS-1 fixture；本轮保留原始行为断言和冻结轨迹，增加直接时间变更、稀疏长按存储、非法重排恢复及反馈代次测试。结果见[证据记录](#handoff-evidence)；永久职责说明见[判定引擎开发文档](judgement-engine.md)。方案清理和最终集成仍需等待全部验收完成。
+测试消费者已直接迁到正式入口，旧 Controller 记录器已删除；Note、LN、CN、HCN 执行测试使用框架出口与记录出口对照。AutoScratch 由 Mod 本体在输入处理后的每个模拟帧检查下次动作时间，到期调用框架按下/释放入口。共享记录器覆盖普通输入并保留原 AS-1 fixture 作为历史证据；本轮保留原始行为断言和冻结轨迹，增加直接时间变更、稀疏长按存储、非法重排恢复及反馈代次测试。结果见[证据记录](#handoff-evidence)；永久职责说明见[判定引擎开发文档](judgement-engine.md)。方案清理和最终集成仍需等待全部验收完成。
 
 快速导航：[实施顺序](#implementation-order) · [目标架构](#target-structure) · [生命周期](#state-lifecycle) · [调度](#scheduling-contracts) · [Git 对照](#git-comparison) · [验收](#behaviour-acceptance) · [验证命令](#verification-commands) · [完成条件](#completion)。
 
@@ -43,7 +43,7 @@
 
 ### 2. 完成 Mod 与生产消费者迁移
 
-核心入口稳定后直接迁移 AutoScratch/Autoplay 等受影响 Mod、相关注册与生产消费者。基于对象身份和稳定核心入口恢复自动持有与采样，明确 AS-1 的语义及行为变化，同步玩家文档和本地化。此阶段不恢复旧接口，也不为旧测试增加临时路径。
+核心入口稳定后直接迁移 AutoScratch/Autoplay 等受影响 Mod、相关注册与生产消费者。基于普通框架输入恢复自动按下、保持、释放与采样，明确 AS-1 的语义及行为变化，同步玩家文档和本地化。此阶段不恢复旧接口，也不为旧测试增加临时路径。
 
 ### 3. 统一迁移测试、对照与最终验收
 
@@ -64,19 +64,22 @@
 - 保持判定目标、窗口边界、事件时间与顺序、计分、血量、回放、暂停恢复、音效与视觉反馈一致。
 - 在相同负载下保持或降低判定耗时、稳态分配和内存占用，并保留现有绘制延迟更新优化。
 
-本次重构保持现有判定算法、LN/CN/HCN 语义、回放格式和音频路由。若发现现有行为缺陷，单独记录并安排修复，不在行为等价迁移中顺带修改。
+本次重构保持现有判定算法、LN/CN/HCN 语义、回放兼容性和音频路由。若发现现有行为缺陷，单独记录并安排修复，不在行为等价迁移中顺带修改。
 
 <a id="mod-scope"></a>
 
-**核心与 Mod 边界。** 先完整实现普通玩家/普通回放所需的规则、表现、地雷、独立调度和框架适配，再迁移 Mod 和生产消费者，最后统一对照验证。Scratch 双方向、反向尾、重按、长按、HCN 身体、暂停及回退都是核心范围。核心入口稳定后继续实现 AutoScratch 等 Mod 的入口、自动持有与采样适配。
+**核心与 Mod 边界。** 先完整实现普通玩家/普通回放所需的规则、表现、地雷、独立调度和框架适配，再迁移 Mod 和生产消费者，最后统一对照验证。Scratch 双方向、反向尾、重按、长按、HCN 身体、暂停及回退都是核心范围。核心入口稳定后实现 AutoScratch 等 Mod 的普通输入生成入口，由框架和既有规则处理后续行为。
 
-无 Mod 的真实 Player 必须可构建运行，用于完整核心对照。AutoScratch 消费者及注册基于稳定核心入口恢复；最终发布要求全部应支持的 Mod 通过集成验收。自动持有的基线行为保留用于对照，Mod 采样语义及有意变化在迁移中明确记录。
+无 Mod 的真实 Player 必须可构建运行，用于完整核心对照。AutoScratch 消费者及注册基于框架输入入口恢复；最终发布要求全部应支持的 Mod 通过集成验收。自动持有的基线行为保留用于对照，Mod 采样语义及有意变化在迁移中明确记录。
 
 <a id="target-structure"></a>
 
 ## 目标结构
 
 ```text
+BmsModAutoScratch（输入时间表、游标、nextTime）
+  | IBmsActionProducer.UpdateActions(time) -> 框架 TriggerPressed/TriggerReleased
+  v
 BmsPlayfield
   | 收集玩家/普通回放输入，提供时钟及游玩上下文
   v
@@ -87,7 +90,6 @@ BmsJudgementEngine (每个 playfield 一个)
   |     +-- BmsColumnNoteIndex：活跃成员、候选、待判端点、身体、截止时间
   |     +-- BmsHoldRegistry：不可变长按绑定与按模式持有的类型化状态
   |     +-- BmsLandmineRegistry：地雷状态与活跃顺序
-  |     +-- BmsAutoScratchController：按需创建的自动持有和遍历计划
   |     +-- BmsCoreJudgementSchedule：绑定句柄与阶段/步骤去重
   |     +-- BmsJudgementSelector
   +-- BmsNoteJudgementRule           普通 Note
@@ -155,11 +157,11 @@ BmsHitObjectLifetimeEntry
 | `TryPress` | 已选对象运行状态、结果、输入时间、模拟时间、方向、速率及同步出口 | 普通 Note、LN、CN、HCN |
 | `CheckPassive` | 对象运行状态、模拟时间及同步出口；在已记录的被动检查边界调用 | 普通 Note、LN、CN、HCN |
 | `TryRepress` / `TryRelease` / `CompleteAtPause` | 列运行时选目标，具体绑定调用对应规则的方法 | LN、CN、HCN |
-| `UpdateBody` | 模拟时间、elapsed、本批最终物理按住状态及自动按住状态 | HCN |
+| `UpdateBody` | 模拟时间、elapsed、本批最终 action 按住状态 | HCN |
 | `CheckPassing` | 模拟时间与本批最终物理按住状态 | 地雷 |
 | `Rewind` | 对象运行状态与回退时间，协调顺序由引擎决定 | LN、CN、HCN、地雷 |
 
-表内方法属于具体规则，按登记阶段调用。`BmsPressContext`、`BmsReleaseContext`、`BmsFrameContext` 等值类型分别携带操作所需的时间与输入，不传 Drawable、Column 或 Clock；输入时间与模拟时间保持区分。`UpdateBody` 中已有自动按住输入是现有语义，不意味着核心阶段须设计 Mod 采样；核心对照使用普通物理按住路径。对象运行数据按类型存储，不要求为每个普通 Note 增加堆对象。框架主结果状态由出口提供只读查询，普通 Note 仍可使用谱面对象及值类型缓存。
+表内方法属于具体规则，按登记阶段调用。`BmsPressContext`、`BmsReleaseContext`、`BmsFrameContext` 等值类型分别携带操作所需的时间与输入，不传 Drawable、Column 或 Clock；输入时间与模拟时间保持区分。`UpdateBody` 只读取统一的 action 按住状态；核心对照使用普通物理输入路径。对象运行数据按类型存储，不要求为每个普通 Note 增加堆对象。框架主结果状态由出口提供只读查询，普通 Note 仍可使用谱面对象及值类型缓存。
 
 引擎持有状态，规则是该类型状态的唯一写入者；列索引和表现层只查询语义状态。身体、待判端点和可见对象分别维护需要的活跃范围，不再共用一个同时表示判定和视觉存续的长按标志。
 
@@ -179,7 +181,7 @@ BmsHitObjectLifetimeEntry
 
 **引擎、列运行时与共享规则。** 宿主创建并管理本次游玩的引擎；引擎持有列运行时、共享规则实例及全局调度数据。列运行时拥有本列的输入状态、索引、对象运行状态和操作登记，绑定只引用共享 Rule 及对应状态存储。选择器保留静态工具依赖。
 
-列运行时通过组合持有组件，索引和类型状态不再分散在同一个 partial 类中。索引只暴露只读成员视图，重排先校验完整性再更新活跃顺序；缓存 rank 替代循环中的 `Contains`/`IndexOf` 顺序查找。直接变更 `StartTime` 会更新待判头键、历史查找排序和自动计划，并立即使被动截止时间失效。框架桥接的双向职责保留在同一边界，避免为生命周期与结果分别复制表示绑定。
+列运行时通过组合持有组件，索引和类型状态不再分散在同一个 partial 类中。索引只暴露只读成员视图，重排先校验完整性再更新活跃顺序；缓存 rank 替代循环中的 `Contains`/`IndexOf` 顺序查找。直接变更 `StartTime` 会更新待判头键、历史查找排序，并立即使被动截止时间失效。框架桥接的双向职责保留在同一边界，避免为生命周期与结果分别复制表示绑定。
 
 ```mermaid
 classDiagram
@@ -194,7 +196,6 @@ classDiagram
     class BmsColumnNoteIndex
     class BmsHoldRegistry
     class BmsLandmineRegistry
-    class BmsAutoScratchController
     class BmsCoreJudgementSchedule
     class RuntimeStore["长按类型状态存储"]
     class OperationBindings["不可变长按绑定／共享模式适配"]
@@ -208,7 +209,6 @@ classDiagram
     BmsColumnJudgementRuntime *-- BmsColumnNoteIndex
     BmsColumnJudgementRuntime *-- BmsHoldRegistry
     BmsColumnJudgementRuntime *-- BmsLandmineRegistry
-    BmsColumnJudgementRuntime *-- BmsAutoScratchController : 按需
     BmsColumnJudgementRuntime *-- BmsCoreJudgementSchedule
     BmsHoldRegistry *-- OperationBindings
     BmsHoldRegistry *-- RuntimeStore
@@ -453,7 +453,7 @@ CN/HCN 合成端点、PMS 非消费 BAD、E-POOR 和 HCN tick 继续走现有专
 
 ### 表现映射与绘制
 
-保留一个 `DrawableBmsLongNote` 及现有 `BmsLongNoteGeometry`、`BmsLongNoteVisualState`、`BmsLongNoteSegmentComposer`。绑定时按模式选择表现策略，可以是三个无状态映射函数；它们消费只读端点/身体状态、物理或自动按住状态及时间，产生 `BmsLongNotePresentation`，不调用任何判定方法。
+保留一个 `DrawableBmsLongNote` 及现有 `BmsLongNoteGeometry`、`BmsLongNoteVisualState`、`BmsLongNoteSegmentComposer`。绑定时按模式选择表现策略，可以是三个无状态映射函数；它们消费只读端点/身体状态、action 按住状态及时间，产生 `BmsLongNotePresentation`，不调用任何判定方法。
 
 | 表现数据（示意） | 绘制用途 |
 | --- | --- |
@@ -614,7 +614,7 @@ Engine 显式拥有经过、身体、输入、被动检查、端点收尾及回�
 
 **AutoScratch 历史证据（AS-1）。** 旧 `BmsPlayfield.UpdateSubTree()` 的延迟遍历和 `EndGameplayFrame()` 的最终遍历会影响 Mod 调用次数、自动持有和 HCN 身体采样。相同模拟步骤下，普通遍历的 scratch Note 和长按头分别在 3000、3001 判定；前五步延迟到最终遍历时，两者均在 3003 处理，自动持有也从 3001 推迟到 3003。HCN 在 3202 的身体 tick 在普通遍历中将血量从 0.32 恢复至 0.34，延迟遍历没有该 tick，血量仍为 0.32。原始轨迹与复现命令保存在[历史证据](#historical-evidence)中。
 
-AS-1 的迁移决定：自动演奏随每个模拟步骤执行，固定在物理输入之后、被动收尾之前；同一步的 HCN 身体先读取已有自动持有。普通和延迟视觉遍历使用相同自动端点及身体采样，这是有意消除旧绘制调用频率造成的差异。保留原 fixture 作为历史证据，最终验证分别记录前后事件/采样时间及血量，不覆盖旧预期。重应用即时清空自动持有（RA-1），下一模拟步骤依据仍在持有的规则状态恢复；普通回退同样从规则状态恢复，暂停恢复冻结既有完成状态。
+AS-1 的当前决定：AS Mod 本体预生成皿输入时间表，持有游标、按键状态及 nextTime，实现 IBmsActionProducer.UpdateActions(time)。输入管理器初始化时缓存实现该接口的 Mod，每个模拟步骤只调用接口；Mod 比较时间，到期调用 TriggerPressed/TriggerReleased。同帧跨过的转换按顺序发送，同刻的释放和按下分别保留。IBmsActionFilter 将手动输入及回放接管决策留在 Mod；输入管理器只转发，不保存自动动作集合、调度状态或 AS 回放策略。输入和手动/回放进入同一批次，地雷及 HCN 身体读取最终按住状态，结果与采样遵循普通输入顺序。普通回退二分恢复时间表状态；暂停恢复冻结既有输入直到追上暂停时间。重应用保留框架按住状态，不再执行历史 RA-1 的自动持有清空。新回放记录生成动作并标记，旧回放继续本地生成。原 fixture 保留作历史证据，新的行为由真实输入、回放及普通/延迟遍历测试独立验收。
 
 ## 必须保持的时序
 
@@ -764,7 +764,27 @@ foreach ($refactorGroup in $refactorFilters.Keys) {
 
 进度只记录核心实现、核心对照适配、Mod 适配及最终集成的实际状态，包括当前缺口和构建/测试结果。
 
-### 本轮职责重构（2026-10-01）
+### AutoScratch 输入接口与 Mod 所有权（2026-10-01）
+
+- `IBmsActionProducer.UpdateActions(double time)` 是每个模拟帧的调用契约；输入管理器仅在初始化时缓存接口实例，运行时只调用接口。AS Mod 本体拥有输入时间表、游标、方向状态和 `nextTime`，到期直接调用框架 `TriggerPressed/TriggerReleased`。
+- `IBmsActionFilter` 单独表达输入接管：AS 决定是否允许物理或回放动作，输入管理器只应用接口结果，不保存 scratch 集合、自动调度或 AS 回放策略。物理动作在修改框架按键状态之前过滤，防止手动按键吞掉生成输入或阻止释放。
+- 删除核心 `BmsAutoScratchController`、独立自动持有及专用自动尾操作。AS 的头尾、HCN 身体、地雷和 keysound 统一由普通输入规则处理；Drawable 重应用保留框架按住状态，普通回退恢复时间表状态，暂停恢复阶段冻结既有输入。
+- 时间表复用 Autoplay 的动作点，保留同刻释放/按下顺序；修复相邻 CN/HCN 的尾部反向动作在同一时间被释放后又保持的问题。双皿、2P、PMS、超短长皿和同刻衔接均有定向测试。
+- 新回放首帧保存 `IncludesGeneratedInputs`，AS 使用已记录动作。旧文件缺少标记时继续本地生成；JSON、归档、首帧去重、实际框架录制和回放时点均有覆盖。
+- 原 AS-1/RA-1 fixture 继续作为历史证据保留。当前 AS 用例断言普通按键路径的结果、样本顺序、端点、血量、重应用与回退，不再复刻旧自动持有字段或核心内部自动化阶段。
+
+定向功能组 **62 项通过，0 失败、0 跳过**。覆盖输入生成、相邻 LN/CN/HCN、物理按键冲突、框架录制、新旧回放、暂停恢复与普通回退。稳态分配单测仅检查少量调用的分配量，不运行计时 benchmark；性能验收仍按用户要求暂停。
+
+最终生产与测试项目 Release 构建均为 **0 警告、0 错误**。正式脚本的默认 JIT 分组 **1,368 项通过**，仪器化分组 **294 项通过**，合计 **1,662 项，0 失败、0 跳过**。当前无 AS 行为及视觉轨迹与保留的 `d4e690cd3f8fadc70fe2d82021f338a012e1980e` 基线分别 **86/86 匹配**；原始 fixture、比较器和容差均未修改，本轮未重跑旧版本。最终日志、过滤器、TRX、计数、程序集哈希及比较报告保存在下列 `final` 目录。
+
+验证入口：
+
+```powershell
+./scripts/verify-judgement-migration.ps1 -ResultsDirectory artifacts/hitobject-core/as-actions-20261001/final
+python scripts/compare-judgement-traces.py artifacts/hitobject-core/verified-profiles/comparison/baseline artifacts/hitobject-core/as-actions-20261001/final/comparison/current --output artifacts/hitobject-core/as-actions-20261001/final/comparison/report.json
+```
+
+### 职责重构（2026-10-01，AS 输入简化前的历史记录）
 
 - 将纯判定核心、框架双向适配和表现映射拆为三个命名空间；不再将它们统一归入 UI 的 Judgement 目录。
 - 用单一 `BmsColumnJudgementRuntime` 协调输入和检查点，组合持有 `BmsColumnNoteIndex`、`BmsHoldRegistry`、`BmsLandmineRegistry`、`BmsAutoScratchController` 和调度器，删除原列上下文的各个 partial 文件。

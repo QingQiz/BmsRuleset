@@ -25,7 +25,6 @@ internal sealed class BmsColumnJudgementRuntime
     private readonly BmsHoldRegistry holds;
     private readonly BmsLandmineRegistry landmines;
     private readonly BmsLongNote[] longNotes;
-    private BmsAutoScratchController? automation;
     private int pressedDirections;
 
     internal BmsJudgementRules Rules { get; }
@@ -58,10 +57,7 @@ internal sealed class BmsColumnJudgementRuntime
     internal void CompleteLongNotesAtPause(in BmsFrameContext frame)
     {
         foreach (var note in GetHoldingNotes().ToArray())
-        {
             holds.Pause(noteSlots[note], frame);
-            ResetAutomaticHold(note);
-        }
     }
 
     internal void RewindLongNotes(double time)
@@ -71,10 +67,7 @@ internal sealed class BmsColumnJudgementRuntime
         foreach (var note in longNotes)
         {
             if (note != null)
-            {
                 holds.Rewind(noteSlots[note], time);
-                automation?.RestoreHold(note);
-            }
         }
     }
 
@@ -155,31 +148,17 @@ internal sealed class BmsColumnJudgementRuntime
     internal bool IsNoteCandidate(BmsHitObject note) => Notes.IsNoteCandidate(note);
     internal IEnumerable<BmsHitObject> GetNoteCandidates() => Notes.GetNoteCandidates();
 
-    internal void ActivateNote(BmsHitObject note)
-    {
-        Notes.ActivateNote(note);
-        automation?.InvalidateOrder();
-    }
+    internal void ActivateNote(BmsHitObject note) => Notes.ActivateNote(note);
 
-    internal void BeginNoteRemoval(BmsHitObject note)
-    {
-        Notes.BeginNoteRemoval(note);
-        ResetAutomaticHold(note);
-        automation?.InvalidateOrder();
-    }
+    internal void BeginNoteRemoval(BmsHitObject note) => Notes.BeginNoteRemoval(note);
 
-    internal void SetNoteActivationOrder(IEnumerable<BmsHitObject> order)
-    {
-        Notes.SetActivationOrder(order);
-        automation?.InvalidateOrder();
-    }
+    internal void SetNoteActivationOrder(IEnumerable<BmsHitObject> order) => Notes.SetActivationOrder(order);
 
     internal void RefreshNoteTiming(BmsHitObject note)
     {
         if (!noteSlots.ContainsKey(note) || !Notes.RefreshTiming(note)) return;
         // Configuration changes keep the existing relative order of equal-time chart objects.
         columnNotes.OrderBy(n => n.StartTime).ToArray().CopyTo(columnNotes, 0);
-        automation?.InvalidateOrder();
     }
 
     internal void RefreshNoteConfiguration(BmsHitObject note, bool preserveHistory = true)
@@ -349,7 +328,7 @@ internal sealed class BmsColumnJudgementRuntime
     }
 
     internal void UpdateRegisteredLongNote(BmsLongNote note, in BmsFrameContext frame, double elapsed, bool holding)
-        => holds.Finish(noteSlots[note], frame, elapsed, holding || IsAutomaticallyHeld(note));
+        => holds.Finish(noteSlots[note], frame, elapsed, holding);
 
     internal void ObserveSimulationStep(BmsHitObject note, in BmsFrameContext frame) => noteOutput.ObserveSimulationStep(note, frame);
 
@@ -361,7 +340,7 @@ internal sealed class BmsColumnJudgementRuntime
         for (var i = 0; i < Notes.ActiveBodies.Count;)
         {
             var slot = Notes.ActiveBodies[i];
-            holds.UpdateBody(slot, frame, elapsed, holding || IsAutomaticallyHeld(longNotes[slot]));
+            holds.UpdateBody(slot, frame, elapsed, holding);
             // Ending a body removes only that member while preserving the next object's turn.
             if (i < Notes.ActiveBodies.Count && Notes.ActiveBodies[i] == slot)
                 i++;
@@ -369,20 +348,7 @@ internal sealed class BmsColumnJudgementRuntime
     }
 
 
-    internal bool AutoScratchEnabled => automation != null;
-    internal bool HasPendingAutomaticStep => automation?.NeedsStep == true;
     internal int GetNoteSlot(BmsHitObject note) => noteSlots[note];
-
-    internal void EnableAutoScratch()
-    {
-        if (IsScratch) automation ??= new BmsAutoScratchController(this, holds, noteOutput);
-    }
-
-    internal bool IsAutomaticallyHeld(BmsLongNote note) => automation?.IsAutomaticallyHeld(note) == true;
-    internal bool IsHoldInputActive(BmsLongNote note) => pressedDirections != 0 || IsAutomaticallyHeld(note);
-    internal void ResetAutomaticHold(BmsHitObject note) => automation?.ResetAutomaticHold(note);
-    internal void PrepareAutomaticHolds() => automation?.PrepareAutomaticHolds();
-    internal void UpdateAutoScratch(in BmsFrameContext frame) => automation?.UpdateAutoScratch(frame);
     internal BmsLandmineState GetLandmineState(BmsLandmine note) => landmines.GetLandmineState(note);
     internal void ActivateLandmine(BmsLandmine note) => landmines.ActivateLandmine(note);
     internal void RemoveLandmine(BmsLandmine note) => landmines.RemoveLandmine(note);

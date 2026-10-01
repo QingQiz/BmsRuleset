@@ -18,7 +18,6 @@ internal sealed class BmsHoldRegistry
     private readonly HellChargeOperations? hellCharge;
     internal BmsPressOperation PressOperation { get; }
     internal BmsPassiveOperation PassiveOperation { get; }
-    internal int SlotCount => bindingIndices.Length;
 
     internal BmsHoldRegistry(BmsLongNote[] notes, BmsJudgementRules rules, BmsJudgementExecutionContext execution)
     {
@@ -97,12 +96,6 @@ internal sealed class BmsHoldRegistry
         return binding.Operations.Pause(binding.StateIndex, frame);
     }
 
-    internal bool AutomaticTail(int slot, in BmsFrameContext frame)
-    {
-        var binding = bindings[bindingIndices[slot]];
-        return binding.Operations.AutomaticTail(binding.StateIndex, frame);
-    }
-
     internal void Rewind(int slot, double time)
     {
         var binding = bindings[bindingIndices[slot]];
@@ -136,7 +129,6 @@ internal sealed class BmsHoldRegistry
         internal abstract bool Release(int index, in BmsReleaseContext release);
         internal abstract void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding);
         internal abstract bool Pause(int index, in BmsFrameContext frame);
-        internal abstract bool AutomaticTail(int index, in BmsFrameContext frame);
         internal abstract void Rewind(int index, double time);
         internal abstract void Configure(int index, bool preserveHistory);
     }
@@ -159,7 +151,6 @@ internal sealed class BmsHoldRegistry
         internal override bool Release(int index, in BmsReleaseContext release) => rule.TryRelease(states[index], Execution, release);
         internal override void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(states[index], Execution, frame, elapsed, holding);
         internal override bool Pause(int index, in BmsFrameContext frame) => rule.CompleteAtPause(states[index], Execution, frame);
-        internal override bool AutomaticTail(int index, in BmsFrameContext frame) => rule.TryRelease(states[index], Execution, new BmsReleaseContext(frame.SimulationTime, frame));
         internal override void Rewind(int index, double time) => rule.Rewind(states[index], time);
         internal override void Configure(int index, bool preserveHistory)
         {
@@ -185,7 +176,6 @@ internal sealed class BmsHoldRegistry
         internal override bool Release(int index, in BmsReleaseContext release) => rule.TryRelease(states[index], Execution, release);
         internal override void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(states[index], Execution, frame, elapsed, holding);
         internal override bool Pause(int index, in BmsFrameContext frame) => rule.CompleteAtPause(states[index], Execution, frame);
-        internal override bool AutomaticTail(int index, in BmsFrameContext frame) => rule.TryRepress(states[index], Execution, new BmsPressContext(frame.SimulationTime, frame, ReverseScratch: true));
         internal override void Rewind(int index, double time) => rule.Rewind(states[index], time);
         internal override void Configure(int index, bool preserveHistory)
         {
@@ -211,7 +201,6 @@ internal sealed class BmsHoldRegistry
         internal override bool Release(int index, in BmsReleaseContext release) => rule.TryRelease(states[index], Execution, release);
         internal override void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(states[index], Execution, frame, elapsed, holding);
         internal override bool Pause(int index, in BmsFrameContext frame) => rule.CompleteAtPause(states[index], Execution, frame);
-        internal override bool AutomaticTail(int index, in BmsFrameContext frame) => rule.TryRepress(states[index], Execution, new BmsPressContext(frame.SimulationTime, frame, ReverseScratch: true));
         internal override void Rewind(int index, double time) => rule.Rewind(states[index], time);
         internal override void Configure(int index, bool preserveHistory)
         {

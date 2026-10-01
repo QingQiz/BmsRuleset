@@ -93,6 +93,23 @@ public class BmsReplayArchiveTest
     }
 
     [Test]
+    public void TestArchiveWithoutGeneratedInputMarkerUsesLegacyPlayback()
+    {
+        var original = createScore();
+        original.Replay.Frames[0] = new BmsReplayFrame(1234, BmsAction.Key1) { IncludesGeneratedInputs = true };
+        var restored = BmsTestReplayArchive.RoundTrip(original, json =>
+        {
+            var parsed = Newtonsoft.Json.Linq.JObject.Parse(json);
+            var marker = parsed.Descendants().OfType<Newtonsoft.Json.Linq.JProperty>()
+                .Single(p => p.Name.Replace("_", "").Equals("IncludesGeneratedInputs", StringComparison.OrdinalIgnoreCase));
+            marker.Remove();
+            return parsed.ToString();
+        });
+        Assert.That(((BmsReplayFrame)restored.Replay.Frames.Single()).IncludesGeneratedInputs, Is.False);
+        Assert.That(new BmsFramedReplayInputHandler(restored.Replay).IncludesGeneratedInputs, Is.False);
+    }
+
+    [Test]
     public void TestArchiveIsGzipCompressed()
     {
         using var archive = BmsReplayArchive.Create(createScore());
@@ -379,7 +396,7 @@ public class BmsReplayArchiveTest
             {
                 Frames =
                 {
-                    new BmsReplayFrame(0),
+                    new BmsReplayFrame(0) { IncludesGeneratedInputs = true },
                     new BmsReplayFrame(1234, BmsAction.Key1, BmsAction.Scratch)
                     {
                         BranchDecisions = "2:1",

@@ -16,5 +16,6 @@ public partial class BmsReplayRecorder(Score score, BmsJudgementAlgorithm algori
             // Keep the session choice with the input frames so archive export and score cloning
             // preserve it independently of the viewer's current settings.
             JudgementAlgorithm = previousFrame == null ? algorithm : null,
+            IncludesGeneratedInputs = previousFrame == null,
         };
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.Objects;
@@ -10,20 +11,20 @@ using osu.Game.Rulesets.Replays;
 
 namespace osu.Game.Rulesets.BmsRuleset.Replays;
 
-public class BmsAutoGenerator(BmsBeatmap beatmap) : AutoGenerator<BmsReplayFrame>(beatmap)
+public class BmsAutoGenerator(BmsBeatmap beatmap, bool scratchOnly = false) : AutoGenerator<BmsReplayFrame>(beatmap)
 {
     public const double RELEASE_DELAY = 10;
 
     // ReSharper disable once InconsistentNaming
     private new BmsBeatmap Beatmap => (BmsBeatmap)base.Beatmap;
 
-    private readonly record struct ActionPoint(double Time, BmsAction Action, bool Press);
+    internal readonly record struct ActionPoint(double Time, BmsAction Action, bool Press);
 
     protected override void GenerateFrames()
     {
         var active = new List<BmsAction>();
 
-        foreach (var group in generateActionPoints().GroupBy(p => p.Time).OrderBy(g => g.Key))
+        foreach (var group in GenerateActionPoints().GroupBy(p => p.Time).OrderBy(g => g.Key))
         {
             foreach (var point in group.OrderBy(p => p.Press))
             {
@@ -36,7 +37,7 @@ public class BmsAutoGenerator(BmsBeatmap beatmap) : AutoGenerator<BmsReplayFrame
                     active.Remove(point.Action);
             }
 
-            Frames.Add(new BmsReplayFrame(group.Key, active.ToArray()));
+            Frames.Add(new BmsReplayFrame(group.Key, active.ToArray()) { IncludesGeneratedInputs = Frames.Count == 0 });
         }
     }
 
@@ -69,21 +70,24 @@ public class BmsAutoGenerator(BmsBeatmap beatmap) : AutoGenerator<BmsReplayFrame
             return endTime;
         }
 
-        return calculateTapReleaseTime(endTime, nextObject);
+        return calculateTapReleaseTime(endTime, nextObject?.StartTime);
     }
 
-    private static double calculateTapReleaseTime(double pressTime, HitObject? nextObject)
+    private static double calculateTapReleaseTime(double pressTime, double? nextPressTime)
         // A tail reversal is a tap too: it must stop before the next head or mine, even
         // for sub-millisecond gaps, so the following reversal can form a new key-down.
-        => nextObject == null
+        => nextPressTime == null || nextPressTime <= pressTime
             ? pressTime + RELEASE_DELAY
-            : Math.Min(pressTime + RELEASE_DELAY, pressTime + (nextObject.StartTime - pressTime) * 0.9);
+            : Math.Min(pressTime + RELEASE_DELAY, pressTime + (nextPressTime.Value - pressTime) * 0.9);
 
-    private IEnumerable<ActionPoint> generateActionPoints()
+    internal IEnumerable<ActionPoint> GenerateActionPoints()
     {
         for (var i = 0; i < Beatmap.HitObjects.Count; i++)
         {
             var current = Beatmap.HitObjects[i];
+
+            if (scratchOnly && !BmsLayout.IsScratchColumn(current.Column, Beatmap.LayoutVariant))
+                continue;
 
             // Autoplay must never press a mine: doing so detonates it (POOR judgement).
             // Mines are passive — leave the column untouched at their StartTime.
@@ -104,7 +108,11 @@ public class BmsAutoGenerator(BmsBeatmap beatmap) : AutoGenerator<BmsReplayFrame
                 && BmsKeyBindingConfiguration.ReverseScratchAction(action) is { } reverseAction)
             {
                 yield return new ActionPoint(releaseTime, reverseAction, true);
-                yield return new ActionPoint(calculateTapReleaseTime(releaseTime, nextObject), reverseAction, false);
+                // A same-time head uses the forward direction; release the reversal before its tail,
+                // rather than at its head where release-before-press ordering would leave it stuck.
+                var nextReversalTime = nextObject is BmsLongNote nextHold && nextHold.StartTime <= releaseTime
+                    ? nextHold.EndTime : nextObject?.StartTime;
+                yield return new ActionPoint(calculateTapReleaseTime(releaseTime, nextReversalTime), reverseAction, false);
             }
         }
     }

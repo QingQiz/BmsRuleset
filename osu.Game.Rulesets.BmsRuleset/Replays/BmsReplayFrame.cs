@@ -19,6 +19,8 @@ public class BmsReplayFrame : ReplayFrame
 
     public BmsJudgementAlgorithm? JudgementAlgorithm { get; init; }
 
+    public bool IncludesGeneratedInputs { get; init; }
+
     // deserialization requires a default ctor
     // ReSharper disable once UnusedMember.Global
     public BmsReplayFrame()
@@ -42,5 +44,6 @@ public class BmsReplayFrame : ReplayFrame
         && Math.Abs(Time - bmsFrame.Time) < 0.0001
         && BranchDecisions == bmsFrame.BranchDecisions
         && JudgementAlgorithm == bmsFrame.JudgementAlgorithm
+        && IncludesGeneratedInputs == bmsFrame.IncludesGeneratedInputs
         && Actions.SequenceEqual(bmsFrame.Actions);
 }

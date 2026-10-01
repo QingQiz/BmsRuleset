@@ -24,11 +24,11 @@ if (-not $SkipBuild) {
 }
 
 $patterns = @(
-    '.Normal.Gameplay.', '.Normal.Mods.', '.Normal.Replay.', '.Normal.Localisation.',
+    '.Normal.Gameplay.', '.Normal.Mods.', '.Normal.Replay.', '.Normal.Localisation.', '.Normal.AutoGeneration.',
     'BmsKeySoundCursorTest', 'BmsScoreSelectionModTest', 'BmsAudioVolumeRoutingTest', 'BmsSamplePlaybackTest'
 )
 $scenes = @(
-    'Beatoraja', 'CautionAutoplay', 'ChargeNoteExecution', 'ColumnJudgement', 'CoreSchedulingGeneration',
+    'AutoScratchInput', 'Beatoraja', 'CautionAutoplay', 'ChargeNoteExecution', 'ColumnJudgement', 'CoreSchedulingGeneration',
     'DenseReplay', 'GitComparison', 'HcnTailVisuals', 'HellChargeNoteExecution', 'HitExplosionLimit',
     'InitialBackgroundAudio', 'InvertGameplay', 'InvisibleNote', 'JudgementAlgorithm', 'JudgementCheckpoints',
     'JudgementIndexes', 'JudgementLifecycleExecution', 'LandmineKeyboardInput', 'LongNoteBodyTint',

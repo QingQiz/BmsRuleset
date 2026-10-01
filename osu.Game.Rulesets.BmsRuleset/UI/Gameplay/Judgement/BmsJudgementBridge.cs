@@ -67,7 +67,6 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
         boundObjects.Remove(drawable);
         representations.Remove(binding.Note);
-        context.ResetAutomaticHold(binding.Note);
         drawable.OnNewResult -= binding.ResultHandler;
     }
 

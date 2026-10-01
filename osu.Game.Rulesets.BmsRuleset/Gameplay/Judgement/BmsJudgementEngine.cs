@@ -57,20 +57,13 @@ internal sealed class BmsJudgementEngine
 
     internal bool HasPendingInputs => pendingInputs.Count > 0;
 
-    internal void EnableAutoScratch()
-    {
-        foreach (var column in columns)
-            column.EnableAutoScratch();
-    }
-
     internal BmsColumnJudgementRuntime GetColumn(int index)
         => index >= 0 && index < columnsByIndex.Length && columnsByIndex[index] is { } column ? column
             : throw new ArgumentOutOfRangeException(nameof(index));
 
     internal void QueueInput(double time, int column, bool pressed, bool reverseScratch)
     {
-        if (GetColumn(column).AutoScratchEnabled)
-            return;
+        GetColumn(column);
         pendingInputs.Add(new BmsJudgementInput(time, column, pressed, reverseScratch));
     }
 
@@ -118,8 +111,6 @@ internal sealed class BmsJudgementEngine
             if (!resumeRewinding)
             {
                 foreach (var column in columns)
-                    column.PrepareAutomaticHolds();
-                foreach (var column in columns)
                     column.UpdateLandmines(frame, framePressedDirections[column.Index] != 0);
                 foreach (var column in columns)
                     column.UpdateRegisteredBodies(frame, elapsed, framePressedDirections[column.Index] != 0);
@@ -137,13 +128,6 @@ internal sealed class BmsJudgementEngine
                 }
                 else
                     column.HandleExecutionRelease(input.Time, frame, input.ReverseScratch);
-            }
-
-            // Automation consumes simulation steps, so deferred and final visual traversals share one outcome.
-            if (!resumeRewinding)
-            {
-                foreach (var column in columns)
-                    column.UpdateAutoScratch(frame);
             }
         }
         finally

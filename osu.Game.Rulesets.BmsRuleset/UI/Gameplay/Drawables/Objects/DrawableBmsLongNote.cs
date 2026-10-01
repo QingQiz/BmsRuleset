@@ -326,7 +326,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         return updated;
     }
 
-    private bool isKeyHeld() => ParentColumn?.Judgements.IsHoldInputActive(ln) == true;
+    private bool isKeyHeld() => ParentColumn?.Judgements.PressedDirections is > 0;
 
     private void applyPresentation(in BmsLongNoteState snapshot, in BmsFrameContext frame)
     {
