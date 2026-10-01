@@ -106,6 +106,10 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             probe(typeof(DrawableBmsHitObject), "OnKilled", "representation.killed");
             probe(typeof(Playfield), "revertResult", "result.revert");
             // Rebuild callers after their leaves so warmed, inlined rules retain observable checkpoints.
+            foreach (var method in new[] { "ApplyBodyTick", "ApplySyntheticEndpoint", "PlaySample", "PlayTailSample" })
+                refreshCaller(typeof(BmsDrawableJudgementOutput), method);
+            foreach (var method in new[] { "ApplyBodyTick", "ApplySyntheticEndpoint" })
+                refreshCaller(typeof(BmsJudgementExecutionContext), method);
             refreshCaller(typeof(BmsHellChargeBodyTracker), "Update");
             foreach (var type in ruleTypes)
             {

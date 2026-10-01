@@ -5,12 +5,49 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
 [TestFixture]
 public class BmsCoreJudgementScheduleTest
 {
+    [TestCase(BmsLongNoteMode.ChargeNote, false)]
+    [TestCase(BmsLongNoteMode.ChargeNote, true)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, false)]
+    [TestCase(BmsLongNoteMode.HellChargeNote, true)]
+    public void StepObservationPrecedesDeferredTailAndRejectsAReboundPlan(BmsLongNoteMode mode, bool rebind)
+    {
+        var context = new BmsLongNoteTestContext(mode, start: 3000, duration: 1002, layout: BmsLayoutVariant.Pms9K);
+        var schedule = context.Column.Schedule;
+        var handle = schedule.Bind(context.Note);
+        Assert.That(context.Press(3000, HitResult.Perfect), Is.True);
+        context.Release(3401);
+        Assert.That(context.State.TailJudged, Is.False);
+        var observations = new List<string>();
+        context.Output.LongNoteStep = (note, frame) =>
+        {
+            Assert.That(note, Is.SameAs(context.Note));
+            Assert.That(frame.SimulationTime, Is.EqualTo(3990));
+            Assert.That(context.State.TailJudged, Is.False);
+            observations.Add("step");
+            if (rebind) handle = schedule.Bind(note);
+        };
+        context.Output.SyntheticEndpoint = (_, after) => { if (!after) observations.Add("tail"); };
+        schedule.BeginBatch(0, 1, 1);
+        schedule.RunLayout([handle], new BmsFrameContext(3990, 1), 589, false);
+        Assert.That(observations, Is.EqualTo(rebind ? new[] { "step" } : ["step", "tail"]));
+        if (rebind)
+        {
+            context.Output.LongNoteStep = (_, _) => observations.Add("replacement");
+            schedule.BeginBatch(0, 1, 2);
+            schedule.RunLayout([handle], new BmsFrameContext(3990, 1), 589, false);
+            Assert.That(observations, Is.EqualTo(new[] { "step", "replacement", "tail" }));
+        }
+        schedule.RunLayout([handle], new BmsFrameContext(3990, 1), 589, false);
+        Assert.That(context.Output.SyntheticEndpoints, Has.Count.EqualTo(1));
+    }
+
     [Test]
     public void SynchronousRemovalOfCurrentItemKeepsTheNextItem()
     {

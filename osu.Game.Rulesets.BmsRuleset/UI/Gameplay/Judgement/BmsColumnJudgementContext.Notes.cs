@@ -470,6 +470,8 @@ internal sealed partial class BmsColumnJudgementContext
     internal void UpdateRegisteredLongNote(BmsLongNote note, in BmsFrameContext frame, double elapsed, bool holding)
         => finishOperations[holdOperationSlots[noteSlots[note]]](noteSlots[note], frame, elapsed, holding || IsAutomaticallyHeld(note));
 
+    internal void ObserveLongNoteStep(BmsLongNote note, in BmsFrameContext frame) => noteOutput.ObserveLongNoteStep(note, frame);
+
     internal void UpdateRegisteredBodies(in BmsFrameContext frame, double elapsed, bool holding)
     {
         // A completed hold leaves the active schedule before the next batch's body observations.

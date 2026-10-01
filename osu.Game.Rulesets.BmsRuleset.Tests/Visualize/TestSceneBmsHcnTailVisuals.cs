@@ -26,7 +26,7 @@ public partial class TestSceneBmsHcnTailVisuals : BmsPlayerTestScene
     private int column;
     private bool mineAtTail;
     private bool earlyRelease;
-    private float? expectedPinnedHeadY;
+    private float? expectedPinnedHeadOffset;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(createReplay);
 
@@ -101,8 +101,9 @@ public partial class TestSceneBmsHcnTailVisuals : BmsPlayerTestScene
         AddStep("capture held head position", () =>
         {
             var note = Playfield.GetAliveObjectAtTime(3000)!;
-            expectedPinnedHeadY = BmsPlayfieldAssertions.BottomOf(part(note, "head"));
-            Assert.That(Math.Sign(expectedPinnedHeadY.Value - Playfield.JudgementLineY()), Is.EqualTo(Math.Sign(offset)));
+            // The player entrance can still move the entire stage between checkpoints.
+            expectedPinnedHeadOffset = BmsPlayfieldAssertions.BottomOf(part(note, "head")) - Playfield.JudgementLineY();
+            Assert.That(Math.Sign(expectedPinnedHeadOffset.Value), Is.EqualTo(Math.Sign(offset)));
         });
         checkHeldBody(3915);
         checkCompleted(4500);
@@ -117,7 +118,7 @@ public partial class TestSceneBmsHcnTailVisuals : BmsPlayerTestScene
             column = noteColumn;
             mineAtTail = adjacentMine;
             earlyRelease = early;
-            expectedPinnedHeadY = null;
+            expectedPinnedHeadOffset = null;
             LoadPlayer();
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Playfield.Stage.IsLoaded);
@@ -144,7 +145,7 @@ public partial class TestSceneBmsHcnTailVisuals : BmsPlayerTestScene
             Assert.That(note!.Alpha, Is.GreaterThan(0));
             var head = part(note, "head");
             var body = part(note, "longNoteBody");
-            Assert.That(BmsPlayfieldAssertions.BottomOf(head), Is.EqualTo(expectedPinnedHeadY ?? Playfield.JudgementLineY()).Within(1),
+            Assert.That(BmsPlayfieldAssertions.BottomOf(head) - Playfield.JudgementLineY(), Is.EqualTo(expectedPinnedHeadOffset ?? 0).Within(1),
                 "A successfully held HCN must finish shrinking toward its pinned head.");
             Assert.That(body.Alpha, Is.EqualTo(1));
         });

@@ -1,5 +1,6 @@
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Timing;
 using osu.Game.Online.API;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -27,7 +28,7 @@ public class BmsModPausedTest
     [Test]
     public void TestPauseAfterExistingRewindStartsNewWindow()
     {
-        var playfield = new BmsPlayfield(new BmsBeatmap { TotalColumns = 1 });
+        var playfield = new BmsPlayfield(new BmsBeatmap { TotalColumns = 1 }) { Clock = new FramedClock(new ManualClock()) };
 
         playfield.BeginResumeRewind(10000, 0);
         var nextTarget = playfield.BeginResumeRewind(11000, 0);
@@ -91,7 +92,7 @@ public class BmsModPausedTest
     [Test]
     public void TestRepeatedPauseReusesExistingRewindWindow()
     {
-        var playfield = new BmsPlayfield(new BmsBeatmap { TotalColumns = 1 });
+        var playfield = new BmsPlayfield(new BmsBeatmap { TotalColumns = 1 }) { Clock = new FramedClock(new ManualClock()) };
 
         var firstTarget = playfield.BeginResumeRewind(10000, 0);
         var repeatedTarget = playfield.BeginResumeRewind(7000, 0);

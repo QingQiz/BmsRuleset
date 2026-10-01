@@ -136,6 +136,10 @@ internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
             observer.Observer(state, frame);
     }
 
+    public void ObserveLongNoteStep(BmsLongNote note, in BmsFrameContext frame)
+        // Hold feedback observes the pending tail before this step can settle a deferred release.
+        => GetRepresentation(note).UpdateVisualState();
+
     public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
     {
         var drawable = GetRepresentation(endpoint.Source);

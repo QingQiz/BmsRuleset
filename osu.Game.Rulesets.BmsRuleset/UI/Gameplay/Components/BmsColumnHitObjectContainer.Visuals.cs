@@ -34,7 +34,6 @@ public sealed partial class BmsColumnHitObjectContainer
             var note = observation.Note;
             var position = scrollController.GetVisualScrollPosition(note.StartTime, note.ScrollPositionAtStartTime);
             observation.Observer(frame.YAt(position), frame);
-            drawable.UpdateVisualState();
         }
     }
 

@@ -117,8 +117,8 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
     internal void UpdateDeferredFrame()
     {
-        Judgements.Schedule.RunDeferred(coreFrame(), Time.Elapsed);
         observeDeferredVisuals(visualFrame());
+        Judgements.Schedule.RunDeferred(coreFrame(), Time.Elapsed);
     }
 
     /// <summary>
@@ -152,10 +152,8 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         base.UpdateAfterChildrenLife();
 
         refreshCoreOrder();
-        Judgements.Schedule.RunLayout(coreLayoutOrder, coreFrame(), Time.Elapsed, isResumeRewinding());
 
         var frame = visualFrame();
-        var resumeRewinding = isResumeRewinding();
 
         // Position all alive entries in this column
         foreach (var entry in AliveEntries)
@@ -169,12 +167,10 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             var y = frame.YAt(startPosition);
             observeVisualTime(note, y, frame);
             note.UpdateVisualLayout(y, frame);
-
-            // Resume rewind retains the completed presentation while the clock moves backwards.
-            if (!resumeRewinding && (Clock as IGameplayClock)?.IsRewinding != true && Time.Elapsed >= 0)
-                note.UpdateVisualState();
         }
 
+        // Geometry observes the pre-passive state; result feedback can then retire or recolour that presentation.
+        Judgements.Schedule.RunLayout(coreLayoutOrder, coreFrame(), Time.Elapsed, isResumeRewinding());
         Judgements.Schedule.RunSubtree(coreSubtreeOrder, coreFrame());
     }
 

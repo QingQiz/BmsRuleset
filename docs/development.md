@@ -19,6 +19,8 @@ AutoScratch and its registration are restored using the simulation engine and ob
 
 The core now also owns the deferred hold plan and rewind coordination. Resume visibility belongs to the long-note presentation, while the generic container reports lifecycle boundaries and applies common layout. Framework history and index notifications retain their two separate synchronous checkpoints through the output adapter; synthetic PMS penalty decisions are made in the core. Empty-press keysounds query core activation/results, and unused column input forwarding and drawable-query aliases are removed. Production and test-consumer migration now compile together using existing read-only sibling binaries. Filtered runtime tests, isolated Git comparisons and approved performance measurements are the next validation steps.
 
+The 2026-10-01 runtime checkpoint passed 660 core/Mod checks. The expanded combined run passed 1528 checks with eight failures: seven concern warmed instrumentation missing body ticks, and one concerns a completed long note becoming visible during resume rewind. Portable Git comparisons cover 86 scenarios and have matched all behavioural traces in isolated runs; warmed feedback probes and remaining visual differences still need resolution. An advancing Player benchmark is prepared and compiles in both worktrees, but has not been run pending explicit benchmark approval. This is an intermediate checkpoint, not final acceptance.
+
 ## Build Manually
 
 Install [Git](https://git-scm.com/) and the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), then clone

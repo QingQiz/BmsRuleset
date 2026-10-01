@@ -25,6 +25,7 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     internal Action<BmsHitObject, BmsFrameContext>? AfterResultCheckpoint;
     internal Action<string>? Feedback;
     internal Action<BmsLongNote, BmsLongNoteState, BmsFrameContext>? StatePublished;
+    internal Action<BmsLongNote, BmsFrameContext>? LongNoteStep;
     internal Action<BmsLongNoteEndpointResult, bool>? SyntheticEndpoint;
     internal List<BmsLongNoteEndpointResult> SyntheticEndpoints { get; } = [];
     internal List<double> SyntheticApplicationTimes { get; } = [];
@@ -72,6 +73,8 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
 
     public void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
         => StatePublished?.Invoke(note, state, frame);
+
+    public void ObserveLongNoteStep(BmsLongNote note, in BmsFrameContext frame) => LongNoteStep?.Invoke(note, frame);
 
     public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
     {

@@ -318,12 +318,19 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
         {
             var column = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
             var note = column.AliveEntries.Values.First();
-            using var counter = new ScopedMethodProbe(note.GetType().GetProperty("NextPassiveJudgementTime", BindingFlags.Instance | BindingFlags.NonPublic)!.GetMethod,
+            using var counter = new ScopedMethodProbe(typeof(BmsNoteJudgementWindows).GetMethod("NextPassiveJudgementTime", BindingFlags.Instance | BindingFlags.NonPublic),
                 typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countPassiveDeadline), BindingFlags.Static | BindingFlags.NonPublic));
+            // Rebuild the caller after probing the leaf so a warmed inline cannot hide deadline scans.
+            using var caller = new ScopedMethodProbe(typeof(BmsColumnJudgementContext).GetMethod("refreshNoteDeadline", BindingFlags.Instance | BindingFlags.NonPublic),
+                typeof(TestSceneBmsDenseReplay).GetMethod(nameof(keepDeadlineBoundary), BindingFlags.Static | BindingFlags.NonPublic));
             passiveDeadlineReads = 0;
             for (var i = 0; i < 20; i++)
                 column.UpdateSubTree();
             Assert.That(passiveDeadlineReads, Is.LessThan(64), "deadlines change on activation/revert or expiry, not on every visual frame");
+            passiveDeadlineReads = 0;
+            note.HitObject.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
+            column.UpdateSubTree();
+            Assert.That(passiveDeadlineReads, Is.GreaterThan(0), "The probe must observe a real invalidation.");
         });
     }
 
@@ -449,6 +456,8 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     private static void countColumnTraversal(BmsColumnHitObjectContainer __instance) => columnTraversals.Count(__instance);
 
     private static void countPassiveDeadline() => passiveDeadlineReads++;
+
+    private static void keepDeadlineBoundary() { }
 
     // ReSharper disable once InconsistentNaming
     private static void countMasking(CompositeDrawable __instance)

@@ -162,6 +162,8 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
         if (binding.LastPostStep == step) return;
         binding.LastPostStep = step;
         bindings[item.Object] = binding;
+        column.ObserveLongNoteStep((BmsLongNote)item.Object, frame);
+        if (version != revision || !current(item)) return;
         FinishLongNote((BmsLongNote)item.Object, frame, elapsed, column.PressedDirections != 0);
     }
 
