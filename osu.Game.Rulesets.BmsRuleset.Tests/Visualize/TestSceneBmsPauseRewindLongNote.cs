@@ -61,9 +61,9 @@ public partial class TestSceneBmsPauseRewindLongNote : BmsPlayerTestScene
                 .SingleOrDefault(drawable => drawable.HitObject is BmsLongNote);
             return longNote != null;
         });
-        AddStep("judge long note head", () => Playfield.Stage.Columns[2].HandlePress(hitObject.StartTime));
+        AddStep("judge long note head", () => PressColumn(Playfield.Stage.Columns[2], hitObject.StartTime));
         AddStep("seek to long note tail", () => Player.GameplayClockContainer.Seek(hitObject.EndTime));
-        AddStep("judge long note tail", () => Playfield.Stage.Columns[2].HandleRelease(hitObject.EndTime));
+        AddStep("judge long note tail", () => ReleaseColumn(Playfield.Stage.Columns[2], hitObject.EndTime));
         AddAssert("long note judged", () => longNote!.Judged);
 
         AddStep("seek to pause time", () =>
@@ -94,7 +94,7 @@ public partial class TestSceneBmsPauseRewindLongNote : BmsPlayerTestScene
         });
         AddStep("stop at long note head", () => Player.GameplayClockContainer.Stop());
         AddUntilStep("long note alive", () => Playfield.AllColumnAliveObjects().Any(drawable => drawable.HitObject is BmsLongNote));
-        AddStep("judge long note head", () => Playfield.Stage.Columns[2].HandlePress(long_note_time));
+        AddStep("judge long note head", () => PressColumn(Playfield.Stage.Columns[2], long_note_time));
         AddStep("seek into long note body", () =>
         {
             Player.GameplayClockContainer.Seek(long_note_time + 100);

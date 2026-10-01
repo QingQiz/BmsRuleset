@@ -20,6 +20,7 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     private readonly Dictionary<BmsLongNote, IReadOnlyList<BmsLongNoteEndpointResult>> endpoints = new(ReferenceEqualityComparer.Instance);
     private readonly Stack<BmsHitObject> appliedResults = new();
     private Action<BmsHitObject> checkpoint = null!;
+    private Action<BmsHitObject, double> historyCheckpoint = null!;
     internal Action<BmsHitObject, BmsFrameContext>? BeforeResultCheckpoint;
     internal Action<BmsHitObject, BmsFrameContext>? AfterResultCheckpoint;
     internal Action<string>? Feedback;
@@ -27,6 +28,7 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     internal Action<BmsLongNoteEndpointResult, bool>? SyntheticEndpoint;
     internal List<BmsLongNoteEndpointResult> SyntheticEndpoints { get; } = [];
     internal List<double> SyntheticApplicationTimes { get; } = [];
+    internal List<bool> SyntheticPenaltySuppression { get; } = [];
     internal Action<BmsLongNote, bool, double, BmsFrameContext>? BodyTick;
     internal List<(BmsLongNote Note, bool Holding, double Scale, double Time)> BodyTicks { get; } = [];
     internal Action<BmsHitObject>? Reverting;
@@ -40,7 +42,11 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     internal double? GetRawTime(BmsHitObject note) => rawTimes.GetValueOrDefault(note);
     internal IReadOnlyList<BmsLongNoteEndpointResult> GetEndpoints(BmsLongNote note) => endpoints.GetValueOrDefault(note) ?? [];
 
-    public void SetResultCheckpoint(Action<BmsHitObject> resultCheckpoint) => checkpoint = resultCheckpoint;
+    public void SetResultCheckpoints(Action<BmsHitObject, double> recordHistory, Action<BmsHitObject> refreshIndexes)
+    {
+        historyCheckpoint = recordHistory;
+        checkpoint = refreshIndexes;
+    }
 
     public void ApplyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty)
     {
@@ -53,6 +59,7 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
         MainResults++;
         appliedResults.Push(note);
         BeforeResultCheckpoint?.Invoke(note, frame);
+        historyCheckpoint(note, frame.SimulationTime);
         checkpoint(note);
         AfterResultCheckpoint?.Invoke(note, frame);
     }
@@ -66,11 +73,12 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     public void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
         => StatePublished?.Invoke(note, state, frame);
 
-    public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame)
+    public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
     {
         SyntheticEndpoint?.Invoke(endpoint, false);
         SyntheticEndpoints.Add(endpoint);
         SyntheticApplicationTimes.Add(frame.SimulationTime);
+        SyntheticPenaltySuppression.Add(suppressPenalty);
         SyntheticEndpoint?.Invoke(endpoint, true);
     }
 
@@ -87,6 +95,7 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
         {
             SyntheticApplicationTimes.RemoveAt(SyntheticApplicationTimes.Count - 1);
             SyntheticEndpoints.RemoveAt(SyntheticEndpoints.Count - 1);
+            SyntheticPenaltySuppression.RemoveAt(SyntheticPenaltySuppression.Count - 1);
         }
     }
 

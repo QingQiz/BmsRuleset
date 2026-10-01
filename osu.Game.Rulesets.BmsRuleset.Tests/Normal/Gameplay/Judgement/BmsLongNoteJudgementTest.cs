@@ -375,8 +375,6 @@ public class BmsLongNoteJudgementTest
     {
         var tracker = new BmsHellChargeBodyTracker();
         var ticks = new List<(bool Holding, double Scale)>();
-
-        tracker.MarkReleased();
         tracker.Update(elapsed: 1, holding: true, (holding, scale) => ticks.Add((holding, scale)));
 
         Assert.That(ticks, Is.Empty);
@@ -455,7 +453,6 @@ public class BmsLongNoteJudgementTest
 
         tracker.Update(150, true, apply, 1150);
         tracker.Update(100, true, apply, 1250);
-        tracker.MarkReleased(1250);
         tracker.Update(100, false, apply, 1350);
         tracker.Update(100, true, apply, 1450);
         tracker.Rewind(1150);
@@ -466,8 +463,6 @@ public class BmsLongNoteJudgementTest
         tracker.Update(1, true, apply, 1201);
         Assert.That(ticks, Has.Count.EqualTo(1));
         Assert.That(ticks[0], Is.EqualTo((true, BmsHellChargeBodyTracker.DEFAULT_TICK_SCALE)));
-
-        tracker.MarkReleased(1250);
         tracker.Update(100, false, apply, 1350);
         tracker.Rewind(1300);
         ticks.Clear();

@@ -11,7 +11,9 @@ using osu.Game.Database;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Replays;
+using osu.Game.Screens.Play;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -32,6 +34,24 @@ public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageReso
     /// The currently-loaded <see cref="BmsPlayfield"/>. Must be called after the player is loaded.
     /// </summary>
     protected BmsPlayfield Playfield => (BmsPlayfield)Player.DrawableRuleset.Playfield;
+
+    // Fixed-plan execution scenes supply numerical contexts; input-generation scenes use actual input events.
+    private protected PressOutcome PressColumn(IBmsColumn column, double inputTime, bool reverseScratch = false)
+    {
+        var source = (BmsColumn)column;
+        return source.Judgements.HandleNotePress(new BmsPressContext(inputTime, frameFor(source), reverseScratch, Playfield.IsResumeRewinding),
+            Playfield.JudgementAlgorithm);
+    }
+
+    private protected void ReleaseColumn(IBmsColumn column, double inputTime, bool reverseScratch = false)
+    {
+        var source = (BmsColumn)column;
+        source.Judgements.HandleExecutionRelease(inputTime, frameFor(source), reverseScratch);
+    }
+
+    private static BmsFrameContext frameFor(BmsColumn column)
+        => new(column.Time.Current, (column.Clock as IGameplayClock)?.GetTrueGameplayRate() ?? column.Clock.Rate,
+            (column.Clock as IGameplayClock)?.IsRewinding == true || column.Time.Elapsed < 0);
 
     [Resolved]
     protected GameHost Host { get; private set; } = null!;

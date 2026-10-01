@@ -43,8 +43,8 @@ public partial class TestSceneBmsPauseRewindInput : BmsPlayerTestScene
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Playfield.Stage.IsLoaded);
         AddStep("freeze gameplay time", freezeGameplayTime);
         seekTo(9000);
-        AddStep("judge first note", () => Playfield.Stage.Columns[1].HandlePress(9000));
-        AddStep("release first note", () => Playfield.Stage.Columns[1].HandleRelease(9000));
+        AddStep("judge first note", () => PressColumn(Playfield.Stage.Columns[1], 9000));
+        AddStep("release first note", () => ReleaseColumn(Playfield.Stage.Columns[1], 9000));
         AddAssert("first note judged", () => Player.ScoreProcessor.JudgedHits, () => Is.EqualTo(1));
         seekTo(pause_time);
         AddStep("pause", () => Player.Pause());
@@ -71,7 +71,7 @@ public partial class TestSceneBmsPauseRewindInput : BmsPlayerTestScene
             () => Is.EqualTo(eventsBeforePress));
         AddAssert("lead-in presses preserve gauge", () => Player.HealthProcessor.Health.Value, () => Is.EqualTo(healthBeforePress));
         AddAssert("lead-in presses preserve combo", () => Player.ScoreProcessor.Combo.Value, () => Is.EqualTo(comboBeforePress));
-        AddAssert("pending note has no PMS mistake", () => !((BmsColumn)Playfield.Stage.Columns[2]).HasPmsMistake(boundaryNote));
+        AddAssert("pending note has no PMS mistake", () => !((BmsColumn)Playfield.Stage.Columns[2]).Judgements.HasPmsMistake(boundaryNote));
 
         seekTo(10600);
         AddAssert("lead-in finished", () => !Playfield.IsResumeRewinding);

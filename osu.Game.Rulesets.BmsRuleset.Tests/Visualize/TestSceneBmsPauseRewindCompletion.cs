@@ -76,7 +76,7 @@ public partial class TestSceneBmsPauseRewindCompletion : BmsPlayerTestScene
         AddStep("play head", () =>
         {
             if (hitHead)
-                Playfield.Stage.Columns[2].HandlePress(head_time);
+                PressColumn(Playfield.Stage.Columns[2], head_time);
         });
         AddStep("seek to pause time", () =>
         {

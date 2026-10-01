@@ -21,7 +21,7 @@ using osu.Game.Rulesets.UI;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 /// <summary>
-/// Observes the no-automation core path captured before P3a-0.7. Probes exist only while a non-parallel baseline test runs.
+/// Observes production scheduling, with optional automation checkpoints. Probes are scoped to non-parallel scenes.
 /// </summary>
 internal sealed class BmsCoreSchedulingRecorder : IDisposable
 {
@@ -46,7 +46,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
     internal int ReplayPolls { get; private set; }
     internal int StabilityUpdates { get; private set; }
 
-    internal BmsCoreSchedulingRecorder(BmsPlayfield playfield, BmsScoreProcessor score, BmsHealthProcessor health)
+    internal BmsCoreSchedulingRecorder(BmsPlayfield playfield, BmsScoreProcessor score, BmsHealthProcessor health, bool observeAutomation = false)
     {
         if (current != null)
             throw new InvalidOperationException("Checkpoint probes require a non-parallel scope.");
@@ -68,10 +68,12 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             probe(typeof(BmsPlayfield), "Update", "playfield.update");
             probe(typeof(BmsJudgementEngine), "QueueInput", "input.queue");
             probe(typeof(BmsJudgementEngine), "ProcessFrame", "batch");
+            if (observeAutomation)
+                probe(typeof(BmsColumnJudgementContext), "UpdateAutoScratch", "auto");
             probe(typeof(BmsFramedReplayInputHandler), "CollectReplayInputs", "replay.poll");
             probe(typeof(FrameStabilityContainer), "UpdateSubTree", "stability");
             probe(typeof(BmsColumnHitObjectContainer), "UpdateAfterChildrenLife", "column.layout");
-            probe(typeof(BmsColumnHitObjectContainer), "UpdateDeferredLongNotes", "column.deferred");
+            probe(typeof(BmsColumnHitObjectContainer), "UpdateDeferredFrame", "column.deferred");
             probe(typeof(BmsColumnHitObjectContainer), "RemoveDrawable", "representation.remove");
             probe(typeof(BmsColumnHitObjectContainer), "AddDrawable", "representation.add");
             probe(typeof(BmsColumnJudgementContext), "UpdateLandmines", "mines");
@@ -114,7 +116,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             refreshCaller(typeof(BmsHellChargeNoteJudgementRule), "UpdateBody");
             foreach (var type in typeof(BmsColumnJudgementContext).GetNestedTypes(BindingFlags.NonPublic)
                          .Where(t => t.Name.EndsWith("NoteOperations")))
-                foreach (var method in new[] { "Press", "Passive", "Repress", "Release", "Finish" })
+                foreach (var method in new[] { "Press", "Passive", "Repress", "Release", "Finish", "AutomaticTail" })
                     refreshCaller(type, method);
             refreshCaller(typeof(BmsColumnJudgementContext), "UpdateRegisteredBodies");
             refreshCaller(typeof(BmsCoreJudgementSchedule), "updateLongNote");
@@ -123,7 +125,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             refreshCaller(typeof(DrawableHitObject), "UpdateAfterChildren");
             refreshCaller(typeof(DrawableHitObject), "OnKilled");
             refreshCaller(typeof(BmsColumnHitObjectContainer), "UpdateAfterChildrenLife");
-            refreshCaller(typeof(BmsColumnHitObjectContainer), "UpdateDeferredLongNotes");
+            refreshCaller(typeof(BmsColumnHitObjectContainer), "UpdateDeferredFrame");
             refreshCaller(typeof(BmsColumnHitObjectContainer), "EndGameplayFrame");
             refreshCaller(typeof(BmsJudgementEngine), "ProcessFrame");
             refreshCaller(typeof(BmsPlayfield), "processJudgementFrame");
@@ -192,6 +194,13 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         }
 
         var name = recorder!.names[__originalMethod];
+        if (name == "auto" && __instance is BmsColumnJudgementContext automaticColumn
+            && (!automaticColumn.AutoScratchEnabled || ((long, long))typeof(BmsColumnJudgementContext)
+                .GetField("lastAutomaticStep", instance)!.GetValue(automaticColumn)! == (automaticColumn.Schedule.Epoch, automaticColumn.Schedule.Step)))
+        {
+            __state = false;
+            return;
+        }
         if (name == "frame.begin") recorder.frame++;
         if (name == "simulation") recorder.step++;
         if (name == "batch") recorder.batch++;
@@ -289,6 +298,8 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         // Preserve the frozen trace schema while numerical contexts replace clock-dependent arguments.
         if (name == "batch") argumentText = "suppressJudgements=" + format(args.OfType<bool>().First());
         if (name == "bodies") argumentText = "holding=" + format(args.OfType<bool>().Single());
+        // The suppression flag moved from the playfield into the core; the baseline encoded only endpoint data here.
+        if (name == "endpoint") argumentText = "";
         if (name == "body.sample") argumentText = "currentTime=" + format(args.OfType<BmsFrameContext>().Single().SimulationTime) + "," + argumentText;
         if (endpoint is { } e)
             argumentText += $",endpoint={e.Kind}:{e.Result}@{format(e.EventTime)}:{format(e.ApplicationTime)}:{format(e.GameplayRate)}";
@@ -299,7 +310,9 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             Array.IndexOf(playfield.Stage.Columns[column].HitObjectContainer.AliveEntries.Values.ToArray(), drawable),
             Array.IndexOf(playfield.Stage.Columns[column].HitObjectContainer.AliveObjects.ToArray(), drawable),
             playfield.Stage.Columns[column].HitObjectContainer.IndexOf(drawable));
-        var states = drawable == null ? "-" : state(drawable);
+        var states = name == "auto"
+            ? string.Join(";", playfield.Stage.Columns[0].HitObjectContainer.AliveObjects.OfType<DrawableBmsHitObject>().Select(state))
+            : drawable == null ? "-" : state(drawable);
         var pending = string.Join(",", playfield.Stage.Columns.Take(2).Cast<BmsColumn>()
             .Select(c => c.Judgements.FirstPendingNote is { } first ? identities[first] : -1));
         var active = string.Join("/", playfield.Stage.Columns.Take(2).Cast<BmsColumn>()
@@ -331,7 +344,8 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         var state = drawable.HitObject is BmsLongNote note && hasLongNoteObservation(drawable)
             ? ((BmsColumn)playfield.Stage.Columns[note.Column]).Judgements.GetLongNoteState(note) : (BmsLongNoteState?)null;
         return string.Join(",", identities[drawable.HitObject], drawable.Result?.Type,
-            state?.HeadJudged, state?.TailJudged, drawable.HitObject is BmsLongNote ? false : (bool?)null);
+            state?.HeadJudged, state?.TailJudged, drawable.HitObject is BmsLongNote held
+                ? ((BmsColumn)playfield.Stage.Columns[held.Column]).Judgements.IsAutomaticallyHeld(held) : (bool?)null);
     }
 
     private bool hasLongNoteObservation(DrawableBmsHitObject drawable)

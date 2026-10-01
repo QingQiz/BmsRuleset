@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 
@@ -61,19 +62,21 @@ public partial class TestSceneBmsJudgementPerformance : BmsPlayerTestScene
             var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
             Assert.That(container.AliveEntries.Count, Is.EqualTo(count + 2));
             const int operations = 20000;
-            BmsJudgementPerformanceTest.Measure("Repress-empty-" + count, operations, () =>
+            var frame = currentFrame(container);
+            BmsJudgementPerformanceTest.Measure("Press-empty-" + count, operations, () =>
             {
                 var found = 0;
                 return new BmsJudgementPerformanceTest.Measurement(() =>
                 {
                     for (var i = 0; i < operations; i++)
-                        if (container.Judgements.TryRepress(3000, false) != null)
+                        if (container.Judgements.HandleNotePress(new BmsPressContext(0, frame)).Kind == PressOutcomeKind.Hit)
                             found++;
                 }, () => { Assert.That(found, Is.Zero); return new { Found = found, Alive = container.AliveEntries.Count }; });
             });
             measurePhases(container, count, "idle", operations);
             measureFrame(count, "idle", operations);
-            Assert.That(Playfield.GetAliveObjectAtTime(3000).TryHit(HitResult.Perfect), Is.True);
+            var head = Playfield.Beatmap.HitObjects.Single(n => n.Column == 1 && n.StartTime == 3000);
+            Assert.That(container.Judgements.TryPressRegisteredNote(head, HitResult.Perfect, new BmsPressContext(3000, frame)), Is.True);
             measurePhases(container, count, "active", operations);
             measureFrame(count, "active", operations);
         });
@@ -106,8 +109,11 @@ public partial class TestSceneBmsJudgementPerformance : BmsPlayerTestScene
             {
                 for (var i = 0; i < operations; i++)
                 {
-                    container.UpdateLandmines(false);
-                    container.Judgements.UpdateHellChargeBodies(false);
+                    container.Judgements.UpdateLandmines(currentFrame(container), false);
+                    container.Judgements.UpdateRegisteredBodies(currentFrame(container), container.Time.Elapsed, false);
                 }
             }, () => new { Alive = container.AliveEntries.Count, Active = container.AliveEntries.Values.Count(d => d.HitObject.StartTime == 3000 && d.Judged) }));
+
+    private static BmsFrameContext currentFrame(BmsColumnHitObjectContainer container)
+        => new(container.Time.Current, (container.Clock as IGameplayClock)?.GetTrueGameplayRate() ?? container.Clock.Rate);
 }

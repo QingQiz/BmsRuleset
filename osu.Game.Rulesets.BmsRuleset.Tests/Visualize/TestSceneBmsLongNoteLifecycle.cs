@@ -71,14 +71,14 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             note = (BmsLongNote)first.HitObject;
             first.OnNewResult += (source, _) => Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState((BmsLongNote)source.HitObject).IsHolding, Is.True,
                 "The head is pinned, and the normal-LN tail is not marked judged, when the main result is submitted.");
-            Playfield.Stage.Columns[1].HandlePress(5000);
+            PressColumn(Playfield.Stage.Columns[1], 5000);
             originalHeadTime = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).HeadTime;
         });
         capture("head");
         seek(5501);
         capture("body and mine");
         seek(6900);
-        AddStep("release before tail", () => Playfield.Stage.Columns[1].HandleRelease(6900));
+        AddStep("release before tail", () => ReleaseColumn(Playfield.Stage.Columns[1], 6900));
         capture("early tail");
         seek(6999);
         capture("body after successful tail");
@@ -92,7 +92,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             Assert.That(context.GetLongNoteState(note).HeadTime, Is.EqualTo(originalHeadTime));
         });
         seek(9000);
-        AddStep("judge another pooled representation", () => Playfield.Stage.Columns[1].HandlePress(9000));
+        AddStep("judge another pooled representation", () => PressColumn(Playfield.Stage.Columns[1], 9000));
         capture("second head");
         seek(6000);
         AddAssert("first head restored inside body", () =>
@@ -101,7 +101,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).HeadTime == originalHeadTime);
         capture("rewound body");
         seek(6900);
-        AddStep("release restored tail", () => Playfield.Stage.Columns[1].HandleRelease(6900));
+        AddStep("release restored tail", () => ReleaseColumn(Playfield.Stage.Columns[1], 6900));
         capture("replayed tail");
         seek(7400);
         capture("retired again");
@@ -135,7 +135,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         AddStep("load long notes", () => { mode = longNoteMode; includeMine = false; duplicateHeads = false; LoadPlayer(); });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         seek(5003);
-        AddStep("hold head", () => Playfield.Stage.Columns[1].HandlePress(5000));
+        AddStep("hold head", () => PressColumn(Playfield.Stage.Columns[1], 5000));
         seek(5204);
         AddStep("reapply active defaults twice", () =>
         {
@@ -168,7 +168,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             Assert.That(JsonSerializer.Serialize(score.JudgementEvents), Is.EqualTo(events));
         });
         seek(6900);
-        AddStep("release the rebound tail", () => Playfield.Stage.Columns[1].HandleRelease(6900));
+        AddStep("release the rebound tail", () => ReleaseColumn(Playfield.Stage.Columns[1], 6900));
         AddAssert("tail completed through new binding", () =>
         {
             var note = Playfield.Beatmap.HitObjects.OfType<BmsLongNote>().First();
@@ -182,7 +182,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         AddStep("load mine", () => { mode = BmsLongNoteMode.HellChargeNote; includeMine = true; duplicateHeads = false; LoadPlayer(); });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         seek(5000);
-        AddStep("hold mine column", () => Playfield.Stage.Columns[1].HandlePress(5000));
+        AddStep("hold mine column", () => PressColumn(Playfield.Stage.Columns[1], 5000));
         seek(5501);
         AddStep("reapply detonated mine", () =>
         {

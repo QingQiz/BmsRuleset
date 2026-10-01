@@ -14,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays;
@@ -63,11 +64,8 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
 
         AddUntilStep("scratch LN is automatically held", () =>
             Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SCENARIO_START_TIME + BmsTestBeatmaps.LN_SCENARIO_DURATION / 2
-            && Playfield.GetAliveObjectAtTime(BmsTestBeatmaps.LN_SCENARIO_START_TIME) is ILongNoteHolder
-            {
-                IsAutomaticallyHeld: true,
-                IsHoldingLongNote: true,
-            });
+            && Playfield.GetAliveObjectAtTime(BmsTestBeatmaps.LN_SCENARIO_START_TIME)?.HitObject is BmsLongNote note
+            && ((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements.IsAutomaticallyHeld(note));
 
         AddUntilStep("scratch LN tail is judged", () =>
             Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SCENARIO_START_TIME + BmsTestBeatmaps.LN_SCENARIO_DURATION + 100);

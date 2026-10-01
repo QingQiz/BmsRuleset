@@ -131,12 +131,7 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
             foreach (var note in container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Select(d => d.HitObject).Where(notes.Contains))
                 recorded.ActivateNote(note);
             output.Feedback = recordedTrace.Add;
-            output.BeforeResultCheckpoint = (note, frame) =>
-            {
-                // This is the existing column's framework-result consumer, before the playfield observers.
-                recorded.RecordResult(note, frame.SimulationTime);
-                recordedTrace.Add(snapshot("main.before", note, true));
-            };
+            output.BeforeResultCheckpoint = (note, _) => recordedTrace.Add(snapshot("main.before", note, true));
             output.AfterResultCheckpoint = (note, _) => recordedTrace.Add(snapshot("main.after", note, true));
             before = (drawable, _) => { if (drawable is DrawableBmsHitObject d && notes.Contains(d.HitObject)) trace.Add(snapshot("main.before", d.HitObject, false)); };
             after = (drawable, _) => { if (drawable is DrawableBmsHitObject d && notes.Contains(d.HitObject)) trace.Add(snapshot("main.after", d.HitObject, false)); };
@@ -266,10 +261,10 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
             void press(double simulationTime, double inputTime)
             {
                 advance(simulationTime);
-                var actual = column.HandlePress(inputTime);
+                var actual = PressColumn(column, inputTime);
                 var expected = recorded.HandleNotePress(new BmsPressContext(inputTime, new BmsFrameContext(simulationTime, 1.5)), algorithm);
                 Assert.That(actual, Is.EqualTo(expected));
-                column.HandleRelease(inputTime);
+                ReleaseColumn(column, inputTime);
                 recorded.HandleExecutionRelease(inputTime, new BmsFrameContext(simulationTime, 1.5));
                 mark($"press:{inputTime}:{simulationTime}:{actual.Kind}");
             }

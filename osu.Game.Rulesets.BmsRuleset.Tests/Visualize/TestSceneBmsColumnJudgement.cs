@@ -86,9 +86,9 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
         {
             Playfield.JudgementAlgorithm = algorithm;
             var column = Playfield.Stage.Columns[1];
-            column.HandlePress(5000);
-            column.HandleRelease(5000);
-            column.HandlePress(5000);
+            PressColumn(column, 5000);
+            ReleaseColumn(column, 5000);
+            PressColumn(column, 5000);
         });
         capture("same timestamp inputs");
         AddAssert("distinct heads receive perfect results", () =>

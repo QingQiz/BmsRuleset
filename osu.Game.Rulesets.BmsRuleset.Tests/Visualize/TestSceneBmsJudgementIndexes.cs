@@ -67,9 +67,9 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
                 typeof(TestSceneBmsJudgementIndexes).GetMethod(nameof(countRepress), BindingFlags.Static | BindingFlags.NonPublic));
 
             repressCalls = 0;
-            Assert.That(column.HandlePress(3000), Is.EqualTo(PressOutcome.Hit));
+            Assert.That(PressColumn(column, 3000), Is.EqualTo(PressOutcome.Hit));
             Assert.That(repressCalls, Is.Zero, "An exact head press must not query unstarted future holds.");
-            Assert.That(column.HandlePress(3001), Is.EqualTo(PressOutcome.Hit));
+            Assert.That(PressColumn(column, 3001), Is.EqualTo(PressOutcome.Hit));
             Assert.That(repressCalls, Is.EqualTo(1), "Only the active hold participates in a repress.");
             Assert.That(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.Select(e => e.Result), Is.EqualTo(new[] { HitResult.Perfect }));
             Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(.24).Within(1e-8));
@@ -81,7 +81,7 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
     {
         load(true);
         seek(3000);
-        AddStep("start HCN", () => Assert.That(Playfield.Stage.Columns[1].HandlePress(3000), Is.EqualTo(PressOutcome.Hit)));
+        AddStep("start HCN", () => Assert.That(PressColumn(Playfield.Stage.Columns[1], 3000), Is.EqualTo(PressOutcome.Hit)));
         seek(3200);
         AddStep("body phase work depends on active holds", () =>
         {

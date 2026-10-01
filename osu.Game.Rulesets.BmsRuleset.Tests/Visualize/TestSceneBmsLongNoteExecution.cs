@@ -141,11 +141,7 @@ public partial class TestSceneBmsLongNoteExecution : BmsPlayerTestScene
             foreach (var note in container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Select(d => d.HitObject).Where(notes.Contains))
                 recorded.ActivateNote(note);
             output.Feedback = recordedTrace.Add;
-            output.BeforeResultCheckpoint = (note, frame) =>
-            {
-                recorded.RecordResult(note, frame.SimulationTime);
-                recordedTrace.Add(snapshot("main.before", note, true));
-            };
+            output.BeforeResultCheckpoint = (note, _) => recordedTrace.Add(snapshot("main.before", note, true));
             output.AfterResultCheckpoint = (note, _) => recordedTrace.Add(snapshot("main.after", note, true));
             var publishedHeads = new HashSet<BmsLongNote>();
             output.StatePublished = (note, state, _) =>
@@ -314,7 +310,7 @@ public partial class TestSceneBmsLongNoteExecution : BmsPlayerTestScene
             void press(double simulation, double input)
             {
                 advance(simulation);
-                var actual = column.HandlePress(input);
+                var actual = PressColumn(column, input);
                 var expected = recorded.HandleNotePress(new BmsPressContext(input, frame()), algorithm);
                 Assert.That(actual, Is.EqualTo(expected));
                 mark($"press:{input}:{simulation}:{actual.Kind}");
@@ -322,7 +318,7 @@ public partial class TestSceneBmsLongNoteExecution : BmsPlayerTestScene
             void release(double simulation, double input, double rate)
             {
                 advance(simulation, rate);
-                column.HandleRelease(input);
+                ReleaseColumn(column, input);
                 recorded.HandleExecutionRelease(input, frame());
                 mark($"release:{input}:{simulation}");
             }
@@ -345,7 +341,7 @@ public partial class TestSceneBmsLongNoteExecution : BmsPlayerTestScene
                 output.RevertAfter(time);
                 context.RewindLongNotes(time);
                 recorded.RewindLongNotes(time);
-                foreach (var drawable in drawables) drawable.RestoreRewoundState();
+                foreach (var drawable in drawables) drawable.RestoreRewoundVisuals();
                 context.RestoreExecutionState(frame());
                 recorded.RewindPressHistory(time);
                 recorded.RestoreExecutionState(frame());

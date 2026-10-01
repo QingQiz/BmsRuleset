@@ -53,7 +53,7 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal void PrepareAutomaticHolds()
     {
-        if (!AutoScratchEnabled)
+        if (!AutoScratchEnabled || lastAutomaticStep == (Schedule.Epoch, Schedule.Step))
             return;
         // A restored or rebound hold must be available to body sampling before this step's new endpoints.
         foreach (var slot in pendingLongNoteTailSlots)

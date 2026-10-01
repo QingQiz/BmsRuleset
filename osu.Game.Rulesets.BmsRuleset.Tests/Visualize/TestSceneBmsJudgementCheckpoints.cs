@@ -28,7 +28,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
 {
     private BmsLongNoteMode mode;
     private bool replayInputs;
-    private BmsJudgementCheckpointRecorder? recorder;
+    private BmsCoreSchedulingRecorder? recorder;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(_ => replayInputs
         ? [new BmsReplayFrame(0), new BmsReplayFrame(3000, BmsAction.Key1), new BmsReplayFrame(3001),
@@ -54,61 +54,69 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
         return beatmap;
     }
 
-    [TestCase(BmsLongNoteMode.LongNote, false)]
-    [TestCase(BmsLongNoteMode.LongNote, true)]
-    [TestCase(BmsLongNoteMode.ChargeNote, false)]
-    [TestCase(BmsLongNoteMode.ChargeNote, true)]
-    [TestCase(BmsLongNoteMode.HellChargeNote, false)]
-    [TestCase(BmsLongNoteMode.HellChargeNote, true)]
-    public void FixedClockRecordsOrdinaryAndDeferredCheckpoints(BmsLongNoteMode longNoteMode, bool deferred)
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void FixedClockRecordsOrdinaryAndDeferredCheckpoints(BmsLongNoteMode longNoteMode)
     {
-        load(longNoteMode);
-        AddStep("record fixed production traversal", () => withClock(advance =>
+        string[]? ordinaryObservations = null;
+        foreach (var deferred in new[] { false, true })
         {
-            startRecording();
-            if (deferred) Playfield.BeginGameplayFrame();
-            advance(2999);
-            Playfield.UpdateSubTree();
-            advance(3000);
-            press();
-            Playfield.UpdateSubTree();
-            advance(3001);
-            release();
-            Playfield.UpdateSubTree();
-            advance(3002);
-            Playfield.UpdateSubTree();
-            advance(3003);
-            Playfield.UpdateSubTree();
-            if (deferred) Playfield.EndGameplayFrame();
-            recorder!.Mark("burst.complete");
-
-            var scratchTimes = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents
-                .Where(e => e.Source.Column == 0).SelectMany(e => e.TimingObservations).Select(o => o.ActualTime).ToArray();
-            Assert.That(scratchTimes[0], Is.EqualTo(deferred ? 3003 : 3000), "Keep the old AutoScratch sampling difference explicit.");
-            var holding = (ILongNoteHolder)Playfield.GetAliveObjectAtTime(3001)!;
-            Assert.That(holding.IsAutomaticallyHeld, Is.True);
-
-            double[] times = [3202, 3301, 3605, 2999, 3000, 3001, 3301];
-            foreach (var time in times)
+            load(longNoteMode);
+            AddStep("record fixed production traversal", () => withClock(advance =>
             {
-                advance(time);
+                startRecording();
+                if (deferred) Playfield.BeginGameplayFrame();
+                advance(2999);
                 Playfield.UpdateSubTree();
-            }
-            recorder.Mark("scenario.complete");
-            var rows = recorder.Rows.Select(r => r.Split('|')).ToArray();
-            var tapSample = Array.FindIndex(rows, r => r[4] == "auto/keysound>" && r[11].Contains("sampleKey=11"));
-            var tapResult = Array.FindIndex(rows, r => r[4] == "note.press/result.notify=" && r[8] == "0");
-            Assert.That(tapSample, Is.GreaterThanOrEqualTo(0).And.LessThan(tapResult));
-            if (longNoteMode != BmsLongNoteMode.LongNote)
-            {
-                var headResult = Array.FindIndex(rows, r => r[4] == "long.press/result.notify=");
-                var headSample = Array.FindIndex(rows, r => r[4] == "auto/keysound>" && r[11].Contains("sampleKey=13"));
-                Assert.That(headResult, Is.GreaterThanOrEqualTo(0).And.LessThan(headSample));
-            }
-            if (longNoteMode == BmsLongNoteMode.HellChargeNote)
-                Assert.That(rows.Count(r => r[4].EndsWith("/body.tick>") && r[5] == "3202"), Is.EqualTo(deferred ? 0 : 1));
-            finishRecording($"traversal-{longNoteMode}-{deferred}");
-        }));
+                advance(3000);
+                press();
+                Playfield.UpdateSubTree();
+                advance(3001);
+                release();
+                Playfield.UpdateSubTree();
+                advance(3002);
+                Playfield.UpdateSubTree();
+                advance(3003);
+                Playfield.UpdateSubTree();
+                if (deferred) Playfield.EndGameplayFrame();
+                recorder!.Mark("burst.complete");
+
+                var scratchTimes = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents
+                    .Where(e => e.Source.Column == 0).SelectMany(e => e.TimingObservations).Select(o => o.ActualTime).ToArray();
+                Assert.That(scratchTimes[0], Is.EqualTo(3000), "AS-1: automation consumes each simulation step regardless of visual deferral.");
+                var holding = (BmsLongNote)Playfield.GetAliveObjectAtTime(3001)!.HitObject;
+                var context = ((BmsColumn)Playfield.Stage.Columns[holding.Column]).Judgements;
+                Assert.That(context.IsAutomaticallyHeld(holding), Is.True);
+                Assert.That(context.GetLongNoteState(holding).HeadTime, Is.EqualTo(3001));
+
+                double[] times = [3202, 3301, 3605, 2999, 3000, 3001, 3301];
+                foreach (var time in times)
+                {
+                    advance(time);
+                    Playfield.UpdateSubTree();
+                }
+                recorder.Mark("scenario.complete");
+                var rows = recorder.Rows.Select(r => r.Split('|')).ToArray();
+                var tapSample = Array.FindIndex(rows, r => r[4] == "auto/keysound>" && r[11].Contains("sampleKey=11"));
+                var tapResult = Array.FindIndex(rows, r => r[4].EndsWith("/result.notify=") && r[8] == "0");
+                Assert.That(tapSample, Is.GreaterThanOrEqualTo(0).And.LessThan(tapResult));
+                if (longNoteMode != BmsLongNoteMode.LongNote)
+                {
+                    var headResult = Array.FindIndex(rows, r => r[4].EndsWith("/result.notify=") && r[8] == "2");
+                    var headSample = Array.FindIndex(rows, r => r[4] == "auto/keysound>" && r[11].Contains("sampleKey=13"));
+                    Assert.That(headResult, Is.GreaterThanOrEqualTo(0).And.LessThan(headSample));
+                }
+                if (longNoteMode == BmsLongNoteMode.HellChargeNote)
+                    Assert.That(rows.Count(r => r[4].EndsWith("/body.tick>") && r[5] == "3202"), Is.EqualTo(1));
+                var observations = observableRows(recorder.Rows);
+                if (deferred)
+                    Assert.That(observations, Is.EqualTo(ordinaryObservations), "Ordered results, endpoints, keysounds and intermediate health are independent of visual grouping.");
+                else
+                    ordinaryObservations = observations;
+                finishRecording($"traversal-{longNoteMode}-{deferred}");
+            }));
+        }
     }
 
     [TestCase(BmsLongNoteMode.LongNote)]
@@ -125,7 +133,8 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             var drawable = (DrawableBmsHitObject)Playfield.GetAliveObjectAtTime(3001)!;
             var note = drawable.HitObject;
             var entry = drawable.Entry;
-            var controller = drawable.LongNoteJudgement;
+            var context = ((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements;
+            var state = context.GetLongNoteState((BmsLongNote)note);
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.Count;
 
             recorder!.Mark("reapply.before");
@@ -133,20 +142,20 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             recorder.Mark("reapply.after");
             Assert.That(drawable.Entry, Is.SameAs(entry));
-            Assert.That(drawable.LongNoteJudgement, Is.SameAs(controller));
-            Assert.That(controller!.HeadJudged, Is.True);
-            Assert.That(((ILongNoteHolder)drawable).IsAutomaticallyHeld, Is.False, "Record the old reapply reset separately from the retained controller state.");
+            Assert.That(context.GetLongNoteState((BmsLongNote)note), Is.EqualTo(state));
+            Assert.That(state.HeadJudged, Is.True);
+            Assert.That(context.IsAutomaticallyHeld((BmsLongNote)note), Is.False, "RA-1: reapply resets automatic holding while preserving the logical endpoints.");
             Assert.That(drawable.Result.TimeOffset, Is.Zero, "The framework reapplies the main result time at the end of the object.");
             Assert.That(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents, Has.Count.EqualTo(events));
             Assert.That(recorder.Rows.Skip(reapplyStart).Any(r => r.Contains("/representation.killed")), Is.False, "ApplyDefaults must preserve the lifetime registration.");
-            Assert.That(((BmsColumn)Playfield.Stage.Columns[0]).Judgements.ActiveLongNotes.Count(d => ReferenceEquals(d, drawable)), Is.EqualTo(1));
+            Assert.That(context.ActiveLongNotes.Count(n => ReferenceEquals(n, note)), Is.EqualTo(1));
 
             advance(3301);
             Playfield.UpdateSubTree();
             advance(2999);
             Playfield.UpdateSubTree();
             recorder.Mark("rewind.restored");
-            Assert.That(((BmsColumn)Playfield.Stage.Columns[0]).Judgements.FirstPendingHead?.HitObject.StartTime, Is.EqualTo(3000));
+            Assert.That(context.FirstPendingNote?.StartTime, Is.EqualTo(3000));
             assertRevertObservations(requireDrawable: true);
             advance(3000);
             Playfield.UpdateSubTree();
@@ -163,13 +172,14 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
         {
             startRecording();
             var column = (BmsColumn)Playfield.Stage.Columns[1];
-            var drawable = column.Judgements.FirstPendingHead!;
+            var note = column.Judgements.FirstPendingNote!;
+            var drawable = column.JudgementOutput.GetRepresentation(note);
             var result = drawable.Result;
             var entry = drawable.Entry;
             drawable.HitObject.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             Assert.That(drawable.Entry, Is.SameAs(entry));
             Assert.That(drawable.Result, Is.SameAs(result));
-            Assert.That(column.Judgements.FirstPendingHead, Is.SameAs(drawable));
+            Assert.That(column.Judgements.FirstPendingNote, Is.SameAs(note));
             Assert.That(recorder!.Rows.Any(r => r.Contains("/representation.killed")), Is.False);
             advance(3000);
             press();
@@ -177,7 +187,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             advance(2999);
             Playfield.UpdateSubTree();
             recorder.Mark("rewind.restored");
-            Assert.That(column.Judgements.FirstPendingHead?.HitObject.StartTime, Is.EqualTo(3000));
+            Assert.That(column.Judgements.FirstPendingNote?.StartTime, Is.EqualTo(3000));
             assertRevertObservations(requireDrawable: false);
             finishRecording("lifecycle-note");
         }));
@@ -229,8 +239,9 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             Assert.That(rows.Where(r => r[4].EndsWith("/input.queue>")).Select(r => r[5]), Is.EqualTo(inputTimes));
             Assert.That(rows.Any(r => r[4].EndsWith("/column.deferred>")), Is.True);
             Assert.That(rows.Any(r => r[4] == "frame.end/playfield.update>"), Is.True);
-            Assert.That(rows.Any(r => r[4] == "playfield.update/auto>"), Is.True);
+            Assert.That(rows.Any(r => r[4] == "batch/auto>"), Is.True);
             var autoCalls = rows.Where(r => r[4].EndsWith("/auto>")).ToArray();
+            Assert.That(autoCalls.All(r => r[4] == "batch/auto>"), Is.True, "Automation belongs to simulation batches.");
             TestContext.WriteLine("P3A0_REPLAY " + JsonSerializer.Serialize(new
             {
                 inputs = rows.Where(r => r[4].EndsWith("/input.queue>")).Select(r => new { frame = r[1], step = r[2], time = r[5], args = r[11] }),
@@ -291,7 +302,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
 
     private void startRecording()
     {
-        recorder = new BmsJudgementCheckpointRecorder(Playfield, (BmsScoreProcessor)Player.ScoreProcessor, (BmsHealthProcessor)Player.HealthProcessor)
+        recorder = new BmsCoreSchedulingRecorder(Playfield, (BmsScoreProcessor)Player.ScoreProcessor, (BmsHealthProcessor)Player.HealthProcessor, observeAutomation: true)
         {
             Recording = true,
         };
@@ -322,8 +333,28 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
                            ?? throw new InvalidDataException("Missing P3 checkpoint baseline.");
         using var baseline = JsonDocument.Parse(stream);
         Assert.That(baseline.RootElement.GetProperty("traces").TryGetProperty(scenario, out var expected), Is.True, "Missing old-path scenario " + scenario);
-        Assert.That(recorder.Rows, Is.EqualTo(expected.EnumerateArray().Select(r => r.GetString()).ToArray()), "Ordered P3 checkpoint baseline.");
+        var historical = expected.EnumerateArray().Select(r => r.GetString()!.Split('|')).ToArray();
+        if (scenario.StartsWith("traversal-"))
+        {
+            var wasDeferred = scenario.EndsWith("True");
+            Assert.That(historical.First(r => r[4].EndsWith("/result.notify=") && r[8] == "0")[5],
+                Is.EqualTo(wasDeferred ? "3003" : "3000"), "Preserve the original AS-1 evidence instead of replacing its fixture.");
+            if (mode == BmsLongNoteMode.HellChargeNote)
+                Assert.That(historical.Count(r => r[4].EndsWith("/body.tick>") && r[5] == "3202"), Is.EqualTo(wasDeferred ? 0 : 1));
+        }
+        else
+            Assert.That(markers(recorder.Rows.Select(r => r.Split('|'))), Is.EqualTo(markers(historical)),
+                "Historical lifecycle markers retain pending objects, active holds and score/health state.");
     }
+
+    private static string[] markers(System.Collections.Generic.IEnumerable<string[]> rows)
+        => rows.Where(r => r[4].StartsWith("host/") && r[4].EndsWith('=')).Select(r => string.Join('|', r[4], r[5], r[14], r[15], r[16])).ToArray();
+
+    private static string[] observableRows(System.Collections.Generic.IEnumerable<string> rows)
+        => rows.Select(r => r.Split('|'))
+               .Where(r => r[4].EndsWith("/result.notify=") || r[4].EndsWith("/endpoint>") || r[4].EndsWith("/endpoint<")
+                           || r[4].EndsWith("/keysound>") || r[4].EndsWith("/body.tick>") || r[4].EndsWith("/body.tick<"))
+               .Select(r => string.Join('|', r[4].Split('/')[^1], r[5], r[7], r[8], r[11], r[12], r[13], r[16])).ToArray();
 
     [TearDown]
     public void StopCheckpointProbes() => stopRecording();

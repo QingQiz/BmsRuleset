@@ -124,11 +124,7 @@ public partial class TestSceneBmsChargeNoteExecution : BmsPlayerTestScene
             var recorded = new BmsJudgementEngine([note], Playfield.LayoutVariant, columnIndex, !mixed, output).GetColumn(columnIndex);
             recorded.ActivateNote(note);
             output.Feedback = recordedTrace.Add;
-            output.BeforeResultCheckpoint = (source, frame) =>
-            {
-                recorded.RecordResult(source, frame.SimulationTime);
-                recordedTrace.Add(snapshot("main.before", true));
-            };
+            output.BeforeResultCheckpoint = (_, _) => recordedTrace.Add(snapshot("main.before", true));
             output.AfterResultCheckpoint = (_, _) => recordedTrace.Add(snapshot("main.after", true));
             var recordedHeadPublished = false;
             output.StatePublished = (_, state, _) =>
@@ -340,13 +336,13 @@ public partial class TestSceneBmsChargeNoteExecution : BmsPlayerTestScene
             void press(double simulation, double input, bool reverse = false)
             {
                 advance(simulation);
-                Assert.That(column.HandlePress(input, reverse), Is.EqualTo(recorded.HandleNotePress(new BmsPressContext(input, frame(), reverse))));
+                Assert.That(PressColumn(column, input, reverse), Is.EqualTo(recorded.HandleNotePress(new BmsPressContext(input, frame(), reverse))));
                 mark($"press:{input}:{simulation}");
             }
             void release(double simulation, double input, double rate)
             {
                 advance(simulation, rate);
-                column.HandleRelease(input);
+                ReleaseColumn(column, input);
                 recorded.HandleExecutionRelease(input, frame());
                 mark($"release:{input}:{simulation}");
             }

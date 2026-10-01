@@ -161,7 +161,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         AddStep("hold head and vary only the visual projection", () =>
         {
             var column = (BmsColumn)Playfield.Stage.Columns[1];
-            column.HandlePress(5000);
+            PressColumn(column, 5000);
             var note = (BmsLongNote)hitObject;
             var state = column.Judgements.GetLongNoteState(note);
             var result = drawable.Result.Type;
@@ -206,7 +206,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         AddUntilStep("visible with fresh position", () => drawable.IsPresent && drawable.Y < 0 && drawable.Y > -drawable.Parent!.DrawHeight);
         hide();
         seek(5000);
-        AddStep("press while culled", () => Playfield.Stage.Columns[1].HandlePress(5000));
+        AddStep("press while culled", () => PressColumn(Playfield.Stage.Columns[1], 5000));
         AddAssert("input judged perfectly", () => Player.Results.Any(r => r.HitObject == hitObject && r.Type == HitResult.Perfect));
     }
 
@@ -240,7 +240,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         AddStep("capture head poor health", () => healthAfterHead = Player.HealthProcessor.Health.Value);
         seek(5700);
         AddAssert("culled body drains health", () => Player.HealthProcessor.Health.Value < healthAfterHead);
-        AddStep("hold culled HCN", () => Playfield.Stage.Columns[1].HandlePress(5700));
+        AddStep("hold culled HCN", () => PressColumn(Playfield.Stage.Columns[1], 5700));
         var releasedHealth = 0d;
         AddStep("capture released health", () => releasedHealth = Player.HealthProcessor.Health.Value);
         seek(6300);
