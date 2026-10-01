@@ -31,6 +31,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [HeadlessTest]
 [NonParallelizable]
+[Category("JudgementInstrumentation")]
 public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScene
 {
     public enum Kind { Note, LN, CN, HCN }

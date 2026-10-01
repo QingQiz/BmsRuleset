@@ -38,6 +38,7 @@ using osu.Game.Tests.Visual;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [HeadlessTest]
+[Category("JudgementInstrumentation")]
 public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
 {
     private const int note_count = 512;
@@ -402,11 +403,14 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
                 Player.Results.Clear();
                 probe = new ScopedMethodProbe(typeof(BmsColumnHitObjectContainer).GetMethod("UpdateAfterChildrenLife", BindingFlags.Instance | BindingFlags.NonPublic),
                     typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countColumnTraversal), BindingFlags.Static | BindingFlags.NonPublic));
-                maskingProbe = new ScopedMethodProbe(typeof(CompositeDrawable).GetMethod(nameof(CompositeDrawable.UpdateSubTreeMasking)),
-                    typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countMasking), BindingFlags.Static | BindingFlags.NonPublic));
                 // Hit objects bypass CompositeDrawable's masking method, so they need their own probe.
                 noteMaskingProbe = new ScopedMethodProbe(typeof(DrawableHitObject).GetMethod(nameof(DrawableHitObject.UpdateSubTreeMasking)),
                     typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countMasking), BindingFlags.Static | BindingFlags.NonPublic));
+                maskingProbe = new ScopedMethodProbe(typeof(CompositeDrawable).GetMethod(nameof(CompositeDrawable.UpdateSubTreeMasking)),
+                    typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countMasking), BindingFlags.Static | BindingFlags.NonPublic));
+                noteMaskingTraversals.Reset();
+                Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().First().UpdateSubTreeMasking();
+                Assert.That(noteMaskingTraversals.MaxPerFrame, Is.EqualTo(1), "Observe a live note before measuring the burst.");
                 columnTraversals.Reset();
                 noteMaskingTraversals.Reset();
                 explosionMaskingTraversals.Reset();
@@ -430,7 +434,8 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
                         .Max(e => Math.Abs(e.TimeOffset)), Is.LessThan(0.000001));
             });
             AddAssert("each column is traversed at most once per game frame", () => columnTraversals.MaxPerFrame, () => Is.EqualTo(1));
-            AddAssert("each note is masked at most once per game frame", () => noteMaskingTraversals.MaxPerFrame, () => Is.EqualTo(1));
+            // A fast catch-up can retire all taps before the first outer masking pass.
+            AddAssert("each note is masked at most once per game frame", () => noteMaskingTraversals.MaxPerFrame, () => Is.LessThanOrEqualTo(1));
             AddAssert("each overlapping pulse is masked at most once per game frame", () => explosionMaskingTraversals.MaxPerFrame, () => Is.EqualTo(1));
         }
     }

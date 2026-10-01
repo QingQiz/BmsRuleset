@@ -1,5 +1,6 @@
 #nullable enable
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
@@ -8,6 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Screens.Play;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -66,15 +68,28 @@ public partial class TestSceneBmsPauseRewindLongNote : BmsPlayerTestScene
         AddStep("judge long note tail", () => ReleaseColumn(Playfield.Stage.Columns[2], hitObject.EndTime));
         AddAssert("long note judged", () => longNote!.Judged);
 
-        AddStep("seek to pause time", () =>
+        AddStep("pause at fixed boundary", () =>
         {
             Player.GameplayClockContainer.Seek(pause_time);
             Player.GameplayClockContainer.Start();
+            Assert.That(Player.Pause(), Is.True);
         });
-        AddStep("pause", () => Player.Pause());
         AddStep("resume", () => Player.Resume());
-        AddUntilStep("resume rewind active", () => Playfield.IsResumeRewinding);
-        AddUntilStep("completed long note restored to lifetime", () => Playfield.AllColumnAliveObjects().Any(drawable => drawable.HitObject is BmsLongNote));
+        AddUntilStep("freeze resume rewind", () =>
+        {
+            if (!Playfield.IsResumeRewinding) return false;
+            // Loading and instrumentation can outlast this note's short reactivation window.
+            typeof(GameplayClockContainer).GetMethod("StopGameplayClock", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(Player.GameplayClockContainer, null);
+            Player.GameplayClockContainer.Seek(Playfield.ResumeRewindStartTime);
+            return true;
+        });
+        AddUntilStep("completed long note restored to lifetime", () =>
+        {
+            longNote = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>()
+                .SingleOrDefault(drawable => ReferenceEquals(drawable.HitObject, hitObject));
+            return longNote != null;
+        });
         AddWaitStep("allow drawable transforms", 2);
         AddAssert("rewind remains active", () => Playfield.IsResumeRewinding);
         AddAssert("judgement survives rewind", () => longNote!.Judged);

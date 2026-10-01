@@ -24,6 +24,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [HeadlessTest]
 [NonParallelizable]
+[Category("JudgementInstrumentation")]
 public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
 {
     private BmsLongNoteMode mode;

@@ -14,7 +14,7 @@
 
 当前在 `codex/hitobject-judgement-refactor` 分支完成核心、Mod 与生产消费者迁移。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次。列上下文已移除 Drawable、容器及图形时钟依赖，表示绑定与生命周期通知归入现有输出适配。各绘制子类组合自己的图形，容器提供共享视觉帧，由长按计算头尾布局。纯视觉观测已独立登记并按表示代次解绑，布局读取固定头位置和方向历史。收尾去重已从 `LastPostTime` 迁到绑定内的调度代次/模拟步骤。生产及完整测试项目 Release 构建均为 0 警告、0 错误。
 
-剩余测试消费者已直接迁到最终入口，旧 Controller 记录器已删除；Note、LN、CN、HCN 执行测试使用正式框架出口与记录出口对照。AutoScratch 已迁到核心模拟步骤，Mod 注册已恢复，新增纯引擎自动头尾、回退、重绑定和暂停恢复测试。共享记录器覆盖自动化并保留原 AS-1 fixture。当前进入统一定向回归、完整调度矩阵、Git 旧版对照及性能验收；当前树尚未执行运行时测试。先前 634 项通过仅属于生命周期检查点 `e1de0257`，不能作为最终迁移的验收结果。
+测试消费者已直接迁到最终入口，旧 Controller 记录器已删除；Note、LN、CN、HCN 执行测试使用正式框架出口与记录出口对照。AutoScratch 已迁到核心模拟步骤，Mod 注册已恢复，新增纯引擎自动头尾、回退、重绑定和暂停恢复测试。共享记录器覆盖自动化并保留原 AS-1 fixture。运行时回归和 Git 对照已推进到最终接口，结果见[证据记录](#handoff-evidence)；性能仍等待许可后测量。先前 634 项通过仅属于生命周期检查点 `e1de0257`。已建立永久[判定引擎开发文档](judgement-engine.md)，方案清理和最终集成留到验收完成后。
 
 快速导航：[实施顺序](#implementation-order) · [目标架构](#target-structure) · [生命周期](#state-lifecycle) · [调度](#scheduling-contracts) · [Git 对照](#git-comparison) · [验收](#behaviour-acceptance) · [验证命令](#verification-commands) · [完成条件](#completion)。
 
@@ -711,6 +711,8 @@ AS-1 的迁移决定：自动演奏随每个模拟步骤执行，固定在物理
 <a id="verification-commands"></a>
 
 ## 验证入口与命令
+
+当前完整范围入口为 `./scripts/verify-judgement-migration.ps1`，复用已还原依赖和现有 sibling 程序集，所有测试均带 `--filter`，拒绝零匹配、失败或跳过。普通回归使用默认 JIT；`JudgementInstrumentation` 分类在独立进程使用 `judgement-instrumentation.runsettings` 禁用方法内联，以保留运行时探针边界。新旧 Git 对照必须采用相同配置，性能测试不使用此配置。测试记录器直接观察实际血量 tick 并校验事件时间；不再通过层层无操作探针重编译调用者来避免预热漏记。
 
 以下为核心完整实现后的验证模板。先按[构建说明](development.md#build-manually)准备同版引用程序集和还原结果，再构建两个工作树各自的项目。共享 `../osu`、`../osu-framework`、`../rulesets` 只读；若需要自行构建依赖，使用独立副本与显式路径。
 

@@ -29,6 +29,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [HeadlessTest]
 [NonParallelizable]
+[Category("JudgementInstrumentation")]
 public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
 {
     public enum Scenario { HeadPoor, SuccessfulTail, LargeElapsed, ScratchTail }

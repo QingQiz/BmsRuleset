@@ -97,7 +97,8 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             probe(typeof(BmsColumnJudgementContext), "RestoreExecutionState", "index.rebuild");
             probe(typeof(BmsHellChargeNoteJudgementRule), "updateBody", "body.sample");
             probe(typeof(BmsColumn), "PlaySample", "keysound");
-            probe(typeof(BmsPlayfield), "ApplyHellChargeTick", "body.tick");
+            // Observe the actual effect; the playfield's expression-bodied forwarding call can be inlined.
+            probe(typeof(BmsHealthProcessor), "ApplyHellChargeTick", "body.tick");
             probe(typeof(BmsPlayfield), "ApplySyntheticLongNoteEndpoint", "endpoint");
             probe(typeof(DrawableHitObject), "onDefaultsApplied", "defaults");
             probe(typeof(DrawableHitObject), "OnApply", "representation.apply", [typeof(HitObjectLifetimeEntry)]);
@@ -105,46 +106,6 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             probe(typeof(DrawableHitObject), "OnKilled", "representation.killed");
             probe(typeof(DrawableBmsHitObject), "OnKilled", "representation.killed");
             probe(typeof(Playfield), "revertResult", "result.revert");
-            // Rebuild callers after their leaves so warmed, inlined rules retain observable checkpoints.
-            foreach (var method in new[] { "ApplyBodyTick", "ApplySyntheticEndpoint", "PlaySample", "PlayTailSample" })
-                refreshCaller(typeof(BmsDrawableJudgementOutput), method);
-            foreach (var method in new[] { "ApplyBodyTick", "ApplySyntheticEndpoint" })
-                refreshCaller(typeof(BmsJudgementExecutionContext), method);
-            refreshCaller(typeof(BmsHellChargeBodyTracker), "Update");
-            foreach (var type in ruleTypes)
-            {
-                refreshCaller(type, "TryPress");
-                refreshCaller(type, "CheckPassive");
-                refreshCaller(type, "Finish");
-            }
-            refreshCaller(typeof(BmsHellChargeNoteJudgementRule), "UpdateBody");
-            foreach (var type in typeof(BmsColumnJudgementContext).GetNestedTypes(BindingFlags.NonPublic)
-                         .Where(t => t.Name.EndsWith("NoteOperations")))
-                foreach (var method in new[] { "Press", "Passive", "Repress", "Release", "Finish", "AutomaticTail" })
-                    refreshCaller(type, method);
-            refreshCaller(typeof(BmsColumnJudgementContext), "UpdateRegisteredBodies");
-            refreshCaller(typeof(BmsCoreJudgementSchedule), "updateLongNote");
-            // Tiered framework callers can devirtualise CheckForResult before this scope observes it.
-            refreshCaller(typeof(DrawableHitObject), "UpdateResult");
-            refreshCaller(typeof(DrawableHitObject), "UpdateAfterChildren");
-            refreshCaller(typeof(DrawableHitObject), "OnKilled");
-            refreshCaller(typeof(BmsColumnHitObjectContainer), "UpdateAfterChildrenLife");
-            refreshCaller(typeof(BmsColumnHitObjectContainer), "UpdateDeferredFrame");
-            refreshCaller(typeof(BmsColumnHitObjectContainer), "EndGameplayFrame");
-            refreshCaller(typeof(BmsJudgementEngine), "ProcessFrame");
-            refreshCaller(typeof(BmsPlayfield), "processJudgementFrame");
-            // Replay frame tests can warm input forwarding before QueueInput is observed.
-            // Its closed generic parent may also inline the replay leaf before this scope starts.
-            refreshCaller(typeof(FramedReplayInputHandler<BmsReplayFrame>), "CollectPendingInputs");
-            refreshCaller(typeof(BmsPlayfield), "OnPressed");
-            refreshCaller(typeof(BmsPlayfield), "OnReleased");
-            refreshCaller(typeof(BmsPlayfield), "BeginGameplayFrame");
-            refreshCaller(typeof(BmsPlayfield), "Update");
-            refreshCaller(typeof(BmsPlayfield), "UpdateSubTree");
-            refreshCaller(typeof(BmsPlayfield), "EndGameplayFrame");
-            // The real replay host can inline EndGameplayFrame, hiding its source even while the final traversal runs.
-            refreshCaller(typeof(BmsDrawableRuleset), "Update");
-            refreshCaller(typeof(BmsDrawableRuleset), "UpdateAfterChildren");
             playfield.NewResult += newResult;
             playfield.RevertResult += revertResult;
         }
@@ -166,19 +127,6 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         probes.Add(new ScopedMethodProbe(target,
             typeof(BmsCoreSchedulingRecorder).GetMethod(nameof(before), BindingFlags.Static | BindingFlags.NonPublic),
             typeof(BmsCoreSchedulingRecorder).GetMethod(nameof(after), BindingFlags.Static | BindingFlags.NonPublic)));
-    }
-
-    private void refreshCaller(Type type, string method)
-    {
-        var targets = type.GetMethods(instance | BindingFlags.Static).Where(m => m.Name == method).ToArray();
-        if (targets.Length == 0) throw new MissingMethodException(type.FullName, method);
-        foreach (var target in targets)
-            probes.Add(new ScopedMethodProbe(target,
-                typeof(BmsCoreSchedulingRecorder).GetMethod(nameof(keepCallBoundary), BindingFlags.Static | BindingFlags.NonPublic)));
-    }
-
-    private static void keepCallBoundary()
-    {
     }
 
     private static void before(object __instance, MethodBase __originalMethod, object[] __args, out bool __state)
@@ -228,6 +176,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
     private bool owns(object value, object[] args) => value switch
     {
         BmsPlayfield field => ReferenceEquals(field, playfield),
+        BmsHealthProcessor processor => ReferenceEquals(processor, health),
         BmsColumn column => column.Index < 2 && ReferenceEquals(playfield.Stage.Columns[column.Index], column),
         BmsColumnHitObjectContainer container => playfield.Stage.Columns.Take(2).Any(c => ReferenceEquals(c.HitObjectContainer, container)),
         BmsColumnJudgementContext context => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.Judgements, context)),
@@ -302,6 +251,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         // Preserve the frozen trace schema while numerical contexts replace clock-dependent arguments.
         if (name == "batch") argumentText = "suppressJudgements=" + format(args.OfType<bool>().First());
         if (name == "bodies") argumentText = "holding=" + format(args.OfType<bool>().Single());
+        if (name == "body.tick") argumentText = "holding=" + format(args[0]) + ",scale=" + format(args[1]);
         // The suppression flag moved from the playfield into the core; the baseline encoded only endpoint data here.
         if (name == "endpoint") argumentText = "";
         if (name == "body.sample") argumentText = "currentTime=" + format(args.OfType<BmsFrameContext>().Single().SimulationTime) + "," + argumentText;

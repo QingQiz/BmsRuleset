@@ -8,6 +8,7 @@ using System.Text.Json;
 using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
@@ -34,6 +35,7 @@ internal sealed class BmsGitComparisonRecorder : IDisposable
     private int results;
     private int samples;
     private int ticks;
+    private int hitLights;
     private int reverts;
 
     internal BmsGitComparisonRecorder(BmsPlayfield playfield, ScoreProcessor score, HealthProcessor health)
@@ -49,20 +51,9 @@ internal sealed class BmsGitComparisonRecorder : IDisposable
             foreach (var name in new[] { "PlaySample", "PlayKeySound" })
                 probe(typeof(BmsColumnKeySound).GetMethod(name, instance)!);
             probe(typeof(BmsColumn).GetMethod("TriggerHitExplosion", instance)!);
-            foreach (var name in new[] { "ApplySyntheticLongNoteEndpoint", "ApplyHellChargeTick", "RegisterNonConsumingBad", "RegisterEmptyPoor", "requestJudgementDisplay" })
+            foreach (var name in new[] { "ApplySyntheticLongNoteEndpoint", "RegisterNonConsumingBad", "RegisterEmptyPoor", "requestJudgementDisplay" })
                 probe(typeof(BmsPlayfield).GetMethod(name, instance | BindingFlags.IgnoreCase)!);
-            // These adapters can have inlined the sampled leaf before the observer is installed.
-            foreach (var type in new[] { typeof(BmsPlayfield), typeof(BmsColumn), typeof(BmsColumnKeySound) }
-                         .Concat(typeof(BmsPlayfield).Assembly.GetTypes().Where(t => !t.ContainsGenericParameters &&
-                             (t.Name is "BmsDrawableJudgementOutput" or "BmsJudgementExecutionContext" || t.Name.EndsWith("NoteOperations"))))
-                         .Concat(playfield.AllColumnAliveObjects().Select(d => d.GetType()).Distinct()))
-            {
-                foreach (var method in type.GetMethods(instance | BindingFlags.DeclaredOnly).Where(m => !m.IsSpecialName && !m.IsAbstract &&
-                             m.Name is "TryHit" or "TryPress" or "TryRelease" or "TryRepress" or "Press" or "Release" or "Repress"
-                                 or "AutomaticTail" or "PlayTailSample" or "PublishState" or "onNewResult" or "applyMainResult" or "PlaySample" or "PlayKeySound" or "PlayLandmineSound"
-                                 or "HandlePress" or "HandleRelease" or "ApplySyntheticEndpoint" or "ApplyBodyTick" or "ApplyMainResult"))
-                    probes.Add(new ScopedMethodProbe(method, typeof(BmsGitComparisonRecorder).GetMethod(nameof(keepBoundary), BindingFlags.Static | BindingFlags.NonPublic)!));
-            }
+            probe(typeof(BmsHealthProcessor).GetMethod("ApplyHellChargeTick", instance)!);
             playfield.NewResult += newResult;
             playfield.RevertResult += revert;
         }
@@ -73,7 +64,6 @@ internal sealed class BmsGitComparisonRecorder : IDisposable
         typeof(BmsGitComparisonRecorder).GetMethod(nameof(before), BindingFlags.Static | BindingFlags.NonPublic),
         typeof(BmsGitComparisonRecorder).GetMethod(nameof(after), BindingFlags.Static | BindingFlags.NonPublic)));
 
-    private static void keepBoundary() { }
     private static void before(object __instance, MethodBase __originalMethod, object[] __args) => current?.observe(__instance, __originalMethod.Name, __args, false);
     private static void after(object __instance, MethodBase __originalMethod, object[] __args) => current?.observe(__instance, __originalMethod.Name, __args, true);
 
@@ -81,6 +71,7 @@ internal sealed class BmsGitComparisonRecorder : IDisposable
     {
         if (source is BmsColumn column && !ReferenceEquals(playfield.Stage.Columns[column.Index], column)) return;
         if (source is BmsPlayfield field && !ReferenceEquals(field, playfield)) return;
+        if (source is BmsHealthProcessor processor && !ReferenceEquals(processor, health)) return;
         var columnIndex = (source as BmsColumn)?.Index;
         if (source is BmsColumnKeySound)
         {
@@ -90,7 +81,12 @@ internal sealed class BmsGitComparisonRecorder : IDisposable
         if (name == "registerEmptyPoor") name = "RegisterEmptyPoor";
         if (!after && name == "PlaySample") samples++;
         if (!after && name == "ApplyHellChargeTick") ticks++;
-        var args = arguments.Where(a => name != "ApplySyntheticLongNoteEndpoint" || a is BmsLongNoteEndpointResult)
+        if (!after && name == "TriggerHitExplosion") hitLights++;
+        // The playfield forwards exactly this time; retain that contract when observing the health effect directly.
+        if (source is BmsHealthProcessor)
+            Assert.That(arguments[2], Is.EqualTo(playfield.Time.Current));
+        var observedArguments = source is BmsHealthProcessor ? arguments.Take(2) : arguments;
+        var args = observedArguments.Where(a => name != "ApplySyntheticLongNoteEndpoint" || a is BmsLongNoteEndpointResult)
             .Select(a => a is BmsLongNoteEndpointResult e ? endpoint(e)
                 : name == "TriggerHitExplosion" ? a is bool hold ? hold ? "Hold" : "Note" : a.ToString() : a).ToArray();
         record(name + (after ? ".after" : ".before"), new { Column = columnIndex, Arguments = args });
@@ -160,6 +156,9 @@ internal sealed class BmsGitComparisonRecorder : IDisposable
         Assert.That(results, Is.GreaterThan(0), "The scenario must submit actual framework results.");
         Assert.That(samples, Is.GreaterThan(0), "The audio observer must see actual sample requests.");
         Assert.That(reverts, Is.GreaterThan(0), "The scenario must restore the framework result stack.");
+        Assert.That(hitLights, Is.GreaterThan(0), "The feedback observer must see actual hit-light requests after warmup.");
+        if (playfield.Beatmap.LockedLongNoteMode == BmsLongNoteMode.HellChargeNote)
+            Assert.That(ticks, Is.GreaterThan(0), "The body observer must see actual HCN ticks after warmup.");
         var json = JsonSerializer.Serialize(new { Scenario = scenario, Results = results, Samples = samples, Ticks = ticks, Reverts = reverts, Rows = rows, Visuals = visuals });
         var directory = Environment.GetEnvironmentVariable("BMS_COMPARISON_RESULTS");
         if (!string.IsNullOrEmpty(directory))

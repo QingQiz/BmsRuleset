@@ -32,6 +32,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 // Keep this scene and its observer portable to the pre-refactor checkout: only host inputs and outputs are shared.
 [HeadlessTest, NonParallelizable]
+[Category("JudgementInstrumentation")]
 public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
 {
     private const BindingFlags instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;

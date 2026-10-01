@@ -21,6 +21,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [HeadlessTest]
 [NonParallelizable]
+[Category("JudgementInstrumentation")]
 public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
 {
     private const int future_note_count = 128;

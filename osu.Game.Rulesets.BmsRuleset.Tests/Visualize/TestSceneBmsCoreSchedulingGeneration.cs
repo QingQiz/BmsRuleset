@@ -33,6 +33,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [HeadlessTest]
 [NonParallelizable]
+[Category("JudgementInstrumentation")]
 public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
 {
     private const BindingFlags instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;

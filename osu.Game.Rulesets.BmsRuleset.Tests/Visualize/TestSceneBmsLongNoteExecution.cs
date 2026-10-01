@@ -32,6 +32,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 [HeadlessTest]
 [NonParallelizable]
+[Category("JudgementInstrumentation")]
 public partial class TestSceneBmsLongNoteExecution : BmsPlayerTestScene
 {
     public enum Scenario
