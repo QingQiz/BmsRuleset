@@ -2,7 +2,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Input.Bindings;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Configuration;

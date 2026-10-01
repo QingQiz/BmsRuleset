@@ -1,8 +1,8 @@
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Course;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Course;
 
@@ -46,7 +46,7 @@ public class BmsCourseCatalogTest
     [Test]
     public void TestDifficultyTableCoursesAreConvertedWithChartMetadata()
     {
-        var table = new Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+        var table = new Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable
         {
             Name = "Satellite",
             Symbol = "sl",
@@ -122,7 +122,7 @@ public class BmsCourseCatalogTest
     {
         var previousStore = BmsRulesetRuntime.DifficultyTableStore;
         var store = new DifficultyTableStore(null, Path.Combine(TestContext.CurrentContext.WorkDirectory, "course-store"));
-        var table = new Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+        var table = new Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable
         {
             Name = "Runtime Table",
             SourcePath = "runtime-table",

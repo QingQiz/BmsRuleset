@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using osu.Game.Rulesets.BmsRuleset.Difficulty;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 

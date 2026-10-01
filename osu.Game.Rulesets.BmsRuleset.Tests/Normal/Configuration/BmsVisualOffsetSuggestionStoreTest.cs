@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Configuration;
 

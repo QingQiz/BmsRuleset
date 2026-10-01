@@ -1,4 +1,3 @@
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -7,7 +6,6 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 

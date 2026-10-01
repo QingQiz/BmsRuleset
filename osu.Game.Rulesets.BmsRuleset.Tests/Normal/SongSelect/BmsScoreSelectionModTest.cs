@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Scoring;
 using osu.Game.Rulesets.Mods;

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
@@ -74,12 +74,13 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     }
 
     internal DrawableBmsHitObject GetRepresentation(BmsHitObject note)
-        => representations.TryGetValue(note, out var binding) && isCurrent(binding) ? binding.Drawable
+        => representations.TryGetValue(note, out var binding) && isCurrent(binding)
+            ? binding.Drawable
             : throw new InvalidOperationException("A main result requires the current representation.");
 
     private bool isCurrent(Binding binding)
         => binding.Drawable.BindingGeneration == binding.Generation && ReferenceEquals(binding.Drawable.HitObject, binding.Note)
-            && boundObjects.TryGetValue(binding.Drawable, out var current) && ReferenceEquals(current, binding);
+                                                                    && boundObjects.TryGetValue(binding.Drawable, out var current) && ReferenceEquals(current, binding);
 
     private sealed class Binding
     {
@@ -94,7 +95,10 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
             Drawable = drawable;
             Generation = generation;
             // A captured callback can outlive OnFree when the same drawable already represents another object.
-            ResultHandler = (_, _) => { if (output.isCurrent(this)) output.resultCheckpoint(Note); };
+            ResultHandler = (_, _) =>
+            {
+                if (output.isCurrent(this)) output.resultCheckpoint(Note);
+            };
         }
     }
 
@@ -102,6 +106,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     {
         if (!results.TryGetValue(note, out var result))
             throw new InvalidOperationException("The framework has not supplied this note's result.");
+
         return new BmsMainResultState(result.Type, result.TimeAbsolute, result.TimeOffset, result.GameplayRate, result.SuppressPenalty);
     }
 
@@ -185,12 +190,17 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     {
         if (playfield.Time.Current != frame.SimulationTime)
             throw new InvalidOperationException("Supplementary results must use the current application time.");
+
         playfield.RegisterNonConsumingBad(note.StartTime, note.Column);
     }
 
     public void PlaySample(BmsHitObject note) => column.PlaySample(note.SampleKey, note.SampleVolume);
+
     public void PlayTailSample(BmsLongNote note) => column.PlaySample(note.TailSampleKey, note.TailSampleVolume);
+
     public void PlayKeySound() => column.PlayKeySound();
+
     public void ApplyEmptyPoor(double expectedTime, int columnIndex, in BmsFrameContext frame) => playfield.RegisterEmptyPoor(expectedTime, columnIndex);
+
     public void PlayLandmineSample(BmsLandmine note) => column.DetonateLandmine(note);
 }

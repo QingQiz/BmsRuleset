@@ -9,7 +9,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Difficulty;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mods;
@@ -101,7 +102,7 @@ public class BmsDifficultyPerformanceRegressionTest
     {
         var beatmap = CreateBeatmap(24, columns);
         var calculator = new BmsDifficultyCalculator(new BmsRuleset().RulesetInfo, new PlayableWorkingBeatmap(beatmap));
-        var mod = new osu.Game.Rulesets.BmsRuleset.Mods.BmsModDoubleTime { SpeedChange = { Value = rate } };
+        var mod = new BmsModDoubleTime { SpeedChange = { Value = rate } };
         var actual = calculator.CalculateTimed([mod]);
         for (var i = 0; i < actual.Count; i++)
         {

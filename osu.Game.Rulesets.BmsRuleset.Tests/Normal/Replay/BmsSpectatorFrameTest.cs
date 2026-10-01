@@ -2,8 +2,8 @@ using NUnit.Framework;
 using osu.Game.Online;
 using osu.Game.Online.Spectator;
 using osu.Game.Replays.Legacy;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Replays;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Replay;
 

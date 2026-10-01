@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Configuration;
 using osu.Framework.Localisation;
-using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Localisation;

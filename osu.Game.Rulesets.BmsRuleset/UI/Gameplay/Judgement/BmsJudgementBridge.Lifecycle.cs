@@ -1,5 +1,4 @@
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
-using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -12,7 +11,9 @@ internal sealed partial class BmsJudgementBridge
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsScheduledObject Handle)> scheduledRepresentations = [];
     private readonly List<BmsHitObject> activationOrder = [];
     private readonly List<BmsLandmine> landmineOrder = [];
+
     private BmsColumnJudgementRuntime context => column.Judgements;
+
     private BmsColumnHitObjectContainer container => (BmsColumnHitObjectContainer)column.HitObjectContainer;
 
     internal void ObserveVisualTime(DrawableBmsHitObject drawable, BmsVisualTimeObserver observer)
@@ -23,12 +24,14 @@ internal sealed partial class BmsJudgementBridge
 
     internal bool TryGetScheduledObject(DrawableBmsHitObject drawable, out BmsScheduledObject item)
     {
-        if (scheduledRepresentations.TryGetValue(drawable, out var binding) && binding.Generation == drawable.BindingGeneration
+        if (scheduledRepresentations.TryGetValue(drawable, out var binding)
+            && binding.Generation == drawable.BindingGeneration
             && ReferenceEquals(binding.Handle.Object, drawable.HitObject))
         {
             item = binding.Handle;
             return true;
         }
+
         item = default;
         return false;
     }
@@ -49,6 +52,7 @@ internal sealed partial class BmsJudgementBridge
             if (drawable is DrawableBmsHitObject bms)
                 bms.RestoreRewoundVisuals();
         }
+
         context.RestoreExecutionState(frame);
     }
 
@@ -67,6 +71,7 @@ internal sealed partial class BmsJudgementBridge
         }
         else
             return;
+
         refreshActiveOrder();
     }
 
@@ -77,7 +82,9 @@ internal sealed partial class BmsJudgementBridge
             context.RemoveLandmine(mine);
             return;
         }
+
         if (drawable.HitObject is not (BmsNote or BmsLongNote)) return;
+
         context.BeginNoteRemoval(drawable.HitObject);
         if (TryGetScheduledObject(drawable, out var scheduled)) context.Schedule.BeginRemoval(scheduled);
         refreshActiveOrder();
@@ -93,6 +100,7 @@ internal sealed partial class BmsJudgementBridge
             scheduledRepresentations.Remove(drawable);
             context.Schedule.Unbind(binding.Handle);
         }
+
         Unbind(drawable, generation);
     }
 
@@ -104,6 +112,7 @@ internal sealed partial class BmsJudgementBridge
             if (context.IsLandmineActive(mine)) Bind(drawable);
             return;
         }
+
         // Reapply has no AddDrawable callback. Replace only the binding, retaining ordering and histories.
         if (context.IsNoteActive(note))
         {
@@ -111,6 +120,7 @@ internal sealed partial class BmsJudgementBridge
             bindScheduledRepresentation(drawable);
             container.InvalidateCoreOrder();
         }
+
         context.RefreshNoteConfiguration(note, column.PreserveLongNoteHistory);
     }
 
@@ -124,6 +134,7 @@ internal sealed partial class BmsJudgementBridge
             if (drawable.HitObject is BmsLandmine mine && context.IsLandmineActive(mine)) landmineOrder.Add(mine);
             if (drawable.HitObject is BmsHitObject note && context.IsNoteActive(note)) activationOrder.Add(note);
         }
+
         context.SetNoteActivationOrder(activationOrder);
         context.SetLandmineActivationOrder(landmineOrder);
     }
