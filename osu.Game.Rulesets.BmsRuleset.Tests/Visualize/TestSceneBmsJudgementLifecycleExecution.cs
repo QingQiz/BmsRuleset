@@ -42,7 +42,6 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     private bool pmsFixture;
     private int columnIndex => scratch ? 0 : 1;
     private static readonly BindingFlags instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-    private readonly List<string> legacy = [];
     private static Action<object, MethodBase, bool>? observation;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
@@ -79,9 +78,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     public void DefaultsReplaceOnlyTheRepresentationGeneration([Values] Kind objectKind, [Values] bool nonBatch)
     {
         load(objectKind, nonBatch: nonBatch, sameTime: true);
-        AddStep("capture real legacy defaults", () => withClock(false, run));
-        load(objectKind, nonBatch: nonBatch, sameTime: true);
-        AddStep("compare real bounded defaults", () => withClock(true, run));
+        AddStep("verify real defaults", () => withClock(run));
 
         void run(Session session)
         {
@@ -89,25 +86,24 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             var note = session.Note;
             var result = drawable.Result;
             var entry = drawable.Entry;
-            var controller = drawable.LongNoteJudgement;
+            var runtime = getRuntime(session.Context, note);
             var order = session.Container.AliveEntries.Values.ToArray();
             var generation = drawable.BindingGeneration;
             session.Advance(3003);
             if (note is BmsLongNote)
             {
-                drawable.TryHit(HitResult.Perfect);
+                session.Context.TryPressRegisteredNote(note, HitResult.Perfect, new BmsPressContext(3003, session.Frame));
                 session.Recorded.TryPressRegisteredNote(note, HitResult.Perfect, new BmsPressContext(3003, session.Frame));
-                ((ILongNoteHolder)drawable).IsAutomaticallyHeld = true;
             }
-            var state = controller?.State;
+            var state = note is BmsLongNote held ? session.Context.GetLongNoteState(held) : (BmsLongNoteState?)null;
             var oldRaw = raw(result);
             var oldEvents = JsonSerializer.Serialize(session.Score.JudgementEvents);
-            var oldCallback = session.Bounded ? session.CaptureResultCallback() : null;
+            var oldCallback = session.CaptureResultCallback();
             var boundaries = new List<string>();
             using var probes = observe(drawable, session, (method, exit) =>
             {
                 boundaries.Add(method.Name + (exit ? ".exit" : ".enter"));
-                if (method.Name == "OnFree" && exit && session.Bounded)
+                if (method.Name == "OnFree" && exit)
                     Assert.Throws<InvalidOperationException>(() => session.ProductionOutput.GetRepresentation(note));
             });
             note.JudgementRate = .5;
@@ -117,20 +113,19 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Assert.That(drawable.BindingGeneration, Is.EqualTo(generation + 1));
             Assert.That(drawable.Entry, Is.SameAs(entry));
             Assert.That(drawable.Result, Is.SameAs(result));
-            Assert.That(drawable.LongNoteJudgement, Is.SameAs(controller));
-            Assert.That(controller?.State, Is.EqualTo(state));
+            Assert.That(getRuntime(session.Context, note), Is.SameAs(runtime));
+            Assert.That(note is BmsLongNote heldAfter ? session.Context.GetLongNoteState(heldAfter) : (BmsLongNoteState?)null, Is.EqualTo(state));
             Assert.That(session.Container.AliveEntries.Values, Is.EqualTo(order));
             Assert.That(JsonSerializer.Serialize(session.Score.JudgementEvents), Is.EqualTo(oldEvents));
             Assert.That(result.TimeOffset, Is.Zero);
             Assert.That(raw(result), Is.EqualTo(session.Output.GetRawTime(note)), "The framework setter also stamps unjudged Note and LN results");
-            TestContext.WriteLine($"P3A07_LIFECYCLE_EFFECT defaults;kind={objectKind};bounded={session.Bounded};generation={generation}->{drawable.BindingGeneration};resultRetained={ReferenceEquals(drawable.Result, result)};boundaries={string.Join(',', boundaries)}");
+            TestContext.WriteLine($"P3A07_LIFECYCLE_EFFECT defaults;kind={objectKind};generation={generation}->{drawable.BindingGeneration};resultRetained={ReferenceEquals(drawable.Result, result)};boundaries={string.Join(',', boundaries)}");
             Assert.That(boundaries, Is.EqualTo(new[] { "OnFree.enter", "OnFree.exit", "OnApply.enter", "OnApply.exit" }));
             if (note is BmsLongNote)
             {
-                Assert.That(((ILongNoteHolder)drawable).IsAutomaticallyHeld, Is.False, "RA-1 remains an explicit legacy compatibility boundary");
                 Assert.That(readField<double>(drawable, "lastSimulationTime"), Is.NaN);
                 Assert.That(readField<bool>(drawable, "bodyGeometryValid"), Is.False);
-                Assert.That(session.Context.ActiveLongNotes.Count(d => ReferenceEquals(d, drawable)), Is.EqualTo(1));
+                Assert.That(session.Context.ActiveLongNotes.Count(n => ReferenceEquals(n, note)), Is.EqualTo(1));
             }
             if (objectKind is Kind.CN or Kind.HCN)
             {
@@ -139,19 +134,16 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
                 Assert.That(result.TimeAbsolute, Is.EqualTo(4000));
                 Assert.That(((BmsLongNoteJudgementResult)result).EndpointResults.Single().EventTime, Is.EqualTo(3003));
             }
-            if (session.Bounded)
-            {
-                Assert.That(session.ProductionOutput.GetRepresentation(note), Is.SameAs(drawable));
-                session.AssertOldNotificationIgnored(oldCallback!, drawable, result, generation);
-                var active = readField<IList>(session.Context, "activeNoteSlots");
-                Assert.That(active.Cast<int>().Distinct().Count(), Is.EqualTo(active.Count));
-                Assert.That(readField<IDictionary>(session.ProductionOutput, "representations").Count, Is.EqualTo(order.Count(d => d.HitObject is BmsNote or BmsLongNote)));
-                Assert.That(readField<IDictionary>(session.ProductionOutput, "presentationStates").Count, Is.EqualTo(order.Count(d => d.HitObject is BmsLongNote)));
-            }
+            Assert.That(session.ProductionOutput.GetRepresentation(note), Is.SameAs(drawable));
+            session.AssertOldNotificationIgnored(oldCallback!, drawable, result, generation);
+            var active = readField<IList>(session.Context, "activeNoteSlots");
+            Assert.That(active.Cast<int>().Distinct().Count(), Is.EqualTo(active.Count));
+            Assert.That(readField<IDictionary>(session.ProductionOutput, "representations").Count, Is.EqualTo(order.Count(d => d.HitObject is BmsNote or BmsLongNote)));
+            Assert.That(readField<IDictionary>(session.ProductionOutput, "presentationObservers").Count, Is.EqualTo(order.Count(d => d.HitObject is BmsLongNote)));
             var expectedDeadline = session.Note is BmsLongNote ? double.PositiveInfinity : new BmsNoteJudgementWindows(note).NextPassiveJudgementTime(note);
-            Assert.That(drawable.NextPassiveJudgementTime, Is.EqualTo(expectedDeadline));
+            Assert.That(passiveDeadline(session.Context, note), Is.EqualTo(expectedDeadline));
             session.Mark("reapply");
-            TestContext.WriteLine("P3A0_REAPPLY " + JsonSerializer.Serialize(new { objectKind, nonBatch, session.Bounded, generation, nextGeneration = drawable.BindingGeneration, boundaries, oldRaw, raw = raw(result), result.TimeAbsolute, oldEvents }));
+            TestContext.WriteLine("P3A0_REAPPLY " + JsonSerializer.Serialize(new { objectKind, nonBatch, generation, nextGeneration = drawable.BindingGeneration, boundaries, oldRaw, raw = raw(result), result.TimeAbsolute, oldEvents }));
             session.Finish("RA-1-and-reapply");
         }
     }
@@ -160,16 +152,14 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     public void RemovalKeepsTheLastCheckBoundAndInvalidatesPooledCallbacks([Values] Kind objectKind, [Values] bool nonBatch)
     {
         load(objectKind, nonBatch: nonBatch);
-        AddStep("capture real legacy removal", () => withClock(false, run));
-        load(objectKind, nonBatch: nonBatch);
-        AddStep("compare real bounded removal", () => withClock(true, run));
+        AddStep("verify real removal", () => withClock(run));
 
         void run(Session session)
         {
             var drawable = session.Drawable;
             var result = drawable.Result;
             var generation = drawable.BindingGeneration;
-            var oldCallback = session.Bounded ? session.CaptureResultCallback() : null;
+            var oldCallback = session.CaptureResultCallback();
             var boundaries = new List<string>();
             var actualResults = new List<string>();
             var recordedResults = new List<string>();
@@ -187,14 +177,11 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
                 boundaries.Add(method.Name + (exit ? ".exit" : ".enter"));
                 if (method.Name == "StopAllSamples" && exit) samplesStopped = true;
                 if (method.Name != "OnKilled") return;
-                Assert.That(session.Context.ActiveLongNotes, Does.Not.Contain(drawable));
-                if (session.Bounded)
-                {
-                    Assert.That(session.ProductionOutput.GetRepresentation(session.Note), Is.SameAs(drawable));
-                    Assert.That(session.Context.IsNoteCandidate(session.Note), Is.False);
-                    Assert.That(session.Context.GetPendingLongNoteTails(), Is.Empty);
-                    Assert.That(session.Context.GetActiveBodies(), Is.Empty);
-                }
+                Assert.That(session.Context.ActiveLongNotes, Does.Not.Contain(session.Note));
+                Assert.That(session.ProductionOutput.GetRepresentation(session.Note), Is.SameAs(drawable));
+                Assert.That(session.Context.IsNoteCandidate(session.Note), Is.False);
+                Assert.That(session.Context.GetPendingLongNoteTails(), Is.Empty);
+                Assert.That(session.Context.GetActiveBodies(), Is.Empty);
                 if (!exit)
                 {
                     session.Recorded.BeginNoteRemoval(session.Note);
@@ -219,8 +206,8 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Assert.That(actualResults, Is.EqualTo(recordedResults));
             Assert.That(session.Container.AliveEntries.Values.Any(d => ReferenceEquals(d.HitObject, session.Note)), Is.False);
             Assert.That(result.Type, Is.EqualTo(session.Output.GetMainResult(session.Note).Type));
-            if (session.Bounded) Assert.Throws<InvalidOperationException>(() => session.ProductionOutput.GetRepresentation(session.Note));
-            TestContext.WriteLine($"P3A07_LIFECYCLE_EFFECT removal;kind={objectKind};bounded={session.Bounded};freed={drawable.HitObject == null};boundaries={string.Join(',', boundaries)}");
+            Assert.Throws<InvalidOperationException>(() => session.ProductionOutput.GetRepresentation(session.Note));
+            TestContext.WriteLine($"P3A07_LIFECYCLE_EFFECT removal;kind={objectKind};freed={drawable.HitObject == null};boundaries={string.Join(',', boundaries)}");
             Assert.That(boundaries, Is.EqualTo(new[] { "OnKilled.enter", "StopAllSamples.enter", "StopAllSamples.exit", "OnKilled.exit", "OnFree.enter", "OnFree.exit" }));
             var count = session.Score.ScoringJudgementEventCount;
             Assert.That(count, Is.EqualTo(objectKind is Kind.CN or Kind.HCN ? 2 : 1));
@@ -237,19 +224,16 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Assert.That(replacement, Is.SameAs(drawable), "The real column pool reuses the released representation");
             Assert.That(replacement.BindingGeneration, Is.EqualTo(generation + 1));
             Assert.That(replacement.Result, Is.Not.SameAs(result));
-            if (session.Bounded)
-            {
-                session.AssertOldNotificationIgnored(oldCallback!, drawable, result, generation);
-                Assert.That(session.ProductionOutput.GetRepresentation(replacement.HitObject), Is.SameAs(drawable));
-                Assert.That(session.Context.IsNoteCandidate(replacement.HitObject), Is.True);
-            }
-            TestContext.WriteLine("P3A0_REMOVAL " + JsonSerializer.Serialize(new { objectKind, nonBatch, session.Bounded, generation, nextGeneration = replacement.BindingGeneration, boundaries, actualResults, recordedResults, result.Type, events = session.Score.JudgementEvents }));
+            session.AssertOldNotificationIgnored(oldCallback!, drawable, result, generation);
+            Assert.That(session.ProductionOutput.GetRepresentation(replacement.HitObject), Is.SameAs(drawable));
+            Assert.That(session.Context.IsNoteCandidate(replacement.HitObject), Is.True);
+            TestContext.WriteLine("P3A0_REMOVAL " + JsonSerializer.Serialize(new { objectKind, nonBatch, generation, nextGeneration = replacement.BindingGeneration, boundaries, actualResults, recordedResults, result.Type, events = session.Score.JudgementEvents }));
             session.ExtraTrace.AddRange(actualResults);
             session.Finish("removal");
 
             string resultSnapshot(string checkpoint, bool recording)
             {
-                if (session.Bounded && !recording)
+                if (!recording)
                 {
                     Assert.That(session.Context.IsNoteCandidate(session.Note), Is.False);
                     Assert.That(session.Context.GetPendingLongNoteTails(), Is.Empty);
@@ -266,7 +250,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     public void ChangedSortKeyReplacesTheOldPendingKey([Values] Kind objectKind)
     {
         load(objectKind, sameTime: true);
-        AddStep("reapply changed head time through the actual entry", () => withClock(true, session =>
+        AddStep("reapply changed head time through the actual entry", () => withClock(session =>
         {
             var note = session.Note;
             var drawable = session.Drawable;
@@ -286,7 +270,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Assert.That(readField<List<int>>(session.Context, "activeNoteSlots"), Is.EqualTo(order));
             Assert.That(session.ProductionOutput.GetRepresentation(note), Is.SameAs(drawable));
             session.Context.RefreshPassiveDeadline(2798);
-            Assert.That(session.Context.NextPassiveUpdateTime, Is.EqualTo(drawable.NextPassiveJudgementTime));
+            Assert.That(session.Context.NextPassiveUpdateTime, Is.EqualTo(passiveDeadline(session.Context, note)));
             note.StartTime = 3000;
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             session.Recorded.RefreshNoteConfiguration(note);
@@ -299,9 +283,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     public void MainResultNotificationsPrecedeResetAndHistoryRestoration([Values] Kind objectKind, [Values] bool nonBatch)
     {
         load(objectKind, nonBatch: nonBatch);
-        AddStep("capture real legacy main result rollback", () => withClock(false, run));
-        load(objectKind, nonBatch: nonBatch);
-        AddStep("compare real bounded main result rollback", () => withClock(true, run));
+        AddStep("verify real main result rollback", () => withClock(run));
 
         void run(Session session)
         {
@@ -353,8 +335,8 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Assert.That(result.HasResult, Is.False);
             Assert.That(session.Health.CurrentGaugeStates, Is.EqualTo(initialHealth));
             Assert.That(session.Score.ScoringJudgementEventCount, Is.Zero);
-            Assert.That(session.Context.FirstPendingHead, nonBatch ? Is.Null : Is.SameAs(drawable));
-            if (session.Bounded) Assert.That(session.Context.IsNoteCandidate(session.Note), Is.True);
+            Assert.That(session.Context.FirstPendingNote, nonBatch ? Is.Null : Is.SameAs(session.Note));
+            Assert.That(session.Context.IsNoteCandidate(session.Note), Is.True);
             if (session.Note is BmsLongNote note)
             {
                 Assert.That(session.Context.GetLongNoteState(note).HeadJudged, Is.False);
@@ -364,7 +346,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             session.Advance(3003);
             Assert.That(session.Column.HandlePress(3000), Is.EqualTo(session.Recorded.HandleNotePress(new BmsPressContext(3000, session.Frame))));
             session.Mark("same-head-selected-after-rewind");
-            TestContext.WriteLine("P3A0_REVERT " + JsonSerializer.Serialize(new { objectKind, nonBatch, session.Bounded, actual, recorded }));
+            TestContext.WriteLine("P3A0_REVERT " + JsonSerializer.Serialize(new { objectKind, nonBatch, actual, recorded }));
             session.Finish("main-revert");
 
             void capture(string checkpoint, bool recording)
@@ -372,7 +354,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
                 var current = recording ? session.Output.GetMainResult(session.Note)
                     : new BmsMainResultState(result.Type, result.TimeAbsolute, result.TimeOffset, result.GameplayRate, ((BmsJudgementResult)result).SuppressPenalty);
                 Assert.That(current.HasResult, Is.EqualTo(checkpoint != "reset"), "Every original notification sees the old authoritative result");
-                if (session.Bounded && !recording) Assert.That(session.Context.GetNoteResult(session.Note), Is.EqualTo(current));
+                if (!recording) Assert.That(session.Context.GetNoteResult(session.Note), Is.EqualTo(current));
                 (recording ? recorded : actual).Add(JsonSerializer.Serialize(new { checkpoint, current, raw = recording ? session.Output.GetRawTime(session.Note) : raw(result),
                     state = session.Note is BmsLongNote n ? recording ? session.Recorded.GetLongNoteState(n) : session.Context.GetLongNoteState(n) : (BmsLongNoteState?)null }));
             }
@@ -385,16 +367,14 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     public void HcnReapplyRetainsNonEmptyBodyAndPendingReleaseHistory()
     {
         load(Kind.HCN, pms: true);
-        AddStep("capture legacy reapply with real histories", () => withClock(false, run));
-        load(Kind.HCN, pms: true);
-        AddStep("compare bounded reapply with real histories", () => withClock(true, run));
+        AddStep("verify reapply with real histories", () => withClock(run));
 
         void run(Session session)
         {
             var note = (BmsLongNote)session.Note;
             var drawable = session.Drawable;
-            var controller = drawable.LongNoteJudgement!;
-            var tracker = readField<BmsHellChargeBodyTracker>(controller, "hellChargeTracker");
+            var runtime = (BmsHellChargeNoteRuntime)getRuntime(session.Context, note)!;
+            var tracker = runtime.Body;
             Assert.That(session.Column.PreserveLongNoteHistory && tracker.HistoryEnabled, Is.True, "Replay playback retains applicable HCN histories");
             session.Advance(3003);
             session.Column.HandlePress(3000);
@@ -405,44 +385,44 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             session.Column.HandleRelease(3300);
             session.Recorded.HandleExecutionRelease(3300, session.Frame);
             session.Traverse(3400);
-            Assert.That(controller.State.PendingReleaseTime, Is.EqualTo(3300));
+            Assert.That(runtime.State.PendingReleaseTime, Is.EqualTo(3300));
             var history = readField<BmsHellChargeHistory>(tracker, "history");
-            var releases = readField<IList>(controller, "releaseHistory");
+            var releases = readField<IList>(runtime.Hold, "releaseHistory");
             Assert.That(releases.Count, Is.GreaterThan(0));
             Assert.That(readField<IList>(history, "frames").Count + readField<IList>(history, "runs").Count, Is.GreaterThan(0));
-            var before = histories(controller);
+            var before = histories(runtime);
             session.Mark("nonempty-history-before-reapply");
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             session.Recorded.RefreshNoteConfiguration(note);
             session.Output.Reapply(note);
-            Assert.That(drawable.LongNoteJudgement, Is.SameAs(controller));
-            Assert.That(readField<BmsHellChargeBodyTracker>(controller, "hellChargeTracker"), Is.SameAs(tracker));
+            Assert.That(getRuntime(session.Context, note), Is.SameAs(runtime));
+            Assert.That(runtime.Body, Is.SameAs(tracker));
             Assert.That(readField<BmsHellChargeHistory>(tracker, "history"), Is.SameAs(history));
-            Assert.That(readField<IList>(controller, "releaseHistory"), Is.SameAs(releases));
-            Assert.That(histories(controller), Is.EqualTo(before));
+            Assert.That(readField<IList>(runtime.Hold, "releaseHistory"), Is.SameAs(releases));
+            Assert.That(histories(runtime), Is.EqualTo(before));
             session.Mark("nonempty-history-after-reapply");
             foreach (var time in new[] { 3350d, 3299d })
             {
                 session.Traverse(time);
                 Assert.That(readField<double>(tracker, "accumulator"), Is.EqualTo(accumulatorAt3204));
-                Assert.That(controller.State.PendingReleaseTime, time > 3300 ? Is.EqualTo(3300) : Is.Null);
-                var recordedController = session.Recorded.LongNoteRegistrations.First(r => ReferenceEquals(r.Object, note)).State;
-                Assert.That(histories(controller), Is.EqualTo(histories(recordedController)));
+                Assert.That(runtime.State.PendingReleaseTime, time > 3300 ? Is.EqualTo(3300) : Is.Null);
+                var recordedRuntime = (BmsHellChargeNoteRuntime)getRuntime(session.Recorded, note)!;
+                Assert.That(histories(runtime), Is.EqualTo(histories(recordedRuntime)));
                 session.Mark("history-rewind:" + time);
             }
             session.Traverse(3401);
             session.Mark("history-replayed");
-            session.ExtraTrace.Add(histories(controller));
+            session.ExtraTrace.Add(histories(runtime));
             session.Finish("nonempty-hcn-reapply");
         }
 
-        static string histories(BmsLongNoteJudgementController controller)
+        static string histories(BmsHellChargeNoteRuntime runtime)
         {
-            var tracker = readField<BmsHellChargeBodyTracker>(controller, "hellChargeTracker");
+            var tracker = runtime.Body;
             var history = readField<BmsHellChargeHistory>(tracker, "history");
             return JsonSerializer.Serialize(new { accumulator = readField<double>(tracker, "accumulator"),
                 frames = readField<IList>(history, "frames").Cast<object>(), runs = readField<IList>(history, "runs").Cast<object>(),
-                releases = readField<IList>(controller, "releaseHistory").Cast<object>() });
+                releases = readField<IList>(runtime.Hold, "releaseHistory").Cast<object>() });
         }
     }
 
@@ -452,15 +432,13 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     public void PooledActivationRestoresTheLogicalObjectBeforeRegisteringItsRepresentation(Kind objectKind)
     {
         load(objectKind);
-        AddStep("capture legacy activation after ordinary rewind", () => withClock(false, run));
-        load(objectKind);
-        AddStep("compare bounded activation after ordinary rewind", () => withClock(true, run));
+        AddStep("verify activation after ordinary rewind", () => withClock(run));
 
         void run(Session session)
         {
             var note = (BmsLongNote)session.Note;
             var original = session.Drawable;
-            var controller = original.LongNoteJudgement;
+            var runtime = getRuntime(session.Context, note);
             var generation = original.BindingGeneration;
             session.Advance(3003);
             session.Column.HandlePress(3000);
@@ -473,23 +451,20 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             var registered = 0;
             observation = (target, method, exit) =>
             {
-                if (!ReferenceEquals(target, session.Context)) return;
+                if (!ReferenceEquals(target, session.ProductionOutput)) return;
                 var drawable = session.Drawable;
-                Assert.That(drawable.LongNoteJudgement, Is.SameAs(controller));
-                Assert.That(controller!.State.IsHolding, Is.True);
-                Assert.That(controller.State.TailJudged, Is.False);
+                Assert.That(getRuntime(session.Context, note), Is.SameAs(runtime));
+                Assert.That(session.Context.GetLongNoteState(note).IsHolding, Is.True);
+                Assert.That(session.Context.GetLongNoteState(note).TailJudged, Is.False);
                 if (exit)
                 {
                     registered++;
-                    if (session.Bounded)
-                    {
-                        Assert.That(session.ProductionOutput.GetRepresentation(note), Is.SameAs(drawable));
-                        Assert.That(session.Context.GetPendingLongNoteTails(), Is.EqualTo(new[] { note }));
-                        Assert.That(session.Context.GetActiveBodies(), Is.EqualTo(objectKind == Kind.HCN ? new[] { note } : Array.Empty<BmsLongNote>()));
-                    }
+                    Assert.That(session.ProductionOutput.GetRepresentation(note), Is.SameAs(drawable));
+                    Assert.That(session.Context.GetPendingLongNoteTails(), Is.EqualTo(new[] { note }));
+                    Assert.That(session.Context.GetActiveBodies(), Is.EqualTo(objectKind == Kind.HCN ? new[] { note } : Array.Empty<BmsLongNote>()));
                 }
             };
-            using (var probe = new ScopedMethodProbe(typeof(BmsColumnJudgementContext).GetMethod("Register", instance)!,
+            using (var probe = new ScopedMethodProbe(typeof(BmsDrawableJudgementOutput).GetMethod("Register", instance)!,
                        GetType().GetMethod(nameof(observeEnter), BindingFlags.Static | BindingFlags.NonPublic), GetType().GetMethod(nameof(observeExit), BindingFlags.Static | BindingFlags.NonPublic)))
             {
                 try { session.Traverse(3500); }
@@ -520,16 +495,14 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     public void RealPlayerPausePreservesCompletionAndPresentationThroughResume(Kind objectKind, PauseState pauseState, double pauseTime)
     {
         load(objectKind, allowPause: true);
-        AddStep("capture actual legacy player pause", () => withClock(false, run));
-        load(objectKind, allowPause: true);
-        AddStep("compare actual bounded player pause", () => withClock(true, run));
+        AddStep("verify actual player pause", () => withClock(run));
 
         void run(Session session)
         {
             var note = (BmsLongNote)session.Note;
             var drawable = session.Drawable;
             if (pauseState == PauseState.HeadPoor)
-                session.Traverse(drawable.NextPassiveJudgementTime + 1);
+                session.Traverse(passiveDeadline(session.Context, note) + 1);
             else
             {
                 session.Advance(3003);
@@ -550,15 +523,14 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             try
             {
                 observation = (target, method, exit) => { if (ReferenceEquals(target, drawable)) pauseVisuals.Add(method.Name.Split('.').Last() + (exit ? ".after" : ".before")); };
-                foreach (var method in drawable.GetType().GetMethods(instance).Where(m => m.Name.Contains("IBmsLongNoteDrawable")))
-                    probes.Add(new ScopedMethodProbe(method, GetType().GetMethod(nameof(observeEnter), BindingFlags.Static | BindingFlags.NonPublic), GetType().GetMethod(nameof(observeExit), BindingFlags.Static | BindingFlags.NonPublic)));
-                probes.Add(new ScopedMethodProbe(typeof(BmsLongNotePresentation).GetMethod("Apply", BindingFlags.Static | BindingFlags.NonPublic)!, GetType().GetMethod(nameof(keepBoundary), BindingFlags.Static | BindingFlags.NonPublic)));
+                probes.Add(new ScopedMethodProbe(drawable.GetType().GetMethod("applyPresentation", instance)!,
+                    GetType().GetMethod(nameof(observeEnter), BindingFlags.Static | BindingFlags.NonPublic),
+                    GetType().GetMethod(nameof(observeExit), BindingFlags.Static | BindingFlags.NonPublic)));
                 Player.GameplayClockContainer.Seek(pauseTime);
                 Player.GameplayClockContainer.Start();
                 Assert.That(Player.GameplayClockContainer.CurrentTime, Is.EqualTo(pauseTime));
                 Assert.That(Player.Pause(), Is.True);
-                var slot = readField<Dictionary<BmsHitObject, int>>(session.Recorded, "noteSlots")[note];
-                readField<BmsLongNoteOperationBinding>(session.Recorded, "longNoteBinding").CompleteAtPause(slot, session.Frame);
+                session.Recorded.CompleteLongNotesAtPause(session.Frame);
                 captureVisual("paused");
             }
             finally
@@ -607,7 +579,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Assert.That(session.Score.ScoringJudgementEventCount, Is.EqualTo(endpointCount), "Resuming cannot submit either endpoint again");
             Assert.That(session.Context.GetLongNoteState(note).TailJudged, Is.True);
             if (pauseState == PauseState.Holding) Assert.That(session.Context.GetLongNoteState(note).HasActiveBody, Is.False);
-            TestContext.WriteLine("P3A0_PAUSE " + JsonSerializer.Serialize(new { objectKind, pauseState, pauseTime, session.Bounded, pauseVisuals, visuals }));
+            TestContext.WriteLine("P3A0_PAUSE " + JsonSerializer.Serialize(new { objectKind, pauseState, pauseTime, pauseVisuals, visuals }));
             session.ExtraTrace.AddRange(visuals);
             session.ExtraTrace.Add(JsonSerializer.Serialize(pauseVisuals));
             session.Finish("player-pause:" + pauseState + ":" + pauseTime);
@@ -660,14 +632,31 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     private static T readField<T>(object target, string name) => (T)target.GetType().GetField(name, instance)!.GetValue(target)!;
     private static double? raw(JudgementResult result) => (double?)typeof(JudgementResult).GetProperty("RawTime", instance)!.GetValue(result);
 
+    private static object? getRuntime(BmsColumnJudgementContext context, BmsHitObject note)
+    {
+        if (note is not BmsLongNote held) return null;
+        return held.Beatmap.LockedLongNoteMode switch
+        {
+            BmsLongNoteMode.ChargeNote => readField<List<BmsChargeNoteRuntime>>(context, "chargeHoldStates").Single(s => ReferenceEquals(s.Hold.Note, note)),
+            BmsLongNoteMode.HellChargeNote => readField<List<BmsHellChargeNoteRuntime>>(context, "hellChargeHoldStates").Single(s => ReferenceEquals(s.Hold.Note, note)),
+            _ => readField<List<BmsLongNoteRuntime>>(context, "normalHoldStates").Single(s => ReferenceEquals(s.Hold.Note, note)),
+        };
+    }
+
+    private static double passiveDeadline(BmsColumnJudgementContext context, BmsHitObject note)
+    {
+        var slot = readField<Dictionary<BmsHitObject, int>>(context, "noteSlots")[note];
+        return note is BmsLongNote
+            ? readField<Func<int, double>[]>(context, "headDeadlines")[readField<int[]>(context, "holdOperationSlots")[slot]](slot)
+            : context.NoteWindows[slot].NextPassiveJudgementTime(note);
+    }
+
     [TestCase(Kind.CN)]
     [TestCase(Kind.HCN)]
-    public void ScratchSubmissionAndControllerRewindUseTheirActualOldTimes(Kind objectKind)
+    public void ScratchSubmissionAndStateRewindPreserveTheBaselineTimes(Kind objectKind)
     {
         load(objectKind, true);
-        AddStep("capture legacy full scratch rewind", () => withClock(false, run));
-        load(objectKind, true);
-        AddStep("compare bounded full scratch rewind", () => withClock(true, run));
+        AddStep("verify full scratch rewind", () => withClock(run));
 
         void run(Session session)
         {
@@ -704,25 +693,25 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Assert.That(session.Submissions, Is.Empty);
             Assert.That(output.SyntheticEndpoints, Is.Empty);
             Assert.That(session.Drawable.Result.HasResult, Is.True);
-            // ST-1: the real legacy controller uses event time while the result stack uses submission time.
+            // ST-1: tail state uses event time while the result stack uses submission time.
             Assert.That(context.GetLongNoteState(note).TailJudged, Is.True);
             Assert.That(context.GetLongNoteState(note).TailTime, Is.EqualTo(3990));
             Assert.That(session.Health.CurrentGaugeStates, Is.EqualTo(beforeTail));
             Assert.That(session.Health.GaugeHistory, Has.Count.EqualTo(beforeTailHistory));
             Assert.That(recorded.GetPendingLongNoteTails(), Is.Empty);
-            if (session.Bounded) Assert.That(context.GetPendingLongNoteTails(), Is.Empty);
-            session.Mark("submission-reverted-controller-retained");
+            Assert.That(context.GetPendingLongNoteTails(), Is.Empty);
+            session.Mark("submission-reverted-state-retained");
             session.Traverse(3989);
             Assert.That(context.GetLongNoteState(note).TailJudged, Is.False);
             Assert.That(context.GetLongNoteState(note).IsHolding, Is.True);
             Assert.That(recorded.GetPendingLongNoteTails(), Is.EqualTo(new[] { note }));
-            if (session.Bounded) Assert.That(context.GetPendingLongNoteTails(), Is.EqualTo(new[] { note }));
+            Assert.That(context.GetPendingLongNoteTails(), Is.EqualTo(new[] { note }));
             session.Mark("event-reverted");
             session.Finish("ST-1");
         }
     }
 
-    private void withClock(bool bounded, Action<Session> action)
+    private void withClock(Action<Session> action)
     {
         var oldClock = Playfield.Clock;
         var oldScoreClock = Player.ScoreProcessor.Clock;
@@ -740,12 +729,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Playfield.EndGameplayFrame();
             Playfield.UpdateSubTree();
             var column = (BmsColumn)Playfield.Stage.Columns[columnIndex];
-            if (bounded)
-            {
-                if (kind == Kind.Note) Playfield.EnableNoteExecution(columnIndex);
-                else Playfield.EnableLongNoteExecution(columnIndex);
-            }
-            action(new Session(this, column, manual, clock, bounded));
+            action(new Session(this, column, manual, clock));
         }
         finally
         {
@@ -770,9 +754,8 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
         internal readonly BmsJudgementResult Result;
         internal readonly BmsHealthProcessor Health;
         internal readonly BmsScoreProcessor Score;
-        internal readonly bool Bounded;
         internal readonly List<(double Time, BmsLongNoteJudgementResult Result)> Submissions;
-        internal BmsDrawableJudgementOutput ProductionOutput => readField<BmsDrawableJudgementOutput>(Context, "drawableNoteOutput");
+        internal BmsDrawableJudgementOutput ProductionOutput => Column.JudgementOutput;
         private readonly List<string> trace = [];
         private readonly List<string> scores = [];
         internal readonly List<string> ExtraTrace = [];
@@ -780,7 +763,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
         internal DrawableBmsHitObject Drawable => Container.AliveEntries.Values.OfType<DrawableBmsHitObject>().First(d => ReferenceEquals(d.HitObject, Note));
         internal BmsFrameContext Frame => new(manual.CurrentTime, manual.Rate);
 
-        internal Session(TestSceneBmsJudgementLifecycleExecution scene, BmsColumn column, ManualClock manual, FramedClock clock, bool bounded)
+        internal Session(TestSceneBmsJudgementLifecycleExecution scene, BmsColumn column, ManualClock manual, FramedClock clock)
         {
             this.scene = scene;
             this.manual = manual;
@@ -788,7 +771,6 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Column = column;
             Context = column.Judgements;
             Container = (BmsColumnHitObjectContainer)column.HitObjectContainer;
-            Bounded = bounded;
             Note = scene.Playfield.Beatmap.HitObjects.First(n => n.Column == scene.columnIndex && n.StartTime == 3000);
             Result = (BmsJudgementResult)Drawable.Result;
             var notes = scene.Playfield.Beatmap.HitObjects.Where(n => n.Column == scene.columnIndex && n is BmsNote or BmsLongNote).ToArray();
@@ -831,7 +813,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             try
             {
                 oldCallback(drawable, result);
-                Context.UnbindNoteRepresentation(drawable, generation);
+                ProductionOutput.UnbindNoteRepresentation(drawable, generation);
                 Assert.That(calls, Is.Zero);
             }
             finally { ProductionOutput.SetResultCheckpoint(checkpoint); }
@@ -876,17 +858,14 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
                 Assert.That(Context.GetLongNoteState(note), Is.EqualTo(Recorded.GetLongNoteState(note)), checkpoint);
                 if (scene.kind == Kind.HCN)
                 {
-                    var actualController = readField<Dictionary<BmsLongNote, BmsLongNoteJudgementController>>(Context, "longNoteControllers")[note];
-                    var recordedController = Recorded.LongNoteRegistrations.First(r => ReferenceEquals(r.Object, note)).State;
-                    Assert.That(readField<double>(readField<BmsHellChargeBodyTracker>(actualController, "hellChargeTracker"), "accumulator"),
-                        Is.EqualTo(readField<double>(readField<BmsHellChargeBodyTracker>(recordedController, "hellChargeTracker"), "accumulator")), checkpoint);
+                    var actualRuntime = (BmsHellChargeNoteRuntime)getRuntime(Context, note)!;
+                    var recordedRuntime = (BmsHellChargeNoteRuntime)getRuntime(Recorded, note)!;
+                    Assert.That(readField<double>(actualRuntime.Body, "accumulator"),
+                        Is.EqualTo(readField<double>(recordedRuntime.Body, "accumulator")), checkpoint);
                 }
-                if (Bounded)
-                {
-                    Assert.That(Context.GetPendingLongNoteTails(), Is.EqualTo(Recorded.GetPendingLongNoteTails()), checkpoint);
-                    Assert.That(Context.GetActiveBodies(), Is.EqualTo(Recorded.GetActiveBodies()), checkpoint);
-                    Assert.That(Context.GetHoldingNotes(), Is.EqualTo(Recorded.GetHoldingNotes()), checkpoint);
-                }
+                Assert.That(Context.GetPendingLongNoteTails(), Is.EqualTo(Recorded.GetPendingLongNoteTails()), checkpoint);
+                Assert.That(Context.GetActiveBodies(), Is.EqualTo(Recorded.GetActiveBodies()), checkpoint);
+                Assert.That(Context.GetHoldingNotes(), Is.EqualTo(Recorded.GetHoldingNotes()), checkpoint);
             }
             Assert.That(new BmsMainResultState(Result.Type, Result.TimeAbsolute, Result.TimeOffset,
                 Result.GameplayRate, Result.SuppressPenalty), Is.EqualTo(Output.GetMainResult(Note)), checkpoint);
@@ -898,10 +877,8 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
 
         internal void Finish(string scenario)
         {
-            TestContext.WriteLine("P3A0_LIFECYCLE " + JsonSerializer.Serialize(new { scenario, scene.kind, scene.mixed, Bounded, trace, scores }));
-            var all = trace.Concat(scores).Concat(ExtraTrace).ToArray();
-            if (Bounded) Assert.That(all, Is.EqualTo(scene.legacy));
-            else { scene.legacy.Clear(); scene.legacy.AddRange(all); }
+            TestContext.WriteLine("P3A0_LIFECYCLE " + JsonSerializer.Serialize(new { scenario, scene.kind, scene.mixed, trace, scores }));
+            TestContext.WriteLine("P3A0_LIFECYCLE_OBSERVATIONS " + JsonSerializer.Serialize(ExtraTrace));
         }
     }
 }

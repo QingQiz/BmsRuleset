@@ -2,17 +2,19 @@
 
 [返回开发文档](development.md)
 
-更新：2026-10-01。直接完成核心设计，再通过 Git 旧版对照完成行为适配，最后接入 Mod。
+更新：2026-10-01。按最新实施要求，先完成核心、Mod 和所有生产消费者的重构，持续提交中间态；测试迁移、Git 旧版对照及验收统一放在重构完成后。
 
 <a id="implementation-start"></a>
 
 ## 当前实施入口
 
-**完整实现核心 → Git 旧版对照与适配 → Mod 适配 → 最终集成。**
+**完整实现核心 → Mod 与生产消费者迁移 → 统一迁移测试及 Git 旧版对照 → 最终验收。**
 
-当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次。列上下文已移除 Drawable、容器及图形时钟依赖，表示绑定与生命周期通知归入现有输出适配。各绘制子类组合自己的图形，容器提供共享视觉帧，由长按计算头尾布局。纯视觉观测已独立登记并按表示代次解绑，布局读取固定头位置和方向历史。收尾去重已从 `LastPostTime` 迁到绑定内的调度代次/模拟步骤。生产 Release 构建及 591 项定向回归通过。
+本次调整以生产实现为先，不为运行尚未迁完的测试增加中间适配层。以下行为、架构和性能要求保持为最终验收条件，不作为中间提交或 Mod 迁移前的测试门槛。
 
-核心尚未完成：统一布局准备/应用契约已接入，仍需迁移其余旧生命周期和检查点测试，并补齐完整调度矩阵。无自动化调度记录器已迁移，真实键盘和回放生成的逻辑轨迹与原 fixture 一致；Note、LN、CN、HCN 执行测试已改为正式框架出口与记录出口对照。完整测试项目仍受剩余旧 Controller 记录器、旧表现接口和已摘除 AutoScratch 的消费者阻塞；本次局部测试通过不代表整个测试项目已恢复。Git 旧版完整对照、性能验收及 Mod 适配均尚未进行。
+当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次。列上下文已移除 Drawable、容器及图形时钟依赖，表示绑定与生命周期通知归入现有输出适配。各绘制子类组合自己的图形，容器提供共享视觉帧，由长按计算头尾布局。纯视觉观测已独立登记并按表示代次解绑，布局读取固定头位置和方向历史。收尾去重已从 `LastPostTime` 迁到绑定内的调度代次/模拟步骤。生产 Release 构建及 634 项定向回归通过。
+
+核心尚未完成：统一布局准备/应用契约已接入，仍需迁移剩余旧检查点测试，并补齐完整调度矩阵。无自动化调度记录器已迁移，真实键盘和回放生成的逻辑轨迹与原 fixture 一致；Note、LN、CN、HCN 执行测试已改为正式框架出口与记录出口对照。完整测试项目仍受剩余旧 Controller 记录器、旧表现接口和已摘除 AutoScratch 的消费者阻塞；本次局部测试通过不代表整个测试项目已恢复。Git 旧版完整对照、性能验收及 Mod 适配均尚未进行。
 
 快速导航：[实施顺序](#implementation-order) · [目标架构](#target-structure) · [生命周期](#state-lifecycle) · [调度](#scheduling-contracts) · [Git 对照](#git-comparison) · [验收](#behaviour-acceptance) · [验证命令](#verification-commands) · [完成条件](#completion)。
 
@@ -39,17 +41,17 @@
 
 核心完成时，无 Mod 的真实 Player 和无 Drawable 的完整引擎使用同一套规则与调度。操作绑定、统一结果出口及框架结果/生命周期适配只承担最终架构中的职责。开发中可以按依赖顺序编码、小提交和定向单测；不要求中间版本单独可游玩，不增加受限模式、运行时新旧开关或供旧测试调用的兼容层。保留行为断言并迁移到最终入口。
 
-### 2. 使用 Git 对照并完成核心适配
+### 2. 完成 Mod 与生产消费者迁移
 
-完整核心可以构建运行后，按[Git 对照流程](#git-comparison)运行重构前版本和新实现，补齐行为、框架、表现与性能证据。直接在新规则、调度或正式框架适配中修正差异，直至满足核心完成条件。
+核心入口稳定后直接迁移 AutoScratch/Autoplay 等受影响 Mod、相关注册与生产消费者。基于对象身份和稳定核心入口恢复自动持有与采样，明确 AS-1 的语义及行为变化，同步玩家文档和本地化。此阶段不恢复旧接口，也不为旧测试增加临时路径。
+
+### 3. 统一迁移测试、对照与最终验收
+
+全部生产重构完成后，将剩余测试直接迁到最终入口，再按[Git 对照流程](#git-comparison)运行重构前版本和新实现，补齐行为、框架、表现与性能证据。直接在新规则、调度或正式框架适配中修正差异，直至满足完成条件。
 
 保持已记录的玩法语义、时间边界和同步观察顺序。RA-1/ST-1 等基线行为按事实对照；有意行为修复单列原因和前后证据，原 fixture 保留原始预期。
 
-### 3. 适配 Mod 并最终集成
-
-核心对照与适配完成后，再设计、实现和验证 AutoScratch/Autoplay 等受影响 Mod。基于对象身份和稳定核心入口恢复消费者与注册，此时决定 AS-1 的采样语义及修复范围，并补齐玩家文档和本地化。
-
-Mod 接入后重跑受影响的核心行为、回放、表现和性能组合，满足[全部完成条件](#completion)后最终集成。
+统一验证核心行为、Mod、回放、表现和性能组合，满足[全部完成条件](#completion)后最终集成。benchmark 仍需事先取得用户同意。
 
 ## 目标与范围
 
@@ -702,7 +704,7 @@ Engine 显式拥有经过、身体、输入、被动检查、端点收尾及回�
 3. 复用已冻结的输入、fixture 和轨迹。旧提交缺少记录能力时，只在旧版对照工作树添加测试探针/测试资源，保存补丁；不改变旧规则、状态、调度或结果逻辑。新端直接观察最终生产入口。
 4. 比较共同的行为观察格式：对象/端点身份、目标次序、输入与模拟时间、结果/速率、同步回调内状态、中间计分/血量、keysound 和视觉反馈。不同内部类型/容器不要求同名，投影规则必须显式且不能丢弃行为差异。
 5. 先定位首个分歧，再用 `git diff`、历史提交和必要的 `git bisect` 缩小来源。在新实现修正后，重跑受影响的精确过滤器；不得复制整套旧实现进新代码作为 oracle 或 fallback。
-6. 冻结最终核心对照结果与未通过项。只有核心行为、架构和要求的性能证据齐备，才开始 Mod 适配；benchmark 仍遵守先取得用户同意的仓库规则。
+6. 冻结最终核心及 Mod 对照结果与未通过项。全部生产迁移完成后统一完成行为、架构和性能验收；benchmark 仍遵守先取得用户同意的仓库规则。
 
 测试层保留真实 Player 集成、无 Drawable 的完整调度测试和规则单测。现有旧私有方法探针、旧 Controller 测试及 `legacy/bounded` 开关型测试迁移为最终入口断言或 Git 旧版复现工具，不阻止生产旧类型删除。固定计划单测和真实入口生成对照分别记录，不另建只服务阶段验收的生产执行路径。
 
@@ -760,13 +762,14 @@ foreach ($refactorGroup in $refactorFilters.Keys) {
 
 - 公共 `UpdateVisualLayout` 已统一为 `PrepareVisual → 裁剪 → ApplyVisual`；具体长按缓存本次头尾坐标供绘制使用。准备布局不改变图形位置、尺寸、缩放、透明度或视觉时间历史，已由真实 Player 用例验证。
 - LN、CN、HCN 出口执行测试共 81 项通过，保留端点/提交时间、结果前后状态、PMS 宽限及回退、合成计分先于血量、成功尾后的 HCN 身体和同列多身体顺序断言。移除旧 Controller/表现接口探针，改用具体规则及当前状态发布、表现映射边界。迁移发现并修复 LN/CN 头 POOR 后错误准备固定头位置的表现差异，沿用旧测试的无准备预期。
+- 生命周期出口测试已迁到正式输出与类型化状态，43 项覆盖重应用、回池代次、过期回调、撤销通知、HCN 历史、暂停恢复及 ST-1 时间边界。RA-1 的自动持有重置断言待全部生产迁移完成后随 Mod 测试恢复。调整执行顺序前已启动的组合测试最终为 634 项通过；后续测试统一安排在全部生产重构完成后。
 
-**本次验证范围。** 生产 Release 构建使用 `--no-restore -p:BuildProjectReferences=false`，0 警告、0 错误；引用已有 sibling 程序集，未构建或修改 sibling 源码。定向测试通过本地生成的 `artifacts/hitobject-core/core.csproj` 编译正式 `Normal/Gameplay/Judgement` 下的全部测试，以及所需 Player 辅助文件和下列定向视觉测试。覆盖规则、候选选择、独立参考窗口、HCN 血量历史、核心计划执行、多列引擎、真实长按玩法、生命周期、地雷回退、HCN 帧顺序、暂停恢复、裁剪、身体透明度、HCN 尾部视觉、Invisible Note、活跃索引、无自动化调度生成和 Note/LN/CN/HCN 出口对照。组合结果为 **591 项通过，0 失败、0 跳过**。该局部编译入口不添加生产兼容代码。完整测试项目构建首先报告剩余 `BmsJudgementCheckpointRecorder` 的旧 Controller 和 `BmsLampScoreSelectorTest` 的 AutoScratch 类型缺失；这不是所有未迁移调用的完整清单。
+**本次验证范围。** 生产 Release 构建使用 `--no-restore -p:BuildProjectReferences=false`，0 警告、0 错误；引用已有 sibling 程序集，未构建或修改 sibling 源码。定向测试通过本地生成的 `artifacts/hitobject-core/core.csproj` 编译正式 `Normal/Gameplay/Judgement` 下的全部测试，以及所需 Player 辅助文件和下列定向视觉测试。覆盖规则、候选选择、独立参考窗口、HCN 血量历史、核心计划执行、多列引擎、真实长按玩法、生命周期、地雷回退、HCN 帧顺序、暂停恢复、裁剪、身体透明度、HCN 尾部视觉、Invisible Note、活跃索引、无自动化调度生成和 Note/LN/CN/HCN 出口对照。组合结果为 **634 项通过，0 失败、0 跳过**。该局部编译入口不添加生产兼容代码。完整测试项目构建首先报告剩余 `BmsJudgementCheckpointRecorder` 的旧 Controller 和 `BmsLampScoreSelectorTest` 的 AutoScratch 类型缺失；这不是所有未迁移调用的完整清单。
 
 本地组合复现命令（结果写入 `artifacts/hitobject-core/results`）：
 
 ```powershell
-dotnet test artifacts/hitobject-core/core.csproj -c Release --no-restore -p:BuildProjectReferences=false --filter '(FullyQualifiedName~.Normal.Gameplay.Judgement.|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaLandmineRewindLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaHcnFrameOrder|FullyQualifiedName~TestSceneBmsBeatorajaHcnLandmineFrameOrder|FullyQualifiedName~TestSceneBmsPauseRewindLongNote|FullyQualifiedName~TestSceneBmsVisualCulling|FullyQualifiedName~TestSceneBmsLongNoteBodyTint|FullyQualifiedName~TestSceneBmsInvisibleNote|FullyQualifiedName~TestSceneBmsJudgementIndexes|FullyQualifiedName~TestSceneBmsHcnTailVisuals|FullyQualifiedName~TestSceneBmsCoreSchedulingGeneration|FullyQualifiedName~TestSceneBmsNoteExecution|FullyQualifiedName~TestSceneBmsLongNoteExecution|FullyQualifiedName~TestSceneBmsChargeNoteExecution|FullyQualifiedName~TestSceneBmsHellChargeNoteExecution)&FullyQualifiedName!~.Performance.' --logger 'trx;LogFileName=migration-combined.trx' --results-directory artifacts/hitobject-core/results
+dotnet test artifacts/hitobject-core/core.csproj -c Release --no-restore -p:BuildProjectReferences=false --filter '(FullyQualifiedName~.Normal.Gameplay.Judgement.|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaLandmineRewindLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaHcnFrameOrder|FullyQualifiedName~TestSceneBmsBeatorajaHcnLandmineFrameOrder|FullyQualifiedName~TestSceneBmsPauseRewindLongNote|FullyQualifiedName~TestSceneBmsVisualCulling|FullyQualifiedName~TestSceneBmsLongNoteBodyTint|FullyQualifiedName~TestSceneBmsInvisibleNote|FullyQualifiedName~TestSceneBmsJudgementIndexes|FullyQualifiedName~TestSceneBmsHcnTailVisuals|FullyQualifiedName~TestSceneBmsCoreSchedulingGeneration|FullyQualifiedName~TestSceneBmsNoteExecution|FullyQualifiedName~TestSceneBmsLongNoteExecution|FullyQualifiedName~TestSceneBmsChargeNoteExecution|FullyQualifiedName~TestSceneBmsHellChargeNoteExecution|FullyQualifiedName~TestSceneBmsJudgementLifecycleExecution)&FullyQualifiedName!~.Performance.' --logger 'trx;LogFileName=migration-combined.trx' --results-directory artifacts/hitobject-core/results
 ```
 
 这是实现期间的定向规则、计划执行和真实 Player 回归；冻结无自动化轨迹覆盖的生成检查已通过。完整调度矩阵、Git 新旧版本对照、全部音频/视觉反馈和性能均待验证；未运行 benchmark。局部编译项目和日志保留在忽略的 `artifacts` 中，稳定测试源文件及 fixture 仍在正式测试项目中。
