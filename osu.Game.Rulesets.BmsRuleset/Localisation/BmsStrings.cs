@@ -700,6 +700,10 @@ public static class BmsStrings
 
     public static LocalisableString ModAutoScratch => get("mod_auto_scratch");
 
+    public static LocalisableString ModAutoScratchName => get("mod_auto_scratch_name");
+
+    public static LocalisableString ModAutoScratchAcronym => get("mod_auto_scratch_acronym");
+
     public static LocalisableString ModBackgroundKeysound => get("mod_background_keysound");
 
     public static LocalisableString ModBranchReplay => get("mod_branch_replay");

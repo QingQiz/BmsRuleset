@@ -227,6 +227,8 @@
   <data name="min_bpm" xml:space="preserve"><value>最低 BPM</value></data>
   <data name="mod_second_player" xml:space="preserve"><value>切换为街机二号玩家布局（皿在右侧）。</value></data>
   <data name="mod_auto_scratch" xml:space="preserve"><value>自动完成皿音符、长皿保持和 CN/HCN 尾部反向操作。</value></data>
+  <data name="mod_auto_scratch_name" xml:space="preserve"><value>自动皿</value></data>
+  <data name="mod_auto_scratch_acronym" xml:space="preserve"><value>AS</value></data>
   <data name="mod_background_keysound" xml:space="preserve"><value>随歌曲自动播放所有按键音。</value></data>
   <data name="mod_branch_replay" xml:space="preserve"><value>保存 BMS 随机与分支选择，以供回放时重现。</value></data>
   <data name="mod_constant" xml:space="preserve"><value>禁用由 BPM 引起的滚动速度变化。</value></data>

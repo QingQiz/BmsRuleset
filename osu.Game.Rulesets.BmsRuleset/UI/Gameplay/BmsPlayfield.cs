@@ -237,6 +237,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private readonly BmsColumn[] judgementColumns;
 
+    internal void EnableAutoScratch() => judgementEngine.EnableAutoScratch();
+
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
     {
         switch (e.Action)

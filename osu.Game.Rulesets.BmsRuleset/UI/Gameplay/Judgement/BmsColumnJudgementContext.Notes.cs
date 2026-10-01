@@ -173,6 +173,7 @@ internal sealed partial class BmsColumnJudgementContext
         activeNotes[slot] = true;
         noteOrders[slot] = ++nextNoteOrder;
         activeNoteSlots.Add(slot);
+        automaticOrderDirty = true;
         updateNoteIndexes(note);
         passiveDeadlineDirty = true;
     }
@@ -182,10 +183,14 @@ internal sealed partial class BmsColumnJudgementContext
         var slot = noteSlots[note];
         activeNotes[slot] = false;
         activeNoteSlots.Remove(slot);
+        automaticOrderDirty = true;
         pendingLongNoteTailSlots.Remove(slot);
         activeBodySlots.Remove(slot);
         if (note is BmsLongNote longNote)
+        {
             activeLongNotes.Remove(longNote);
+            ResetAutomaticHold(longNote);
+        }
         pendingNoteHeads.Remove((noteHeadTimes[slot], noteOrders[slot], slot));
     }
 
@@ -203,6 +208,7 @@ internal sealed partial class BmsColumnJudgementContext
         if (activeNoteSlots.Count != remaining)
             throw new InvalidOperationException("The activation plan omitted an active note.");
         reorderLongNoteSlots();
+        automaticOrderDirty = true;
     }
 
     private void reorderLongNoteSlots()
@@ -243,6 +249,7 @@ internal sealed partial class BmsColumnJudgementContext
         {
             pendingNoteHeads.Remove((noteHeadTimes[slot], noteOrders[slot], slot));
             noteHeadTimes[slot] = note.StartTime;
+            automaticOrderDirty = true;
             // Configuration changes must retain the pre-existing order among equal-time objects.
             columnNotes.OrderBy(n => n.StartTime).ToArray().CopyTo(columnNotes, 0);
         }
@@ -463,7 +470,7 @@ internal sealed partial class BmsColumnJudgementContext
     }
 
     internal void UpdateRegisteredLongNote(BmsLongNote note, in BmsFrameContext frame, double elapsed, bool holding)
-        => finishOperations[holdOperationSlots[noteSlots[note]]](noteSlots[note], frame, elapsed, holding);
+        => finishOperations[holdOperationSlots[noteSlots[note]]](noteSlots[note], frame, elapsed, holding || IsAutomaticallyHeld(note));
 
     internal void UpdateRegisteredBodies(in BmsFrameContext frame, double elapsed, bool holding)
     {
@@ -474,7 +481,7 @@ internal sealed partial class BmsColumnJudgementContext
         {
             var slot = activeBodySlots[i];
             Rules.HellChargeNote.UpdateBody(hellChargeHoldStates[holdStateSlots[holdOperationSlots[slot]]],
-                new BmsJudgementExecutionContext(this, noteOutput), frame, elapsed, holding);
+                new BmsJudgementExecutionContext(this, noteOutput), frame, elapsed, holding || IsAutomaticallyHeld(longNotes[slot]));
             // Ending a body removes only that member while preserving the next object's turn.
             if (i < activeBodySlots.Count && activeBodySlots[i] == slot)
                 i++;

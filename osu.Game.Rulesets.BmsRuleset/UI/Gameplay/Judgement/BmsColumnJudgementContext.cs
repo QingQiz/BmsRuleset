@@ -56,7 +56,10 @@ internal sealed partial class BmsColumnJudgementContext
     internal void CompleteLongNotesAtPause(in BmsFrameContext frame)
     {
         foreach (var note in GetHoldingNotes().ToArray())
+        {
             pauseOperations[holdOperationSlots[noteSlots[note]]](noteSlots[note], frame);
+            ResetAutomaticHold(note);
+        }
     }
 
     internal void RewindLongNotes(double time)
@@ -66,7 +69,10 @@ internal sealed partial class BmsColumnJudgementContext
         foreach (var note in longNotes)
         {
             if (note != null)
+            {
                 rewindOperations[holdOperationSlots[noteSlots[note]]](noteSlots[note], time);
+                restoreAutomaticHold(note);
+            }
         }
     }
 

@@ -312,7 +312,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     private bool isHoldingBody() => mapPresentation(ln, state, isKeyHeld(), Time.Current).HoldingBody;
 
-    private bool isKeyHeld() => ParentColumn?.IsPressed == true;
+    private bool isKeyHeld() => ParentColumn?.Judgements.IsHoldInputActive(ln) == true;
 
     private void applyPresentation(in BmsLongNoteState snapshot, in BmsFrameContext frame)
     {

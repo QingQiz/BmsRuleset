@@ -11,6 +11,7 @@ internal delegate bool BmsRepressOperation(int slot, in BmsPressContext press);
 internal delegate bool BmsReleaseOperation(int slot, in BmsReleaseContext release);
 internal delegate void BmsFinishOperation(int slot, in BmsFrameContext frame, double elapsed, bool holding);
 internal delegate bool BmsPauseOperation(int slot, in BmsFrameContext frame);
+internal delegate bool BmsAutomaticTailOperation(int slot, in BmsFrameContext frame);
 
 internal sealed partial class BmsColumnJudgementContext
 {
@@ -24,6 +25,7 @@ internal sealed partial class BmsColumnJudgementContext
     private BmsReleaseOperation[] releaseOperations = [];
     private BmsFinishOperation[] finishOperations = [];
     private BmsPauseOperation[] pauseOperations = [];
+    private BmsAutomaticTailOperation[] automaticTailOperations = [];
     private Action<int, double>[] rewindOperations = [];
     private Action<int, bool>[] configurationOperations = [];
     private Func<int, double>[] headDeadlines = [];
@@ -39,6 +41,7 @@ internal sealed partial class BmsColumnJudgementContext
         releaseOperations = new BmsReleaseOperation[count];
         finishOperations = new BmsFinishOperation[count];
         pauseOperations = new BmsPauseOperation[count];
+        automaticTailOperations = new BmsAutomaticTailOperation[count];
         rewindOperations = new Action<int, double>[count];
         configurationOperations = new Action<int, bool>[count];
         headDeadlines = new Func<int, double>[count];
@@ -66,6 +69,7 @@ internal sealed partial class BmsColumnJudgementContext
         private readonly BmsReleaseOperation release;
         private readonly BmsFinishOperation finish;
         private readonly BmsPauseOperation pause;
+        private readonly BmsAutomaticTailOperation automaticTail;
         private readonly Action<int, double> rewind;
         private readonly Action<int, bool> configure;
         private readonly Func<int, double> deadline;
@@ -82,6 +86,7 @@ internal sealed partial class BmsColumnJudgementContext
             release = Release;
             finish = Finish;
             pause = Pause;
+            automaticTail = AutomaticTail;
             rewind = Rewind;
             configure = Configure;
             deadline = Deadline;
@@ -100,6 +105,7 @@ internal sealed partial class BmsColumnJudgementContext
             column.releaseOperations[operationSlot] = release;
             column.finishOperations[operationSlot] = finish;
             column.pauseOperations[operationSlot] = pause;
+            column.automaticTailOperations[operationSlot] = automaticTail;
             column.rewindOperations[operationSlot] = rewind;
             column.configurationOperations[operationSlot] = configure;
             column.headDeadlines[operationSlot] = deadline;
@@ -113,6 +119,7 @@ internal sealed partial class BmsColumnJudgementContext
         private bool Release(int slot, in BmsReleaseContext input) => rule.TryRelease(state(slot), execution, input);
         private void Finish(int slot, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(state(slot), execution, frame, elapsed, holding);
         private bool Pause(int slot, in BmsFrameContext frame) => rule.CompleteAtPause(state(slot), execution, frame);
+        private bool AutomaticTail(int slot, in BmsFrameContext frame) => rule.TryRelease(state(slot), execution, new BmsReleaseContext(frame.SimulationTime, frame));
         private void Rewind(int slot, double time) => rule.Rewind(state(slot), time);
         private double Deadline(int slot) => state(slot).Hold.NextHeadTime;
         private void Configure(int slot, bool preserveHistory)
@@ -133,6 +140,7 @@ internal sealed partial class BmsColumnJudgementContext
         private readonly BmsReleaseOperation release;
         private readonly BmsFinishOperation finish;
         private readonly BmsPauseOperation pause;
+        private readonly BmsAutomaticTailOperation automaticTail;
         private readonly Action<int, double> rewind;
         private readonly Action<int, bool> configure;
         private readonly Func<int, double> deadline;
@@ -149,6 +157,7 @@ internal sealed partial class BmsColumnJudgementContext
             release = Release;
             finish = Finish;
             pause = Pause;
+            automaticTail = AutomaticTail;
             rewind = Rewind;
             configure = Configure;
             deadline = Deadline;
@@ -167,6 +176,7 @@ internal sealed partial class BmsColumnJudgementContext
             column.releaseOperations[operationSlot] = release;
             column.finishOperations[operationSlot] = finish;
             column.pauseOperations[operationSlot] = pause;
+            column.automaticTailOperations[operationSlot] = automaticTail;
             column.rewindOperations[operationSlot] = rewind;
             column.configurationOperations[operationSlot] = configure;
             column.headDeadlines[operationSlot] = deadline;
@@ -180,6 +190,7 @@ internal sealed partial class BmsColumnJudgementContext
         private bool Release(int slot, in BmsReleaseContext input) => rule.TryRelease(state(slot), execution, input);
         private void Finish(int slot, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(state(slot), execution, frame, elapsed, holding);
         private bool Pause(int slot, in BmsFrameContext frame) => rule.CompleteAtPause(state(slot), execution, frame);
+        private bool AutomaticTail(int slot, in BmsFrameContext frame) => rule.TryRepress(state(slot), execution, new BmsPressContext(frame.SimulationTime, frame, ReverseScratch: true));
         private void Rewind(int slot, double time) => rule.Rewind(state(slot), time);
         private double Deadline(int slot) => state(slot).Hold.NextHeadTime;
         private void Configure(int slot, bool preserveHistory)
@@ -200,6 +211,7 @@ internal sealed partial class BmsColumnJudgementContext
         private readonly BmsReleaseOperation release;
         private readonly BmsFinishOperation finish;
         private readonly BmsPauseOperation pause;
+        private readonly BmsAutomaticTailOperation automaticTail;
         private readonly Action<int, double> rewind;
         private readonly Action<int, bool> configure;
         private readonly Func<int, double> deadline;
@@ -216,6 +228,7 @@ internal sealed partial class BmsColumnJudgementContext
             release = Release;
             finish = Finish;
             pause = Pause;
+            automaticTail = AutomaticTail;
             rewind = Rewind;
             configure = Configure;
             deadline = Deadline;
@@ -234,6 +247,7 @@ internal sealed partial class BmsColumnJudgementContext
             column.releaseOperations[operationSlot] = release;
             column.finishOperations[operationSlot] = finish;
             column.pauseOperations[operationSlot] = pause;
+            column.automaticTailOperations[operationSlot] = automaticTail;
             column.rewindOperations[operationSlot] = rewind;
             column.configurationOperations[operationSlot] = configure;
             column.headDeadlines[operationSlot] = deadline;
@@ -247,6 +261,7 @@ internal sealed partial class BmsColumnJudgementContext
         private bool Release(int slot, in BmsReleaseContext input) => rule.TryRelease(state(slot), execution, input);
         private void Finish(int slot, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(state(slot), execution, frame, elapsed, holding);
         private bool Pause(int slot, in BmsFrameContext frame) => rule.CompleteAtPause(state(slot), execution, frame);
+        private bool AutomaticTail(int slot, in BmsFrameContext frame) => rule.TryRepress(state(slot), execution, new BmsPressContext(frame.SimulationTime, frame, ReverseScratch: true));
         private void Rewind(int slot, double time) => rule.Rewind(state(slot), time);
         private double Deadline(int slot) => state(slot).Hold.NextHeadTime;
         private void Configure(int slot, bool preserveHistory)
