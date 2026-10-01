@@ -1,7 +1,7 @@
 using System;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 
 internal sealed class BmsHellChargeBodyTracker
 {
@@ -11,21 +11,20 @@ internal sealed class BmsHellChargeBodyTracker
 
     private double accumulator;
     private BmsHellChargeHistory? history;
-    private bool historyEnabled = true;
 
     public bool HistoryEnabled
     {
-        get => historyEnabled;
+        get;
         set
         {
-            if (historyEnabled == value)
+            if (field == value)
                 return;
 
-            historyEnabled = value;
+            field = value;
             if (!value)
                 history = null;
         }
-    }
+    } = true;
 
     public void Reset()
     {
@@ -56,6 +55,7 @@ internal sealed class BmsHellChargeBodyTracker
     {
         if (elapsed <= 0)
             return;
+
         var tick = accumulate(elapsed, holding);
         if (tick)
             applyTick(holding, DEFAULT_TICK_SCALE);
@@ -66,6 +66,7 @@ internal sealed class BmsHellChargeBodyTracker
     {
         if (elapsed <= 0)
             return;
+
         var tick = accumulate(elapsed, holding);
         if (tick)
             execution.ApplyBodyTick(note, holding, DEFAULT_TICK_SCALE, frame);
@@ -76,7 +77,7 @@ internal sealed class BmsHellChargeBodyTracker
     {
         accumulator += holding ? elapsed : -elapsed;
         // One update releases at most one tick, leaving a large frame's backlog for later updates.
-        return holding && accumulator > tick_interval || !holding && accumulator < -tick_interval;
+        return (holding && accumulator > tick_interval) || (!holding && accumulator < -tick_interval);
     }
 
     private void commit(bool holding, bool tick, double? time)

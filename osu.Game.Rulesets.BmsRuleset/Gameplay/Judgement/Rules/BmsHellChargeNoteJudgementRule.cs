@@ -1,8 +1,9 @@
 using System;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 
 internal sealed class BmsHellChargeNoteJudgementRule
 {
@@ -11,12 +12,14 @@ internal sealed class BmsHellChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (press.Frame.IsRewinding || hold.HeadJudged || hold.Started || result == HitResult.None || execution.GetMainResult(hold.Note).HasResult)
             return false;
+
         if (result == HitResult.Meh)
         {
             startMissedHead(state, execution, press.Frame);
             execution.PublishState(hold.Note, state.State, press.Frame);
             return true;
         }
+
         state.Body.Reset();
         hold.HeadJudged = true;
         hold.Started = result != HitResult.Meh;
@@ -34,6 +37,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (!hold.Holding || press.Frame.IsRewinding)
             return false;
+
         var previous = state.State;
         if (hold.IsScratch && press.ReverseScratch != hold.HeadReverseScratch)
             applyTail(state, execution, press.InputTime - hold.Note.EndTime, press.InputTime, press.Frame);
@@ -48,17 +52,20 @@ internal sealed class BmsHellChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (!hold.Holding || release.Frame.IsRewinding)
             return false;
+
         var offset = release.InputTime - hold.Note.EndTime;
         var result = hold.TailWindow.ResultForOffset(offset);
         // Charge scratch tails use reversal; releasing the head direction only drops an out-of-window hold.
         if (hold.IsScratch && (release.ReverseScratch != hold.HeadReverseScratch || result != HitResult.None))
             return false;
+
         if (offset < 0 && result is HitResult.None or HitResult.Ok && hold.ReleaseMargin > 0)
         {
             hold.SetPendingRelease(release.Frame.SimulationTime, release.Frame.SimulationTime);
         }
         else
             applyTail(state, execution, offset, release.Frame.SimulationTime, release.Frame);
+
         execution.PublishState(hold.Note, state.State, release.Frame);
         return true;
     }
@@ -67,6 +74,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
     {
         if (frame.IsRewinding)
             return;
+
         ref var hold = ref state.Hold;
         if (execution.GetMainResult(hold.Note).HasResult)
         {
@@ -74,6 +82,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
                 Finish(state, execution, frame, 0, false);
             return;
         }
+
         var previous = state.State;
         resolveRelease(state, execution, frame);
         if (!hold.TailJudged)
@@ -86,6 +95,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
             else if (hold.HeadWindow.IsPastPassivePoorOffset(frame.SimulationTime - hold.Note.EndTime))
                 missTail(state, execution, frame);
         }
+
         if (previous != state.State)
             execution.PublishState(hold.Note, state.State, frame);
     }
@@ -94,6 +104,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
     {
         if (frame.IsRewinding)
             return;
+
         ref var hold = ref state.Hold;
         var previous = state.State;
         if (hold.HeadJudged && frame.SimulationTime < hold.Note.StartTime + hold.HeadOffset)
@@ -107,6 +118,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
             if (hold.Started && hold.TailJudged && frame.SimulationTime >= hold.Note.EndTime)
                 hold.Started = false;
         }
+
         if (previous != state.State)
             execution.PublishState(hold.Note, state.State, frame);
     }
@@ -116,6 +128,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (!hold.Holding)
             return false;
+
         var released = hold.PendingRelease ?? frame.SimulationTime;
         hold.SetPendingRelease(frame.SimulationTime, null);
         applyTail(state, execution, released - hold.Note.EndTime, frame.SimulationTime, frame);
@@ -131,17 +144,20 @@ internal sealed class BmsHellChargeNoteJudgementRule
         state.LastBodyTime = Math.Min(state.LastBodyTime, time);
         if (!hold.HeadJudged)
             return;
+
         if (time < hold.Note.StartTime + hold.HeadOffset)
         {
             Reset(state);
             return;
         }
+
         if (hold.TailTime > time)
         {
             hold.TailJudged = false;
             hold.TailTime = null;
             hold.TailResult = HitResult.None;
         }
+
         hold.Started = time < hold.Note.EndTime || !hold.TailJudged;
         state.Body.Rewind(time);
     }
@@ -165,6 +181,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
     {
         if (frame.IsRewinding || elapsed <= 0 || frame.SimulationTime <= state.LastBodyTime)
             return;
+
         state.LastBodyTime = frame.SimulationTime;
         ref var hold = ref state.Hold;
         if (hold.Started && frame.SimulationTime > hold.Note.StartTime + hold.HeadOffset)
@@ -174,9 +191,9 @@ internal sealed class BmsHellChargeNoteJudgementRule
             else if (frame.SimulationTime >= hold.Note.StartTime)
             {
                 var chargeElapsed = Math.Max(0, Math.Min(frame.SimulationTime, hold.Note.EndTime)
-                                               - Math.Max(frame.SimulationTime - elapsed, hold.Note.StartTime));
+                                                - Math.Max(frame.SimulationTime - elapsed, hold.Note.StartTime));
                 var successfulTail = hold.TailJudged && hold.TailResult is HitResult.Perfect or HitResult.Great or HitResult.Good
-                                     && hold.TailTime < frame.SimulationTime;
+                                                     && hold.TailTime < frame.SimulationTime;
                 state.Body.Update(chargeElapsed, holding || successfulTail, hold.Note, execution, frame);
             }
         }
@@ -187,6 +204,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (hold.HeadJudged)
             return;
+
         hold.HeadJudged = true;
         hold.Started = true;
         hold.HeadResult = HitResult.Meh;
@@ -202,6 +220,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (hold.PendingRelease is not { } released || hold.TailJudged || released + hold.ReleaseMargin > frame.SimulationTime)
             return;
+
         hold.SetPendingRelease(frame.SimulationTime, null);
         applyTail(state, execution, released - hold.Note.EndTime, frame.SimulationTime, frame);
     }
@@ -220,6 +239,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (hold.TailJudged)
             return;
+
         var result = hold.TailWindow.ResultForOffset(offset);
         if (result == HitResult.None)
             result = HitResult.Meh;

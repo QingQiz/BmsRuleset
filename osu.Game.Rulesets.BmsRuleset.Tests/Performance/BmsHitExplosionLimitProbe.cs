@@ -5,6 +5,7 @@ using System.Reflection;
 using osu.Framework.Graphics.Pooling;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
@@ -10,8 +12,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 internal sealed class BmsColumnNoteIndex
 {
     private readonly IReadOnlyDictionary<BmsHitObject, int> noteSlots;
-    private readonly BmsNoteRegistration[] NoteRegistrations;
-    private readonly BmsNoteJudgementWindows[] NoteWindows;
+    private readonly BmsNoteRegistration[] noteRegistrations;
+    private readonly BmsNoteJudgementWindows[] noteWindows;
     private readonly BmsHoldRegistry holds;
     private readonly IBmsJudgementOutput noteOutput;
     private readonly bool canBatchUpdates;
@@ -31,19 +33,24 @@ internal sealed class BmsColumnNoteIndex
     private bool passiveDeadlineDirty = true;
 
     internal int RankOf(int slot) => activeOrderRanks[slot];
+
     internal IReadOnlyList<int> ActiveSlots => activeNoteSlots;
+
     internal IReadOnlyList<int> PendingTails => pendingLongNoteTailSlots;
+
     internal IReadOnlyList<int> ActiveBodies => activeBodySlots;
+
     internal IReadOnlyList<BmsLongNote> ActiveLongNotes => activeLongNotes;
+
     internal double NextPassiveUpdateTime { get; private set; }
 
     internal BmsColumnNoteIndex(IReadOnlyDictionary<BmsHitObject, int> slots, BmsNoteRegistration[] registrations,
-                               BmsNoteJudgementWindows[] windows, BmsHoldRegistry holds,
-                               IBmsJudgementOutput output, bool batchUpdates)
+                                BmsNoteJudgementWindows[] windows, BmsHoldRegistry holds,
+                                IBmsJudgementOutput output, bool batchUpdates)
     {
         noteSlots = slots;
-        NoteRegistrations = registrations;
-        NoteWindows = windows;
+        noteRegistrations = registrations;
+        noteWindows = windows;
         this.holds = holds;
         noteOutput = output;
         canBatchUpdates = batchUpdates;
@@ -58,13 +65,15 @@ internal sealed class BmsColumnNoteIndex
         compareActiveOrder = (left, right) => activeOrderRanks[left].CompareTo(activeOrderRanks[right]);
     }
 
-    private BmsLongNoteState GetLongNoteState(BmsLongNote note) => holds.GetState(noteSlots[note]);
+    private BmsLongNoteState getLongNoteState(BmsLongNote note) => holds.GetState(noteSlots[note]);
+
     internal void InvalidateDeadline() => passiveDeadlineDirty = true;
 
     internal bool RefreshTiming(BmsHitObject note)
     {
         var slot = noteSlots[note];
         if (noteHeadTimes[slot] == note.StartTime) return false;
+
         pendingNoteHeads.Remove((noteHeadTimes[slot], noteOrders[slot], slot));
         noteHeadTimes[slot] = note.StartTime;
         Refresh(note);
@@ -83,11 +92,14 @@ internal sealed class BmsColumnNoteIndex
         {
             if (!noteSlots.TryGetValue(note, out var slot) || !activeNotes[slot] || proposedOrderRanks[slot] >= 0)
                 throw new InvalidOperationException("The activation plan must contain each active note exactly once.");
+
             proposedOrderRanks[slot] = proposedOrder.Count;
             proposedOrder.Add(slot);
         }
+
         if (proposedOrder.Count != activeNoteSlots.Count)
             throw new InvalidOperationException("The activation plan omitted an active note.");
+
         activeNoteSlots.Clear();
         activeNoteSlots.AddRange(proposedOrder);
         refreshOrderRanks();
@@ -114,19 +126,21 @@ internal sealed class BmsColumnNoteIndex
         {
             if (!canBatchUpdates || pendingNoteHeads.Count == 0)
                 return null;
-            var first = NoteRegistrations[pendingNoteHeads.Min.Slot].Object;
+
+            var first = noteRegistrations[pendingNoteHeads.Min.Slot].Object;
             foreach (var slot in pendingLongNoteTailSlots)
             {
-                var held = NoteRegistrations[slot].Object;
+                var held = noteRegistrations[slot].Object;
                 if (!noteOutput.GetMainResult(held).HasResult && held.StartTime <= first.StartTime)
                     return null;
             }
+
             return first;
         }
     }
 
     private bool hasPendingExecutionHead(BmsHitObject note)
-        => note is BmsLongNote ln ? !GetLongNoteState(ln).HeadJudged : !noteOutput.GetMainResult(note).HasResult;
+        => note is BmsLongNote ln ? !getLongNoteState(ln).HeadJudged : !noteOutput.GetMainResult(note).HasResult;
 
     internal bool IsNoteActive(BmsHitObject note)
         => noteSlots.TryGetValue(note, out var slot) && activeNotes[slot];
@@ -138,7 +152,7 @@ internal sealed class BmsColumnNoteIndex
     {
         foreach (var slot in activeNoteSlots)
         {
-            var note = NoteRegistrations[slot].Object;
+            var note = noteRegistrations[slot].Object;
             if (!noteOutput.GetMainResult(note).HasResult)
                 yield return note;
         }
@@ -171,6 +185,7 @@ internal sealed class BmsColumnNoteIndex
         {
             activeLongNotes.Remove(longNote);
         }
+
         pendingNoteHeads.Remove((noteHeadTimes[slot], noteOrders[slot], slot));
     }
 
@@ -178,13 +193,14 @@ internal sealed class BmsColumnNoteIndex
     {
         if (!noteSlots.TryGetValue(note, out var slot))
             return;
+
         var key = (noteHeadTimes[slot], noteOrders[slot], slot);
         // Removal precedes the last passive check; a synchronous result must never reactivate it.
         if (canBatchUpdates && activeNotes[slot] && hasPendingExecutionHead(note))
             pendingNoteHeads.Add(key);
         else
             pendingNoteHeads.Remove(key);
-        if (note is BmsLongNote ln && activeNotes[slot] && GetLongNoteState(ln).HasPendingTail)
+        if (note is BmsLongNote ln && activeNotes[slot] && getLongNoteState(ln).HasPendingTail)
         {
             if (!pendingLongNoteTailSlots.Contains(slot))
             {
@@ -194,7 +210,8 @@ internal sealed class BmsColumnNoteIndex
         }
         else
             pendingLongNoteTailSlots.Remove(slot);
-        if (note is BmsLongNote body && activeNotes[slot] && GetLongNoteState(body).HasActiveBody)
+
+        if (note is BmsLongNote body && activeNotes[slot] && getLongNoteState(body).HasActiveBody)
         {
             if (!activeBodySlots.Contains(slot))
             {
@@ -205,6 +222,7 @@ internal sealed class BmsColumnNoteIndex
         }
         else
             activeBodySlots.Remove(slot);
+
         // Visual retirement can outlast a POOR tail; it must not keep a judged endpoint selectable.
         if (note is BmsLongNote activeHold && activeNotes[slot])
             trackActiveLongNote(activeHold);
@@ -217,7 +235,7 @@ internal sealed class BmsColumnNoteIndex
         activeBodySlots.Clear();
         activeLongNotes.Clear();
         foreach (var slot in activeNoteSlots)
-            Refresh(NoteRegistrations[slot].Object);
+            Refresh(noteRegistrations[slot].Object);
         passiveDeadlineDirty = true;
     }
 
@@ -229,11 +247,13 @@ internal sealed class BmsColumnNoteIndex
         NextPassiveUpdateTime = double.PositiveInfinity;
         foreach (var slot in activeNoteSlots)
         {
-            var note = NoteRegistrations[slot].Object;
+            var note = noteRegistrations[slot].Object;
             if (hasPendingExecutionHead(note))
-                NextPassiveUpdateTime = Math.Min(NextPassiveUpdateTime, note is BmsLongNote ln
-                    ? holds.HeadDeadline(slot) : NoteWindows[slot].NextPassiveJudgementTime(note));
+                NextPassiveUpdateTime = Math.Min(NextPassiveUpdateTime, note is BmsLongNote
+                    ? holds.HeadDeadline(slot)
+                    : noteWindows[slot].NextPassiveJudgementTime(note));
         }
+
         passiveDeadlineDirty = false;
     }
 
@@ -241,7 +261,8 @@ internal sealed class BmsColumnNoteIndex
     {
         if (note is not BmsLongNote longNote)
             return false;
-        var state = GetLongNoteState(longNote);
+
+        var state = getLongNoteState(longNote);
         return state.LongNoteStarted || state.HasPendingTail || state.HasActiveBody;
     }
 

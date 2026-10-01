@@ -12,6 +12,7 @@ using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;

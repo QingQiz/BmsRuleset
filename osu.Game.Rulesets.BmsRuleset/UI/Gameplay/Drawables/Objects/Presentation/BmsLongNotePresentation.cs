@@ -1,6 +1,5 @@
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
@@ -9,24 +8,31 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentatio
 internal delegate BmsLongNotePresentation BmsLongNotePresentationMapping(BmsLongNote note, in BmsLongNoteState state, bool held, double time);
 
 internal readonly record struct BmsLongNotePresentation(
-    bool HeadJudged, bool HoldingBody, bool KeepAfterHeadResult, bool KeepAlive, bool Retired, bool ClearBodyOnRetire, double LifetimeEnd, bool HoldLightActive)
+    bool HeadJudged,
+    bool HoldingBody,
+    bool KeepAfterHeadResult,
+    bool KeepAlive,
+    bool Retired,
+    bool ClearBodyOnRetire,
+    double LifetimeEnd,
+    bool HoldLightActive)
 {
-    private static readonly BmsLongNotePresentationMapping longNoteMapping = longNote;
-    private static readonly BmsLongNotePresentationMapping chargeNoteMapping = chargeNote;
-    private static readonly BmsLongNotePresentationMapping hellChargeNoteMapping = hellChargeNote;
+    private static readonly BmsLongNotePresentationMapping long_note_mapping = longNote;
+    private static readonly BmsLongNotePresentationMapping charge_note_mapping = chargeNote;
+    private static readonly BmsLongNotePresentationMapping hell_charge_note_mapping = hellChargeNote;
 
     internal BmsHitLightStyle HitLightStyle => BmsHitLightStyle.Hold;
 
     internal static bool HideDuringResume(BmsLongNote note, in BmsLongNoteState state, bool hasMainResult, double resumeTime)
         // HCN head-POOR can complete both endpoints synthetically without a main result.
-        => note.EndTime <= resumeTime || hasMainResult && !state.IsHolding;
+        => note.EndTime <= resumeTime || (hasMainResult && !state.IsHolding);
 
     internal static BmsLongNotePresentationMapping SelectMapping(BmsLongNoteMode mode)
         => mode switch
         {
-            BmsLongNoteMode.ChargeNote => chargeNoteMapping,
-            BmsLongNoteMode.HellChargeNote => hellChargeNoteMapping,
-            _ => longNoteMapping,
+            BmsLongNoteMode.ChargeNote => charge_note_mapping,
+            BmsLongNoteMode.HellChargeNote => hell_charge_note_mapping,
+            _ => long_note_mapping,
         };
 
     private static BmsLongNotePresentation longNote(BmsLongNote note, in BmsLongNoteState state, bool held, double time)

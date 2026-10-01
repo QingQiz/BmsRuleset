@@ -4,6 +4,7 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 internal delegate bool BmsPressOperation(int slot, HitResult result, in BmsPressContext press);
+
 internal delegate void BmsPassiveOperation(int slot, in BmsFrameContext frame);
 
 internal readonly record struct BmsNoteRegistration(BmsHitObject Object, int Slot, BmsPressOperation Press, BmsPassiveOperation Passive);
@@ -25,6 +26,7 @@ internal sealed class BmsNoteOperationBinding
     }
 
     internal BmsPressOperation Press { get; }
+
     internal BmsPassiveOperation Passive { get; }
 
     private bool tryPress(int slot, HitResult result, in BmsPressContext press)

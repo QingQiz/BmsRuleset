@@ -1,7 +1,8 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 
 internal sealed class BmsChargeNoteJudgementRule
 {
@@ -10,6 +11,7 @@ internal sealed class BmsChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (press.Frame.IsRewinding || hold.HeadJudged || hold.Started || result == HitResult.None || execution.GetMainResult(hold.Note).HasResult)
             return false;
+
         hold.HeadJudged = true;
         hold.Started = result != HitResult.Meh;
         hold.HeadResult = result;
@@ -26,6 +28,7 @@ internal sealed class BmsChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (!hold.Holding || press.Frame.IsRewinding)
             return false;
+
         if (hold.IsScratch && press.ReverseScratch != hold.HeadReverseScratch)
             applyTail(state, execution, press.InputTime - hold.Note.EndTime, press.InputTime, press.Frame);
         var previous = state.State;
@@ -40,11 +43,13 @@ internal sealed class BmsChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (!hold.Holding || release.Frame.IsRewinding)
             return false;
+
         var offset = release.InputTime - hold.Note.EndTime;
         var result = hold.TailWindow.ResultForOffset(offset);
         // Charge scratch tails use reversal; releasing the head direction only drops an out-of-window hold.
         if (hold.IsScratch && (release.ReverseScratch != hold.HeadReverseScratch || result != HitResult.None))
             return false;
+
         if (offset < 0 && result is HitResult.None or HitResult.Ok && hold.ReleaseMargin > 0)
         {
             hold.SetPendingRelease(release.Frame.SimulationTime, release.Frame.SimulationTime);
@@ -52,6 +57,7 @@ internal sealed class BmsChargeNoteJudgementRule
         }
         else
             applyTail(state, execution, offset, release.Frame.SimulationTime, release.Frame);
+
         return true;
     }
 
@@ -59,6 +65,7 @@ internal sealed class BmsChargeNoteJudgementRule
     {
         if (frame.IsRewinding)
             return;
+
         ref var hold = ref state.Hold;
         if (execution.GetMainResult(hold.Note).HasResult)
         {
@@ -66,13 +73,16 @@ internal sealed class BmsChargeNoteJudgementRule
                 Finish(state, execution, frame, 0, false);
             return;
         }
+
         resolveRelease(state, execution, frame);
         if (hold.TailJudged)
             return;
+
         if (!hold.Started)
         {
             if (!hold.HeadWindow.IsPastPassivePoorOffset(frame.SimulationTime - hold.Note.StartTime))
                 return;
+
             hold.HeadJudged = true;
             hold.HeadResult = HitResult.Meh;
             hold.HeadOffset = frame.SimulationTime - hold.Note.StartTime;
@@ -82,6 +92,7 @@ internal sealed class BmsChargeNoteJudgementRule
         }
         else if (hold.HeadWindow.IsPastPassivePoorOffset(frame.SimulationTime - hold.Note.EndTime))
             missTail(state, execution, frame);
+
         if (hold.TailJudged)
             execution.PublishState(hold.Note, state.State, frame);
     }
@@ -90,6 +101,7 @@ internal sealed class BmsChargeNoteJudgementRule
     {
         if (frame.IsRewinding)
             return;
+
         ref var hold = ref state.Hold;
         if (hold.HeadJudged && frame.SimulationTime < hold.Note.StartTime + hold.HeadOffset)
         {
@@ -97,6 +109,7 @@ internal sealed class BmsChargeNoteJudgementRule
             execution.PublishState(hold.Note, state.State, frame);
             return;
         }
+
         resolveRelease(state, execution, frame);
         var missedTail = hold.HeadJudged && !hold.TailJudged && hold.HeadWindow.IsPastPassivePoorOffset(frame.SimulationTime - hold.Note.EndTime);
         if (missedTail)
@@ -115,6 +128,7 @@ internal sealed class BmsChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (!hold.Holding)
             return false;
+
         var released = hold.PendingRelease ?? frame.SimulationTime;
         hold.SetPendingRelease(frame.SimulationTime, null);
         applyTail(state, execution, released - hold.Note.EndTime, frame.SimulationTime, frame);
@@ -123,6 +137,7 @@ internal sealed class BmsChargeNoteJudgementRule
             hold.Started = false;
             execution.PublishState(hold.Note, state.State, frame with { IsPauseCompletion = true });
         }
+
         return true;
     }
 
@@ -132,19 +147,22 @@ internal sealed class BmsChargeNoteJudgementRule
         hold.RewindReleaseHistory(time);
         if (!hold.HeadJudged)
             return;
+
         if (time < hold.Note.StartTime + hold.HeadOffset)
         {
             Reset(state);
             return;
         }
+
         if (hold.TailTime > time)
         {
             hold.TailJudged = false;
             hold.TailTime = null;
             hold.TailResult = HitResult.None;
         }
+
         hold.Started = hold.HeadResult != HitResult.Meh && (!hold.TailJudged || hold.TailResult == HitResult.Meh)
-                      && time <= hold.Note.EndTime + 50;
+                                                        && time <= hold.Note.EndTime + 50;
     }
 
     internal void Reset(BmsChargeNoteRuntime state) => state.Hold.Reset();
@@ -154,6 +172,7 @@ internal sealed class BmsChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (hold.PendingRelease is not { } released || hold.TailJudged || released + hold.ReleaseMargin > frame.SimulationTime)
             return;
+
         hold.SetPendingRelease(frame.SimulationTime, null);
         applyTail(state, execution, released - hold.Note.EndTime, frame.SimulationTime, frame);
     }
@@ -172,6 +191,7 @@ internal sealed class BmsChargeNoteJudgementRule
         ref var hold = ref state.Hold;
         if (hold.TailJudged)
             return;
+
         var result = hold.TailWindow.ResultForOffset(offset);
         if (result == HitResult.None)
             result = HitResult.Meh;

@@ -1,8 +1,9 @@
 using System;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 
 internal sealed class BmsLongNoteJudgementRule
 {
@@ -27,6 +28,7 @@ internal sealed class BmsLongNoteJudgementRule
         ref var hold = ref state.Hold;
         if (!hold.Holding || press.Frame.IsRewinding)
             return false;
+
         var previous = state.State;
         hold.SetPendingRelease(press.InputTime, null);
         if (previous != state.State)
@@ -37,8 +39,9 @@ internal sealed class BmsLongNoteJudgementRule
     internal bool TryRelease(BmsLongNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsReleaseContext release)
     {
         ref var hold = ref state.Hold;
-        if (!hold.Holding || release.Frame.IsRewinding || hold.IsScratch && release.ReverseScratch != hold.HeadReverseScratch)
+        if (!hold.Holding || release.Frame.IsRewinding || (hold.IsScratch && release.ReverseScratch != hold.HeadReverseScratch))
             return false;
+
         var offset = release.InputTime - hold.Note.EndTime;
         var result = hold.TailWindow.ResultForOffset(offset);
         if (offset < 0 && result is HitResult.None or HitResult.Ok && hold.ReleaseMargin > 0)
@@ -48,6 +51,7 @@ internal sealed class BmsLongNoteJudgementRule
         }
         else
             applyTail(state, execution, hold.TailWindow, offset, release.Frame, false);
+
         return true;
     }
 
@@ -55,14 +59,17 @@ internal sealed class BmsLongNoteJudgementRule
     {
         if (frame.IsRewinding)
             return;
+
         resolveRelease(state, execution, frame);
         ref var hold = ref state.Hold;
         if (hold.TailJudged || execution.GetMainResult(hold.Note).HasResult)
             return;
+
         if (!hold.Started)
         {
             if (!hold.HeadWindow.IsPastPassivePoorOffset(frame.SimulationTime - hold.Note.StartTime))
                 return;
+
             hold.HeadJudged = true;
             hold.HeadResult = HitResult.Meh;
             hold.HeadOffset = frame.SimulationTime - hold.Note.StartTime;
@@ -81,6 +88,7 @@ internal sealed class BmsLongNoteJudgementRule
     {
         if (frame.IsRewinding)
             return;
+
         ref var hold = ref state.Hold;
         if (hold.HeadJudged && frame.SimulationTime < hold.Note.StartTime + hold.HeadOffset)
         {
@@ -88,6 +96,7 @@ internal sealed class BmsLongNoteJudgementRule
             execution.PublishState(hold.Note, state.State, frame);
             return;
         }
+
         resolveRelease(state, execution, frame);
         if (hold.Started && frame.SimulationTime > hold.Note.EndTime + 50)
         {
@@ -101,6 +110,7 @@ internal sealed class BmsLongNoteJudgementRule
         ref var hold = ref state.Hold;
         if (!hold.Holding)
             return false;
+
         var released = hold.PendingRelease ?? frame.SimulationTime;
         hold.SetPendingRelease(frame.SimulationTime, null);
         applyTail(state, execution, hold.TailWindow, released - hold.Note.EndTime, frame, false);
@@ -109,6 +119,7 @@ internal sealed class BmsLongNoteJudgementRule
             hold.Started = false;
             execution.PublishState(hold.Note, state.State, frame with { IsPauseCompletion = true });
         }
+
         return true;
     }
 
@@ -118,19 +129,22 @@ internal sealed class BmsLongNoteJudgementRule
         hold.RewindReleaseHistory(time);
         if (!hold.HeadJudged)
             return;
+
         if (time < hold.Note.StartTime + hold.HeadOffset)
         {
             Reset(state);
             return;
         }
+
         if (hold.TailTime > time)
         {
             hold.TailJudged = false;
             hold.TailTime = null;
             hold.TailResult = HitResult.None;
         }
+
         hold.Started = hold.HeadResult != HitResult.Meh && (!hold.TailJudged || hold.TailResult == HitResult.Meh)
-                      && time <= hold.Note.EndTime + 50;
+                                                        && time <= hold.Note.EndTime + 50;
     }
 
     internal void Reset(BmsLongNoteRuntime state)
@@ -144,12 +158,13 @@ internal sealed class BmsLongNoteJudgementRule
         ref var hold = ref state.Hold;
         if (hold.PendingRelease is not { } released || hold.TailJudged || released + hold.ReleaseMargin > frame.SimulationTime)
             return;
+
         hold.SetPendingRelease(frame.SimulationTime, null);
         applyTail(state, execution, hold.TailWindow, released - hold.Note.EndTime, frame, false);
     }
 
     private static void applyTail(BmsLongNoteRuntime state, in BmsJudgementExecutionContext execution,
-                                 BmsJudgementWindowTable window, double offset, in BmsFrameContext frame, bool automatic)
+                                  BmsJudgementWindowTable window, double offset, in BmsFrameContext frame, bool automatic)
     {
         ref var hold = ref state.Hold;
         var heldOffset = automatic || Math.Abs(hold.HeadOffset) > Math.Abs(offset) ? hold.HeadOffset : offset;

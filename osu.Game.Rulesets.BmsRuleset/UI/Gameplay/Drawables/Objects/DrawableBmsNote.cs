@@ -15,6 +15,7 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
     private void load() => Visuals.Add(noteVisual = new BmsNoteVisual(BmsSkinComponents.Note, LayoutVariant, Column));
 
     protected override float VisualHeight => noteVisual.VisualHeight * (ParentColumn?.NoteHeightScale ?? 1);
+
     protected override void ApplyVisualHeightScale(float scale) => noteVisual.Scale = new Vector2(1, scale);
 
     protected override void OnApply()

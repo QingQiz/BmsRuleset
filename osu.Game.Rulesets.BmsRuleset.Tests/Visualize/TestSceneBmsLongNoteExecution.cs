@@ -14,6 +14,8 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;

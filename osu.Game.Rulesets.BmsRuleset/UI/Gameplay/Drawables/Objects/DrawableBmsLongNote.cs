@@ -5,6 +5,7 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
@@ -14,7 +15,6 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.Scoring;
 using osuTK;
 using osuTK.Graphics;
 
@@ -38,7 +38,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     private readonly BmsLongNoteVisualState visualState = new();
     private readonly Func<float, float, int> resolveBodyDirection;
+
     private BmsLongNoteState state => ParentColumn!.Judgements.GetLongNoteState(ln);
+
     private BmsLongNotePresentation presentation;
     private BmsLongNotePresentationMapping mapPresentation = null!;
     private readonly BmsLongNoteStateObserver stateObserver;
@@ -77,7 +79,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     /// <summary>
     /// Keeps the head-to-tail bounds with the object so column layout does not depend on its geometry.
     /// </summary>
-    private protected override BmsVisualLayout PrepareVisual(float y, in BmsColumnVisualFrame frame)
+    protected private override BmsVisualLayout PrepareVisual(float y, in BmsColumnVisualFrame frame)
     {
         preparedTailY = tailY(frame);
         preparedHoldingBody = isHoldingBody();
@@ -87,7 +89,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         return new BmsVisualLayout(y, Math.Min(preparedHeadY, preparedTailY), Math.Max(preparedHeadY, preparedTailY));
     }
 
-    private protected override void ApplyVisual(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
+    protected private override void ApplyVisual(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
     {
         base.ApplyVisual(frame, layout);
         updateVisualGeometry(preparedHeadY, preparedTailY, preparedHoldingBody);
@@ -186,6 +188,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             visualState.UpdateHeadYAtStartTime(y, observation.Time, HitObject.StartTime, observation.Offset);
             lastVisualObservation = observation;
         }
+
         if (isHoldingBody())
             visualState.ObserveHeldBodyDirection(y, tailY(frame), Time.Current >= HitObject.StartTime, resolveBodyDirection);
     }
@@ -340,11 +343,13 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             visualState.PrepareHeadPin();
             lastHoldExplosionTime = Time.Current - hold_explosion_interval;
         }
+
         if (presentation.KeepAlive)
         {
             Alpha = 1;
             LifetimeEnd = presentation.LifetimeEnd;
         }
+
         if (presentation.Retired)
         {
             // Settled LN/CN tails clear immediately; body expiry retains its final geometry for rewind.
@@ -354,6 +359,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
                 longNoteBody.Alpha = 0;
                 longNoteTail.Alpha = 0;
             }
+
             Alpha = 0;
             LifetimeEnd = frame.SimulationTime;
         }

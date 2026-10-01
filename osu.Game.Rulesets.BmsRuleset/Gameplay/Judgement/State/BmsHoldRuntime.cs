@@ -4,7 +4,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 
 // Endpoint data and release history are shared storage; each rule owns its mode's transitions.
 internal struct BmsHoldRuntime
@@ -30,8 +30,11 @@ internal struct BmsHoldRuntime
     }
 
     internal readonly bool IsScratch => BmsLayout.IsScratchColumn(Note.Column, Note.Beatmap.LayoutVariant);
+
     internal readonly double ReleaseMargin => BmsJudgementProfileProvider.IsPms(Note.Beatmap.LayoutVariant) ? 200 : 0;
+
     internal readonly bool Holding => Started && !TailJudged;
+
     internal readonly double NextHeadTime => HeadJudged ? double.PositiveInfinity : Note.StartTime + HeadWindow.SlowWindowFor(HitResult.Ok);
 
     internal readonly BmsLongNoteState Snapshot(bool activeBody = false)
@@ -74,12 +77,14 @@ internal sealed class BmsLongNoteRuntime(BmsLongNote note)
 {
     internal BmsHoldRuntime Hold = new(note);
     internal BmsLongNoteEndpointResult? HeadEndpoint;
+
     internal BmsLongNoteState State => Hold.Snapshot();
 }
 
 internal sealed class BmsChargeNoteRuntime(BmsLongNote note)
 {
     internal BmsHoldRuntime Hold = new(note);
+
     internal BmsLongNoteState State => Hold.Snapshot();
 }
 
@@ -88,6 +93,7 @@ internal sealed class BmsHellChargeNoteRuntime(BmsLongNote note)
     internal BmsHoldRuntime Hold = new(note);
     internal readonly BmsHellChargeBodyTracker Body = new();
     internal double LastBodyTime = double.NegativeInfinity;
+
     internal BmsLongNoteState State => Hold.Snapshot(Hold.Started && LastBodyTime < Hold.Note.EndTime);
 }
 

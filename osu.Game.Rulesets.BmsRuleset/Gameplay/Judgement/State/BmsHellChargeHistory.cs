@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 
 internal sealed class BmsHellChargeHistory
 {
@@ -12,6 +12,7 @@ internal sealed class BmsHellChargeHistory
     private readonly record struct FrameRun(Frame Start, double TimeStep, double AccumulatorStep, int Count)
     {
         public Frame At(int index) => new(Start.Time + TimeStep * index, Start.Accumulator + AccumulatorStep * index);
+
         public Frame Last => At(Count - 1);
     }
 
@@ -35,7 +36,7 @@ internal sealed class BmsHellChargeHistory
         }
 
         frames.Add(frame);
-        if (frames.Count < 3 || runs.Count > 0 && frames[^3].Time <= runs[^1].Last.Time)
+        if (frames.Count < 3 || (runs.Count > 0 && frames[^3].Time <= runs[^1].Last.Time))
             return;
 
         var first = frames[^3];
@@ -62,6 +63,7 @@ internal sealed class BmsHellChargeHistory
             else
                 high = middle;
         }
+
         frames.RemoveRange(low, frames.Count - low);
 
         low = 0;
@@ -74,6 +76,7 @@ internal sealed class BmsHellChargeHistory
             else
                 high = middle;
         }
+
         runs.RemoveRange(low, runs.Count - low);
 
         if (runs.Count > 0)
@@ -91,6 +94,7 @@ internal sealed class BmsHellChargeHistory
                 else
                     high = middle;
             }
+
             runs[^1] = run with { Count = low };
         }
 

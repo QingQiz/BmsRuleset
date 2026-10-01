@@ -39,9 +39,9 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         if (!suppress) ApplyVisual(frame, layout);
     }
 
-    private protected virtual BmsVisualLayout PrepareVisual(float y, in BmsColumnVisualFrame frame) => new(y, y, y);
+    protected private virtual BmsVisualLayout PrepareVisual(float y, in BmsColumnVisualFrame frame) => new(y, y, y);
 
-    private protected virtual void ApplyVisual(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
+    protected private virtual void ApplyVisual(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
     {
         ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
         Y = layout.OriginY;

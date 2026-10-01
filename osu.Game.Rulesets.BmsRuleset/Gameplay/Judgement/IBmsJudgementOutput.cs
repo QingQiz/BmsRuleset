@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
@@ -12,19 +14,33 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 internal interface IBmsJudgementOutput
 {
     BmsMainResultState GetMainResult(BmsHitObject note);
+
     void SetResultCheckpoints(Action<BmsHitObject, double> recordHistory, Action<BmsHitObject> refreshIndexes);
+
     void ApplyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty);
+
     void ApplyMainResult(BmsLongNote note, HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints, in BmsFrameContext frame, bool suppressPenalty);
+
     void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty);
+
     void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame);
+
     void ObserveSimulationStep(BmsHitObject note, in BmsFrameContext frame);
+
     void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame);
+
     void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame);
+
     void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame);
+
     void ApplyEmptyPoor(double expectedTime, int column, in BmsFrameContext frame);
+
     void PlaySample(BmsHitObject note);
+
     void PlayTailSample(BmsLongNote note);
+
     void PlayKeySound();
+
     void PlayLandmineSample(BmsLandmine note);
 }
 

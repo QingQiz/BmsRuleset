@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
@@ -35,10 +36,12 @@ internal sealed class BmsLandmineRegistry
     {
         if (order.Count != activeLandmines.Count)
             throw new InvalidOperationException("The activation plan must contain each active landmine exactly once.");
+
         for (var i = 0; i < order.Count; i++)
         {
             var previous = activeLandmines.IndexOf(order[i], i);
             if (previous < 0) throw new InvalidOperationException("The activation plan contains an inactive or repeated landmine.");
+
             (activeLandmines[i], activeLandmines[previous]) = (activeLandmines[previous], activeLandmines[i]);
         }
     }

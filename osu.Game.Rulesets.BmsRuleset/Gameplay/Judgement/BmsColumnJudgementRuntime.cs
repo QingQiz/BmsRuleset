@@ -1,9 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -25,19 +26,27 @@ internal sealed class BmsColumnJudgementRuntime
     private readonly BmsHoldRegistry holds;
     private readonly BmsLandmineRegistry landmines;
     private readonly BmsLongNote[] longNotes;
-    private int pressedDirections;
 
     internal BmsJudgementRules Rules { get; }
 
     internal int Index { get; }
+
     internal bool IsScratch => BmsLayout.IsScratchColumn(Index, LayoutVariant);
+
     internal BmsLayoutVariant LayoutVariant { get; }
+
     internal BmsColumnNoteIndex Notes { get; }
+
     internal BmsCoreJudgementSchedule Schedule { get; }
+
     internal BmsNoteRegistration[] NoteRegistrations { get; }
+
     internal BmsNoteJudgementWindows[] NoteWindows { get; }
+
     internal IReadOnlyList<BmsLongNote> ActiveLongNotes => Notes.ActiveLongNotes;
+
     internal double NextPassiveUpdateTime => Notes.NextPassiveUpdateTime;
+
     internal void ApplyEmptyPoor(double expectedTime, in BmsFrameContext frame) => noteOutput.ApplyEmptyPoor(expectedTime, Index, frame);
 
     internal bool HasPmsMistake(BmsHitObject note) => BmsJudgementProfileProvider.IsPms(LayoutVariant) && pressHistory.Get(note).Mistake;
@@ -52,6 +61,7 @@ internal sealed class BmsColumnJudgementRuntime
     internal void RefreshPassiveDeadline(double now) => Notes.RefreshDeadline(now);
 
     internal bool RequiresActiveLongNoteUpdate(BmsHitObject note) => Notes.RequiresActiveLongNoteUpdate(note);
+
     internal void RetireInactiveLongNoteAt(int index) => Notes.RetireInactiveLongNoteAt(index);
 
     internal void CompleteLongNotesAtPause(in BmsFrameContext frame)
@@ -66,16 +76,12 @@ internal sealed class BmsColumnJudgementRuntime
         // Inactive objects retain history so pool activation cannot resurrect a future head.
         foreach (var note in longNotes)
         {
-            if (note != null)
-                holds.Rewind(noteSlots[note], time);
+            holds.Rewind(noteSlots[note], time);
         }
     }
 
-    internal int PressedDirections
-    {
-        get => pressedDirections;
-        set => pressedDirections = value;
-    }
+    internal int PressedDirections { get; set; }
+
     internal BmsColumnJudgementRuntime(BmsHitObject[] notes, BmsLayoutVariant layout, int column, bool batchUpdates, IBmsJudgementOutput output, BmsJudgementRules rules)
     {
         Rules = rules;
@@ -94,6 +100,7 @@ internal sealed class BmsColumnJudgementRuntime
             noteSlots.Add(columnNotes[i], i);
             if (columnNotes[i] is BmsLongNote note) longNotes[i] = note;
         }
+
         holds = new BmsHoldRegistry(longNotes, Rules, new BmsJudgementExecutionContext(this, output));
         for (var i = 0; i < columnNotes.Length; i++)
         {
@@ -106,6 +113,7 @@ internal sealed class BmsColumnJudgementRuntime
                 NoteWindows[i] = new BmsNoteJudgementWindows(note);
             }
         }
+
         Notes = new BmsColumnNoteIndex(noteSlots, NoteRegistrations, NoteWindows, holds, output, batchUpdates);
         output.SetResultCheckpoints(RecordResult, Notes.Refresh);
     }
@@ -144,8 +152,11 @@ internal sealed class BmsColumnJudgementRuntime
     internal BmsMainResultState GetNoteResult(BmsHitObject note) => noteOutput.GetMainResult(note);
 
     internal BmsHitObject? FirstPendingNote => Notes.FirstPendingNote;
+
     internal bool IsNoteActive(BmsHitObject note) => Notes.IsNoteActive(note);
+
     internal bool IsNoteCandidate(BmsHitObject note) => Notes.IsNoteCandidate(note);
+
     internal IEnumerable<BmsHitObject> GetNoteCandidates() => Notes.GetNoteCandidates();
 
     internal void ActivateNote(BmsHitObject note) => Notes.ActivateNote(note);
@@ -157,6 +168,7 @@ internal sealed class BmsColumnJudgementRuntime
     internal void RefreshNoteTiming(BmsHitObject note)
     {
         if (!noteSlots.ContainsKey(note) || !Notes.RefreshTiming(note)) return;
+
         // Configuration changes keep the existing relative order of equal-time chart objects.
         columnNotes.OrderBy(n => n.StartTime).ToArray().CopyTo(columnNotes, 0);
     }
@@ -164,6 +176,7 @@ internal sealed class BmsColumnJudgementRuntime
     internal void RefreshNoteConfiguration(BmsHitObject note, bool preserveHistory = true)
     {
         if (!noteSlots.TryGetValue(note, out var slot)) return;
+
         if (note is BmsLongNote) holds.Configure(slot, preserveHistory);
         else NoteWindows[slot] = new BmsNoteJudgementWindows(note);
         RefreshNoteTiming(note);
@@ -182,6 +195,7 @@ internal sealed class BmsColumnJudgementRuntime
             if (NoteRegistrations[slot].Object is BmsLongNote note)
                 noteOutput.PublishState(note, holds.GetState(noteSlots[note]), frame);
         }
+
         Notes.Rebuild();
     }
 
@@ -200,7 +214,7 @@ internal sealed class BmsColumnJudgementRuntime
 
     internal PressOutcome HandleNotePress(in BmsPressContext press, BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)
     {
-        pressedDirections |= IsScratch && press.ReverseScratch ? 2 : 1;
+        PressedDirections |= IsScratch && press.ReverseScratch ? 2 : 1;
         if (press.Frame.IsRewinding)
             return PressOutcome.Empty;
 
@@ -283,6 +297,7 @@ internal sealed class BmsColumnJudgementRuntime
                     noteOutput.PlaySample(note);
                     return PressOutcome.Hit;
                 }
+
                 break;
             }
         }
@@ -298,6 +313,7 @@ internal sealed class BmsColumnJudgementRuntime
                 if (candidate.Candidate.Equals(emptyPoor))
                     pressHistory.Record(NoteRegistrations[candidate.Slot].Object, press.InputTime, false, true);
             }
+
             return PressOutcome.ForEmptyPoor(emptyPoor.StartTime, emptyPoor.Column);
         }
 
@@ -307,11 +323,13 @@ internal sealed class BmsColumnJudgementRuntime
     internal void HandleExecutionRelease(double inputTime, in BmsFrameContext frame, bool reverseScratch = false)
     {
         var direction = IsScratch && reverseScratch ? 2 : 1;
-        if ((pressedDirections & direction) == 0)
+        if ((PressedDirections & direction) == 0)
             return;
-        pressedDirections &= ~direction;
+
+        PressedDirections &= ~direction;
         if (frame.IsRewinding)
             return;
+
         BmsLongNote? held = null;
         for (var i = 0; i < Notes.PendingTails.Count; i++)
         {
@@ -319,10 +337,12 @@ internal sealed class BmsColumnJudgementRuntime
             var longNote = longNotes[slot];
             if (!GetLongNoteState(longNote).IsHolding)
                 continue;
+
             var note = longNote;
             if (held == null || note.EndTime < held.EndTime)
                 held = note;
         }
+
         if (held != null && holds.Release(noteSlots[held], new BmsReleaseContext(inputTime, frame, reverseScratch)))
             noteOutput.PlayTailSample(held);
     }
@@ -349,11 +369,18 @@ internal sealed class BmsColumnJudgementRuntime
 
 
     internal int GetNoteSlot(BmsHitObject note) => noteSlots[note];
+
     internal BmsLandmineState GetLandmineState(BmsLandmine note) => landmines.GetLandmineState(note);
+
     internal void ActivateLandmine(BmsLandmine note) => landmines.ActivateLandmine(note);
+
     internal void RemoveLandmine(BmsLandmine note) => landmines.RemoveLandmine(note);
+
     internal bool IsLandmineActive(BmsLandmine note) => landmines.IsLandmineActive(note);
+
     internal void SetLandmineActivationOrder(IReadOnlyList<BmsLandmine> order) => landmines.SetLandmineActivationOrder(order);
+
     internal void UpdateLandmines(in BmsFrameContext frame, bool holding) => landmines.UpdateLandmines(frame, holding);
+
     internal void RewindLandmines(double time) => landmines.RewindLandmines(time);
 }

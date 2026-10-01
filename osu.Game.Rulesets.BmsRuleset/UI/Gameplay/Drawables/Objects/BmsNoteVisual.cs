@@ -45,6 +45,7 @@ internal sealed partial class BmsNoteVisual : Container
         {
             var drawable = skin.Drawable;
             if (drawable == null) return 0;
+
             // Absolute skin heights avoid waking width-dependent layout on culled trees.
             return (drawable.RelativeSizeAxes & Axes.Y) == 0 ? drawable.Height : drawable.DrawHeight;
         }

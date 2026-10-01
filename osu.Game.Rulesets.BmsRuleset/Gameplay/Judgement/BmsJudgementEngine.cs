@@ -4,6 +4,7 @@ using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
@@ -37,7 +38,8 @@ internal sealed class BmsJudgementEngine
     internal BmsJudgementEngine(params BmsJudgementColumnDefinition[] definitions)
     {
         if (definitions.Length == 0 || definitions.Any(d => d.Index < 0) || definitions.Select(d => d.Index).Distinct().Count() != definitions.Length)
-            throw new ArgumentException("Each judgement column needs a unique non-negative index.", nameof(definitions));
+            throw new ArgumentException(@"Each judgement column needs a unique non-negative index.", nameof(definitions));
+
         columns = new BmsColumnJudgementRuntime[definitions.Length];
         columnsByIndex = new BmsColumnJudgementRuntime[definitions.Max(d => d.Index) + 1];
         framePressedDirections = new int[columnsByIndex.Length];
@@ -58,7 +60,8 @@ internal sealed class BmsJudgementEngine
     internal bool HasPendingInputs => pendingInputs.Count > 0;
 
     internal BmsColumnJudgementRuntime GetColumn(int index)
-        => index >= 0 && index < columnsByIndex.Length && columnsByIndex[index] is { } column ? column
+        => index >= 0 && index < columnsByIndex.Length && columnsByIndex[index] is { } column
+            ? column
             : throw new ArgumentOutOfRangeException(nameof(index));
 
     internal void QueueInput(double time, int column, bool pressed, bool reverseScratch)
@@ -72,6 +75,7 @@ internal sealed class BmsJudgementEngine
     {
         if (processing)
             throw new InvalidOperationException("Result observers may queue inputs, but cannot recursively process a frame.");
+
         processing = true;
         var inputCount = pendingInputs.Count;
         try
@@ -83,6 +87,7 @@ internal sealed class BmsJudgementEngine
                 scheduleTime = frame.SimulationTime;
                 scheduleStep++;
             }
+
             scheduleBatch++;
             foreach (var column in columns)
             {

@@ -1,5 +1,6 @@
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
