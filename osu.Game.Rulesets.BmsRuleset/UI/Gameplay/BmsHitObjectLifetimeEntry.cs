@@ -17,7 +17,6 @@ internal sealed class BmsHitObjectLifetimeEntry(
 {
 
     // Avoided mines have no result, so their crossing must survive drawable pooling separately.
-    internal double? LandmineHandledTime { get; set; }
 
     /// <summary>
     ///     Set to true once <see cref="RefreshLifetime"/> has run.
@@ -53,7 +52,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     ///     Mines only need a single frame to check whether the column is pressed; after that they
     ///     can die shortly afterwards. A 100 ms past-lifetime keeps the check reliable across frame boundaries.
     /// </summary>
-    internal const double MINE_PAST_LIFETIME = 100;
+    internal const double MINE_PAST_LIFETIME = BmsLandmineJudgementRule.PASSING_LIFETIME;
 
     /// <summary>
     ///     Step-size used when probing backwards from StartTime to find the earliest visible frame.

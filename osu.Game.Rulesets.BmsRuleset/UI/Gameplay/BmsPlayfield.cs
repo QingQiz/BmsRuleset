@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -86,7 +86,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                                 .OrderBy(column => firstScratchLane < 0 || column.Index > firstScratchLane
                                     ? column.Index : column.Index == 0 ? firstScratchLane : column.Index - 1)
                                 .ToArray();
-        judgementEngine = new BmsJudgementEngine(this, judgementColumns);
+        var judgementObjects = Beatmap.HitObjects.ToArray();
+        judgementEngine = new BmsJudgementEngine(judgementColumns.Select(column => new BmsJudgementColumnDefinition(
+            judgementObjects, LayoutVariant, column.Index, column.CanBatchUpdates, new BmsDrawableJudgementOutput(this, column))).ToArray());
+        foreach (var column in judgementColumns)
+            judgementEngine.GetColumn(column.Index).AttachRepresentationServices(this, column);
 
         InternalChildren =
         [
@@ -268,7 +272,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     }
 
     private void processJudgementFrame(bool suppressJudgements = false)
-        => judgementEngine.ProcessFrame(suppressJudgements);
+        => judgementEngine.ProcessFrame(new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
+            (Clock as IGameplayClock)?.IsRewinding == true), Time.Elapsed, JudgementAlgorithm, suppressJudgements, IsResumeRewinding);
 
     #endregion
 
@@ -350,7 +355,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     }
 
     internal void CompleteLongNotesAtPause(double currentTime)
-        => judgementEngine.CompleteLongNotesAtPause(currentTime);
+        => judgementEngine.CompleteLongNotesAtPause(new BmsFrameContext(currentTime,
+            (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate));
 
     public override bool UpdateSubTreeMasking()
     {

@@ -64,10 +64,6 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     {
     }
 
-    internal virtual void UpdateLandmine(bool holding)
-    {
-    }
-
     internal virtual void RestoreRewoundState()
     {
     }

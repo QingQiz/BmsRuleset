@@ -59,12 +59,14 @@ public class BmsLongNoteExecutionTest
     public void MixedRegistrationsShareBindingsAndKeepSeparateTypedState()
     {
         var (context, _, notes) = create(2);
-        Assert.That(typeof(BmsLongNoteRegistration).IsValueType, Is.True);
+        Assert.That(typeof(BmsNoteRegistration).IsValueType, Is.True);
         Assert.That(context.NoteRegistrations[0].Press, Is.SameAs(context.NoteRegistrations[1].Press));
         Assert.That(context.NoteRegistrations[0].Passive, Is.SameAs(context.NoteRegistrations[1].Passive));
-        Assert.That(context.LongNoteRegistrations[0].State, Is.Not.SameAs(context.LongNoteRegistrations[1].State));
+        context.TryPressRegisteredNote(notes[0], HitResult.Perfect, new BmsPressContext(3000, new BmsFrameContext(3000, 1)));
+        Assert.That(context.GetLongNoteState((BmsLongNote)notes[0]).HeadJudged, Is.True);
+        Assert.That(context.GetLongNoteState((BmsLongNote)notes[1]).HeadJudged, Is.False);
         Assert.That(context.NoteRegistrations[2].Press, Is.Not.SameAs(context.NoteRegistrations[0].Press));
-        Assert.That(context.LongNoteRegistrations[0].Object, Is.SameAs(notes[0]));
+        Assert.That(context.NoteRegistrations[0].Object, Is.SameAs(notes[0]));
         Assert.That(context.Column, Is.Null);
         Assert.That(context.Container, Is.Null);
     }

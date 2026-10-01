@@ -9,7 +9,7 @@
 
 ### HitObject implementation status
 
-Commit consolidation and transitional-layer removal are complete. The core remains incomplete and cannot build: independent long-note rules and operation bindings, landmine rules, scheduling, indexes and lifecycle integration still require implementation. Existing behaviour assertions must be migrated to the final core or Mod entry points. See the [current implementation entry](hitobject-refactor-plan.zh-CN.md#implementation-start) for scope and the [Git baselines](hitobject-refactor-plan.zh-CN.md#git-baselines) for preserved versions.
+Independent LN/CN/HCN rules, typed runtime state, operation bindings, landmine rules and the data-driven multi-column frame entry are connected to production. The ruleset builds in Release, and targeted rule, scheduling, real Player, pooling, rewind and ApplyDefaults checks pass. The core still needs its final presentation/container/lifecycle boundaries, complete scheduling-generation validation and migration of the remaining old test entry points. The complete test project remains blocked by removed Controller, presentation and AutoScratch APIs; the current targeted checks compile a selected subset. See the [current implementation entry](hitobject-refactor-plan.zh-CN.md#implementation-start) for scope and the [Git baselines](hitobject-refactor-plan.zh-CN.md#git-baselines) for preserved versions.
 
 Complete and compare the core before adapting AutoScratch and other affected Mods. AutoScratch's implementation and registrations remain removed pending that work. Final behaviour, visual/audio and performance validation are still required.
 

@@ -19,6 +19,7 @@ internal sealed class BmsDrawableJudgementOutput : IBmsJudgementOutput
     private readonly Dictionary<DrawableBmsHitObject, Binding> boundObjects = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<BmsHitObject, BmsJudgementResult> results = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLongNoteStateObserver Observer)> presentationObservers = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLandmineStateObserver Observer)> landmineObservers = new(ReferenceEqualityComparer.Instance);
     private Action<BmsHitObject> resultCheckpoint = null!;
 
     internal BmsDrawableJudgementOutput(BmsPlayfield playfield, BmsColumn column)
@@ -39,10 +40,15 @@ internal sealed class BmsDrawableJudgementOutput : IBmsJudgementOutput
     internal void ObserveLongNoteState(DrawableBmsHitObject drawable, BmsLongNoteStateObserver observer)
         => presentationObservers[drawable] = (drawable.BindingGeneration, observer);
 
+    internal void ObserveLandmineState(DrawableBmsHitObject drawable, BmsLandmineStateObserver observer)
+        => landmineObservers[drawable] = (drawable.BindingGeneration, observer);
+
     internal void Unbind(DrawableBmsHitObject drawable, long generation)
     {
         if (presentationObservers.TryGetValue(drawable, out var observer) && observer.Generation == generation)
             presentationObservers.Remove(drawable);
+        if (landmineObservers.TryGetValue(drawable, out var mineObserver) && mineObserver.Generation == generation)
+            landmineObservers.Remove(drawable);
 
         // Pool return may have cleared HitObject; only the binding owns the old identity.
         if (!boundObjects.TryGetValue(drawable, out var binding) || binding.Generation != generation)
@@ -120,6 +126,14 @@ internal sealed class BmsDrawableJudgementOutput : IBmsJudgementOutput
         playfield.ApplySyntheticLongNoteEndpoint(endpoint);
     }
 
+    public void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame)
+    {
+        var drawable = GetRepresentation(note);
+        var observer = landmineObservers[drawable];
+        if (observer.Generation == drawable.BindingGeneration)
+            observer.Observer(state, frame);
+    }
+
     public void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame)
     {
         var drawable = GetRepresentation(note);
@@ -139,4 +153,6 @@ internal sealed class BmsDrawableJudgementOutput : IBmsJudgementOutput
     public void PlaySample(BmsHitObject note) => column.PlaySample(note.SampleKey, note.SampleVolume);
     public void PlayTailSample(BmsLongNote note) => column.PlaySample(note.TailSampleKey, note.TailSampleVolume);
     public void PlayKeySound() => column.PlayKeySound();
+    public void ApplyEmptyPoor(double expectedTime, int columnIndex, in BmsFrameContext frame) => playfield.RegisterEmptyPoor(expectedTime, columnIndex);
+    public void PlayLandmineSample(BmsLandmine note) => column.DetonateLandmine(note);
 }

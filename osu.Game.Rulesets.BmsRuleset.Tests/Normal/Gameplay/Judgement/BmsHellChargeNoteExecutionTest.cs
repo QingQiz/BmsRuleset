@@ -117,7 +117,8 @@ public class BmsHellChargeNoteExecutionTest
         context.UpdateRegisteredBodies(new BmsFrameContext(3100, 1), 100, true);
         context.TryPressRegisteredNote(second, HitResult.Good, new BmsPressContext(3100, new BmsFrameContext(3100, 1)));
         context.UpdateRegisteredBodies(new BmsFrameContext(3201, 1), 101, true);
-        Assert.That(context.LongNoteRegistrations[0].State, Is.Not.SameAs(context.LongNoteRegistrations[1].State));
+        Assert.That(context.GetLongNoteState(first).HeadTime, Is.EqualTo(3000));
+        Assert.That(context.GetLongNoteState(second).HeadTime, Is.EqualTo(3100));
         Assert.That(output.BodyTicks.Select(t => t.Note), Is.EqualTo(new[] { first }));
         context.RewindLongNotes(3150);
         context.RestoreExecutionState(new BmsFrameContext(3150, 1));

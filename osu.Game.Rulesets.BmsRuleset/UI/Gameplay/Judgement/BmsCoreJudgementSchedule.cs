@@ -26,6 +26,17 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
     internal long Step { get; private set; }
     internal long Batch { get; private set; }
 
+    internal bool TryGetCurrent(BmsHitObject note, out BmsScheduledObject item)
+    {
+        if (bindings.TryGetValue(note, out var binding) && !binding.Removing)
+        {
+            item = new BmsScheduledObject(note, binding.Token);
+            return true;
+        }
+        item = default;
+        return false;
+    }
+
     internal void BeginBatch(long epoch, long step, long batch)
     {
         revision++;

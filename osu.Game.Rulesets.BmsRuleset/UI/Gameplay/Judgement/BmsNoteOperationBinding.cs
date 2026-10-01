@@ -28,8 +28,8 @@ internal sealed class BmsNoteOperationBinding
     internal BmsPassiveOperation Passive { get; }
 
     private bool tryPress(int slot, HitResult result, in BmsPressContext press)
-        => BmsNoteJudgementRule.Shared.TryPress(column.NoteRegistrations[slot].Object, execution, result, press);
+        => column.Rules.Note.TryPress(column.NoteRegistrations[slot].Object, execution, result, press);
 
     private void checkPassive(int slot, in BmsFrameContext frame)
-        => BmsNoteJudgementRule.Shared.CheckPassive(column.NoteRegistrations[slot].Object, column.NoteWindows[slot], execution, frame);
+        => column.Rules.Note.CheckPassive(column.NoteRegistrations[slot].Object, column.NoteWindows[slot], execution, frame);
 }

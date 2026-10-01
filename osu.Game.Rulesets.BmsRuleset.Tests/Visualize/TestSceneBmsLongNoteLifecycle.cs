@@ -61,7 +61,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
     public void RewindIntoPooledBodyPreservesHeadAndReplaysTail(BmsLongNoteMode longNoteMode, bool mine)
     {
         BmsLongNote note = null!;
-        BmsLongNoteJudgementController originalController = null!;
+        double? originalHeadTime = null;
         AddStep("load long notes", () => { mode = longNoteMode; includeMine = mine; duplicateHeads = false; LoadPlayer(); });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         seek(5000);
@@ -69,10 +69,10 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         {
             first = (DrawableBmsHitObject)Playfield.GetAliveObjectAtTime(5000)!;
             note = (BmsLongNote)first.HitObject;
-            originalController = first.LongNoteJudgement!;
-            first.OnNewResult += (_, _) => Assert.That(((ILongNoteHolder)first).IsHoldingLongNote, Is.True,
+            first.OnNewResult += (source, _) => Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState((BmsLongNote)source.HitObject).IsHolding, Is.True,
                 "The head is pinned, and the normal-LN tail is not marked judged, when the main result is submitted.");
             Playfield.Stage.Columns[1].HandlePress(5000);
+            originalHeadTime = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).HeadTime;
         });
         capture("head");
         seek(5501);
@@ -86,17 +86,19 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         AddAssert("first long note pooled", () => !Playfield.AllColumnAliveObjects().Any(d => d.HitObject.StartTime == 5000));
         AddStep("pool return releases both sides of the binding", () =>
         {
-            Assert.That(first.LongNoteJudgement, Is.Not.SameAs(originalController));
-            Assert.Throws<InvalidOperationException>(() => ((IBmsLongNoteJudgementSink)((BmsColumn)Playfield.Stage.Columns[1]).Judgements).Retire(note));
+            var context = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements;
+            Assert.That(context.Schedule.TryGetCurrent(note, out _), Is.False);
+            Assert.Throws<InvalidOperationException>(() => context.GetRepresentation(note));
+            Assert.That(context.GetLongNoteState(note).HeadTime, Is.EqualTo(originalHeadTime));
         });
         seek(9000);
         AddStep("judge another pooled representation", () => Playfield.Stage.Columns[1].HandlePress(9000));
         capture("second head");
         seek(6000);
         AddAssert("first head restored inside body", () =>
-            Playfield.GetAliveObjectAtTime(5000) is ILongNoteHolder { IsHoldingLongNote: true });
-        AddAssert("engine restores the same controller", () =>
-            ReferenceEquals(((DrawableBmsHitObject)Playfield.GetAliveObjectAtTime(5000)!).LongNoteJudgement, originalController));
+            Playfield.GetAliveObjectAtTime(5000) != null && ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).IsHolding);
+        AddAssert("engine restores the stored head", () =>
+            ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).HeadTime == originalHeadTime);
         capture("rewound body");
         seek(6900);
         AddStep("release restored tail", () => Playfield.Stage.Columns[1].HandleRelease(6900));
@@ -108,7 +110,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
     [TestCase(BmsLongNoteMode.LongNote)]
     [TestCase(BmsLongNoteMode.ChargeNote)]
     [TestCase(BmsLongNoteMode.HellChargeNote)]
-    public void IdenticalHeadTimeAndColumnHaveIndependentControllers(BmsLongNoteMode longNoteMode)
+    public void IdenticalHeadTimeAndColumnHaveIndependentState(BmsLongNoteMode longNoteMode)
     {
         AddStep("load overlapping heads", () => { mode = longNoteMode; includeMine = false; duplicateHeads = true; LoadPlayer(); });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
@@ -117,10 +119,88 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         {
             var notes = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().Where(d => d.HitObject is BmsLongNote).ToArray();
             Assert.That(notes, Has.Length.EqualTo(2));
-            Assert.That(notes[0].LongNoteJudgement, Is.Not.SameAs(notes[1].LongNoteJudgement));
-            notes[0].TryHit(HitResult.Perfect);
-            Assert.That(notes[0].LongNoteJudgement!.HeadJudged, Is.True);
-            Assert.That(notes[1].LongNoteJudgement!.HeadJudged, Is.False);
+            var context = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements;
+            context.TryPressRegisteredNote(notes[0].HitObject, HitResult.Perfect,
+                new BmsPressContext(Playfield.Time.Current, new BmsFrameContext(Playfield.Time.Current, 1)));
+            Assert.That(context.GetLongNoteState((BmsLongNote)notes[0].HitObject).HeadJudged, Is.True);
+            Assert.That(context.GetLongNoteState((BmsLongNote)notes[1].HitObject).HeadJudged, Is.False);
+        });
+    }
+
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void DefaultsReplaceTheBindingAndPreserveThePendingTail(BmsLongNoteMode longNoteMode)
+    {
+        AddStep("load long notes", () => { mode = longNoteMode; includeMine = false; duplicateHeads = false; LoadPlayer(); });
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        seek(5003);
+        AddStep("hold head", () => Playfield.Stage.Columns[1].HandlePress(5000));
+        seek(5204);
+        AddStep("reapply active defaults twice", () =>
+        {
+            var context = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements;
+            var drawable = Playfield.GetAliveObjectAtTime(5000)!;
+            var note = (BmsLongNote)drawable.HitObject;
+            var state = context.GetLongNoteState(note);
+            var result = drawable.Result;
+            var events = JsonSerializer.Serialize(score.JudgementEvents);
+            var order = context.GetNoteCandidates().ToArray();
+            Assert.That(context.TryGetScheduledObject(drawable, out var previous), Is.True);
+            var generation = drawable.BindingGeneration;
+            note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
+            note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
+            Assert.That(drawable.BindingGeneration, Is.GreaterThan(generation));
+            Assert.That(context.GetRepresentation(note), Is.SameAs(drawable));
+            Assert.That(context.GetLongNoteState(note), Is.EqualTo(state));
+            Assert.That(context.GetNoteCandidates(), Is.EqualTo(order));
+            Assert.That(context.ActiveLongNotes.Count(n => ReferenceEquals(n, note)), Is.EqualTo(1));
+            Assert.That(context.GetPendingLongNoteTails().Count(n => ReferenceEquals(n, note)), Is.EqualTo(1));
+            Assert.That(drawable.Result, Is.SameAs(result));
+            Assert.That(result.TimeOffset, Is.Zero, "Preserve the framework's existing ApplyDefaults timestamp semantics.");
+            context.Schedule.BeginRemoval(previous);
+            context.Schedule.CompleteRemoval(previous, new BmsFrameContext(Playfield.Time.Current, 1));
+            context.Schedule.Unbind(previous);
+            Assert.That(context.TryGetScheduledObject(drawable, out var current), Is.True);
+            Assert.That(current.BindingToken, Is.Not.EqualTo(previous.BindingToken));
+            Assert.That(context.Schedule.TryGetCurrent(note, out _), Is.True);
+            Assert.That(context.GetLongNoteState(note).TailJudged, Is.False);
+            Assert.That(JsonSerializer.Serialize(score.JudgementEvents), Is.EqualTo(events));
+        });
+        seek(6900);
+        AddStep("release the rebound tail", () => Playfield.Stage.Columns[1].HandleRelease(6900));
+        AddAssert("tail completed through new binding", () =>
+        {
+            var note = Playfield.Beatmap.HitObjects.OfType<BmsLongNote>().First();
+            return ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).TailJudged;
+        });
+    }
+
+    [Test]
+    public void DefaultsPreserveLandmineCrossingAndItsResult()
+    {
+        AddStep("load mine", () => { mode = BmsLongNoteMode.HellChargeNote; includeMine = true; duplicateHeads = false; LoadPlayer(); });
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        seek(5000);
+        AddStep("hold mine column", () => Playfield.Stage.Columns[1].HandlePress(5000));
+        seek(5501);
+        AddStep("reapply detonated mine", () =>
+        {
+            var context = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements;
+            var drawable = Playfield.GetAliveObjectAtTime(5500)!;
+            var mine = (BmsLandmine)drawable.HitObject;
+            var state = context.GetLandmineState(mine);
+            var result = drawable.Result;
+            var count = Player.Results.Count;
+            var generation = drawable.BindingGeneration;
+            Assert.That(state.Detonated, Is.True);
+            mine.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
+            Assert.That(drawable.BindingGeneration, Is.GreaterThan(generation));
+            Assert.That(context.GetRepresentation(mine), Is.SameAs(drawable));
+            Assert.That(context.GetLandmineState(mine), Is.EqualTo(state));
+            Assert.That(drawable.Result, Is.SameAs(result));
+            context.UpdateLandmines(new BmsFrameContext(Playfield.Time.Current, 1), true);
+            Assert.That(Player.Results.Count, Is.EqualTo(count));
         });
     }
 

@@ -1,0 +1,94 @@
+using System.Collections.Generic;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+using osu.Game.Rulesets.Scoring;
+
+namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+
+// Endpoint data and release history are shared storage; each rule owns its mode's transitions.
+internal struct BmsHoldRuntime
+{
+    internal readonly BmsLongNote Note;
+    internal BmsJudgementWindowTable HeadWindow = null!;
+    internal BmsJudgementWindowTable TailWindow = null!;
+    internal bool HeadJudged;
+    internal bool Started;
+    internal bool TailJudged;
+    internal bool HeadReverseScratch;
+    internal double HeadOffset;
+    internal HitResult HeadResult;
+    internal HitResult TailResult;
+    internal double? TailTime;
+    internal double? PendingRelease;
+    private readonly List<(double Time, double? Release)> releaseHistory = [];
+
+    internal BmsHoldRuntime(BmsLongNote note)
+    {
+        Note = note;
+        RefreshWindows();
+    }
+
+    internal readonly bool IsScratch => BmsLayout.IsScratchColumn(Note.Column, Note.Beatmap.LayoutVariant);
+    internal readonly double ReleaseMargin => BmsJudgementProfileProvider.IsPms(Note.Beatmap.LayoutVariant) ? 200 : 0;
+    internal readonly bool Holding => Started && !TailJudged;
+    internal readonly double NextHeadTime => HeadJudged ? double.PositiveInfinity : Note.StartTime + HeadWindow.SlowWindowFor(HitResult.Ok);
+
+    internal readonly BmsLongNoteState Snapshot(bool activeBody = false)
+        => new(HeadJudged, Started, TailJudged, HeadResult, HeadJudged ? Note.StartTime + HeadOffset : null,
+            TailResult, TailTime, PendingRelease, activeBody);
+
+    internal void RefreshWindows()
+    {
+        HeadWindow = BmsJudgementProfileProvider.GetTable(Note.Beatmap.LayoutVariant, Note.Column, Note.EffectiveJudgementRate, false);
+        TailWindow = BmsJudgementProfileProvider.GetTable(Note.Beatmap.LayoutVariant, Note.Column, Note.EffectiveJudgementRate, true);
+    }
+
+    internal void SetPendingRelease(double time, double? release)
+    {
+        PendingRelease = release;
+        releaseHistory.Add((time, release));
+    }
+
+    internal void RewindReleaseHistory(double time)
+    {
+        while (releaseHistory.Count > 0 && releaseHistory[^1].Time > time)
+            releaseHistory.RemoveAt(releaseHistory.Count - 1);
+        PendingRelease = releaseHistory.Count > 0 ? releaseHistory[^1].Release : null;
+    }
+
+    internal void Reset()
+    {
+        HeadJudged = Started = TailJudged = HeadReverseScratch = false;
+        HeadOffset = 0;
+        HeadResult = TailResult = HitResult.None;
+        TailTime = PendingRelease = null;
+        releaseHistory.Clear();
+    }
+
+    internal readonly BmsLongNoteEndpointResult Endpoint(BmsLongNoteEndpointKind kind, double time, double rate, HitResult result, double? applicationTime = null)
+        => new(Note, kind, time, rate, result, applicationTime ?? time);
+}
+
+internal sealed class BmsLongNoteRuntime(BmsLongNote note)
+{
+    internal BmsHoldRuntime Hold = new(note);
+    internal BmsLongNoteEndpointResult? HeadEndpoint;
+    internal BmsLongNoteState State => Hold.Snapshot();
+}
+
+internal sealed class BmsChargeNoteRuntime(BmsLongNote note)
+{
+    internal BmsHoldRuntime Hold = new(note);
+    internal BmsLongNoteState State => Hold.Snapshot();
+}
+
+internal sealed class BmsHellChargeNoteRuntime(BmsLongNote note)
+{
+    internal BmsHoldRuntime Hold = new(note);
+    internal readonly BmsHellChargeBodyTracker Body = new();
+    internal double LastBodyTime = double.NegativeInfinity;
+    internal BmsLongNoteState State => Hold.Snapshot(Hold.Started && LastBodyTime < Hold.Note.EndTime);
+}
+
+internal readonly record struct BmsReleaseContext(double InputTime, BmsFrameContext Frame, bool ReverseScratch = false);

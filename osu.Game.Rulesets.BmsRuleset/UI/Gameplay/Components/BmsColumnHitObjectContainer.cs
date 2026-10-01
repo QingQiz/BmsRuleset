@@ -24,8 +24,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private bool updatePending;
     private double lastFullUpdateTime;
     private double latestLifetimeStart = double.PositiveInfinity;
-    private readonly List<DrawableBmsHitObject> landmines = [];
-    private bool landmineOrderDirty;
     private bool coreOrderDirty = true;
     private readonly List<BmsScheduledObject> coreLayoutOrder = [];
     private readonly List<BmsScheduledObject> coreSubtreeOrder = [];
@@ -62,12 +60,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         if (drawable is not DrawableBmsHitObject note)
             return;
 
-        if (entry.HitObject is BmsLandmine)
-        {
-            landmines.Add(note);
-            landmineOrderDirty = true;
-        }
-
         Judgements.Register(note);
         InvalidateCoreOrder();
     }
@@ -79,9 +71,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             startTime.UnbindAll();
         if (drawable is DrawableBmsHitObject note)
             Judgements.Unregister(note);
-
-        if (drawable is DrawableBmsHitObject { HitObject: BmsLandmine } mine)
-            landmineOrderDirty |= landmines.Remove(mine);
 
         base.RemoveDrawable(entry, drawable);
         if (drawable is DrawableBmsHitObject removed)
@@ -129,25 +118,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         return updated;
     }
 
-    internal void UpdateLandmines(bool holding)
-    {
-        // Lifetime enumeration order is unspecified. Cache it only when membership changes
-        // so simultaneous judgements keep their previous order without a per-frame scan.
-        if (landmineOrderDirty && landmines.Count > 1)
-        {
-            landmines.Clear();
-            foreach (var drawable in AliveEntries.Values)
-            {
-                if (drawable is DrawableBmsHitObject { HitObject: BmsLandmine } mine)
-                    landmines.Add(mine);
-            }
-        }
-        landmineOrderDirty = false;
-
-        foreach (var mine in landmines)
-            mine.UpdateLandmine(holding);
-    }
-
     internal void UpdateDeferredLongNotes()
     {
         var activeLongNotes = Judgements.ActiveLongNotes;
@@ -158,7 +128,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         for (var i = 0; i < activeLongNotes.Count; i++)
         {
             var note = activeLongNotes[i];
-            if (Judgements.RequiresActiveLongNoteUpdate(note.HitObject) && Judgements.TryGetScheduledObject(note, out var item))
+            if (Judgements.RequiresActiveLongNoteUpdate(note) && Judgements.Schedule.TryGetCurrent(note, out var item))
                 coreDeferredOrder.Add(item);
         }
         Judgements.Schedule.RunDeferred(coreDeferredOrder, coreFrame(), Time.Elapsed);
@@ -170,12 +140,12 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         for (var i = activeLongNotes.Count - 1; i >= 0; i--)
         {
             var note = activeLongNotes[i];
-            if (Judgements.RequiresActiveLongNoteUpdate(note.HitObject))
+            if (Judgements.RequiresActiveLongNoteUpdate(note))
             {
-                var ln = (BmsLongNote)note.HitObject;
+                var ln = note;
                 var startPosition = scrollController.GetVisualScrollPosition(ln.StartTime, ln.ScrollPositionAtStartTime);
                 var endPosition = double.IsNaN(ln.VisualScrollPositionAtEndTime) ? ln.ScrollPositionAtEndTime : ln.VisualScrollPositionAtEndTime;
-                note.UpdateDeferredVisuals(-(hitTarget + (float)((startPosition - currentScrollPos) * scale)),
+                Judgements.GetRepresentation(note).UpdateDeferredVisuals(-(hitTarget + (float)((startPosition - currentScrollPos) * scale)),
                     -(hitTarget + (float)((endPosition - currentScrollPos) * scale)));
             }
 
@@ -327,15 +297,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
         Judgements.RewindLongNotes(Time.Current);
 
-        // Mine crossing history remains on entries until its separate migration.
-        foreach (var entry in Entries)
-        {
-            if (entry is not BmsHitObjectLifetimeEntry bmsEntry)
-                continue;
-
-            if (bmsEntry.LandmineHandledTime is { } handledTime && Time.Current < handledTime)
-                bmsEntry.LandmineHandledTime = null;
-        }
+        Judgements.RewindLandmines(Time.Current);
 
         foreach (var note in AliveEntries.Values)
         {

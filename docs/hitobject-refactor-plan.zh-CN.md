@@ -10,7 +10,9 @@
 
 **完整实现核心 → Git 旧版对照与适配 → Mod 适配 → 最终集成。**
 
-提交整理与过渡路径清理已完成，当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。核心尚不能构建或游玩：独立 LN/CN/HCN 规则、类型化状态及正式操作绑定仍待实现，地雷规则、独立调度、索引和生命周期调用方也须补全。依赖旧 API 的测试保留行为断言，随核心和 Mod 的最终入口分别迁移；完整行为对照与性能验收尚未完成。
+当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次，真实 Player 与无 Drawable 测试调用相同的地雷、身体和输入阶段。生产项目已恢复 Release 构建，部分真实 Player、回池、回退及原地重应用用例已通过。
+
+核心尚未完成：仍需收敛表现基类、容器与生命周期的最终职责，补齐独立调度及完整入口生成验证，并迁移其余依赖旧 API 的核心测试。完整测试项目仍受旧 Controller、旧表现接口和已摘除 AutoScratch 的消费者阻塞；本次局部测试通过不代表整个测试项目已恢复。Git 旧版完整对照、性能验收及 Mod 适配均尚未进行。
 
 快速导航：[实施顺序](#implementation-order) · [目标架构](#target-structure) · [生命周期](#state-lifecycle) · [调度](#scheduling-contracts) · [Git 对照](#git-comparison) · [验收](#behaviour-acceptance) · [验证命令](#verification-commands) · [完成条件](#completion)。
 
@@ -739,6 +741,23 @@ foreach ($refactorGroup in $refactorFilters.Keys) {
 ## 证据与进度记录
 
 进度只记录核心实现、核心对照适配、Mod 适配及最终集成的实际状态，包括当前缺口和构建/测试结果。
+
+### 当前核心实现进度
+
+- LN、CN、HCN 各自实现头尾、释放与重按、PMS 宽限、暂停和回退；只共享窗口、端点数据及释放历史。LN 独有暂存头端点，HCN 独有身体累计与历史。规则实例由引擎共享，类型化状态由列上下文持有；长按操作表按长按数量分配，普通 Note 不创建状态包装。
+- 地雷经过状态由核心按谱面身份持有，移除 `BmsHitObjectLifetimeEntry` 和 Drawable 中的经过时间。地雷 Drawable 只读取状态并应用表现；活跃地雷、待判尾、身体和长按收尾列表使用谱面对象或槽位。
+- 引擎接受多列数据定义、模拟帧、elapsed 和有序输入；先全部地雷、再全部 HCN 身体、最后输入。同时间戳的新输入批次保留，同步反馈追加的输入留给下一批处理。生产适配提供时钟值、结果和表示生命周期，HCN 身体不再读取 Drawable 时钟。
+- 已迁移 LN/HCN 登记断言、真实长按生命周期和 HCN 跨列帧顺序测试；新增多列阶段、地雷边界、暂停发布检查点及真实 ApplyDefaults 的绑定代次断言。既有长按生命周期 fixture 的结果、计分和血量预期保持不变。
+
+**本次验证范围。** 生产 Release 构建使用 `--no-restore -p:BuildProjectReferences=false`，0 警告、0 错误；引用已有 sibling 程序集，未构建或修改 sibling 源码。定向测试通过本地生成的 `artifacts/hitobject-core/core.csproj` 编译已迁移测试和所需辅助文件：普通 Note/LN/CN/HCN 执行、候选选择、HCN 历史、核心计划执行、多列引擎，以及真实长按玩法/表现、长按生命周期、地雷回退、HCN 帧顺序和暂停恢复。组合结果为 **147 项通过，0 失败、0 跳过**。该局部编译入口不添加生产兼容代码，完整测试项目的旧入口仍待迁移。
+
+本地组合复现命令（结果写入 `artifacts/hitobject-core/results`）：
+
+```powershell
+dotnet test artifacts/hitobject-core/core.csproj -c Release --no-restore -p:BuildProjectReferences=false --filter '(FullyQualifiedName~.Normal.Gameplay.Judgement.|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaLandmineRewindLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaHcnFrameOrder|FullyQualifiedName~TestSceneBmsBeatorajaHcnLandmineFrameOrder|FullyQualifiedName~TestSceneBmsPauseRewindLongNote)&FullyQualifiedName!~.Performance.' --logger 'trx;LogFileName=combined.trx' --results-directory artifacts/hitobject-core/results
+```
+
+这是实现期间的定向规则、计划执行及部分真实 Player 回归。完整调度生成等价、Git 新旧版本对照、全部音频/视觉反馈和性能均待验证；未运行 benchmark。局部编译项目和日志保留在忽略的 `artifacts` 中，稳定测试源文件及 fixture 仍在正式测试项目中。
 
 每份最终证据记录：比较版本的完整 SHA、框架/运行环境、实际命令、测试补丁、匹配数量、失败/跳过、执行等价与生成等价各自范围、行为差异及处理、性能样本和剩余项。未提交的测试探针保存为 diff。
 

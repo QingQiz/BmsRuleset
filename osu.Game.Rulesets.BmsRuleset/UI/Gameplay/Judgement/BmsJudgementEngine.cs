@@ -3,133 +3,147 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
-using osu.Game.Rulesets.Judgements;
-using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
+internal readonly record struct BmsJudgementColumnDefinition(BmsHitObject[] Objects, BmsLayoutVariant Layout, int Index, bool BatchUpdates, IBmsJudgementOutput Output);
+
+internal sealed class BmsJudgementRules
+{
+    internal readonly BmsNoteJudgementRule Note = new();
+    internal readonly BmsLongNoteJudgementRule LongNote = new();
+    internal readonly BmsChargeNoteJudgementRule ChargeNote = new();
+    internal readonly BmsHellChargeNoteJudgementRule HellChargeNote = new();
+    internal readonly BmsLandmineJudgementRule Landmine = new();
+}
+
 /// <summary>
-/// Coordinates the judgement phases for one playfield.
+/// Owns column state and the ordered simulation phases, independently of representations and clocks.
 /// </summary>
-/// <remarks>
-/// Column contexts own input selection and indexes. Landmine passing still uses framework representations.
-/// </remarks>
 internal sealed class BmsJudgementEngine
 {
-    private readonly BmsPlayfield playfield = null!;
+    private readonly BmsJudgementRules rules = new();
     private readonly BmsColumnJudgementContext[] columns;
+    private readonly BmsColumnJudgementContext[] columnsByIndex;
     private readonly List<BmsJudgementInput> pendingInputs = [];
     private readonly int[] framePressedDirections;
     private long scheduleEpoch;
     private long scheduleStep;
     private long scheduleBatch;
     private double scheduleTime = double.NaN;
+    private bool processing;
 
-    internal BmsJudgementEngine(BmsPlayfield playfield, BmsColumn[] orderedColumns)
+    internal BmsJudgementEngine(params BmsJudgementColumnDefinition[] definitions)
     {
-        this.playfield = playfield;
-        columns = new BmsColumnJudgementContext[orderedColumns.Length];
-        framePressedDirections = new int[playfield.TotalColumns];
-
-        for (var i = 0; i < orderedColumns.Length; i++)
+        if (definitions.Length == 0 || definitions.Any(d => d.Index < 0) || definitions.Select(d => d.Index).Distinct().Count() != definitions.Length)
+            throw new ArgumentException("Each judgement column needs a unique non-negative index.", nameof(definitions));
+        columns = new BmsColumnJudgementContext[definitions.Length];
+        columnsByIndex = new BmsColumnJudgementContext[definitions.Max(d => d.Index) + 1];
+        framePressedDirections = new int[columnsByIndex.Length];
+        for (var i = 0; i < definitions.Length; i++)
         {
-            var context = new BmsColumnJudgementContext(playfield, orderedColumns[i]);
-            columns[i] = context;
-            context.Column.Judgements = context;
-            context.Container.Judgements = context;
+            var definition = definitions[i];
+            var column = new BmsColumnJudgementContext(definition.Objects, definition.Layout, definition.Index, definition.BatchUpdates, definition.Output, rules);
+            columns[i] = column;
+            columnsByIndex[column.Index] = column;
         }
+    }
+
+    internal BmsJudgementEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, bool batchUpdates, IBmsJudgementOutput output)
+        : this(new BmsJudgementColumnDefinition(notes, layout, column, batchUpdates, output))
+    {
     }
 
     internal bool HasPendingInputs => pendingInputs.Count > 0;
 
-    internal BmsJudgementEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, bool canBatchUpdates, IBmsJudgementOutput output)
-    {
-        columns = [new BmsColumnJudgementContext(notes, layout, column, canBatchUpdates, output)];
-        framePressedDirections = new int[column + 1];
-    }
-
-    internal BmsColumnJudgementContext GetColumn(int index) => columns.Single(c => c.Index == index);
-
+    internal BmsColumnJudgementContext GetColumn(int index)
+        => index >= 0 && index < columnsByIndex.Length && columnsByIndex[index] is { } column ? column
+            : throw new ArgumentOutOfRangeException(nameof(index));
 
     internal void QueueInput(double time, int column, bool pressed, bool reverseScratch)
-        => pendingInputs.Add(new BmsJudgementInput(time, column, pressed, reverseScratch));
-
-    internal void ProcessFrame(bool suppressJudgements = false)
     {
-        var time = playfield.Time.Current;
-        if (time != scheduleTime)
+        GetColumn(column);
+        pendingInputs.Add(new BmsJudgementInput(time, column, pressed, reverseScratch));
+    }
+
+    internal void ProcessFrame(in BmsFrameContext frame, double elapsed, BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo,
+                               bool suppressJudgements = false, bool resumeRewinding = false)
+    {
+        if (processing)
+            throw new InvalidOperationException("Result observers may queue inputs, but cannot recursively process a frame.");
+        processing = true;
+        var inputCount = pendingInputs.Count;
+        try
         {
-            if (time < scheduleTime) scheduleEpoch++;
-            scheduleTime = time;
-            scheduleStep++;
-        }
-        scheduleBatch++;
-        foreach (var context in columns)
-            context.Schedule.BeginBatch(scheduleEpoch, scheduleStep, scheduleBatch);
-
-        foreach (var context in columns)
-            framePressedDirections[context.Index] = context.PressedDirections;
-
-        foreach (var input in pendingInputs)
-        {
-            var column = playfield.Stage.Columns[input.Column];
-            var direction = column.IsScratch && input.ReverseScratch ? 2 : 1;
-            if (input.Pressed)
-                framePressedDirections[input.Column] |= direction;
-            else
-                framePressedDirections[input.Column] &= ~direction;
-        }
-
-        if (suppressJudgements || (playfield.Clock as IGameplayClock)?.IsRewinding == true || playfield.Time.Elapsed < 0)
-        {
-            // Rewinding updates physical key state while result stacks restore the judgement state.
-            foreach (var context in columns)
-                context.PressedDirections = framePressedDirections[context.Index];
-
-            pendingInputs.Clear();
-            return;
-        }
-
-        // Keep the phase boundaries explicit: passing mines precede HCN bodies, both use the
-        // final physical state for this input batch, and input endpoints run afterwards.
-        if (!playfield.IsResumeRewinding)
-        {
-            foreach (var context in columns)
-                context.Container.UpdateLandmines(framePressedDirections[context.Index] != 0);
-
-            foreach (var context in columns)
-                context.UpdateHellChargeBodies(framePressedDirections[context.Index] != 0);
-        }
-
-        foreach (var input in pendingInputs)
-        {
-            var column = playfield.Stage.Columns[input.Column];
-            if (input.Pressed)
+            if (frame.SimulationTime != scheduleTime)
             {
-                var outcome = column.HandlePress(input.Time, input.ReverseScratch);
-                if (outcome is { Kind: PressOutcomeKind.EmptyPoor, ExpectedTime: { } expectedTime })
-                    playfield.RegisterEmptyPoor(expectedTime, outcome.Column);
+                if (frame.SimulationTime < scheduleTime)
+                    scheduleEpoch++;
+                scheduleTime = frame.SimulationTime;
+                scheduleStep++;
             }
-            else
-                column.HandleRelease(input.Time, input.ReverseScratch);
+            scheduleBatch++;
+            foreach (var column in columns)
+            {
+                column.Schedule.BeginBatch(scheduleEpoch, scheduleStep, scheduleBatch);
+                framePressedDirections[column.Index] = column.PressedDirections;
+            }
+
+            for (var i = 0; i < inputCount; i++)
+            {
+                var input = pendingInputs[i];
+                var direction = columnsByIndex[input.Column].IsScratch && input.ReverseScratch ? 2 : 1;
+                if (input.Pressed)
+                    framePressedDirections[input.Column] |= direction;
+                else
+                    framePressedDirections[input.Column] &= ~direction;
+            }
+
+            if (suppressJudgements || frame.IsRewinding || elapsed < 0)
+            {
+                foreach (var column in columns)
+                    column.PressedDirections = framePressedDirections[column.Index];
+                return;
+            }
+
+            // The batch's final physical state drives all mines, then all bodies, before its ordered inputs.
+            if (!resumeRewinding)
+            {
+                foreach (var column in columns)
+                    column.UpdateLandmines(frame, framePressedDirections[column.Index] != 0);
+                foreach (var column in columns)
+                    column.UpdateRegisteredBodies(frame, elapsed, framePressedDirections[column.Index] != 0);
+            }
+
+            for (var i = 0; i < inputCount; i++)
+            {
+                var input = pendingInputs[i];
+                var column = columnsByIndex[input.Column];
+                if (input.Pressed)
+                {
+                    var outcome = column.HandleNotePress(new BmsPressContext(input.Time, frame, input.ReverseScratch, resumeRewinding), algorithm);
+                    if (outcome is { Kind: PressOutcomeKind.EmptyPoor, ExpectedTime: { } expectedTime })
+                        column.ApplyEmptyPoor(expectedTime, frame);
+                }
+                else
+                    column.HandleExecutionRelease(input.Time, frame, input.ReverseScratch);
+            }
         }
-
-        pendingInputs.Clear();
+        finally
+        {
+            // Synchronous feedback may enqueue another batch at the same timestamp.
+            pendingInputs.RemoveRange(0, inputCount);
+            processing = false;
+        }
     }
 
-    internal void CompleteLongNotesAtPause(double currentTime)
+    internal void CompleteLongNotesAtPause(in BmsFrameContext frame)
     {
-        foreach (var context in columns)
-            context.CompleteLongNotesAtPause(currentTime);
+        foreach (var column in columns)
+            column.CompleteLongNotesAtPause(frame);
     }
 
-    private readonly struct BmsJudgementInput(double time, int column, bool pressed, bool reverseScratch)
-    {
-        internal double Time { get; } = time;
-        internal int Column { get; } = column;
-        internal bool Pressed { get; } = pressed;
-        internal bool ReverseScratch { get; } = reverseScratch;
-    }
-
+    private readonly record struct BmsJudgementInput(double Time, int Column, bool Pressed, bool ReverseScratch);
 }

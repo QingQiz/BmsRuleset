@@ -1,4 +1,5 @@
 using System;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
@@ -60,27 +61,35 @@ internal sealed class BmsHellChargeBodyTracker
     {
         if (elapsed <= 0)
             return;
+        var tick = accumulate(elapsed, holding);
+        if (tick)
+            applyTick(holding, DEFAULT_TICK_SCALE);
+        commit(holding, tick, time);
+    }
 
+    internal void Update(double elapsed, bool holding, BmsLongNote note, in BmsJudgementExecutionContext execution, in BmsFrameContext frame)
+    {
+        if (elapsed <= 0)
+            return;
+        var tick = accumulate(elapsed, holding);
+        if (tick)
+            execution.ApplyBodyTick(note, holding, DEFAULT_TICK_SCALE, frame);
+        commit(holding, tick, frame.SimulationTime);
+    }
+
+    private bool accumulate(double elapsed, bool holding)
+    {
         accumulator += holding ? elapsed : -elapsed;
+        // One update releases at most one tick, leaving a large frame's backlog for later updates.
+        return holding && accumulator > tick_interval || !holding && accumulator < -tick_interval;
+    }
 
-        // beatoraja applies at most one tick per update, retaining any backlog for later frames.
-        if (holding && accumulator > tick_interval)
-        {
-            applyTick(true, DEFAULT_TICK_SCALE);
-            accumulator -= tick_interval;
-        }
-
-        else if (!holding && accumulator < -tick_interval)
-        {
-            applyTick(false, DEFAULT_TICK_SCALE);
-            accumulator += tick_interval;
-        }
-
+    private void commit(bool holding, bool tick, double? time)
+    {
+        // Feedback observes the pre-commit accumulator; history records only completed frames.
+        if (tick)
+            accumulator += holding ? -tick_interval : tick_interval;
         if (HistoryEnabled && time is { } end)
-        {
-            // Frame boundaries matter when a long update leaves a backlog. Restore the last
-            // applied frame rather than interpolating ticks that never occurred.
             (history ??= new BmsHellChargeHistory()).Add(end, accumulator);
-        }
     }
 }

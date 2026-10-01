@@ -9,8 +9,6 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 /// </summary>
 internal sealed class BmsNoteJudgementRule
 {
-    internal static readonly BmsNoteJudgementRule Shared = new();
-
     internal HitResult JudgePress(HitResult selectedResult, bool judged) => judged ? HitResult.None : selectedResult;
 
     internal HitResult JudgePassive(BmsHitObject target, in BmsNoteJudgementWindows windows, double simulationTime, bool judged)

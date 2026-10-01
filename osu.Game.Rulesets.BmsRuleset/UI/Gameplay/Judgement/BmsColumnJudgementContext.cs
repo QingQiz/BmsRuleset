@@ -11,34 +11,35 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 internal sealed partial class BmsColumnJudgementContext
 {
-    private readonly BmsPlayfield playfield = null!;
+    private BmsPlayfield playfield = null!;
     private readonly BmsNotePressHistory pressHistory = new();
     private readonly BmsHitObject[] columnNotes;
     private readonly bool canBatchUpdates;
     private readonly List<BmsJudgementCandidate> pressJudgementCandidates = [];
-    private readonly List<DrawableBmsHitObject> activeLongNotes = [];
+    private readonly List<BmsLongNote> activeLongNotes = [];
     private int pressedDirections;
     private bool passiveDeadlineDirty = true;
 
-    internal BmsColumnJudgementContext(BmsPlayfield playfield, BmsColumn column)
+    internal BmsJudgementRules Rules { get; }
+
+    internal void AttachRepresentationServices(BmsPlayfield playfield, BmsColumn column)
     {
         this.playfield = playfield;
         Column = column;
         Container = (BmsColumnHitObjectContainer)column.HitObjectContainer;
-        canBatchUpdates = column.CanBatchUpdates;
-        columnNotes = playfield.Beatmap.HitObjects.Where(h => h.Column == Index && h is not BmsLandmine and not BmsInvisibleNote)
-                              .OrderBy(h => h.StartTime).ToArray();
-        drawableNoteOutput = new BmsDrawableJudgementOutput(playfield, column);
-        initialiseNoteExecution(drawableNoteOutput);
+        drawableNoteOutput = (BmsDrawableJudgementOutput)noteOutput;
+        column.Judgements = this;
+        Container.Judgements = this;
     }
 
-    internal BmsColumn Column { get; } = null!;
-    internal BmsColumnHitObjectContainer Container { get; } = null!;
-    internal int Index => Column?.Index ?? noteColumnIndex;
-    private bool IsScratch => Column?.IsScratch ?? BmsLayout.IsScratchColumn(Index, LayoutVariant);
-    private BmsLayoutVariant LayoutVariant => Column?.LayoutVariant ?? noteLayout;
-    internal IReadOnlyList<DrawableBmsHitObject> ActiveLongNotes => activeLongNotes;
+    internal BmsColumn Column { get; private set; } = null!;
+    internal BmsColumnHitObjectContainer Container { get; private set; } = null!;
+    internal int Index => noteColumnIndex;
+    internal bool IsScratch => BmsLayout.IsScratchColumn(Index, LayoutVariant);
+    private BmsLayoutVariant LayoutVariant => noteLayout;
+    internal IReadOnlyList<BmsLongNote> ActiveLongNotes => activeLongNotes;
     internal double NextPassiveUpdateTime { get; private set; }
+    internal void ApplyEmptyPoor(double expectedTime, in BmsFrameContext frame) => noteOutput.ApplyEmptyPoor(expectedTime, Index, frame);
 
     internal bool HasPmsMistake(BmsHitObject note) => BmsJudgementProfileProvider.IsPms(LayoutVariant) && pressHistory.Get(note).Mistake;
 
@@ -50,6 +51,11 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal void ObserveLongNoteState(DrawableBmsHitObject drawable, BmsLongNoteStateObserver observer)
         => drawableNoteOutput!.ObserveLongNoteState(drawable, observer);
+
+    internal void ObserveLandmineState(DrawableBmsHitObject drawable, BmsLandmineStateObserver observer)
+        => drawableNoteOutput!.ObserveLandmineState(drawable, observer);
+
+    internal DrawableBmsHitObject GetRepresentation(BmsHitObject note) => drawableNoteOutput!.GetRepresentation(note);
 
     internal DrawableBmsHitObject? FirstPendingHead
         => FirstPendingNote is { } note ? drawableNoteOutput!.GetRepresentation(note) : null;
@@ -64,12 +70,19 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal void RetireInactiveLongNoteAt(int index)
     {
-        if (!RequiresActiveLongNoteUpdate(activeLongNotes[index].HitObject))
+        if (!RequiresActiveLongNoteUpdate(activeLongNotes[index]))
             activeLongNotes.RemoveAt(index);
     }
 
     internal void Register(DrawableBmsHitObject note)
     {
+        if (note.HitObject is BmsLandmine mine)
+        {
+            drawableNoteOutput!.Bind(note);
+            ActivateLandmine(mine);
+            refreshActiveNoteOrder();
+            return;
+        }
         if (!noteSlots.ContainsKey(note.HitObject))
             return;
 
@@ -81,6 +94,11 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal void Unregister(DrawableBmsHitObject note)
     {
+        if (note.HitObject is BmsLandmine mine)
+        {
+            RemoveLandmine(mine);
+            return;
+        }
         if (!noteSlots.ContainsKey(note.HitObject))
             return;
 
@@ -90,24 +108,16 @@ internal sealed partial class BmsColumnJudgementContext
         refreshActiveNoteOrder();
     }
 
-    private void trackActiveLongNote(DrawableBmsHitObject note)
+    private void trackActiveLongNote(BmsLongNote note)
     {
-        if (RequiresActiveLongNoteUpdate(note.HitObject) && !activeLongNotes.Contains(note))
+        if (RequiresActiveLongNoteUpdate(note) && !activeLongNotes.Contains(note))
             activeLongNotes.Add(note);
     }
 
-    internal void UpdateHellChargeBodies(bool holding)
-    {
-        for (var i = activeLongNotes.Count - 1; i >= 0; i--)
-            RetireInactiveLongNoteAt(i);
-        updateDrawableBodies(holding);
-    }
-
-    internal void CompleteLongNotesAtPause(double currentTime)
+    internal void CompleteLongNotesAtPause(in BmsFrameContext frame)
     {
         foreach (var note in GetHoldingNotes().ToArray())
-            longNoteBinding!.CompleteAtPause(noteSlots[note], new BmsFrameContext(currentTime,
-                (Column.Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Column.Clock.Rate));
+            pauseOperations[holdOperationSlots[noteSlots[note]]](noteSlots[note], frame);
     }
 
     internal void RewindLongNotes(double time)
@@ -117,7 +127,7 @@ internal sealed partial class BmsColumnJudgementContext
         foreach (var note in longNotes)
         {
             if (note != null)
-                longNoteBinding!.Rewind(noteSlots[note], time);
+                rewindOperations[holdOperationSlots[noteSlots[note]]](noteSlots[note], time);
         }
     }
 

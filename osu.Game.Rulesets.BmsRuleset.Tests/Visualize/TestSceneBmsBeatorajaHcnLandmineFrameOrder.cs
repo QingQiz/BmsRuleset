@@ -50,9 +50,9 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
     }
 
     [Test]
-    public void MineBeforeHcnBodyAtGaugeCeiling([Values(1, 2)] int column, [Values] bool bounded)
+    public void MineBeforeHcnBodyAtGaugeCeiling([Values(1, 2)] int column)
     {
-        load(column, 240, false, bounded);
+        load(column, 240, false);
         // Java 9cddf911 JudgeManager 244-246 precedes all bodies at 306-338.
         // NORMAL TOTAL240 / 3 endpoints: head +80%, body +40%, mine -10%.
         checkpoint("first", 3200, 1, false, []);
@@ -62,11 +62,10 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
         assertTimeline();
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void UnsaturatedMineAndHcnBodyApplyExactlyOnceInReferenceOrder(bool bounded)
+    [Test]
+    public void UnsaturatedMineAndHcnBodyApplyExactlyOnceInReferenceOrder()
     {
-        load(2, 12, false, bounded);
+        load(2, 12, false);
         // TOTAL12 / 3 gives head +4% and body +2%; neither operation clips.
         // Final 16% alone cannot distinguish ordering, but [14%,16%] can.
         checkpoint("first", 3200, .24, false, []);
@@ -76,11 +75,10 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
         assertTimeline();
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void SameFrameReleaseAvoidsMineAndLaterPressDoesNotDetonateIt(bool bounded)
+    [Test]
+    public void SameFrameReleaseAvoidsMineAndLaterPressDoesNotDetonateIt()
     {
-        load(2, 240, true, bounded);
+        load(2, 240, true);
         // The mine scan reads final physical keys, so a release at 3201 avoids
         // the mine even though Key2 was held at 3200. Passed mines stay passed.
         checkpoint("first", 3200, 1, false, []);
@@ -92,7 +90,7 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
         assertTimeline();
     }
 
-    private void load(int column, double chartTotal, bool release, bool bounded)
+    private void load(int column, double chartTotal, bool release)
     {
         AddStep("load mine and HCN scenario", () =>
         {
@@ -103,7 +101,6 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
             LoadPlayer();
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        if (bounded) AddStep("enable bounded HCN column", () => Playfield.EnableLongNoteExecution(1));
     }
 
     private void checkpoint(string phase, double time, double expectedHealth, bool expectedMine, double[] expectedFrameHealth)

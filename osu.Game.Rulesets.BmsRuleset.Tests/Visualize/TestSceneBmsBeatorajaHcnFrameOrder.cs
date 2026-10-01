@@ -51,9 +51,9 @@ public partial class TestSceneBmsBeatorajaHcnFrameOrder : BmsPlayerTestScene
     }
 
     [Test]
-    public void BodyBeforeOtherColumnBadAtGaugeCeiling([Values(1, 2)] int column, [Values] bool bounded)
+    public void BodyBeforeOtherColumnBadAtGaugeCeiling([Values(1, 2)] int column)
     {
-        load(column, 320, false, bounded);
+        load(column, 320, false);
         // Java 9cddf911 JudgeManager 310-338 precedes every key change at 347.
         // NORMAL starts at 20%; TOTAL320 / 4 endpoints gives +80% per PG, +40% body, BAD -3%.
         checkpoint(3200, 1, [HitResult.Perfect], [3000], [0]);
@@ -63,11 +63,10 @@ public partial class TestSceneBmsBeatorajaHcnFrameOrder : BmsPlayerTestScene
         assertTimeline();
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void UnsaturatedBodyAndOtherColumnBadApplyExactlyOneTick(bool bounded)
+    [Test]
+    public void UnsaturatedBodyAndOtherColumnBadApplyExactlyOneTick()
     {
-        load(1, 12, false, bounded);
+        load(1, 12, false);
         // Without clipping, one +1.5% body and one -3% BAD must net -1.5% in either order.
         checkpoint(3200, .23, [HitResult.Perfect], [3000], [0]);
         checkpoint(3201, .215, [HitResult.Perfect, HitResult.Ok], [3000, 3201], [0, -149]);
@@ -76,11 +75,10 @@ public partial class TestSceneBmsBeatorajaHcnFrameOrder : BmsPlayerTestScene
         assertTimeline();
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void ReleasedBodyBeforeOtherColumnPerfectAtGaugeCeiling(bool bounded)
+    [Test]
+    public void ReleasedBodyBeforeOtherColumnPerfectAtGaugeCeiling()
     {
-        load(1, 320, true, bounded);
+        load(1, 320, true);
         // The early release is POOR (-6%). At 3201 body damage (-1.5%) comes before
         // the other column's +80% PG, which clamps to 100%; reversing them leaves 98.5%.
         checkpoint(3200, .94, [HitResult.Perfect, HitResult.Meh], [3000, 3001], [0, -1999]);
@@ -90,7 +88,7 @@ public partial class TestSceneBmsBeatorajaHcnFrameOrder : BmsPlayerTestScene
         assertTimeline();
     }
 
-    private void load(int column, double chartTotal, bool release, bool bounded)
+    private void load(int column, double chartTotal, bool release)
     {
         AddStep("load frame order scenario", () =>
         {
@@ -101,7 +99,6 @@ public partial class TestSceneBmsBeatorajaHcnFrameOrder : BmsPlayerTestScene
             LoadPlayer();
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        if (bounded) AddStep("enable bounded HCN column", () => Playfield.EnableLongNoteExecution(column));
     }
 
     private void checkpoint(double time, double expectedHealth, HitResult[] expectedResults, double[] expectedTimes,

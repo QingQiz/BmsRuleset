@@ -18,10 +18,13 @@ internal interface IBmsJudgementOutput
     void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame);
     void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame);
     void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame);
+    void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame);
     void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame);
+    void ApplyEmptyPoor(double expectedTime, int column, in BmsFrameContext frame);
     void PlaySample(BmsHitObject note);
     void PlayTailSample(BmsLongNote note);
     void PlayKeySound();
+    void PlayLandmineSample(BmsLandmine note);
 }
 
 internal readonly record struct BmsMainResultState(HitResult Type, double TimeAbsolute, double TimeOffset, double? GameplayRate, bool SuppressPenalty)

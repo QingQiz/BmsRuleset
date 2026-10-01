@@ -1,59 +1,44 @@
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
 public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCol>
     where TCol : struct, IColumnProvider
 {
-
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Mine;
+    private BmsLandmineState state => ParentColumn!.Judgements.GetLandmineState((BmsLandmine)HitObject);
+    private readonly BmsLandmineStateObserver stateObserver;
 
-    // The playfield's passing phase owns detonation so it precedes every HCN body.
-    protected override bool SkipFurtherUpdates => mineHandledTime.HasValue && Time.Current >= HitObject.StartTime;
-
-    private double? mineHandledTime;
-
+    protected override bool SkipFurtherUpdates => state.HandledTime.HasValue && Time.Current >= HitObject.StartTime;
     internal override bool RequiresColumnFrameUpdate => false;
 
-    protected override void ResetKindState() => mineHandledTime = (Entry as BmsHitObjectLifetimeEntry)?.LandmineHandledTime;
+    public DrawableBmsLandmine() => stateObserver = applyPresentation;
 
-    internal override void RestoreRewoundState()
+    protected override void OnApply()
     {
-        if (mineHandledTime.HasValue && Time.Current < mineHandledTime.Value)
-        {
-            // Processing can follow StartTime, so detonated and avoided mines must both
-            // rewind at the actual frame, matching the host's RawTime result boundary.
-            mineHandledTime = null;
-            Alpha = 1;
-        }
+        base.OnApply();
+        ParentColumn!.Judgements.ObserveLandmineState(this, stateObserver);
+        ParentColumn.Judgements.RefreshNoteRepresentation(this);
+        restorePresentation();
     }
 
-    internal override void UpdateLandmine(bool holding)
+    internal override void RestoreRewoundState() => restorePresentation();
+
+    private void restorePresentation()
     {
-        if (Judged || mineHandledTime.HasValue || Time.Current < HitObject.StartTime)
-            return;
+        Alpha = state.HandledTime.HasValue ? 0 : 1;
+        if (state.Detonated)
+            LifetimeEnd = HitObject.StartTime + BmsLandmineJudgementRule.PASSING_LIFETIME;
+    }
 
-        mineHandledTime = Time.Current;
-        if (Entry is BmsHitObjectLifetimeEntry entry)
-            entry.LandmineHandledTime = mineHandledTime;
-
-        if (holding && Time.Current < HitObject.StartTime + BmsHitObjectLifetimeEntry.MINE_PAST_LIFETIME)
-        {
-            ParentColumn?.DetonateLandmine(HitObject);
-            ApplyResult(HitResult.Meh);
-            // Passing judgements now precede the column's lifetime pass. Keep the hidden
-            // mine until its normal expiry so this same traversal cannot free its result.
-            LifetimeEnd = HitObject.StartTime + BmsHitObjectLifetimeEntry.MINE_PAST_LIFETIME;
-        }
-        else
-        {
+    private void applyPresentation(in BmsLandmineState snapshot, in BmsFrameContext frame)
+    {
+        if (snapshot.Detonated)
+            // Retain the result through the same traversal's lifetime pass.
+            LifetimeEnd = HitObject.StartTime + BmsLandmineJudgementRule.PASSING_LIFETIME;
+        else if (snapshot.HandledTime.HasValue)
             Alpha = 0;
-        }
-    }
-
-    protected override void CheckForResult(bool userTriggered, double timeOffset)
-    {
     }
 }

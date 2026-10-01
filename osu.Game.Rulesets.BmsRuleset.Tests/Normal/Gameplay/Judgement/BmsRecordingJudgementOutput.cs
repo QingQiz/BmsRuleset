@@ -123,4 +123,7 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     public void PlaySample(BmsHitObject note) => Feedback?.Invoke($"sample:{note.SampleKey}:{note.SampleVolume}");
     public void PlayTailSample(BmsLongNote note) => Feedback?.Invoke($"sample:{note.TailSampleKey}:{note.TailSampleVolume}");
     public void PlayKeySound() => Feedback?.Invoke("keysound");
+    public void ApplyEmptyPoor(double expectedTime, int column, in BmsFrameContext frame) => Feedback?.Invoke($"empty-poor:{expectedTime}:{column}");
+    public void PlayLandmineSample(BmsLandmine note) => Feedback?.Invoke("landmine");
+    public void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame) { }
 }
