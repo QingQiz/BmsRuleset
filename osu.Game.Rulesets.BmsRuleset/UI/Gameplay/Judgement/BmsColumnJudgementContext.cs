@@ -27,6 +27,9 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal bool HasPmsMistake(BmsHitObject note) => BmsJudgementProfileProvider.IsPms(LayoutVariant) && pressHistory.Get(note).Mistake;
 
+    internal bool IsKeySoundFinished(BmsHitObject note, double time)
+        => IsNoteActive(note) ? GetNoteResult(note).HasResult : time > note.StartTime;
+
     internal void RecordResult(BmsHitObject note, double time) => pressHistory.Record(note, time, true);
 
     internal void RewindPressHistory(double time) => pressHistory.Rewind(time);
@@ -81,7 +84,5 @@ internal sealed partial class BmsColumnJudgementContext
         get => pressedDirections;
         set => pressedDirections = value;
     }
-
-    internal bool LastPressWasReverseScratch { get; private set; }
 
 }

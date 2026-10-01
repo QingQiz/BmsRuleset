@@ -14,8 +14,6 @@ internal sealed partial class BmsDrawableJudgementOutput
     private BmsColumnJudgementContext context => column.Judgements;
     private BmsColumnHitObjectContainer container => (BmsColumnHitObjectContainer)column.HitObjectContainer;
 
-    internal DrawableBmsHitObject? FirstPendingHead => context.FirstPendingNote is { } note ? GetRepresentation(note) : null;
-
     internal void ObserveVisualTime(DrawableBmsHitObject drawable, BmsVisualTimeObserver observer)
         => container.ObserveVisualTime(drawable, observer);
 
@@ -37,6 +35,20 @@ internal sealed partial class BmsDrawableJudgementOutput
     internal void CompleteScheduledRemoval(DrawableBmsHitObject drawable, in BmsFrameContext frame)
     {
         if (TryGetScheduledObject(drawable, out var item)) context.Schedule.CompleteRemoval(item, frame);
+    }
+
+    internal void RestoreRewoundState(in BmsFrameContext frame)
+    {
+        if (!context.Schedule.BeginRewindStep(frame))
+            return;
+
+        // Framework results have reverted; rebuild visuals before publishing the restored logical indexes.
+        foreach (var drawable in container.AliveEntries.Values)
+        {
+            if (drawable is DrawableBmsHitObject bms)
+                bms.RestoreRewoundVisuals();
+        }
+        context.RestoreExecutionState(frame);
     }
 
     internal void Register(DrawableBmsHitObject drawable)

@@ -1,13 +1,13 @@
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
-public enum PressOutcomeKind
+internal enum PressOutcomeKind
 {
     Hit,
     EmptyPoor,
     Empty,
 }
 
-public readonly record struct PressOutcome(PressOutcomeKind Kind, double? ExpectedTime = null, int Column = 0)
+internal readonly record struct PressOutcome(PressOutcomeKind Kind, double? ExpectedTime = null, int Column = 0)
 {
     public static PressOutcome Hit => new(PressOutcomeKind.Hit);
 

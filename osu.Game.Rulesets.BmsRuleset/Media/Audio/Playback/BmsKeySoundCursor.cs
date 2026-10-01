@@ -11,12 +11,11 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 ///     Pure per-column cursor that finds the next hit object whose key-sound should play on an
 ///     empty press. Linear-walks this column's sorted hit-object slice from a cursor that advances
 ///     forward, skipping landmines, notes past their slow BAD window, and notes the caller reports
-///     as finished (judged / expired-without-drawable). The cursor repositions via binary search
+///     as finished (judged or past its active lifetime). The cursor repositions via binary search
 ///     only on a backward seek; forward time progression (including normal gaps with no key press)
 ///     is handled by the linear scan, which advances past notes whose slow BAD window expired.
-///     Extracted from the old centralized keysound player so the seek/skip logic is unit-testable without a drawable
-///     host; the caller supplies isFinished (which needs the column's live HitObjectContainer —
-///     see BmsColumnKeySound.hasNoteFinished).
+///     The caller supplies the core's result and activation query; selecting a sample does not
+///     require a representation or advance judgement state.
 /// </summary>
 public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
 {
@@ -25,8 +24,8 @@ public sealed class BmsKeySoundCursor(IReadOnlyList<BmsHitObject> hitObjects, IR
 
     /// <summary>
     /// Returns the next hit object whose key-sound should play at <paramref name="currentTime"/>,
-    /// or <c>null</c>. <paramref name="isFinished"/> must return true for notes whose drawable is
-    /// already judged or expired-without-drawable (the caller has the live HitObjectContainer).
+    /// or <c>null</c>. <paramref name="isFinished"/> reports judged notes and notes which have
+    /// passed while inactive.
     /// </summary>
     public BmsHitObject? Next(double currentTime, Func<BmsHitObject, bool> isFinished)
     {

@@ -16,8 +16,6 @@ internal sealed class BmsHitObjectLifetimeEntry(
     : HitObjectLifetimeEntry(hitObject)
 {
 
-    // Avoided mines have no result, so their crossing must survive drawable pooling separately.
-
     /// <summary>
     ///     Set to true once <see cref="RefreshLifetime"/> has run.
     ///     Guards against framework code overwriting our

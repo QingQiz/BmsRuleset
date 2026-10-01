@@ -21,6 +21,7 @@ internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLongNoteStateObserver Observer)> presentationObservers = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLandmineStateObserver Observer)> landmineObservers = new(ReferenceEqualityComparer.Instance);
     private Action<BmsHitObject> resultCheckpoint = null!;
+    private Action<BmsHitObject, double> resultHistoryCheckpoint = null!;
 
     internal BmsDrawableJudgementOutput(BmsPlayfield playfield, BmsColumn column)
     {
@@ -93,7 +94,23 @@ internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
         return new BmsMainResultState(result.Type, result.TimeAbsolute, result.TimeOffset, result.GameplayRate, result.SuppressPenalty);
     }
 
-    public void SetResultCheckpoint(Action<BmsHitObject> checkpoint) => resultCheckpoint = checkpoint;
+    public void SetResultCheckpoints(Action<BmsHitObject, double> recordHistory, Action<BmsHitObject> refreshIndexes)
+    {
+        resultHistoryCheckpoint = recordHistory;
+        resultCheckpoint = refreshIndexes;
+    }
+
+    internal void OnFrameworkNewResult(DrawableHitObject drawable, JudgementResult result)
+    {
+        if (drawable is not DrawableBmsHitObject || result.HitObject is not BmsHitObject note || note is BmsLandmine)
+            return;
+
+        // The column notification precedes the bound result callback; retain both observation boundaries.
+        // An earlier observer may have returned the drawable to its pool, so the result owns the identity.
+        resultHistoryCheckpoint(note, column.Time.Current);
+        if (BmsColumn.ShouldTriggerHitExplosion(result.Type))
+            column.TriggerHitExplosion(note is BmsLongNote ? BmsHitLightStyle.Hold : BmsHitLightStyle.Note);
+    }
 
     public void ApplyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty)
     {
@@ -119,13 +136,13 @@ internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
             observer.Observer(state, frame);
     }
 
-    public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame)
+    public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
     {
         var drawable = GetRepresentation(endpoint.Source);
         if (drawable.Time.Current != frame.SimulationTime || playfield.Time.Current != frame.SimulationTime)
             throw new InvalidOperationException("Supplementary endpoints require the current representation and application time.");
 
-        playfield.ApplySyntheticLongNoteEndpoint(endpoint);
+        playfield.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty);
     }
 
     public void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame)

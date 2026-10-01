@@ -246,7 +246,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         Visuals.Add(head = new BmsNoteVisual(BmsSkinComponents.HoldNoteHead, LayoutVariant, Column));
     }
 
-    internal override void RestoreRewoundState()
+    internal override void RestoreRewoundVisuals()
     {
         lastSimulationTime = double.NaN;
         lastVisualObservation = null;
@@ -311,6 +311,14 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     }
 
     private bool isHoldingBody() => mapPresentation(ln, state, isKeyHeld(), Time.Current).HoldingBody;
+
+    protected override void UpdateAfterChildren()
+    {
+        base.UpdateAfterChildren();
+        if (ParentColumn?.ResumeRewindEndTime is { } resumeTime
+            && BmsLongNotePresentation.HideDuringResume(ln, state, Judged, resumeTime))
+            Alpha = 0;
+    }
 
     private bool isKeyHeld() => ParentColumn?.Judgements.IsHoldInputActive(ln) == true;
 

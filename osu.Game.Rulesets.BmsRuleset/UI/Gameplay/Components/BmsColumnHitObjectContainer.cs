@@ -17,7 +17,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private readonly BmsGameplayScrollController scrollController;
     private readonly Func<float> getHitTargetPosition;
     private readonly Func<bool> isResumeRewinding;
-    private readonly Func<double> getResumeRewindEndTime;
     private readonly bool canBatchUpdates;
     private bool frameOpen;
     private bool hasUpdated;
@@ -28,7 +27,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private readonly List<BmsScheduledObject> coreLayoutOrder = [];
     private readonly List<BmsScheduledObject> coreSubtreeOrder = [];
     private readonly List<(int Position, BmsScheduledObject Object)> corePositions = [];
-    private readonly List<BmsScheduledObject> coreDeferredOrder = [];
     private readonly Dictionary<DrawableBmsHitObject, Bindable<double>> coreStartTimes = [];
 
     internal BmsColumnJudgementContext Judgements { get; set; } = null!;
@@ -44,13 +42,11 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         BmsGameplayScrollController scrollController,
         Func<float> getHitTargetPosition,
         Func<bool> isResumeRewinding,
-        Func<double> getResumeRewindEndTime,
         bool canBatchUpdates = false)
     {
         this.scrollController = scrollController;
         this.getHitTargetPosition = getHitTargetPosition;
         this.isResumeRewinding = isResumeRewinding;
-        this.getResumeRewindEndTime = getResumeRewindEndTime;
         this.canBatchUpdates = canBatchUpdates;
         RelativeSizeAxes = Axes.Both;
     }
@@ -106,7 +102,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         if (CanDeferUpdate)
         {
             updatePending = true;
-            UpdateDeferredLongNotes();
+            UpdateDeferredFrame();
             return true;
         }
 
@@ -119,22 +115,10 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         return updated;
     }
 
-    internal void UpdateDeferredLongNotes()
+    internal void UpdateDeferredFrame()
     {
-        var activeLongNotes = Judgements.ActiveLongNotes;
-        coreDeferredOrder.Clear();
-        for (var i = 0; i < activeLongNotes.Count; i++)
-        {
-            var note = activeLongNotes[i];
-            if (Judgements.RequiresActiveLongNoteUpdate(note) && Judgements.Schedule.TryGetCurrent(note, out var item))
-                coreDeferredOrder.Add(item);
-        }
-        if (activeLongNotes.Count > 0)
-            Judgements.Schedule.RunDeferred(coreDeferredOrder, coreFrame(), Time.Elapsed);
-
+        Judgements.Schedule.RunDeferred(coreFrame(), Time.Elapsed);
         observeDeferredVisuals(visualFrame());
-        for (var i = activeLongNotes.Count - 1; i >= 0; i--)
-            Judgements.RetireInactiveLongNoteAt(i);
     }
 
     /// <summary>
@@ -243,46 +227,12 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         base.Dispose(isDisposing);
     }
 
-    protected override void UpdateAfterChildren()
-    {
-        base.UpdateAfterChildren();
-
-        if (!isResumeRewinding())
-            return;
-
-        var rewindEndTime = getResumeRewindEndTime();
-
-        foreach (var note in AliveEntries.Values)
-        {
-            if (note.HitObject is not BmsLongNote longNote)
-                continue;
-
-            // EndTime covers HCN head-POOR, whose endpoints are scored synthetically
-            // without applying a result to the parent drawable.
-            if (longNote.EndTime <= rewindEndTime || (note.Judged && !Judgements.GetLongNoteState(longNote).IsHolding))
-                note.Alpha = 0;
-        }
-    }
-
     protected override void Update()
     {
         base.Update();
         if (Time.Elapsed >= 0 || isResumeRewinding())
             return;
 
-        if (!Judgements.Schedule.BeginRewindStep())
-            return;
-
-        Judgements.RewindLongNotes(Time.Current);
-
-        Judgements.RewindLandmines(Time.Current);
-
-        foreach (var note in AliveEntries.Values)
-        {
-            if (note is DrawableBmsHitObject bms)
-                bms.RestoreRewoundState();
-        }
-
-        Judgements.RestoreExecutionState(coreFrame());
+        JudgementOutput.RestoreRewoundState(coreFrame());
     }
 }

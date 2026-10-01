@@ -80,11 +80,13 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
 
     internal void InvalidateOrder() => bindingRevision++;
 
-    internal bool BeginRewindStep()
+    internal bool BeginRewindStep(in BmsFrameContext frame)
     {
         var next = (Epoch, Step);
         if (lastRewind == next) return false;
         lastRewind = next;
+        column.RewindLongNotes(frame.SimulationTime);
+        column.RewindLandmines(frame.SimulationTime);
         return true;
     }
 
@@ -114,16 +116,26 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
         }
     }
 
-    internal void RunDeferred(IReadOnlyList<BmsScheduledObject> order, in BmsFrameContext frame, double elapsed)
+    internal void RunDeferred(in BmsFrameContext frame, double elapsed)
     {
         if (!begin(ref lastDeferred)) return;
-        var version = snapshot(order);
+        plan.Clear();
+        var holds = column.ActiveLongNotes;
+        for (var i = 0; i < holds.Count; i++)
+        {
+            var note = holds[i];
+            if (column.RequiresActiveLongNoteUpdate(note) && TryGetCurrent(note, out var item))
+                plan.Add(item);
+        }
+        var version = ++revision;
         for (var i = plan.Count - 1; i >= 0; i--)
         {
             if (version != revision) return;
             var item = plan[i];
             if (current(item)) updateLongNote(item, frame, elapsed, version);
         }
+        for (var i = holds.Count - 1; i >= 0; i--)
+            column.RetireInactiveLongNoteAt(i);
     }
 
     internal void CompleteRemoval(BmsScheduledObject item, in BmsFrameContext frame)

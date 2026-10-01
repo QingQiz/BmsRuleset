@@ -10,13 +10,9 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
-using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -78,6 +74,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal bool PreserveLongNoteHistory => ParentPlayfield.PreserveLongNoteHistory;
 
+    internal double? ResumeRewindEndTime => ParentPlayfield.IsResumeRewinding ? ParentPlayfield.ResumeRewindEndTime : null;
+
     protected BmsPlayfield ParentPlayfield { get; }
 
     internal float GetLongNoteHeadYAtStartTime(BmsLongNote note)
@@ -95,8 +93,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
     private BmsColumnKeySound? keySound;
     internal BmsColumnJudgementContext Judgements { get; set; } = null!;
     internal BmsDrawableJudgementOutput JudgementOutput { get; set; } = null!;
-
-    internal bool HasPmsMistake(BmsHitObject note) => Judgements.HasPmsMistake(note);
 
     internal bool CanBatchUpdates => canBatchUpdates;
 
@@ -144,7 +140,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     protected override void Dispose(bool isDisposing)
     {
-        NewResult -= onColumnNewResult;
+        if (JudgementOutput != null)
+            NewResult -= JudgementOutput.OnFrameworkNewResult;
         base.Dispose(isDisposing);
 
         if (skin.IsNotNull())
@@ -165,7 +162,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
             ParentPlayfield.ScrollController,
             () => HitTargetPosition,
             () => ParentPlayfield.IsResumeRewinding,
-            () => ParentPlayfield.ResumeRewindEndTime,
             canBatchUpdates);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
@@ -196,10 +192,10 @@ public partial class BmsColumn : Playfield, IBmsColumn
         if (invisibleNotes.Length > 0)
             ((BmsColumnHitObjectContainer)HitObjectContainer).RefreshAllEntries();
 
-        keySound = new BmsColumnKeySound(columnHitObjects, HitObjectContainer, invisibleNotes);
+        keySound = new BmsColumnKeySound(columnHitObjects, Judgements, invisibleNotes);
         AddInternal(keySound);
 
-        NewResult += onColumnNewResult;
+        NewResult += JudgementOutput.OnFrameworkNewResult;
     }
 
     protected override void Update()
@@ -306,24 +302,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         keySound?.PlayLandmineSound(hitObject.SampleVolume);
     }
 
-    private void onColumnNewResult(DrawableHitObject drawable, JudgementResult result)
-    {
-        if (drawable is not DrawableBmsHitObject || result.HitObject is not BmsHitObject hitObject)
-            return;
-
-        // Landmines detonate via their own path (DrawableBmsLandmine + DetonateLandmine); no hit light.
-        if (hitObject is BmsLandmine)
-            return;
-
-        // An earlier synchronous observer may already have returned the representation to its pool.
-        Judgements.RecordResult(hitObject, Time.Current);
-
-        // BMS POOR is represented by framework Meh, which IsHit() considers successful even though
-        // it must not produce the hit feedback reserved for BAD and better judgements.
-        if (ShouldTriggerHitExplosion(result.Type))
-            TriggerHitExplosion(hitObject is BmsLongNote ? BmsHitLightStyle.Hold : BmsHitLightStyle.Note);
-    }
-
+    // Framework Meh counts as a hit, but BMS POOR has no successful hit feedback.
     internal static bool ShouldTriggerHitExplosion(HitResult result) => result != HitResult.Meh && result.IsHit();
 
     #endregion
@@ -331,22 +310,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
     #region Input
 
     public bool IsPressed => Judgements.PressedDirections != 0;
-
-    internal int PressedDirections
-    {
-        get => Judgements.PressedDirections;
-        set => Judgements.PressedDirections = value;
-    }
-
-    internal bool LastPressWasReverseScratch => Judgements.LastPressWasReverseScratch;
-
-    public PressOutcome HandlePress(double time, bool reverseScratch = false) => Judgements.HandleNotePress(new BmsPressContext(time, judgementFrame(), reverseScratch, ParentPlayfield.IsResumeRewinding), ParentPlayfield.JudgementAlgorithm);
-
-    public void HandleRelease(double time, bool reverseScratch = false) => Judgements.HandleExecutionRelease(time, judgementFrame(), reverseScratch);
-
-    private BmsFrameContext judgementFrame()
-        => new(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
-            (Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0);
 
     internal void PlayKeySound() => keySound?.PlayKeySound();
 

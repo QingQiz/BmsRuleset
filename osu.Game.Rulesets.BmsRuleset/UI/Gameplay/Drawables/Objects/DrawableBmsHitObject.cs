@@ -50,7 +50,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected virtual bool SkipFurtherUpdates => false;
 
-    internal virtual void RestoreRewoundState()
+    internal virtual void RestoreRewoundVisuals()
     {
     }
 

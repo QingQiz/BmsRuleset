@@ -32,7 +32,7 @@ public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCo
         restorePresentation();
     }
 
-    internal override void RestoreRewoundState() => restorePresentation();
+    internal override void RestoreRewoundVisuals() => restorePresentation();
 
     protected override void UpdateHitStateTransforms(ArmedState state)
     {

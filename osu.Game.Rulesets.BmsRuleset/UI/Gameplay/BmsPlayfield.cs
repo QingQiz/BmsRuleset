@@ -386,7 +386,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             // Input is dispatched by our parent before this traversal. Holds still need passive
             // tails, HCN ticks and light pulses at every timestamp, without visiting future skins.
             foreach (var column in Stage.Columns)
-                ((BmsColumnHitObjectContainer)column.HitObjectContainer).UpdateDeferredLongNotes();
+                ((BmsColumnHitObjectContainer)column.HitObjectContainer).UpdateDeferredFrame();
             visualUpdatePending = true;
             return true;
         }
@@ -594,11 +594,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// <summary>
     ///     Registers a separate CN/HCN endpoint through the score and health processors.
     /// </summary>
-    internal void ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpoint)
+    internal void ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpoint, bool suppressPenalty)
     {
         var note = endpoint.Source;
-        var suppressPenalty = endpoint.Kind == BmsLongNoteEndpointKind.Head && endpoint.Result == HitResult.Meh
-                                                                            && Stage.Columns[note.Column] is BmsColumn sourceColumn && sourceColumn.HasPmsMistake(note);
         var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty);
 
         if (scoreResult != null)

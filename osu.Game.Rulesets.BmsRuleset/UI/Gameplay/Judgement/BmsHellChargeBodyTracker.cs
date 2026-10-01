@@ -36,11 +36,6 @@ internal sealed class BmsHellChargeBodyTracker
             history = null;
     }
 
-    public void MarkReleased(double? time = null)
-    {
-        // Changing direction does not reset the signed HCN accumulator.
-    }
-
     public void End(double time)
     {
         if (accumulator == 0)

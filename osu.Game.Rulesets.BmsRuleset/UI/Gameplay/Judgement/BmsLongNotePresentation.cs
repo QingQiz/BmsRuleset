@@ -16,6 +16,10 @@ internal readonly record struct BmsLongNotePresentation(
 
     internal BmsHitLightStyle HitLightStyle => BmsHitLightStyle.Hold;
 
+    internal static bool HideDuringResume(BmsLongNote note, in BmsLongNoteState state, bool hasMainResult, double resumeTime)
+        // HCN head-POOR can complete both endpoints synthetically without a main result.
+        => note.EndTime <= resumeTime || hasMainResult && !state.IsHolding;
+
     internal static BmsLongNotePresentationMapping SelectMapping(BmsLongNoteMode mode)
         => mode switch
         {

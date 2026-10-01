@@ -25,7 +25,8 @@ internal readonly struct BmsJudgementExecutionContext(BmsColumnJudgementContext 
     }
 
     internal void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame)
-        => output.ApplySyntheticEndpoint(endpoint, frame);
+        => output.ApplySyntheticEndpoint(endpoint, frame,
+            endpoint.Kind == BmsLongNoteEndpointKind.Head && endpoint.Result == HitResult.Meh && column.HasPmsMistake(endpoint.Source));
 
     internal void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame)
         => output.ApplyBodyTick(note, holding, scale, frame);

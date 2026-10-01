@@ -12,10 +12,10 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 internal interface IBmsJudgementOutput
 {
     BmsMainResultState GetMainResult(BmsHitObject note);
-    void SetResultCheckpoint(Action<BmsHitObject> checkpoint);
+    void SetResultCheckpoints(Action<BmsHitObject, double> recordHistory, Action<BmsHitObject> refreshIndexes);
     void ApplyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty);
     void ApplyMainResult(BmsLongNote note, HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints, in BmsFrameContext frame, bool suppressPenalty);
-    void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame);
+    void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty);
     void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame);
     void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame);
     void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame);

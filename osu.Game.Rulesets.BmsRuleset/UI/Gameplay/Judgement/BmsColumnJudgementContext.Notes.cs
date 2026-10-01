@@ -5,7 +5,6 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
@@ -93,7 +92,7 @@ internal sealed partial class BmsColumnJudgementContext
             }
         }
 
-        output.SetResultCheckpoint(updateNoteIndexes);
+        output.SetResultCheckpoints(RecordResult, updateNoteIndexes);
     }
 
     internal BmsLongNoteState GetLongNoteState(BmsLongNote note) => holdQueries[holdOperationSlots[noteSlots[note]]](noteSlots[note]);
@@ -344,8 +343,7 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal PressOutcome HandleNotePress(in BmsPressContext press, BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)
     {
-        LastPressWasReverseScratch = IsScratch && press.ReverseScratch;
-        pressedDirections |= LastPressWasReverseScratch ? 2 : 1;
+        pressedDirections |= IsScratch && press.ReverseScratch ? 2 : 1;
         if (press.Frame.IsRewinding)
             return PressOutcome.Empty;
 
