@@ -5,7 +5,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Mods;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
@@ -44,10 +43,6 @@ public class BmsDifficultyCalculator(IRulesetInfo ruleset, IWorkingBeatmap beatm
 
         if (noteTimings.Count > 0)
         {
-            // When Auto Scratch is active, exclude scratch column notes from difficulty calculation.
-            if (bmsBeatmap != null && mods.Any(m => m is BmsModAutoScratch))
-                noteTimings = noteTimings.Where(n => !BmsLayout.IsScratchColumn(n.Column, bmsBeatmap.LayoutVariant)).ToList();
-
             if (noteTimings.Count > 0)
             {
                 var layout = bmsBeatmap?.LayoutVariant ?? BmsLayout.VariantFromTotalColumns(totalColumns);

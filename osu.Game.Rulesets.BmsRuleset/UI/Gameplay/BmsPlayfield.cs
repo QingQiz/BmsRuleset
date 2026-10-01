@@ -221,9 +221,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private readonly BmsJudgementEngine judgementEngine;
 
-    internal void EnableNoteExecution(int column) => judgementEngine.EnableNoteExecution(column);
-    internal void EnableLongNoteExecution(int column) => judgementEngine.EnableLongNoteExecution(column);
-    internal void EnableCoreScheduling() => judgementEngine.EnableCoreScheduling();
 
     #endregion
 
@@ -601,7 +598,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (endpoint.Kind == BmsLongNoteEndpointKind.Tail && endpoint.Result.IsHit())
         {
             var column = Math.Clamp(note.Column, 0, Stage.Columns.Length - 1);
-            Stage.Columns[column].TriggerHitExplosion(true);
+            Stage.Columns[column].TriggerHitExplosion(BmsHitLightStyle.Hold);
         }
 
         if (!suppressPenalty)

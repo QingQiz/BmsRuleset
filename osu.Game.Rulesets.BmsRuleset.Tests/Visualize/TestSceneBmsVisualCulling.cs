@@ -10,6 +10,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
@@ -97,7 +98,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         AddStep("warm overlapping feedback", () =>
         {
             for (var i = 0; i < 32; i++)
-                ((BmsColumn)Playfield.Stage.Columns[1]).TriggerHitExplosion(false);
+                ((BmsColumn)Playfield.Stage.Columns[1]).TriggerHitExplosion(BmsHitLightStyle.Note);
         });
         AddStep("record warmed pool", () => poolSize = ((BmsColumn)Playfield.Stage.Columns[1]).ChildrenOfType<DrawablePool<BmsHitExplosion>>().Sum(p => p.CurrentPoolSize));
         seek(4850);
@@ -108,7 +109,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         {
             var column = (BmsColumn)Playfield.Stage.Columns[1];
             for (var i = 0; i < 32; i++)
-                column.TriggerHitExplosion(false);
+                column.TriggerHitExplosion(BmsHitLightStyle.Note);
         });
         AddAssert("expired drawables are reused", () => ((BmsColumn)Playfield.Stage.Columns[1]).ChildrenOfType<DrawablePool<BmsHitExplosion>>().Sum(p => p.CurrentPoolSize) == poolSize);
     }
@@ -121,7 +122,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         for (var pulse = 0; pulse < 4; pulse++)
         {
             seek(4800 + pulse * 50);
-            AddStep("trigger independent pulse", () => ((BmsColumn)Playfield.Stage.Columns[1]).TriggerHitExplosion(isLongNote));
+            AddStep("trigger independent pulse", () => ((BmsColumn)Playfield.Stage.Columns[1]).TriggerHitExplosion(isLongNote ? BmsHitLightStyle.Hold : BmsHitLightStyle.Note));
         }
 
         seek(4990);

@@ -18,7 +18,7 @@ internal sealed class BmsDrawableJudgementOutput : IBmsJudgementOutput
     private readonly Dictionary<BmsHitObject, Binding> representations = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, Binding> boundObjects = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<BmsHitObject, BmsJudgementResult> results = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<BmsLongNote, BmsLongNoteState> presentationStates = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLongNoteStateObserver Observer)> presentationObservers = new(ReferenceEqualityComparer.Instance);
     private Action<BmsHitObject> resultCheckpoint = null!;
 
     internal BmsDrawableJudgementOutput(BmsPlayfield playfield, BmsColumn column)
@@ -33,21 +33,23 @@ internal sealed class BmsDrawableJudgementOutput : IBmsJudgementOutput
         representations.Add(binding.Note, binding);
         boundObjects.Add(drawable, binding);
         results[drawable.HitObject] = (BmsJudgementResult)drawable.Result;
-        if (drawable.HitObject is BmsLongNote longNote)
-            presentationStates[longNote] = drawable.LongNoteJudgement!.State;
         drawable.OnNewResult += binding.ResultHandler;
     }
 
+    internal void ObserveLongNoteState(DrawableBmsHitObject drawable, BmsLongNoteStateObserver observer)
+        => presentationObservers[drawable] = (drawable.BindingGeneration, observer);
+
     internal void Unbind(DrawableBmsHitObject drawable, long generation)
     {
+        if (presentationObservers.TryGetValue(drawable, out var observer) && observer.Generation == generation)
+            presentationObservers.Remove(drawable);
+
         // Pool return may have cleared HitObject; only the binding owns the old identity.
         if (!boundObjects.TryGetValue(drawable, out var binding) || binding.Generation != generation)
             return;
 
         boundObjects.Remove(drawable);
         representations.Remove(binding.Note);
-        if (binding.Note is BmsLongNote longNote)
-            presentationStates.Remove(longNote);
         drawable.OnNewResult -= binding.ResultHandler;
     }
 
@@ -103,12 +105,10 @@ internal sealed class BmsDrawableJudgementOutput : IBmsJudgementOutput
 
     public void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
     {
-        var previous = presentationStates[note];
         var drawable = GetRepresentation(note);
-        // CompleteAtPause freezes gameplay after endpoint feedback without retiring the old presentation.
-        if (!frame.IsPauseCompletion)
-            BmsLongNotePresentation.Apply(drawable, previous, state);
-        presentationStates[note] = state;
+        var observer = presentationObservers[drawable];
+        if (observer.Generation == drawable.BindingGeneration)
+            observer.Observer(state, frame);
     }
 
     public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame)

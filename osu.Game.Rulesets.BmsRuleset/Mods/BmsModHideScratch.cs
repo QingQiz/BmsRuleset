@@ -28,7 +28,7 @@ public class BmsModHideScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>
 
     public IScoreSelectionRule ScoreSelectionRule => BmsModTypeScoreSelectionRule<BmsModHideScratch>.REDUCTION;
 
-    public override Type[] IncompatibleMods => [typeof(BmsModSecondPlayer), typeof(BmsModAutoScratch)];
+    public override Type[] IncompatibleMods => [typeof(BmsModSecondPlayer)];
 
     private BmsPlayfield playfield = null!;
 

@@ -339,7 +339,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             var pools = column.ChildrenOfType<DrawablePool<BmsHitExplosion>>().ToArray();
             var count = pools.Sum(p => p.CurrentPoolSize);
             for (var i = 0; i < note_count / 8; i++)
-                column.TriggerHitExplosion(false);
+                column.TriggerHitExplosion(BmsHitLightStyle.Note);
             Assert.That(pools.Sum(p => p.CurrentPoolSize), Is.EqualTo(count));
         });
         seek(3050);

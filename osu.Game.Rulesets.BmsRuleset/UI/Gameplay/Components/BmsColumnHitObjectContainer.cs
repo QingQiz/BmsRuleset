@@ -154,17 +154,14 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         if (activeLongNotes.Count == 0)
             return;
 
-        if (Judgements.Schedule is { } schedule)
+        coreDeferredOrder.Clear();
+        for (var i = 0; i < activeLongNotes.Count; i++)
         {
-            coreDeferredOrder.Clear();
-            for (var i = 0; i < activeLongNotes.Count; i++)
-            {
-                var note = activeLongNotes[i];
-                if (note.RequiresActiveLongNoteUpdate && Judgements.TryGetScheduledObject(note, out var item))
-                    coreDeferredOrder.Add(item);
-            }
-            schedule.RunDeferred(coreDeferredOrder, coreFrame(), Time.Elapsed);
+            var note = activeLongNotes[i];
+            if (Judgements.RequiresActiveLongNoteUpdate(note.HitObject) && Judgements.TryGetScheduledObject(note, out var item))
+                coreDeferredOrder.Add(item);
         }
+        Judgements.Schedule.RunDeferred(coreDeferredOrder, coreFrame(), Time.Elapsed);
 
         var hitTarget = getHitTargetPosition();
         var scale = scrollController.ScrollSpeedMultiplier / Math.Max(1.0, scrollController.ScrollRange)
@@ -173,12 +170,12 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         for (var i = activeLongNotes.Count - 1; i >= 0; i--)
         {
             var note = activeLongNotes[i];
-            if (note.RequiresActiveLongNoteUpdate)
+            if (Judgements.RequiresActiveLongNoteUpdate(note.HitObject))
             {
                 var ln = (BmsLongNote)note.HitObject;
                 var startPosition = scrollController.GetVisualScrollPosition(ln.StartTime, ln.ScrollPositionAtStartTime);
                 var endPosition = double.IsNaN(ln.VisualScrollPositionAtEndTime) ? ln.ScrollPositionAtEndTime : ln.VisualScrollPositionAtEndTime;
-                note.UpdateDeferredLongNote(-(hitTarget + (float)((startPosition - currentScrollPos) * scale)),
+                note.UpdateDeferredVisuals(-(hitTarget + (float)((startPosition - currentScrollPos) * scale)),
                     -(hitTarget + (float)((endPosition - currentScrollPos) * scale)));
             }
 
@@ -216,11 +213,8 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     {
         base.UpdateAfterChildrenLife();
 
-        if (Judgements.Schedule is { } schedule)
-        {
-            refreshCoreOrder();
-            schedule.RunLayout(coreLayoutOrder, coreFrame(), Time.Elapsed, isResumeRewinding());
-        }
+        refreshCoreOrder();
+        Judgements.Schedule.RunLayout(coreLayoutOrder, coreFrame(), Time.Elapsed, isResumeRewinding());
 
         var currentScrollPos = scrollController.CurrentScrollPosition;
         var hitTarget = getHitTargetPosition();
@@ -240,7 +234,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             var offset = (float)((startPosition - currentScrollPos) * scale);
             var y = -(hitTarget + offset);
 
-            if (note is ILongNoteHolder ln && hitObject is BmsLongNote longNote)
+            if (hitObject is BmsLongNote longNote)
             {
                 var endPosition = double.IsNaN(longNote.VisualScrollPositionAtEndTime)
                     ? longNote.ScrollPositionAtEndTime
@@ -248,23 +242,23 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
                 var endOffset = (float)((endPosition - currentScrollPos) * scale);
                 var endY = -(hitTarget + endOffset);
                 note.UpdateVisualPosition(y, DrawHeight, endY);
-                ln.UpdateBodyGeometry(y, endY);
+                note.UpdateVisualGeometry(y, endY);
             }
             else
                 note.UpdateVisualPosition(y, DrawHeight);
 
-            // Keeping judgement controllers frozen avoids replaying misses or resetting an active long note.
+            // Resume rewind retains the completed presentation while the clock moves backwards.
             if (!resumeRewinding && (Clock as IGameplayClock)?.IsRewinding != true && Time.Elapsed >= 0 && note.RequiresColumnFrameUpdate)
                 note.UpdateColumnFrame();
         }
 
-        Judgements.Schedule?.RunSubtree(coreSubtreeOrder, coreFrame());
+        Judgements.Schedule.RunSubtree(coreSubtreeOrder, coreFrame());
     }
 
     internal void InvalidateCoreOrder()
     {
         coreOrderDirty = true;
-        Judgements?.Schedule?.InvalidateOrder();
+        Judgements?.Schedule.InvalidateOrder();
     }
 
     private BmsFrameContext coreFrame()
@@ -312,12 +306,12 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
         foreach (var note in AliveEntries.Values)
         {
-            if (note is not ILongNoteHolder longNoteHolder || note.HitObject is not BmsLongNote longNote)
+            if (note.HitObject is not BmsLongNote longNote)
                 continue;
 
             // EndTime covers HCN head-POOR, whose endpoints are scored synthetically
             // without applying a result to the parent drawable.
-            if (longNote.EndTime <= rewindEndTime || (note.Judged && !longNoteHolder.IsHoldingLongNote))
+            if (longNote.EndTime <= rewindEndTime || (note.Judged && !Judgements.GetLongNoteState(longNote).IsHolding))
                 note.Alpha = 0;
         }
     }
@@ -328,7 +322,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         if (Time.Elapsed >= 0 || isResumeRewinding())
             return;
 
-        if (Judgements.Schedule is { } schedule && !schedule.BeginRewindStep())
+        if (!Judgements.Schedule.BeginRewindStep())
             return;
 
         Judgements.RewindLongNotes(Time.Current);

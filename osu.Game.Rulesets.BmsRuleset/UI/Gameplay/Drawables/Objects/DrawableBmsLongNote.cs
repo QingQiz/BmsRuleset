@@ -10,22 +10,15 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens.Play;
 using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
-public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCol>, ILongNoteHolder, IBmsLongNoteDrawable
+public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCol>
     where TCol : struct, IColumnProvider
 {
-    public bool IsHoldingLongNote => controller?.IsHolding == true;
-
-    public bool IsAutomaticallyHeld { get; set; }
-
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.HoldNoteHead;
-
-    protected override bool RequiresResultBeforeKindPostState => true;
 
     private BmsLongNote ln => (BmsLongNote)HitObject;
 
@@ -38,9 +31,10 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     private readonly BmsLongNoteVisualState visualState = new();
     private readonly Func<float, float, int> resolveBodyDirection;
-    private BmsLongNoteJudgementController controller = null!;
-
-    internal override BmsLongNoteJudgementController LongNoteJudgement => controller;
+    private BmsLongNoteState state => ParentColumn!.Judgements.GetLongNoteState(ln);
+    private BmsLongNotePresentation presentation;
+    private BmsLongNotePresentationMapping mapPresentation = null!;
+    private readonly BmsLongNoteStateObserver stateObserver;
 
     private double lastHoldExplosionTime;
     private bool restoreHeadPin;
@@ -57,13 +51,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private BmsCachedSkinnableDrawable longNoteTail = null!;
 
-    internal override bool HasPendingHead => !controller.HeadJudged;
-
-    internal override double NextPassiveJudgementTime => controller.NextHeadJudgementTime;
-
-    internal override bool RequiresActiveLongNoteUpdate => controller.RequiresActiveUpdate;
-
-    internal override void UpdateDeferredLongNote(float y, float endY)
+    internal override void UpdateDeferredVisuals(float y, float endY)
     {
         // Pin the held head at the simulation timestamp even when skins wait for the final frame.
         GetVisualHeadY(y, endY);
@@ -75,28 +63,14 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         // A held note resolves its visual head for both culling and geometry every frame.
         // Keep the instance delegate across pool reuse instead of allocating at each call.
         resolveBodyDirection = bodyDirectionBeforeTailPasses;
+        stateObserver = applyPresentation;
     }
-
-    public override bool TryHit(HitResult result) => ParentColumn!.Judgements.TryPressLongNote(this, result);
-
-    public bool TryRepress(double currentTime, bool reverseScratch = false)
-    {
-        return ParentColumn!.Judgements.TryRepressLongNote(this, currentTime, reverseScratch);
-    }
-
-    public bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable, bool reverseScratch = false)
-    {
-        return ParentColumn!.Judgements.TryReleaseLongNote(this, releaseOffset, tailTable, reverseScratch);
-    }
-
-    public bool CompleteAtPause(double currentTime)
-        => ParentColumn!.Judgements.CompleteLongNoteAtPause(this, currentTime);
 
     /// <summary>
     /// Called by BmsColumnHitObjectContainer every frame with pre-computed
     /// head and end Y positions. Updates the body/tail visual geometry.
     /// </summary>
-    public void UpdateBodyGeometry(float headY, float endY)
+    internal override void UpdateVisualGeometry(float headY, float endY)
     {
         if (VisualsSuppressed)
         {
@@ -117,7 +91,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         var visualNoteHeight = NoteVisualHeight * noteHeightScale;
 
         var releasedFast =
-            controller.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !holdingBody;
+            state.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !holdingBody;
         var geometryChanged = !bodyGeometryValid
                               || Math.Abs(lastHeadOffset - headOffset) > 0.5f
                               || Math.Abs(lastBodyTailOffset - bodyTailOffset) > 0.5f
@@ -131,7 +105,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         {
             // Static LNs move with their parent. Their relative body geometry does not need to be
             // invalidated every frame, but animated skins must still be allowed to advance.
-            longNoteBody.UpdateAnimation(controller.LongNoteStarted);
+            longNoteBody.UpdateAnimation(state.LongNoteStarted);
             return;
         }
 
@@ -164,7 +138,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (Math.Abs(longNoteBody.Height - bodyHeight) > 0.5f)
             longNoteBody.Height = Math.Max(1, bodyHeight);
 
-        longNoteBody.UpdateBody(bodyHeight, tailAtTop, controller.LongNoteStarted);
+        longNoteBody.UpdateBody(bodyHeight, tailAtTop, state.LongNoteStarted);
         longNoteBody.Alpha = bodyHeight > 0 ? releasedFast ? released_alpha : 1f : 0;
 
         if (Math.Abs(longNoteTail.Y - tailOffset) > 0.5f)
@@ -197,7 +171,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     protected override void ResetKindState()
     {
         lastSimulationTime = double.NaN;
-        IsAutomaticallyHeld = false;
         visualState.Reset();
         bodyGeometryValid = false;
         longNoteBody.ResetBody();
@@ -217,20 +190,14 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         if (HitObject != null)
         {
-            controller = ParentColumn!.Judgements.BindLongNote(this);
-            restoreHeadPin = controller.LongNoteStarted;
+            mapPresentation = BmsLongNotePresentation.SelectMapping(ln.Beatmap.LockedLongNoteMode);
+            ParentColumn!.Judgements.ObserveLongNoteState(this, stateObserver);
+            presentation = mapPresentation(ln, state, isKeyHeld(), Time.Current);
+            restoreHeadPin = state.LongNoteStarted;
 
             longNoteBody.SetSkinLookup(LayoutVariant, Column);
             ParentColumn.Judgements.RefreshNoteRepresentation(this);
         }
-    }
-
-    protected override void OnFree()
-    {
-        // OnKilled still needs this representation for its final synchronous passive result.
-        ParentColumn!.Judgements.UnbindLongNote(this);
-        controller = null!;
-        base.OnFree();
     }
 
     protected override void AddKindDrawablesBeforeNote()
@@ -261,20 +228,11 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     {
         lastSimulationTime = double.NaN;
         visualState.Reset();
-        restoreHeadPin = controller.LongNoteStarted;
+        restoreHeadPin = state.LongNoteStarted;
         bodyGeometryValid = false;
         lastHoldExplosionTime = Time.Current;
+        presentation = mapPresentation(ln, state, isKeyHeld(), Time.Current);
         RefreshStateTransforms();
-    }
-
-    protected override void CheckForResult(bool userTriggered, double timeOffset)
-    {
-        if (!userTriggered && UsesCoreScheduling)
-            ParentColumn!.Judgements.CompleteScheduledRemoval(this,
-                new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
-                    (Clock as IGameplayClock)?.IsRewinding == true));
-        if (!userTriggered && !UsesCoreScheduling)
-            ParentColumn!.Judgements.CheckPassiveLongNote(this);
     }
 
     // Keep CN/HCN visuals alive after head judgement
@@ -283,16 +241,16 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (state == ArmedState.Hit && HitObject != null && Time.Current < ln.EndTime)
         {
             Alpha = 1;
-            LifetimeEnd = controller.IsChargeMode ? controller.ChargeTailLifetimeEnd() : ln.EndTime;
+            LifetimeEnd = presentation.LifetimeEnd;
             return;
         }
 
-        if (controller.IsChargeMode && state == ArmedState.Hit && !controller.TailJudged)
+        if (presentation.KeepAfterHeadResult && state == ArmedState.Hit && !this.state.TailJudged)
         {
             Alpha = 1;
 
             if (HitObject != null)
-                LifetimeEnd = controller.ChargeTailLifetimeEnd();
+                LifetimeEnd = presentation.LifetimeEnd;
 
             return;
         }
@@ -319,22 +277,49 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         lastSimulationTime = Time.Current;
 
-        if (controller.LongNoteStarted && !controller.TailJudged
+        if (state.LongNoteStarted && !state.TailJudged
                                        && Time.Current >= HitObject.StartTime && Time.Current <= ln.EndTime
                                        && Time.Current - lastHoldExplosionTime >= hold_explosion_interval)
         {
-            ParentColumn?.TriggerHitExplosion(true);
+            ParentColumn?.TriggerHitExplosion(presentation.HitLightStyle);
             lastHoldExplosionTime = Time.Current;
         }
-
-        if (!UsesCoreScheduling)
-            ParentColumn!.Judgements.UpdateLongNotePostResult(this, isKeyHeld());
     }
 
     private bool isHoldingBody()
-        => HitObject != null && controller.ShouldShowHeldVisual(isKeyHeld());
+    {
+        presentation = mapPresentation(ln, state, isKeyHeld(), Time.Current);
+        return presentation.HoldingBody;
+    }
 
-    private bool isKeyHeld() => ParentColumn?.IsPressed == true || IsAutomaticallyHeld;
+    private bool isKeyHeld() => ParentColumn?.IsPressed == true;
+
+    private void applyPresentation(in BmsLongNoteState snapshot, in BmsFrameContext frame)
+    {
+        var previous = presentation;
+        presentation = mapPresentation(ln, snapshot, isKeyHeld(), frame.SimulationTime);
+        if (frame.IsPauseCompletion)
+            return;
+
+        if (!previous.HeadJudged && presentation.HeadJudged)
+        {
+            visualState.PrepareHeadPin();
+            lastHoldExplosionTime = Time.Current - hold_explosion_interval;
+        }
+        if (presentation.KeepAlive)
+        {
+            Alpha = 1;
+            LifetimeEnd = presentation.LifetimeEnd;
+        }
+        if (presentation.Retired)
+        {
+            visualState.Reset();
+            longNoteBody.Alpha = 0;
+            longNoteTail.Alpha = 0;
+            Alpha = 0;
+            LifetimeEnd = frame.SimulationTime;
+        }
+    }
 
     private int bodyDirectionBeforeTailPasses(float realHeadY, float realTailY) => HitObject == null
         ? Math.Sign(realTailY - realHeadY)
@@ -344,34 +329,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             ScrollSpeedMultiplier,
             realHeadY,
             realTailY);
-
-    void IBmsLongNoteDrawable.PrepareHeadPin()
-    {
-        visualState.PrepareHeadPin();
-        lastHoldExplosionTime = Time.Current - hold_explosion_interval;
-    }
-
-    void IBmsLongNoteDrawable.KeepBodyAlive(double lifetimeEnd)
-    {
-        visualState.PrepareHeadPin();
-        Alpha = 1;
-        LifetimeEnd = lifetimeEnd;
-    }
-
-    void IBmsLongNoteDrawable.ClearBody()
-    {
-        visualState.Reset();
-        longNoteBody.Alpha = 0;
-        longNoteTail.Alpha = 0;
-        Alpha = 0;
-        LifetimeEnd = Time.Current;
-    }
-
-    void IBmsLongNoteDrawable.Retire()
-    {
-        Alpha = 0;
-        LifetimeEnd = Time.Current;
-    }
 
     protected override JudgementResult CreateResult(Judgement judgement)
         => new BmsLongNoteJudgementResult(HitObject, judgement);

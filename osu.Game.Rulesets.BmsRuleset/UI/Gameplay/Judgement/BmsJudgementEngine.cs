@@ -13,8 +13,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 /// Coordinates the judgement phases for one playfield.
 /// </summary>
 /// <remarks>
-/// Column contexts own input selection, indexes and long-note history. Landmine rules continue
-/// to use their existing drawable adapters until their migration stage.
+/// Column contexts own input selection and indexes. Landmine passing still uses framework representations.
 /// </remarks>
 internal sealed class BmsJudgementEngine
 {
@@ -44,7 +43,6 @@ internal sealed class BmsJudgementEngine
 
     internal bool HasPendingInputs => pendingInputs.Count > 0;
 
-    // The bounded data host executes supplied operations via GetColumn; frame-plan generation is still the legacy host's responsibility.
     internal BmsJudgementEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, bool canBatchUpdates, IBmsJudgementOutput output)
     {
         columns = [new BmsColumnJudgementContext(notes, layout, column, canBatchUpdates, output)];
@@ -53,19 +51,6 @@ internal sealed class BmsJudgementEngine
 
     internal BmsColumnJudgementContext GetColumn(int index) => columns.Single(c => c.Index == index);
 
-    internal void EnableNoteExecution(int column) => GetColumn(column).EnableNoteExecution();
-    internal void EnableLongNoteExecution(int column) => GetColumn(column).EnableNoteExecution(true);
-
-    internal void EnableCoreScheduling()
-    {
-        if (playfield.Beatmap.HitObjects.Any(n => n is BmsLongNote) && playfield.Beatmap.LockedLongNoteMode != BmsLongNoteMode.HellChargeNote)
-            throw new InvalidOperationException("The bounded scheduling path supports ordinary notes and HCN only.");
-        foreach (var column in columns)
-        {
-            column.EnableNoteExecution(true);
-            column.EnableCoreScheduling();
-        }
-    }
 
     internal void QueueInput(double time, int column, bool pressed, bool reverseScratch)
         => pendingInputs.Add(new BmsJudgementInput(time, column, pressed, reverseScratch));
@@ -81,7 +66,7 @@ internal sealed class BmsJudgementEngine
         }
         scheduleBatch++;
         foreach (var context in columns)
-            context.Schedule?.BeginBatch(scheduleEpoch, scheduleStep, scheduleBatch);
+            context.Schedule.BeginBatch(scheduleEpoch, scheduleStep, scheduleBatch);
 
         foreach (var context in columns)
             framePressedDirections[context.Index] = context.PressedDirections;

@@ -2,78 +2,57 @@
 
 [返回开发文档](development.md)
 
-日期：2026-10-01（Asia/Shanghai）。本方案替代原逐卡迁移计划，保留目标设计和历史证据，采用“Git 保存旧版、直接实现新设计、完整实现后对照适配”的执行方式。原 P0–P6 编号仅用于追溯证据，不再决定任务切分、前置验收或中间架构。
+更新：2026-10-01。直接完成核心设计，再通过 Git 旧版对照完成行为适配，最后接入 Mod。
 
 <a id="implementation-start"></a>
 
-## 实施入口
+## 当前实施入口
 
-**执行顺序：commit 现有工作 → squash 已有重构提交 → 移除中间层/兼容层 → 完整实现核心设计 → 使用 Git 对照旧版并修正行为差异 → 最后适配 Mod。**
+**完整实现核心 → Git 旧版对照与适配 → Mod 适配 → 最终集成。**
 
-当前仍处于现有工作待保存的状态。本次文档修订不代表 commit、squash、代码迁移或任何验收已经执行。后续接手先核对实际 HEAD、未提交差异和保存引用，再从真实停点继续；不得重新跑原任务卡流程。
+提交整理与过渡路径清理已完成，当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。核心尚不能构建或游玩：独立 LN/CN/HCN 规则、类型化状态及正式操作绑定仍待实现，地雷规则、独立调度、索引和生命周期调用方也须补全。依赖旧 API 的测试保留行为断言，随核心和 Mod 的最终入口分别迁移；完整行为对照与性能验收尚未完成。
 
-| 基线 | 已核对事实与用途 |
+快速导航：[实施顺序](#implementation-order) · [目标架构](#target-structure) · [生命周期](#state-lifecycle) · [调度](#scheduling-contracts) · [Git 对照](#git-comparison) · [验收](#behaviour-acceptance) · [验证命令](#verification-commands) · [完成条件](#completion)。
+
+<a id="git-baselines"></a>
+
+### Git 基线
+
+| 版本 | 用途 |
 | --- | --- |
-| 重构前版本 | `d4e690cd3f8fadc70fe2d82021f338a012e1980e`；本重构分支与 `dev` 的共同祖先，是原始行为和 squash 的范围基点 |
-| 当前分支 / HEAD | `codex/hitobject-judgement-refactor` / `329018cd3497b26499cc556ab18e751796273cce`；执行时重新核实 |
-| 已有重构范围 | 从 `9a26da11` 的设计提交起至当前 HEAD，共 12 个提交；另有尚未提交的核心调度代码、测试、fixture 和文档 |
-| 历史验证 | [P2](hitobject-refactor-p2-validation.zh-CN.md)、[P3](hitobject-refactor-p3-validation.zh-CN.md)、[检查点与生命周期证据](hitobject-refactor-p3a0-validation.zh-CN.md)；保留输入、轨迹和复现命令，不继承其中的下一卡指令 |
-| 验收状态 | 已有受限执行/生成对照不代表完整核心完成；完整行为、视觉/音频、性能及最终 Mod 集成仍须验收 |
-
-快速导航：[实施顺序](#implementation-order) · [目标架构](#target-structure) · [生命周期](#state-lifecycle) · [调度](#scheduling-contracts) · [Git 对照](#git-comparison) · [验收](#behaviour-acceptance) · [验证命令](#verification-commands) · [完成条件](#completion).
+| 重构前行为基线 | `d4e690cd3f8fadc70fe2d82021f338a012e1980e`；完整核心的行为对照版本 |
+| 原有工作检查点 | `e2315b28aa614220b937344c06dc21cf3663a6c9`；持久引用 `codex/hitobject-before-direct-implementation`，保留原实现、测试和未压缩历史 |
+| 压缩后基点 | `a209acb1a39ebb7e001da5eb27c37dc5759afd2d`；与检查点文件树相同 |
+| 核心实施分支 | `codex/hitobject-judgement-refactor`；继续完整核心实现，对照前固定待验证版本的 commit |
 
 <a id="implementation-order"></a>
 
-## 实施顺序与 Git 基线
+## 剩余实施顺序
 
-### 1. Commit 现有工作
+### 1. 完整实现核心设计
 
-将当前这轮重构的代码、测试、fixture 和文档一起保存成 checkpoint commit。逐项检查未跟踪文件，保留已有工作；不把本机日志、构建产物或无关修改纳入提交。提交消息遵循 `type(scope): summary`，例如 `refactor(judgement): checkpoint existing refactor work`。
+一起完成普通 Note、LN/CN/HCN、地雷、输入/回放、运行状态、索引、结果输出、生命周期、只读表现及独立调度。规则与表现、索引与调度、调用方与被调用方按同一套最终契约实现，复用现有几何、皮肤、计分和音频逻辑。
 
-这一提交用于保存工作，不冒充已通过最终验收。记录实际 commit、工作树差异、已验证/未验证范围；不再为原受限任务补齐一轮中间态验收后才允许保存。
+核心完成时，无 Mod 的真实 Player 和无 Drawable 的完整引擎使用同一套规则与调度。操作绑定、统一结果出口及框架结果/生命周期适配只承担最终架构中的职责。开发中可以按依赖顺序编码、小提交和定向单测；不要求中间版本单独可游玩，不增加受限模式、运行时新旧开关或供旧测试调用的兼容层。保留行为断言并迁移到最终入口。
 
-### 2. Squash 已有重构提交
+### 2. 使用 Git 对照并完成核心适配
 
-在整理历史前，为 checkpoint 建立持久 Git 引用，例如 `codex/hitobject-before-direct-implementation`，并记录完整 SHA。该引用保留全部原提交、未提交工作保存后的树及历史 fixture；引用已存在时核对身份，不覆盖。
+完整核心可以构建运行后，按[Git 对照流程](#git-comparison)运行重构前版本和新实现，补齐行为、框架、表现与性能证据。直接在新规则、调度或正式框架适配中修正差异，直至满足核心完成条件。
 
-将 `d4e690cd..checkpoint` 的本分支重构提交压成一个基础提交。范围不包含基点本身，不修改 `dev` 上的独立修改、远端分支或 sibling checkouts。执行前重新核对祖先关系、工作区干净状态和分支使用情况。可在已确认备份的当前重构分支上用 `git reset --soft <基点>` 后重新提交，消息例如 `refactor(judgement): consolidate existing refactor work`。
+保持已记录的玩法语义、时间边界和同步观察顺序。RA-1/ST-1 等基线行为按事实对照；有意行为修复单列原因和前后证据，原 fixture 保留原始预期。
 
-压缩前后必须通过 `git diff <checkpoint> <squashed> --exit-code` 确认文件树完全一致，记录压缩后的 SHA。历史只在 Git 中保存，不为对照保留生产旧路径。原始行为基点、保存当前工作的 checkpoint、压缩后的继续实施基点三者分别记录，不能混为一个“旧版”。
+### 3. 适配 Mod 并最终集成
 
-### 3. 移除中间层和兼容层
+核心对照与适配完成后，再设计、实现和验证 AutoScratch/Autoplay 等受影响 Mod。基于对象身份和稳定核心入口恢复消费者与注册，此时决定 AS-1 的采样语义及修复范围，并补齐玩家文档和本地化。
 
-直接删除用于分段迁移或新旧同进程对照的开关、Controller 转接、旧 sink 转发及旧视觉命令映射；所有受影响的核心调用方按最终契约一起改造。删除清单见下方“接口收敛与清理清单”，另包括 `EnableNoteExecution`、`EnableLongNoteExecution`、`EnableCoreScheduling` 等受限路径选择入口。
-
-`BmsLongNoteOperationBinding` 对旧 Controller 的转接和当前 `BmsLongNotePresentation` 对旧 Drawable 命令的映射必须替换为最终规则绑定与表现值。新的操作绑定、统一结果出口以及框架结果/生命周期薄适配属于最终架构，按其真实职责保留，不按“adapter”名称一概删除。
-
-开发过程允许存在未完成的代码和暂时不能通过的构建/旧结构测试，不要求这一步单独可游玩或可交付。保留行为断言并迁移到新入口；不为让旧测试继续调用已删除接口而补空实现、同义接口或另一层转发。依赖旧接口的 Mod 消费者按下方核心/Mod 边界处理。
-
-### 4. 直接完整实现核心设计
-
-以本方案的最终所有权和时序契约为唯一目标，一起完成普通 Note、LN/CN/HCN、地雷、输入/回放、运行状态、索引、结果输出、生命周期、只读表现及独立调度。按实际依赖顺序编码，可以小提交和定向单测；不再拆出受限谱面、新旧双路径或独立可验收的过渡架构。
-
-规则和直接消费状态的表现同时改造，索引与调度同时切换，调用方与被调用方在同一核心实现范围内收敛。几何、皮肤、计分和音频中可复用的实现继续复用。核心完成时，无 Mod 的真实 Player 和无 Drawable 的完整引擎都走同一套规则与调度，生产中只有新路径，旧 Controller/sink/开关已删除。
-
-核心完整实现之前不进行逐卡旧新等价验收，也不为 Mod 提前设计采样语义或兼容入口。
-
-### 5. 使用 Git 对照旧版并完成核心适配
-
-完整核心可以构建运行后，再按[Git 对照流程](#git-comparison)运行重构前版本和新实现，补齐行为、框架、表现与性能证据。差异直接在新规则、调度或正式框架适配中修正，反复验证直到满足核心完成条件；不能切回旧路径或增加兼容模式。
-
-优先保持已记录的玩法语义、时间边界和同步观察顺序。RA-1/ST-1 等旧行为按事实对照，任何有意行为修复单列原因和前后证据，不把修复夹在结构迁移中，也不改旧 fixture 迎合新输出。
-
-### 6. 核心适配完成后再处理 Mod
-
-只有核心旧版对照和适配完成后，才开始 AutoScratch/Autoplay 等受影响 Mod 的适配设计、实现及测试。恢复此前摘除的消费者与注册，使用对象身份和稳定核心入口，不恢复 Drawable 输入接口、Controller 或旧调度。此时再决定 AS-1 的采样语义与修复范围，并补齐相关玩家文档和本地化。
-
-Mod 接入后重跑受影响的核心行为、回放、表现和性能组合，全部通过才最终集成。本方案修订不提前规定 AS-1 的修复结果，也不将旧 Mod 的实现方式变成核心设计约束。
+Mod 接入后重跑受影响的核心行为、回放、表现和性能组合，满足[全部完成条件](#completion)后最终集成。
 
 ## 目标与范围
 
 - 每个 playfield 使用一个 `BmsJudgementEngine`，内部按列维护上下文；普通 Note、LN、CN、HCN、地雷分别使用独立判定规则。
 - 引擎拥有自定义判定状态与调度；Drawable 负责表现及必要的框架结果适配。
 - `DrawableBmsHitObject` 只定义所有类型共同需要的绑定、框架结果桥接、布局与裁剪契约；具体图形结构由子类组合，基类不暴露长按、地雷或输入操作。
-- 收敛 LN 专用接口及通用接口中的 LN 操作；按真实消费者保留契约，类型化数据、具体规则和共享组件不逐一配套接口。
+- 按真实消费者定义接口契约；类型化数据、具体规则和共享组件保留具体类型，接口只承担可替换输出或框架边界职责。
 - 规则通过谱面对象身份访问运行状态，直接接受输入和模拟时间；表现层读取只读状态，绘制更新不推进判定。
 - 摘除自定义判定状态与 `BmsHitObjectLifetimeEntry` 的耦合，状态在 Drawable 回池后继续有效。
 - 保持判定目标、窗口边界、事件时间与顺序、计分、血量、回放、暂停恢复、音效与视觉反馈一致。
@@ -85,18 +64,7 @@ Mod 接入后重跑受影响的核心行为、回放、表现和性能组合，�
 
 **核心与 Mod 边界。** 先完整实现普通玩家/普通回放所需的规则、表现、地雷、独立调度和框架适配，再通过 Git 旧版对照修正行为差异。Scratch 双方向、反向尾、重按、长按、HCN 身体、暂停及回退都是核心范围。核心对照及适配完成后，才设计和实现 AutoScratch 等 Mod 的入口、自动持有与采样适配。
 
-核心实施不为旧 Mod 消费者保留 Controller、Drawable 输入接口、专用调度或临时编译桥。需要删除的旧 Mod 消费者连同失效注册一起摘除，最后基于稳定核心入口重新接入；不提供空实现或伪装为可用的 Mod。无 Mod 的真实 Player 必须可构建运行，用于完整核心对照。最终发布要求全部应支持的 Mod 恢复并通过集成验收。现有自动持有字段的算法事实保留为历史证据，具体 Mod 采样语义不在核心实施期提前决定。
-
-## 迁移前职责交叉
-
-| 位置 | 当前职责与迁移重点 |
-| --- | --- |
-| [BmsPlayfield](../osu.Game.Rulesets.BmsRuleset/UI/Gameplay/BmsPlayfield.cs) | 收集输入、安排全列地雷/HCN/输入阶段，保存合成端点回退记录，触发计分与反馈。全局判定调度迁入引擎。 |
-| [BmsColumn](../osu.Game.Rulesets.BmsRuleset/UI/Gameplay/Components/BmsColumn.cs) | 候选收集与选择、按键历史、长按重按和松开目标选择，同时播放音效与灯光。列判定逻辑迁入列上下文。 |
-| [BmsColumnHitObjectContainer](../osu.Game.Rulesets.BmsRuleset/UI/Gameplay/Components/BmsColumnHitObjectContainer.cs) | 对象池、定位、裁剪、绘制批处理，同时维护待判头、活跃长按、地雷索引及被动判定截止时间。判定索引与调度迁入引擎。 |
-| [DrawableBmsHitObject](../osu.Game.Rulesets.BmsRuleset/UI/Gameplay/Drawables/Objects/DrawableBmsHitObject.cs) 及子类 | 绘制、框架结果提交与逐对象判定混合。保留绘制和薄适配，迁出规则及可变判定状态。 |
-| [BmsLongNoteJudgementController](../osu.Game.Rulesets.BmsRuleset/UI/Gameplay/Judgement/BmsLongNoteJudgementController.cs) | 现有状态归属已经迁出 Drawable/entry，但仍混合三种模式、视觉存续及同步输出；本次完整替换为独立规则、运行状态与表现映射。 |
-| [BmsHitObjectLifetimeEntry](../osu.Game.Rulesets.BmsRuleset/UI/Gameplay/BmsHitObjectLifetimeEntry.cs) | 计算生命周期，同时保存长按控制器和地雷经过时间。移走这两个自定义状态字段。 |
+无 Mod 的真实 Player 必须可构建运行，用于完整核心对照。当前摘除的 AutoScratch 消费者及注册在 Mod 适配时基于稳定核心入口恢复；最终发布要求全部应支持的 Mod 通过集成验收。自动持有的基线行为保留用于对照，具体 Mod 采样语义在核心适配完成后决定。
 
 <a id="target-structure"></a>
 
@@ -185,7 +153,7 @@ BmsHitObjectLifetimeEntry
 
 引擎持有状态，规则是该类型状态的唯一写入者；列索引和表现层只查询语义状态。身体、待判端点和可见对象分别维护需要的活跃范围，不再共用一个同时表示判定和视觉存续的长按标志。
 
-**操作绑定首版方案。** 采用按操作登记的缓存调用，不将 `BmsRuleBinding` 实现为所有类型共用的大型委托包，也不按类型整批执行混合对象：
+**操作绑定方案。** 采用按操作登记的缓存调用，不将 `BmsRuleBinding` 实现为所有类型共用的大型委托包，也不按类型整批执行混合对象：
 
 - 每列、每种规则建立共享的具体调用适配，适配引用列上下文拥有的该类型状态存储并缓存方法组委托。规则本身接受具体类型的状态；热点路径不使用 `object`、`DynamicInvoke` 或按模式强转。重复的存储/登记代码确有需要时才提取泛型工具。
 - 对象登记是值类型记录，包含稳定对象身份、状态槽位及共享操作绑定；普通 Note 复用谱面对象索引，不创建独立的可变状态堆对象。注册工厂保证槽位和对应类型存储匹配。
@@ -313,21 +281,18 @@ classDiagram
 
 框架生命周期适配通过对象身份向引擎报告激活、重应用、移除和恢复边界；输出适配调用注入的同步结果检查点回调，索引算法仍归引擎/列上下文。两者均不在规则中暴露 Drawable。跨层的表现映射只读取语义状态并产生表现值，不能反向调用 Rule 推进判定。Invisible Note 继续使用独立 keysound 时间线，不因该关系图增加一个空判定 Rule。Mod 适配在这些核心关系之外使用稳定入口；适配不取得规则、状态或调度所有权，最终实现不含旧协议转发层。
 
-### 接口收敛与清理清单
+### 接口与操作边界
 
-首版不新增 LN/CN/HCN 专用接口。三个独立 Rule 是具体实现，其运行状态、端点、表现数据及几何组件保留具体类型。接口只用于确有共同消费者的可替换实现或必须隔离的框架边界；不能只因为拆出一个类或希望方便 mock 就同时增加一个接口。
+LN/CN/HCN 使用三个具体 Rule，其运行状态、端点、表现数据及几何组件保留具体类型。接口只用于确有共同消费者的可替换实现或必须隔离的框架边界。
 
-| 现有接口或上一版设计候选 | 收敛方案 |
+| 职责 | 最终契约 |
 | --- | --- |
-| `ILongNoteHolder` | 删除；输入/暂停进入引擎，几何进入具体 Drawable，测试分别查询运行状态和图形。依赖它的旧 Mod 调用一并摘除，Mod 适配时使用稳定核心入口 |
-| `IBmsLongNoteDrawable` | 删除；通过绑定的表现数据更新图形，不再提供固定头/清除身体/退场命令接口 |
-| `IBmsLongNoteJudgementSink` | 删除；结果接入共用 `IBmsJudgementOutput`，状态转换先经引擎内部协调，再同步通知表现；去除 LN 视觉命令及 HCN 特例回调 |
-| `IBmsLongNoteHooks` / `IBmsLnScoring` | 已删除，保持删除，不在规则或表现拆分时重新引入同义接口 |
-| 拟议的 `IBmsLongNoteJudgementRule` | 撤回；三个具体 Rule 通过内部绑定参与重按、释放及暂停调度，不额外定义长按接口族 |
-| 拟议的身体、经过、回退能力接口 | 不预先引入；分别登记具体操作，单一实现的 HCN 身体和地雷经过直接使用具体组件 |
-| 拟议的 `IBmsVisualTimeObserver` | 不预先引入；复用具体视觉状态组件和绑定时缓存的观测调用，保留按需登记与解绑 |
-| 现有 `IBmsPressJudgementRule` / `IBmsPassiveJudgementRule<T>` | 首版消费者迁至按操作登记的缓存调用，无剩余消费者后删除；不同时保留两套分派机制 |
-| 通用接口中的 `TriggerHitExplosion(bool isLongNote)` | 迁为消费已决定的命中灯样式/脉冲请求；LN 资源选择留在表现映射和皮肤适配，不另建长按反馈接口 |
+| 输入、重按、释放、暂停及回退 | 通过对象身份进入引擎，按具体操作登记缓存调用；按下/被动接口的剩余消费者统一迁入这一分派机制 |
+| HCN 身体与地雷经过 | 使用具体规则和组件，通过操作登记参与调度 |
+| 框架结果、计分及血量 | 通过共用 `IBmsJudgementOutput` 同步适配；内部索引仍由引擎协调 |
+| 长按表现 | 类型化只读表现值驱动具体 Drawable，测试分别查询运行状态和图形 |
+| 视觉时间观测 | 复用具体视觉状态组件和绑定时缓存的观测调用，按需登记与解绑 |
+| 命中灯 | 消费 `BmsHitLightStyle` 等已决定的表现值；资源选择归表现映射及皮肤适配 |
 
 必要的跨框架可替换出口采用一个 `IBmsJudgementOutput`，由生产适配及记录测试适配实现。它提供框架主结果的只读查询，并表达主结果提交、补充计分、血量效果、只读状态通知和必要反馈请求，以对象身份和类型化数据传递。使用明确操作，保留各计分路径；不将所有事件装进一个 `Process(event)`，也不把原 LN sink 的全部方法改名搬入公共接口。出口不持有或修改候选、待判端点及活跃身体索引。
 
@@ -407,10 +372,10 @@ classDiagram
 | 条件 | 来源与用途 |
 | --- | --- |
 | 判定活跃 | 规则给出的静态输入/被动窗口，加当前端点、释放和身体状态；决定候选、待判端点及身体阶段成员 |
-| 表示需要存续 | 生命周期适配合并判定所需区间与既有视觉寿命；首版在整个判定活跃区间保留框架表示，保证同步主结果及反馈可用 |
+| 表示需要存续 | 生命周期适配合并判定所需区间与既有视觉寿命；在整个判定活跃区间保留框架表示，保证同步主结果及反馈可用 |
 | 当前可见 | 表现策略、布局边界和视口；决定是否应用昂贵图形更新，不能直接决定退出判定或回池 |
 
-entry 通过规则提供的无状态判定窗口保证最早输入前激活，生命周期适配结合只读状态保留最后一次被动检查机会。首版保留原激活范围、寿命余量及合法的提前退场条件；CN 主结果已提交或 HCN 尾已处理不能单独触发回池。没有活跃表示时，只保留可回退状态，不继续执行需要框架表示的操作。
+entry 通过规则提供的无状态判定窗口保证最早输入前激活，生命周期适配结合只读状态保留最后一次被动检查机会。保留原激活范围、寿命余量及合法的提前退场条件；CN 主结果已提交或 HCN 尾已处理不能单独触发回池。没有活跃表示时，只保留可回退状态，不继续执行需要框架表示的操作。
 
 **绑定、重应用与移除协议。** 稳定对象身份用于玩法状态，绑定代次用于识别当前池化表示；二者独立。代次在每次绑定时递增，纯视觉观测登记也记录代次，旧绑定的通知不能影响复用后的 Drawable。`OnFree` 表示解除本次表示绑定，不能单独证明对象已经退出判定生命周期；真正移除由容器移除及末次检查边界驱动。
 
@@ -446,15 +411,15 @@ entry 通过规则提供的无状态判定窗口保证最早输入前激活，�
 
 例如，PMS 在 `t1` 释放、到 `t2` 才结算且尾时刻为 `te`，尾端点保留 `EventTime = t1`、`ApplicationTime = t2`、`TimeOffset = t1 - te`。生产主结果桥接应验证当前框架时钟与提交的应用时刻/速率一致，然后正常调用 `ApplyResult`；不在回调之后覆写 `RawTime` 修补差异。记录适配模拟相同主结果时间、端点和同步观察顺序。
 
-**ST-1：对照时保留的既有行为。** 历史 CN/HCN scratch 反向重按在输入 3990、模拟提交 3997 时，把端点 `EventTime` 和旧 `ApplicationTime` 字段都写为 3990，合成提交/撤销栈记录 3997。回退到 3996 时合成结果和血量先撤销，尾状态仍按 3990 保留已判尾；到 3989 才恢复待判尾，HCN 身体具有独立存续。详见 [ST-1 证据](hitobject-refactor-p3a0-validation.zh-CN.md#st-1) 与 [完整分层恢复证据](hitobject-refactor-p3a0-validation.zh-CN.md#p3a0-6)。
+**ST-1：对照时保留的既有行为。** 历史 CN/HCN scratch 反向重按在输入 3990、模拟提交 3997 时，把端点 `EventTime` 和旧 `ApplicationTime` 字段都写为 3990，合成提交/撤销栈记录 3997。回退到 3996 时合成结果和血量先撤销，尾状态仍按 3990 保留已判尾；到 3989 才恢复待判尾，HCN 身体具有独立存续。原始输入、分层恢复轨迹和复现命令可从[历史证据](#historical-evidence)读取。
 
 核心行为对照默认保持这一已观测事实：新的类型规则直接实现对应端点/历史时间语义，结果适配明确区分事件时间与真实提交时间，不保留旧 Controller 或独立兼容执行分支。字段命名整理不能悄悄改变回退行为；有意修复须单列差异及前后证据，不能修改旧 fixture 吸收变化。
 
-**RA-1 的真实 Reapply 边界（已验收）。** `OnFree→OnApply` 保留 entry、Controller、框架 Result 与适用历史，但自动持有仍由旧绘制重置为 false；框架随后无条件写 `TimeOffset=0`，连未判 Note/LN 的 `RawTime` 都变为对象结束时间。CN/HCN 已提交头的 `RawTime/TimeAbsolute` 变为尾时间，原 endpoint 和计分事件保持原头时间。绑定代次与索引刷新不修复或掩盖这一旧行为。
+**RA-1：重应用的基线行为。** 旧版本的 `OnFree→OnApply` 保留 entry、Controller、框架 Result 与适用历史，但自动持有由旧绘制重置为 false；框架随后无条件写 `TimeOffset=0`，连未判 Note/LN 的 `RawTime` 都变为对象结束时间。CN/HCN 已提交头的 `RawTime/TimeAbsolute` 变为尾时间，原 endpoint 和计分事件保持原头时间。绑定代次与索引刷新不修复或掩盖这一旧行为。
 
 CN/HCN 合成端点、PMS 非消费 BAD、E-POOR 和 HCN tick 继续走现有专用路径。引擎给出判定决定，适配负责调用计分、血量和反馈，普通结果与专用路径均只有一个执行者。
 
-现有实现已移除 `IBmsLongNoteHooks` 和控制器长期保存的 Drawable 引用。最终实现用内部执行上下文协调 `IBmsJudgementOutput`：提交主结果、补充计分及血量效果，发布只读状态变化和必要反馈请求。长按端点、HCN tick 通过对应数据接入，公共方法不绑定具体模式。外部适配解析对象身份、提交结果或调用表现映射；索引由引擎在内部状态及框架结果检查点维护。规则不发出 `PrepareHeadPin`、`ClearBody`、`Retire` 等绘制命令，也不设置视觉寿命。
+内部执行上下文协调 `IBmsJudgementOutput`：提交主结果、补充计分及血量效果，发布只读状态变化和必要反馈请求。长按端点、HCN tick 通过对应数据接入，公共方法不绑定具体模式。外部适配解析对象身份、提交结果或调用表现映射；索引由引擎在内部状态及框架结果检查点维护。规则不发出 `PrepareHeadPin`、`ClearBody`、`Retire` 等绘制命令，也不设置视觉寿命。
 
 输出采用同步调用，不创建整帧末尾统一派发的事件队列。保留当前可以被结果观察者看到的转换顺序，例如：
 
@@ -486,7 +451,7 @@ CN/HCN 合成端点、PMS 非消费 BAD、E-POOR 和 HCN tick 继续走现有专
 
 基类继续继承框架 `DrawableHitObject<BmsHitObject>`，承担池化绑定、框架 `JudgementResult`、结果通知及回退适配。它同时提供根视觉容器、公共可见性因子和按布局边界裁剪的实现。框架结果提交只接受适配已决定的数据；`SuppressPenalty` 等玩法决策移到判定/结果适配侧。具体结果类型仍可通过框架的 `CreateResult` 扩展点创建。
 
-| 当前基类或接口中的职责 | 目标位置 |
+| 职责 | 最终归属 |
 | --- | --- |
 | `TryHit`、`HasPendingHead`、`NextPassiveJudgementTime` | 引擎入口、规则查询及被动调度 |
 | `LongNoteJudgement`、`RequiresActiveLongNoteUpdate`、`UpdateLandmine` | 按对象身份持有的运行状态及能力索引 |
@@ -497,7 +462,7 @@ CN/HCN 合成端点、PMS 非消费 BAD、E-POOR 和 HCN tick 继续走现有专
 | 命中就立即退场、Miss 就染红等默认模式 | 对应类型的表现策略或明确共享的视觉工具 |
 | `RestoreRewoundState` | 引擎恢复玩法状态；表现绑定单独重建视觉缓存 |
 
-首版保留 `DrawableBmsHitObject<TCol>` 作为现有列身份及对象池绑定便利层，单张皮肤部件构造从该层移入可组合组件。普通 Note、长按和地雷通过该层继承通用基类；`DrawableBmsInvisibleNote` 保持直接继承非泛型基类。Invisible Note 可只有标记，LN 可组合头、身体和尾，普通 Note 与地雷可以复用单部件组件，无需为不具备的结构实现占位成员。
+保留 `DrawableBmsHitObject<TCol>` 作为列身份及对象池绑定便利层，单张皮肤部件构造移入可组合组件。普通 Note、长按和地雷通过该层继承通用基类；`DrawableBmsInvisibleNote` 保持直接继承非泛型基类。Invisible Note 可只有标记，LN 可组合头、身体和尾，普通 Note 与地雷可以复用单部件组件，无需为不具备的结构实现占位成员。
 
 **目标继承关系与容器依赖。** 泛型层保留池类型身份，不提供长按、地雷或单块音符的默认图形。容器的常规布局/裁剪路径只使用非泛型基类契约；具体类型选择集中在池注册和绑定工厂。
 
@@ -577,7 +542,7 @@ classDiagram
 
 普通 Note、地雷、长按和 Invisible Note 之间不建立横向持有关系，也不通过继承某个具体 note Drawable 复用图形。公共基类及 `TCol` 层不反向依赖这些具体类型，不存放类型专有 `NoteContainer`、`SkinComponent`、Controller 或空功能槽位。LN/CN/HCN 的区别由各自表现映射产生，长按 Drawable 只解释长按图形结构及表现值。框架 `HitObject`、`Result` 和 entry 的必要关联继续通过现有基类/适配保留，其权威数据归属不因图形组合改变。
 
-**统一布局契约。** 容器每列构造一次 `BmsVisualFrame`，提供模拟时间、显示时间、视口、缩放及共享滚动投影服务；每个对象使用已绑定的只读表现数据计算自身布局。拟议的两个类型扩展点为：
+**统一布局契约。** 容器每列构造一次 `BmsVisualFrame`，提供模拟时间、显示时间、视口、缩放及共享滚动投影服务；每个对象使用已绑定的只读表现数据计算自身布局。两个类型扩展点为：
 
 ```csharp
 protected abstract BmsVisualLayout PrepareVisual(in BmsVisualFrame frame);
@@ -625,7 +590,9 @@ Engine 显式拥有经过、身体、输入、被动检查、端点收尾及回�
 
 **去重分层。** 输入使用到达顺序及批次消费位置；身体沿用规则自己的最后处理时间、正 elapsed 和每更新至多一次 tick 的逻辑；被动检查依靠端点状态和有效截止时间，不能用“此时间检查过”跳过状态改变后的检查；视觉重复调用独立处理。HCN 大 elapsed 留下的积压仍按原更新边界释放，本次重构不改变模拟步长或增加补发 tick 循环。
 
-**AutoScratch 历史证据。** 旧 `BmsPlayfield.UpdateSubTree()` 的延迟遍历和 `EndGameplayFrame()` 的最终遍历会影响 Mod 调用次数、自动持有和 HCN 身体采样；既有 [AS-1 观察](hitobject-refactor-p3a0-validation.zh-CN.md#p3a0-1) 保留原样。核心实现及无 Mod 对照不以复制这些旧触发点为目标。核心对照与适配完成后，再在 Mod 工作中决定采样语义，分别记录等价适配和有意行为修复；本方案不预先指定 AutoScratch 修复结果。
+**AutoScratch 历史证据（AS-1）。** 旧 `BmsPlayfield.UpdateSubTree()` 的延迟遍历和 `EndGameplayFrame()` 的最终遍历会影响 Mod 调用次数、自动持有和 HCN 身体采样。相同模拟步骤下，普通遍历的 scratch Note 和长按头分别在 3000、3001 判定；前五步延迟到最终遍历时，两者均在 3003 处理，自动持有也从 3001 推迟到 3003。HCN 在 3202 的身体 tick 在普通遍历中将血量从 0.32 恢复至 0.34，延迟遍历没有该 tick，血量仍为 0.32。原始轨迹与复现命令保存在[历史证据](#historical-evidence)中。
+
+核心对照与适配完成后，再在 Mod 工作中决定 AS-1 的采样语义，分别记录等价适配和有意行为修复；核心实现及无 Mod 对照不以复制旧 Mod 触发点为目标，本方案不预先指定 AutoScratch 修复结果。
 
 ## 必须保持的时序
 
@@ -720,6 +687,10 @@ Engine 显式拥有经过、身体、输入、被动检查、端点收尾及回�
 
 ## Git 旧版对照与适配
 
+<a id="historical-evidence"></a>
+
+对照版本见[Git 基线](#git-baselines)。旧实现、fixture 和验证记录保留在对应 Git 版本，可用 `git show <SHA>:<path>` 读取；ST-1、RA-1 和 AS-1 的有效行为事实保留在本方案中。
+
 旧版本保留在 Git，跨版本运行发生在完整核心实现之后。对照使用独立工作树和独立输出目录；优先使用现有空闲工作树，需要新增时使用环境提供的 worktree 工具。不得 checkout/reset 覆盖仍有未提交实现的当前工作区。
 
 1. 固定比较对：重构前行为基点与完整核心的新 commit。必要时运行保存的 checkpoint，定位差异来自先前工作还是本次直接实现；checkpoint 不能替代原始行为基点。未提交测试探针另存 diff，报告注明实际代码树。
@@ -735,7 +706,7 @@ Engine 显式拥有经过、身体、输入、被动检查、端点收尾及回�
 
 ## 验证入口与命令
 
-以下为核心完整实现后的验证模板，不是本次执行记录。先按[构建说明](development.md#build-manually)准备同版引用程序集和还原结果，再构建两个工作树各自的项目。共享 `../osu`、`../osu-framework`、`../rulesets` 只读；若需要自行构建依赖，使用独立副本与显式路径。
+以下为核心完整实现后的验证模板。先按[构建说明](development.md#build-manually)准备同版引用程序集和还原结果，再构建两个工作树各自的项目。共享 `../osu`、`../osu-framework`、`../rulesets` 只读；若需要自行构建依赖，使用独立副本与显式路径。
 
 ```powershell
 dotnet build osu.Game.Rulesets.BmsRuleset/osu.Game.Rulesets.BmsRuleset.csproj -c Release --no-restore -p:BuildProjectReferences=false
@@ -767,11 +738,11 @@ foreach ($refactorGroup in $refactorFilters.Keys) {
 
 ## 证据与进度记录
 
-只维护“Git 保存与整理 / 核心实现 / 核心对照适配 / Mod 适配 / 最终集成”的实际状态，不重新拆出编号任务卡或要求每卡更换实施者。编码期间记录真实停点、未完成调用方和构建/测试结果，不把过渡实现标成可交付成果。
+进度只记录核心实现、核心对照适配、Mod 适配及最终集成的实际状态，包括当前缺口和构建/测试结果。
 
-每份最终证据记录：基线与产出完整 SHA、checkpoint/备份引用、squash 前后树一致性、框架/运行环境、实际命令、测试补丁、匹配数量、失败/跳过、执行等价与生成等价各自范围、行为差异及处理、性能样本和剩余项。设计/代码尚未提交时保存相关 diff。
+每份最终证据记录：比较版本的完整 SHA、框架/运行环境、实际命令、测试补丁、匹配数量、失败/跳过、执行等价与生成等价各自范围、行为差异及处理、性能样本和剩余项。未提交的测试探针保存为 diff。
 
-历史验证文件保持原轨迹和事实；其中的原阶段进度、下一卡、P6 延后等文字仅描述当时安排，不作为当前指令。小型 fixture、复现输入和稳定断言进入版本库；大型 TRX/日志可在本地保存，但必须给出重建步骤，不以无法取得的本机文件作为唯一证据。
+小型 fixture、复现输入和稳定断言进入版本库；大型 TRX/日志提供重建步骤，保证证据可复现。
 
 <a id="completion"></a>
 
@@ -788,4 +759,4 @@ foreach ($refactorGroup in $refactorFilters.Keys) {
 
 **整个重构最终完成：** 核心对照适配完成后，所有受影响 Mod 已基于稳定入口恢复并通过适配及组合验证；AS-1 的决定与前后证据明确，未借 Mod 恢复旧核心接口或视觉驱动判定。变更涉及玩家行为时，同步简明玩家文档及 `BmsStrings` 英文和全部现有翻译；Background Sample/KeySound 继续遵守独立音量路由。
 
-最终职责写入开发文档，完成记录保存后移除本临时方案及其开发文档索引。最终集成保留原定的两个父提交 merge commit（`--no-ff`）；本方案中的前期 squash 只整理实施分支历史，不替代最终 merge，也不 squash/rebase-away 已保存的历史引用。提交主题沿用仓库风格。
+最终职责写入开发文档，完成记录保存后移除本实施方案及其开发文档索引。最终集成使用两个父提交的 merge commit（`--no-ff`），保留行为基线和检查点的持久引用。提交主题沿用仓库风格。

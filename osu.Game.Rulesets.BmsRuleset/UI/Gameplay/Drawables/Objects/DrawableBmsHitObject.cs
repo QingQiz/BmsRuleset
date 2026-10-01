@@ -26,17 +26,6 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     internal bool VisualsSuppressed { get; private set; }
 
     internal long BindingGeneration { get; private set; }
-    protected bool UsesCoreScheduling => ParentColumn?.Judgements.Schedule != null;
-
-    public override bool UpdateSubTree()
-    {
-        var updated = base.UpdateSubTree();
-        // CompositeDrawable skips UpdateAfterChildren when culled. Passive judgements must
-        // still run at the same point in the column traversal, rather than waiting for OnKilled.
-        if (UsesPassiveResultCheck && VisualsSuppressed && IsLoaded)
-            UpdateResult(false);
-        return updated;
-    }
 
     internal void UpdateVisualPosition(float y, float columnHeight, float? endY = null)
     {
@@ -59,27 +48,19 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         }
     }
 
+    internal virtual void UpdateVisualGeometry(float headY, float endY)
+    {
+    }
+
     protected virtual float GetVisualHeadY(float y, float endY) => y;
 
     protected virtual float VisualHeight => 0;
 
     protected virtual bool SkipFurtherUpdates => false;
 
-    protected virtual bool RequiresResultBeforeKindPostState => false;
-
-    protected virtual bool UsesPassiveResultCheck => true;
-
     internal virtual bool RequiresColumnFrameUpdate => true;
 
-    internal virtual double NextPassiveJudgementTime => double.NegativeInfinity;
-
-    internal virtual bool HasPendingHead => !Judged;
-
-    internal virtual bool RequiresActiveLongNoteUpdate => false;
-
-    internal virtual BmsLongNoteJudgementController? LongNoteJudgement => null;
-
-    internal virtual void UpdateDeferredLongNote(float y, float endY)
+    internal virtual void UpdateDeferredVisuals(float y, float endY)
     {
     }
 
@@ -117,15 +98,6 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         AddInternal(Visuals);
     }
 
-    public virtual bool TryHit(HitResult result)
-    {
-        if (Judged || result == HitResult.None)
-            return false;
-
-        ApplyBmsResult(result);
-        return true;
-    }
-
     internal void ApplyBmsResult(HitResult result)
     {
         ApplyBmsResult(result, result == HitResult.Meh && ParentColumn?.HasPmsMistake(HitObject) == true);
@@ -144,12 +116,6 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     internal void UpdateColumnFrame()
     {
         if (HitObject == null) return;
-
-        if (!UsesCoreScheduling && !Judged && !SkipFurtherUpdates)
-        {
-            if (!UpdateKindState() && RequiresResultBeforeKindPostState)
-                UpdateResult(false);
-        }
 
         UpdateKindPostResultState();
     }
@@ -199,8 +165,6 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     protected virtual void ResetKindState()
     {
     }
-
-    protected virtual bool UpdateKindState() => false;
 
     protected virtual void UpdateKindPostResultState()
     {

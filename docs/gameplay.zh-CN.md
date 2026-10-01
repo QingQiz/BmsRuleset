@@ -19,7 +19,6 @@
 | 双人布局，P2 | 右 Shift | 右 Ctrl |
 
 使用键盘游玩时，请为两个方向分别设置顺手的按键。CN 和 HCN 长皿需要在尾部附近按下相反方向来完成尾判定。
-**Auto Scratch** 会自动完成皿音符、长皿保持和尾部反向操作。
 
 ## 判定与计分
 
@@ -178,7 +177,6 @@ beatoraja 将谱面辅助（**ASSIST**，深紫）与 Assist Easy 血条（**L-A
 | 反键 (IN)                  | 将每条轨道中除最后一个音符外的音符转换为长按音符                 | 随机 LN 长度；随机种子          |
 | 2P                       | 将玩家布局从 1P 切换为 2P                         |     |
 | Constant (CN)            | 禁用滚速变化，包括 #SPEED/#SCROLL/BPM 变化造成的影响 |         |
-| Auto Scratch (AS)        | 自动完成皿音符、长皿保持和 CN/HCN 尾部反向操作 |     |
 | Hide Scratch (HS)        | 移除皿音符并隐藏皿轨                       |     |
 | No Mine (NM)             | 移除所有地雷，包括皿轨上的地雷                 |     |
 | Background Keysound (BK) | 随歌曲自动播放按键音                         |     |

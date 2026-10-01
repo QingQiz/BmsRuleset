@@ -1,27 +1,47 @@
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
-/// <summary>
-/// The bounded long-note adapter projects read-only state onto the existing visual implementation.
-/// P3b replaces these legacy drawable calls with presentation data consumed by the shared drawable.
-/// </summary>
-internal static class BmsLongNotePresentation
+internal delegate BmsLongNotePresentation BmsLongNotePresentationMapping(BmsLongNote note, in BmsLongNoteState state, bool held, double time);
+
+internal readonly record struct BmsLongNotePresentation(
+    bool HeadJudged, bool HoldingBody, bool KeepAfterHeadResult, bool KeepAlive, bool Retired, double LifetimeEnd)
 {
-    internal static void Apply(DrawableBmsHitObject drawable, in BmsLongNoteState previous, in BmsLongNoteState state)
-    {
-        var visual = (IBmsLongNoteDrawable)drawable;
-        if (!previous.HeadJudged && state.HeadJudged && !state.TailJudged)
+    private static readonly BmsLongNotePresentationMapping longNoteMapping = longNote;
+    private static readonly BmsLongNotePresentationMapping chargeNoteMapping = chargeNote;
+    private static readonly BmsLongNotePresentationMapping hellChargeNoteMapping = hellChargeNote;
+
+    internal BmsHitLightStyle HitLightStyle => BmsHitLightStyle.Hold;
+
+    internal static BmsLongNotePresentationMapping SelectMapping(BmsLongNoteMode mode)
+        => mode switch
         {
-            if (state.HeadResult == HitResult.Meh && state.HasActiveBody)
-                visual.KeepBodyAlive(drawable.LongNoteJudgement!.ChargeTailLifetimeEnd());
-            else
-                visual.PrepareHeadPin();
-        }
-        if (!previous.TailJudged && state.TailJudged && state.TailResult != HitResult.Meh && !state.LongNoteStarted)
-            visual.ClearBody();
-        else if (previous.LongNoteStarted && !state.LongNoteStarted && state.TailJudged)
-            visual.Retire();
+            BmsLongNoteMode.ChargeNote => chargeNoteMapping,
+            BmsLongNoteMode.HellChargeNote => hellChargeNoteMapping,
+            _ => longNoteMapping,
+        };
+
+    private static BmsLongNotePresentation longNote(BmsLongNote note, in BmsLongNoteState state, bool held, double time)
+        => new(state.HeadJudged, state.IsHolding && held, false, false,
+            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, note.EndTime);
+
+    private static BmsLongNotePresentation chargeNote(BmsLongNote note, in BmsLongNoteState state, bool held, double time)
+        => new(state.HeadJudged, state.IsHolding && held, true, false,
+            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, chargeLifetimeEnd(note));
+
+    private static BmsLongNotePresentation hellChargeNote(BmsLongNote note, in BmsLongNoteState state, bool held, double time)
+    {
+        // A successful early tail keeps the remaining HCN body visually held.
+        var successfulTail = state.TailJudged && state.TailResult is HitResult.Perfect or HitResult.Great or HitResult.Good;
+        return new BmsLongNotePresentation(state.HeadJudged, state.LongNoteStarted && (held || successfulTail), true,
+            state.LongNoteStarted && state.HeadResult == HitResult.Meh && time < chargeLifetimeEnd(note),
+            state.TailJudged && !state.LongNoteStarted, chargeLifetimeEnd(note));
     }
+
+    private static double chargeLifetimeEnd(BmsLongNote note)
+        => note.EndTime + BmsJudgementProfileProvider.GetTable(note.Beatmap.LayoutVariant, note.Column,
+            note.EffectiveJudgementRate, tail: false).SlowWindowFor(HitResult.Ok) + 100;
 }

@@ -60,14 +60,14 @@ internal sealed class BmsHitExplosionLimitProbe : IDisposable
             __result[i] = Math.Min(__result[i], active!.Limit);
     }
 
-    private static bool trigger(BmsColumn __instance, bool isLongNote)
+    private static bool trigger(BmsColumn __instance, BmsHitLightStyle style)
     {
         var experiment = active!;
         experiment.triggers++;
         if (!experiment.columns.TryGetValue(__instance, out var state))
             experiment.columns.Add(__instance, state = new ColumnState(__instance));
-        var pulses = isLongNote ? state.LongNote : state.Normal;
-        var pool = isLongNote ? state.LongNotePool : state.NormalPool;
+        var pulses = style == BmsHitLightStyle.Hold ? state.LongNote : state.Normal;
+        var pool = style == BmsHitLightStyle.Hold ? state.LongNotePool : state.NormalPool;
         while (pulses.TryPeek(out var expired) && (!expired.IsInUse || expired.Parent != __instance.HitExplosionArea))
             pulses.Dequeue();
 

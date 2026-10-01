@@ -273,9 +273,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
     /// own NewResult), LN head/tail endpoints, and the repeating hit light fired throughout an
     /// LN hold. Moved here from BmsPlayfield so the column owns its lane's hit-light visuals.
     /// </summary>
-    public void TriggerHitExplosion(bool isLongNote)
+    public void TriggerHitExplosion(BmsHitLightStyle style)
     {
-        var pool = isLongNote ? longNoteHitExplosionPool : normalHitExplosionPool;
+        var pool = style == BmsHitLightStyle.Hold ? longNoteHitExplosionPool : normalHitExplosionPool;
         var explosion = pool.Get();
         explosion.ApplyPositionOffset(ParentPlayfield.Stage.HitTargetPositionOffset);
         HitExplosionArea.Add(explosion);
@@ -319,7 +319,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         // BMS POOR is represented by framework Meh, which IsHit() considers successful even though
         // it must not produce the hit feedback reserved for BAD and better judgements.
         if (ShouldTriggerHitExplosion(result.Type))
-            TriggerHitExplosion(hitObject is BmsLongNote);
+            TriggerHitExplosion(hitObject is BmsLongNote ? BmsHitLightStyle.Hold : BmsHitLightStyle.Note);
     }
 
     internal static bool ShouldTriggerHitExplosion(HitResult result) => result != HitResult.Meh && result.IsHit();

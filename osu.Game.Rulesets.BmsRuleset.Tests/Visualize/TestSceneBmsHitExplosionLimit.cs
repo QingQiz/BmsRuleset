@@ -10,6 +10,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Tests.Visual;
 
@@ -62,12 +63,12 @@ public partial class TestSceneBmsHitExplosionLimit : BmsPlayerTestScene
     {
         load(limit);
         AddAssert("prewarm respects the limit", () => column.ChildrenOfType<DrawablePool<BmsHitExplosion>>().All(p => p.CurrentPoolSize <= limit));
-        AddStep("trigger extreme burst", () => { for (var i = 0; i < 1000; i++) column.TriggerHitExplosion(false); });
+        AddStep("trigger extreme burst", () => { for (var i = 0; i < 1000; i++) column.TriggerHitExplosion(BmsHitLightStyle.Note); });
         seek(1050);
         AddAssert("drawable count is bounded", () => column.HitExplosionArea.AliveChildren.Count() == limit);
         seek(1250);
         AddUntilStep("all pulses expire", () => !column.HitExplosionArea.AliveChildren.Any());
-        AddStep("trigger another burst", () => { for (var i = 0; i < 1000; i++) column.TriggerHitExplosion(false); });
+        AddStep("trigger another burst", () => { for (var i = 0; i < 1000; i++) column.TriggerHitExplosion(BmsHitLightStyle.Note); });
         seek(1300);
         AddAssert("expired objects are reused within the same budget", () => column.ChildrenOfType<DrawablePool<BmsHitExplosion>>().All(p => p.CurrentPoolSize <= limit));
     }
@@ -79,7 +80,7 @@ public partial class TestSceneBmsHitExplosionLimit : BmsPlayerTestScene
         for (var i = 0; i < 4; i++)
         {
             seek(1000 + i * 40);
-            AddStep("trigger independent pulse", () => column.TriggerHitExplosion(false));
+            AddStep("trigger independent pulse", () => column.TriggerHitExplosion(BmsHitLightStyle.Note));
         }
         seek(1150);
         AddStep("no phase changes below the cap", () =>
@@ -96,11 +97,11 @@ public partial class TestSceneBmsHitExplosionLimit : BmsPlayerTestScene
     public void OverflowRetainsLatestHitAndSeparatesNormalFromLongNote()
     {
         load(2, BmsHitExplosionOverflowPolicy.ReplaceOldest);
-        AddStep("first tap and hold pulse", () => { column.TriggerHitExplosion(false); column.TriggerHitExplosion(true); });
+        AddStep("first tap and hold pulse", () => { column.TriggerHitExplosion(BmsHitLightStyle.Note); column.TriggerHitExplosion(BmsHitLightStyle.Hold); });
         seek(1040);
-        AddStep("second tap", () => column.TriggerHitExplosion(false));
+        AddStep("second tap", () => column.TriggerHitExplosion(BmsHitLightStyle.Note));
         seek(1080);
-        AddStep("overflow tap", () => column.TriggerHitExplosion(false));
+        AddStep("overflow tap", () => column.TriggerHitExplosion(BmsHitLightStyle.Note));
         seek(1090);
         AddStep("oldest tap replaced, hold pulse retained", () =>
         {
@@ -115,9 +116,9 @@ public partial class TestSceneBmsHitExplosionLimit : BmsPlayerTestScene
     public void KeepExistingLetsPulsesReachPeakBrightnessDuringOverflow()
     {
         load(2);
-        AddStep("fill both slots", () => { column.TriggerHitExplosion(false); column.TriggerHitExplosion(false); });
+        AddStep("fill both slots", () => { column.TriggerHitExplosion(BmsHitLightStyle.Note); column.TriggerHitExplosion(BmsHitLightStyle.Note); });
         seek(1040);
-        AddStep("overflow with a dense burst", () => { for (var i = 0; i < 1000; i++) column.TriggerHitExplosion(false); });
+        AddStep("overflow with a dense burst", () => { for (var i = 0; i < 1000; i++) column.TriggerHitExplosion(BmsHitLightStyle.Note); });
         seek(1080);
         AddAssert("both original pulses reach their peak", () => column.HitExplosionArea.AliveChildren.Count() == 2
             && column.HitExplosionArea.AliveChildren.All(p => Math.Abs(p.Alpha - 1) < 0.001 && p.LifetimeStart == 1000));
@@ -127,7 +128,7 @@ public partial class TestSceneBmsHitExplosionLimit : BmsPlayerTestScene
     public void ZeroKeepsOriginalUnlimitedBehaviour()
     {
         load(0);
-        AddStep("trigger 256 pulses", () => { for (var i = 0; i < 256; i++) column.TriggerHitExplosion(false); });
+        AddStep("trigger 256 pulses", () => { for (var i = 0; i < 256; i++) column.TriggerHitExplosion(BmsHitLightStyle.Note); });
         seek(1050);
         AddAssert("all 256 pulses are present", () => column.HitExplosionArea.AliveChildren.Count() == 256);
     }

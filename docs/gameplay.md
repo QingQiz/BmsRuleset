@@ -20,7 +20,7 @@ For long scratches, press one direction at the head and follow the [long-note ru
 | Double play, P2 | Right Shift | Right Ctrl |
 
 For keyboard play, bind both directions to comfortable keys. In CN and HCN, press the opposite direction near the
-tail to complete a long scratch. **Auto Scratch** handles scratch notes, holds, and tail reversals automatically.
+tail to complete a long scratch.
 
 ## Judgements and Scoring
 
@@ -197,7 +197,6 @@ matching the selected mods.
 | Invert (IN)              | Converts each note except the lane's last into a hold note      | Randomise LN length; seed                          |
 | 2P                       | Switches the layout from 1P to 2P                               |         |
 | Constant (CN)            | Disables scroll-speed changes, including #SPEED/#SCROLL/BPM     |         |
-| Auto Scratch (AS)        | Plays scratch notes, holds, and CN/HCN tail reversals automatically |         |
 | Hide Scratch (HS)        | Removes scratch notes and hides the lane                        |         |
 | No Mine (NM)             | Removes all landmines, including those in scratch lanes         |         |
 | Background Keysound (BK) | Plays keysounds automatically with the song                     |         |

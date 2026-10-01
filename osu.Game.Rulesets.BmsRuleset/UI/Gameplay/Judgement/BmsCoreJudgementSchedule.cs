@@ -7,7 +7,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 internal readonly record struct BmsScheduledObject(BmsHitObject Object, long BindingToken);
 
 /// <summary>
-/// Generates the bounded Note/HCN passive and post-result plan from actual lifecycle order.
+/// Orders passive and post-result operations at lifecycle boundaries.
 /// Ordering and representation availability are supplied by the host; operations belong to the core.
 /// </summary>
 internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)

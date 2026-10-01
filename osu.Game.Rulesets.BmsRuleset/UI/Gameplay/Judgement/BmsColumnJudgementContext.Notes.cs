@@ -17,7 +17,7 @@ internal sealed partial class BmsColumnJudgementContext
 {
     private readonly int noteColumnIndex;
     private readonly BmsLayoutVariant noteLayout;
-    private IBmsJudgementOutput? noteOutput;
+    private IBmsJudgementOutput noteOutput = null!;
     private BmsDrawableJudgementOutput? drawableNoteOutput;
     private readonly Dictionary<BmsHitObject, int> noteSlots = new(ReferenceEqualityComparer.Instance);
     private readonly List<int> activeNoteSlots = [];
@@ -31,22 +31,11 @@ internal sealed partial class BmsColumnJudgementContext
     private readonly List<int> pendingLongNoteTailSlots = [];
     private readonly List<int> activeBodySlots = [];
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsScheduledObject Handle)> scheduledRepresentations = [];
-    internal BmsCoreJudgementSchedule? Schedule { get; private set; }
-
-    internal void EnableCoreScheduling()
-    {
-        Schedule = new BmsCoreJudgementSchedule(this);
-        foreach (var drawable in Container.AliveEntries.Values.OfType<DrawableBmsHitObject>())
-        {
-            if (noteSlots.ContainsKey(drawable.HitObject)) bindScheduledRepresentation(drawable);
-        }
-        Container.InvalidateCoreOrder();
-    }
+    internal BmsCoreJudgementSchedule Schedule { get; private set; } = null!;
 
     private void bindScheduledRepresentation(DrawableBmsHitObject drawable)
     {
-        if (Schedule != null)
-            scheduledRepresentations[drawable] = (drawable.BindingGeneration, Schedule.Bind(drawable.HitObject));
+        scheduledRepresentations[drawable] = (drawable.BindingGeneration, Schedule.Bind(drawable.HitObject));
     }
 
     internal bool TryGetScheduledObject(DrawableBmsHitObject drawable, out BmsScheduledObject item)
@@ -63,12 +52,12 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal void CompleteScheduledRemoval(DrawableBmsHitObject drawable, in BmsFrameContext frame)
     {
-        if (TryGetScheduledObject(drawable, out var item)) Schedule!.CompleteRemoval(item, frame);
+        if (TryGetScheduledObject(drawable, out var item)) Schedule.CompleteRemoval(item, frame);
     }
 
     internal BmsNoteRegistration[] NoteRegistrations { get; private set; } = [];
     internal BmsNoteJudgementWindows[] NoteWindows { get; private set; } = [];
-    internal BmsLongNoteRegistration[] LongNoteRegistrations { get; private set; } = [];
+    private BmsLongNote[] longNotes = [];
 
     internal BmsColumnJudgementContext(BmsHitObject[] notes, BmsLayoutVariant layout, int column, bool batchUpdates, IBmsJudgementOutput output)
     {
@@ -79,29 +68,9 @@ internal sealed partial class BmsColumnJudgementContext
         initialiseNoteExecution(output);
     }
 
-    // This composition entry is deliberately opt-in until plan generation and all object types are verified.
-    internal void EnableNoteExecution(bool includeLongNotes = false)
-    {
-        if (noteOutput != null)
-            throw new InvalidOperationException("Note execution is already configured.");
-        if (!includeLongNotes && columnNotes.Any(n => n is not BmsNote))
-            throw new InvalidOperationException("The bounded note path requires an ordinary-note scoring column.");
-
-        validateExecutionTypes();
-        var alive = Container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Where(d => d.HitObject is BmsNote or BmsLongNote).ToArray();
-        foreach (var drawable in alive)
-            Unregister(drawable);
-
-        drawableNoteOutput = new BmsDrawableJudgementOutput(playfield, Column);
-        initialiseNoteExecution(drawableNoteOutput);
-        foreach (var drawable in alive)
-            Register(drawable);
-    }
-
     private void initialiseNoteExecution(IBmsJudgementOutput output)
     {
-        validateExecutionTypes();
-
+        Schedule = new BmsCoreJudgementSchedule(this);
         noteOutput = output;
         var binding = new BmsNoteOperationBinding(this, output);
         var containsLongNotes = columnNotes.Any(n => n is BmsLongNote);
@@ -109,7 +78,7 @@ internal sealed partial class BmsColumnJudgementContext
             longNoteBinding = new BmsLongNoteOperationBinding(this, output);
         NoteRegistrations = new BmsNoteRegistration[columnNotes.Length];
         NoteWindows = new BmsNoteJudgementWindows[columnNotes.Length];
-        LongNoteRegistrations = containsLongNotes ? new BmsLongNoteRegistration[columnNotes.Length] : [];
+        longNotes = containsLongNotes ? new BmsLongNote[columnNotes.Length] : [];
         activeNotes = new bool[columnNotes.Length];
         noteOrders = new long[columnNotes.Length];
         noteHeadTimes = new double[columnNotes.Length];
@@ -120,9 +89,8 @@ internal sealed partial class BmsColumnJudgementContext
             noteHeadTimes[i] = note.StartTime;
             if (note is BmsLongNote longNote)
             {
-                if (!longNoteControllers.TryGetValue(longNote, out var controller))
-                    longNoteControllers.Add(longNote, controller = new BmsLongNoteJudgementController(longNote));
-                LongNoteRegistrations[i] = new BmsLongNoteRegistration(longNote, controller);
+                longNotes[i] = longNote;
+                longNoteBinding!.Register(longNote, i);
                 NoteRegistrations[i] = new BmsNoteRegistration(note, i, longNoteBinding!.Press, longNoteBinding.Passive);
             }
             else
@@ -135,34 +103,27 @@ internal sealed partial class BmsColumnJudgementContext
         output.SetResultCheckpoint(updateNoteIndexes);
     }
 
-    private void validateExecutionTypes()
-    {
-        if (columnNotes.Any(n => n is not BmsNote and not BmsLongNote
-                                || n is BmsLongNote ln && ln.Beatmap.LockedLongNoteMode is not (BmsLongNoteMode.Undefined or BmsLongNoteMode.LongNote or BmsLongNoteMode.ChargeNote or BmsLongNoteMode.HellChargeNote)))
-            throw new InvalidOperationException("Only ordinary notes and long-note operations are supported by this composition.");
-    }
-
-    internal BmsLongNoteState GetLongNoteState(BmsLongNote note) => longNoteControllers[note].State;
+    internal BmsLongNoteState GetLongNoteState(BmsLongNote note) => longNoteBinding!.GetState(noteSlots[note]);
 
     internal IEnumerable<BmsLongNote> GetPendingLongNoteTails()
     {
         foreach (var slot in pendingLongNoteTailSlots)
-            yield return LongNoteRegistrations[slot].Object;
+            yield return longNotes[slot];
     }
 
     internal IEnumerable<BmsLongNote> GetActiveBodies()
     {
         foreach (var slot in activeBodySlots)
-            yield return LongNoteRegistrations[slot].Object;
+            yield return longNotes[slot];
     }
 
     internal IEnumerable<BmsLongNote> GetHoldingNotes()
     {
         foreach (var slot in pendingLongNoteTailSlots)
         {
-            var registration = LongNoteRegistrations[slot];
-            if (registration.State.IsHolding)
-                yield return registration.Object;
+            var longNote = longNotes[slot];
+            if (GetLongNoteState(longNote).IsHolding)
+                yield return longNote;
         }
     }
 
@@ -172,7 +133,7 @@ internal sealed partial class BmsColumnJudgementContext
         passiveDeadlineDirty = true;
     }
 
-    internal BmsMainResultState GetNoteResult(BmsHitObject note) => noteOutput!.GetMainResult(note);
+    internal BmsMainResultState GetNoteResult(BmsHitObject note) => noteOutput.GetMainResult(note);
 
     internal BmsHitObject? FirstPendingNote
     {
@@ -184,7 +145,7 @@ internal sealed partial class BmsColumnJudgementContext
             foreach (var slot in pendingLongNoteTailSlots)
             {
                 var held = NoteRegistrations[slot].Object;
-                if (!noteOutput!.GetMainResult(held).HasResult && held.StartTime <= first.StartTime)
+                if (!noteOutput.GetMainResult(held).HasResult && held.StartTime <= first.StartTime)
                     return null;
             }
             return first;
@@ -192,17 +153,17 @@ internal sealed partial class BmsColumnJudgementContext
     }
 
     private bool hasPendingExecutionHead(BmsHitObject note)
-        => note is BmsLongNote ln ? !longNoteControllers[ln].HeadJudged : !noteOutput!.GetMainResult(note).HasResult;
+        => note is BmsLongNote ln ? !GetLongNoteState(ln).HeadJudged : !noteOutput.GetMainResult(note).HasResult;
 
     internal bool IsNoteCandidate(BmsHitObject note)
-        => noteSlots.TryGetValue(note, out var slot) && activeNotes[slot] && !noteOutput!.GetMainResult(note).HasResult;
+        => noteSlots.TryGetValue(note, out var slot) && activeNotes[slot] && !noteOutput.GetMainResult(note).HasResult;
 
     internal IEnumerable<BmsHitObject> GetNoteCandidates()
     {
         foreach (var slot in activeNoteSlots)
         {
             var note = NoteRegistrations[slot].Object;
-            if (!noteOutput!.GetMainResult(note).HasResult)
+            if (!noteOutput.GetMainResult(note).HasResult)
                 yield return note;
         }
     }
@@ -240,7 +201,7 @@ internal sealed partial class BmsColumnJudgementContext
         if (scheduledRepresentations.TryGetValue(drawable, out var binding) && binding.Generation == generation)
         {
             scheduledRepresentations.Remove(drawable);
-            Schedule!.Unbind(binding.Handle);
+            Schedule.Unbind(binding.Handle);
         }
         drawableNoteOutput?.Unbind(drawable, generation);
     }
@@ -314,13 +275,13 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal void RefreshNoteConfiguration(BmsHitObject note)
     {
-        if (noteOutput == null || !noteSlots.TryGetValue(note, out var slot))
+        if (!noteSlots.TryGetValue(note, out var slot))
             return;
 
         if (note is BmsNote)
             NoteWindows[slot] = new BmsNoteJudgementWindows(note);
         else if (note is BmsLongNote longNote)
-            longNoteControllers[longNote].RefreshConfiguration(Column?.PreserveLongNoteHistory ?? true);
+            longNoteBinding!.RefreshConfiguration(slot, Column?.PreserveLongNoteHistory ?? true);
         if (noteHeadTimes[slot] != note.StartTime)
         {
             pendingNoteHeads.Remove((noteHeadTimes[slot], noteOrders[slot], slot));
@@ -341,7 +302,7 @@ internal sealed partial class BmsColumnJudgementContext
             pendingNoteHeads.Add(key);
         else
             pendingNoteHeads.Remove(key);
-        if (note is BmsLongNote ln && activeNotes[slot] && longNoteControllers[ln].State.HasPendingTail)
+        if (note is BmsLongNote ln && activeNotes[slot] && GetLongNoteState(ln).HasPendingTail)
         {
             if (!pendingLongNoteTailSlots.Contains(slot))
             {
@@ -351,7 +312,7 @@ internal sealed partial class BmsColumnJudgementContext
         }
         else
             pendingLongNoteTailSlots.Remove(slot);
-        if (note is BmsLongNote body && activeNotes[slot] && longNoteControllers[body].State.HasActiveBody)
+        if (note is BmsLongNote body && activeNotes[slot] && GetLongNoteState(body).HasActiveBody)
         {
             if (!activeBodySlots.Contains(slot))
             {
@@ -383,7 +344,7 @@ internal sealed partial class BmsColumnJudgementContext
         foreach (var slot in activeNoteSlots)
         {
             if (NoteRegistrations[slot].Object is BmsLongNote note)
-                noteOutput!.PublishState(note, longNoteControllers[note].State, frame);
+                noteOutput.PublishState(note, longNoteBinding!.GetState(noteSlots[note]), frame);
         }
         rebuildNoteIndexes();
     }
@@ -399,7 +360,7 @@ internal sealed partial class BmsColumnJudgementContext
             var note = NoteRegistrations[slot].Object;
             if (hasPendingExecutionHead(note))
                 NextPassiveUpdateTime = Math.Min(NextPassiveUpdateTime, note is BmsLongNote ln
-                    ? longNoteControllers[ln].NextHeadJudgementTime : NoteWindows[slot].NextPassiveJudgementTime(note));
+                    ? longNoteBinding!.NextHeadJudgementTime(slot) : NoteWindows[slot].NextPassiveJudgementTime(note));
         }
         passiveDeadlineDirty = false;
     }
@@ -427,9 +388,9 @@ internal sealed partial class BmsColumnJudgementContext
         {
             if (longNoteBinding!.Repress(slot, press))
             {
-                var registration = LongNoteRegistrations[slot];
-                if (!registration.State.IsHolding)
-                    noteOutput!.PlayTailSample(registration.Object);
+                var longNote = longNotes[slot];
+                if (!GetLongNoteState(longNote).IsHolding)
+                    noteOutput.PlayTailSample(longNote);
                 return PressOutcome.Hit;
             }
         }
@@ -439,7 +400,7 @@ internal sealed partial class BmsColumnJudgementContext
             && TryPressRegisteredNote(first, HitResult.Perfect, press))
         {
             pressHistory.Record(first, press.InputTime, true);
-            noteOutput!.PlaySample(first);
+            noteOutput.PlaySample(first);
             return PressOutcome.Hit;
         }
 
@@ -448,7 +409,7 @@ internal sealed partial class BmsColumnJudgementContext
         foreach (var slot in activeNoteSlots)
         {
             var note = NoteRegistrations[slot].Object;
-            if (noteOutput!.GetMainResult(note).HasResult)
+            if (noteOutput.GetMainResult(note).HasResult)
                 continue;
 
             var candidate = new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), note.Column, note.EffectiveJudgementRate,
@@ -489,7 +450,7 @@ internal sealed partial class BmsColumnJudgementContext
                 if (selection.Result == HitResult.Ok && BmsJudgementProfileProvider.IsPms(LayoutVariant))
                 {
                     pressHistory.Record(note, press.InputTime, false, true);
-                    noteOutput!.ApplyNonConsumingBad(note, press.Frame);
+                    noteOutput.ApplyNonConsumingBad(note, press.Frame);
                     noteOutput.PlaySample(note);
                     return PressOutcome.Hit;
                 }
@@ -497,14 +458,14 @@ internal sealed partial class BmsColumnJudgementContext
                 if (TryPressRegisteredNote(note, selection.Result, press))
                 {
                     pressHistory.Record(note, press.InputTime, true);
-                    noteOutput!.PlaySample(note);
+                    noteOutput.PlaySample(note);
                     return PressOutcome.Hit;
                 }
                 break;
             }
         }
 
-        noteOutput!.PlayKeySound();
+        noteOutput.PlayKeySound();
         if (selection is { IsEmptyPoor: true, Candidate: { } emptyPoor })
         {
             if (press.IsResumeRewinding)
@@ -532,15 +493,15 @@ internal sealed partial class BmsColumnJudgementContext
         BmsLongNote? held = null;
         foreach (var slot in pendingLongNoteTailSlots)
         {
-            var registration = LongNoteRegistrations[slot];
-            if (!registration.State.IsHolding)
+            var longNote = longNotes[slot];
+            if (!GetLongNoteState(longNote).IsHolding)
                 continue;
-            var note = registration.Object;
+            var note = longNote;
             if (held == null || note.EndTime < held.EndTime)
                 held = note;
         }
         if (held != null && longNoteBinding!.Release(noteSlots[held], inputTime, frame, reverseScratch))
-            noteOutput!.PlayTailSample(held);
+            noteOutput.PlayTailSample(held);
     }
 
     internal void UpdateRegisteredLongNote(BmsLongNote note, in BmsFrameContext frame, double elapsed, bool holding)
@@ -563,9 +524,9 @@ internal sealed partial class BmsColumnJudgementContext
         for (var i = 0; i < activeBodySlots.Count;)
         {
             var slot = activeBodySlots[i];
-            var drawable = drawableNoteOutput!.GetRepresentation(LongNoteRegistrations[slot].Object);
+            var drawable = drawableNoteOutput!.GetRepresentation(longNotes[slot]);
             longNoteBinding!.UpdateBody(slot, noteFrame(drawable), drawable.Time.Elapsed,
-                holding || ((ILongNoteHolder)drawable).IsAutomaticallyHeld);
+                holding);
             if (i < activeBodySlots.Count && activeBodySlots[i] == slot)
                 i++;
         }

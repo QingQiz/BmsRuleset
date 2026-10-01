@@ -24,7 +24,7 @@ public interface IBmsColumn
 
     bool Hidden { get; set; }
 
-    void TriggerHitExplosion(bool isLongNote);
+    void TriggerHitExplosion(BmsHitLightStyle style);
 
     void PlaySample(ushort? sampleKey, int volume);
 

@@ -11,8 +11,6 @@ public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCo
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Mine;
 
     // The playfield's passing phase owns detonation so it precedes every HCN body.
-    protected override bool UsesPassiveResultCheck => false;
-
     protected override bool SkipFurtherUpdates => mineHandledTime.HasValue && Time.Current >= HitObject.StartTime;
 
     private double? mineHandledTime;
