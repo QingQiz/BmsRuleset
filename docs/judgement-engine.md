@@ -27,11 +27,11 @@ The code has three dependency boundaries:
 | `BmsColumnHitObjectContainer` | Reports activation/removal and traversal order, samples visual time, and applies shared layout and culling. |
 | Concrete drawables and presentation mappings | Compose graphics and consume read-only state. Long-note geometry belongs to the long-note drawable. |
 
-Normal notes use slot data and shared operation delegates. Each long note has one immutable binding containing its identity, shared operation adapter and typed-state index. A compact slot map connects mixed columns to the hold-only binding array; ordinary notes do not allocate hold records. This replaces parallel arrays of operations whose correspondence previously had to be maintained separately. The adapters share only operations supported by all holds; the HCN adapter alone exposes body updates. Rules remain independent of one another.
+Normal notes use slot data and shared operation delegates. Each long note has one immutable binding containing its identity, shared operation adapter and typed-state index. A compact slot map connects mixed columns to the hold-only binding array; columns containing only ordinary notes need no hold slot map. The registry accepts chart objects and owns all hold lookup and rewind traversal, including inactive holds. The column decides when to rewind and never traverses a sparse long-note array. The adapters share only operations supported by all holds; the HCN adapter alone exposes body updates. Rules remain independent of one another.
 
 LN, CN and HCN have separate runtime types; only HCN owns a body accumulator and its lossless rewind history. Pooling a drawable does not discard the object's logical history. Framework main results remain authoritative.
 
-Activation order is validated before it replaces the live index. Cached ranks provide constant-time order lookup when sorting pending tails and mixed-column bodies. Direct start-time changes refresh pending-head keys and the sorted historical lookup. They invalidate the passive deadline immediately so an earlier head cannot wait behind an obsolete cached bound.
+Note and landmine activation orders are validated completely before publication. Duplicate, inactive or missing entries leave the previous order intact. Cached ranks provide constant-time order lookup when sorting pending tails and mixed-column bodies. Direct start-time changes refresh pending-head keys and the sorted historical lookup. They invalidate the passive deadline immediately so an earlier head cannot wait behind an obsolete cached bound.
 
 ## AutoScratch input
 
@@ -51,17 +51,54 @@ Passive and completion plans preserve the host's observed traversal order. Token
 
 Framework history notification and core index refresh are separate synchronous checkpoints. The bridge implements `IBmsJudgementOutput` for core output and accepts framework lifecycle inputs; its name reflects both directions. It does not duplicate candidate selection or rule transitions. `ObserveSimulationStep` supplies feedback after the passive check and before a delayed tail can settle; the schedule checks the binding again after that callback. Concrete representations register their feedback callback at binding time, and the bridge checks and removes it by generation. The drawable base has no long-note-only update hook.
 
+The synchronous output protocol is shared by the bridge and recording output:
+
+| Boundary | State visible inside the callback | State after the boundary |
+| --- | --- | --- |
+| `PublishState` | Updated rule snapshot and the preceding index checkpoint. An LN head can still have no main result. | `BmsJudgementExecutionContext` refreshes membership and invalidates the passive deadline. |
+| Main result | Framework result and endpoint array are already assigned. History notification precedes the bound index callback; a successful LN tail is still pending during these callbacks. | The rule continues its transition and publishes its final state. |
+| Synthetic endpoint | The supplementary result is submitted through score, gauge and HUD consumers while the rule retains its current transition state. | The rule updates the endpoint state and publishes it at the mode's existing checkpoint. |
+| Framework revert notification | The old main result remains readable; drawable notification follows the change to `ArmedState.Idle`. | Framework `Reset()` clears the main result, then history restoration and index rebuild establish the next input's candidates. |
+
+### Host checkpoints
+
+The production container and recording hosts use the same core schedule. A timestamp identifies simulation time, not an input batch: the engine increments `Batch` on every processing call, `Step` when time changes, and `Epoch` when time moves backwards. A binding token identifies a core registration independently of a drawable's local generation.
+
+| Host entry | Order and representation requirement | Deduplication and result work |
+| --- | --- | --- |
+| Input batch | All columns' mines, then bodies, then transitions in arrival order; result targets require a current representation. | Callback inputs wait for a new batch even at the same time. Suppressed or rewind frames only update held inputs. |
+| Ordinary traversal | Sample visual time and prepare geometry before layout completion; layout uses alive-map order and passive checks use subtree order. | Each phase runs once per epoch, batch and binding revision. Long-note feedback and completion run once per epoch, step, rewind revision and binding. |
+| Deferred traversal | Sample visual time, then visit the active long-note list in reverse order. | Uses the same completion stamp as ordinary traversal; the final skin pass cannot settle a tail twice. |
+| Removal | Drop candidate membership, mark the current handle as removing, run its last passive check while the representation exists, then unbind. | Last check occurs once per removing handle. Replaced tokens cannot submit. |
+| Reapply | Free the old binding and observers, register the new generation, refresh configuration and traversal order. | Retains logical history and active membership. The bridge's binding owns the schedule handle, so one unbind releases both. |
+| Ordinary rewind | After framework result restoration, rewind every registry state, restore active visuals, publish restored snapshots, then rebuild indexes. | Once per epoch and step. Inactive hold history is restored too; rewind invalidates existing completion stamps. |
+| Pause and resume lead-in | Complete held tails at pause; preserve completed state during the lead-in and evaluate resume visibility against its target time. | Pause-completion publications retain their existing mode-specific visual semantics. Body and mine ticks stay frozen during resume rewind. |
+
+Synchronous callbacks may remove or replace representations. The schedule rechecks tokens after passive checks and feedback; a late free or callback from an old generation cannot release or operate on its replacement.
+
 ## Presentation and audio
 
 Layout prepares object bounds once, applies culling and reuses the prepared geometry. Long-note time observations are registered separately from layout; repeated layout reads do not append visual history or advance rules. Geometry observes the state before that traversal's passive and completion phases.
 
-The binding selects an LN, CN or HCN presentation mapping, including whether hold-light pulses are active. The long-note drawable owns pulse timing. Successful LN/CN completion clears the body immediately. Natural body expiry retains the final child geometry while hiding the parent. Resume visibility is applied even when culling skips the drawable's children.
+The binding selects an LN, CN or HCN presentation mapping. It receives a rule snapshot plus `BmsLongNotePresentationContext` (time, held input, main-result presence and resume target) and returns body animation, released styling, head pinning, lifetime, hit visibility, retirement, resume visibility and hold-light decisions. Drawable code applies those decisions and owns geometry, skin resources, visual history and pulse timing.
+
+State publication, visual observation/layout, framework transforms and simulation feedback sample their own current context. Visual reads do not reuse a timestamp-only cache: held input may change in another batch at the same time without publishing rule state. Layout preparation and application share one prepared presentation. The last published presentation is retained only to detect synchronous head transitions. Successful LN/CN completion clears the body immediately. Natural body expiry retains the final child geometry while hiding the parent. Resume visibility is applied even when culling skips the drawable's children.
 
 Key and background sample requests continue through `BmsSamplePlayback` and `BmsPcmPlaybackSession`. The PCM controller takes the audio manager's aggregate master volume; the framework's effects/sample-volume setting is not part of that route. Empty-press sample selection queries core activation and results through `BmsKeySoundCursor`.
 
 ## Verification
 
-Rule and engine tests run without drawables through the recording output. Architecture tests inspect every core type's fields, method signatures and constructor parameters for UI, drawable and clock dependencies. Execution tests compare recording and framework outputs at fixed checkpoints. Player tests cover actual input generation, replay catchup, simultaneous stages, pool reuse, reapplication, rewind, Mods, culling and presentation. Dedicated regressions cover direct timing changes, sparse hold storage, rejected activation plans and feedback callback generations.
+Rule and engine tests run without drawables through the recording output. Architecture tests inspect every core type's fields, method signatures and constructor parameters, including the `Rules` and `State` namespace trees, for UI, drawable and clock dependencies. Execution tests compare recording and framework outputs at fixed checkpoints. Player tests cover actual input generation, replay catchup, simultaneous stages, pool reuse, reapplication, rewind, Mods, culling and presentation.
+
+| Contract | Regression entry |
+| --- | --- |
+| Mixed ordinary/long-note columns, active and pooled history | `BmsRegistryRecoveryTest.MixedColumnRewindsActiveAndPooledHolds` for LN/CN/HCN |
+| Invalid mine order leaves previous order usable | `BmsRegistryRecoveryTest.RejectedMineOrderPreservesPublishedOrder` |
+| Head without main result, HCN tail with remaining body, resume visibility | `BmsLongNotePresentationTest` |
+| Same-time input changes and repeated geometry reads | `TestSceneBmsJudgementLifecycleExecution.VisualRefreshReadsHeldStateAtTheSameTimeWithoutPublishingRuleState` |
+| State publication and result callbacks | `BmsLongNoteExecutionTest`, `BmsChargeNoteExecutionTest`, `BmsHellChargeNoteExecutionTest`, `TestSceneBmsJudgementCheckpoints` |
+| Actual ordinary/deferred host sequences and same-time batches | `TestSceneBmsCoreSchedulingGeneration`, `BmsCoreJudgementScheduleTest` |
+| Reapply, old callbacks/tokens, pooling and pause restoration | `TestSceneBmsJudgementLifecycleExecution`, `TestSceneBmsLongNoteLifecycle` |
 
 `TestSceneBmsGitComparison` and `BmsGitComparisonRecorder` can be copied unchanged to the original Git baseline. They record ordered results, intermediate score/gauge histories, requested samples, hit lights and visual snapshots. `scripts/compare-judgement-traces.py` compares both directories and rejects missing scenarios. HCN effects are observed at the health processor, including an assertion on the forwarded event time.
 

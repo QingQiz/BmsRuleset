@@ -22,18 +22,18 @@ internal sealed class BmsHoldRegistry
 
     internal BmsPassiveOperation PassiveOperation { get; }
 
-    internal BmsHoldRegistry(BmsLongNote[] notes, BmsJudgementRules rules, BmsJudgementExecutionContext execution)
+    internal BmsHoldRegistry(BmsHitObject[] notes, BmsJudgementRules rules, BmsJudgementExecutionContext execution)
     {
         // A mixed column needs one compact index per note, but binding records only for actual holds.
-        bindingIndices = new int[notes.Length];
+        bindings = new Binding[notes.Count(n => n is BmsLongNote)];
+        bindingIndices = bindings.Length == 0 ? [] : new int[notes.Length];
         Array.Fill(bindingIndices, -1);
-        bindings = new Binding[notes.Count(n => n != null)];
         var bindingIndex = 0;
         LongNoteOperations? normal = null;
         ChargeOperations? charge = null;
         for (var slot = 0; slot < notes.Length; slot++)
         {
-            if (notes[slot] is not { } note) continue;
+            if (notes[slot] is not BmsLongNote note) continue;
 
             HoldOperations operations = mode(note) switch
             {
@@ -53,6 +53,8 @@ internal sealed class BmsHoldRegistry
     private static BmsLongNoteMode mode(BmsLongNote note) => note.Beatmap.LockedLongNoteMode == BmsLongNoteMode.Undefined
         ? BmsLongNoteMode.LongNote
         : note.Beatmap.LockedLongNoteMode;
+
+    internal BmsLongNote GetNote(int slot) => bindings[bindingIndices[slot]].Note;
 
     internal BmsLongNoteState GetState(int slot)
     {
@@ -102,10 +104,11 @@ internal sealed class BmsHoldRegistry
         return binding.Operations.Pause(binding.StateIndex, frame);
     }
 
-    internal void Rewind(int slot, double time)
+    internal void Rewind(double time)
     {
-        var binding = bindings[bindingIndices[slot]];
-        binding.Operations.Rewind(binding.StateIndex, time);
+        // Inactive holds retain history so pool activation cannot resurrect a future head.
+        foreach (var binding in bindings)
+            binding.Operations.Rewind(binding.StateIndex, time);
     }
 
     internal void UpdateBody(int slot, in BmsFrameContext frame, double elapsed, bool holding)

@@ -16,7 +16,9 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 public class BmsJudgementEngineTest
 {
     private static IEnumerable<Type> CoreTypes => typeof(BmsJudgementEngine).Assembly.GetTypes()
-        .Where(t => t.Namespace == typeof(BmsJudgementEngine).Namespace && !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)));
+        .Where(t => (t.Namespace == typeof(BmsJudgementEngine).Namespace
+                     || t.Namespace?.StartsWith(typeof(BmsJudgementEngine).Namespace + ".", StringComparison.Ordinal) == true)
+                    && !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)));
 
     [TestCaseSource(nameof(CoreTypes))]
     public void CoreMembersDoNotDependOnDrawablesOrClocks(Type coreType)

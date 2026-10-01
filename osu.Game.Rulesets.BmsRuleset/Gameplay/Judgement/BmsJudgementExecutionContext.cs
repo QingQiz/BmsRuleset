@@ -21,6 +21,7 @@ internal readonly struct BmsJudgementExecutionContext(BmsColumnJudgementRuntime 
 
     internal void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
     {
+        // Synchronous observers see the new rule state with the preceding index checkpoint.
         output.PublishState(note, state, frame);
         column.RefreshExecutionState(note);
     }

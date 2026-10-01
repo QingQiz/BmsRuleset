@@ -93,5 +93,5 @@ internal sealed class BmsLongNoteTestContext
     }
 
     internal BmsLongNotePresentation Presentation(bool held = false, double time = 0)
-        => BmsLongNotePresentation.SelectMapping(Note.Beatmap.LockedLongNoteMode)(Note, State, held, time);
+        => BmsLongNotePresentation.SelectMapping(Note.Beatmap.LockedLongNoteMode)(Note, State, new BmsLongNotePresentationContext(time, held));
 }

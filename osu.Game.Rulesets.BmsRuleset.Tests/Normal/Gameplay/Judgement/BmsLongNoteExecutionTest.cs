@@ -70,6 +70,17 @@ public class BmsLongNoteExecutionTest
     }
 
     [Test]
+    public void OrdinaryColumnsDoNotAllocateHoldSlotMaps()
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K };
+        BmsHitObject[] notes = Enumerable.Range(0, 1024).Select(i => (BmsHitObject)new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 + i }).ToArray();
+        var column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, true, new BmsRecordingJudgementOutput()).GetColumn(1);
+        var holds = BmsJudgementStateInspection.GetHolds(column);
+        Assert.That((Array)typeof(BmsHoldRegistry).GetField("bindingIndices", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(holds)!, Is.Empty);
+        Assert.DoesNotThrow(() => column.RewindLongNotes(0));
+    }
+
+    [Test]
     public void SparseHoldsAllocateOnlyTheirOwnBindings()
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, LockedLongNoteMode = BmsLongNoteMode.LongNote };

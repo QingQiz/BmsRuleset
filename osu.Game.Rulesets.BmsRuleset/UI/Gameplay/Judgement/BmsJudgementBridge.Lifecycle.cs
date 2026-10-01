@@ -8,7 +8,6 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 
 internal sealed partial class BmsJudgementBridge
 {
-    private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsScheduledObject Handle)> scheduledRepresentations = [];
     private readonly List<BmsHitObject> activationOrder = [];
     private readonly List<BmsLandmine> landmineOrder = [];
 
@@ -20,15 +19,13 @@ internal sealed partial class BmsJudgementBridge
         => container.ObserveVisualTime(drawable, observer);
 
     private void bindScheduledRepresentation(DrawableBmsHitObject drawable)
-        => scheduledRepresentations[drawable] = (drawable.BindingGeneration, context.Schedule.Bind(drawable.HitObject));
+        => boundObjects[drawable].ScheduledObject = context.Schedule.Bind(drawable.HitObject);
 
     internal bool TryGetScheduledObject(DrawableBmsHitObject drawable, out BmsScheduledObject item)
     {
-        if (scheduledRepresentations.TryGetValue(drawable, out var binding)
-            && binding.Generation == drawable.BindingGeneration
-            && ReferenceEquals(binding.Handle.Object, drawable.HitObject))
+        if (boundObjects.TryGetValue(drawable, out var binding) && isCurrent(binding) && binding.ScheduledObject is { } scheduled)
         {
-            item = binding.Handle;
+            item = scheduled;
             return true;
         }
 
@@ -93,16 +90,7 @@ internal sealed partial class BmsJudgementBridge
     internal void UnbindRemovedNote(DrawableBmsHitObject drawable) => UnbindNoteRepresentation(drawable, drawable.BindingGeneration);
 
     internal void UnbindNoteRepresentation(DrawableBmsHitObject drawable, long generation)
-    {
-        // A late free belongs to that representation, even when its HitObject was cleared or replaced.
-        if (scheduledRepresentations.TryGetValue(drawable, out var binding) && binding.Generation == generation)
-        {
-            scheduledRepresentations.Remove(drawable);
-            context.Schedule.Unbind(binding.Handle);
-        }
-
-        Unbind(drawable, generation);
-    }
+        => Unbind(drawable, generation);
 
     internal void RefreshNoteRepresentation(DrawableBmsHitObject drawable)
     {

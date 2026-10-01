@@ -9,6 +9,7 @@ internal sealed class BmsLandmineRegistry
 {
     private readonly Dictionary<BmsLandmine, BmsLandmineRuntime> landmineStates = [];
     private readonly List<BmsLandmine> activeLandmines = [];
+    private readonly HashSet<BmsLandmine> proposedOrder = new(ReferenceEqualityComparer.Instance);
 
     private readonly BmsLandmineJudgementRule rule;
     private readonly IBmsJudgementOutput output;
@@ -37,13 +38,22 @@ internal sealed class BmsLandmineRegistry
         if (order.Count != activeLandmines.Count)
             throw new InvalidOperationException("The activation plan must contain each active landmine exactly once.");
 
-        for (var i = 0; i < order.Count; i++)
+        proposedOrder.Clear();
+        foreach (var mine in order)
         {
-            var previous = activeLandmines.IndexOf(order[i], i);
-            if (previous < 0) throw new InvalidOperationException("The activation plan contains an inactive or repeated landmine.");
-
-            (activeLandmines[i], activeLandmines[previous]) = (activeLandmines[previous], activeLandmines[i]);
+            if (!proposedOrder.Add(mine))
+                throw new InvalidOperationException("The activation plan contains a repeated landmine.");
         }
+
+        foreach (var mine in activeLandmines)
+        {
+            if (!proposedOrder.Contains(mine))
+                throw new InvalidOperationException("The activation plan omitted an active landmine.");
+        }
+
+        // Callbacks observe the published order; reject the whole plan before changing that order.
+        for (var i = 0; i < order.Count; i++)
+            activeLandmines[i] = order[i];
     }
 
     internal void UpdateLandmines(in BmsFrameContext frame, bool holding)

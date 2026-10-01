@@ -15,6 +15,10 @@ internal interface IBmsJudgementOutput
 {
     BmsMainResultState GetMainResult(BmsHitObject note);
 
+    /// <summary>
+    /// Keeps history notification and derived-index refresh distinct so framework callbacks retain
+    /// their intermediate observations. Each main result invokes both at its existing callback boundary.
+    /// </summary>
     void SetResultCheckpoints(Action<BmsHitObject, double> recordHistory, Action<BmsHitObject> refreshIndexes);
 
     void ApplyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty);
@@ -27,6 +31,10 @@ internal interface IBmsJudgementOutput
 
     void ObserveSimulationStep(BmsHitObject note, in BmsFrameContext frame);
 
+    /// <summary>
+    /// Observes rule state synchronously before the execution context refreshes derived indexes.
+    /// Main results are queried separately because publishing a head need not submit a main result.
+    /// </summary>
     void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame);
 
     void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame);

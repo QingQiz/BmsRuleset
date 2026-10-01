@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using NUnit.Framework;
+using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
@@ -280,6 +281,40 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             session.Recorded.HandleNotePress(new BmsPressContext(2990, session.Frame));
             Assert.That(note is BmsLongNote hold ? session.Context.GetLongNoteState(hold).HeadJudged : session.Drawable.Result.HasResult, Is.True);
             Assert.That(session.Context.FirstPendingNote, Is.SameAs(session.Recorded.FirstPendingNote));
+        }));
+    }
+
+    [TestCase(Kind.LN)]
+    [TestCase(Kind.CN)]
+    [TestCase(Kind.HCN)]
+    public void VisualRefreshReadsHeldStateAtTheSameTimeWithoutPublishingRuleState(Kind objectKind)
+    {
+        load(objectKind);
+        AddStep("refresh held and released visuals at one timestamp", () => withClock(session =>
+        {
+            session.Advance(3000);
+            PressColumn(session.Column, 3000);
+            session.Advance(3200);
+            var note = (BmsLongNote)session.Note;
+            var drawable = session.Drawable;
+            var state = session.Context.GetLongNoteState(note);
+            var events = JsonSerializer.Serialize(session.Score.JudgementEvents);
+            var body = readField<Drawable>(drawable, "longNoteBody");
+            var tail = readField<Drawable>(drawable, "longNoteTail");
+            var frame = new BmsColumnVisualFrame(note.ScrollPositionAtEndTime, 1, 0, 1000);
+            foreach (var directions in new[] { 1, 0, 1, 0 })
+            {
+                // Isolate the presentation input: no rule transition or publication accompanies this sample.
+                session.Context.PressedDirections = directions;
+                for (var repeat = 0; repeat < 2; repeat++)
+                {
+                    drawable.UpdateVisualLayout(-100, frame);
+                    Assert.That(body.Alpha, Is.EqualTo(directions == 0 ? 0.4f : 1f));
+                    Assert.That(tail.Alpha, Is.EqualTo(body.Alpha));
+                    Assert.That(session.Context.GetLongNoteState(note), Is.EqualTo(state));
+                    Assert.That(JsonSerializer.Serialize(session.Score.JudgementEvents), Is.EqualTo(events));
+                }
+            }
         }));
     }
 

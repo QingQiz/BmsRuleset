@@ -5,7 +5,9 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 
-internal delegate BmsLongNotePresentation BmsLongNotePresentationMapping(BmsLongNote note, in BmsLongNoteState state, bool held, double time);
+internal readonly record struct BmsLongNotePresentationContext(double Time, bool Held, bool HasMainResult = false, double? ResumeTime = null);
+
+internal delegate BmsLongNotePresentation BmsLongNotePresentationMapping(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context);
 
 internal readonly record struct BmsLongNotePresentation(
     bool HeadJudged,
@@ -17,15 +19,25 @@ internal readonly record struct BmsLongNotePresentation(
     double LifetimeEnd,
     bool HoldLightActive)
 {
+    internal bool AnimateBody { get; init; }
+
+    internal bool ReleasedStyle { get; init; }
+
+    internal bool PrepareHeadPin { get; init; }
+
+    internal bool RestoreHeadPin { get; init; }
+
+    internal bool HeadReached { get; init; }
+
+    internal bool KeepVisibleAfterHit { get; init; }
+
+    internal bool HiddenDuringResume { get; init; }
+
     private static readonly BmsLongNotePresentationMapping long_note_mapping = longNote;
     private static readonly BmsLongNotePresentationMapping charge_note_mapping = chargeNote;
     private static readonly BmsLongNotePresentationMapping hell_charge_note_mapping = hellChargeNote;
 
     internal BmsHitLightStyle HitLightStyle => BmsHitLightStyle.Hold;
-
-    internal static bool HideDuringResume(BmsLongNote note, in BmsLongNoteState state, bool hasMainResult, double resumeTime)
-        // HCN head-POOR can complete both endpoints synthetically without a main result.
-        => note.EndTime <= resumeTime || (hasMainResult && !state.IsHolding);
 
     internal static BmsLongNotePresentationMapping SelectMapping(BmsLongNoteMode mode)
         => mode switch
@@ -35,22 +47,38 @@ internal readonly record struct BmsLongNotePresentation(
             _ => long_note_mapping,
         };
 
-    private static BmsLongNotePresentation longNote(BmsLongNote note, in BmsLongNoteState state, bool held, double time)
-        => new(state.HeadJudged, state.IsHolding && held, false, false,
-            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, state.TailResult != HitResult.Meh, note.EndTime, holdLightActive(note, state, time));
+    private static BmsLongNotePresentation longNote(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context)
+        => complete(new BmsLongNotePresentation(state.HeadJudged, state.IsHolding && context.Held, false, false,
+            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, state.TailResult != HitResult.Meh,
+            note.EndTime, holdLightActive(note, state, context.Time)), note, state, context);
 
-    private static BmsLongNotePresentation chargeNote(BmsLongNote note, in BmsLongNoteState state, bool held, double time)
-        => new(state.HeadJudged, state.IsHolding && held, true, false,
-            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, state.TailResult != HitResult.Meh, chargeLifetimeEnd(note), holdLightActive(note, state, time));
+    private static BmsLongNotePresentation chargeNote(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context)
+        => complete(new BmsLongNotePresentation(state.HeadJudged, state.IsHolding && context.Held, true, false,
+            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, state.TailResult != HitResult.Meh,
+            chargeLifetimeEnd(note), holdLightActive(note, state, context.Time)), note, state, context);
 
-    private static BmsLongNotePresentation hellChargeNote(BmsLongNote note, in BmsLongNoteState state, bool held, double time)
+    private static BmsLongNotePresentation hellChargeNote(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context)
     {
         // A successful early tail keeps the remaining HCN body visually held.
         var successfulTail = state.TailJudged && state.TailResult is HitResult.Perfect or HitResult.Great or HitResult.Good;
-        return new BmsLongNotePresentation(state.HeadJudged, state.LongNoteStarted && (held || successfulTail), true,
-            state.LongNoteStarted && state.HeadResult == HitResult.Meh && time < chargeLifetimeEnd(note),
-            state.TailJudged && !state.LongNoteStarted, false, chargeLifetimeEnd(note), holdLightActive(note, state, time));
+        return complete(new BmsLongNotePresentation(state.HeadJudged, state.LongNoteStarted && (context.Held || successfulTail), true,
+            state.LongNoteStarted && state.HeadResult == HitResult.Meh && context.Time < chargeLifetimeEnd(note),
+            state.TailJudged && !state.LongNoteStarted, false, chargeLifetimeEnd(note), holdLightActive(note, state, context.Time)), note, state, context);
     }
+
+    private static BmsLongNotePresentation complete(BmsLongNotePresentation presentation, BmsLongNote note,
+                                                    in BmsLongNoteState state, in BmsLongNotePresentationContext context)
+        => presentation with
+        {
+            AnimateBody = state.LongNoteStarted,
+            ReleasedStyle = state.LongNoteStarted && context.Time < note.EndTime && !presentation.HoldingBody,
+            PrepareHeadPin = state.HeadJudged && !state.TailJudged,
+            RestoreHeadPin = state.LongNoteStarted,
+            HeadReached = context.Time >= note.StartTime,
+            KeepVisibleAfterHit = context.Time < note.EndTime || (presentation.KeepAfterHeadResult && !state.TailJudged),
+            // HCN head-POOR can complete both endpoints synthetically without a main result.
+            HiddenDuringResume = context.ResumeTime is { } resumeTime && (note.EndTime <= resumeTime || (context.HasMainResult && !state.IsHolding)),
+        };
 
     private static bool holdLightActive(BmsLongNote note, in BmsLongNoteState state, double time)
         => state.LongNoteStarted && !state.TailJudged && time >= note.StartTime && time <= note.EndTime;

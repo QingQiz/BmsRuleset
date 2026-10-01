@@ -56,6 +56,9 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
     internal void Unbind(DrawableBmsHitObject drawable, long generation)
     {
+        if (boundObjects.TryGetValue(drawable, out var binding) && binding.Generation == generation && binding.ScheduledObject is { } scheduled)
+            context.Schedule.Unbind(scheduled);
+
         container.RemoveVisualObservation(drawable, generation);
         if (simulationObservers.TryGetValue(drawable, out var stepObserver) && stepObserver.Generation == generation)
             simulationObservers.Remove(drawable);
@@ -65,7 +68,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
             landmineObservers.Remove(drawable);
 
         // Pool return may have cleared HitObject; only the binding owns the old identity.
-        if (!boundObjects.TryGetValue(drawable, out var binding) || binding.Generation != generation)
+        if (binding == null || binding.Generation != generation)
             return;
 
         boundObjects.Remove(drawable);
@@ -88,6 +91,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         internal readonly DrawableBmsHitObject Drawable;
         internal readonly long Generation;
         internal readonly Action<DrawableHitObject, JudgementResult> ResultHandler;
+        internal BmsScheduledObject? ScheduledObject;
 
         internal Binding(BmsHitObject note, DrawableBmsHitObject drawable, long generation, BmsJudgementBridge output)
         {

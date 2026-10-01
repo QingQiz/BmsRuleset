@@ -25,7 +25,6 @@ internal sealed class BmsColumnJudgementRuntime
     private readonly IBmsJudgementOutput noteOutput;
     private readonly BmsHoldRegistry holds;
     private readonly BmsLandmineRegistry landmines;
-    private readonly BmsLongNote[] longNotes;
 
     internal BmsJudgementRules Rules { get; }
 
@@ -73,11 +72,7 @@ internal sealed class BmsColumnJudgementRuntime
     internal void RewindLongNotes(double time)
     {
         Schedule.Rewind();
-        // Inactive objects retain history so pool activation cannot resurrect a future head.
-        foreach (var note in longNotes)
-        {
-            holds.Rewind(noteSlots[note], time);
-        }
+        holds.Rewind(time);
     }
 
     internal int PressedDirections { get; set; }
@@ -94,14 +89,10 @@ internal sealed class BmsColumnJudgementRuntime
         var binding = new BmsNoteOperationBinding(this, output);
         NoteRegistrations = new BmsNoteRegistration[columnNotes.Length];
         NoteWindows = new BmsNoteJudgementWindows[columnNotes.Length];
-        longNotes = columnNotes.Any(n => n is BmsLongNote) ? new BmsLongNote[columnNotes.Length] : [];
         for (var i = 0; i < columnNotes.Length; i++)
-        {
             noteSlots.Add(columnNotes[i], i);
-            if (columnNotes[i] is BmsLongNote note) longNotes[i] = note;
-        }
 
-        holds = new BmsHoldRegistry(longNotes, Rules, new BmsJudgementExecutionContext(this, output));
+        holds = new BmsHoldRegistry(columnNotes, Rules, new BmsJudgementExecutionContext(this, output));
         for (var i = 0; i < columnNotes.Length; i++)
         {
             var note = columnNotes[i];
@@ -123,13 +114,13 @@ internal sealed class BmsColumnJudgementRuntime
     internal IEnumerable<BmsLongNote> GetPendingLongNoteTails()
     {
         for (var i = 0; i < Notes.PendingTails.Count; i++)
-            yield return longNotes[Notes.PendingTails[i]];
+            yield return holds.GetNote(Notes.PendingTails[i]);
     }
 
     internal IEnumerable<BmsLongNote> GetActiveBodies()
     {
         for (var i = 0; i < Notes.ActiveBodies.Count; i++)
-            yield return longNotes[Notes.ActiveBodies[i]];
+            yield return holds.GetNote(Notes.ActiveBodies[i]);
     }
 
     internal IEnumerable<BmsLongNote> GetHoldingNotes()
@@ -137,7 +128,7 @@ internal sealed class BmsColumnJudgementRuntime
         for (var i = 0; i < Notes.PendingTails.Count; i++)
         {
             var slot = Notes.PendingTails[i];
-            var longNote = longNotes[slot];
+            var longNote = holds.GetNote(slot);
             if (GetLongNoteState(longNote).IsHolding)
                 yield return longNote;
         }
@@ -223,7 +214,7 @@ internal sealed class BmsColumnJudgementRuntime
             var slot = Notes.PendingTails[i];
             if (holds.Repress(slot, press))
             {
-                var longNote = longNotes[slot];
+                var longNote = holds.GetNote(slot);
                 if (!GetLongNoteState(longNote).IsHolding)
                     noteOutput.PlayTailSample(longNote);
                 return PressOutcome.Hit;
@@ -334,7 +325,7 @@ internal sealed class BmsColumnJudgementRuntime
         for (var i = 0; i < Notes.PendingTails.Count; i++)
         {
             var slot = Notes.PendingTails[i];
-            var longNote = longNotes[slot];
+            var longNote = holds.GetNote(slot);
             if (!GetLongNoteState(longNote).IsHolding)
                 continue;
 
