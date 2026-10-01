@@ -1,5 +1,4 @@
 using osu.Game.Rulesets.BmsRuleset.Objects;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -11,28 +10,39 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
 {
     protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Note;
 
-    // The framework already performs passive result checks; normal notes have no BMS-specific frame state.
     internal override bool RequiresColumnFrameUpdate => false;
 
-    private double passivePoorOffset;
+    protected override bool UsesPassiveResultCheck => false;
 
-    internal override double NextPassiveJudgementTime => HitObject.StartTime + passivePoorOffset;
+    private BmsNoteJudgementWindows rule;
+
+    internal override double NextPassiveJudgementTime => rule.NextPassiveJudgementTime(HitObject);
 
     protected override void OnApply()
     {
         base.OnApply();
 
-        var table = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.EffectiveJudgementRate, tail: false);
-        passivePoorOffset = table.SlowWindowFor(HitResult.Ok);
+        rule = new BmsNoteJudgementWindows(HitObject);
+        ParentColumn?.Judgements.RefreshNoteRepresentation(this);
     }
 
-    protected override void CheckForResult(bool userTriggered, double timeOffset)
-    {
-        if (userTriggered || HitObject == null)
-            return;
+    public override bool TryHit(HitResult result) => ParentColumn!.Judgements.TryPressNote(this, rule, result);
 
-        if (timeOffset > passivePoorOffset)
-            ApplyBmsResult(HitResult.Meh);
+    public override bool UpdateSubTree()
+    {
+        var updated = base.UpdateSubTree();
+        // Dispatch at each object's traversal boundary, including culled objects, so mixed
+        // note types keep their result order before the next sibling is visited.
+        if (IsLoaded && !UsesCoreScheduling)
+            ParentColumn!.Judgements.CheckPassiveNote(this, rule);
+        return updated;
+    }
+
+    public override void OnKilled()
+    {
+        base.OnKilled();
+        // A large time step can retire a representation before its next subtree visit.
+        if (!UsesCoreScheduling) ParentColumn!.Judgements.CheckPassiveNote(this, rule);
     }
 
     protected override void UpdateHitStateTransforms(ArmedState state)

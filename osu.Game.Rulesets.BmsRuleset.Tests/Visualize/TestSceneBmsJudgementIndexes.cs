@@ -11,6 +11,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -61,9 +62,8 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
         AddStep("head and active hold use the same judgement with bounded work", () =>
         {
             var column = Playfield.Stage.Columns[1];
-            var head = Playfield.GetAliveObjectAtTime(3000)!;
             Assert.That(column.HitObjectContainer.AliveEntries.Values.Count(d => d.HitObject is BmsLongNote), Is.GreaterThan(64));
-            using var probe = new ScopedMethodProbe(head.GetType().GetMethod(nameof(ILongNoteHolder.TryRepress)),
+            using var probe = new ScopedMethodProbe(typeof(BmsLongNoteJudgementController).GetMethod(nameof(BmsLongNoteJudgementController.TryRepress)),
                 typeof(TestSceneBmsJudgementIndexes).GetMethod(nameof(countRepress), BindingFlags.Static | BindingFlags.NonPublic));
 
             repressCalls = 0;
@@ -86,17 +86,14 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
         AddStep("body phase work depends on active holds", () =>
         {
             var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
-            var head = Playfield.GetAliveObjectAtTime(3000)!;
             Assert.That(container.AliveEntries.Count, Is.GreaterThan(128));
-            using var tapProbe = new ScopedMethodProbe(typeof(DrawableBmsHitObject).GetMethod("UpdateHellChargeBody", BindingFlags.Instance | BindingFlags.NonPublic),
-                typeof(TestSceneBmsJudgementIndexes).GetMethod(nameof(countUnrelatedBody), BindingFlags.Static | BindingFlags.NonPublic));
-            using var holdProbe = new ScopedMethodProbe(head.GetType().GetMethod("UpdateHellChargeBody", BindingFlags.Instance | BindingFlags.NonPublic),
+            using var holdProbe = new ScopedMethodProbe(typeof(BmsLongNoteJudgementController).GetMethod(nameof(BmsLongNoteJudgementController.UpdateHellChargeBody)),
                 typeof(TestSceneBmsJudgementIndexes).GetMethod(nameof(countUnstartedBody), BindingFlags.Static | BindingFlags.NonPublic));
             unrelatedBodyCalls = 0;
             for (var i = 0; i < 20; i++)
             {
                 container.UpdateLandmines(true);
-                container.UpdateHellChargeBodies(true);
+                container.Judgements.UpdateHellChargeBodies(true);
             }
             Assert.That(unrelatedBodyCalls, Is.Zero, "The body phase must not visit taps, mines or unstarted long notes.");
             Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(.24).Within(1e-8), "Repeated passes at one timestamp must not tick.");
@@ -128,10 +125,9 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
     }
 
     private static void countRepress() => repressCalls++;
-    private static void countUnrelatedBody() => unrelatedBodyCalls++;
-    private static void countUnstartedBody(DrawableBmsHitObject __instance)
+    private static void countUnstartedBody(BmsLongNoteJudgementController __instance)
     {
-        if (__instance.HasPendingHead)
+        if (!__instance.HeadJudged)
             unrelatedBodyCalls++;
     }
 }

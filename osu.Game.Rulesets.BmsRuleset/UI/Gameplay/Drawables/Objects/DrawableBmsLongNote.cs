@@ -1,5 +1,4 @@
 using System;
-using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects;
@@ -17,10 +16,10 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
-public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCol>, ILongNoteHolder, IBmsLongNoteHooks
+public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCol>, ILongNoteHolder, IBmsLongNoteDrawable
     where TCol : struct, IColumnProvider
 {
-    public bool IsHoldingLongNote => controller.LongNoteStarted && !controller.TailJudged;
+    public bool IsHoldingLongNote => controller?.IsHolding == true;
 
     public bool IsAutomaticallyHeld { get; set; }
 
@@ -39,7 +38,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     private readonly BmsLongNoteVisualState visualState = new();
     private readonly Func<float, float, int> resolveBodyDirection;
-    private BmsLongNoteJudgementController controller = new();
+    private BmsLongNoteJudgementController controller = null!;
+
+    internal override BmsLongNoteJudgementController LongNoteJudgement => controller;
 
     private double lastHoldExplosionTime;
     private bool restoreHeadPin;
@@ -56,16 +57,11 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private BmsCachedSkinnableDrawable longNoteTail = null!;
 
-    [Resolved(CanBeNull = true)]
-    private IBmsLnScoring? scoring { get; set; }
-
-    private double gameplayRate => (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
-
     internal override bool HasPendingHead => !controller.HeadJudged;
 
     internal override double NextPassiveJudgementTime => controller.NextHeadJudgementTime;
 
-    internal override bool RequiresActiveLongNoteUpdate => controller.LongNoteStarted || controller.IsChargeMode && controller.HeadJudged && !controller.TailJudged;
+    internal override bool RequiresActiveLongNoteUpdate => controller.RequiresActiveUpdate;
 
     internal override void UpdateDeferredLongNote(float y, float endY)
     {
@@ -81,29 +77,20 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         resolveBodyDirection = bodyDirectionBeforeTailPasses;
     }
 
-    public override bool TryHit(HitResult result)
-    {
-        if (Judged || HitObject == null)
-            return false;
-
-        return controller.TryHit(Time.Current, result, gameplayRate, ParentColumn?.LastPressWasReverseScratch == true);
-    }
+    public override bool TryHit(HitResult result) => ParentColumn!.Judgements.TryPressLongNote(this, result);
 
     public bool TryRepress(double currentTime, bool reverseScratch = false)
     {
-        return controller.TryRepress(currentTime, reverseScratch, gameplayRate);
+        return ParentColumn!.Judgements.TryRepressLongNote(this, currentTime, reverseScratch);
     }
 
     public bool TryRelease(double releaseOffset, BmsJudgementWindowTable tailTable, bool reverseScratch = false)
     {
-        if (HitObject == null)
-            return false;
-
-        return controller.TryRelease(Time.Current, releaseOffset, tailTable, gameplayRate, reverseScratch);
+        return ParentColumn!.Judgements.TryReleaseLongNote(this, releaseOffset, tailTable, reverseScratch);
     }
 
     public bool CompleteAtPause(double currentTime)
-        => HitObject != null && controller.CompleteAtPause(currentTime, gameplayRate);
+        => ParentColumn!.Judgements.CompleteLongNoteAtPause(this, currentTime);
 
     /// <summary>
     /// Called by BmsColumnHitObjectContainer every frame with pre-computed
@@ -230,15 +217,20 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         if (HitObject != null)
         {
-            // The lifetime entry owns judgement state across both rewind and pool reuse.
-            controller = Entry is BmsHitObjectLifetimeEntry bmsEntry
-                ? bmsEntry.LongNoteJudgementController ??= new BmsLongNoteJudgementController()
-                : new BmsLongNoteJudgementController();
-            controller.Bind((BmsLongNote)HitObject, this, ParentColumn?.PreserveLongNoteHistory ?? true);
+            controller = ParentColumn!.Judgements.BindLongNote(this);
             restoreHeadPin = controller.LongNoteStarted;
 
             longNoteBody.SetSkinLookup(LayoutVariant, Column);
+            ParentColumn.Judgements.RefreshNoteRepresentation(this);
         }
+    }
+
+    protected override void OnFree()
+    {
+        // OnKilled still needs this representation for its final synchronous passive result.
+        ParentColumn!.Judgements.UnbindLongNote(this);
+        controller = null!;
+        base.OnFree();
     }
 
     protected override void AddKindDrawablesBeforeNote()
@@ -277,10 +269,12 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     protected override void CheckForResult(bool userTriggered, double timeOffset)
     {
-        if (userTriggered || HitObject == null)
-            return;
-
-        controller.CheckPassiveResult(Time.Current, gameplayRate);
+        if (!userTriggered && UsesCoreScheduling)
+            ParentColumn!.Judgements.CompleteScheduledRemoval(this,
+                new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
+                    (Clock as IGameplayClock)?.IsRewinding == true));
+        if (!userTriggered && !UsesCoreScheduling)
+            ParentColumn!.Judgements.CheckPassiveLongNote(this);
     }
 
     // Keep CN/HCN visuals alive after head judgement
@@ -333,11 +327,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             lastHoldExplosionTime = Time.Current;
         }
 
-        controller.UpdatePostResult(Time.Current, Time.Elapsed, isKeyHeld(), gameplayRate);
+        if (!UsesCoreScheduling)
+            ParentColumn!.Judgements.UpdateLongNotePostResult(this, isKeyHeld());
     }
-
-    internal override void UpdateHellChargeBody(bool holding)
-        => controller.UpdateHellChargeBody(Time.Current, Time.Elapsed, holding || IsAutomaticallyHeld);
 
     private bool isHoldingBody()
         => HitObject != null && controller.ShouldShowHeldVisual(isKeyHeld());
@@ -353,37 +345,21 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             realHeadY,
             realTailY);
 
-    // --- IBmsLongNoteHooks: side-effects driven by the judgement controller. ---
-
-    void IBmsLongNoteHooks.OnUserHeadJudged()
+    void IBmsLongNoteDrawable.PrepareHeadPin()
     {
         visualState.PrepareHeadPin();
         lastHoldExplosionTime = Time.Current - hold_explosion_interval;
-        NotifyHeadJudged();
     }
 
-    void IBmsLongNoteHooks.OnHellChargeHeadPoor(double eventTime, double lifetimeEnd)
+    void IBmsLongNoteDrawable.KeepBodyAlive(double lifetimeEnd)
     {
         visualState.PrepareHeadPin();
         Alpha = 1;
         LifetimeEnd = lifetimeEnd;
-        NotifyHeadJudged();
     }
 
-    void IBmsLongNoteHooks.ApplyJudgementResult(HitResult result, System.Collections.Generic.IReadOnlyList<BmsLongNoteEndpointResult> endpoints)
+    void IBmsLongNoteDrawable.ClearBody()
     {
-        ((BmsLongNoteJudgementResult)Result).SetEndpointResults(endpoints);
-        ApplyBmsResult(result);
-    }
-
-    void IBmsLongNoteHooks.ApplySyntheticEndpoint(HitResult result, BmsLongNoteEndpointResult endpoint)
-        => scoring?.ApplySyntheticLongNoteEndpoint(this, endpoint);
-
-    void IBmsLongNoteHooks.ClearVisualIfTailWasNotPoor(HitResult tailResult)
-    {
-        if (tailResult == HitResult.Meh)
-            return;
-
         visualState.Reset();
         longNoteBody.Alpha = 0;
         longNoteTail.Alpha = 0;
@@ -391,10 +367,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         LifetimeEnd = Time.Current;
     }
 
-    void IBmsLongNoteHooks.ApplyHellChargeTick(bool holding, double scale)
-        => scoring?.ApplyHellChargeTick(holding, scale);
-
-    void IBmsLongNoteHooks.Retire()
+    void IBmsLongNoteDrawable.Retire()
     {
         Alpha = 0;
         LifetimeEnd = Time.Current;

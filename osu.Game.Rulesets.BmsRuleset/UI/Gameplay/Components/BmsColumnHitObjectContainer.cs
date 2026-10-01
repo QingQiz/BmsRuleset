@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -23,37 +23,17 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private bool hasUpdated;
     private bool updatePending;
     private double lastFullUpdateTime;
-    private double nextPassiveUpdateTime;
     private double latestLifetimeStart = double.PositiveInfinity;
-    private bool passiveDeadlineDirty = true;
-    private readonly SortedSet<(double Time, long Id, DrawableBmsHitObject Note)> pendingHeads = [];
-    private readonly Dictionary<DrawableBmsHitObject, long> headIds = [];
-    private long nextHeadId;
-    private readonly List<DrawableBmsHitObject> activeLongNotes = [];
-    private readonly List<DrawableBmsHitObject> orderedActiveLongNotes = [];
     private readonly List<DrawableBmsHitObject> landmines = [];
-    private bool activeLongNoteOrderDirty;
     private bool landmineOrderDirty;
+    private bool coreOrderDirty = true;
+    private readonly List<BmsScheduledObject> coreLayoutOrder = [];
+    private readonly List<BmsScheduledObject> coreSubtreeOrder = [];
+    private readonly List<(int Position, BmsScheduledObject Object)> corePositions = [];
+    private readonly List<BmsScheduledObject> coreDeferredOrder = [];
+    private readonly Dictionary<DrawableBmsHitObject, Bindable<double>> coreStartTimes = [];
 
-    internal DrawableBmsHitObject? FirstPendingHead
-    {
-        get
-        {
-            if (!canBatchUpdates || pendingHeads.Count == 0)
-                return null;
-
-            var first = pendingHeads.Min.Note;
-            // Normal LN heads remain uncommitted until release. An overlapping hold may still
-            // win the legacy/Lowest selector, so keep its original slow-path selection semantics.
-            foreach (var held in activeLongNotes)
-            {
-                if (!held.Judged && held.HitObject.StartTime <= first.HitObject.StartTime)
-                    return null;
-            }
-
-            return first;
-        }
-    }
+    internal BmsColumnJudgementContext Judgements { get; set; } = null!;
 
     public override void Add(HitObjectLifetimeEntry entry)
     {
@@ -88,67 +68,24 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             landmineOrderDirty = true;
         }
 
-        // Holds also need an index in columns containing mines or invisible notes.
-        if (entry.HitObject is not BmsLongNote && (!canBatchUpdates || entry.HitObject is not BmsNote))
-            return;
-
-        var id = ++nextHeadId;
-        headIds.Add(note, id);
-        if (canBatchUpdates && note.HasPendingHead)
-            pendingHeads.Add((note.HitObject.StartTime, id, note));
-        trackActiveLongNote(note);
-        passiveDeadlineDirty = true;
-        note.OnNewResult += removeJudgedHead;
-        note.OnRevertResult += restoreHead;
-        note.HeadJudged += onHeadJudged;
+        Judgements.Register(note);
+        InvalidateCoreOrder();
     }
 
     protected override void RemoveDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
     {
-        if (drawable is DrawableBmsHitObject note && headIds.Remove(note, out var id))
-        {
-            pendingHeads.Remove((note.HitObject.StartTime, id, note));
-            note.OnNewResult -= removeJudgedHead;
-            note.OnRevertResult -= restoreHead;
-            note.HeadJudged -= onHeadJudged;
-            activeLongNoteOrderDirty |= activeLongNotes.Remove(note);
-        }
+        InvalidateCoreOrder();
+        if (drawable is DrawableBmsHitObject old && coreStartTimes.Remove(old, out var startTime))
+            startTime.UnbindAll();
+        if (drawable is DrawableBmsHitObject note)
+            Judgements.Unregister(note);
 
         if (drawable is DrawableBmsHitObject { HitObject: BmsLandmine } mine)
             landmineOrderDirty |= landmines.Remove(mine);
 
         base.RemoveDrawable(entry, drawable);
-    }
-
-    private void removeJudgedHead(DrawableHitObject drawable, JudgementResult result)
-    {
-        var note = (DrawableBmsHitObject)drawable;
-        pendingHeads.Remove((note.HitObject.StartTime, headIds[note], note));
-        trackActiveLongNote(note);
-    }
-
-    private void onHeadJudged(DrawableBmsHitObject note)
-    {
-        pendingHeads.Remove((note.HitObject.StartTime, headIds[note], note));
-        trackActiveLongNote(note);
-    }
-
-    private void trackActiveLongNote(DrawableBmsHitObject note)
-    {
-        if (note.RequiresActiveLongNoteUpdate && !activeLongNotes.Contains(note))
-        {
-            activeLongNotes.Add(note);
-            activeLongNoteOrderDirty = true;
-        }
-    }
-
-    private void restoreHead(DrawableHitObject drawable, JudgementResult result)
-    {
-        var note = (DrawableBmsHitObject)drawable;
-        if (canBatchUpdates && note.HasPendingHead)
-            pendingHeads.Add((note.HitObject.StartTime, headIds[note], note));
-        trackActiveLongNote(note);
-        passiveDeadlineDirty = true;
+        if (drawable is DrawableBmsHitObject removed)
+            Judgements.UnbindRemovedNote(removed);
     }
 
     internal void BeginGameplayFrame()
@@ -168,7 +105,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
                                     && (Clock as IGameplayClock)?.IsRewinding != true && !isResumeRewinding()
                                     && Time.Current >= lastFullUpdateTime
                                     && (Time.Current - lastFullUpdateTime < MAX_DEFERRED_UPDATE_TIME || lastFullUpdateTime >= latestLifetimeStart)
-                                    && Time.Current <= nextPassiveUpdateTime;
+                                    && Time.Current <= Judgements.NextPassiveUpdateTime;
 
     public override bool UpdateSubTree()
     {
@@ -187,18 +124,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         hasUpdated = true;
         updatePending = false;
         lastFullUpdateTime = now;
-        // Removing/judging a note can only make this bound conservative. Rescan when the bound
-        // expires or activation/rewind introduces an earlier candidate, not on every render update.
-        if (canBatchUpdates && (passiveDeadlineDirty || now > nextPassiveUpdateTime))
-        {
-            passiveDeadlineDirty = false;
-            nextPassiveUpdateTime = double.PositiveInfinity;
-            foreach (var drawable in AliveEntries.Values)
-            {
-                if (drawable is DrawableBmsHitObject note && note.HasPendingHead)
-                    nextPassiveUpdateTime = Math.Min(nextPassiveUpdateTime, note.NextPassiveJudgementTime);
-            }
-        }
+        Judgements.RefreshPassiveDeadline(now);
 
         return updated;
     }
@@ -222,76 +148,23 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             mine.UpdateLandmine(holding);
     }
 
-    internal void UpdateHellChargeBodies(bool holding)
-    {
-        pruneInactiveLongNotes();
-        foreach (var note in canBatchUpdates ? activeLongNotes : getOrderedActiveLongNotes())
-            note.UpdateHellChargeBody(holding);
-    }
-
-    internal void CompleteLongNotesAtPause(double currentTime)
-    {
-        pruneInactiveLongNotes();
-
-        // Resume rewind keeps completed results authoritative. Finalising active holds here
-        // means the rewind does not need to reconstruct an intermediate LN controller state.
-        foreach (var note in getOrderedActiveLongNotes())
-        {
-            if (note is ILongNoteHolder longNote)
-                longNote.CompleteAtPause(currentTime);
-        }
-    }
-
-    internal DrawableBmsHitObject? TryRepress(double time, bool reverseScratch)
-    {
-        pruneInactiveLongNotes();
-        foreach (var note in getOrderedActiveLongNotes())
-        {
-            if (note is ILongNoteHolder holder && holder.TryRepress(time, reverseScratch))
-                return note;
-        }
-
-        return null;
-    }
-
-    private void pruneInactiveLongNotes()
-    {
-        for (var i = activeLongNotes.Count - 1; i >= 0; i--)
-        {
-            if (activeLongNotes[i].RequiresActiveLongNoteUpdate)
-                continue;
-
-            activeLongNotes.RemoveAt(i);
-            activeLongNoteOrderDirty = true;
-        }
-    }
-
-    private List<DrawableBmsHitObject> getOrderedActiveLongNotes()
-    {
-        if (!activeLongNoteOrderDirty)
-            return orderedActiveLongNotes;
-
-        orderedActiveLongNotes.Clear();
-        if (activeLongNotes.Count <= 1)
-            orderedActiveLongNotes.AddRange(activeLongNotes);
-        else
-        {
-            // Overlapping holds must keep the same input winner as the former alive scan.
-            // Rebuild on activation/retirement/rewind, rather than on every key or frame.
-            foreach (var drawable in AliveEntries.Values)
-            {
-                if (drawable is DrawableBmsHitObject { RequiresActiveLongNoteUpdate: true } note)
-                    orderedActiveLongNotes.Add(note);
-            }
-        }
-        activeLongNoteOrderDirty = false;
-        return orderedActiveLongNotes;
-    }
-
     internal void UpdateDeferredLongNotes()
     {
+        var activeLongNotes = Judgements.ActiveLongNotes;
         if (activeLongNotes.Count == 0)
             return;
+
+        if (Judgements.Schedule is { } schedule)
+        {
+            coreDeferredOrder.Clear();
+            for (var i = 0; i < activeLongNotes.Count; i++)
+            {
+                var note = activeLongNotes[i];
+                if (note.RequiresActiveLongNoteUpdate && Judgements.TryGetScheduledObject(note, out var item))
+                    coreDeferredOrder.Add(item);
+            }
+            schedule.RunDeferred(coreDeferredOrder, coreFrame(), Time.Elapsed);
+        }
 
         var hitTarget = getHitTargetPosition();
         var scale = scrollController.ScrollSpeedMultiplier / Math.Max(1.0, scrollController.ScrollRange)
@@ -309,11 +182,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
                     -(hitTarget + (float)((endPosition - currentScrollPos) * scale)));
             }
 
-            if (!note.RequiresActiveLongNoteUpdate)
-            {
-                activeLongNotes.RemoveAt(i);
-                activeLongNoteOrderDirty = true;
-            }
+            Judgements.RetireInactiveLongNoteAt(i);
         }
     }
 
@@ -346,6 +215,12 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     protected override void UpdateAfterChildrenLife()
     {
         base.UpdateAfterChildrenLife();
+
+        if (Judgements.Schedule is { } schedule)
+        {
+            refreshCoreOrder();
+            schedule.RunLayout(coreLayoutOrder, coreFrame(), Time.Elapsed, isResumeRewinding());
+        }
 
         var currentScrollPos = scrollController.CurrentScrollPosition;
         var hitTarget = getHitTargetPosition();
@@ -382,6 +257,48 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             if (!resumeRewinding && (Clock as IGameplayClock)?.IsRewinding != true && Time.Elapsed >= 0 && note.RequiresColumnFrameUpdate)
                 note.UpdateColumnFrame();
         }
+
+        Judgements.Schedule?.RunSubtree(coreSubtreeOrder, coreFrame());
+    }
+
+    internal void InvalidateCoreOrder()
+    {
+        coreOrderDirty = true;
+        Judgements?.Schedule?.InvalidateOrder();
+    }
+
+    private BmsFrameContext coreFrame()
+        => new(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate, (Clock as IGameplayClock)?.IsRewinding == true);
+
+    private void refreshCoreOrder()
+    {
+        if (!coreOrderDirty) return;
+        coreLayoutOrder.Clear();
+        coreSubtreeOrder.Clear();
+        corePositions.Clear();
+        foreach (var drawable in AliveEntries.Values)
+        {
+            if (drawable is not DrawableBmsHitObject note || !Judgements.TryGetScheduledObject(note, out var item)) continue;
+            if (!coreStartTimes.ContainsKey(note))
+            {
+                var startTime = note.StartTimeBindable.GetBoundCopy();
+                startTime.BindValueChanged(_ => InvalidateCoreOrder());
+                coreStartTimes.Add(note, startTime);
+            }
+            coreLayoutOrder.Add(item);
+            corePositions.Add((IndexOf(note), item));
+        }
+        // Alive-map order differs from the native child order, including equal-time reverse child IDs.
+        corePositions.Sort((left, right) => left.Position.CompareTo(right.Position));
+        foreach (var position in corePositions) coreSubtreeOrder.Add(position.Object);
+        coreOrderDirty = false;
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        foreach (var startTime in coreStartTimes.Values) startTime.UnbindAll();
+        coreStartTimes.Clear();
+        base.Dispose(isDisposing);
     }
 
     protected override void UpdateAfterChildren()
@@ -411,13 +328,17 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         if (Time.Elapsed >= 0 || isResumeRewinding())
             return;
 
-        // Restore entries before pool activation, including controllers whose drawables were freed.
+        if (Judgements.Schedule is { } schedule && !schedule.BeginRewindStep())
+            return;
+
+        Judgements.RewindLongNotes(Time.Current);
+
+        // Mine crossing history remains on entries until its separate migration.
         foreach (var entry in Entries)
         {
             if (entry is not BmsHitObjectLifetimeEntry bmsEntry)
                 continue;
 
-            bmsEntry.LongNoteJudgementController?.Rewind(Time.Current);
             if (bmsEntry.LandmineHandledTime is { } handledTime && Time.Current < handledTime)
                 bmsEntry.LandmineHandledTime = null;
         }
@@ -428,18 +349,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
                 bms.RestoreRewoundState();
         }
 
-        // Normal LN heads are not committed results until their tails. Rewind can undo a head
-        // without OnRevertResult, so rebuild the input/hold indexes from the restored controllers.
-        pendingHeads.Clear();
-        activeLongNotes.Clear();
-        activeLongNoteOrderDirty = true;
-        foreach (var (note, id) in headIds)
-        {
-            if (canBatchUpdates && note.HasPendingHead)
-                pendingHeads.Add((note.HitObject.StartTime, id, note));
-            trackActiveLongNote(note);
-        }
-
-        passiveDeadlineDirty = true;
+        Judgements.RebuildRewoundIndexes();
     }
 }

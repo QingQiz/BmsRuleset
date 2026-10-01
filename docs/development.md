@@ -5,6 +5,15 @@
 ## Design Plans
 
 - [Online leaderboard plan (中文)](online-leaderboard-plan.zh-CN.md): osu! OAuth, full replay uploads, and SQLite storage. Design only; not implemented.
+- [HitObject implementation scheme (中文)](hitobject-refactor-plan.zh-CN.md): [execution order and Git baselines](hitobject-refactor-plan.zh-CN.md#implementation-order) define the workflow: commit the existing work, squash the refactor history, remove transitional layers, implement the complete core, compare and adapt it against old Git revisions, then adapt Mods. The [target architecture](hitobject-refactor-plan.zh-CN.md#target-structure), [Git comparison procedure](hitobject-refactor-plan.zh-CN.md#git-comparison), [validation commands](hitobject-refactor-plan.zh-CN.md#verification-commands) and [completion criteria](hitobject-refactor-plan.zh-CN.md#completion) describe the final implementation. No bounded task-card architecture or production legacy/new switch is required for intermediate testing.
+
+  [P2](hitobject-refactor-p2-validation.zh-CN.md), [P3](hitobject-refactor-p3-validation.zh-CN.md) and [checkpoint/lifecycle validation](hitobject-refactor-p3a0-validation.zh-CN.md) retain historical fixtures, observations and reproduction commands. Their old next-task instructions are superseded by the implementation scheme. Historical test passes do not establish completion of the final architecture.
+
+### HitObject implementation status
+
+The current engine and column contexts own input state, selection and part of the judgement state/indexes. Long notes still use the shared controller, and optional test compositions exercise new output and scheduling boundaries. Drawables and containers still participate in lifecycle and judgement forwarding; landmine state and independent scheduling are not fully migrated. These are current code facts, not an intermediate architecture to preserve.
+
+The implementation scheme replaces these paths with independent Note/LN/CN/HCN/landmine rules, engine-owned state and scheduling, synchronous framework result adapters and read-only presentation. Complete core implementation precedes cross-version behaviour comparison and adaptation. AutoScratch and other affected Mods are considered only after that core comparison and adaptation are complete; their old sampling behaviour does not prescribe core interfaces.
 
 ## Build Manually
 

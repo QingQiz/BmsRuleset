@@ -1,0 +1,5606 @@
+{
+  "baseline": "cebe24e55da539d2fec0d5261c4a37054cd273fb",
+  "traces": {
+    "RewindIntoPooledBodyPreservesHeadAndReplaysTail(ChargeNote,False)": {
+      "head": {
+        "checkpoint": "head",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 1,
+        "total": 200000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "body and mine": {
+        "checkpoint": "body and mine",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 1,
+        "total": 200000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "early tail": {
+        "checkpoint": "early tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 2,
+        "total": 300000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.296,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "body after successful tail": {
+        "checkpoint": "body after successful tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 2,
+        "total": 300000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.296,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "second head": {
+        "checkpoint": "second head",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 9000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 1000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 10000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 9000,
+                "ActualTime": 9000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 1,
+            "Type": 6,
+            "TimeAbsolute": 9000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3,
+          5
+        ],
+        "combo": 3,
+        "total": 500000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.296,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 9000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.344,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "rewound body": {
+        "checkpoint": "rewound body",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 1,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 1,
+        "total": 200000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "replayed tail": {
+        "checkpoint": "replayed tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 1,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 2,
+        "total": 300000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.296,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "retired again": {
+        "checkpoint": "retired again",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 1,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 2,
+        "total": 300000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.296,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "RewindIntoPooledBodyPreservesHeadAndReplaysTail(ChargeNote,True)": {
+      "head": {
+        "checkpoint": "head",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 1,
+        "total": 166667,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "body and mine": {
+        "checkpoint": "body and mine",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 0,
+        "total": 333333,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.148,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "early tail": {
+        "checkpoint": "early tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 1,
+        "total": 375000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.148,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.196,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "body after successful tail": {
+        "checkpoint": "body after successful tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 1,
+        "total": 375000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.148,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.196,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "second head": {
+        "checkpoint": "second head",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 9000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 1000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 10000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 9000,
+                "ActualTime": 9000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 2,
+            "Type": 6,
+            "TimeAbsolute": 9000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3,
+          5
+        ],
+        "combo": 2,
+        "total": 555556,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.148,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.196,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 9000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.244,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "rewound body": {
+        "checkpoint": "rewound body",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 2,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 0,
+        "total": 333333,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.148,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "replayed tail": {
+        "checkpoint": "replayed tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 2,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 1,
+        "total": 375000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.148,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.196,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "retired again": {
+        "checkpoint": "retired again",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 2,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 1,
+        "total": 375000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.148,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.196,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "RewindIntoPooledBodyPreservesHeadAndReplaysTail(HellChargeNote,False)": {
+      "head": {
+        "checkpoint": "head",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 1,
+        "total": 200000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "body and mine": {
+        "checkpoint": "body and mine",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 1,
+        "total": 200000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "early tail": {
+        "checkpoint": "early tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 2,
+        "total": 300000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.32000000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3440000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6001.000000000009,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3680000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6201.000000000013,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3920000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6401.000000000016,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.41600000000000015,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6601.00000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.44000000000000017,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6801.000000000024,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4640000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.5120000000000002,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "body after successful tail": {
+        "checkpoint": "body after successful tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 2,
+        "total": 300000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.32000000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3440000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6001.000000000009,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3680000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6201.000000000013,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3920000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6401.000000000016,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.41600000000000015,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6601.00000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.44000000000000017,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6801.000000000024,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4640000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.5120000000000002,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "second head": {
+        "checkpoint": "second head",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 9000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 1000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 10000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 9000,
+                "ActualTime": 9000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 1,
+            "Type": 6,
+            "TimeAbsolute": 9000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3,
+          5
+        ],
+        "combo": 3,
+        "total": 500000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.32000000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3440000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6001.000000000009,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3680000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6201.000000000013,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3920000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6401.000000000016,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.41600000000000015,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6601.00000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.44000000000000017,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6801.000000000024,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4640000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.5120000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 9000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.5600000000000003,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "rewound body": {
+        "checkpoint": "rewound body",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 1,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 1,
+        "total": 200000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.32000000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3440000000000001,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "replayed tail": {
+        "checkpoint": "replayed tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 1,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 2,
+        "total": 300000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.32000000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3440000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6016.666666666667,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3680000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6216.666666666671,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3920000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6416.666666666674,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.41600000000000015,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6616.666666666678,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.44000000000000017,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6816.6666666666815,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4640000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.5120000000000002,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "retired again": {
+        "checkpoint": "retired again",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 1,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 2,
+        "total": 300000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.32000000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3440000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6016.666666666667,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3680000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6216.666666666671,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3920000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6416.666666666674,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.41600000000000015,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6616.666666666678,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.44000000000000017,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6816.6666666666815,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4640000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.5120000000000002,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "RewindIntoPooledBodyPreservesHeadAndReplaysTail(HellChargeNote,True)": {
+      "head": {
+        "checkpoint": "head",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 1,
+        "total": 166667,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "body and mine": {
+        "checkpoint": "body and mine",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 0,
+        "total": 333333,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.19600000000000004,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "early tail": {
+        "checkpoint": "early tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 1,
+        "total": 375000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.19600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.22000000000000003,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.24400000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6001.000000000009,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.268,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6201.000000000013,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29200000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6401.000000000016,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.31600000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6601.00000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3400000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6801.000000000024,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3640000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4120000000000001,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "body after successful tail": {
+        "checkpoint": "body after successful tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 1,
+        "total": 375000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.19600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.22000000000000003,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.24400000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6001.000000000009,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.268,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6201.000000000013,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29200000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6401.000000000016,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.31600000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6601.00000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3400000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6801.000000000024,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3640000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4120000000000001,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "second head": {
+        "checkpoint": "second head",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 9000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 1000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 10000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 9000,
+                "ActualTime": 9000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 2,
+            "Type": 6,
+            "TimeAbsolute": 9000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3,
+          5
+        ],
+        "combo": 2,
+        "total": 555556,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.19600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.22000000000000003,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.24400000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6001.000000000009,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.268,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6201.000000000013,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29200000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6401.000000000016,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.31600000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6601.00000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3400000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6801.000000000024,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3640000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4120000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 9000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4600000000000001,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "rewound body": {
+        "checkpoint": "rewound body",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 2,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          2
+        ],
+        "combo": 0,
+        "total": 333333,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.19600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.22000000000000003,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.24400000000000002,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "replayed tail": {
+        "checkpoint": "replayed tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 2,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 1,
+        "total": 375000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.19600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.22000000000000003,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.24400000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6016.666666666667,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.268,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6216.666666666671,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29200000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6416.666666666674,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.31600000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6616.666666666678,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3400000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6816.6666666666815,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3640000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4120000000000001,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "retired again": {
+        "checkpoint": "retired again",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 6,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 7000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 6,
+            "TimeAbsolute": 5000,
+            "GameplayRate": 1
+          },
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          },
+          {
+            "id": 2,
+            "Type": 0,
+            "TimeAbsolute": 10000,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 5,
+            "TimeAbsolute": 7000,
+            "GameplayRate": null
+          }
+        ],
+        "progression": [
+          0,
+          2,
+          3
+        ],
+        "combo": 1,
+        "total": 375000,
+        "health": [
+          {
+            "Time": 5000,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.248,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5200.000000000004,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.272,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5400.000000000007,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.19600000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5601.000000000002,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.22000000000000003,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 5801.0000000000055,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.24400000000000002,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6016.666666666667,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.268,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6216.666666666671,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.29200000000000004,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6416.666666666674,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.31600000000000006,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6616.666666666678,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3400000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6816.6666666666815,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.3640000000000001,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.4120000000000001,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "RewindIntoPooledBodyPreservesHeadAndReplaysTail(LongNote,False)": {
+      "head": {
+        "checkpoint": "head",
+        "events": [],
+        "results": [],
+        "progression": [
+          0
+        ],
+        "combo": 0,
+        "total": 0,
+        "health": []
+      },
+      "body and mine": {
+        "checkpoint": "body and mine",
+        "events": [],
+        "results": [],
+        "progression": [
+          0
+        ],
+        "combo": 0,
+        "total": 0,
+        "health": []
+      },
+      "early tail": {
+        "checkpoint": "early tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              },
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          1
+        ],
+        "combo": 1,
+        "total": 166667,
+        "health": [
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.28,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "body after successful tail": {
+        "checkpoint": "body after successful tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              },
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          1
+        ],
+        "combo": 1,
+        "total": 166667,
+        "health": [
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.28,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "second head": {
+        "checkpoint": "second head",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              },
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          1
+        ],
+        "combo": 1,
+        "total": 166667,
+        "health": [
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.28,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "rewound body": {
+        "checkpoint": "rewound body",
+        "events": [],
+        "results": [
+          {
+            "id": 0,
+            "Type": 0,
+            "TimeAbsolute": 7000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0
+        ],
+        "combo": 0,
+        "total": 0,
+        "health": []
+      },
+      "replayed tail": {
+        "checkpoint": "replayed tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              },
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          },
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          1
+        ],
+        "combo": 1,
+        "total": 166667,
+        "health": [
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.28,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "retired again": {
+        "checkpoint": "retired again",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              },
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          },
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          1
+        ],
+        "combo": 1,
+        "total": 166667,
+        "health": [
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.28,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "RewindIntoPooledBodyPreservesHeadAndReplaysTail(LongNote,True)": {
+      "head": {
+        "checkpoint": "head",
+        "events": [],
+        "results": [],
+        "progression": [
+          0
+        ],
+        "combo": 0,
+        "total": 0,
+        "health": []
+      },
+      "body and mine": {
+        "checkpoint": "body and mine",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0
+        ],
+        "combo": 0,
+        "total": 250000,
+        "health": [
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.1,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "early tail": {
+        "checkpoint": "early tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              },
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          1
+        ],
+        "combo": 1,
+        "total": 250000,
+        "health": [
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.1,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.18,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "body after successful tail": {
+        "checkpoint": "body after successful tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              },
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          1
+        ],
+        "combo": 1,
+        "total": 250000,
+        "health": [
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.1,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.18,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "second head": {
+        "checkpoint": "second head",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              },
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          1
+        ],
+        "combo": 1,
+        "total": 250000,
+        "health": [
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.1,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.18,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "rewound body": {
+        "checkpoint": "rewound body",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": 0,
+            "Type": 0,
+            "TimeAbsolute": 7000,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0
+        ],
+        "combo": 0,
+        "total": 250000,
+        "health": [
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.1,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "replayed tail": {
+        "checkpoint": "replayed tail",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              },
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          },
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          1
+        ],
+        "combo": 1,
+        "total": 250000,
+        "health": [
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.1,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.18,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      },
+      "retired again": {
+        "checkpoint": "retired again",
+        "events": [
+          {
+            "Source": {
+              "StartTime": 5500,
+              "Column": 1,
+              "Kind": 2,
+              "Duration": 0,
+              "LandmineDamagePercent": 10,
+              "EndTime": 5500,
+              "IsScoring": false
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5500,
+                "ActualTime": 5501,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 1
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 1,
+              "Duration": 2000,
+              "LandmineDamagePercent": 0,
+              "EndTime": 7000,
+              "IsScoring": true
+            },
+            "Result": 5,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 1,
+                "ExpectedTime": 5000,
+                "ActualTime": 5000,
+                "GameplayRate": 1,
+                "Result": 6,
+                "TimeOffset": 0
+              },
+              {
+                "Kind": 2,
+                "ExpectedTime": 7000,
+                "ActualTime": 6900,
+                "GameplayRate": 1,
+                "Result": 5,
+                "TimeOffset": -100
+              }
+            ]
+          }
+        ],
+        "results": [
+          {
+            "id": 1,
+            "Type": 2,
+            "TimeAbsolute": 5501,
+            "GameplayRate": 1
+          },
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          },
+          {
+            "id": 0,
+            "Type": 5,
+            "TimeAbsolute": 6900,
+            "GameplayRate": 1
+          }
+        ],
+        "progression": [
+          0,
+          1
+        ],
+        "combo": 1,
+        "total": 250000,
+        "health": [
+          {
+            "Time": 5501,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.1,
+                "Failed": false
+              }
+            ]
+          },
+          {
+            "Time": 6900,
+            "ActiveGaugeType": 2,
+            "States": [
+              {
+                "GaugeType": 2,
+                "Health": 0.18,
+                "Failed": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

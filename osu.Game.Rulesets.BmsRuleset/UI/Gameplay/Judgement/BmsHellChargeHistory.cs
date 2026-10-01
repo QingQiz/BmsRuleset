@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 internal sealed class BmsHellChargeHistory
 {

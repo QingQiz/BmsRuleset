@@ -12,6 +12,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Play;
 using osuTK;
 using osuTK.Graphics;
 
@@ -23,6 +24,9 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     public override bool IsPresent => !VisualsSuppressed && base.IsPresent;
 
     internal bool VisualsSuppressed { get; private set; }
+
+    internal long BindingGeneration { get; private set; }
+    protected bool UsesCoreScheduling => ParentColumn?.Judgements.Schedule != null;
 
     public override bool UpdateSubTree()
     {
@@ -73,19 +77,13 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     internal virtual bool RequiresActiveLongNoteUpdate => false;
 
-    internal event Action<DrawableBmsHitObject>? HeadJudged;
-
-    protected void NotifyHeadJudged() => HeadJudged?.Invoke(this);
+    internal virtual BmsLongNoteJudgementController? LongNoteJudgement => null;
 
     internal virtual void UpdateDeferredLongNote(float y, float endY)
     {
     }
 
     internal virtual void UpdateLandmine(bool holding)
-    {
-    }
-
-    internal virtual void UpdateHellChargeBody(bool holding)
     {
     }
 
@@ -128,9 +126,14 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         return true;
     }
 
-    protected void ApplyBmsResult(HitResult result)
+    internal void ApplyBmsResult(HitResult result)
     {
-        ((BmsJudgementResult)Result).SuppressPenalty = result == HitResult.Meh && ParentColumn?.HasPmsMistake(HitObject) == true;
+        ApplyBmsResult(result, result == HitResult.Meh && ParentColumn?.HasPmsMistake(HitObject) == true);
+    }
+
+    internal void ApplyBmsResult(HitResult result, bool suppressPenalty)
+    {
+        ((BmsJudgementResult)Result).SuppressPenalty = suppressPenalty;
         ApplyResult(result);
     }
 
@@ -142,13 +145,22 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     {
         if (HitObject == null) return;
 
-        if (!Judged && !SkipFurtherUpdates)
+        if (!UsesCoreScheduling && !Judged && !SkipFurtherUpdates)
         {
             if (!UpdateKindState() && RequiresResultBeforeKindPostState)
                 UpdateResult(false);
         }
 
         UpdateKindPostResultState();
+    }
+
+    public override void OnKilled()
+    {
+        base.OnKilled();
+        // The framework has stopped samples, while this removing representation can still submit its final result.
+        ParentColumn?.Judgements.CompleteScheduledRemoval(this,
+            new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
+                (Clock as IGameplayClock)?.IsRewinding == true));
     }
 
     protected override void Update()
@@ -201,6 +213,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     protected override void OnApply()
     {
         base.OnApply();
+        BindingGeneration++;
         if (VisualsSuppressed)
         {
             VisualsSuppressed = false;
@@ -210,6 +223,13 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         Alpha = 1;
         Visuals.Alpha = 1;
         ResetKindState();
+    }
+
+    protected override void OnFree()
+    {
+        // ApplyDefaults also frees the representation; its logical registration stays in place.
+        ParentColumn?.Judgements.UnbindNoteRepresentation(this, BindingGeneration);
+        base.OnFree();
     }
 
     protected override void UpdateHitStateTransforms(ArmedState state)

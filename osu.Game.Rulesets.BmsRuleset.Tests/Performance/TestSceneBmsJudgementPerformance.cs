@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
@@ -8,6 +9,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
@@ -65,14 +67,37 @@ public partial class TestSceneBmsJudgementPerformance : BmsPlayerTestScene
                 return new BmsJudgementPerformanceTest.Measurement(() =>
                 {
                     for (var i = 0; i < operations; i++)
-                        if (container.TryRepress(3000, false) != null)
+                        if (container.Judgements.TryRepress(3000, false) != null)
                             found++;
                 }, () => { Assert.That(found, Is.Zero); return new { Found = found, Alive = container.AliveEntries.Count }; });
             });
             measurePhases(container, count, "idle", operations);
+            measureFrame(count, "idle", operations);
             Assert.That(Playfield.GetAliveObjectAtTime(3000).TryHit(HitResult.Perfect), Is.True);
             measurePhases(container, count, "active", operations);
+            measureFrame(count, "active", operations);
         });
+    }
+
+    private void measureFrame(int count, string state, int operations)
+    {
+        // Resolve the unchanged playfield boundary outside measurement so the same harness
+        // compares the old scheduler and the engine without reflection in the timed loop.
+        var processFrame = typeof(BmsPlayfield).GetMethod("processJudgementFrame", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<Action<bool>>(Playfield);
+        var score = Player.ScoreProcessor.TotalScore.Value;
+        var health = Player.HealthProcessor.Health.Value;
+        BmsJudgementPerformanceTest.Measure("Frame-" + state + "-" + count, operations, () =>
+            new BmsJudgementPerformanceTest.Measurement(() =>
+            {
+                for (var i = 0; i < operations; i++)
+                    processFrame(false);
+            }, () =>
+            {
+                Assert.That(Player.ScoreProcessor.TotalScore.Value, Is.EqualTo(score));
+                Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(health));
+                return new { Columns = Playfield.TotalColumns, Score = score, Health = health };
+            }));
     }
 
     private static void measurePhases(BmsColumnHitObjectContainer container, int count, string state, int operations)
@@ -82,7 +107,7 @@ public partial class TestSceneBmsJudgementPerformance : BmsPlayerTestScene
                 for (var i = 0; i < operations; i++)
                 {
                     container.UpdateLandmines(false);
-                    container.UpdateHellChargeBodies(false);
+                    container.Judgements.UpdateHellChargeBodies(false);
                 }
             }, () => new { Alive = container.AliveEntries.Count, Active = container.AliveEntries.Values.Count(d => d.HitObject.StartTime == 3000 && d.Judged) }));
 }
