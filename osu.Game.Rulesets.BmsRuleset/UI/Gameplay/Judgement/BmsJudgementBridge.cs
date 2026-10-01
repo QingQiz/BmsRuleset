@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -9,9 +10,11 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 
-internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
+internal delegate void BmsSimulationStepObserver(in BmsFrameContext frame);
+
+internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 {
     private readonly BmsPlayfield playfield;
     private readonly BmsColumn column;
@@ -20,10 +23,11 @@ internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
     private readonly Dictionary<BmsHitObject, BmsJudgementResult> results = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLongNoteStateObserver Observer)> presentationObservers = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLandmineStateObserver Observer)> landmineObservers = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsSimulationStepObserver Observer)> simulationObservers = [];
     private Action<BmsHitObject> resultCheckpoint = null!;
     private Action<BmsHitObject, double> resultHistoryCheckpoint = null!;
 
-    internal BmsDrawableJudgementOutput(BmsPlayfield playfield, BmsColumn column)
+    internal BmsJudgementBridge(BmsPlayfield playfield, BmsColumn column)
     {
         this.playfield = playfield;
         this.column = column;
@@ -41,12 +45,17 @@ internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
     internal void ObserveLongNoteState(DrawableBmsHitObject drawable, BmsLongNoteStateObserver observer)
         => presentationObservers[drawable] = (drawable.BindingGeneration, observer);
 
+    internal void ObserveSimulationSteps(DrawableBmsHitObject drawable, BmsSimulationStepObserver observer)
+        => simulationObservers[drawable] = (drawable.BindingGeneration, observer);
+
     internal void ObserveLandmineState(DrawableBmsHitObject drawable, BmsLandmineStateObserver observer)
         => landmineObservers[drawable] = (drawable.BindingGeneration, observer);
 
     internal void Unbind(DrawableBmsHitObject drawable, long generation)
     {
         container.RemoveVisualObservation(drawable, generation);
+        if (simulationObservers.TryGetValue(drawable, out var stepObserver) && stepObserver.Generation == generation)
+            simulationObservers.Remove(drawable);
         if (presentationObservers.TryGetValue(drawable, out var observer) && observer.Generation == generation)
             presentationObservers.Remove(drawable);
         if (landmineObservers.TryGetValue(drawable, out var mineObserver) && mineObserver.Generation == generation)
@@ -77,7 +86,7 @@ internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
         internal readonly long Generation;
         internal readonly Action<DrawableHitObject, JudgementResult> ResultHandler;
 
-        internal Binding(BmsHitObject note, DrawableBmsHitObject drawable, long generation, BmsDrawableJudgementOutput output)
+        internal Binding(BmsHitObject note, DrawableBmsHitObject drawable, long generation, BmsJudgementBridge output)
         {
             Note = note;
             Drawable = drawable;
@@ -136,9 +145,13 @@ internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
             observer.Observer(state, frame);
     }
 
-    public void ObserveLongNoteStep(BmsLongNote note, in BmsFrameContext frame)
-        // Hold feedback observes the pending tail before this step can settle a deferred release.
-        => GetRepresentation(note).UpdateVisualState();
+    public void ObserveSimulationStep(BmsHitObject note, in BmsFrameContext frame)
+    {
+        // Feedback keeps its synchronous checkpoint while concrete representations opt in at binding time.
+        var drawable = GetRepresentation(note);
+        if (simulationObservers.TryGetValue(drawable, out var observer) && observer.Generation == drawable.BindingGeneration)
+            observer.Observer(frame);
+    }
 
     public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
     {

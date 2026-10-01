@@ -1,3 +1,5 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -88,13 +90,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                                 .ToArray();
         var judgementObjects = Beatmap.HitObjects.ToArray();
         judgementEngine = new BmsJudgementEngine(judgementColumns.Select(column => new BmsJudgementColumnDefinition(
-            judgementObjects, LayoutVariant, column.Index, column.CanBatchUpdates, column.JudgementOutput = new BmsDrawableJudgementOutput(this, column))).ToArray());
+            judgementObjects, LayoutVariant, column.Index, column.CanBatchUpdates, column.JudgementBridge = new BmsJudgementBridge(this, column))).ToArray());
         foreach (var column in judgementColumns)
         {
             column.Judgements = judgementEngine.GetColumn(column.Index);
             var container = (BmsColumnHitObjectContainer)column.HitObjectContainer;
             container.Judgements = column.Judgements;
-            container.JudgementOutput = column.JudgementOutput;
+            container.JudgementBridge = column.JudgementBridge;
         }
 
         InternalChildren =

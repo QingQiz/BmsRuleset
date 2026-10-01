@@ -1,3 +1,6 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -40,6 +43,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private BmsLongNotePresentationMapping mapPresentation = null!;
     private readonly BmsLongNoteStateObserver stateObserver;
     private readonly BmsVisualTimeObserver visualTimeObserver;
+    private readonly BmsSimulationStepObserver simulationObserver;
     private (double Time, double Offset, BmsColumnVisualFrame Frame)? lastVisualObservation;
 
     private double lastHoldExplosionTime;
@@ -67,6 +71,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         resolveBodyDirection = bodyDirectionBeforeTailPasses;
         stateObserver = applyPresentation;
         visualTimeObserver = observeVisualTime;
+        simulationObserver = observeSimulationStep;
     }
 
     /// <summary>
@@ -210,13 +215,14 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (HitObject != null)
         {
             mapPresentation = BmsLongNotePresentation.SelectMapping(ln.Beatmap.LockedLongNoteMode);
-            ParentColumn!.JudgementOutput.ObserveLongNoteState(this, stateObserver);
-            ParentColumn.JudgementOutput.ObserveVisualTime(this, visualTimeObserver);
+            ParentColumn!.JudgementBridge.ObserveLongNoteState(this, stateObserver);
+            ParentColumn.JudgementBridge.ObserveVisualTime(this, visualTimeObserver);
+            ParentColumn.JudgementBridge.ObserveSimulationSteps(this, simulationObserver);
             presentation = mapPresentation(ln, state, isKeyHeld(), Time.Current);
             restoreHeadPin = state.LongNoteStarted;
 
             longNoteBody.SetSkinLookup(LayoutVariant, Column);
-            ParentColumn.JudgementOutput.RefreshNoteRepresentation(this);
+            ParentColumn.JudgementBridge.RefreshNoteRepresentation(this);
         }
     }
 
@@ -289,24 +295,22 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         BmsNoteVisual.ApplyResultEffects(this, state, Time.Current);
     }
 
-    internal override void UpdateVisualState()
+    private void observeSimulationStep(in BmsFrameContext frame)
     {
         if (HitObject == null)
             return;
 
-        // The final visual traversal can revisit the same simulation timestamp. HCN elapsed
-        // time and hold-light pulses must only be applied once at that timestamp.
-        if (lastSimulationTime == Time.Current)
+        // Repeated traversals at the same simulation timestamp must not emit another hold-light pulse.
+        if (lastSimulationTime == frame.SimulationTime)
             return;
 
-        lastSimulationTime = Time.Current;
+        lastSimulationTime = frame.SimulationTime;
 
-        if (state.LongNoteStarted && !state.TailJudged
-                                       && Time.Current >= HitObject.StartTime && Time.Current <= ln.EndTime
-                                       && Time.Current - lastHoldExplosionTime >= hold_explosion_interval)
+        var current = mapPresentation(ln, state, isKeyHeld(), frame.SimulationTime);
+        if (current.HoldLightActive && frame.SimulationTime - lastHoldExplosionTime >= hold_explosion_interval)
         {
-            ParentColumn?.TriggerHitExplosion(presentation.HitLightStyle);
-            lastHoldExplosionTime = Time.Current;
+            ParentColumn?.TriggerHitExplosion(current.HitLightStyle);
+            lastHoldExplosionTime = frame.SimulationTime;
         }
     }
 
@@ -364,6 +368,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             realHeadY,
             realTailY);
 
-    protected override JudgementResult CreateResult(Judgement judgement)
+    protected override JudgementResult CreateResult(osu.Game.Rulesets.Judgements.Judgement judgement)
         => new BmsLongNoteJudgementResult(HitObject, judgement);
 }

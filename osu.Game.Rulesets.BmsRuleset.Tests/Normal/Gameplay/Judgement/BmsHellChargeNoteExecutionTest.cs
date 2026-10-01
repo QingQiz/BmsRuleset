@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -177,7 +178,7 @@ public class BmsHellChargeNoteExecutionTest
         Assert.That(output.BodyTicks.Select(t => t.Note), Is.EqualTo(notes.Reverse()));
     }
 
-    private static (BmsColumnJudgementContext Context, BmsRecordingJudgementOutput Output, BmsLongNote[] Notes) create(int count = 1, int column = 1, bool batch = true)
+    private static (BmsColumnJudgementRuntime Context, BmsRecordingJudgementOutput Output, BmsLongNote[] Notes) create(int count = 1, int column = 1, bool batch = true)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, LockedLongNoteMode = BmsLongNoteMode.HellChargeNote, Rank = 2 };
         var notes = Enumerable.Range(0, count).Select(_ => new BmsLongNote { Beatmap = beatmap, Column = column, StartTime = 3000, Duration = 1000 }).ToArray();

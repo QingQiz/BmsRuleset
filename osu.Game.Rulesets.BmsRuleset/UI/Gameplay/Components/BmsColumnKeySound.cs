@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using osu.Framework.Allocation;
@@ -15,10 +16,10 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
     public override bool IsPresent => false;
 
     private readonly BmsKeySoundCursor cursor;
-    private readonly BmsColumnJudgementContext judgements;
+    private readonly BmsColumnJudgementRuntime judgements;
     private readonly Func<BmsHitObject, bool> isFinished;
 
-    internal BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, BmsColumnJudgementContext judgements,
+    internal BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, BmsColumnJudgementRuntime judgements,
                               IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
     {
         this.judgements = judgements;

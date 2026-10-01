@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,15 +17,18 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 [TestFixture]
 public class BmsJudgementEngineTest
 {
-    [TestCase(typeof(BmsJudgementEngine))]
-    [TestCase(typeof(BmsColumnJudgementContext))]
-    [TestCase(typeof(BmsCoreJudgementSchedule))]
+    private static IEnumerable<Type> CoreTypes => typeof(BmsJudgementEngine).Assembly.GetTypes()
+        .Where(t => t.Namespace == typeof(BmsJudgementEngine).Namespace && !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)));
+
+    [TestCaseSource(nameof(CoreTypes))]
     public void CoreMembersDoNotDependOnDrawablesOrClocks(Type coreType)
     {
-        const BindingFlags members = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+        const BindingFlags members = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
         var types = coreType.GetFields(members).Select(f => f.FieldType)
-            .Concat(coreType.GetMethods(members).SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType)));
-        Assert.That(types.SelectMany(expand).Where(t => typeof(Drawable).IsAssignableFrom(t) || typeof(IClock).IsAssignableFrom(t)), Is.Empty);
+            .Concat(coreType.GetMethods(members).SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType)))
+            .Concat(coreType.GetConstructors(members).SelectMany(c => c.GetParameters().Select(p => p.ParameterType)));
+        Assert.That(types.SelectMany(expand).Where(t => typeof(Drawable).IsAssignableFrom(t) || typeof(IClock).IsAssignableFrom(t)
+            || t.Namespace?.StartsWith("osu.Game.Rulesets.BmsRuleset.UI", StringComparison.Ordinal) == true), Is.Empty);
 
         static IEnumerable<Type> expand(Type type)
         {

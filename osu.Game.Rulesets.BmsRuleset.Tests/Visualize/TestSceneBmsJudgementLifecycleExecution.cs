@@ -1,4 +1,6 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using System.Collections;
@@ -137,7 +139,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             }
             Assert.That(session.ProductionOutput.GetRepresentation(note), Is.SameAs(drawable));
             session.AssertOldNotificationIgnored(oldCallback!, drawable, result, generation);
-            var active = readField<IList>(session.Context, "activeNoteSlots");
+            var active = readField<IList>(session.Context.Notes, "activeNoteSlots");
             Assert.That(active.Cast<int>().Distinct().Count(), Is.EqualTo(active.Count));
             Assert.That(readField<IDictionary>(session.ProductionOutput, "representations").Count, Is.EqualTo(order.Count(d => d.HitObject is BmsNote or BmsLongNote)));
             Assert.That(readField<IDictionary>(session.ProductionOutput, "presentationObservers").Count, Is.EqualTo(order.Count(d => d.HitObject is BmsLongNote)));
@@ -248,6 +250,67 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     }
 
     [Test]
+    public void DirectTimingChangeRefreshesCandidatesAndDeadlineWithoutRebinding([Values] Kind objectKind)
+    {
+        load(objectKind, sameTime: true);
+        AddStep("move a live head without reapplying defaults", () => withClock(session =>
+        {
+            var note = session.Note;
+            var generation = session.Drawable.BindingGeneration;
+            var slot = session.Context.GetNoteSlot(note);
+            var heads = readField<SortedSet<(double Time, long Order, int Slot)>>(session.Context.Notes, "pendingNoteHeads");
+            var oldKey = heads.Single(h => h.Slot == slot);
+            session.Context.RefreshPassiveDeadline(2798);
+
+            note.StartTime = 2990;
+            session.Recorded.RefreshNoteTiming(note);
+            Assert.That(session.Drawable.BindingGeneration, Is.EqualTo(generation));
+            Assert.That(heads.Single(h => h.Slot == slot), Is.EqualTo((2990d, oldKey.Order, slot)));
+            Assert.That(heads.Count(h => h.Time == 3000), Is.EqualTo(1));
+            Assert.That(session.Context.FirstPendingNote, Is.SameAs(note));
+            Assert.That(session.Context.NextPassiveUpdateTime, Is.EqualTo(double.NegativeInfinity));
+            session.Context.RefreshPassiveDeadline(2798);
+            Assert.That(session.Context.NextPassiveUpdateTime, Is.EqualTo(passiveDeadline(session.Context, note)));
+            Assert.That(readField<BmsHitObject[]>(session.Context, "columnNotes"), Is.Ordered.By(nameof(BmsHitObject.StartTime)));
+
+            session.Advance(2990);
+            PressColumn(session.Column, 2990);
+            session.Recorded.HandleNotePress(new BmsPressContext(2990, session.Frame));
+            Assert.That(note is BmsLongNote hold ? session.Context.GetLongNoteState(hold).HeadJudged : session.Drawable.Result.HasResult, Is.True);
+            Assert.That(session.Context.FirstPendingNote, Is.SameAs(session.Recorded.FirstPendingNote));
+        }));
+    }
+
+    [TestCase(Kind.LN)]
+    [TestCase(Kind.CN)]
+    [TestCase(Kind.HCN)]
+    public void SimulationFeedbackBelongsToTheCurrentRepresentation(Kind objectKind)
+    {
+        load(objectKind);
+        AddStep("reapply and release the registered feedback", () => withClock(session =>
+        {
+            var drawable = session.Drawable;
+            var generation = drawable.BindingGeneration;
+            var oldCalls = 0;
+            session.ProductionOutput.ObserveSimulationSteps(drawable, (in BmsFrameContext _) => oldCalls++);
+            session.ProductionOutput.ObserveSimulationStep(session.Note, session.Frame);
+            Assert.That(oldCalls, Is.EqualTo(1));
+
+            session.Note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
+            Assert.That(drawable.BindingGeneration, Is.EqualTo(generation + 1));
+            Assert.That(readField<double>(drawable, "lastSimulationTime"), Is.NaN);
+            session.ProductionOutput.UnbindNoteRepresentation(drawable, generation);
+            session.ProductionOutput.ObserveSimulationStep(session.Note, session.Frame);
+            Assert.That(oldCalls, Is.EqualTo(1));
+            Assert.That(readField<double>(drawable, "lastSimulationTime"), Is.EqualTo(session.Frame.SimulationTime));
+            Assert.That(typeof(DrawableBmsHitObject).GetMethod("UpdateVisualState", instance), Is.Null);
+
+            Assert.That(session.Container.Remove(drawable.Entry!), Is.True);
+            Assert.That(readField<IDictionary>(session.ProductionOutput, "simulationObservers").Contains(drawable), Is.False);
+        }));
+    }
+
+    [Test]
     public void ChangedSortKeyReplacesTheOldPendingKey([Values] Kind objectKind)
     {
         load(objectKind, sameTime: true);
@@ -256,9 +319,9 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             var note = session.Note;
             var drawable = session.Drawable;
             var slot = readField<Dictionary<BmsHitObject, int>>(session.Context, "noteSlots")[note];
-            var heads = readField<SortedSet<(double Time, long Order, int Slot)>>(session.Context, "pendingNoteHeads");
+            var heads = readField<SortedSet<(double Time, long Order, int Slot)>>(session.Context.Notes, "pendingNoteHeads");
             var oldKey = heads.Single(h => h.Slot == slot);
-            var order = readField<List<int>>(session.Context, "activeNoteSlots").ToArray();
+            var order = readField<List<int>>(session.Context.Notes, "activeNoteSlots").ToArray();
             note.StartTime = 2990;
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             session.Recorded.RefreshNoteConfiguration(note);
@@ -267,8 +330,8 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Assert.That(heads.Count(h => h.Time == 3000), Is.EqualTo(1));
             Assert.That(session.Context.FirstPendingNote, Is.SameAs(note));
             Assert.That(session.Recorded.FirstPendingNote, Is.SameAs(note));
-            Assert.That(readField<SortedSet<(double Time, long Order, int Slot)>>(session.Recorded, "pendingNoteHeads"), Is.EqualTo(heads));
-            Assert.That(readField<List<int>>(session.Context, "activeNoteSlots"), Is.EqualTo(order));
+            Assert.That(readField<SortedSet<(double Time, long Order, int Slot)>>(session.Recorded.Notes, "pendingNoteHeads"), Is.EqualTo(heads));
+            Assert.That(readField<List<int>>(session.Context.Notes, "activeNoteSlots"), Is.EqualTo(order));
             Assert.That(session.ProductionOutput.GetRepresentation(note), Is.SameAs(drawable));
             session.Context.RefreshPassiveDeadline(2798);
             Assert.That(session.Context.NextPassiveUpdateTime, Is.EqualTo(passiveDeadline(session.Context, note)));
@@ -276,7 +339,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             session.Recorded.RefreshNoteConfiguration(note);
             Assert.That(readField<BmsHitObject[]>(session.Context, "columnNotes"), Is.EqualTo(readField<BmsHitObject[]>(session.Recorded, "columnNotes")));
-            Assert.That(readField<SortedSet<(double Time, long Order, int Slot)>>(session.Recorded, "pendingNoteHeads"), Is.EqualTo(heads));
+            Assert.That(readField<SortedSet<(double Time, long Order, int Slot)>>(session.Recorded.Notes, "pendingNoteHeads"), Is.EqualTo(heads));
         }));
     }
 
@@ -465,7 +528,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
                     Assert.That(session.Context.GetActiveBodies(), Is.EqualTo(objectKind == Kind.HCN ? new[] { note } : Array.Empty<BmsLongNote>()));
                 }
             };
-            using (var probe = new ScopedMethodProbe(typeof(BmsDrawableJudgementOutput).GetMethod("Register", instance)!,
+            using (var probe = new ScopedMethodProbe(typeof(BmsJudgementBridge).GetMethod("Register", instance)!,
                        GetType().GetMethod(nameof(observeEnter), BindingFlags.Static | BindingFlags.NonPublic), GetType().GetMethod(nameof(observeExit), BindingFlags.Static | BindingFlags.NonPublic)))
             {
                 try { session.Traverse(3500); }
@@ -633,22 +696,16 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     private static T readField<T>(object target, string name) => (T)target.GetType().GetField(name, instance)!.GetValue(target)!;
     private static double? raw(JudgementResult result) => (double?)typeof(JudgementResult).GetProperty("RawTime", instance)!.GetValue(result);
 
-    private static object? getRuntime(BmsColumnJudgementContext context, BmsHitObject note)
+    private static object? getRuntime(BmsColumnJudgementRuntime context, BmsHitObject note)
     {
-        if (note is not BmsLongNote held) return null;
-        return held.Beatmap.LockedLongNoteMode switch
-        {
-            BmsLongNoteMode.ChargeNote => readField<List<BmsChargeNoteRuntime>>(context, "chargeHoldStates").Single(s => ReferenceEquals(s.Hold.Note, note)),
-            BmsLongNoteMode.HellChargeNote => readField<List<BmsHellChargeNoteRuntime>>(context, "hellChargeHoldStates").Single(s => ReferenceEquals(s.Hold.Note, note)),
-            _ => readField<List<BmsLongNoteRuntime>>(context, "normalHoldStates").Single(s => ReferenceEquals(s.Hold.Note, note)),
-        };
+        return BmsJudgementStateInspection.GetRuntime(context, note);
     }
 
-    private static double passiveDeadline(BmsColumnJudgementContext context, BmsHitObject note)
+    private static double passiveDeadline(BmsColumnJudgementRuntime context, BmsHitObject note)
     {
         var slot = readField<Dictionary<BmsHitObject, int>>(context, "noteSlots")[note];
         return note is BmsLongNote
-            ? readField<Func<int, double>[]>(context, "headDeadlines")[readField<int[]>(context, "holdOperationSlots")[slot]](slot)
+            ? BmsJudgementStateInspection.GetHolds(context).HeadDeadline(slot)
             : context.NoteWindows[slot].NextPassiveJudgementTime(note);
     }
 
@@ -748,15 +805,15 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
         private readonly FramedClock clock;
         internal readonly BmsColumn Column;
         internal readonly BmsColumnHitObjectContainer Container;
-        internal readonly BmsColumnJudgementContext Context;
+        internal readonly BmsColumnJudgementRuntime Context;
         internal readonly BmsRecordingJudgementOutput Output = new();
-        internal readonly BmsColumnJudgementContext Recorded;
+        internal readonly BmsColumnJudgementRuntime Recorded;
         internal readonly BmsHitObject Note;
         internal readonly BmsJudgementResult Result;
         internal readonly BmsHealthProcessor Health;
         internal readonly BmsScoreProcessor Score;
         internal readonly List<(double Time, BmsLongNoteJudgementResult Result)> Submissions;
-        internal BmsDrawableJudgementOutput ProductionOutput => Column.JudgementOutput;
+        internal BmsJudgementBridge ProductionOutput => Column.JudgementBridge;
         private readonly List<string> trace = [];
         private readonly List<string> scores = [];
         internal readonly List<string> ExtraTrace = [];

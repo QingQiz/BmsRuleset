@@ -1,3 +1,5 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using System;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -91,8 +93,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
     }
 
     private BmsColumnKeySound? keySound;
-    internal BmsColumnJudgementContext Judgements { get; set; } = null!;
-    internal BmsDrawableJudgementOutput JudgementOutput { get; set; } = null!;
+    internal BmsColumnJudgementRuntime Judgements { get; set; } = null!;
+    internal BmsJudgementBridge JudgementBridge { get; set; } = null!;
 
     internal bool CanBatchUpdates => canBatchUpdates;
 
@@ -140,8 +142,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     protected override void Dispose(bool isDisposing)
     {
-        if (JudgementOutput != null)
-            NewResult -= JudgementOutput.OnFrameworkNewResult;
+        if (JudgementBridge != null)
+            NewResult -= JudgementBridge.OnFrameworkNewResult;
         base.Dispose(isDisposing);
 
         if (skin.IsNotNull())
@@ -195,7 +197,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         keySound = new BmsColumnKeySound(columnHitObjects, Judgements, invisibleNotes);
         AddInternal(keySound);
 
-        NewResult += JudgementOutput.OnFrameworkNewResult;
+        NewResult += JudgementBridge.OnFrameworkNewResult;
     }
 
     protected override void Update()

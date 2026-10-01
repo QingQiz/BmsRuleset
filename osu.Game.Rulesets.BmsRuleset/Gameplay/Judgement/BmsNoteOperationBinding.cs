@@ -1,7 +1,7 @@
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 internal delegate bool BmsPressOperation(int slot, HitResult result, in BmsPressContext press);
 internal delegate void BmsPassiveOperation(int slot, in BmsFrameContext frame);
@@ -13,10 +13,10 @@ internal readonly record struct BmsNoteRegistration(BmsHitObject Object, int Slo
 /// </summary>
 internal sealed class BmsNoteOperationBinding
 {
-    private readonly BmsColumnJudgementContext column;
+    private readonly BmsColumnJudgementRuntime column;
     private readonly BmsJudgementExecutionContext execution;
 
-    internal BmsNoteOperationBinding(BmsColumnJudgementContext column, IBmsJudgementOutput output)
+    internal BmsNoteOperationBinding(BmsColumnJudgementRuntime column, IBmsJudgementOutput output)
     {
         this.column = column;
         execution = new BmsJudgementExecutionContext(column, output);

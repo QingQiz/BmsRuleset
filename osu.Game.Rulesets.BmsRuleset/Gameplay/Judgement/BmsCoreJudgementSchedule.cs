@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 internal readonly record struct BmsScheduledObject(BmsHitObject Object, long BindingToken);
 
@@ -10,7 +10,7 @@ internal readonly record struct BmsScheduledObject(BmsHitObject Object, long Bin
 /// Orders passive and post-result operations at lifecycle boundaries.
 /// Ordering and representation availability are supplied by the host; operations belong to the core.
 /// </summary>
-internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
+internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
 {
     private readonly Dictionary<BmsHitObject, Binding> bindings = new(ReferenceEqualityComparer.Instance);
     private readonly List<BmsScheduledObject> plan = [];
@@ -162,7 +162,7 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
         if (binding.LastPostStep == step) return;
         binding.LastPostStep = step;
         bindings[item.Object] = binding;
-        column.ObserveLongNoteStep((BmsLongNote)item.Object, frame);
+        column.ObserveSimulationStep(item.Object, frame);
         if (version != revision || !current(item)) return;
         FinishLongNote((BmsLongNote)item.Object, frame, elapsed, column.PressedDirections != 0);
     }

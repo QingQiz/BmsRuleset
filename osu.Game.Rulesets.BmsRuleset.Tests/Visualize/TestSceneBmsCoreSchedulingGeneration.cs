@@ -1,4 +1,5 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -456,7 +457,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             var otherEntry = pair[1].Entry!;
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             var generation = original.BindingGeneration;
-            Assert.That(column.JudgementOutput.TryGetScheduledObject(original, out var oldBinding), Is.True);
+            Assert.That(column.JudgementBridge.TryGetScheduledObject(original, out var oldBinding), Is.True);
             Assert.That(container.Remove(entry), Is.True);
             Assert.That(container.Remove(otherEntry), Is.True);
             container.Add(entry);
@@ -465,10 +466,10 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             Assert.That(replacement, Is.SameAs(pair[1]));
             Assert.That(replacement, Is.Not.SameAs(original));
             Assert.That(replacement.BindingGeneration, Is.EqualTo(generation));
-            Assert.That(column.JudgementOutput.TryGetScheduledObject(replacement, out var newBinding), Is.True);
+            Assert.That(column.JudgementBridge.TryGetScheduledObject(replacement, out var newBinding), Is.True);
             Assert.That(newBinding.BindingToken, Is.Not.EqualTo(oldBinding.BindingToken));
             var unaffected = container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Single(d => d.HitObject.StartTime == 3030);
-            Assert.That(column.JudgementOutput.TryGetScheduledObject(unaffected, out var unaffectedBinding), Is.True);
+            Assert.That(column.JudgementBridge.TryGetScheduledObject(unaffected, out var unaffectedBinding), Is.True);
             var observed = new List<BmsHitObject>();
             void result(osu.Game.Rulesets.Objects.Drawables.DrawableHitObject _, osu.Game.Rulesets.Judgements.JudgementResult judgement)
                 => observed.Add((BmsHitObject)judgement.HitObject);
@@ -483,8 +484,8 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
                 schedule.CompleteRemoval(oldBinding, frame);
                 schedule.RunSubtree([oldBinding, unaffectedBinding], frame);
                 Assert.That(observed, Is.EqualTo(new[] { unaffected.HitObject }));
-                column.JudgementOutput.UnbindNoteRepresentation(original, generation);
-                Assert.That(column.JudgementOutput.TryGetScheduledObject(replacement, out var afterLateFree), Is.True);
+                column.JudgementBridge.UnbindNoteRepresentation(original, generation);
+                Assert.That(column.JudgementBridge.TryGetScheduledObject(replacement, out var afterLateFree), Is.True);
                 Assert.That(afterLateFree, Is.EqualTo(newBinding));
                 schedule.Unbind(oldBinding);
                 schedule.BeginBatch(0, 11, 11);

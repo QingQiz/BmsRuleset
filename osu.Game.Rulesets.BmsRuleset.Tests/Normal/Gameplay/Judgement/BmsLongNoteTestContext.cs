@@ -1,3 +1,5 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -16,7 +18,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 internal sealed class BmsLongNoteTestContext
 {
     internal BmsLongNote Note { get; }
-    internal BmsColumnJudgementContext Column { get; }
+    internal BmsColumnJudgementRuntime Column { get; }
     internal BmsRecordingJudgementOutput Output { get; } = new();
     internal BmsLongNoteState State => Column.GetLongNoteState(Note);
     internal List<(HitResult Result, IReadOnlyList<BmsLongNoteEndpointResult> Endpoints)> MainResults { get; } = [];

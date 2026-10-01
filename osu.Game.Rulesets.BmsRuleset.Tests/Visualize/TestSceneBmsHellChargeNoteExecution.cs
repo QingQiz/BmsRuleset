@@ -1,4 +1,7 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -152,7 +155,7 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             {
                 if (ReferenceEquals(target, column) && !exit && method.Name == "PlaySample") trace.Add($"sample:{args[0]}:{args[1]}");
                 if (ReferenceEquals(target, column) && !exit && method.Name == "PlayKeySound") trace.Add("keysound");
-                if (ReferenceEquals(target, column.JudgementOutput) && exit && method.Name == "PublishState"
+                if (ReferenceEquals(target, column.JudgementBridge) && exit && method.Name == "PublishState"
                     && args[1] is BmsLongNoteState state && state.HeadJudged && !state.TailJudged && !actualHead)
                 {
                     actualHead = true;
@@ -200,13 +203,13 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
                          (typeof(BmsPlayfield), "ApplySyntheticLongNoteEndpoint"), (typeof(BmsPlayfield), "ApplyHellChargeTick"),
                      })
                 probes.Add(new ScopedMethodProbe(type.GetMethod(name, instance)!, GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
-            probes.Add(new ScopedMethodProbe(typeof(BmsDrawableJudgementOutput).GetMethod("PublishState", instance,
+            probes.Add(new ScopedMethodProbe(typeof(BmsJudgementBridge).GetMethod("PublishState", instance,
                 [typeof(BmsLongNote), typeof(BmsLongNoteState).MakeByRefType(), typeof(BmsFrameContext).MakeByRefType()])!,
                 GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
             probes.Add(new ScopedMethodProbe(initialDrawable.GetType().GetMethod("applyPresentation", instance)!,
                 GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
             // Rebuild callers after leaf probes so earlier fixtures' JIT inlining cannot hide a synchronous observation.
-            foreach (var type in new[] { typeof(BmsColumnJudgementContext), typeof(BmsJudgementExecutionContext), typeof(BmsHellChargeNoteJudgementRule), typeof(BmsHellChargeBodyTracker), typeof(BmsLongNotePresentation), typeof(BmsDrawableJudgementOutput) })
+            foreach (var type in new[] { typeof(BmsColumnJudgementRuntime), typeof(BmsJudgementExecutionContext), typeof(BmsHellChargeNoteJudgementRule), typeof(BmsHellChargeBodyTracker), typeof(BmsLongNotePresentation), typeof(BmsJudgementBridge) })
             {
                 foreach (var method in type.GetMethods(instance | BindingFlags.Static).Where(m => m.DeclaringType == type && !m.IsSpecialName
                              && m.Name is not "PublishState" and not "onHeadJudged"))
@@ -425,7 +428,7 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             var bodyObject = -1;
             observation = (target, method, args, exit) =>
             {
-                if (!exit && ReferenceEquals(target, column.JudgementOutput) && method.Name == "ApplyBodyTick")
+                if (!exit && ReferenceEquals(target, column.JudgementBridge) && method.Name == "ApplyBodyTick")
                     bodyObject = Array.IndexOf(notes, (BmsLongNote)args[0]);
                 if (ReferenceEquals(target, Playfield) && exit && method.Name == "ApplyHellChargeTick")
                 {
@@ -434,9 +437,9 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
                     ticks.Add((bodyObject, manual.CurrentTime));
                 }
             };
-            foreach (var (type, name) in new[] { (typeof(BmsPlayfield), "ApplyHellChargeTick"), (typeof(BmsDrawableJudgementOutput), "ApplyBodyTick") })
+            foreach (var (type, name) in new[] { (typeof(BmsPlayfield), "ApplyHellChargeTick"), (typeof(BmsJudgementBridge), "ApplyBodyTick") })
                 probes.Add(new ScopedMethodProbe(type.GetMethod(name, instance)!, GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
-            foreach (var type in new[] { typeof(BmsHellChargeBodyTracker), typeof(BmsDrawableJudgementOutput), typeof(BmsJudgementExecutionContext), typeof(BmsColumnJudgementContext) })
+            foreach (var type in new[] { typeof(BmsHellChargeBodyTracker), typeof(BmsJudgementBridge), typeof(BmsJudgementExecutionContext), typeof(BmsColumnJudgementRuntime) })
             {
                 foreach (var method in type.GetMethods(instance).Where(m => m.DeclaringType == type && !m.IsSpecialName))
                     probes.Add(new ScopedMethodProbe(method, GetType().GetMethod(nameof(keepCallBoundary), statics)));

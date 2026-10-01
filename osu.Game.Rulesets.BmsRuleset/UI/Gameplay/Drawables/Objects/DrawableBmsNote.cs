@@ -21,7 +21,7 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
     {
         base.OnApply();
 
-        ParentColumn?.JudgementOutput.RefreshNoteRepresentation(this);
+        ParentColumn?.JudgementBridge.RefreshNoteRepresentation(this);
     }
 
     protected override void UpdateHitStateTransforms(ArmedState state)

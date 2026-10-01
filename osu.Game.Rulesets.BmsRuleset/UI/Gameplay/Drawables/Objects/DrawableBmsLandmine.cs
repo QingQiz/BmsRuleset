@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Framework.Allocation;
 using osuTK;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -27,8 +28,8 @@ public sealed partial class DrawableBmsLandmine<TCol> : DrawableBmsHitObject<TCo
     protected override void OnApply()
     {
         base.OnApply();
-        ParentColumn!.JudgementOutput.ObserveLandmineState(this, stateObserver);
-        ParentColumn.JudgementOutput.RefreshNoteRepresentation(this);
+        ParentColumn!.JudgementBridge.ObserveLandmineState(this, stateObserver);
+        ParentColumn.JudgementBridge.RefreshNoteRepresentation(this);
         restorePresentation();
     }
 

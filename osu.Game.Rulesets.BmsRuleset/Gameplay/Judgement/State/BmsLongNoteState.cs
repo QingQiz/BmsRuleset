@@ -1,6 +1,6 @@
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 internal delegate void BmsLongNoteStateObserver(in BmsLongNoteState state, in BmsFrameContext frame);
 

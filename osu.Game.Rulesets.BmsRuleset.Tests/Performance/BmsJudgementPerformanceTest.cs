@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Diagnostics;
 using System.IO;

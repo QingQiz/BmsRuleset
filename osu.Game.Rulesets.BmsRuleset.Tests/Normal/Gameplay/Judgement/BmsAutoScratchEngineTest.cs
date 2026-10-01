@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -96,7 +97,7 @@ public class BmsAutoScratchEngineTest
         Assert.That(output.BodyTicks, Is.Empty);
     }
 
-    private static (BmsJudgementEngine Engine, BmsColumnJudgementContext Column, BmsLongNote Note, BmsLandmine Mine, BmsRecordingJudgementOutput Output)
+    private static (BmsJudgementEngine Engine, BmsColumnJudgementRuntime Column, BmsLongNote Note, BmsLandmine Mine, BmsRecordingJudgementOutput Output)
         create(BmsLongNoteMode mode)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode };

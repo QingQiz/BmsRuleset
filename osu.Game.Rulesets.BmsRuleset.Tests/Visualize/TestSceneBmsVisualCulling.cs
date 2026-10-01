@@ -11,6 +11,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
@@ -186,7 +187,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
             {
                 drawable.UpdateVisualLayout(-100, frame);
                 drawable.UpdateVisualLayout(-1_000_000, frame with { ScrollPosition = -1_000_000 });
-                drawable.UpdateVisualState();
+                column.JudgementBridge.ObserveSimulationStep(note, new BmsFrameContext(Playfield.Time.Current, 1));
             }
             Assert.That(column.Judgements.GetLongNoteState(note), Is.EqualTo(state));
             Assert.That(drawable.Result.Type, Is.EqualTo(result));

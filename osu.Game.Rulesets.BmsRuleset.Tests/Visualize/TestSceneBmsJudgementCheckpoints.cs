@@ -174,7 +174,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             startRecording();
             var column = (BmsColumn)Playfield.Stage.Columns[1];
             var note = column.Judgements.FirstPendingNote!;
-            var drawable = column.JudgementOutput.GetRepresentation(note);
+            var drawable = column.JudgementBridge.GetRepresentation(note);
             var result = drawable.Result;
             var entry = drawable.Entry;
             drawable.HitObject.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);

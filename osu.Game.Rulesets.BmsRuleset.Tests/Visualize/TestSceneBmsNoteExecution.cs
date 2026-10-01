@@ -1,4 +1,5 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -147,7 +148,7 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
                 probes.Add(new ScopedMethodProbe(type.GetMethod(name, instance)!, typeof(TestSceneBmsNoteExecution).GetMethod(nameof(observeFeedback), BindingFlags.Static | BindingFlags.NonPublic)));
             // Regenerate callers so prior tests cannot hide a tiny feedback method through inlining.
             foreach (var name in new[] { "HandleNotePress" })
-                probes.Add(new ScopedMethodProbe(typeof(BmsColumnJudgementContext).GetMethod(name, instance)!, typeof(TestSceneBmsNoteExecution).GetMethod(nameof(keepCallBoundary), BindingFlags.Static | BindingFlags.NonPublic)));
+                probes.Add(new ScopedMethodProbe(typeof(BmsColumnJudgementRuntime).GetMethod(name, instance)!, typeof(TestSceneBmsNoteExecution).GetMethod(nameof(keepCallBoundary), BindingFlags.Static | BindingFlags.NonPublic)));
 
             if (scenario == Scenario.Reactivation)
             {

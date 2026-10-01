@@ -5,7 +5,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 internal readonly record struct BmsJudgementColumnDefinition(BmsHitObject[] Objects, BmsLayoutVariant Layout, int Index, bool BatchUpdates, IBmsJudgementOutput Output);
 
@@ -24,8 +24,8 @@ internal sealed class BmsJudgementRules
 internal sealed class BmsJudgementEngine
 {
     private readonly BmsJudgementRules rules = new();
-    private readonly BmsColumnJudgementContext[] columns;
-    private readonly BmsColumnJudgementContext[] columnsByIndex;
+    private readonly BmsColumnJudgementRuntime[] columns;
+    private readonly BmsColumnJudgementRuntime[] columnsByIndex;
     private readonly List<BmsJudgementInput> pendingInputs = [];
     private readonly int[] framePressedDirections;
     private long scheduleEpoch;
@@ -38,13 +38,13 @@ internal sealed class BmsJudgementEngine
     {
         if (definitions.Length == 0 || definitions.Any(d => d.Index < 0) || definitions.Select(d => d.Index).Distinct().Count() != definitions.Length)
             throw new ArgumentException("Each judgement column needs a unique non-negative index.", nameof(definitions));
-        columns = new BmsColumnJudgementContext[definitions.Length];
-        columnsByIndex = new BmsColumnJudgementContext[definitions.Max(d => d.Index) + 1];
+        columns = new BmsColumnJudgementRuntime[definitions.Length];
+        columnsByIndex = new BmsColumnJudgementRuntime[definitions.Max(d => d.Index) + 1];
         framePressedDirections = new int[columnsByIndex.Length];
         for (var i = 0; i < definitions.Length; i++)
         {
             var definition = definitions[i];
-            var column = new BmsColumnJudgementContext(definition.Objects, definition.Layout, definition.Index, definition.BatchUpdates, definition.Output, rules);
+            var column = new BmsColumnJudgementRuntime(definition.Objects, definition.Layout, definition.Index, definition.BatchUpdates, definition.Output, rules);
             columns[i] = column;
             columnsByIndex[column.Index] = column;
         }
@@ -63,7 +63,7 @@ internal sealed class BmsJudgementEngine
             column.EnableAutoScratch();
     }
 
-    internal BmsColumnJudgementContext GetColumn(int index)
+    internal BmsColumnJudgementRuntime GetColumn(int index)
         => index >= 0 && index < columnsByIndex.Length && columnsByIndex[index] is { } column ? column
             : throw new ArgumentOutOfRangeException(nameof(index));
 

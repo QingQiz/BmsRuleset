@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -92,7 +93,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     {
         base.OnKilled();
         // The framework has stopped samples, while this removing representation can still submit its final result.
-        ParentColumn?.JudgementOutput.CompleteScheduledRemoval(this,
+        ParentColumn?.JudgementBridge.CompleteScheduledRemoval(this,
             new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
                 (Clock as IGameplayClock)?.IsRewinding == true));
     }
@@ -133,10 +134,6 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     {
     }
 
-    internal virtual void UpdateVisualState()
-    {
-    }
-
     protected override void OnApply()
     {
         base.OnApply();
@@ -155,11 +152,11 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     protected override void OnFree()
     {
         // ApplyDefaults also frees the representation; its logical registration stays in place.
-        ParentColumn?.JudgementOutput.UnbindNoteRepresentation(this, BindingGeneration);
+        ParentColumn?.JudgementBridge.UnbindNoteRepresentation(this, BindingGeneration);
         base.OnFree();
     }
 
-    protected override JudgementResult CreateResult(Judgement judgement) => new BmsJudgementResult(HitObject, judgement);
+    protected override JudgementResult CreateResult(osu.Game.Rulesets.Judgements.Judgement judgement) => new BmsJudgementResult(HitObject, judgement);
 
     protected override void LoadSamples()
     {

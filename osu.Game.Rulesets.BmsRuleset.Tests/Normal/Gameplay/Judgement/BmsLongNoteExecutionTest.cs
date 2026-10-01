@@ -1,6 +1,8 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -70,6 +72,25 @@ public class BmsLongNoteExecutionTest
     }
 
     [Test]
+    public void SparseHoldsAllocateOnlyTheirOwnBindings()
+    {
+        var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, LockedLongNoteMode = BmsLongNoteMode.LongNote };
+        BmsHitObject[] notes = Enumerable.Range(0, 1024).Select(i => (BmsHitObject)new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 + i }).ToArray();
+        notes[100] = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1100, Duration = 1000 };
+        notes[900] = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1900, Duration = 1000 };
+        var column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, true, new BmsRecordingJudgementOutput()).GetColumn(1);
+        var holds = BmsJudgementStateInspection.GetHolds(column);
+        var bindings = (Array)typeof(BmsHoldRegistry).GetField("bindings", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(holds)!;
+        Assert.That(bindings, Has.Length.EqualTo(2));
+        Assert.That(column.NoteRegistrations[100].Press, Is.SameAs(column.NoteRegistrations[900].Press));
+        Assert.That(BmsJudgementStateInspection.GetRuntime(column, notes[100]), Is.Not.SameAs(BmsJudgementStateInspection.GetRuntime(column, notes[900])));
+        column.ActivateNote(notes[900]);
+        column.TryPressRegisteredNote(notes[900], HitResult.Perfect, new BmsPressContext(1900, new BmsFrameContext(1900, 1)));
+        Assert.That(column.GetLongNoteState((BmsLongNote)notes[900]).HeadJudged, Is.True);
+        Assert.That(column.GetLongNoteState((BmsLongNote)notes[100]).HeadJudged, Is.False);
+    }
+
+    [Test]
     public void SameApplicationTimeRevertsInReverseSubmissionOrder()
     {
         var (context, output, notes) = create(2);
@@ -125,7 +146,7 @@ public class BmsLongNoteExecutionTest
         Assert.Throws<InvalidOperationException>(() => new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, true, new BmsRecordingJudgementOutput()));
     }
 
-    private static (BmsColumnJudgementContext Context, BmsRecordingJudgementOutput Output, BmsHitObject[] Notes) create(int count = 1)
+    private static (BmsColumnJudgementRuntime Context, BmsRecordingJudgementOutput Output, BmsHitObject[] Notes) create(int count = 1)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, LockedLongNoteMode = BmsLongNoteMode.LongNote, Rank = 2 };
         var notes = Enumerable.Range(0, count).Select(i => (BmsHitObject)new BmsLongNote

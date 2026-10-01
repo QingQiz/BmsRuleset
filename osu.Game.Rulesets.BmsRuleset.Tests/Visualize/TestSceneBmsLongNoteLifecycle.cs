@@ -1,4 +1,5 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.IO;
 using System.Linq;
@@ -88,7 +89,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         {
             var context = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements;
             Assert.That(context.Schedule.TryGetCurrent(note, out _), Is.False);
-            Assert.Throws<InvalidOperationException>(() => ((BmsColumn)Playfield.Stage.Columns[1]).JudgementOutput.GetRepresentation(note));
+            Assert.Throws<InvalidOperationException>(() => ((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.GetRepresentation(note));
             Assert.That(context.GetLongNoteState(note).HeadTime, Is.EqualTo(originalHeadTime));
         });
         seek(9000);
@@ -146,12 +147,12 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             var result = drawable.Result;
             var events = JsonSerializer.Serialize(score.JudgementEvents);
             var order = context.GetNoteCandidates().ToArray();
-            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementOutput.TryGetScheduledObject(drawable, out var previous), Is.True);
+            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.TryGetScheduledObject(drawable, out var previous), Is.True);
             var generation = drawable.BindingGeneration;
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             Assert.That(drawable.BindingGeneration, Is.GreaterThan(generation));
-            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementOutput.GetRepresentation(note), Is.SameAs(drawable));
+            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.GetRepresentation(note), Is.SameAs(drawable));
             Assert.That(context.GetLongNoteState(note), Is.EqualTo(state));
             Assert.That(context.GetNoteCandidates(), Is.EqualTo(order));
             Assert.That(context.ActiveLongNotes.Count(n => ReferenceEquals(n, note)), Is.EqualTo(1));
@@ -161,7 +162,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             context.Schedule.BeginRemoval(previous);
             context.Schedule.CompleteRemoval(previous, new BmsFrameContext(Playfield.Time.Current, 1));
             context.Schedule.Unbind(previous);
-            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementOutput.TryGetScheduledObject(drawable, out var current), Is.True);
+            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.TryGetScheduledObject(drawable, out var current), Is.True);
             Assert.That(current.BindingToken, Is.Not.EqualTo(previous.BindingToken));
             Assert.That(context.Schedule.TryGetCurrent(note, out _), Is.True);
             Assert.That(context.GetLongNoteState(note).TailJudged, Is.False);
@@ -196,7 +197,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             Assert.That(state.Detonated, Is.True);
             mine.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             Assert.That(drawable.BindingGeneration, Is.GreaterThan(generation));
-            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementOutput.GetRepresentation(mine), Is.SameAs(drawable));
+            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.GetRepresentation(mine), Is.SameAs(drawable));
             Assert.That(context.GetLandmineState(mine), Is.EqualTo(state));
             Assert.That(drawable.Result, Is.SameAs(result));
             context.UpdateLandmines(new BmsFrameContext(Playfield.Time.Current, 1), true);

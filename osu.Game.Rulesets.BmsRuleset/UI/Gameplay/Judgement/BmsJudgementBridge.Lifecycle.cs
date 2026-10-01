@@ -1,17 +1,18 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 
-internal sealed partial class BmsDrawableJudgementOutput
+internal sealed partial class BmsJudgementBridge
 {
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsScheduledObject Handle)> scheduledRepresentations = [];
     private readonly List<BmsHitObject> activationOrder = [];
     private readonly List<BmsLandmine> landmineOrder = [];
-    private BmsColumnJudgementContext context => column.Judgements;
+    private BmsColumnJudgementRuntime context => column.Judgements;
     private BmsColumnHitObjectContainer container => (BmsColumnHitObjectContainer)column.HitObjectContainer;
 
     internal void ObserveVisualTime(DrawableBmsHitObject drawable, BmsVisualTimeObserver observer)

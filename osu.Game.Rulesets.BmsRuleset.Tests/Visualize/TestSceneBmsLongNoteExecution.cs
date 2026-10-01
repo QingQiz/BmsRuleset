@@ -1,4 +1,6 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -177,7 +179,7 @@ public partial class TestSceneBmsLongNoteExecution : BmsPlayerTestScene
                     trace.Add($"sample:{args[0]}:{args[1]}");
                 if (ReferenceEquals(target, column) && !exit && method.Name == "PlayKeySound")
                     trace.Add("keysound");
-                if (ReferenceEquals(target, column.JudgementOutput) && exit && method.Name == "PublishState"
+                if (ReferenceEquals(target, column.JudgementBridge) && exit && method.Name == "PublishState"
                     && args[0] is BmsLongNote note && notes.Contains(note) && args[1] is BmsLongNoteState state
                     && state.HeadJudged && !state.TailJudged && actualPublishedHeads.Add(note))
                     trace.Add(snapshot("head.beforeIndexes", note, false));
@@ -191,13 +193,13 @@ public partial class TestSceneBmsLongNoteExecution : BmsPlayerTestScene
             foreach (var (type, name) in new[] { (typeof(BmsColumn), "PlaySample"), (typeof(BmsColumn), "PlayKeySound"),
                          (typeof(BmsLongNoteVisualState), "PrepareHeadPin"), (typeof(Playfield), "revertResult") })
                 probes.Add(new ScopedMethodProbe(type.GetMethod(name, instance)!, GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
-            probes.Add(new ScopedMethodProbe(typeof(BmsDrawableJudgementOutput).GetMethod("PublishState", instance,
+            probes.Add(new ScopedMethodProbe(typeof(BmsJudgementBridge).GetMethod("PublishState", instance,
                 [typeof(BmsLongNote), typeof(BmsLongNoteState).MakeByRefType(), typeof(BmsFrameContext).MakeByRefType()])!,
                 GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
             foreach (var type in drawables.Where(d => d.HitObject is BmsLongNote).Select(d => d.GetType()).Distinct())
                 probes.Add(new ScopedMethodProbe(type.GetMethod("applyPresentation", instance)!, GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
             // Keep synchronous feedback visible after earlier fixtures warm the production rule callers.
-            foreach (var type in new[] { typeof(BmsColumnJudgementContext), typeof(BmsLongNoteJudgementRule), typeof(BmsJudgementExecutionContext) })
+            foreach (var type in new[] { typeof(BmsColumnJudgementRuntime), typeof(BmsLongNoteJudgementRule), typeof(BmsJudgementExecutionContext) })
                 foreach (var method in type.GetMethods(instance).Where(m => m.Name is "HandleNotePress" or "HandleExecutionRelease" or "PublishState" or "TryPress" or "CheckPassive" or "TryRelease"))
                     probes.Add(new ScopedMethodProbe(method, GetType().GetMethod(nameof(keepCallBoundary), statics)));
 

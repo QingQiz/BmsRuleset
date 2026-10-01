@@ -2,7 +2,7 @@
 
 [返回开发文档](development.md)
 
-更新：2026-10-01。按最新实施要求，先完成核心、Mod 和所有生产消费者的重构，持续提交中间态；测试迁移、Git 旧版对照及验收统一放在重构完成后。
+更新：2026-10-01。本轮在既有迁移之上重构 Judgement 的职责和依赖边界，保留规则、框架权威结果与同步检查点。实现、定向回归和 Git 旧版行为/表现对照同步完成；性能测试按用户要求暂停，性能验收保持开放。
 
 <a id="implementation-start"></a>
 
@@ -12,9 +12,9 @@
 
 本次调整以生产实现为先，不为运行尚未迁完的测试增加中间适配层。以下行为、架构和性能要求保持为最终验收条件，不作为中间提交或 Mod 迁移前的测试门槛。
 
-当前在 `codex/hitobject-judgement-refactor` 分支完成核心、Mod 与生产消费者迁移。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次。列上下文已移除 Drawable、容器及图形时钟依赖，表示绑定与生命周期通知归入现有输出适配。各绘制子类组合自己的图形，容器提供共享视觉帧，由长按计算头尾布局。纯视觉观测已独立登记并按表示代次解绑，布局读取固定头位置和方向历史。收尾去重已从 `LastPostTime` 迁到绑定内的调度代次/模拟步骤。生产及完整测试项目 Release 构建均为 0 警告、0 错误。
+当前在 `codex/hitobject-judgement-refactor` 分支完成核心、Mod 与生产消费者迁移。纯核心移至 `Gameplay/Judgement`，框架适配位于 `UI/Gameplay/Judgement`，表现映射位于 Drawable 的 `Presentation` 目录。`BmsColumnJudgementRuntime` 是列级协调入口；活跃索引、长按绑定与类型状态、地雷状态、自动演奏分别由独立组件拥有。`BmsJudgementBridge` 明确承接生命周期输入和结果/反馈输出。通用 Drawable 基类已移除长按专用空钩子，具体长按在绑定时注册模拟步骤反馈。规则、权威结果、同步观察顺序和调度代次契约保持不变。
 
-测试消费者已直接迁到最终入口，旧 Controller 记录器已删除；Note、LN、CN、HCN 执行测试使用正式框架出口与记录出口对照。AutoScratch 已迁到核心模拟步骤，Mod 注册已恢复，新增纯引擎自动头尾、回退、重绑定和暂停恢复测试。共享记录器覆盖自动化并保留原 AS-1 fixture。运行时回归和 Git 对照已推进到最终接口，结果见[证据记录](#handoff-evidence)；性能仍等待许可后测量。先前 634 项通过仅属于生命周期检查点 `e1de0257`。已建立永久[判定引擎开发文档](judgement-engine.md)，方案清理和最终集成留到验收完成后。
+测试消费者已直接迁到正式入口，旧 Controller 记录器已删除；Note、LN、CN、HCN 执行测试使用框架出口与记录出口对照。AutoScratch 已迁到核心模拟步骤，Mod 注册已恢复。共享记录器覆盖自动化并保留原 AS-1 fixture；本轮保留原始行为断言和冻结轨迹，增加直接时间变更、稀疏长按存储、非法重排恢复及反馈代次测试。结果见[证据记录](#handoff-evidence)；永久职责说明见[判定引擎开发文档](judgement-engine.md)。方案清理和最终集成仍需等待全部验收完成。
 
 快速导航：[实施顺序](#implementation-order) · [目标架构](#target-structure) · [生命周期](#state-lifecycle) · [调度](#scheduling-contracts) · [Git 对照](#git-comparison) · [验收](#behaviour-acceptance) · [验证命令](#verification-commands) · [完成条件](#completion)。
 
@@ -82,9 +82,13 @@ BmsPlayfield
   v
 BmsJudgementEngine (每个 playfield 一个)
   +-- 全局阶段顺序、输入批次、暂停及回退协调
-  +-- BmsColumnJudgementContext[]
-  |     +-- 按键方向、按键历史、按对象身份维护的候选与活跃索引
-  |     +-- 规则绑定及每个对象的运行状态/历史
+  +-- BmsColumnJudgementRuntime[]
+  |     +-- 按键方向、按键历史、稳定谱面槽位
+  |     +-- BmsColumnNoteIndex：活跃成员、候选、待判端点、身体、截止时间
+  |     +-- BmsHoldRegistry：不可变长按绑定与按模式持有的类型化状态
+  |     +-- BmsLandmineRegistry：地雷状态与活跃顺序
+  |     +-- BmsAutoScratchController：按需创建的自动持有和遍历计划
+  |     +-- BmsCoreJudgementSchedule：绑定句柄与阶段/步骤去重
   |     +-- BmsJudgementSelector
   +-- BmsNoteJudgementRule           普通 Note
   +-- BmsLongNoteJudgementRule       LN
@@ -95,7 +99,7 @@ BmsJudgementEngine (每个 playfield 一个)
   +-- 内部执行上下文：协调状态检查点，维护索引及阶段成员
   | 在原检查点同步调用外部适配；替换出口不替换内部协调
   v
-IBmsJudgementOutput / 当前表示适配
+BmsJudgementBridge（框架双向适配，实现 IBmsJudgementOutput）
   +-- Drawable 薄适配 -> ApplyResult -> 框架计分与回退链
   +-- 合成端点、非消费判定、HCN tick -> 现有计分与回退路径
   +-- 只读状态通知 -> 表现映射及即时反馈
@@ -123,7 +127,7 @@ BmsHitObjectLifetimeEntry
   +-- 通过无状态规则获取激活/回收所需窗口
 ```
 
-以上是目标结构，新增名称不代表已经存在实现。结果适配和表现策略可以用内部方法或无状态函数实现，不要求逐对象创建服务。规则实例在同一游玩内共享；窗口缓存、释放历史和身体累计属于具体对象的运行状态。
+以上组件已落入生产实现，结构本身不代表通过最终验收。核心、框架适配和表现映射分属独立命名空间；核心不得依赖 UI、Drawable 或图形时钟。结果适配和表现策略不要求逐对象创建服务。规则实例在同一游玩内共享；窗口缓存、释放历史和身体累计属于具体对象的运行状态。
 
 **关系图约定。** 上面的概览表达职责与数据流；继承、持有和使用依赖由静态关系图及所有权表明确。关系图描述迁移完成后的约束，不能作为现实现已经符合的证明。
 
@@ -134,23 +138,23 @@ BmsHitObjectLifetimeEntry
 
 图中的职责名称不要求逐一创建新类或接口。继承关系不能仅为复用某块图形而扩展；可变状态和图形组件的持有者、跨边界引用的有效期应与“状态与生命周期”一节一致。
 
-### 引擎、列上下文与类型规则
+### 引擎、列运行时与类型规则
 
-- 引擎统一处理全列阶段；列上下文只查找本列对象，不自行跑一套完整帧循环。
+- 引擎统一处理全列阶段；列运行时只查找本列对象，不自行跑一套完整帧循环。
 - `BmsJudgementSelector` 继续负责同列跨类型候选选择。选中目标后，上下文直接调用该对象已绑定的规则，不经 `Drawable.TryHit()` 再转回上下文。PMS 非消费 BAD、E-POOR 和按键历史仍在原列级选择流程处理。
 - LN、CN、HCN 各自拥有完整的状态转换、端点结算及回退语义。三个规则使用组合共享计算组件，不让 HCN 继承 CN 的判定流程。
 - 普通 Note 处理按下与被动漏判；三种长按规则处理头尾、重按、释放、暂停结算及自身回退；只有 HCN 注册身体更新能力；地雷处理经过。
 - Invisible Note 保持独立的 keysound 时间线，不进入计分候选。
 - 规则按阶段操作登记，不使用一个带通用事件类型和内部 `switch` 的万能 `Process` 接口。“有一种操作”不等于“新增一个接口”；长按操作、HCN 身体和回退通过具体规则绑定接入，普通 Note 不提供这些操作的空实现。
 - 每种对象的规则在初始化或登记时确定，热点路径避免反复类型分派、临时委托和对象分配。
-- Engine/列上下文的初始化输入为谱面数据、列配置和结果/反馈出口；不要求构造真实 Playfield、Column 或图形时钟。Playfield 适配提供时间值和生命周期通知，列级音效请求经反馈出口代理到现有音频路径。
+- Engine/列运行时的初始化输入为谱面数据、列配置和结果/反馈出口；不要求构造真实 Playfield、Column 或图形时钟。Playfield 适配提供时间值和生命周期通知，列级音效请求经反馈出口代理到现有音频路径。
 - 玩家和普通回放适配调用核心引擎入口，保留输入时间、方向、批次次序及反馈时点。核心入口稳定后，继续适配 AutoScratch 等 Mod；定向操作和采样语义在 Mod 工作中决定，不以旧 Mod 调度反向规定核心接口。
 
 | 调度操作（示意，不逐项新增接口） | 调用方与输入 | 实现规则 |
 | --- | --- | --- |
 | `TryPress` | 已选对象运行状态、结果、输入时间、模拟时间、方向、速率及同步出口 | 普通 Note、LN、CN、HCN |
 | `CheckPassive` | 对象运行状态、模拟时间及同步出口；在已记录的被动检查边界调用 | 普通 Note、LN、CN、HCN |
-| `TryRepress` / `TryRelease` / `CompleteAtPause` | 列上下文选目标，具体绑定调用对应规则的方法 | LN、CN、HCN |
+| `TryRepress` / `TryRelease` / `CompleteAtPause` | 列运行时选目标，具体绑定调用对应规则的方法 | LN、CN、HCN |
 | `UpdateBody` | 模拟时间、elapsed、本批最终物理按住状态及自动按住状态 | HCN |
 | `CheckPassing` | 模拟时间与本批最终物理按住状态 | 地雷 |
 | `Rewind` | 对象运行状态与回退时间，协调顺序由引擎决定 | LN、CN、HCN、地雷 |
@@ -161,7 +165,9 @@ BmsHitObjectLifetimeEntry
 
 **操作绑定方案。** 采用按操作登记的缓存调用，不将 `BmsRuleBinding` 实现为所有类型共用的大型委托包，也不按类型整批执行混合对象：
 
-- 每列、每种规则建立共享的具体调用适配，适配引用列上下文拥有的该类型状态存储并缓存方法组委托。规则本身接受具体类型的状态；热点路径不使用 `object`、`DynamicInvoke` 或按模式强转。重复的存储/登记代码确有需要时才提取泛型工具。
+- `BmsHoldRegistry` 将音符槽位映射到只按长按数量分配的不可变绑定记录；记录整体保存对象身份、共享操作适配和类型状态索引，替代需要共同维护的多组操作数组。各模式的共享适配拥有独立类型列表，规则借用对应状态。
+- 共享 `HoldOperations` 仅描述三种长按实际共有的能力。三种判定规则仍相互独立；HCN 身体操作只存在于 HCN 适配，不为普通 Note、LN 或 CN 增加身体空实现。
+- 每列、每种规则建立共享的具体调用适配，适配引用列运行时拥有的该类型状态存储并缓存方法组委托。规则本身接受具体类型的状态；热点路径不使用 `object`、`DynamicInvoke` 或按模式强转。重复的存储/登记代码确有需要时才提取泛型工具。
 - 对象登记是值类型记录，包含稳定对象身份、状态槽位及共享操作绑定；普通 Note 复用谱面对象索引，不创建独立的可变状态堆对象。注册工厂保证槽位和对应类型存储匹配。
 - 按下、被动、重按/释放等各自登记实际支持的操作；未支持的对象不进入该操作的登记表。一次候选选择仍只产生一个目标，再调用该目标的操作；能力登记不改变候选胜出规则。
 - HCN 身体和地雷经过各自只有一个具体实现，活跃阶段直接调用对应规则。混合被动计划按原顺序保存对象 handle，通过已登记操作调用规则；共享委托数量随列数和规则种类增长，不随音符数、输入数或帧数增长。
@@ -171,7 +177,9 @@ BmsHitObjectLifetimeEntry
 
 以下关系描述目标设计，沿用前述继承、持有、引用和使用依赖图例。图中的“各类型 Rule”“类型化状态存储”“操作登记”和“执行上下文”是已定义职责的展示，不要求新增统一 Rule 基类、RuleSet 服务或逐音符包装对象。静态关系图不表达同步执行先后；结果提交、状态发布及回退顺序仍以对应检查点契约为准。
 
-**引擎、列上下文与共享规则。** 宿主创建并管理本次游玩的引擎；引擎持有列上下文、共享规则实例及全局调度数据。列上下文拥有本列的输入状态、索引、对象运行状态和操作登记，绑定只引用共享 Rule 及对应状态存储。选择器保留静态工具依赖。
+**引擎、列运行时与共享规则。** 宿主创建并管理本次游玩的引擎；引擎持有列运行时、共享规则实例及全局调度数据。列运行时拥有本列的输入状态、索引、对象运行状态和操作登记，绑定只引用共享 Rule 及对应状态存储。选择器保留静态工具依赖。
+
+列运行时通过组合持有组件，索引和类型状态不再分散在同一个 partial 类中。索引只暴露只读成员视图，重排先校验完整性再更新活跃顺序；缓存 rank 替代循环中的 `Contains`/`IndexOf` 顺序查找。直接变更 `StartTime` 会更新待判头键、历史查找排序和自动计划，并立即使被动截止时间失效。框架桥接的双向职责保留在同一边界，避免为生命周期与结果分别复制表示绑定。
 
 ```mermaid
 classDiagram
@@ -179,35 +187,43 @@ classDiagram
 
     class Host["生产 Playfield／测试宿主"]
     class BmsJudgementEngine
-    class BmsColumnJudgementContext
+    class BmsColumnJudgementRuntime
     class ScheduleData["输入批次／阶段计划／回退协调数据"]
     class SharedRules["普通 Note／LN／CN／HCN／地雷独立 Rule"]
     class ColumnInput["列按键状态与 BmsNotePressHistory"]
-    class ColumnIndexes["候选／待判端点／活跃身体索引"]
-    class RuntimeStore["类型化对象状态存储"]
-    class OperationBindings["按操作登记的缓存调用"]
+    class BmsColumnNoteIndex
+    class BmsHoldRegistry
+    class BmsLandmineRegistry
+    class BmsAutoScratchController
+    class BmsCoreJudgementSchedule
+    class RuntimeStore["长按类型状态存储"]
+    class OperationBindings["不可变长按绑定／共享模式适配"]
     class BmsJudgementSelector
 
     Host *-- BmsJudgementEngine : 本次游玩
-    BmsJudgementEngine *-- "1..*" BmsColumnJudgementContext : 每列一个
+    BmsJudgementEngine *-- "1..*" BmsColumnJudgementRuntime : 每列一个
     BmsJudgementEngine *-- ScheduleData
     BmsJudgementEngine *-- SharedRules : 每种规则共享
-    BmsColumnJudgementContext *-- ColumnInput
-    BmsColumnJudgementContext *-- ColumnIndexes
-    BmsColumnJudgementContext *-- RuntimeStore
-    BmsColumnJudgementContext *-- OperationBindings
-    BmsColumnJudgementContext ..> BmsJudgementSelector : 静态候选选择
+    BmsColumnJudgementRuntime *-- ColumnInput
+    BmsColumnJudgementRuntime *-- BmsColumnNoteIndex
+    BmsColumnJudgementRuntime *-- BmsHoldRegistry
+    BmsColumnJudgementRuntime *-- BmsLandmineRegistry
+    BmsColumnJudgementRuntime *-- BmsAutoScratchController : 按需
+    BmsColumnJudgementRuntime *-- BmsCoreJudgementSchedule
+    BmsHoldRegistry *-- OperationBindings
+    BmsHoldRegistry *-- RuntimeStore
+    BmsColumnJudgementRuntime ..> BmsJudgementSelector : 静态候选选择
     OperationBindings --> SharedRules : 缓存对应操作
     OperationBindings --> RuntimeStore : 按身份取得对应状态
 ```
 
-**具体 Rule 与逐对象状态。** 五种 Rule 相互独立，不通过继承或互相调用复用结算流程。规则每次操作借用对应状态，状态的存储和生命期仍由引擎的列上下文管理。普通 Note 使用谱面数据和必要的值缓存；框架主结果查询通过下一图的执行上下文/出口完成，不为普通 Note 增加独立可变状态堆对象。
+**具体 Rule 与逐对象状态。** 五种 Rule 相互独立，不通过继承或互相调用复用结算流程。规则每次操作借用对应状态，状态的存储和生命期仍由引擎的列运行时管理。普通 Note 使用谱面数据和必要的值缓存；框架主结果查询通过下一图的执行上下文/出口完成，不为普通 Note 增加独立可变状态堆对象。
 
 ```mermaid
 classDiagram
     direction TB
 
-    class RuntimeStore["列上下文中的类型化对象状态存储"]
+    class RuntimeStore["长按登记表／地雷登记表中的类型化对象状态存储"]
     class BmsNoteJudgementRule
     class BmsLongNoteJudgementRule
     class BmsChargeNoteJudgementRule
@@ -248,13 +264,13 @@ classDiagram
     direction TB
 
     class BmsJudgementEngine
-    class BmsColumnJudgementContext
+    class BmsColumnJudgementRuntime
     class ConcreteRule["当前操作对应的具体 Rule"]
     class ExecutionContext["内部执行上下文（调用期）"]
     class IBmsJudgementOutput {
         <<interface>>
     }
-    class ProductionOutput["生产结果适配"]
+    class ProductionOutput["BmsJudgementBridge：框架双向适配"]
     class RecordingOutput["记录结果适配"]
     class FrameworkServices["框架结果／计分／血量及反馈服务"]
     class RepresentationBindings["当前表示登记（对象身份与代次）"]
@@ -263,7 +279,7 @@ classDiagram
 
     BmsJudgementEngine --> IBmsJudgementOutput : 注入的出口
     ConcreteRule ..> ExecutionContext : 查询结果及请求同步操作
-    ExecutionContext --> BmsColumnJudgementContext : 借用并协调内部索引
+    ExecutionContext --> BmsColumnJudgementRuntime : 借用并协调内部索引
     ExecutionContext --> IBmsJudgementOutput : 借用并调用外部适配
     IBmsJudgementOutput <|.. ProductionOutput
     IBmsJudgementOutput <|.. RecordingOutput
@@ -276,8 +292,8 @@ classDiagram
 
 | 关系 | 所有权与有效期 |
 | --- | --- |
-| 引擎持有列上下文、规则及调度数据 | 本次游玩；Rule 实例共享，各对象的可变状态由列上下文存储，规则不长期捕获某个对象状态 |
-| 列上下文持有索引及对象状态 | 对象以稳定身份关联；索引只维护其所需活跃范围，状态/历史按回退需求保留，不随 Drawable 回池删除 |
+| 引擎持有列运行时、规则及调度数据 | 本次游玩；Rule 实例共享，各对象的可变状态由列运行时存储，规则不长期捕获某个对象状态 |
+| 列运行时持有索引及对象状态 | 对象以稳定身份关联；索引只维护其所需活跃范围，状态/历史按回退需求保留，不随 Drawable 回池删除 |
 | 操作登记引用 Rule 和类型化存储 | 复用共享调用；对象登记只保存身份、槽位及相应绑定，不保存池化 Drawable 或每对象闭包 |
 | Rule 借用执行上下文和类型化状态 | 一次同步操作内有效；只有对应规则写该类型玩法状态，执行上下文维护派生索引而不重新决定类型语义 |
 | HCN 对象状态持有累计器与历史 | 每对象独立，按对应回退/暂停规则恢复；其他类型不创建 HCN 身体状态 |
@@ -285,7 +301,7 @@ classDiagram
 | 生产出口借用框架服务和表示登记 | 框架主结果仍归原框架链；表示登记由宿主的框架适配层管理，Reapply 替换代次，真正移除完成末次检查后解除引用 |
 | 记录出口持有测试主结果 | 模拟权威结果查询及同步提交/撤销观察点；不另行实现规则、派生索引或调度算法 |
 
-框架生命周期适配通过对象身份向引擎报告激活、重应用、移除和恢复边界；输出适配调用注入的同步结果检查点回调，索引算法仍归引擎/列上下文。两者均不在规则中暴露 Drawable。跨层的表现映射只读取语义状态并产生表现值，不能反向调用 Rule 推进判定。Invisible Note 继续使用独立 keysound 时间线，不因该关系图增加一个空判定 Rule。Mod 适配在这些核心关系之外使用稳定入口；适配不取得规则、状态或调度所有权，最终实现不含旧协议转发层。
+框架生命周期适配通过对象身份向引擎报告激活、重应用、移除和恢复边界；输出适配调用注入的同步结果检查点回调，索引算法仍归引擎/列运行时。两者均不在规则中暴露 Drawable。跨层的表现映射只读取语义状态并产生表现值，不能反向调用 Rule 推进判定。Invisible Note 继续使用独立 keysound 时间线，不因该关系图增加一个空判定 Rule。Mod 适配在这些核心关系之外使用稳定入口；适配不取得规则、状态或调度所有权，最终实现不含旧协议转发层。
 
 ### 接口与操作边界
 
@@ -304,7 +320,7 @@ LN/CN/HCN 使用三个具体 Rule，其运行状态、端点、表现数据及�
 
 规则通过引擎提供的具体执行上下文调用 `PublishState(objectId, context)`，不直接把内部索引通知交给可替换出口。执行上下文在规定检查点同步刷新只读表现，再由引擎重新计算该对象的索引成员和截止时间；记录出口可以不生成任何图形，内部索引更新仍然执行。公开出口不增加 `OnHellChargeHeadPoor`、`KeepLongNoteAlive` 等模式专用方法。`BmsLongNoteEndpointResult` 等领域数据仍可存在，LN 专有数据不需要为消除名称而泛化。
 
-核心实现同时消除列上下文的 LN Drawable 强转、测试对旧绘制接口的判定查询以及所有过渡分派。Mod 后续直接接入最终契约，不能借旧接口或同义转发恢复耦合。真实需要的皮肤来源、HUD 事件和框架规定的接口继续保留，接口数量本身不作为完成指标。
+核心实现同时消除列运行时的 LN Drawable 强转、测试对旧绘制接口的判定查询以及所有过渡分派。Mod 后续直接接入最终契约，不能借旧接口或同义转发恢复耦合。真实需要的皮肤来源、HUD 事件和框架规定的接口继续保留，接口数量本身不作为完成指标。
 
 <a id="state-checkpoints"></a>
 
@@ -361,7 +377,7 @@ LN/CN/HCN 使用三个具体 Rule，其运行状态、端点、表现数据及�
 | 数据 | 唯一归属 | 生命周期 |
 | --- | --- | --- |
 | 谱面时间、列、音效与预计算滚动数据 | `BmsHitObject` 及谱面处理流程 | 谱面 |
-| 按键方向、候选索引、`BmsNotePressHistory` | 引擎的列上下文 | 本次游玩 |
+| 按键方向、候选索引、`BmsNotePressHistory` | 引擎的列运行时 | 本次游玩 |
 | 类型化运行状态、长按历史、地雷经过时间 | 引擎按谱面对象持有，由对应规则写入 | 支持回退的本次游玩，按需创建 |
 | 主 `JudgementResult`、框架已判定状态及主结果回退栈 | 现有框架 entry/playfield 链 | 由框架管理 |
 | 合成端点、非消费判定和血量历史 | 现有计分/血量及 playfield 回退路径 | 由对应路径管理，引擎协调调用 |
@@ -748,14 +764,40 @@ foreach ($refactorGroup in $refactorFilters.Keys) {
 
 进度只记录核心实现、核心对照适配、Mod 适配及最终集成的实际状态，包括当前缺口和构建/测试结果。
 
-### 当前核心实现进度
+### 本轮职责重构（2026-10-01）
 
-- LN、CN、HCN 各自实现头尾、释放与重按、PMS 宽限、暂停和回退；只共享窗口、端点数据及释放历史。LN 独有暂存头端点，HCN 独有身体累计与历史。规则实例由引擎共享，类型化状态由列上下文持有；长按操作表按长按数量分配，普通 Note 不创建状态包装。
+- 将纯判定核心、框架双向适配和表现映射拆为三个命名空间；不再将它们统一归入 UI 的 Judgement 目录。
+- 用单一 `BmsColumnJudgementRuntime` 协调输入和检查点，组合持有 `BmsColumnNoteIndex`、`BmsHoldRegistry`、`BmsLandmineRegistry`、`BmsAutoScratchController` 和调度器，删除原列上下文的各个 partial 文件。
+- 长按使用“谱面槽位 → 长按绑定 → 类型状态”关系，绑定整体保存对象、共享操作适配和状态索引。只有实际长按分配绑定记录，普通 Note 不分配长按状态或逐对象委托；HCN 身体操作保留在对应适配中。
+- 活跃顺序使用缓存 rank，校验失败不会破坏已发布的索引。直接修改 `StartTime` 同步刷新待判头、历史查找顺序、自动计划和被动截止时间；原生框架订阅和纯核心均有回归覆盖。
+- `BmsJudgementBridge` 持有框架表示绑定、权威结果引用以及按代次注册的状态和模拟反馈。长按主动注册 `ObserveSimulationSteps`，通用 Drawable 基类移除 `UpdateVisualState` 空钩子；表现映射决定持续灯效是否活跃，Drawable 保留脉冲计时。
+- 规则算法、原始冻结 fixture 和同步检查点预期未改。结构反射测试迁移到实际状态持有组件；核心边界检查扩展到所有核心类型的字段、方法及构造参数。
+
+**本轮验证结果。** 生产及完整测试项目 Release 构建均为 **0 警告、0 错误**。正式验证脚本的默认 JIT 分组 **1,337 项通过**，独立仪器化分组 **294 项通过**，合计 **1,631 项，0 失败、0 跳过**。所有测试均使用明确过滤器，排除性能测试。新增覆盖包括真实 Note/LN/CN/HCN 时间变更、长按反馈的重应用与回收、稀疏长按绑定、重排失败后的索引完整性及全核心成员依赖检查。
+
+复用 `verified-profiles/comparison/baseline` 中保留的原始 Git 基线 `d4e690cd3f8fadc70fe2d82021f338a012e1980e` 轨迹，与本轮重新生成的轨迹比较：**86/86 行为通过，86/86 视觉通过**。比较器和原始 fixture 未改，仍使用既有血量数值与视觉几何容差。本轮未重跑旧版本；这份证据是当前实现与既有基线轨迹的对照。
+
+本轮可复现入口：
+
+```powershell
+./scripts/verify-judgement-migration.ps1 -ResultsDirectory artifacts/hitobject-core/refactor-20261001/final
+python scripts/compare-judgement-traces.py artifacts/hitobject-core/verified-profiles/comparison/baseline artifacts/hitobject-core/refactor-20261001/final/comparison/current --output artifacts/hitobject-core/refactor-20261001/final/comparison/report.json
+```
+
+该目录保留分组日志、TRX、实际命令、`summary.json` 及轨迹报告。首次组合运行的旧探针定位错误保存在相邻 `verification` 目录；最终结果以 `final` 为准。探针已迁至实际拥有截止时间计算的 `BmsColumnNoteIndex.RefreshDeadline`，原扫描上限与真实失效断言保留。
+
+本轮性能测试按用户要求暂停。此前获准执行的性能对照不作为本轮实现的性能结论；最终性能验收与集成保持开放。
+
+### 先前核心迁移记录（历史）
+
+以下保留各中间检查点的证据与当时的待办，当前状态以本轮记录为准。
+
+- LN、CN、HCN 各自实现头尾、释放与重按、PMS 宽限、暂停和回退；只共享窗口、端点数据及释放历史。LN 独有暂存头端点，HCN 独有身体累计与历史。规则实例由引擎共享，类型化状态由列运行时持有；长按操作表按长按数量分配，普通 Note 不创建状态包装。
 - 地雷经过状态由核心按谱面身份持有，移除 `BmsHitObjectLifetimeEntry` 和 Drawable 中的经过时间。地雷 Drawable 只读取状态并应用表现；活跃地雷、待判尾、身体和长按收尾列表使用谱面对象或槽位。
 - 引擎接受多列数据定义、模拟帧、elapsed 和有序输入；先全部地雷、再全部 HCN 身体、最后输入。同时间戳的新输入批次保留，同步反馈追加的输入留给下一批处理。生产适配提供时钟值、结果和表示生命周期，HCN 身体不再读取 Drawable 时钟。
 - 已迁移 LN/HCN 登记断言、真实长按生命周期和 HCN 跨列帧顺序测试；新增多列阶段、地雷边界、暂停发布检查点及真实 ApplyDefaults 的绑定代次断言。既有长按生命周期 fixture 的结果、计分和血量预期保持不变。
 - 旧 Controller 单测迁为 `BmsLongNoteRuleTest`，beatoraja 窗口参考与 HCN 血量历史测试通过正式列操作和记录出口执行；端点时间、PMS 宽限和血量预期保留。三组迁移测试合计 113 项通过，不恢复旧 Controller 或 sink。
-- `BmsDrawableJudgementOutput` 管理表示代次、观察者和生命周期适配；核心只接收谱面身份、活跃顺序及数值帧。新增架构检查，约束引擎、列上下文和调度的字段及方法签名不依赖 Drawable 或图形时钟。
+- `BmsJudgementBridge` 管理表示代次、观察者和生命周期适配；核心只接收谱面身份、活跃顺序及数值帧。新增架构检查，约束引擎、列运行时和调度的字段及方法签名不依赖 Drawable 或图形时钟。
 - `BmsNoteVisual` 由 Note、地雷和长按头按需组合，Invisible Note 自有标记；通用基类与泛型列层不再持有头部图形。共享 `BmsColumnVisualFrame` 和 `BmsVisualLayout` 保留原投影和裁剪边界，容器不再计算长按尾坐标。已迁移活跃索引与头部组件测试，并验证重复视觉更新不改变端点状态、结果及血量。
 - 固定头位置和方向在表现绑定登记的数值帧观测中采样，布局只读取历史；延迟视觉观测不再遍历核心活跃长按列表，未按下的长按也能采样接近判定线的位置。重应用替换登记，回池解绑，回退重新登记；重复布局与皮肤遍历不推进判定或视觉历史。
 - `BmsCoreSchedulingRecorder` 已迁至具体规则、正式调度和输出适配；移除测试中的新旧执行开关，保留 `judgement_p3a07_core.json` 原始内容及逻辑轨迹投影。数值帧参数映射到原参数字段，长按移除观察点覆盖末次被动检查，解绑期间的表现快照仍为空；这些变化对应观测位置与数据所有权迁移，不删除状态、结果或中间血量字段。19 项调度/生命周期测试通过，包括原始键盘与真实回放轨迹对照。

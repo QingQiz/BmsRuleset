@@ -4,7 +4,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 // Endpoint data and release history are shared storage; each rule owns its mode's transitions.
 internal struct BmsHoldRuntime

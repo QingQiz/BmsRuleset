@@ -1,3 +1,5 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
@@ -29,8 +31,8 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private readonly List<(int Position, BmsScheduledObject Object)> corePositions = [];
     private readonly Dictionary<DrawableBmsHitObject, Bindable<double>> coreStartTimes = [];
 
-    internal BmsColumnJudgementContext Judgements { get; set; } = null!;
-    internal BmsDrawableJudgementOutput JudgementOutput { get; set; } = null!;
+    internal BmsColumnJudgementRuntime Judgements { get; set; } = null!;
+    internal BmsJudgementBridge JudgementBridge { get; set; } = null!;
 
     public override void Add(HitObjectLifetimeEntry entry)
     {
@@ -57,7 +59,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         if (drawable is not DrawableBmsHitObject note)
             return;
 
-        JudgementOutput.Register(note);
+        JudgementBridge.Register(note);
         InvalidateCoreOrder();
     }
 
@@ -67,11 +69,11 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         if (drawable is DrawableBmsHitObject old && coreStartTimes.Remove(old, out var startTime))
             startTime.UnbindAll();
         if (drawable is DrawableBmsHitObject note)
-            JudgementOutput.Unregister(note);
+            JudgementBridge.Unregister(note);
 
         base.RemoveDrawable(entry, drawable);
         if (drawable is DrawableBmsHitObject removed)
-            JudgementOutput.UnbindRemovedNote(removed);
+            JudgementBridge.UnbindRemovedNote(removed);
     }
 
     internal void BeginGameplayFrame()
@@ -199,11 +201,15 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         corePositions.Clear();
         foreach (var drawable in AliveEntries.Values)
         {
-            if (drawable is not DrawableBmsHitObject note || !JudgementOutput.TryGetScheduledObject(note, out var item)) continue;
+            if (drawable is not DrawableBmsHitObject note || !JudgementBridge.TryGetScheduledObject(note, out var item)) continue;
             if (!coreStartTimes.ContainsKey(note))
             {
                 var startTime = note.StartTimeBindable.GetBoundCopy();
-                startTime.BindValueChanged(_ => InvalidateCoreOrder());
+                startTime.BindValueChanged(_ =>
+                {
+                    Judgements.RefreshNoteTiming(note.HitObject);
+                    InvalidateCoreOrder();
+                });
                 coreStartTimes.Add(note, startTime);
             }
             coreLayoutOrder.Add(item);
@@ -229,6 +235,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         if (Time.Elapsed >= 0 || isResumeRewinding())
             return;
 
-        JudgementOutput.RestoreRewoundState(coreFrame());
+        JudgementBridge.RestoreRewoundState(coreFrame());
     }
 }

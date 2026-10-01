@@ -4,7 +4,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 /// <summary>
 /// Synchronous framework results and feedback, without ownership of judgement indexes.
@@ -17,7 +17,7 @@ internal interface IBmsJudgementOutput
     void ApplyMainResult(BmsLongNote note, HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints, in BmsFrameContext frame, bool suppressPenalty);
     void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty);
     void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame);
-    void ObserveLongNoteStep(BmsLongNote note, in BmsFrameContext frame);
+    void ObserveSimulationStep(BmsHitObject note, in BmsFrameContext frame);
     void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame);
     void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame);
     void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame);

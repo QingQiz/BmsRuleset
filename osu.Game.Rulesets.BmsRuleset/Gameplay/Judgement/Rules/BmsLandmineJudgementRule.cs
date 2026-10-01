@@ -1,7 +1,7 @@
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 internal readonly record struct BmsLandmineState(double? HandledTime, bool Detonated);
 internal delegate void BmsLandmineStateObserver(in BmsLandmineState state, in BmsFrameContext frame);

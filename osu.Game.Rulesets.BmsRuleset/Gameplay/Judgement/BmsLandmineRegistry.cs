@@ -2,18 +2,23 @@ using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
-internal sealed partial class BmsColumnJudgementContext
+internal sealed class BmsLandmineRegistry
 {
     private readonly Dictionary<BmsLandmine, BmsLandmineRuntime> landmineStates = [];
     private readonly List<BmsLandmine> activeLandmines = [];
 
-    private void initialiseLandmines(IEnumerable<BmsHitObject> objects)
+    private readonly BmsLandmineJudgementRule rule;
+    private readonly IBmsJudgementOutput output;
+
+    internal BmsLandmineRegistry(IEnumerable<BmsHitObject> objects, int column, BmsLandmineJudgementRule rule, IBmsJudgementOutput output)
     {
+        this.rule = rule;
+        this.output = output;
         foreach (var hitObject in objects)
         {
-            if (hitObject is BmsLandmine mine && mine.Column == Index)
+            if (hitObject is BmsLandmine mine && mine.Column == column)
                 landmineStates.Add(mine, new BmsLandmineRuntime(mine));
         }
     }
@@ -43,7 +48,7 @@ internal sealed partial class BmsColumnJudgementContext
         for (var i = 0; i < activeLandmines.Count;)
         {
             var mine = activeLandmines[i];
-            Rules.Landmine.CheckPassing(landmineStates[mine], noteOutput, frame, holding);
+            rule.CheckPassing(landmineStates[mine], output, frame, holding);
             if (i < activeLandmines.Count && ReferenceEquals(activeLandmines[i], mine))
                 i++;
         }
@@ -52,6 +57,6 @@ internal sealed partial class BmsColumnJudgementContext
     internal void RewindLandmines(double time)
     {
         foreach (var state in landmineStates.Values)
-            Rules.Landmine.Rewind(state, time);
+            rule.Rewind(state, time);
     }
 }

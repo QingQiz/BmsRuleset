@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 internal sealed class BmsHellChargeHistory
 {

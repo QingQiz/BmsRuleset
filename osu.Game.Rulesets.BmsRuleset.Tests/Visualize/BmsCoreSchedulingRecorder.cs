@@ -1,5 +1,8 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using System;
+using osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -69,16 +72,16 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             probe(typeof(BmsJudgementEngine), "QueueInput", "input.queue");
             probe(typeof(BmsJudgementEngine), "ProcessFrame", "batch");
             if (observeAutomation)
-                probe(typeof(BmsColumnJudgementContext), "UpdateAutoScratch", "auto");
+                probe(typeof(BmsColumnJudgementRuntime), "UpdateAutoScratch", "auto");
             probe(typeof(BmsFramedReplayInputHandler), "CollectReplayInputs", "replay.poll");
             probe(typeof(FrameStabilityContainer), "UpdateSubTree", "stability");
             probe(typeof(BmsColumnHitObjectContainer), "UpdateAfterChildrenLife", "column.layout");
             probe(typeof(BmsColumnHitObjectContainer), "UpdateDeferredFrame", "column.deferred");
             probe(typeof(BmsColumnHitObjectContainer), "RemoveDrawable", "representation.remove");
             probe(typeof(BmsColumnHitObjectContainer), "AddDrawable", "representation.add");
-            probe(typeof(BmsColumnJudgementContext), "UpdateLandmines", "mines");
-            probe(typeof(BmsColumnJudgementContext), "UpdateRegisteredBodies", "bodies");
-            probe(typeof(BmsColumnJudgementContext), "TryPressRegisteredNote", "core.press");
+            probe(typeof(BmsColumnJudgementRuntime), "UpdateLandmines", "mines");
+            probe(typeof(BmsColumnJudgementRuntime), "UpdateRegisteredBodies", "bodies");
+            probe(typeof(BmsColumnJudgementRuntime), "TryPressRegisteredNote", "core.press");
             probe(typeof(BmsCoreJudgementSchedule), "CheckPassive", "core.passive");
             probe(typeof(BmsCoreJudgementSchedule), "FinishLongNote", "long.finish");
             probe(typeof(BmsCoreJudgementSchedule), "RunLayout", "core.layout");
@@ -90,11 +93,11 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
                 probe(type, "TryRelease", "long.release");
                 probe(type, "TryRepress", "long.repress");
             }
-            probe(typeof(BmsDrawableJudgementOutput), "PublishState", "state.publish",
+            probe(typeof(BmsJudgementBridge), "PublishState", "state.publish",
                 [typeof(BmsLongNote), typeof(BmsLongNoteState).MakeByRefType(), typeof(BmsFrameContext).MakeByRefType()]);
-            probe(typeof(BmsDrawableJudgementOutput), "Unregister", "index.remove");
-            probe(typeof(BmsColumnJudgementContext), "RewindLongNotes", "history.rewind");
-            probe(typeof(BmsColumnJudgementContext), "RestoreExecutionState", "index.rebuild");
+            probe(typeof(BmsJudgementBridge), "Unregister", "index.remove");
+            probe(typeof(BmsColumnJudgementRuntime), "RewindLongNotes", "history.rewind");
+            probe(typeof(BmsColumnJudgementRuntime), "RestoreExecutionState", "index.rebuild");
             probe(typeof(BmsHellChargeNoteJudgementRule), "updateBody", "body.sample");
             probe(typeof(BmsColumn), "PlaySample", "keysound");
             // Observe the actual effect; the playfield's expression-bodied forwarding call can be inlined.
@@ -146,9 +149,8 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         }
 
         var name = recorder!.names[__originalMethod];
-        if (name == "auto" && __instance is BmsColumnJudgementContext automaticColumn
-            && (!automaticColumn.AutoScratchEnabled || ((long, long))typeof(BmsColumnJudgementContext)
-                .GetField("lastAutomaticStep", instance)!.GetValue(automaticColumn)! == (automaticColumn.Schedule.Epoch, automaticColumn.Schedule.Step)))
+        if (name == "auto" && __instance is BmsColumnJudgementRuntime automaticColumn
+            && !automaticColumn.HasPendingAutomaticStep)
         {
             __state = false;
             return;
@@ -179,8 +181,8 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         BmsHealthProcessor processor => ReferenceEquals(processor, health),
         BmsColumn column => column.Index < 2 && ReferenceEquals(playfield.Stage.Columns[column.Index], column),
         BmsColumnHitObjectContainer container => playfield.Stage.Columns.Take(2).Any(c => ReferenceEquals(c.HitObjectContainer, container)),
-        BmsColumnJudgementContext context => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.Judgements, context)),
-        BmsDrawableJudgementOutput output => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.JudgementOutput, output)),
+        BmsColumnJudgementRuntime context => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.Judgements, context)),
+        BmsJudgementBridge output => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.JudgementBridge, output)),
         BmsCoreJudgementSchedule schedule => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.Judgements.Schedule, schedule)),
         BmsFramedReplayInputHandler => true,
         FrameStabilityContainer => true,
@@ -241,7 +243,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         var column = value switch
         {
             BmsColumn c => c.Index,
-            BmsColumnJudgementContext c => c.Index,
+            BmsColumnJudgementRuntime c => c.Index,
             BmsColumnHitObjectContainer c => Array.FindIndex(playfield.Stage.Columns.ToArray(), p => ReferenceEquals(p.HitObjectContainer, c)),
             _ => (note as BmsHitObject)?.Column ?? -1,
         };
@@ -286,8 +288,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
     {
         if (drawable?.HitObject is not BmsLongNote note || !hasLongNoteObservation(drawable)) return "-";
         var context = ((BmsColumn)playfield.Stage.Columns[note.Column]).Judgements;
-        var states = (IEnumerable<BmsHellChargeNoteRuntime>)typeof(BmsColumnJudgementContext).GetField("hellChargeHoldStates", instance)!.GetValue(context)!;
-        var tracker = states.FirstOrDefault(s => ReferenceEquals(s.Hold.Note, note))?.Body;
+        var tracker = (BmsJudgementStateInspection.GetRuntime(context, note) as BmsHellChargeNoteRuntime)?.Body;
         return context.GetLongNoteState(note) + ";acc=" + (tracker == null ? "0" : format(typeof(BmsHellChargeBodyTracker).GetField("accumulator", instance)!.GetValue(tracker)));
     }
 
@@ -305,8 +306,8 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
     private bool hasLongNoteObservation(DrawableBmsHitObject drawable)
     {
         // The fixture observes representation state. Logical history now survives OnFree independently.
-        var output = ((BmsColumn)playfield.Stage.Columns[drawable.HitObject.Column]).JudgementOutput;
-        return ((System.Collections.IDictionary)typeof(BmsDrawableJudgementOutput).GetField("presentationObservers", instance)!.GetValue(output)!).Contains(drawable);
+        var output = ((BmsColumn)playfield.Stage.Columns[drawable.HitObject.Column]).JudgementBridge;
+        return ((System.Collections.IDictionary)typeof(BmsJudgementBridge).GetField("presentationObservers", instance)!.GetValue(output)!).Contains(drawable);
     }
 
     private static string format(object? value) => value is IFormattable formattable

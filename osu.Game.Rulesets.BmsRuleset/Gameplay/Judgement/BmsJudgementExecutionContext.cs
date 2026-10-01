@@ -3,12 +3,12 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 /// <summary>
 /// Borrows the column and output for one operation; no second copy of framework result state.
 /// </summary>
-internal readonly struct BmsJudgementExecutionContext(BmsColumnJudgementContext column, IBmsJudgementOutput output)
+internal readonly struct BmsJudgementExecutionContext(BmsColumnJudgementRuntime column, IBmsJudgementOutput output)
 {
     internal BmsMainResultState GetMainResult(BmsHitObject note) => output.GetMainResult(note);
 

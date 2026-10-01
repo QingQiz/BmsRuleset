@@ -1,7 +1,7 @@
 using System;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
-namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 internal sealed class BmsHellChargeBodyTracker
 {

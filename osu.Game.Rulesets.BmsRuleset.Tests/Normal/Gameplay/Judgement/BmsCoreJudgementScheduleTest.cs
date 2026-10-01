@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
@@ -25,7 +26,7 @@ public class BmsCoreJudgementScheduleTest
         context.Release(3401);
         Assert.That(context.State.TailJudged, Is.False);
         var observations = new List<string>();
-        context.Output.LongNoteStep = (note, frame) =>
+        context.Output.SimulationStep = (note, frame) =>
         {
             Assert.That(note, Is.SameAs(context.Note));
             Assert.That(frame.SimulationTime, Is.EqualTo(3990));
@@ -39,7 +40,7 @@ public class BmsCoreJudgementScheduleTest
         Assert.That(observations, Is.EqualTo(rebind ? new[] { "step" } : ["step", "tail"]));
         if (rebind)
         {
-            context.Output.LongNoteStep = (_, _) => observations.Add("replacement");
+            context.Output.SimulationStep = (_, _) => observations.Add("replacement");
             schedule.BeginBatch(0, 1, 2);
             schedule.RunLayout([handle], new BmsFrameContext(3990, 1), 589, false);
             Assert.That(observations, Is.EqualTo(new[] { "step", "replacement", "tail" }));
@@ -152,7 +153,7 @@ public class BmsCoreJudgementScheduleTest
         Assert.That(context.IsNoteCandidate(notes[0]), Is.False);
     }
 
-    private static (BmsHitObject[] Notes, BmsColumnJudgementContext Context, BmsRecordingJudgementOutput Output, BmsCoreJudgementSchedule Schedule, BmsScheduledObject[] Handles) create()
+    private static (BmsHitObject[] Notes, BmsColumnJudgementRuntime Context, BmsRecordingJudgementOutput Output, BmsCoreJudgementSchedule Schedule, BmsScheduledObject[] Handles) create()
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, TotalColumns = 8, Rank = 2 };
         BmsHitObject[] notes = [new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 },

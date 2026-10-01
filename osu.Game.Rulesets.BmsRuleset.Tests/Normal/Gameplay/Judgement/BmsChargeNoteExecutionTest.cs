@@ -1,3 +1,4 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -128,7 +129,7 @@ public class BmsChargeNoteExecutionTest
         Assert.That(output.GetMainResult(note).HasResult, Is.True);
     }
 
-    private static (BmsColumnJudgementContext Context, BmsRecordingJudgementOutput Output, BmsLongNote Note) create(int column = 1)
+    private static (BmsColumnJudgementRuntime Context, BmsRecordingJudgementOutput Output, BmsLongNote Note) create(int column = 1)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, LockedLongNoteMode = BmsLongNoteMode.ChargeNote, Rank = 2 };
         var note = new BmsLongNote { Beatmap = beatmap, Column = column, StartTime = 3000, Duration = 1000 };
