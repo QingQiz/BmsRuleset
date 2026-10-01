@@ -101,7 +101,7 @@ public partial class TestSceneBmsHcnTailVisuals : BmsPlayerTestScene
         AddStep("capture held head position", () =>
         {
             var note = Playfield.GetAliveObjectAtTime(3000)!;
-            expectedPinnedHeadY = BmsPlayfieldAssertions.BottomOf(part(note, "NoteContainer"));
+            expectedPinnedHeadY = BmsPlayfieldAssertions.BottomOf(part(note, "head"));
             Assert.That(Math.Sign(expectedPinnedHeadY.Value - Playfield.JudgementLineY()), Is.EqualTo(Math.Sign(offset)));
         });
         checkHeldBody(3915);
@@ -142,7 +142,7 @@ public partial class TestSceneBmsHcnTailVisuals : BmsPlayerTestScene
             var note = Playfield.GetAliveObjectAtTime(3000) as DrawableBmsHitObject;
             Assert.That(note, Is.Not.Null);
             Assert.That(note!.Alpha, Is.GreaterThan(0));
-            var head = part(note, "NoteContainer");
+            var head = part(note, "head");
             var body = part(note, "longNoteBody");
             Assert.That(BmsPlayfieldAssertions.BottomOf(head), Is.EqualTo(expectedPinnedHeadY ?? Playfield.JudgementLineY()).Within(1),
                 "A successfully held HCN must finish shrinking toward its pinned head.");

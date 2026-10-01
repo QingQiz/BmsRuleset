@@ -3,15 +3,11 @@ using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
-using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
 internal sealed partial class BmsColumnJudgementContext
 {
-    private BmsPlayfield playfield = null!;
     private readonly BmsNotePressHistory pressHistory = new();
     private readonly BmsHitObject[] columnNotes;
     private readonly bool canBatchUpdates;
@@ -22,18 +18,6 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal BmsJudgementRules Rules { get; }
 
-    internal void AttachRepresentationServices(BmsPlayfield playfield, BmsColumn column)
-    {
-        this.playfield = playfield;
-        Column = column;
-        Container = (BmsColumnHitObjectContainer)column.HitObjectContainer;
-        drawableNoteOutput = (BmsDrawableJudgementOutput)noteOutput;
-        column.Judgements = this;
-        Container.Judgements = this;
-    }
-
-    internal BmsColumn Column { get; private set; } = null!;
-    internal BmsColumnHitObjectContainer Container { get; private set; } = null!;
     internal int Index => noteColumnIndex;
     internal bool IsScratch => BmsLayout.IsScratchColumn(Index, LayoutVariant);
     private BmsLayoutVariant LayoutVariant => noteLayout;
@@ -49,17 +33,6 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal void RefreshPassiveDeadline(double now) => refreshNoteDeadline(now);
 
-    internal void ObserveLongNoteState(DrawableBmsHitObject drawable, BmsLongNoteStateObserver observer)
-        => drawableNoteOutput!.ObserveLongNoteState(drawable, observer);
-
-    internal void ObserveLandmineState(DrawableBmsHitObject drawable, BmsLandmineStateObserver observer)
-        => drawableNoteOutput!.ObserveLandmineState(drawable, observer);
-
-    internal DrawableBmsHitObject GetRepresentation(BmsHitObject note) => drawableNoteOutput!.GetRepresentation(note);
-
-    internal DrawableBmsHitObject? FirstPendingHead
-        => FirstPendingNote is { } note ? drawableNoteOutput!.GetRepresentation(note) : null;
-
     internal bool RequiresActiveLongNoteUpdate(BmsHitObject note)
     {
         if (note is not BmsLongNote longNote)
@@ -72,40 +45,6 @@ internal sealed partial class BmsColumnJudgementContext
     {
         if (!RequiresActiveLongNoteUpdate(activeLongNotes[index]))
             activeLongNotes.RemoveAt(index);
-    }
-
-    internal void Register(DrawableBmsHitObject note)
-    {
-        if (note.HitObject is BmsLandmine mine)
-        {
-            drawableNoteOutput!.Bind(note);
-            ActivateLandmine(mine);
-            refreshActiveNoteOrder();
-            return;
-        }
-        if (!noteSlots.ContainsKey(note.HitObject))
-            return;
-
-        drawableNoteOutput!.Bind(note);
-        ActivateNote(note.HitObject);
-        bindScheduledRepresentation(note);
-        refreshActiveNoteOrder();
-    }
-
-    internal void Unregister(DrawableBmsHitObject note)
-    {
-        if (note.HitObject is BmsLandmine mine)
-        {
-            RemoveLandmine(mine);
-            return;
-        }
-        if (!noteSlots.ContainsKey(note.HitObject))
-            return;
-
-        BeginNoteRemoval(note.HitObject);
-        if (TryGetScheduledObject(note, out var scheduled))
-            Schedule.BeginRemoval(scheduled);
-        refreshActiveNoteOrder();
     }
 
     private void trackActiveLongNote(BmsLongNote note)
@@ -131,10 +70,6 @@ internal sealed partial class BmsColumnJudgementContext
         }
     }
 
-    internal void RebuildRewoundIndexes()
-        => RestoreExecutionState(new BmsFrameContext(Column.Time.Current,
-            (Column.Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Column.Clock.Rate));
-
     internal int PressedDirections
     {
         get => pressedDirections;
@@ -143,14 +78,4 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal bool LastPressWasReverseScratch { get; private set; }
 
-    internal PressOutcome HandlePress(double time, bool reverseScratch = false)
-        => HandleNotePress(new BmsPressContext(time,
-            new BmsFrameContext(Column.Time.Current, (Column.Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Column.Clock.Rate,
-                (Column.Clock as IGameplayClock)?.IsRewinding == true || Column.Time.Elapsed < 0), reverseScratch, playfield.IsResumeRewinding),
-            playfield.JudgementAlgorithm);
-
-    internal void HandleRelease(double time, bool reverseScratch = false)
-        => HandleExecutionRelease(time, new BmsFrameContext(Column.Time.Current,
-            (Column.Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Column.Clock.Rate,
-            (Column.Clock as IGameplayClock)?.IsRewinding == true || Column.Time.Elapsed < 0), reverseScratch);
 }

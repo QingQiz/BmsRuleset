@@ -467,7 +467,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     private static float headBottomOf(DrawableBmsHitObject longNote)
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-        var headContainer = (Container)longNote.GetType().GetField("NoteContainer", flags)!.GetValue(longNote)!;
+        var headContainer = (Container)longNote.GetType().GetField("head", flags)!.GetValue(longNote)!;
         return BmsPlayfieldAssertions.BottomOf(headContainer);
     }
 

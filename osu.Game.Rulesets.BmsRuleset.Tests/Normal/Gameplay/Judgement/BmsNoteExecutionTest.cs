@@ -32,8 +32,6 @@ public class BmsNoteExecutionTest
             Assert.That(registration.Press.Target, Is.SameAs(registration.Passive.Target));
         }
         Assert.That(first.NoteRegistrations[0].Press, Is.Not.SameAs(second.NoteRegistrations[0].Press), "each column borrows its own typed storage");
-        Assert.That(first.Column, Is.Null, "data-only construction does not instantiate a column or drawable tree");
-        Assert.That(first.Container, Is.Null);
     }
 
     [Test]

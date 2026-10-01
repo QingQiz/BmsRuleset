@@ -1,3 +1,5 @@
+using osu.Framework.Allocation;
+using osuTK;
 using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -7,15 +9,19 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
     where TCol : struct, IColumnProvider
 {
-    protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Note;
+    private BmsNoteVisual noteVisual = null!;
 
-    internal override bool RequiresColumnFrameUpdate => false;
+    [BackgroundDependencyLoader]
+    private void load() => Visuals.Add(noteVisual = new BmsNoteVisual(BmsSkinComponents.Note, LayoutVariant, Column));
+
+    protected override float VisualHeight => noteVisual.VisualHeight * (ParentColumn?.NoteHeightScale ?? 1);
+    protected override void ApplyVisualHeightScale(float scale) => noteVisual.Scale = new Vector2(1, scale);
 
     protected override void OnApply()
     {
         base.OnApply();
 
-        ParentColumn?.Judgements.RefreshNoteRepresentation(this);
+        ParentColumn?.JudgementOutput.RefreshNoteRepresentation(this);
     }
 
     protected override void UpdateHitStateTransforms(ArmedState state)
@@ -23,6 +29,7 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
         if (state != ArmedState.Hit)
         {
             base.UpdateHitStateTransforms(state);
+            BmsNoteVisual.ApplyResultEffects(this, state, Time.Current);
             return;
         }
 

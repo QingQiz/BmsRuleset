@@ -32,6 +32,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private readonly Dictionary<DrawableBmsHitObject, Bindable<double>> coreStartTimes = [];
 
     internal BmsColumnJudgementContext Judgements { get; set; } = null!;
+    internal BmsDrawableJudgementOutput JudgementOutput { get; set; } = null!;
 
     public override void Add(HitObjectLifetimeEntry entry)
     {
@@ -60,7 +61,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         if (drawable is not DrawableBmsHitObject note)
             return;
 
-        Judgements.Register(note);
+        JudgementOutput.Register(note);
         InvalidateCoreOrder();
     }
 
@@ -70,11 +71,11 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         if (drawable is DrawableBmsHitObject old && coreStartTimes.Remove(old, out var startTime))
             startTime.UnbindAll();
         if (drawable is DrawableBmsHitObject note)
-            Judgements.Unregister(note);
+            JudgementOutput.Unregister(note);
 
         base.RemoveDrawable(entry, drawable);
         if (drawable is DrawableBmsHitObject removed)
-            Judgements.UnbindRemovedNote(removed);
+            JudgementOutput.UnbindRemovedNote(removed);
     }
 
     internal void BeginGameplayFrame()
@@ -133,20 +134,14 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         }
         Judgements.Schedule.RunDeferred(coreDeferredOrder, coreFrame(), Time.Elapsed);
 
-        var hitTarget = getHitTargetPosition();
-        var scale = scrollController.ScrollSpeedMultiplier / Math.Max(1.0, scrollController.ScrollRange)
-                    * Math.Max(1f, DrawHeight - hitTarget);
-        var currentScrollPos = scrollController.CurrentScrollPosition;
+        var frame = visualFrame();
         for (var i = activeLongNotes.Count - 1; i >= 0; i--)
         {
             var note = activeLongNotes[i];
             if (Judgements.RequiresActiveLongNoteUpdate(note))
             {
-                var ln = note;
-                var startPosition = scrollController.GetVisualScrollPosition(ln.StartTime, ln.ScrollPositionAtStartTime);
-                var endPosition = double.IsNaN(ln.VisualScrollPositionAtEndTime) ? ln.ScrollPositionAtEndTime : ln.VisualScrollPositionAtEndTime;
-                Judgements.GetRepresentation(note).UpdateDeferredVisuals(-(hitTarget + (float)((startPosition - currentScrollPos) * scale)),
-                    -(hitTarget + (float)((endPosition - currentScrollPos) * scale)));
+                var startPosition = scrollController.GetVisualScrollPosition(note.StartTime, note.ScrollPositionAtStartTime);
+                JudgementOutput.GetRepresentation(note).UpdateDeferredVisuals(frame.YAt(startPosition), frame);
             }
 
             Judgements.RetireInactiveLongNoteAt(i);
@@ -186,10 +181,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         refreshCoreOrder();
         Judgements.Schedule.RunLayout(coreLayoutOrder, coreFrame(), Time.Elapsed, isResumeRewinding());
 
-        var currentScrollPos = scrollController.CurrentScrollPosition;
-        var hitTarget = getHitTargetPosition();
-        var scale = scrollController.ScrollSpeedMultiplier / Math.Max(1.0, scrollController.ScrollRange)
-                    * Math.Max(1f, DrawHeight - hitTarget);
+        var frame = visualFrame();
         var resumeRewinding = isResumeRewinding();
 
         // Position all alive entries in this column
@@ -201,25 +193,11 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             var hitObject = note.HitObject!;
             note.UpdateSoftConstantVisibility(scrollController.GetSoftConstantAlpha(hitObject.StartTime));
             var startPosition = scrollController.GetVisualScrollPosition(hitObject.StartTime, hitObject.ScrollPositionAtStartTime);
-            var offset = (float)((startPosition - currentScrollPos) * scale);
-            var y = -(hitTarget + offset);
-
-            if (hitObject is BmsLongNote longNote)
-            {
-                var endPosition = double.IsNaN(longNote.VisualScrollPositionAtEndTime)
-                    ? longNote.ScrollPositionAtEndTime
-                    : longNote.VisualScrollPositionAtEndTime;
-                var endOffset = (float)((endPosition - currentScrollPos) * scale);
-                var endY = -(hitTarget + endOffset);
-                note.UpdateVisualPosition(y, DrawHeight, endY);
-                note.UpdateVisualGeometry(y, endY);
-            }
-            else
-                note.UpdateVisualPosition(y, DrawHeight);
+            note.UpdateVisualLayout(frame.YAt(startPosition), frame);
 
             // Resume rewind retains the completed presentation while the clock moves backwards.
-            if (!resumeRewinding && (Clock as IGameplayClock)?.IsRewinding != true && Time.Elapsed >= 0 && note.RequiresColumnFrameUpdate)
-                note.UpdateColumnFrame();
+            if (!resumeRewinding && (Clock as IGameplayClock)?.IsRewinding != true && Time.Elapsed >= 0)
+                note.UpdateVisualState();
         }
 
         Judgements.Schedule.RunSubtree(coreSubtreeOrder, coreFrame());
@@ -229,6 +207,14 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     {
         coreOrderDirty = true;
         Judgements?.Schedule.InvalidateOrder();
+    }
+
+    private BmsColumnVisualFrame visualFrame()
+    {
+        var hitTarget = getHitTargetPosition();
+        var scale = scrollController.ScrollSpeedMultiplier / Math.Max(1.0, scrollController.ScrollRange)
+                    * Math.Max(1f, DrawHeight - hitTarget);
+        return new BmsColumnVisualFrame(scrollController.CurrentScrollPosition, scale, hitTarget, DrawHeight);
     }
 
     private BmsFrameContext coreFrame()
@@ -242,7 +228,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         corePositions.Clear();
         foreach (var drawable in AliveEntries.Values)
         {
-            if (drawable is not DrawableBmsHitObject note || !Judgements.TryGetScheduledObject(note, out var item)) continue;
+            if (drawable is not DrawableBmsHitObject note || !JudgementOutput.TryGetScheduledObject(note, out var item)) continue;
             if (!coreStartTimes.ContainsKey(note))
             {
                 var startTime = note.StartTimeBindable.GetBoundCopy();
@@ -305,6 +291,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
                 bms.RestoreRewoundState();
         }
 
-        Judgements.RebuildRewoundIndexes();
+        Judgements.RestoreExecutionState(coreFrame());
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -104,12 +103,10 @@ public class BmsBeatorajaFrameHistoryTest
         run.Frame(3002, 2, true); run.Expect(0.30);
     }
 
-    private sealed class Run : IBmsLongNoteJudgementSink, IDisposable
+    private sealed class Run : IDisposable
     {
-        public Action<bool, double> HellChargeTick { get; }
-
         private readonly BmsLongNote note;
-        private readonly BmsLongNoteJudgementController controller;
+        private readonly BmsLongNoteTestContext context;
         private readonly BmsHealthProcessor health;
         private readonly ManualClock clock = new();
         private readonly FramedClock framed;
@@ -127,29 +124,25 @@ public class BmsBeatorajaFrameHistoryTest
             note.Beatmap = beatmap;
             health = new BmsHealthProcessor { Clock = framed };
             health.ApplyBeatmap(beatmap);
-            controller = new BmsLongNoteJudgementController(note);
-            HellChargeTick = ApplyHellChargeTick;
+            context = new BmsLongNoteTestContext(note);
+            context.Output.BeforeResultCheckpoint += (_, _) => health.ApplyResult(new BmsLongNoteJudgementResult(note, note.CreateJudgement(), context.Output.GetEndpoints(note)) { Type = context.Output.GetMainResult(note).Type });
+            context.Output.SyntheticEndpoint += (endpoint, applied) =>
+            {
+                if (applied) health.ApplySyntheticLongNoteEndpoint(new BmsLongNoteJudgementResult(note.CreateSyntheticEndpoint(endpoint.ExpectedTime), note.CreateJudgement(), [endpoint]) { Type = endpoint.Result });
+            };
+            context.Output.BodyTick += (_, holding, scale, frame) => health.ApplyHellChargeTick(holding, scale, frame.SimulationTime);
         }
 
         private void time(double t) { clock.CurrentTime = t; framed.ProcessFrame(); }
-        public void Head() { time(1000); controller.TryHit(this, 1000, HitResult.Perfect); Expect(0.24); }
-        public void Frame(double t, double elapsed, bool holding) { time(t); controller.UpdatePostResult(this, t, elapsed, holding); }
+        public void Head() { time(1000); context.Press(1000, HitResult.Perfect); Expect(0.24); }
+        public void Frame(double t, double elapsed, bool holding) { time(t); context.Frame(t, elapsed, holding); }
         public void Release(double t)
         {
             time(t);
-            controller.TryRelease(this, t, t - 3000, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 1, 2, true));
+            context.Release(t);
         }
-        public void Rewind(double t) { time(t); controller.Rewind(t); health.Rewind(t); }
+        public void Rewind(double t) { time(t); context.Rewind(t); health.Rewind(t); }
         public void Expect(double value) => Assert.That(health.Health.Value, Is.EqualTo(value).Within(1e-10), "HCN health at " + clock.CurrentTime);
-        public void OnUserHeadJudged(BmsLongNote source) { }
-        public void OnHellChargeHeadPoor(BmsLongNote source, double eventTime, double lifetimeEnd) { }
-        public void ApplyJudgementResult(BmsLongNote source, HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints)
-            => health.ApplyResult(new BmsLongNoteJudgementResult(note, note.CreateJudgement(), endpoints) { Type = result });
-        public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint)
-            => health.ApplySyntheticLongNoteEndpoint(new BmsLongNoteJudgementResult(note.CreateSyntheticEndpoint(endpoint.ExpectedTime), note.CreateJudgement(), [endpoint]) { Type = endpoint.Result });
-        public void ApplyHellChargeTick(bool holding, double scale) => health.ApplyHellChargeTick(holding, scale, clock.CurrentTime);
-        public void ClearVisualIfTailWasNotPoor(BmsLongNote source, HitResult result) { }
-        public void Retire(BmsLongNote source) { }
         public void Dispose() => health.Dispose();
     }
 }

@@ -56,8 +56,6 @@ public class BmsHellChargeNoteExecutionTest
         context.CheckRegisteredNotePassive(note, new BmsFrameContext(3502, 1.5));
         Assert.That(output.BodyTicks, Has.Count.EqualTo(1));
         Assert.That(output.SyntheticEndpoints, Has.Count.EqualTo(2));
-        Assert.That(context.Column, Is.Null);
-        Assert.That(context.Container, Is.Null);
     }
 
     [TestCase(false)]

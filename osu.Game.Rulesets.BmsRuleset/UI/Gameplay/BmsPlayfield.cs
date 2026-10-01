@@ -88,9 +88,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                                 .ToArray();
         var judgementObjects = Beatmap.HitObjects.ToArray();
         judgementEngine = new BmsJudgementEngine(judgementColumns.Select(column => new BmsJudgementColumnDefinition(
-            judgementObjects, LayoutVariant, column.Index, column.CanBatchUpdates, new BmsDrawableJudgementOutput(this, column))).ToArray());
+            judgementObjects, LayoutVariant, column.Index, column.CanBatchUpdates, column.JudgementOutput = new BmsDrawableJudgementOutput(this, column))).ToArray());
         foreach (var column in judgementColumns)
-            judgementEngine.GetColumn(column.Index).AttachRepresentationServices(this, column);
+        {
+            column.Judgements = judgementEngine.GetColumn(column.Index);
+            var container = (BmsColumnHitObjectContainer)column.HitObjectContainer;
+            container.Judgements = column.Judgements;
+            container.JudgementOutput = column.JudgementOutput;
+        }
 
         InternalChildren =
         [

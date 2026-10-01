@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions.ObjectExtensions;
@@ -16,6 +16,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -93,6 +94,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     private BmsColumnKeySound? keySound;
     internal BmsColumnJudgementContext Judgements { get; set; } = null!;
+    internal BmsDrawableJudgementOutput JudgementOutput { get; set; } = null!;
 
     internal bool HasPmsMistake(BmsHitObject note) => Judgements.HasPmsMistake(note);
 
@@ -338,9 +340,13 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal bool LastPressWasReverseScratch => Judgements.LastPressWasReverseScratch;
 
-    public PressOutcome HandlePress(double time, bool reverseScratch = false) => Judgements.HandlePress(time, reverseScratch);
+    public PressOutcome HandlePress(double time, bool reverseScratch = false) => Judgements.HandleNotePress(new BmsPressContext(time, judgementFrame(), reverseScratch, ParentPlayfield.IsResumeRewinding), ParentPlayfield.JudgementAlgorithm);
 
-    public void HandleRelease(double time, bool reverseScratch = false) => Judgements.HandleRelease(time, reverseScratch);
+    public void HandleRelease(double time, bool reverseScratch = false) => Judgements.HandleExecutionRelease(time, judgementFrame(), reverseScratch);
+
+    private BmsFrameContext judgementFrame()
+        => new(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
+            (Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0);
 
     internal void PlayKeySound() => keySound?.PlayKeySound();
 

@@ -6,7 +6,6 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
@@ -17,7 +16,6 @@ internal sealed partial class BmsColumnJudgementContext
     private readonly int noteColumnIndex;
     private readonly BmsLayoutVariant noteLayout;
     private IBmsJudgementOutput noteOutput = null!;
-    private BmsDrawableJudgementOutput? drawableNoteOutput;
     private readonly Dictionary<BmsHitObject, int> noteSlots = new(ReferenceEqualityComparer.Instance);
     private readonly List<int> activeNoteSlots = [];
     private readonly SortedSet<(double Time, long Order, int Slot)> pendingNoteHeads = [];
@@ -28,30 +26,7 @@ internal sealed partial class BmsColumnJudgementContext
     private long nextNoteOrder;
     private readonly List<int> pendingLongNoteTailSlots = [];
     private readonly List<int> activeBodySlots = [];
-    private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsScheduledObject Handle)> scheduledRepresentations = [];
     internal BmsCoreJudgementSchedule Schedule { get; private set; } = null!;
-
-    private void bindScheduledRepresentation(DrawableBmsHitObject drawable)
-    {
-        scheduledRepresentations[drawable] = (drawable.BindingGeneration, Schedule.Bind(drawable.HitObject));
-    }
-
-    internal bool TryGetScheduledObject(DrawableBmsHitObject drawable, out BmsScheduledObject item)
-    {
-        if (scheduledRepresentations.TryGetValue(drawable, out var binding) && binding.Generation == drawable.BindingGeneration
-            && ReferenceEquals(binding.Handle.Object, drawable.HitObject))
-        {
-            item = binding.Handle;
-            return true;
-        }
-        item = default;
-        return false;
-    }
-
-    internal void CompleteScheduledRemoval(DrawableBmsHitObject drawable, in BmsFrameContext frame)
-    {
-        if (TryGetScheduledObject(drawable, out var item)) Schedule.CompleteRemoval(item, frame);
-    }
 
     internal BmsNoteRegistration[] NoteRegistrations { get; private set; } = [];
     internal BmsNoteJudgementWindows[] NoteWindows { get; private set; } = [];
@@ -173,6 +148,9 @@ internal sealed partial class BmsColumnJudgementContext
     private bool hasPendingExecutionHead(BmsHitObject note)
         => note is BmsLongNote ln ? !GetLongNoteState(ln).HeadJudged : !noteOutput.GetMainResult(note).HasResult;
 
+    internal bool IsNoteActive(BmsHitObject note)
+        => noteSlots.TryGetValue(note, out var slot) && activeNotes[slot];
+
     internal bool IsNoteCandidate(BmsHitObject note)
         => noteSlots.TryGetValue(note, out var slot) && activeNotes[slot] && !noteOutput.GetMainResult(note).HasResult;
 
@@ -209,54 +187,6 @@ internal sealed partial class BmsColumnJudgementContext
         if (note is BmsLongNote longNote)
             activeLongNotes.Remove(longNote);
         pendingNoteHeads.Remove((noteHeadTimes[slot], noteOrders[slot], slot));
-    }
-
-    internal void UnbindRemovedNote(DrawableBmsHitObject drawable) => UnbindNoteRepresentation(drawable, drawable.BindingGeneration);
-
-    internal void UnbindNoteRepresentation(DrawableBmsHitObject drawable, long generation)
-    {
-        // A late free belongs to that representation, even when its HitObject was cleared or replaced.
-        if (scheduledRepresentations.TryGetValue(drawable, out var binding) && binding.Generation == generation)
-        {
-            scheduledRepresentations.Remove(drawable);
-            Schedule.Unbind(binding.Handle);
-        }
-        drawableNoteOutput?.Unbind(drawable, generation);
-    }
-
-    internal void RefreshNoteRepresentation(DrawableBmsHitObject drawable)
-    {
-        var note = drawable.HitObject;
-        if (note is BmsLandmine mine)
-        {
-            if (activeLandmines.Contains(mine))
-                drawableNoteOutput!.Bind(drawable);
-            return;
-        }
-        // Reapply has no AddDrawable callback. Replace only the representation, retaining ordering and histories.
-        if (drawableNoteOutput != null && noteSlots.TryGetValue(note, out var slot) && activeNotes[slot])
-        {
-            drawableNoteOutput.Bind(drawable);
-            bindScheduledRepresentation(drawable);
-            Container.InvalidateCoreOrder();
-        }
-        RefreshNoteConfiguration(note);
-    }
-
-    private void refreshActiveNoteOrder()
-    {
-        // Dictionary slot reuse affects equal-candidate winners after activation changes.
-        // Capture the framework's actual order at lifecycle boundaries, not on every input.
-        activeNoteSlots.Clear();
-        activeLandmines.Clear();
-        foreach (var drawable in Container.AliveEntries.Values)
-        {
-            if (drawable.HitObject is BmsLandmine mine)
-                activeLandmines.Add(mine);
-            if (drawable is DrawableBmsHitObject && noteSlots.TryGetValue((BmsHitObject)drawable.HitObject, out var slot) && activeNotes[slot])
-                activeNoteSlots.Add(slot);
-        }
-        reorderLongNoteSlots();
     }
 
     internal void SetNoteActivationOrder(IEnumerable<BmsHitObject> notes)
@@ -300,15 +230,15 @@ internal sealed partial class BmsColumnJudgementContext
         }
     }
 
-    internal void RefreshNoteConfiguration(BmsHitObject note)
+    internal void RefreshNoteConfiguration(BmsHitObject note, bool preserveHistory = true)
     {
         if (!noteSlots.TryGetValue(note, out var slot))
             return;
 
         if (note is BmsNote)
             NoteWindows[slot] = new BmsNoteJudgementWindows(note);
-        else if (note is BmsLongNote longNote)
-            refreshHoldConfiguration(slot, Column?.PreserveLongNoteHistory ?? true);
+        else if (note is BmsLongNote)
+            refreshHoldConfiguration(slot, preserveHistory);
         if (noteHeadTimes[slot] != note.StartTime)
         {
             pendingNoteHeads.Remove((noteHeadTimes[slot], noteOrders[slot], slot));

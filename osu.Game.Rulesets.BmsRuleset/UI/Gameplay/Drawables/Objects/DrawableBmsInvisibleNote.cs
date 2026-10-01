@@ -4,6 +4,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
@@ -11,8 +12,9 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 public sealed partial class DrawableBmsInvisibleNote : DrawableBmsHitObject
 {
     private readonly Bindable<bool> showInvisibleNotes = new();
+    private Container marker = null!;
 
-    internal override bool RequiresColumnFrameUpdate => false;
+    protected override void ApplyVisualHeightScale(float scale) => marker.Scale = new Vector2(1, scale);
 
     protected override bool SkipFurtherUpdates => !showInvisibleNotes.Value || Time.Current > HitObject.StartTime;
 
@@ -23,7 +25,7 @@ public sealed partial class DrawableBmsInvisibleNote : DrawableBmsHitObject
     {
         config?.BindWith(BmsRulesetSetting.ShowInvisibleNotes, showInvisibleNotes);
 
-        Visuals.Add(NoteContainer = new Container
+        Visuals.Add(marker = new Container
         {
             RelativeSizeAxes = Axes.X,
             Child = new Container

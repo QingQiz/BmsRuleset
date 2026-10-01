@@ -149,6 +149,37 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
             Player.Results.Single(r => r.HitObject == hitObject).TimeAbsolute <= 5281);
     }
 
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void RepeatedVisualLayoutDoesNotAdvanceJudgement(BmsLongNoteMode longNoteMode)
+    {
+        load(true, longNoteMode);
+        seek(5010);
+        AddStep("hold head and vary only the visual projection", () =>
+        {
+            var column = (BmsColumn)Playfield.Stage.Columns[1];
+            column.HandlePress(5000);
+            var note = (BmsLongNote)hitObject;
+            var state = column.Judgements.GetLongNoteState(note);
+            var result = drawable.Result.Type;
+            var resultCount = Player.Results.Count;
+            var health = Player.HealthProcessor.Health.Value;
+            var scroll = Playfield.ScrollController;
+            var frame = new BmsColumnVisualFrame(scroll.CurrentScrollPosition, 1, 0, 700);
+            for (var i = 0; i < 20; i++)
+            {
+                drawable.UpdateVisualLayout(-100, frame);
+                drawable.UpdateVisualLayout(-1_000_000, frame with { ScrollPosition = -1_000_000 });
+                drawable.UpdateVisualState();
+            }
+            Assert.That(column.Judgements.GetLongNoteState(note), Is.EqualTo(state));
+            Assert.That(drawable.Result.Type, Is.EqualTo(result));
+            Assert.That(Player.Results, Has.Count.EqualTo(resultCount));
+            Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(health));
+        });
+    }
+
     [Test]
     public void TestOffscreenTapStillAcceptsInputAndReenters()
     {

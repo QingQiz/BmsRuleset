@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
@@ -22,6 +23,20 @@ internal sealed partial class BmsColumnJudgementContext
     internal void ActivateLandmine(BmsLandmine note) => activeLandmines.Add(note);
 
     internal void RemoveLandmine(BmsLandmine note) => activeLandmines.Remove(note);
+
+    internal bool IsLandmineActive(BmsLandmine note) => activeLandmines.Contains(note);
+
+    internal void SetLandmineActivationOrder(IReadOnlyList<BmsLandmine> order)
+    {
+        if (order.Count != activeLandmines.Count)
+            throw new InvalidOperationException("The activation plan must contain each active landmine exactly once.");
+        for (var i = 0; i < order.Count; i++)
+        {
+            var previous = activeLandmines.IndexOf(order[i], i);
+            if (previous < 0) throw new InvalidOperationException("The activation plan contains an inactive or repeated landmine.");
+            (activeLandmines[i], activeLandmines[previous]) = (activeLandmines[previous], activeLandmines[i]);
+        }
+    }
 
     internal void UpdateLandmines(in BmsFrameContext frame, bool holding)
     {

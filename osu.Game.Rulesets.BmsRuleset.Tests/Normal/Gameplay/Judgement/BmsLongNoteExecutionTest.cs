@@ -67,8 +67,6 @@ public class BmsLongNoteExecutionTest
         Assert.That(context.GetLongNoteState((BmsLongNote)notes[1]).HeadJudged, Is.False);
         Assert.That(context.NoteRegistrations[2].Press, Is.Not.SameAs(context.NoteRegistrations[0].Press));
         Assert.That(context.NoteRegistrations[0].Object, Is.SameAs(notes[0]));
-        Assert.That(context.Column, Is.Null);
-        Assert.That(context.Container, Is.Null);
     }
 
     [Test]

@@ -63,7 +63,7 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
         {
             var column = Playfield.Stage.Columns[1];
             Assert.That(column.HitObjectContainer.AliveEntries.Values.Count(d => d.HitObject is BmsLongNote), Is.GreaterThan(64));
-            using var probe = new ScopedMethodProbe(typeof(BmsLongNoteJudgementController).GetMethod(nameof(BmsLongNoteJudgementController.TryRepress)),
+            using var probe = new ScopedMethodProbe(typeof(BmsHellChargeNoteJudgementRule).GetMethod("TryRepress", BindingFlags.Instance | BindingFlags.NonPublic),
                 typeof(TestSceneBmsJudgementIndexes).GetMethod(nameof(countRepress), BindingFlags.Static | BindingFlags.NonPublic));
 
             repressCalls = 0;
@@ -87,13 +87,14 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
         {
             var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
             Assert.That(container.AliveEntries.Count, Is.GreaterThan(128));
-            using var holdProbe = new ScopedMethodProbe(typeof(BmsLongNoteJudgementController).GetMethod(nameof(BmsLongNoteJudgementController.UpdateHellChargeBody)),
+            using var holdProbe = new ScopedMethodProbe(typeof(BmsHellChargeNoteJudgementRule).GetMethod("UpdateBody", BindingFlags.Instance | BindingFlags.NonPublic),
                 typeof(TestSceneBmsJudgementIndexes).GetMethod(nameof(countUnstartedBody), BindingFlags.Static | BindingFlags.NonPublic));
             unrelatedBodyCalls = 0;
             for (var i = 0; i < 20; i++)
             {
-                container.UpdateLandmines(true);
-                container.Judgements.UpdateHellChargeBodies(true);
+                var frame = new BmsFrameContext(container.Time.Current, 1);
+                container.Judgements.UpdateLandmines(frame, true);
+                container.Judgements.UpdateRegisteredBodies(frame, container.Time.Elapsed, true);
             }
             Assert.That(unrelatedBodyCalls, Is.Zero, "The body phase must not visit taps, mines or unstarted long notes.");
             Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(.24).Within(1e-8), "Repeated passes at one timestamp must not tick.");
@@ -125,9 +126,9 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
     }
 
     private static void countRepress() => repressCalls++;
-    private static void countUnstartedBody(BmsLongNoteJudgementController __instance)
+    private static void countUnstartedBody(BmsHellChargeNoteRuntime state)
     {
-        if (!__instance.HeadJudged)
+        if (!state.Hold.HeadJudged)
             unrelatedBodyCalls++;
     }
 }

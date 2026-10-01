@@ -11,7 +11,7 @@ using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
-internal sealed class BmsDrawableJudgementOutput : IBmsJudgementOutput
+internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
 {
     private readonly BmsPlayfield playfield;
     private readonly BmsColumn column;

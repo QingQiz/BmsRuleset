@@ -1,6 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
+using osu.Framework.Graphics;
+using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -12,6 +16,30 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 [TestFixture]
 public class BmsJudgementEngineTest
 {
+    [TestCase(typeof(BmsJudgementEngine))]
+    [TestCase(typeof(BmsColumnJudgementContext))]
+    [TestCase(typeof(BmsCoreJudgementSchedule))]
+    public void CoreMembersDoNotDependOnDrawablesOrClocks(Type coreType)
+    {
+        const BindingFlags members = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+        var types = coreType.GetFields(members).Select(f => f.FieldType)
+            .Concat(coreType.GetMethods(members).SelectMany(m => m.GetParameters().Select(p => p.ParameterType).Append(m.ReturnType)));
+        Assert.That(types.SelectMany(expand).Where(t => typeof(Drawable).IsAssignableFrom(t) || typeof(IClock).IsAssignableFrom(t)), Is.Empty);
+
+        static IEnumerable<Type> expand(Type type)
+        {
+            yield return type;
+            if (type.HasElementType)
+            {
+                foreach (var item in expand(type.GetElementType()!)) yield return item;
+            }
+            foreach (var argument in type.GetGenericArguments())
+            {
+                foreach (var item in expand(argument)) yield return item;
+            }
+        }
+    }
+
     [Test]
     public void EveryColumnMinePrecedesEveryBodyAndEveryInput()
     {

@@ -36,8 +36,6 @@ public class BmsChargeNoteExecutionTest
             Assert.That(context.GetLongNoteState(note).TailJudged, Is.False);
         };
         context.HandleNotePress(new BmsPressContext(3000, new BmsFrameContext(3003, 1.25)));
-        Assert.That(context.Column, Is.Null);
-        Assert.That(context.Container, Is.Null);
         Assert.That(output.MainResults, Is.EqualTo(1));
         Assert.That(context.GetNoteCandidates(), Is.Empty);
         Assert.That(context.GetPendingLongNoteTails(), Is.EqualTo(new[] { note }));

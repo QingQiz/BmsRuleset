@@ -1,4 +1,5 @@
 using System;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Objects;
@@ -18,7 +19,9 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCol>
     where TCol : struct, IColumnProvider
 {
-    protected override BmsSkinComponents SkinComponent => BmsSkinComponents.HoldNoteHead;
+    private BmsNoteVisual head = null!;
+
+    protected override float VisualHeight => head.VisualHeight * (ParentColumn?.NoteHeightScale ?? 1);
 
     private BmsLongNote ln => (BmsLongNote)HitObject;
 
@@ -51,11 +54,11 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private BmsCachedSkinnableDrawable longNoteTail = null!;
 
-    internal override void UpdateDeferredVisuals(float y, float endY)
+    internal override void UpdateDeferredVisuals(float y, in BmsColumnVisualFrame frame)
     {
         // Pin the held head at the simulation timestamp even when skins wait for the final frame.
-        GetVisualHeadY(y, endY);
-        UpdateColumnFrame();
+        getVisualHeadY(y, tailY(frame));
+        UpdateVisualState();
     }
 
     public DrawableBmsLongNote()
@@ -67,10 +70,20 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     }
 
     /// <summary>
-    /// Called by BmsColumnHitObjectContainer every frame with pre-computed
-    /// head and end Y positions. Updates the body/tail visual geometry.
+    /// Keeps the head-to-tail bounds with the object so column layout does not depend on its geometry.
     /// </summary>
-    internal override void UpdateVisualGeometry(float headY, float endY)
+    internal override void UpdateVisualLayout(float y, in BmsColumnVisualFrame frame)
+    {
+        var endY = tailY(frame);
+        var headY = getVisualHeadY(y, endY);
+        ApplyVisualLayout(new BmsVisualLayout(y, Math.Min(headY, endY), Math.Max(headY, endY)), frame.Height);
+        updateVisualGeometry(y, endY);
+    }
+
+    private float tailY(in BmsColumnVisualFrame frame)
+        => frame.YAt(double.IsNaN(ln.VisualScrollPositionAtEndTime) ? ln.ScrollPositionAtEndTime : ln.VisualScrollPositionAtEndTime);
+
+    private void updateVisualGeometry(float headY, float endY)
     {
         if (VisualsSuppressed)
         {
@@ -80,7 +93,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         const float max_piece_height = 4096;
         var holdingBody = isHoldingBody();
-        headY = GetVisualHeadY(headY, endY);
+        headY = getVisualHeadY(headY, endY);
 
         var myY = Y;
         var headOffset = headY - myY;
@@ -88,7 +101,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         var bodyTailOffset = holdingBody
             ? visualState.VisibleBodyTailOffset(headOffset, tailOffset)
             : tailOffset;
-        var visualNoteHeight = NoteVisualHeight * noteHeightScale;
+        var visualNoteHeight = head.VisualHeight * noteHeightScale;
 
         var releasedFast =
             state.LongNoteStarted && HitObject != null && Time.Current < ln.EndTime && !holdingBody;
@@ -118,8 +131,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         lastHoldingBody = holdingBody;
         lastReleasedFast = releasedFast;
 
-        if (Math.Abs(NoteContainer.Y - headOffset) > 0.5f)
-            NoteContainer.Y = headOffset;
+        if (Math.Abs(head.Y - headOffset) > 0.5f)
+            head.Y = headOffset;
 
         // Half-overlap keeps rounded or transparent endpoint edges visually connected, matching mania.
         var bodyHeadCentre = BmsLongNoteGeometry.BodyCentreOffset(headOffset, visualNoteHeight);
@@ -150,7 +163,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         longNoteTail.Alpha = releasedFast ? released_alpha : 1f;
     }
 
-    protected override float GetVisualHeadY(float y, float endY)
+    private float getVisualHeadY(float y, float endY)
     {
         if (restoreHeadPin)
         {
@@ -168,7 +181,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             : y;
     }
 
-    protected override void ResetKindState()
+    protected override void ResetVisualState()
     {
         lastSimulationTime = double.NaN;
         visualState.Reset();
@@ -178,8 +191,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         longNoteTail.Alpha = 0;
     }
 
-    protected override void ApplyNoteHeightScaleToKind(float scale)
+    protected override void ApplyVisualHeightScale(float scale)
     {
+        head.Scale = new Vector2(1, scale);
         noteHeightScale = scale;
         longNoteTail.Scale = new Vector2(1, scale);
     }
@@ -191,16 +205,17 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (HitObject != null)
         {
             mapPresentation = BmsLongNotePresentation.SelectMapping(ln.Beatmap.LockedLongNoteMode);
-            ParentColumn!.Judgements.ObserveLongNoteState(this, stateObserver);
+            ParentColumn!.JudgementOutput.ObserveLongNoteState(this, stateObserver);
             presentation = mapPresentation(ln, state, isKeyHeld(), Time.Current);
             restoreHeadPin = state.LongNoteStarted;
 
             longNoteBody.SetSkinLookup(LayoutVariant, Column);
-            ParentColumn.Judgements.RefreshNoteRepresentation(this);
+            ParentColumn.JudgementOutput.RefreshNoteRepresentation(this);
         }
     }
 
-    protected override void AddKindDrawablesBeforeNote()
+    [BackgroundDependencyLoader]
+    private void load()
     {
         Visuals.AddRange([
             longNoteBody = new BmsSegmentedLongNoteBody
@@ -222,6 +237,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
                 ComponentAnchor = Anchor.BottomCentre,
             },
         ]);
+        Visuals.Add(head = new BmsNoteVisual(BmsSkinComponents.HoldNoteHead, LayoutVariant, Column));
     }
 
     internal override void RestoreRewoundState()
@@ -263,9 +279,10 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         }
 
         base.UpdateHitStateTransforms(state);
+        BmsNoteVisual.ApplyResultEffects(this, state, Time.Current);
     }
 
-    protected override void UpdateKindPostResultState()
+    internal override void UpdateVisualState()
     {
         if (HitObject == null)
             return;

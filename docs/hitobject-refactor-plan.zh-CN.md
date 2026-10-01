@@ -10,9 +10,9 @@
 
 **完整实现核心 → Git 旧版对照与适配 → Mod 适配 → 最终集成。**
 
-当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次，真实 Player 与无 Drawable 测试调用相同的地雷、身体和输入阶段。生产项目已恢复 Release 构建，部分真实 Player、回池、回退及原地重应用用例已通过。
+当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次。列上下文已移除 Drawable、容器及图形时钟依赖，表示绑定与生命周期通知归入现有输出适配。各绘制子类组合自己的图形，容器提供共享视觉帧，由长按计算头尾布局。生产 Release 构建及已迁移的规则、真实 Player、回池、回退、原地重应用和视觉用例已通过。
 
-核心尚未完成：仍需收敛表现基类、容器与生命周期的最终职责，补齐独立调度及完整入口生成验证，并迁移其余依赖旧 API 的核心测试。完整测试项目仍受旧 Controller、旧表现接口和已摘除 AutoScratch 的消费者阻塞；本次局部测试通过不代表整个测试项目已恢复。Git 旧版完整对照、性能验收及 Mod 适配均尚未进行。
+核心尚未完成：仍需将逐模拟时点的视觉观测登记与引擎活跃长按列表分离，使布局准备不推进视觉历史；补齐独立调度及完整入口生成验证，并迁移旧调度记录器和其余旧入口测试。调度中的 `LastPostTime` 去重尚未迁移。完整测试项目仍受旧 Controller 记录器、旧表现接口和已摘除 AutoScratch 的消费者阻塞；本次局部测试通过不代表整个测试项目已恢复。Git 旧版完整对照、性能验收及 Mod 适配均尚未进行。
 
 快速导航：[实施顺序](#implementation-order) · [目标架构](#target-structure) · [生命周期](#state-lifecycle) · [调度](#scheduling-contracts) · [Git 对照](#git-comparison) · [验收](#behaviour-acceptance) · [验证命令](#verification-commands) · [完成条件](#completion)。
 
@@ -25,6 +25,7 @@
 | 重构前行为基线 | `d4e690cd3f8fadc70fe2d82021f338a012e1980e`；完整核心的行为对照版本 |
 | 原有工作检查点 | `e2315b28aa614220b937344c06dc21cf3663a6c9`；持久引用 `codex/hitobject-before-direct-implementation`，保留原实现、测试和未压缩历史 |
 | 压缩后基点 | `a209acb1a39ebb7e001da5eb27c37dc5759afd2d`；与检查点文件树相同 |
+| 独立规则中间态 | `d00a59fb31a55d2725f44406fd33f41d42e68d97`；保存独立长按/地雷规则和多列帧引擎，后续继续职责与测试迁移 |
 | 核心实施分支 | `codex/hitobject-judgement-refactor`；继续完整核心实现，对照前固定待验证版本的 commit |
 
 <a id="implementation-order"></a>
@@ -623,7 +624,7 @@ Engine 显式拥有经过、身体、输入、被动检查、端点收尾及回�
 | --- | --- | --- |
 | 候选与窗口 | Combo/Duration/Lowest/Score/旧回放算法、精确时间、窗口内外、重叠及同列同时间对象 | [BmsJudgementSelectorTest](../osu.Game.Rulesets.BmsRuleset.Tests/Normal/Gameplay/Judgement/BmsJudgementSelectorTest.cs)、[TestSceneBmsJudgementAlgorithm](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsJudgementAlgorithm.cs) |
 | 普通键与 PMS | 被动 POOR、E-POOR、非消费 BAD、mistake 历史及后续消费 | [TestSceneBmsBeatorajaJudgements](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsBeatorajaJudgements.cs)、[TestSceneBmsBeatorajaPmsConsumers](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsBeatorajaPmsConsumers.cs) |
-| LN/CN/HCN | 头尾、提前松开、延迟松开、重按、头 POOR、成功尾后的身体 | [TestSceneBmsLongNoteJudgement](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsLongNoteJudgement.cs)、[BmsLongNoteJudgementControllerTest](../osu.Game.Rulesets.BmsRuleset.Tests/Normal/Gameplay/Judgement/BmsLongNoteJudgementControllerTest.cs) |
+| LN/CN/HCN | 头尾、提前松开、延迟松开、重按、头 POOR、成功尾后的身体 | [TestSceneBmsLongNoteJudgement](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsLongNoteJudgement.cs)、[BmsLongNoteRuleTest](../osu.Game.Rulesets.BmsRuleset.Tests/Normal/Gameplay/Judgement/BmsLongNoteRuleTest.cs) |
 | Scratch | 双方向同时按住、反向尾判定、方向松开与重按 | [TestSceneBmsBeatorajaScratchInput](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsBeatorajaScratchInput.cs) |
 | 跨列与帧阶段 | 同帧地雷/HCN/输入、血量接近上下限、同时间戳再次遍历、不同时间步长 | [TestSceneBmsBeatorajaHcnLandmineFrameOrder](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsBeatorajaHcnLandmineFrameOrder.cs)、[TestSceneBmsBeatorajaHcnFrameOrder](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsBeatorajaHcnFrameOrder.cs) |
 | 生命周期与回退 | 裁剪判定、回池再激活、避开/引爆地雷恢复、头尾之间回退、暂停结算与多次恢复 | [TestSceneBmsVisualCulling](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsVisualCulling.cs)、[TestSceneBmsBeatorajaLandmineRewindLifecycle](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsBeatorajaLandmineRewindLifecycle.cs)、[TestSceneBmsPauseRewindLongNote](../osu.Game.Rulesets.BmsRuleset.Tests/Visualize/TestSceneBmsPauseRewindLongNote.cs) |
@@ -748,13 +749,16 @@ foreach ($refactorGroup in $refactorFilters.Keys) {
 - 地雷经过状态由核心按谱面身份持有，移除 `BmsHitObjectLifetimeEntry` 和 Drawable 中的经过时间。地雷 Drawable 只读取状态并应用表现；活跃地雷、待判尾、身体和长按收尾列表使用谱面对象或槽位。
 - 引擎接受多列数据定义、模拟帧、elapsed 和有序输入；先全部地雷、再全部 HCN 身体、最后输入。同时间戳的新输入批次保留，同步反馈追加的输入留给下一批处理。生产适配提供时钟值、结果和表示生命周期，HCN 身体不再读取 Drawable 时钟。
 - 已迁移 LN/HCN 登记断言、真实长按生命周期和 HCN 跨列帧顺序测试；新增多列阶段、地雷边界、暂停发布检查点及真实 ApplyDefaults 的绑定代次断言。既有长按生命周期 fixture 的结果、计分和血量预期保持不变。
+- 旧 Controller 单测迁为 `BmsLongNoteRuleTest`，beatoraja 窗口参考与 HCN 血量历史测试通过正式列操作和记录出口执行；端点时间、PMS 宽限和血量预期保留。三组迁移测试合计 113 项通过，不恢复旧 Controller 或 sink。
+- `BmsDrawableJudgementOutput` 管理表示代次、观察者和生命周期适配；核心只接收谱面身份、活跃顺序及数值帧。新增架构检查，约束引擎、列上下文和调度的字段及方法签名不依赖 Drawable 或图形时钟。
+- `BmsNoteVisual` 由 Note、地雷和长按头按需组合，Invisible Note 自有标记；通用基类与泛型列层不再持有头部图形。共享 `BmsColumnVisualFrame` 和 `BmsVisualLayout` 保留原投影和裁剪边界，容器不再计算长按尾坐标。已迁移活跃索引与头部组件测试，并验证重复视觉更新不改变端点状态、结果及血量。
 
-**本次验证范围。** 生产 Release 构建使用 `--no-restore -p:BuildProjectReferences=false`，0 警告、0 错误；引用已有 sibling 程序集，未构建或修改 sibling 源码。定向测试通过本地生成的 `artifacts/hitobject-core/core.csproj` 编译已迁移测试和所需辅助文件：普通 Note/LN/CN/HCN 执行、候选选择、HCN 历史、核心计划执行、多列引擎，以及真实长按玩法/表现、长按生命周期、地雷回退、HCN 帧顺序和暂停恢复。组合结果为 **147 项通过，0 失败、0 跳过**。该局部编译入口不添加生产兼容代码，完整测试项目的旧入口仍待迁移。
+**本次验证范围。** 生产 Release 构建使用 `--no-restore -p:BuildProjectReferences=false`，0 警告、0 错误；引用已有 sibling 程序集，未构建或修改 sibling 源码。定向测试通过本地生成的 `artifacts/hitobject-core/core.csproj` 编译正式 `Normal/Gameplay/Judgement` 下的全部测试，以及所需 Player 辅助文件和下列定向视觉测试。覆盖规则、候选选择、独立参考窗口、HCN 血量历史、核心计划执行、多列引擎、真实长按玩法、生命周期、地雷回退、HCN 帧顺序、暂停恢复、裁剪、身体透明度、HCN 尾部视觉、Invisible Note 与活跃索引。组合结果为 **466 项通过，0 失败、0 跳过**。该局部编译入口不添加生产兼容代码，完整测试项目仍被旧记录器及未迁移消费者阻塞。
 
 本地组合复现命令（结果写入 `artifacts/hitobject-core/results`）：
 
 ```powershell
-dotnet test artifacts/hitobject-core/core.csproj -c Release --no-restore -p:BuildProjectReferences=false --filter '(FullyQualifiedName~.Normal.Gameplay.Judgement.|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaLandmineRewindLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaHcnFrameOrder|FullyQualifiedName~TestSceneBmsBeatorajaHcnLandmineFrameOrder|FullyQualifiedName~TestSceneBmsPauseRewindLongNote)&FullyQualifiedName!~.Performance.' --logger 'trx;LogFileName=combined.trx' --results-directory artifacts/hitobject-core/results
+dotnet test artifacts/hitobject-core/core.csproj -c Release --no-restore -p:BuildProjectReferences=false --filter '(FullyQualifiedName~.Normal.Gameplay.Judgement.|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaLandmineRewindLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaHcnFrameOrder|FullyQualifiedName~TestSceneBmsBeatorajaHcnLandmineFrameOrder|FullyQualifiedName~TestSceneBmsPauseRewindLongNote|FullyQualifiedName~TestSceneBmsVisualCulling|FullyQualifiedName~TestSceneBmsLongNoteBodyTint|FullyQualifiedName~TestSceneBmsInvisibleNote|FullyQualifiedName~TestSceneBmsJudgementIndexes|FullyQualifiedName~TestSceneBmsHcnTailVisuals)&FullyQualifiedName!~.Performance.' --logger 'trx;LogFileName=migration-combined.trx' --results-directory artifacts/hitobject-core/results
 ```
 
 这是实现期间的定向规则、计划执行及部分真实 Player 回归。完整调度生成等价、Git 新旧版本对照、全部音频/视觉反馈和性能均待验证；未运行 benchmark。局部编译项目和日志保留在忽略的 `artifacts` 中，稳定测试源文件及 fixture 仍在正式测试项目中。

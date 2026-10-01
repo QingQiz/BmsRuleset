@@ -89,11 +89,11 @@ public class BmsBeatorajaReferenceTest
     [TestCase(BmsLongNoteMode.ChargeNote)]
     public void PmsDeferredReleasePreservesReleaseTiming(BmsLongNoteMode mode)
     {
-        var (controller, sink) = makeController(mode, BmsLayoutVariant.Pms9K, 2000);
-        controller.TryHit(sink, 1000, HitResult.Perfect);
-        controller.TryRelease(sink, 1500, -1500, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, 1, 2, true));
-        controller.UpdatePostResult(sink, 1700, 200, false);
-        Assert.That(sink.Endpoints.Last().TimeOffset, Is.EqualTo(-1500), "JudgeManager uses tailTime - releasetime when the grace period expires.");
+        var run = new BmsLongNoteTestContext(mode, duration: 2000, layout: BmsLayoutVariant.Pms9K);
+        run.Press(1000, HitResult.Perfect);
+        run.Release(1500);
+        run.Frame(1700, 200, false);
+        Assert.That((mode == BmsLongNoteMode.LongNote ? run.MainResults.Last().Endpoints.Last() : run.Output.SyntheticEndpoints.Last()).TimeOffset, Is.EqualTo(-1500), "JudgeManager uses tailTime - releasetime when the grace period expires.");
     }
 
     [Test]
@@ -110,21 +110,21 @@ public class BmsBeatorajaReferenceTest
     [TestCase(false)]
     public void HcnBodyStopsBeforeEndpointFrame(bool holding)
     {
-        var (controller, sink) = makeController(BmsLongNoteMode.HellChargeNote, BmsLayoutVariant.Bme7K, 201);
-        controller.TryHit(sink, 1000, HitResult.Perfect);
-        controller.UpdatePostResult(sink, 1200, 200, holding);
-        Assert.That(sink.Ticks, Is.Empty);
-        controller.UpdatePostResult(sink, 1201, 1, holding);
-        Assert.That(sink.Ticks, Is.Empty, "JudgeManager clears passing at the tail before updating the body accumulator.");
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, duration: 201, layout: BmsLayoutVariant.Bme7K);
+        run.Press(1000, HitResult.Perfect);
+        run.Frame(1200, 200, holding);
+        Assert.That(run.Output.BodyTicks, Is.Empty);
+        run.Frame(1201, 1, holding);
+        Assert.That(run.Output.BodyTicks, Is.Empty, "JudgeManager clears passing at the tail before updating the body accumulator.");
     }
 
     [Test]
     public void HcnDelayedFrameAppliesAtMostOneBodyTick()
     {
-        var (controller, sink) = makeController(BmsLongNoteMode.HellChargeNote, BmsLayoutVariant.Bme7K, 2000);
-        controller.TryHit(sink, 1000, HitResult.Perfect);
-        controller.UpdatePostResult(sink, 1650, 650, true);
-        Assert.That(sink.Ticks, Has.Count.EqualTo(1), "JudgeManager has one if, rather than a catch-up loop, per update.");
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, duration: 2000, layout: BmsLayoutVariant.Bme7K);
+        run.Press(1000, HitResult.Perfect);
+        run.Frame(1650, 650, true);
+        Assert.That(run.Output.BodyTicks, Has.Count.EqualTo(1), "JudgeManager has one if, rather than a catch-up loop, per update.");
     }
 
     [TestCase(BmsLongNoteMode.ChargeNote)]
@@ -133,11 +133,10 @@ public class BmsBeatorajaReferenceTest
     {
         var note = new BmsLongNote { StartTime = 1000, Duration = 1000, Column = 0,
             Beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode } };
-        var sink = new Sink();
-        var controller = new BmsLongNoteJudgementController(note);
-        controller.TryHit(sink, 1000, HitResult.Perfect);
-        controller.TryRelease(sink, 2000, 0, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 0, 2, true));
-        Assert.That(controller.TailJudged, Is.False,
+        var run = new BmsLongNoteTestContext(note);
+        run.Press(1000, HitResult.Perfect);
+        run.Release(2000);
+        Assert.That(run.State.TailJudged, Is.False,
             "JudgeManager ignores scratch key-up inside tail hit windows; the reverse-direction key-down judges the tail.");
     }
 
@@ -181,29 +180,4 @@ public class BmsBeatorajaReferenceTest
         }
     }
 
-    private static (BmsLongNoteJudgementController, Sink) makeController(BmsLongNoteMode mode, BmsLayoutVariant layout, double duration)
-    {
-        var note = new BmsLongNote { StartTime = 1000, Duration = duration, Column = 1,
-            Beatmap = new BmsBeatmap { LayoutVariant = layout, Rank = 2, LockedLongNoteMode = mode } };
-        var sink = new Sink();
-        var controller = new BmsLongNoteJudgementController(note);
-        return (controller, sink);
-    }
-
-    private sealed class Sink : IBmsLongNoteJudgementSink
-    {
-        public System.Action<bool, double> HellChargeTick { get; }
-
-        public Sink() => HellChargeTick = ApplyHellChargeTick;
-
-        public List<BmsLongNoteEndpointResult> Endpoints { get; } = [];
-        public List<(bool Holding, double Scale)> Ticks { get; } = [];
-        public void OnUserHeadJudged(BmsLongNote source) { }
-        public void OnHellChargeHeadPoor(BmsLongNote source, double eventTime, double lifetimeEnd) { }
-        public void ApplyJudgementResult(BmsLongNote source, HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints) => Endpoints.AddRange(endpoints);
-        public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint) => Endpoints.Add(endpoint);
-        public void ApplyHellChargeTick(bool holding, double scale) => Ticks.Add((holding, scale));
-        public void ClearVisualIfTailWasNotPoor(BmsLongNote source, HitResult result) { }
-        public void Retire(BmsLongNote source) { }
-    }
 }
