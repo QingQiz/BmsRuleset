@@ -637,11 +637,11 @@ public class BmsLongNoteJudgementTest
 
         visualState.PrepareHeadPin();
         visualState.UpdateHeadYAtStartTime(20, 980, 1000, 0);
-        var fallingHead = visualState.ResolveHeldHeadY(
-            realHeadY: 20, realTailY: 40, canPin: false, directionResolver: (_, _) => 1);
+        visualState.ObserveHeldBodyDirection(20, 40, false, (_, _) => 1);
+        var fallingHead = visualState.ResolveHeldHeadY(realHeadY: 20, canPin: false);
         visualState.UpdateHeadYAtStartTime(80, 1020, 1000, 0);
-        var fixedHead = visualState.ResolveHeldHeadY(
-            realHeadY: 80, realTailY: 100, canPin: true, directionResolver: (_, _) => 1);
+        visualState.ObserveHeldBodyDirection(80, 100, true, (_, _) => 1);
+        var fixedHead = visualState.ResolveHeldHeadY(realHeadY: 80, canPin: true);
 
         Assert.That(fallingHead, Is.EqualTo(20));
         Assert.That(fixedHead, Is.EqualTo(50));
@@ -656,10 +656,10 @@ public class BmsLongNoteJudgementTest
 
         visualState.PrepareHeadPin();
         visualState.UpdateHeadYAtStartTime(50, 980, 1000, 0);
-        var fallingHead = visualState.ResolveHeldHeadY(
-            realHeadY: 20, realTailY: 40, canPin: false, directionResolver: (_, _) => 1);
-        var completedHead = visualState.ResolveHeldHeadY(
-            realHeadY: 60, realTailY: 80, canPin: false, directionResolver: (_, _) => 1);
+        visualState.ObserveHeldBodyDirection(20, 40, false, (_, _) => 1);
+        var fallingHead = visualState.ResolveHeldHeadY(realHeadY: 20, canPin: false);
+        visualState.ObserveHeldBodyDirection(60, 80, false, (_, _) => 1);
+        var completedHead = visualState.ResolveHeldHeadY(realHeadY: 60, canPin: false);
 
         Assert.That(fallingHead, Is.EqualTo(20));
         Assert.That(completedHead, Is.EqualTo(60));
@@ -672,12 +672,12 @@ public class BmsLongNoteJudgementTest
 
         visualState.PrepareHeadPin();
         visualState.UpdateHeadYAtStartTime(50, 1000, 1000, 0);
-        Assert.That(visualState.ResolveHeldHeadY(
-            realHeadY: 50, realTailY: 70, canPin: true, directionResolver: (_, _) => 1), Is.EqualTo(50));
+        visualState.ObserveHeldBodyDirection(50, 70, true, (_, _) => 1);
+        Assert.That(visualState.ResolveHeldHeadY(realHeadY: 50, canPin: true), Is.EqualTo(50));
 
         visualState.PrepareHeadPin();
-        Assert.That(visualState.ResolveHeldHeadY(
-            realHeadY: 20, realTailY: 40, canPin: false, directionResolver: (_, _) => 1), Is.EqualTo(20));
+        visualState.ObserveHeldBodyDirection(20, 40, false, (_, _) => 1);
+        Assert.That(visualState.ResolveHeldHeadY(realHeadY: 20, canPin: false), Is.EqualTo(20));
     }
 
     [Test]

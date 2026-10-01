@@ -42,9 +42,6 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
 
     private Scenario scenario;
     private bool mixed;
-    private readonly List<string> legacyTrace = [];
-    private string legacyScore = "";
-    private int[] legacyActivationOrder = [];
     private static Action<string>? feedback;
     private static BmsColumn? measuredColumn;
     private static BmsPlayfield? measuredPlayfield;
@@ -72,7 +69,7 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
     }
 
     [Test]
-    public void SamePlanMatchesLegacyAndBothOutputs([Values] Scenario plan, [Values] bool nonBatchColumn, [Values] bool culled)
+    public void SamePlanMatchesFrameworkAndRecordingOutputs([Values] Scenario plan, [Values] bool nonBatchColumn, [Values] bool culled)
         => compare(plan, nonBatchColumn, culled, BmsJudgementAlgorithm.Combo);
 
     [TestCase(BmsJudgementAlgorithm.Duration)]
@@ -85,20 +82,18 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
     private void compare(Scenario plan, bool nonBatchColumn, bool culled, BmsJudgementAlgorithm? algorithm)
     {
         load(plan, nonBatchColumn);
-        AddStep("capture unchanged production path", () => runProduction(false, culled, algorithm));
-        load(plan, nonBatchColumn);
-        AddStep("compare production and recording outputs", () => runProduction(true, culled, algorithm));
+        AddStep("compare production and recording outputs", () => runProduction(culled, algorithm));
     }
 
     private void load(Scenario plan, bool nonBatchColumn)
     {
-        AddStep("load bounded note chart", () => { scenario = plan; mixed = nonBatchColumn; LoadPlayer(); });
+        AddStep("load note output comparison chart", () => { scenario = plan; mixed = nonBatchColumn; LoadPlayer(); });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
         AddStep("seek before input window", () => { Player.GameplayClockContainer.Stop(); Player.GameplayClockContainer.Seek(2798); });
         AddUntilStep("simulation reached start", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 2798) < .001);
     }
 
-    private void runProduction(bool useNewPath, bool culled, BmsJudgementAlgorithm? algorithm)
+    private void runProduction(bool culled, BmsJudgementAlgorithm? algorithm)
     {
         var previousClock = Playfield.Clock;
         var scoreClock = Player.ScoreProcessor.Clock;
@@ -125,8 +120,6 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
             var notes = Playfield.Beatmap.HitObjects.Where(n => n.Column == 1 && n is BmsNote).ToArray();
             drawables = notes.Select(n => container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Single(d => ReferenceEquals(d.HitObject, n))).ToArray();
             var results = drawables.Select(d => (BmsJudgementResult)d.Result).ToArray();
-            if (useNewPath)
-                Playfield.EnableNoteExecution(1);
             var context = column.Judgements;
             Playfield.JudgementAlgorithm = algorithm;
             Assert.That(column.CanBatchUpdates, Is.EqualTo(!mixed));
@@ -157,7 +150,7 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
             foreach (var (type, name) in new[] { (typeof(BmsColumn), "PlaySample"), (typeof(BmsColumn), "PlayKeySound"), (typeof(BmsPlayfield), "RegisterNonConsumingBad") })
                 probes.Add(new ScopedMethodProbe(type.GetMethod(name, instance)!, typeof(TestSceneBmsNoteExecution).GetMethod(nameof(observeFeedback), BindingFlags.Static | BindingFlags.NonPublic)));
             // Regenerate callers so prior tests cannot hide a tiny feedback method through inlining.
-            foreach (var name in new[] { "HandlePress", "HandleNotePress" })
+            foreach (var name in new[] { "HandleNotePress" })
                 probes.Add(new ScopedMethodProbe(typeof(BmsColumnJudgementContext).GetMethod(name, instance)!, typeof(TestSceneBmsNoteExecution).GetMethod(nameof(keepCallBoundary), BindingFlags.Static | BindingFlags.NonPublic)));
 
             if (scenario == Scenario.Reactivation)
@@ -178,10 +171,6 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
                 foreach (var drawable in drawables)
                     drawable.OnNewResult += after;
                 var order = container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Select(d => d.HitObject).Where(notes.Contains).ToArray();
-                if (useNewPath)
-                    Assert.That(order.Select(n => Array.IndexOf(notes, n)), Is.EqualTo(legacyActivationOrder));
-                else
-                    legacyActivationOrder = order.Select(n => Array.IndexOf(notes, n)).ToArray();
                 // Registration order and alive-map enumeration are distinct inputs to the recorded plan.
                 foreach (var note in notes)
                     recorded.ActivateNote(note);
@@ -191,7 +180,7 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
             if (culled)
             {
                 foreach (var drawable in drawables)
-                    drawable.UpdateVisualPosition(-1_000_000, 700);
+                    drawable.UpdateVisualLayout(-1_000_000, new BmsColumnVisualFrame(0, 1, 0, 700));
                 Assert.That(drawables.All(d => d.VisualsSuppressed && !d.IsPresent), Is.True);
             }
 
@@ -243,24 +232,21 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
             var score = (BmsScoreProcessor)Player.ScoreProcessor;
             var scoreTrace = JsonSerializer.Serialize(new { events = score.JudgementEvents, combo = score.Combo.Value, total = score.TotalScore.Value, health = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory });
             Assert.That(trace, Is.EqualTo(recordedTrace), "the same plan through the framework and a Drawable-free output");
-            if (useNewPath)
+            Assert.That(score.JudgementEvents, Has.Count.EqualTo(output.MainResults + output.NonConsumingResults));
+            HitResult[] expectedResults = scenario switch
             {
-                Assert.That(trace, Is.EqualTo(legacyTrace), "synchronous observations from the unchanged production path");
-                Assert.That(scoreTrace, Is.EqualTo(legacyScore), "ordered score and gauge effects");
-            }
-            else
-            {
-                legacyTrace.Clear();
-                legacyTrace.AddRange(trace);
-                legacyScore = scoreTrace;
-            }
-            TestContext.WriteLine("P3A0_NOTE " + JsonSerializer.Serialize(new { scenario, mixed, culled, algorithm, useNewPath, rows = trace, score = scoreTrace }));
+                Scenario.Duplicate or Scenario.Reactivation => [HitResult.Perfect, HitResult.Perfect],
+                Scenario.PmsHit => [HitResult.Ok, HitResult.Perfect],
+                Scenario.PmsPoor => [HitResult.Ok, HitResult.Meh],
+                _ => [HitResult.Meh],
+            };
+            Assert.That(score.JudgementEvents.Select(e => e.Result), Is.EqualTo(expectedResults));
+            TestContext.WriteLine("P3A0_NOTE " + JsonSerializer.Serialize(new { scenario, mixed, culled, algorithm, rows = trace, score = scoreTrace }));
 
             string snapshot(string checkpoint, BmsHitObject? note, bool recording)
             {
-                var candidates = recording ? recorded.GetNoteCandidates() : useNewPath ? context.GetNoteCandidates()
-                    : container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Where(d => !d.Judged && notes.Contains(d.HitObject)).Select(d => d.HitObject);
-                var first = recording ? recorded.FirstPendingNote : context.FirstPendingHead?.HitObject;
+                var candidates = recording ? recorded.GetNoteCandidates() : context.GetNoteCandidates();
+                var first = recording ? recorded.FirstPendingNote : context.FirstPendingNote;
                 return JsonSerializer.Serialize(new
                 {
                     checkpoint, id = note == null ? -1 : Array.IndexOf(notes, note), first = first == null ? -1 : Array.IndexOf(notes, first),
@@ -284,6 +270,7 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
                 var expected = recorded.HandleNotePress(new BmsPressContext(inputTime, new BmsFrameContext(simulationTime, 1.5)), algorithm);
                 Assert.That(actual, Is.EqualTo(expected));
                 column.HandleRelease(inputTime);
+                recorded.HandleExecutionRelease(inputTime, new BmsFrameContext(simulationTime, 1.5));
                 mark($"press:{inputTime}:{simulationTime}:{actual.Kind}");
             }
 
@@ -292,7 +279,7 @@ public partial class TestSceneBmsNoteExecution : BmsPlayerTestScene
                 advance(time);
                 foreach (var drawable in drawables)
                 {
-                    drawable.UpdateSubTree();
+                    context.CheckRegisteredNotePassive(drawable.HitObject, new BmsFrameContext(time, 1.5));
                     recorded.CheckRegisteredNotePassive(drawable.HitObject, new BmsFrameContext(time, 1.5));
                 }
                 mark($"passive:{time}");

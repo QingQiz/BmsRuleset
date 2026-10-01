@@ -7,6 +7,7 @@ using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -38,6 +39,8 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private BmsLongNotePresentation presentation;
     private BmsLongNotePresentationMapping mapPresentation = null!;
     private readonly BmsLongNoteStateObserver stateObserver;
+    private readonly BmsVisualTimeObserver visualTimeObserver;
+    private (double Time, double Offset, BmsColumnVisualFrame Frame)? lastVisualObservation;
 
     private double lastHoldExplosionTime;
     private bool restoreHeadPin;
@@ -54,19 +57,13 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private BmsCachedSkinnableDrawable longNoteTail = null!;
 
-    internal override void UpdateDeferredVisuals(float y, in BmsColumnVisualFrame frame)
-    {
-        // Pin the held head at the simulation timestamp even when skins wait for the final frame.
-        getVisualHeadY(y, tailY(frame));
-        UpdateVisualState();
-    }
-
     public DrawableBmsLongNote()
     {
         // A held note resolves its visual head for both culling and geometry every frame.
         // Keep the instance delegate across pool reuse instead of allocating at each call.
         resolveBodyDirection = bodyDirectionBeforeTailPasses;
         stateObserver = applyPresentation;
+        visualTimeObserver = observeVisualTime;
     }
 
     /// <summary>
@@ -75,7 +72,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     internal override void UpdateVisualLayout(float y, in BmsColumnVisualFrame frame)
     {
         var endY = tailY(frame);
-        var headY = getVisualHeadY(y, endY);
+        var headY = getVisualHeadY(y);
         ApplyVisualLayout(new BmsVisualLayout(y, Math.Min(headY, endY), Math.Max(headY, endY)), frame.Height);
         updateVisualGeometry(y, endY);
     }
@@ -93,7 +90,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         const float max_piece_height = 4096;
         var holdingBody = isHoldingBody();
-        headY = getVisualHeadY(headY, endY);
+        headY = getVisualHeadY(headY);
 
         var myY = Y;
         var headOffset = headY - myY;
@@ -163,7 +160,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         longNoteTail.Alpha = releasedFast ? released_alpha : 1f;
     }
 
-    private float getVisualHeadY(float y, float endY)
+    private void observeVisualTime(float y, in BmsColumnVisualFrame frame)
     {
         if (restoreHeadPin)
         {
@@ -174,16 +171,24 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             restoreHeadPin = false;
         }
 
-        // Observe positions even while culled so a held head can re-enter at its pinned position.
-        visualState.UpdateHeadYAtStartTime(y, Time.Current, HitObject.StartTime, ParentColumn?.VisualOffset ?? 0);
-        return isHoldingBody()
-            ? visualState.ResolveHeldHeadY(y, endY, Time.Current >= HitObject.StartTime, resolveBodyDirection)
-            : y;
+        var observation = (Time: Time.Current, Offset: ParentColumn?.VisualOffset ?? 0, Frame: frame);
+        if (lastVisualObservation != observation)
+        {
+            // A final skin traversal can revisit a sampled simulation frame without extending its history.
+            visualState.UpdateHeadYAtStartTime(y, observation.Time, HitObject.StartTime, observation.Offset);
+            lastVisualObservation = observation;
+        }
+        if (isHoldingBody())
+            visualState.ObserveHeldBodyDirection(y, tailY(frame), Time.Current >= HitObject.StartTime, resolveBodyDirection);
     }
+
+    private float getVisualHeadY(float y) => isHoldingBody()
+        ? visualState.ResolveHeldHeadY(y, Time.Current >= HitObject.StartTime) : y;
 
     protected override void ResetVisualState()
     {
         lastSimulationTime = double.NaN;
+        lastVisualObservation = null;
         visualState.Reset();
         bodyGeometryValid = false;
         longNoteBody.ResetBody();
@@ -206,6 +211,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         {
             mapPresentation = BmsLongNotePresentation.SelectMapping(ln.Beatmap.LockedLongNoteMode);
             ParentColumn!.JudgementOutput.ObserveLongNoteState(this, stateObserver);
+            ParentColumn.JudgementOutput.ObserveVisualTime(this, visualTimeObserver);
             presentation = mapPresentation(ln, state, isKeyHeld(), Time.Current);
             restoreHeadPin = state.LongNoteStarted;
 
@@ -243,6 +249,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     internal override void RestoreRewoundState()
     {
         lastSimulationTime = double.NaN;
+        lastVisualObservation = null;
         visualState.Reset();
         restoreHeadPin = state.LongNoteStarted;
         bodyGeometryValid = false;
@@ -303,11 +310,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         }
     }
 
-    private bool isHoldingBody()
-    {
-        presentation = mapPresentation(ln, state, isKeyHeld(), Time.Current);
-        return presentation.HoldingBody;
-    }
+    private bool isHoldingBody() => mapPresentation(ln, state, isKeyHeld(), Time.Current).HoldingBody;
 
     private bool isKeyHeld() => ParentColumn?.IsPressed == true;
 

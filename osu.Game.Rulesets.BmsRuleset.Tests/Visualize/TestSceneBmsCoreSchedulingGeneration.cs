@@ -38,7 +38,6 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
     private const BindingFlags instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     private bool replay;
     private bool mixed;
-    private bool generated;
     private BmsCoreSchedulingRecorder? recorder;
     private BmsInputManager inputManager = null!;
     private static FrameStabilityContainer? budgetHost;
@@ -83,17 +82,13 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         return beatmap;
     }
 
-    [TestCase(false, false, false)]
-    [TestCase(false, true, false)]
-    [TestCase(true, false, false)]
-    [TestCase(true, true, false)]
-    [TestCase(false, false, true)]
-    [TestCase(false, true, true)]
-    [TestCase(true, false, true)]
-    [TestCase(true, true, true)]
-    public void OrdinaryKeyboardGeneratesCoreCheckpoints(bool mixedStages, bool deferred, bool core)
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void OrdinaryKeyboardGeneratesCoreCheckpoints(bool mixedStages, bool deferred)
     {
-        load(false, mixedStages, core);
+        load(false, mixedStages);
         AddStep("capture ordinary keyboard core scheduling", () => withClock((advance, keyboard) =>
         {
             startRecording();
@@ -116,7 +111,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             Assert.That(recorder.Rows.Count(r => r.Split('|')[4].EndsWith("/input.queue>")), Is.EqualTo(10));
             Assert.That(recorder.Rows.Any(r => r.Contains("reverseScratch=True")), Is.True);
             Assert.That(recorder.Rows.Any(r => r.Contains("/body.tick>")), Is.True);
-            finish($"keyboard-{mixedStages}-{deferred}", false);
+            finish($"keyboard-{mixedStages}-{deferred}");
 
             void step(double time, params ButtonInputEntry<Key>[] keys)
             {
@@ -127,11 +122,10 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         }));
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void OrdinaryKeyboardLifecycleAndSameTimestampBatches(bool core)
+    [Test]
+    public void OrdinaryKeyboardLifecycleAndSameTimestampBatches()
     {
-        load(false, false, core);
+        load(false, false);
         AddStep("capture same-time inputs and real lifecycle", () => withClock((advance, keyboard) =>
         {
             startRecording();
@@ -144,6 +138,11 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             note.HitObject.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             recorder.Mark("defaults.after");
             Assert.That(note.BindingGeneration, Is.EqualTo(oldGeneration + 1));
+            var visuals = (System.Collections.IDictionary)typeof(BmsColumnHitObjectContainer).GetField("visualObservations", instance)!
+                .GetValue(Playfield.Stage.Columns[0].HitObjectContainer)!;
+            Assert.That(visuals.Count, Is.EqualTo(1), "Reapply replaces the visual registration.");
+            var binding = visuals[note]!;
+            Assert.That(binding.GetType().GetProperty("Generation")!.GetValue(binding), Is.EqualTo(note.BindingGeneration));
             // The handler only creates physical transitions. The input manager and playfield choose all phases.
             foreach (var pressed in new[] { false, true, false })
             {
@@ -157,24 +156,25 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             advance(6000);
             inputManager.UpdateSubTree();
             recorder.Mark("removed");
+            Assert.That(visuals.Count, Is.Zero, "Pool return releases visual observations.");
             advance(2798);
             inputManager.UpdateSubTree();
             recorder.Mark("rewound");
+            Assert.That(visuals.Count, Is.EqualTo(1), "Reactivation registers the current representation.");
             advance(3000);
             keyboard.Inputs.Add(new KeyboardKeyInput([new(Key.Z, true)]));
             inputManager.UpdateSubTree();
             recorder.Mark("reactivated");
             Assert.That(recorder.Rows.Any(r => r.Contains("/representation.killed>")), Is.True);
             Assert.That(recorder.Rows.Any(r => r.Contains("/result.revert<")), Is.True);
-            finish("keyboard-lifecycle", false);
+            finish("keyboard-lifecycle");
         }));
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void ParentKeyboardDispatchFlushesBeforeTheSimulationClockAdvances(bool core)
+    [Test]
+    public void ParentKeyboardDispatchFlushesBeforeTheSimulationClockAdvances()
     {
-        load(false, false, core);
+        load(false, false);
         AddStep("observe pending physical input at the parent-frame boundary", () => withClock((advance, keyboard) =>
         {
             startRecording();
@@ -191,17 +191,15 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             var rows = recorder!.Rows.Select(r => r.Split('|')).ToArray();
             Assert.That(rows.Single(r => r[4] == "frame.begin/batch>")[5], Is.EqualTo("3000"));
             Assert.That(rows.Count(r => r[4] == "simulation/batch>" && r[5] == "3001"), Is.EqualTo(2));
-            finish("parent-keyboard", false);
+            finish("parent-keyboard");
         }));
     }
 
-    [TestCase(false, false)]
-    [TestCase(true, false)]
-    [TestCase(false, true)]
-    [TestCase(true, true)]
-    public void OrdinaryReplayUsesFrameStabilityCatchupAndRewind(bool mixedStages, bool core)
+    [TestCase(false)]
+    [TestCase(true)]
+    public void OrdinaryReplayUsesFrameStabilityCatchupAndRewind(bool mixedStages)
     {
-        load(true, mixedStages, core);
+        load(true, mixedStages);
         AddStep("record actual replay catchup and rewind synchronously", () =>
         {
             budgetHost = Player.DrawableRuleset.ChildrenOfType<FrameStabilityContainer>().Single();
@@ -225,7 +223,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(2998).Within(.001));
             recorder!.Recording = false;
             Assert.That(recorder.Rows.Any(r => r.Contains("/result.externalRevert=")), Is.True);
-            finish($"replay-{mixedStages}", false);
+            finish($"replay-{mixedStages}");
             stopRecording();
             budgetHost = null;
         });
@@ -245,8 +243,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             using var fixture = JsonDocument.Parse(stream);
             var expected = fixture.RootElement.GetProperty("traces").GetProperty("replay-False").EnumerateArray().Select(r => r.GetString()!)
                 .TakeWhile(r => !r.Contains("/forward.complete="));
-            if (Environment.GetEnvironmentVariable("BMS_CAPTURE_CORE_BASELINE") != "1")
-                Assert.That(semanticRows(rows), Is.EqualTo(semanticRows(expected)));
+            Assert.That(semanticRows(rows), Is.EqualTo(semanticRows(expected)));
             TestContext.WriteLine("P3A07_REPLAY_SMOKE " + JsonSerializer.Serialize(semanticRows(rows)));
             Assert.That(recorder.ReplayPolls, Is.GreaterThan(0));
             Assert.That(recorder.StabilityUpdates, Is.GreaterThan(0));
@@ -266,7 +263,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
     [TestCase(true)]
     public void RepeatedGeometryAndSkinTraversalDoesNotGenerateBusinessOperations(bool afterRewind)
     {
-        load(false, false, true);
+        load(false, false);
         AddStep("hold through a body checkpoint then refresh only visuals", () => withClock((advance, keyboard) =>
         {
             advance(3000);
@@ -295,7 +292,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
                     foreach (var drawable in column.HitObjectContainer.AliveEntries.Values.OfType<DrawableBmsHitObject>())
                     {
                         drawable.ApplyNoteHeightScale(iteration % 2 == 0 ? 1.1f : 1);
-                        if (drawable is ILongNoteHolder held) held.UpdateBodyGeometry(-100, -500);
+                        drawable.UpdateVisualLayout(-100, new BmsColumnVisualFrame(0, 1, 0, 1000));
                         drawable.UpdateSubTree();
                         drawable.UpdateSubTreeMasking();
                     }
@@ -310,11 +307,31 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         }));
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void DirectStartTimeChangePreservesActualSubtreeOrder(bool core)
+    [Test]
+    public void DeferredVisualObservationDoesNotRequireAnActiveJudgementHold()
     {
-        load(false, false, core);
+        load(false, false);
+        AddStep("observe an approaching head during a deferred simulation slice", () => withClock((advance, _) =>
+        {
+            var column = (BmsColumn)Playfield.Stage.Columns[0];
+            var note = column.HitObjectContainer.AliveEntries.Values.OfType<DrawableBmsHitObject>().Single();
+            Assert.That(column.Judgements.ActiveLongNotes, Is.Empty);
+            Playfield.BeginGameplayFrame();
+            startRecording();
+            advance(2999);
+            inputManager.UpdateSubTree();
+            var visualState = note.GetType().GetField("visualState", instance)!.GetValue(note)!;
+            Assert.That(visualState.GetType().GetField("previousHeadTime", instance)!.GetValue(visualState), Is.EqualTo(2999d));
+            Assert.That(column.Judgements.ActiveLongNotes, Is.Empty);
+            Assert.That(recorder!.Rows.Any(r => r.Contains("/column.layout>")), Is.False,
+                "The head position is sampled without forcing a skin traversal or activating a judgement hold.");
+        }));
+    }
+
+    [Test]
+    public void DirectStartTimeChangePreservesActualSubtreeOrder()
+    {
+        load(false, false);
         AddStep("change sorting key without reapplying defaults", () => withClock((advance, _) =>
         {
             var container = Playfield.Stage.Columns[1].HitObjectContainer;
@@ -328,14 +345,14 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             var actual = recorder!.Rows.Select(r => r.Split('|')).Where(r => r[4].EndsWith("/note.passive>") && r[7] == "1")
                 .Select(r => r[8]).ToArray();
             Assert.That(actual, Is.EqualTo(expected));
-            TestContext.WriteLine("P3A07_DIRECT_SORT " + JsonSerializer.Serialize(new { core, expected, actual }));
+            TestContext.WriteLine("P3A07_DIRECT_SORT " + JsonSerializer.Serialize(new { expected, actual }));
         }));
     }
 
     [Test]
     public void NativeRemoveAndReaddOwnExactlyOneSortingSubscription()
     {
-        load(false, false, true);
+        load(false, false);
         AddStep("remove and re-add the native entry", () => withClock((_, _) =>
         {
             var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
@@ -358,7 +375,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
     [TestCase(true)]
     public void RealResultCallbackCannotSkipTheNextObjectOrExecuteItsStaleBinding(bool reapplyNext)
     {
-        load(false, false, true);
+        load(false, false);
         AddStep("mutate native membership from a synchronous result callback", () => withClock((advance, _) =>
         {
             var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
@@ -395,11 +412,10 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         }));
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void BothResultObserversRetainIdentityAfterSynchronousPoolReturn(bool core)
+    [Test]
+    public void BothResultObserversRetainIdentityAfterSynchronousPoolReturn()
     {
-        load(false, false, core);
+        load(false, false);
         AddStep("return a judged representation inside its result callback", () => withClock((advance, _) =>
         {
             var column = (BmsColumn)Playfield.Stage.Columns[1];
@@ -414,10 +430,11 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             try
             {
                 advance(3000);
-                Assert.That(drawable.TryHit(osu.Game.Rulesets.Scoring.HitResult.Perfect), Is.True);
+                Assert.That(column.Judgements.TryPressRegisteredNote(note, osu.Game.Rulesets.Scoring.HitResult.Perfect,
+                    new BmsPressContext(3000, new BmsFrameContext(3000, Playfield.Clock.Rate))), Is.True);
                 Assert.That(drawable.HitObject, Is.Null);
                 Assert.That(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.Count(e => e.Source == BmsJudgementSource.From(note)), Is.EqualTo(1));
-                TestContext.WriteLine("P3A07_STABLE_RESULT_IDENTITY " + core);
+                TestContext.WriteLine("P3A07_STABLE_RESULT_IDENTITY");
             }
             finally { Playfield.NewResult -= result; }
         }));
@@ -426,7 +443,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
     [Test]
     public void DifferentPooledRepresentationWithEqualLocalGenerationKeepsItsOwnBinding()
     {
-        load(false, false, true);
+        load(false, false);
         AddStep("replace a pooled representation with the same local generation", () => withClock((advance, _) =>
         {
             var column = (BmsColumn)Playfield.Stage.Columns[1];
@@ -438,7 +455,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             var otherEntry = pair[1].Entry!;
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             var generation = original.BindingGeneration;
-            Assert.That(column.Judgements.TryGetScheduledObject(original, out var oldBinding), Is.True);
+            Assert.That(column.JudgementOutput.TryGetScheduledObject(original, out var oldBinding), Is.True);
             Assert.That(container.Remove(entry), Is.True);
             Assert.That(container.Remove(otherEntry), Is.True);
             container.Add(entry);
@@ -447,10 +464,10 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             Assert.That(replacement, Is.SameAs(pair[1]));
             Assert.That(replacement, Is.Not.SameAs(original));
             Assert.That(replacement.BindingGeneration, Is.EqualTo(generation));
-            Assert.That(column.Judgements.TryGetScheduledObject(replacement, out var newBinding), Is.True);
+            Assert.That(column.JudgementOutput.TryGetScheduledObject(replacement, out var newBinding), Is.True);
             Assert.That(newBinding.BindingToken, Is.Not.EqualTo(oldBinding.BindingToken));
             var unaffected = container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Single(d => d.HitObject.StartTime == 3030);
-            Assert.That(column.Judgements.TryGetScheduledObject(unaffected, out var unaffectedBinding), Is.True);
+            Assert.That(column.JudgementOutput.TryGetScheduledObject(unaffected, out var unaffectedBinding), Is.True);
             var observed = new List<BmsHitObject>();
             void result(osu.Game.Rulesets.Objects.Drawables.DrawableHitObject _, osu.Game.Rulesets.Judgements.JudgementResult judgement)
                 => observed.Add((BmsHitObject)judgement.HitObject);
@@ -465,8 +482,8 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
                 schedule.CompleteRemoval(oldBinding, frame);
                 schedule.RunSubtree([oldBinding, unaffectedBinding], frame);
                 Assert.That(observed, Is.EqualTo(new[] { unaffected.HitObject }));
-                column.Judgements.UnbindNoteRepresentation(original, generation);
-                Assert.That(column.Judgements.TryGetScheduledObject(replacement, out var afterLateFree), Is.True);
+                column.JudgementOutput.UnbindNoteRepresentation(original, generation);
+                Assert.That(column.JudgementOutput.TryGetScheduledObject(replacement, out var afterLateFree), Is.True);
                 Assert.That(afterLateFree, Is.EqualTo(newBinding));
                 schedule.Unbind(oldBinding);
                 schedule.BeginBatch(0, 11, 11);
@@ -478,9 +495,9 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         }));
     }
 
-    private void load(bool useReplay, bool mixedStages, bool core = false)
+    private void load(bool useReplay, bool mixedStages)
     {
-        AddStep("load no-automation chart", () => { stopRecording(); replay = useReplay; mixed = mixedStages; generated = core; LoadPlayer(); });
+        AddStep("load no-automation chart", () => { stopRecording(); replay = useReplay; mixed = mixedStages; LoadPlayer(); });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
         AddStep("freeze clock source", () =>
         {
@@ -490,7 +507,6 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             Player.GameplayClockContainer.Seek(2998);
         });
         AddUntilStep("simulation at start", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 2998) < .001);
-        if (core) AddStep("enable bounded core generation", () => Playfield.EnableCoreScheduling());
     }
 
     private void withClock(Action<Action<double>, KeyboardDevice> action)
@@ -531,29 +547,21 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         }
     }
 
-    private void startRecording() => recorder = new BmsCoreSchedulingRecorder(Playfield, (BmsScoreProcessor)Player.ScoreProcessor, (BmsHealthProcessor)Player.HealthProcessor, generated) { Recording = true };
+    private void startRecording() => recorder = new BmsCoreSchedulingRecorder(Playfield, (BmsScoreProcessor)Player.ScoreProcessor, (BmsHealthProcessor)Player.HealthProcessor) { Recording = true };
 
-    private void finish(string scenario, bool semanticOnly)
+    private void finish(string scenario)
     {
         recorder!.Recording = false;
-        var rows = semanticOnly ? semanticRows(recorder.Rows) : recorder.Rows.ToArray();
-        TestContext.WriteLine((generated ? "P3A07_CORE_GENERATED " : "P3A07_CORE_BASELINE ") + JsonSerializer.Serialize(new { scenario, rows, raw = recorder.Rows }));
+        var rows = recorder.Rows.ToArray();
+        TestContext.WriteLine("P3A07_CORE_GENERATED " + JsonSerializer.Serialize(new { scenario, rows, raw = recorder.Rows }));
         using var stream = GetType().Assembly.GetManifestResourceStream("osu.Game.Rulesets.BmsRuleset.Tests.reference_fixtures.judgement_p3a07_core.json");
-        if (stream == null)
-        {
-            Assert.That(Environment.GetEnvironmentVariable("BMS_CAPTURE_CORE_BASELINE"), Is.EqualTo("1"), "Explicit old-core capture required before the fixture exists.");
-            return;
-        }
-        using var fixture = JsonDocument.Parse(stream);
+        Assert.That(stream, Is.Not.Null, "The frozen old-core fixture is required for generation comparison.");
+        using var fixture = JsonDocument.Parse(stream!);
         var expected = fixture.RootElement.GetProperty("traces").GetProperty(scenario).EnumerateArray().Select(r => r.GetString()!).ToArray();
-        if (!generated) Assert.That(rows, Is.EqualTo(expected));
-        else
-        {
-            var actualPlan = logicalRows(rows);
-            var expectedPlan = logicalRows(expected);
-            TestContext.WriteLine("P3A07_CORE_PLAN " + JsonSerializer.Serialize(new { scenario, expected = expectedPlan, actual = actualPlan }));
-            Assert.That(actualPlan, Is.EqualTo(expectedPlan), "Generated operations match the frozen old-core observation, including intermediate state.");
-        }
+        var actualPlan = logicalRows(rows);
+        var expectedPlan = logicalRows(expected);
+        TestContext.WriteLine("P3A07_CORE_PLAN " + JsonSerializer.Serialize(new { scenario, expected = expectedPlan, actual = actualPlan }));
+        Assert.That(actualPlan, Is.EqualTo(expectedPlan), "Generated operations match the frozen old-core observation, including intermediate state.");
     }
 
     private static string[] logicalRows(IEnumerable<string> rows)

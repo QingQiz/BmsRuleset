@@ -73,9 +73,9 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
     {
         revision++;
         bindingRevision++;
-        // A restored frame may revisit a previously processed timestamp.
+        // Restoring history invalidates every checkpoint from the previous execution.
         foreach (var binding in bindings.Values)
-            binding.LastPostTime = double.NaN;
+            binding.LastPostStep = (-1, -1);
     }
 
     internal void InvalidateOrder() => bindingRevision++;
@@ -142,8 +142,9 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
         // Synchronous output may remove or rebind this object. Never let the old plan borrow its replacement.
         if (version != revision || !current(item)) return;
         var binding = bindings[item.Object];
-        if (binding.LastPostTime == frame.SimulationTime) return;
-        binding.LastPostTime = frame.SimulationTime;
+        var step = (Epoch, Step);
+        if (binding.LastPostStep == step) return;
+        binding.LastPostStep = step;
         FinishLongNote((BmsLongNote)item.Object, frame, elapsed, column.PressedDirections != 0);
     }
 
@@ -177,6 +178,7 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
         internal long Token { get; } = token;
         internal bool Removing;
         internal bool RemovalChecked;
-        internal double LastPostTime = double.NaN;
+        // Inputs retain their own batches; post-result work runs once per simulation step and binding.
+        internal (long Epoch, long Step) LastPostStep = (-1, -1);
     }
 }

@@ -45,6 +45,7 @@ internal sealed partial class BmsDrawableJudgementOutput : IBmsJudgementOutput
 
     internal void Unbind(DrawableBmsHitObject drawable, long generation)
     {
+        container.RemoveVisualObservation(drawable, generation);
         if (presentationObservers.TryGetValue(drawable, out var observer) && observer.Generation == generation)
             presentationObservers.Remove(drawable);
         if (landmineObservers.TryGetValue(drawable, out var mineObserver) && mineObserver.Generation == generation)

@@ -467,6 +467,9 @@ internal sealed partial class BmsColumnJudgementContext
 
     internal void UpdateRegisteredBodies(in BmsFrameContext frame, double elapsed, bool holding)
     {
+        // A completed hold leaves the active schedule before the next batch's body observations.
+        for (var i = activeLongNotes.Count - 1; i >= 0; i--)
+            RetireInactiveLongNoteAt(i);
         for (var i = 0; i < activeBodySlots.Count;)
         {
             var slot = activeBodySlots[i];

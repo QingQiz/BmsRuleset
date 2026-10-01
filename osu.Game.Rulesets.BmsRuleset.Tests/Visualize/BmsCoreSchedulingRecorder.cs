@@ -46,7 +46,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
     internal int ReplayPolls { get; private set; }
     internal int StabilityUpdates { get; private set; }
 
-    internal BmsCoreSchedulingRecorder(BmsPlayfield playfield, BmsScoreProcessor score, BmsHealthProcessor health, bool generated = false)
+    internal BmsCoreSchedulingRecorder(BmsPlayfield playfield, BmsScoreProcessor score, BmsHealthProcessor health)
     {
         if (current != null)
             throw new InvalidOperationException("Checkpoint probes require a non-parallel scope.");
@@ -74,34 +74,26 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             probe(typeof(BmsColumnHitObjectContainer), "UpdateDeferredLongNotes", "column.deferred");
             probe(typeof(BmsColumnHitObjectContainer), "RemoveDrawable", "representation.remove");
             probe(typeof(BmsColumnHitObjectContainer), "AddDrawable", "representation.add");
-            probe(typeof(BmsColumnHitObjectContainer), "UpdateLandmines", "mines");
-            probe(typeof(BmsColumnJudgementContext), "UpdateHellChargeBodies", "bodies");
-            if (generated)
+            probe(typeof(BmsColumnJudgementContext), "UpdateLandmines", "mines");
+            probe(typeof(BmsColumnJudgementContext), "UpdateRegisteredBodies", "bodies");
+            probe(typeof(BmsColumnJudgementContext), "TryPressRegisteredNote", "core.press");
+            probe(typeof(BmsCoreJudgementSchedule), "CheckPassive", "core.passive");
+            probe(typeof(BmsCoreJudgementSchedule), "FinishLongNote", "long.finish");
+            probe(typeof(BmsCoreJudgementSchedule), "RunLayout", "core.layout");
+            probe(typeof(BmsCoreJudgementSchedule), "RunSubtree", "core.subtree");
+            probe(typeof(BmsCoreJudgementSchedule), "RunDeferred", "core.deferred");
+            probe(typeof(BmsCoreJudgementSchedule), "CompleteRemoval", "core.removal");
+            foreach (var type in ruleTypes)
             {
-                probe(typeof(BmsColumnJudgementContext), "TryPressRegisteredNote", "core.press");
-                probe(typeof(BmsCoreJudgementSchedule), "CheckPassive", "core.passive");
-                probe(typeof(BmsCoreJudgementSchedule), "FinishLongNote", "long.finish");
-                probe(typeof(BmsCoreJudgementSchedule), "RunLayout", "core.layout");
-                probe(typeof(BmsCoreJudgementSchedule), "RunSubtree", "core.subtree");
-                probe(typeof(BmsCoreJudgementSchedule), "RunDeferred", "core.deferred");
-                probe(typeof(BmsCoreJudgementSchedule), "CompleteRemoval", "core.removal");
+                probe(type, "TryRelease", "long.release");
+                probe(type, "TryRepress", "long.repress");
             }
-            else
-            {
-                probe(typeof(BmsColumnJudgementContext), "TryPressNote", "note.press");
-                probe(typeof(BmsColumnJudgementContext), "TryPressLongNote", "long.press");
-                probe(typeof(BmsColumnJudgementContext), "CheckPassiveNote", "note.passive");
-                probe(typeof(BmsColumnJudgementContext), "CheckPassiveLongNote", "long.passive");
-                probe(typeof(BmsColumnJudgementContext), "UpdateLongNotePostResult", "long.finish");
-            }
-            probe(typeof(BmsColumnJudgementContext), "TryReleaseLongNote", "long.release");
-            // Observe the leaf used by other scoped probes; rebuilding its thin caller can inline it.
-            probe(typeof(BmsLongNoteJudgementController), "TryRepress", "long.repress");
-            probe(typeof(BmsColumnJudgementContext), "onHeadJudged", "head.publish");
-            probe(typeof(BmsColumnJudgementContext), "Unregister", "index.remove");
+            probe(typeof(BmsDrawableJudgementOutput), "PublishState", "state.publish",
+                [typeof(BmsLongNote), typeof(BmsLongNoteState).MakeByRefType(), typeof(BmsFrameContext).MakeByRefType()]);
+            probe(typeof(BmsDrawableJudgementOutput), "Unregister", "index.remove");
             probe(typeof(BmsColumnJudgementContext), "RewindLongNotes", "history.rewind");
-            probe(typeof(BmsColumnJudgementContext), "RebuildRewoundIndexes", "index.rebuild");
-            probe(typeof(BmsLongNoteJudgementController), "UpdateHellChargeBody", "body.sample");
+            probe(typeof(BmsColumnJudgementContext), "RestoreExecutionState", "index.rebuild");
+            probe(typeof(BmsHellChargeNoteJudgementRule), "updateBody", "body.sample");
             probe(typeof(BmsColumn), "PlaySample", "keysound");
             probe(typeof(BmsPlayfield), "ApplyHellChargeTick", "body.tick");
             probe(typeof(BmsPlayfield), "ApplySyntheticLongNoteEndpoint", "endpoint");
@@ -109,42 +101,27 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             probe(typeof(DrawableHitObject), "OnApply", "representation.apply", [typeof(HitObjectLifetimeEntry)]);
             probe(typeof(DrawableHitObject), "OnFree", "representation.free", [typeof(HitObjectLifetimeEntry)]);
             probe(typeof(DrawableHitObject), "OnKilled", "representation.killed");
+            probe(typeof(DrawableBmsHitObject), "OnKilled", "representation.killed");
             probe(typeof(Playfield), "revertResult", "result.revert");
-            // Full CN traversal can warm these callers before this recorder is installed.
-            // Rebuild from leaves outward so prior scoped probes cannot hide synchronous checkpoints by inlining.
-            foreach (var method in typeof(BmsColumnJudgementContext).GetMethods(instance).Where(m => m.Name.Contains("IBmsLongNoteJudgementSink")))
-                refreshCaller(typeof(BmsColumnJudgementContext), method.Name);
+            // Rebuild callers after their leaves so warmed, inlined rules retain observable checkpoints.
             refreshCaller(typeof(BmsHellChargeBodyTracker), "Update");
-            refreshCaller(typeof(BmsLongNoteJudgementController), "UpdateHellChargeBody");
-            refreshCaller(typeof(BmsLongNoteJudgementController), "TryHit");
-            refreshCaller(typeof(BmsLongNoteJudgementController), "CheckPassiveResult");
-            refreshCaller(typeof(BmsLongNoteJudgementController), "UpdatePostResult");
-            refreshCaller(typeof(BmsColumnJudgementContext), "TryPressLongNote");
-            refreshCaller(typeof(BmsColumnJudgementContext), "CheckPassiveLongNote");
-            refreshCaller(typeof(BmsColumnJudgementContext), "UpdateLongNotePostResult");
-            refreshCaller(typeof(BmsColumnJudgementContext), "UpdateHellChargeBodies");
-            // Earlier scenes may have inlined context calls into the concrete long-note adapters.
-            // Recompile those callers after installing the probes, preserving their original bodies.
-            foreach (var type in bindings.Keys.OfType<ILongNoteHolder>().Select(d => d.GetType()).Distinct())
+            foreach (var type in ruleTypes)
             {
-                refreshCaller(type, "CheckForResult");
-                refreshCaller(type, "UpdateKindPostResultState");
+                refreshCaller(type, "TryPress");
+                refreshCaller(type, "CheckPassive");
+                refreshCaller(type, "Finish");
             }
+            refreshCaller(typeof(BmsHellChargeNoteJudgementRule), "UpdateBody");
+            foreach (var type in typeof(BmsColumnJudgementContext).GetNestedTypes(BindingFlags.NonPublic)
+                         .Where(t => t.Name.EndsWith("NoteOperations")))
+                foreach (var method in new[] { "Press", "Passive", "Repress", "Release", "Finish" })
+                    refreshCaller(type, method);
+            refreshCaller(typeof(BmsColumnJudgementContext), "UpdateRegisteredBodies");
+            refreshCaller(typeof(BmsCoreJudgementSchedule), "updateLongNote");
             // Tiered framework callers can devirtualise CheckForResult before this scope observes it.
             refreshCaller(typeof(DrawableHitObject), "UpdateResult");
             refreshCaller(typeof(DrawableHitObject), "UpdateAfterChildren");
             refreshCaller(typeof(DrawableHitObject), "OnKilled");
-            refreshCaller(typeof(DrawableBmsHitObject), "UpdateSubTree");
-            // Ordinary notes dispatch passive checks from traversal and removal, not CheckForResult.
-            foreach (var type in bindings.Keys.Where(d => d.HitObject is BmsNote).Select(d => d.GetType()).Distinct())
-            {
-                refreshCaller(type, "UpdateSubTree");
-                refreshCaller(type, "OnKilled");
-            }
-            // A warmed layout caller can also inline the virtual post-result bridge through UpdateColumnFrame.
-            refreshCaller(typeof(DrawableBmsHitObject), "UpdateColumnFrame");
-            foreach (var type in bindings.Keys.OfType<ILongNoteHolder>().Select(d => d.GetType()).Distinct())
-                refreshCaller(type, "UpdateDeferredLongNote");
             refreshCaller(typeof(BmsColumnHitObjectContainer), "UpdateAfterChildrenLife");
             refreshCaller(typeof(BmsColumnHitObjectContainer), "UpdateDeferredLongNotes");
             refreshCaller(typeof(BmsColumnHitObjectContainer), "EndGameplayFrame");
@@ -172,9 +149,11 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         }
     }
 
+    private static readonly Type[] ruleTypes = [typeof(BmsLongNoteJudgementRule), typeof(BmsChargeNoteJudgementRule), typeof(BmsHellChargeNoteJudgementRule)];
+
     private void probe(Type type, string method, string name, Type[]? parameters = null)
     {
-        var target = parameters == null ? type.GetMethod(method, instance) : type.GetMethod(method, instance, parameters);
+        var target = parameters == null ? type.GetMethod(method, instance | BindingFlags.Static) : type.GetMethod(method, instance, parameters);
         if (target == null)
             throw new MissingMethodException(type.FullName, method);
         names.Add(target, name);
@@ -184,8 +163,13 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
     }
 
     private void refreshCaller(Type type, string method)
-        => probes.Add(new ScopedMethodProbe(type.GetMethod(method, instance)!,
-            typeof(BmsCoreSchedulingRecorder).GetMethod(nameof(keepCallBoundary), BindingFlags.Static | BindingFlags.NonPublic)));
+    {
+        var targets = type.GetMethods(instance | BindingFlags.Static).Where(m => m.Name == method).ToArray();
+        if (targets.Length == 0) throw new MissingMethodException(type.FullName, method);
+        foreach (var target in targets)
+            probes.Add(new ScopedMethodProbe(target,
+                typeof(BmsCoreSchedulingRecorder).GetMethod(nameof(keepCallBoundary), BindingFlags.Static | BindingFlags.NonPublic)));
+    }
 
     private static void keepCallBoundary()
     {
@@ -197,6 +181,15 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         __state = recorder?.Recording == true && recorder.owns(__instance, __args);
         if (!__state)
             return;
+
+        // Long-note removal includes its last passive check; ordinary-note removal observes the
+        // framework sample-stop boundary before that check, as in the frozen framework trace.
+        if (__originalMethod.Name == "OnKilled" && __instance is DrawableBmsHitObject killed
+            && (__originalMethod.DeclaringType == typeof(DrawableBmsHitObject)) != (killed.HitObject is BmsLongNote))
+        {
+            __state = false;
+            return;
+        }
 
         var name = recorder!.names[__originalMethod];
         if (name == "frame.begin") recorder.frame++;
@@ -224,19 +217,24 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         BmsPlayfield field => ReferenceEquals(field, playfield),
         BmsColumn column => column.Index < 2 && ReferenceEquals(playfield.Stage.Columns[column.Index], column),
         BmsColumnHitObjectContainer container => playfield.Stage.Columns.Take(2).Any(c => ReferenceEquals(c.HitObjectContainer, container)),
-        BmsColumnJudgementContext context => owns(context.Column, []),
+        BmsColumnJudgementContext context => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.Judgements, context)),
+        BmsDrawableJudgementOutput output => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.JudgementOutput, output)),
         BmsCoreJudgementSchedule schedule => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.Judgements.Schedule, schedule)),
         BmsFramedReplayInputHandler => true,
         FrameStabilityContainer => true,
         DrawableBmsHitObject drawable => drawable.HitObject != null && identities.ContainsKey(drawable.HitObject),
         HitObjectLifetimeEntry entry => identities.ContainsKey(entry.HitObject),
         JudgementResult result => identities.ContainsKey(result.HitObject),
-        BmsLongNoteJudgementController controller => identities.ContainsKey(controllerNote(controller)),
-        _ => ReferenceEquals(value, engine),
+        _ => runtimeNote(args) is { } note ? identities.ContainsKey(note) : ReferenceEquals(value, engine),
     };
 
-    private static BmsLongNote controllerNote(BmsLongNoteJudgementController controller)
-        => (BmsLongNote)typeof(BmsLongNoteJudgementController).GetField("ln", instance)!.GetValue(controller)!;
+    private static BmsLongNote? runtimeNote(object[] args) => args.Select(arg => arg switch
+    {
+        BmsLongNoteRuntime state => state.Hold.Note,
+        BmsChargeNoteRuntime state => state.Hold.Note,
+        BmsHellChargeNoteRuntime state => state.Hold.Note,
+        _ => null,
+    }).FirstOrDefault(note => note != null);
 
     private void bind(DrawableBmsHitObject drawable)
     {
@@ -271,7 +269,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         var endpoint = args.OfType<BmsLongNoteEndpointResult>().Select(e => (BmsLongNoteEndpointResult?)e).FirstOrDefault();
         var note = (HitObject?)drawable?.HitObject ?? entry?.HitObject ?? result?.HitObject ?? endpoint?.Source
                    ?? args.OfType<BmsHitObject>().FirstOrDefault()
-                   ?? (value is BmsLongNoteJudgementController controller ? controllerNote(controller) : null);
+                   ?? runtimeNote(args);
         if (name.StartsWith("core.") && name is "core.press" or "core.passive")
             name = (note is BmsLongNote ? "long." : "note.") + name[5..];
         if (note != null && drawable == null)
@@ -288,6 +286,10 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         var argumentText = method == null ? "" : string.Join(",", method.GetParameters().Zip(args)
             .Where(p => p.Second is bool or double or int or ushort or Enum)
             .Select(p => p.First.Name + "=" + format(p.Second)));
+        // Preserve the frozen trace schema while numerical contexts replace clock-dependent arguments.
+        if (name == "batch") argumentText = "suppressJudgements=" + format(args.OfType<bool>().First());
+        if (name == "bodies") argumentText = "holding=" + format(args.OfType<bool>().Single());
+        if (name == "body.sample") argumentText = "currentTime=" + format(args.OfType<BmsFrameContext>().Single().SimulationTime) + "," + argumentText;
         if (endpoint is { } e)
             argumentText += $",endpoint={e.Kind}:{e.Result}@{format(e.EventTime)}:{format(e.ApplicationTime)}:{format(e.GameplayRate)}";
         if (name == "result.notify" && result is BmsLongNoteJudgementResult longResult)
@@ -299,9 +301,9 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             playfield.Stage.Columns[column].HitObjectContainer.IndexOf(drawable));
         var states = drawable == null ? "-" : state(drawable);
         var pending = string.Join(",", playfield.Stage.Columns.Take(2).Cast<BmsColumn>()
-            .Select(c => c.Judgements.FirstPendingHead is { } first ? identities[first.HitObject] : -1));
+            .Select(c => c.Judgements.FirstPendingNote is { } first ? identities[first] : -1));
         var active = string.Join("/", playfield.Stage.Columns.Take(2).Cast<BmsColumn>()
-            .Select(c => string.Join(",", c.Judgements.ActiveLongNotes.Select(d => identities[d.HitObject]))));
+            .Select(c => string.Join(",", c.Judgements.ActiveLongNotes.Select(n => identities[n]))));
         var rawTime = result == null ? null : typeof(JudgementResult).GetProperty("RawTime", instance)!.GetValue(result);
         var resultState = result == null ? "-" : $"{result.Type}@{format(result.TimeAbsolute)}:{format(rawTime)}:{format(result.TimeOffset)}:{format(result.GameplayRate)}:{(result as BmsJudgementResult)?.SuppressPenalty}";
         var status = string.Join(",", score.JudgementEvents.Count, BmsExScore.CreateProgression(score.JudgementEvents)[^1],
@@ -313,21 +315,30 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             drawable?.BindingGeneration.ToString() ?? "-", bodyState(drawable)));
     }
 
-    private static string bodyState(DrawableBmsHitObject? drawable)
+    private string bodyState(DrawableBmsHitObject? drawable)
     {
-        var controller = drawable?.LongNoteJudgement;
-        if (controller == null) return "-";
-        var tracker = typeof(BmsLongNoteJudgementController).GetField("hellChargeTracker", instance)!.GetValue(controller)!;
-        return controller.State + ";acc=" + format(typeof(BmsHellChargeBodyTracker).GetField("accumulator", instance)!.GetValue(tracker));
+        if (drawable?.HitObject is not BmsLongNote note || !hasLongNoteObservation(drawable)) return "-";
+        var context = ((BmsColumn)playfield.Stage.Columns[note.Column]).Judgements;
+        var states = (IEnumerable<BmsHellChargeNoteRuntime>)typeof(BmsColumnJudgementContext).GetField("hellChargeHoldStates", instance)!.GetValue(context)!;
+        var tracker = states.FirstOrDefault(s => ReferenceEquals(s.Hold.Note, note))?.Body;
+        return context.GetLongNoteState(note) + ";acc=" + (tracker == null ? "0" : format(typeof(BmsHellChargeBodyTracker).GetField("accumulator", instance)!.GetValue(tracker)));
     }
 
     private string state(DrawableBmsHitObject drawable)
     {
         if (drawable.HitObject == null)
             return "unbound";
-        var controller = drawable.LongNoteJudgement;
+        var state = drawable.HitObject is BmsLongNote note && hasLongNoteObservation(drawable)
+            ? ((BmsColumn)playfield.Stage.Columns[note.Column]).Judgements.GetLongNoteState(note) : (BmsLongNoteState?)null;
         return string.Join(",", identities[drawable.HitObject], drawable.Result?.Type,
-            controller?.HeadJudged, controller?.TailJudged, (drawable as ILongNoteHolder)?.IsAutomaticallyHeld);
+            state?.HeadJudged, state?.TailJudged, drawable.HitObject is BmsLongNote ? false : (bool?)null);
+    }
+
+    private bool hasLongNoteObservation(DrawableBmsHitObject drawable)
+    {
+        // The fixture observes representation state. Logical history now survives OnFree independently.
+        var output = ((BmsColumn)playfield.Stage.Columns[drawable.HitObject.Column]).JudgementOutput;
+        return ((System.Collections.IDictionary)typeof(BmsDrawableJudgementOutput).GetField("presentationObservers", instance)!.GetValue(output)!).Contains(drawable);
     }
 
     private static string format(object? value) => value is IFormattable formattable

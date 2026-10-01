@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Framework.Graphics.Pooling;
@@ -152,7 +153,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
     [TestCase(BmsLongNoteMode.LongNote)]
     [TestCase(BmsLongNoteMode.ChargeNote)]
     [TestCase(BmsLongNoteMode.HellChargeNote)]
-    public void RepeatedVisualLayoutDoesNotAdvanceJudgement(BmsLongNoteMode longNoteMode)
+    public void RepeatedVisualLayoutDoesNotAdvanceJudgementOrVisualHistory(BmsLongNoteMode longNoteMode)
     {
         load(true, longNoteMode);
         seek(5010);
@@ -165,6 +166,11 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
             var result = drawable.Result.Type;
             var resultCount = Player.Results.Count;
             var health = Player.HealthProcessor.Health.Value;
+            const BindingFlags fields = BindingFlags.Instance | BindingFlags.NonPublic;
+            var visualState = drawable.GetType().GetField("visualState", fields)!.GetValue(drawable)!;
+            var historyFields = visualState.GetType().GetFields(fields);
+            var history = historyFields.Select(f => f.GetValue(visualState)).ToArray();
+            var observation = drawable.GetType().GetField("lastVisualObservation", fields)!.GetValue(drawable);
             var scroll = Playfield.ScrollController;
             var frame = new BmsColumnVisualFrame(scroll.CurrentScrollPosition, 1, 0, 700);
             for (var i = 0; i < 20; i++)
@@ -177,6 +183,9 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
             Assert.That(drawable.Result.Type, Is.EqualTo(result));
             Assert.That(Player.Results, Has.Count.EqualTo(resultCount));
             Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(health));
+            Assert.That(historyFields.Select(f => f.GetValue(visualState)), Is.EqualTo(history),
+                "Layout reads the pin and direction history; a fabricated projection must not become a simulation observation.");
+            Assert.That(drawable.GetType().GetField("lastVisualObservation", fields)!.GetValue(drawable), Is.EqualTo(observation));
         });
     }
 

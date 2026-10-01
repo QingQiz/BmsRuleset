@@ -10,9 +10,9 @@
 
 **完整实现核心 → Git 旧版对照与适配 → Mod 适配 → 最终集成。**
 
-当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次。列上下文已移除 Drawable、容器及图形时钟依赖，表示绑定与生命周期通知归入现有输出适配。各绘制子类组合自己的图形，容器提供共享视觉帧，由长按计算头尾布局。生产 Release 构建及已迁移的规则、真实 Player、回池、回退、原地重应用和视觉用例已通过。
+当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次。列上下文已移除 Drawable、容器及图形时钟依赖，表示绑定与生命周期通知归入现有输出适配。各绘制子类组合自己的图形，容器提供共享视觉帧，由长按计算头尾布局。纯视觉观测已独立登记并按表示代次解绑，布局读取固定头位置和方向历史。收尾去重已从 `LastPostTime` 迁到绑定内的调度代次/模拟步骤。生产 Release 构建及 510 项定向回归通过。
 
-核心尚未完成：仍需将逐模拟时点的视觉观测登记与引擎活跃长按列表分离，使布局准备不推进视觉历史；补齐独立调度及完整入口生成验证，并迁移旧调度记录器和其余旧入口测试。调度中的 `LastPostTime` 去重尚未迁移。完整测试项目仍受旧 Controller 记录器、旧表现接口和已摘除 AutoScratch 的消费者阻塞；本次局部测试通过不代表整个测试项目已恢复。Git 旧版完整对照、性能验收及 Mod 适配均尚未进行。
+核心尚未完成：仍需完成统一布局准备/应用契约，迁移其余旧入口测试，并补齐完整调度矩阵。无自动化调度记录器已迁移，真实键盘和回放生成的逻辑轨迹与原 fixture 一致；普通 Note 测试已改为正式框架出口与记录出口对照。完整测试项目仍受剩余旧 Controller 记录器、旧表现接口和已摘除 AutoScratch 的消费者阻塞；本次局部测试通过不代表整个测试项目已恢复。Git 旧版完整对照、性能验收及 Mod 适配均尚未进行。
 
 快速导航：[实施顺序](#implementation-order) · [目标架构](#target-structure) · [生命周期](#state-lifecycle) · [调度](#scheduling-contracts) · [Git 对照](#git-comparison) · [验收](#behaviour-acceptance) · [验证命令](#verification-commands) · [完成条件](#completion)。
 
@@ -26,6 +26,7 @@
 | 原有工作检查点 | `e2315b28aa614220b937344c06dc21cf3663a6c9`；持久引用 `codex/hitobject-before-direct-implementation`，保留原实现、测试和未压缩历史 |
 | 压缩后基点 | `a209acb1a39ebb7e001da5eb27c37dc5759afd2d`；与检查点文件树相同 |
 | 独立规则中间态 | `d00a59fb31a55d2725f44406fd33f41d42e68d97`；保存独立长按/地雷规则和多列帧引擎，后续继续职责与测试迁移 |
+| 表示与图形分离中间态 | `378e7035887b5704615c8278e2b2a6d135ce8053`；保存独立表示绑定、图形组合及 466 项已迁移测试 |
 | 核心实施分支 | `codex/hitobject-judgement-refactor`；继续完整核心实现，对照前固定待验证版本的 commit |
 
 <a id="implementation-order"></a>
@@ -752,16 +753,20 @@ foreach ($refactorGroup in $refactorFilters.Keys) {
 - 旧 Controller 单测迁为 `BmsLongNoteRuleTest`，beatoraja 窗口参考与 HCN 血量历史测试通过正式列操作和记录出口执行；端点时间、PMS 宽限和血量预期保留。三组迁移测试合计 113 项通过，不恢复旧 Controller 或 sink。
 - `BmsDrawableJudgementOutput` 管理表示代次、观察者和生命周期适配；核心只接收谱面身份、活跃顺序及数值帧。新增架构检查，约束引擎、列上下文和调度的字段及方法签名不依赖 Drawable 或图形时钟。
 - `BmsNoteVisual` 由 Note、地雷和长按头按需组合，Invisible Note 自有标记；通用基类与泛型列层不再持有头部图形。共享 `BmsColumnVisualFrame` 和 `BmsVisualLayout` 保留原投影和裁剪边界，容器不再计算长按尾坐标。已迁移活跃索引与头部组件测试，并验证重复视觉更新不改变端点状态、结果及血量。
+- 固定头位置和方向在表现绑定登记的数值帧观测中采样，布局只读取历史；延迟视觉观测不再遍历核心活跃长按列表，未按下的长按也能采样接近判定线的位置。重应用替换登记，回池解绑，回退重新登记；重复布局与皮肤遍历不推进判定或视觉历史。
+- `BmsCoreSchedulingRecorder` 已迁至具体规则、正式调度和输出适配；移除测试中的新旧执行开关，保留 `judgement_p3a07_core.json` 原始内容及逻辑轨迹投影。数值帧参数映射到原参数字段，长按移除观察点覆盖末次被动检查，解绑期间的表现快照仍为空；这些变化对应观测位置与数据所有权迁移，不删除状态、结果或中间血量字段。19 项调度/生命周期测试通过，包括原始键盘与真实回放轨迹对照。
+- 对照发现已完成长按在下一批身体更新前未退出活跃列表，已恢复该检查点的清理顺序。每个绑定的收尾去重改用调度代次及模拟步骤；同时间多批输入、重应用后再次收尾和回退后的重执行保持原轨迹。
+- `TestSceneBmsNoteExecution` 的 25 项测试直接比较正式框架出口与无 Drawable 的记录出口，覆盖同步结果前后查询、候选、PMS 非消费 BAD、窗口边界、移除、重激活、裁剪和全部候选算法。删除同进程新旧开关比较，保留结果/反馈断言并加入明确的计分事件数量与顺序预期；此组提供执行等价证据，不作为 Git 跨版本比较。
 
-**本次验证范围。** 生产 Release 构建使用 `--no-restore -p:BuildProjectReferences=false`，0 警告、0 错误；引用已有 sibling 程序集，未构建或修改 sibling 源码。定向测试通过本地生成的 `artifacts/hitobject-core/core.csproj` 编译正式 `Normal/Gameplay/Judgement` 下的全部测试，以及所需 Player 辅助文件和下列定向视觉测试。覆盖规则、候选选择、独立参考窗口、HCN 血量历史、核心计划执行、多列引擎、真实长按玩法、生命周期、地雷回退、HCN 帧顺序、暂停恢复、裁剪、身体透明度、HCN 尾部视觉、Invisible Note 与活跃索引。组合结果为 **466 项通过，0 失败、0 跳过**。该局部编译入口不添加生产兼容代码，完整测试项目仍被旧记录器及未迁移消费者阻塞。
+**本次验证范围。** 生产 Release 构建使用 `--no-restore -p:BuildProjectReferences=false`，0 警告、0 错误；引用已有 sibling 程序集，未构建或修改 sibling 源码。定向测试通过本地生成的 `artifacts/hitobject-core/core.csproj` 编译正式 `Normal/Gameplay/Judgement` 下的全部测试，以及所需 Player 辅助文件和下列定向视觉测试。覆盖规则、候选选择、独立参考窗口、HCN 血量历史、核心计划执行、多列引擎、真实长按玩法、生命周期、地雷回退、HCN 帧顺序、暂停恢复、裁剪、身体透明度、HCN 尾部视觉、Invisible Note、活跃索引、无自动化调度生成和普通 Note 出口对照。组合结果为 **510 项通过，0 失败、0 跳过**。该局部编译入口不添加生产兼容代码。完整测试项目构建首先报告剩余 `BmsJudgementCheckpointRecorder` 的旧 Controller 和 `BmsLampScoreSelectorTest` 的 AutoScratch 类型缺失；这不是所有未迁移调用的完整清单。
 
 本地组合复现命令（结果写入 `artifacts/hitobject-core/results`）：
 
 ```powershell
-dotnet test artifacts/hitobject-core/core.csproj -c Release --no-restore -p:BuildProjectReferences=false --filter '(FullyQualifiedName~.Normal.Gameplay.Judgement.|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaLandmineRewindLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaHcnFrameOrder|FullyQualifiedName~TestSceneBmsBeatorajaHcnLandmineFrameOrder|FullyQualifiedName~TestSceneBmsPauseRewindLongNote|FullyQualifiedName~TestSceneBmsVisualCulling|FullyQualifiedName~TestSceneBmsLongNoteBodyTint|FullyQualifiedName~TestSceneBmsInvisibleNote|FullyQualifiedName~TestSceneBmsJudgementIndexes|FullyQualifiedName~TestSceneBmsHcnTailVisuals)&FullyQualifiedName!~.Performance.' --logger 'trx;LogFileName=migration-combined.trx' --results-directory artifacts/hitobject-core/results
+dotnet test artifacts/hitobject-core/core.csproj -c Release --no-restore -p:BuildProjectReferences=false --filter '(FullyQualifiedName~.Normal.Gameplay.Judgement.|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaLandmineRewindLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaHcnFrameOrder|FullyQualifiedName~TestSceneBmsBeatorajaHcnLandmineFrameOrder|FullyQualifiedName~TestSceneBmsPauseRewindLongNote|FullyQualifiedName~TestSceneBmsVisualCulling|FullyQualifiedName~TestSceneBmsLongNoteBodyTint|FullyQualifiedName~TestSceneBmsInvisibleNote|FullyQualifiedName~TestSceneBmsJudgementIndexes|FullyQualifiedName~TestSceneBmsHcnTailVisuals|FullyQualifiedName~TestSceneBmsCoreSchedulingGeneration|FullyQualifiedName~TestSceneBmsNoteExecution)&FullyQualifiedName!~.Performance.' --logger 'trx;LogFileName=migration-combined.trx' --results-directory artifacts/hitobject-core/results
 ```
 
-这是实现期间的定向规则、计划执行及部分真实 Player 回归。完整调度生成等价、Git 新旧版本对照、全部音频/视觉反馈和性能均待验证；未运行 benchmark。局部编译项目和日志保留在忽略的 `artifacts` 中，稳定测试源文件及 fixture 仍在正式测试项目中。
+这是实现期间的定向规则、计划执行和真实 Player 回归；冻结无自动化轨迹覆盖的生成检查已通过。完整调度矩阵、Git 新旧版本对照、全部音频/视觉反馈和性能均待验证；未运行 benchmark。局部编译项目和日志保留在忽略的 `artifacts` 中，稳定测试源文件及 fixture 仍在正式测试项目中。
 
 每份最终证据记录：比较版本的完整 SHA、框架/运行环境、实际命令、测试补丁、匹配数量、失败/跳过、执行等价与生成等价各自范围、行为差异及处理、性能样本和剩余项。未提交的测试探针保存为 diff。
 

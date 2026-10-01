@@ -48,11 +48,6 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected virtual bool SkipFurtherUpdates => false;
 
-    internal virtual void UpdateDeferredVisuals(float y, in BmsColumnVisualFrame frame)
-    {
-        UpdateVisualState();
-    }
-
     internal virtual void RestoreRewoundState()
     {
     }

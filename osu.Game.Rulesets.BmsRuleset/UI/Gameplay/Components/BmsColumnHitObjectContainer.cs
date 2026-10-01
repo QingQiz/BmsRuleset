@@ -122,9 +122,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     internal void UpdateDeferredLongNotes()
     {
         var activeLongNotes = Judgements.ActiveLongNotes;
-        if (activeLongNotes.Count == 0)
-            return;
-
         coreDeferredOrder.Clear();
         for (var i = 0; i < activeLongNotes.Count; i++)
         {
@@ -132,20 +129,12 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             if (Judgements.RequiresActiveLongNoteUpdate(note) && Judgements.Schedule.TryGetCurrent(note, out var item))
                 coreDeferredOrder.Add(item);
         }
-        Judgements.Schedule.RunDeferred(coreDeferredOrder, coreFrame(), Time.Elapsed);
+        if (activeLongNotes.Count > 0)
+            Judgements.Schedule.RunDeferred(coreDeferredOrder, coreFrame(), Time.Elapsed);
 
-        var frame = visualFrame();
+        observeDeferredVisuals(visualFrame());
         for (var i = activeLongNotes.Count - 1; i >= 0; i--)
-        {
-            var note = activeLongNotes[i];
-            if (Judgements.RequiresActiveLongNoteUpdate(note))
-            {
-                var startPosition = scrollController.GetVisualScrollPosition(note.StartTime, note.ScrollPositionAtStartTime);
-                JudgementOutput.GetRepresentation(note).UpdateDeferredVisuals(frame.YAt(startPosition), frame);
-            }
-
             Judgements.RetireInactiveLongNoteAt(i);
-        }
     }
 
     /// <summary>
@@ -193,7 +182,9 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             var hitObject = note.HitObject!;
             note.UpdateSoftConstantVisibility(scrollController.GetSoftConstantAlpha(hitObject.StartTime));
             var startPosition = scrollController.GetVisualScrollPosition(hitObject.StartTime, hitObject.ScrollPositionAtStartTime);
-            note.UpdateVisualLayout(frame.YAt(startPosition), frame);
+            var y = frame.YAt(startPosition);
+            observeVisualTime(note, y, frame);
+            note.UpdateVisualLayout(y, frame);
 
             // Resume rewind retains the completed presentation while the clock moves backwards.
             if (!resumeRewinding && (Clock as IGameplayClock)?.IsRewinding != true && Time.Elapsed >= 0)
@@ -248,6 +239,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     {
         foreach (var startTime in coreStartTimes.Values) startTime.UnbindAll();
         coreStartTimes.Clear();
+        visualObservations.Clear();
         base.Dispose(isDisposing);
     }
 

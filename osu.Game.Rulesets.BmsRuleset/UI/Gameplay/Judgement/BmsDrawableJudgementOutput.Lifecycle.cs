@@ -16,6 +16,9 @@ internal sealed partial class BmsDrawableJudgementOutput
 
     internal DrawableBmsHitObject? FirstPendingHead => context.FirstPendingNote is { } note ? GetRepresentation(note) : null;
 
+    internal void ObserveVisualTime(DrawableBmsHitObject drawable, BmsVisualTimeObserver observer)
+        => container.ObserveVisualTime(drawable, observer);
+
     private void bindScheduledRepresentation(DrawableBmsHitObject drawable)
         => scheduledRepresentations[drawable] = (drawable.BindingGeneration, context.Schedule.Bind(drawable.HitObject));
 
