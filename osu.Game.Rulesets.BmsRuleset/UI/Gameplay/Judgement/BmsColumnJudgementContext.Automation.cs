@@ -9,8 +9,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 internal sealed partial class BmsColumnJudgementContext
 {
     private bool[] automaticHolds = [];
-    private readonly List<BmsScheduledObject> automaticPlan = [];
-    private readonly List<int> automaticOrder = [];
+    private List<BmsScheduledObject>? automaticPlan;
+    private List<int>? automaticOrder;
     private Comparison<int>? compareAutomaticOrder;
     private bool automaticOrderDirty = true;
     private (long Epoch, long Step) lastAutomaticStep = (-1, -1);
@@ -24,6 +24,8 @@ internal sealed partial class BmsColumnJudgementContext
 
         AutoScratchEnabled = true;
         automaticHolds = new bool[holdStateSlots.Length];
+        automaticPlan = [];
+        automaticOrder = [];
         compareAutomaticOrder = (left, right) =>
         {
             var timeOrder = NoteRegistrations[left].Object.StartTime.CompareTo(NoteRegistrations[right].Object.StartTime);
@@ -64,24 +66,26 @@ internal sealed partial class BmsColumnJudgementContext
             return;
         lastAutomaticStep = (Schedule.Epoch, Schedule.Step);
 
+        var order = automaticOrder!;
+        var plan = automaticPlan!;
         if (automaticOrderDirty)
         {
-            automaticOrder.Clear();
-            automaticOrder.AddRange(activeNoteSlots);
+            order.Clear();
+            order.AddRange(activeNoteSlots);
             // Match the framework's stable start-time ordering without sorting on every simulation slice.
-            automaticOrder.Sort(compareAutomaticOrder!);
+            order.Sort(compareAutomaticOrder!);
             automaticOrderDirty = false;
         }
 
         // Bindings protect this simulation batch from synchronous removal or pool reuse in result callbacks.
-        automaticPlan.Clear();
-        foreach (var slot in automaticOrder)
+        plan.Clear();
+        foreach (var slot in order)
         {
             if (Schedule.TryGetCurrent(NoteRegistrations[slot].Object, out var item))
-                automaticPlan.Add(item);
+                plan.Add(item);
         }
 
-        foreach (var item in automaticPlan)
+        foreach (var item in plan)
         {
             if (!Schedule.TryGetCurrent(item.Object, out var current) || current != item)
                 continue;

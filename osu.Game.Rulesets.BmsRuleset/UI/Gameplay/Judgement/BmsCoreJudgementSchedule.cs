@@ -16,6 +16,7 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
     private readonly List<BmsScheduledObject> plan = [];
     private long revision;
     private long bindingRevision;
+    private long rewindRevision;
     private long nextBindingToken;
     private (long Epoch, long Batch, long Bindings) lastLayout = (-1, -1, -1);
     private (long Epoch, long Batch, long Bindings) lastSubtree = (-1, -1, -1);
@@ -66,16 +67,18 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
     internal void BeginRemoval(BmsScheduledObject item)
     {
         if (bindings.TryGetValue(item.Object, out var binding) && binding.Token == item.BindingToken)
+        {
             binding.Removing = true;
+            bindings[item.Object] = binding;
+        }
     }
 
     internal void Rewind()
     {
         revision++;
         bindingRevision++;
-        // Restoring history invalidates every checkpoint from the previous execution.
-        foreach (var binding in bindings.Values)
-            binding.LastPostStep = (-1, -1);
+        // A generation invalidates all post-result stamps without rewriting each active binding.
+        rewindRevision++;
     }
 
     internal void InvalidateOrder() => bindingRevision++;
@@ -118,7 +121,7 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
 
     internal void RunDeferred(in BmsFrameContext frame, double elapsed)
     {
-        if (!begin(ref lastDeferred)) return;
+        if (frame.IsRewinding || elapsed < 0 || !begin(ref lastDeferred)) return;
         plan.Clear();
         var holds = column.ActiveLongNotes;
         for (var i = 0; i < holds.Count; i++)
@@ -143,6 +146,7 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
         if (!bindings.TryGetValue(item.Object, out var binding) || binding.Token != item.BindingToken || !binding.Removing || binding.RemovalChecked)
             return;
         binding.RemovalChecked = true;
+        bindings[item.Object] = binding;
         if (item.Object is BmsNote || !column.GetNoteResult(item.Object).HasResult)
             CheckPassive(item.Object, frame);
     }
@@ -154,9 +158,10 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
         // Synchronous output may remove or rebind this object. Never let the old plan borrow its replacement.
         if (version != revision || !current(item)) return;
         var binding = bindings[item.Object];
-        var step = (Epoch, Step);
+        var step = (Epoch, Step, rewindRevision);
         if (binding.LastPostStep == step) return;
         binding.LastPostStep = step;
+        bindings[item.Object] = binding;
         FinishLongNote((BmsLongNote)item.Object, frame, elapsed, column.PressedDirections != 0);
     }
 
@@ -185,12 +190,12 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementContext column)
         return ++revision;
     }
 
-    private sealed class Binding(long token)
+    private struct Binding(long token)
     {
         internal long Token { get; } = token;
         internal bool Removing;
         internal bool RemovalChecked;
         // Inputs retain their own batches; post-result work runs once per simulation step and binding.
-        internal (long Epoch, long Step) LastPostStep = (-1, -1);
+        internal (long Epoch, long Step, long Rewind) LastPostStep = (-1, -1, -1);
     }
 }
