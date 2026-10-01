@@ -19,6 +19,7 @@ using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -36,9 +37,6 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
     private bool mixed;
     private bool multiple;
     private int columnIndex => scenario == Scenario.ScratchTail ? 0 : 1;
-    private readonly List<string> legacyTrace = [];
-    private readonly List<string> legacyVisuals = [];
-    private readonly List<string> legacyScores = [];
     private static readonly BindingFlags instance = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
     private static readonly BindingFlags statics = BindingFlags.NonPublic | BindingFlags.Static;
     private static Action<object, MethodBase, object[], bool>? observation;
@@ -62,12 +60,10 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
     }
 
     [Test]
-    public void IndependentBodyMatchesLegacyAndRecordingAcrossRealTraversal([Values] Scenario plan, [Values] bool nonBatchColumn, [Values] bool culled)
+    public void IndependentBodyMatchesFrameworkAndRecordingAcrossRealTraversal([Values] Scenario plan, [Values] bool nonBatchColumn, [Values] bool culled)
     {
         load(plan, nonBatchColumn);
-        AddStep("capture legacy HCN checkpoints", () => run(false, culled));
-        load(plan, nonBatchColumn);
-        AddStep("compare bounded HCN outputs", () => run(true, culled));
+        AddStep("compare HCN framework and recording outputs", () => run(culled));
     }
 
     private void load(Scenario plan, bool nonBatchColumn, bool multipleBodies = false)
@@ -78,7 +74,7 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
         AddUntilStep("simulation ready", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 2798) < .001);
     }
 
-    private void run(bool useNewPath, bool culled)
+    private void run(bool culled)
     {
         var previousClock = Playfield.Clock;
         var scoreClock = Player.ScoreProcessor.Clock;
@@ -115,7 +111,6 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             initialDrawable = current();
             var result = (BmsLongNoteJudgementResult)initialDrawable.Result;
             var entry = container.AliveEntries.Single(e => ReferenceEquals(e.Value, initialDrawable)).Key;
-            if (useNewPath) Playfield.EnableLongNoteExecution(columnIndex);
             var context = column.Judgements;
             var output = new BmsRecordingJudgementOutput();
             var recorded = new BmsJudgementEngine([note], Playfield.LayoutVariant, columnIndex, !mixed, output).GetColumn(columnIndex);
@@ -155,20 +150,19 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             Playfield.NewResult += before;
             initialDrawable.OnNewResult += after;
             var actualHead = false;
+            var visualState = initialDrawable.GetType().GetField("visualState", instance)!.GetValue(initialDrawable)!;
             observation = (target, method, args, exit) =>
             {
                 if (ReferenceEquals(target, column) && !exit && method.Name == "PlaySample") trace.Add($"sample:{args[0]}:{args[1]}");
                 if (ReferenceEquals(target, column) && !exit && method.Name == "PlayKeySound") trace.Add("keysound");
-                if (!useNewPath && ReferenceEquals(target, context) && !exit && method.Name == "onHeadJudged")
-                    trace.Add(snapshot("head.beforeIndexes", false));
-                if (useNewPath && target is BmsDrawableJudgementOutput && exit && method.Name == "PublishState"
+                if (ReferenceEquals(target, column.JudgementOutput) && exit && method.Name == "PublishState"
                     && args[1] is BmsLongNoteState state && state.HeadJudged && !state.TailJudged && !actualHead)
                 {
                     actualHead = true;
                     Assert.That(context.GetActiveBodies(), Is.Empty);
                     trace.Add(snapshot("head.beforeIndexes", false));
                 }
-                if (ReferenceEquals(target, initialDrawable) && method.Name.Contains("IBmsLongNoteDrawable"))
+                if (ReferenceEquals(target, visualState) || ReferenceEquals(target, initialDrawable) && method.Name == "applyPresentation")
                     visuals.Add(JsonSerializer.Serialize(new { method = method.Name.Split('.').Last(), exit, initialDrawable.Alpha, initialDrawable.LifetimeEnd,
                         state = context.GetLongNoteState(note), type = result.Type }));
                 if (ReferenceEquals(target, Playfield) && method.Name == "ApplySyntheticLongNoteEndpoint")
@@ -204,15 +198,18 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             foreach (var (type, name) in new[]
                      {
                          (typeof(BmsColumn), "PlaySample"), (typeof(BmsColumn), "PlayKeySound"),
-                         (typeof(BmsColumnJudgementContext), "onHeadJudged"), (typeof(BmsDrawableJudgementOutput), "PublishState"),
+                         (typeof(BmsLongNoteVisualState), "PrepareHeadPin"),
                          (typeof(BmsHealthProcessor), "ApplySyntheticLongNoteEndpoint"), (typeof(BmsScoreProcessor), "ApplySyntheticLongNoteEndpoint"),
                          (typeof(BmsPlayfield), "ApplySyntheticLongNoteEndpoint"), (typeof(BmsPlayfield), "ApplyHellChargeTick"),
                      })
                 probes.Add(new ScopedMethodProbe(type.GetMethod(name, instance)!, GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
-            foreach (var method in initialDrawable.GetType().GetMethods(instance).Where(m => m.Name.Contains("IBmsLongNoteDrawable")))
-                probes.Add(new ScopedMethodProbe(method, GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
+            probes.Add(new ScopedMethodProbe(typeof(BmsDrawableJudgementOutput).GetMethod("PublishState", instance,
+                [typeof(BmsLongNote), typeof(BmsLongNoteState).MakeByRefType(), typeof(BmsFrameContext).MakeByRefType()])!,
+                GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
+            probes.Add(new ScopedMethodProbe(initialDrawable.GetType().GetMethod("applyPresentation", instance)!,
+                GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
             // Rebuild callers after leaf probes so earlier fixtures' JIT inlining cannot hide a synchronous observation.
-            foreach (var type in new[] { typeof(BmsColumnJudgementContext), typeof(BmsLongNoteOperationBinding), typeof(BmsLongNoteJudgementController), typeof(BmsHellChargeBodyTracker), typeof(BmsLongNotePresentation), typeof(BmsDrawableJudgementOutput) })
+            foreach (var type in new[] { typeof(BmsColumnJudgementContext), typeof(BmsJudgementExecutionContext), typeof(BmsHellChargeNoteJudgementRule), typeof(BmsHellChargeBodyTracker), typeof(BmsLongNotePresentation), typeof(BmsDrawableJudgementOutput) })
             {
                 foreach (var method in type.GetMethods(instance | BindingFlags.Static).Where(m => m.DeclaringType == type && !m.IsSpecialName
                              && m.Name is not "PublishState" and not "onHeadJudged"))
@@ -229,7 +226,7 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             mark("initial");
             if (scenario == Scenario.HeadPoor)
             {
-                var headPoorTime = initialDrawable.NextPassiveJudgementTime + 1;
+                var headPoorTime = new BmsNoteJudgementWindows(note).NextPassiveJudgementTime(note) + 1;
                 traverse(headPoorTime);
                 Assert.That(result.HasResult, Is.False);
                 Assert.That(synthetic, Has.Count.EqualTo(2));
@@ -286,7 +283,7 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
                 Assert.That(synthetic.Single().Result, Is.AnyOf(HitResult.Perfect, HitResult.Great, HitResult.Good));
                 Assert.That(context.GetLongNoteState(note).TailJudged, Is.True);
                 Assert.That(recorded.GetPendingLongNoteTails(), Is.Empty);
-                if (useNewPath) Assert.That(context.GetPendingLongNoteTails(), Is.Empty);
+                Assert.That(context.GetPendingLongNoteTails(), Is.Empty);
                 assertBody();
                 var tailTickCount = ticks.Count;
                 traverse(3998);
@@ -297,7 +294,7 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             var finalTicks = ticks.Count;
             traverse(4000);
             Assert.That(recorded.GetActiveBodies(), Is.Empty);
-            if (useNewPath) Assert.That(context.GetActiveBodies(), Is.Empty);
+            Assert.That(context.GetActiveBodies(), Is.Empty);
             traverse(4400);
             Assert.That(container.AliveEntries.Values.Any(d => ReferenceEquals(d.HitObject, note)), Is.False);
             Assert.That(ticks, Has.Count.EqualTo(finalTicks));
@@ -306,21 +303,8 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             Assert.That(output.SyntheticEndpoints, Has.Count.EqualTo(scenario == Scenario.HeadPoor ? 2 : 1));
             Assert.That(scores.Count(s => s.Contains("\"checkpoint\":\"endpoint.score\"")), Is.EqualTo(synthetic.Count));
             Assert.That(scores.Count(s => s.Contains("\"checkpoint\":\"endpoint.gauge\"")), Is.EqualTo(synthetic.Count));
-            TestContext.WriteLine("P3A0_HCN " + JsonSerializer.Serialize(new { scenario, mixed, culled, useNewPath, rows = trace, recordedRows = recordedTrace, visuals, scores }));
+            TestContext.WriteLine("P3A0_HCN " + JsonSerializer.Serialize(new { scenario, mixed, culled, rows = trace, recordedRows = recordedTrace, visuals, scores }));
             Assert.That(trace, Is.EqualTo(recordedTrace), "supplied execution plan preserves body membership and synchronous outputs without a Drawable");
-            if (useNewPath)
-            {
-                Assert.That(trace, Is.EqualTo(legacyTrace));
-                Assert.That(visuals, Is.EqualTo(legacyVisuals));
-                Assert.That(scores, Is.EqualTo(legacyScores));
-            }
-            else
-            {
-                legacyTrace.Clear(); legacyTrace.AddRange(trace);
-                legacyVisuals.Clear(); legacyVisuals.AddRange(visuals);
-                legacyScores.Clear(); legacyScores.AddRange(scores);
-            }
-
             DrawableBmsHitObject current() => container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Single(d => ReferenceEquals(d.HitObject, note));
             void assertRepresentation()
             {
@@ -333,18 +317,17 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
                 Assert.That(entry.LifetimeEnd, Is.GreaterThan(note.EndTime));
                 Assert.That(initialDrawable.LifetimeEnd, Is.GreaterThan(note.EndTime));
                 Assert.That(recorded.GetActiveBodies(), Is.EqualTo(new[] { note }));
-                if (useNewPath) Assert.That(context.GetActiveBodies(), Is.EqualTo(new[] { note }));
+                Assert.That(context.GetActiveBodies(), Is.EqualTo(new[] { note }));
             }
             string snapshot(string checkpoint, bool recording)
             {
                 return JsonSerializer.Serialize(new
                 {
                     checkpoint,
-                    body = recording ? recorded.GetActiveBodies().Any() : useNewPath ? context.GetActiveBodies().Any()
-                        : context.ActiveLongNotes.Any(d => d.LongNoteJudgement!.State.HasActiveBody),
-                    holding = recording ? recorded.GetHoldingNotes().Any() : context.ActiveLongNotes.Any(d => d.LongNoteJudgement?.IsHolding == true),
-                    first = recording ? recorded.FirstPendingNote != null : context.FirstPendingHead != null,
-                    candidate = recording ? recorded.IsNoteCandidate(note) : useNewPath ? context.IsNoteCandidate(note) : registered && !result.HasResult,
+                    body = recording ? recorded.GetActiveBodies().Any() : context.GetActiveBodies().Any(),
+                    holding = recording ? recorded.GetHoldingNotes().Any() : context.GetHoldingNotes().Any(),
+                    first = recording ? recorded.FirstPendingNote != null : context.FirstPendingNote != null,
+                    candidate = recording ? recorded.IsNoteCandidate(note) : context.IsNoteCandidate(note),
                     result = recording ? output.GetMainResult(note) : new BmsMainResultState(result.Type, result.TimeAbsolute, result.TimeOffset, result.GameplayRate, result.SuppressPenalty),
                     state = recording ? recorded.GetLongNoteState(note) : context.GetLongNoteState(note),
                     endpoints = (recording ? output.SyntheticEndpoints : synthetic).Select(e => new { e.Kind, e.EventTime, e.ApplicationTime, e.Result }),
@@ -413,12 +396,10 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
     public void SameColumnBodiesKeepIndependentStateAndProductionVisitOrder(bool nonBatchColumn)
     {
         load(Scenario.SuccessfulTail, nonBatchColumn, true);
-        AddStep("capture legacy same-column bodies", () => runMultiple(false));
-        load(Scenario.SuccessfulTail, nonBatchColumn, true);
-        AddStep("compare bounded same-column bodies", () => runMultiple(true));
+        AddStep("compare same-column bodies across both outputs", runMultiple);
     }
 
-    private void runMultiple(bool bounded)
+    private void runMultiple()
     {
         var previousClock = Playfield.Clock;
         var processClock = Playfield.ProcessCustomClock;
@@ -437,7 +418,6 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             var notes = Playfield.Beatmap.HitObjects.OfType<BmsLongNote>().ToArray();
             var drawables = notes.Select(n => container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Single(d => ReferenceEquals(d.HitObject, n))).ToArray();
             var aliveOrder = container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Select(d => Array.IndexOf(notes, d.HitObject)).Where(i => i >= 0).ToArray();
-            if (bounded) Playfield.EnableLongNoteExecution(columnIndex);
             var context = column.Judgements;
             var output = new BmsRecordingJudgementOutput();
             var recorded = new BmsJudgementEngine(notes, Playfield.LayoutVariant, columnIndex, !mixed, output).GetColumn(columnIndex);
@@ -446,10 +426,10 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             context.PressedDirections = recorded.PressedDirections = 1;
             var ticks = new List<(int Object, double Time)>();
             var bodyObject = -1;
-            observation = (target, method, _, exit) =>
+            observation = (target, method, args, exit) =>
             {
-                if (!exit && method.Name == "UpdateHellChargeBody")
-                    bodyObject = Array.FindIndex(drawables, d => ReferenceEquals(d.LongNoteJudgement, target));
+                if (!exit && ReferenceEquals(target, column.JudgementOutput) && method.Name == "ApplyBodyTick")
+                    bodyObject = Array.IndexOf(notes, (BmsLongNote)args[0]);
                 if (ReferenceEquals(target, Playfield) && exit && method.Name == "ApplyHellChargeTick")
                 {
                     Assert.That(bodyObject, Is.GreaterThanOrEqualTo(0));
@@ -457,9 +437,9 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
                     ticks.Add((bodyObject, manual.CurrentTime));
                 }
             };
-            foreach (var (type, name) in new[] { (typeof(BmsPlayfield), "ApplyHellChargeTick"), (typeof(BmsLongNoteJudgementController), "UpdateHellChargeBody") })
+            foreach (var (type, name) in new[] { (typeof(BmsPlayfield), "ApplyHellChargeTick"), (typeof(BmsDrawableJudgementOutput), "ApplyBodyTick") })
                 probes.Add(new ScopedMethodProbe(type.GetMethod(name, instance)!, GetType().GetMethod(nameof(observeEnter), statics), GetType().GetMethod(nameof(observeExit), statics)));
-            foreach (var type in new[] { typeof(BmsHellChargeBodyTracker), typeof(BmsDrawableJudgementOutput), typeof(BmsLongNoteOperationBinding), typeof(BmsColumnJudgementContext) })
+            foreach (var type in new[] { typeof(BmsHellChargeBodyTracker), typeof(BmsDrawableJudgementOutput), typeof(BmsJudgementExecutionContext), typeof(BmsColumnJudgementContext) })
             {
                 foreach (var method in type.GetMethods(instance).Where(m => m.DeclaringType == type && !m.IsSpecialName))
                     probes.Add(new ScopedMethodProbe(method, GetType().GetMethod(nameof(keepCallBoundary), statics)));
@@ -477,21 +457,20 @@ public partial class TestSceneBmsHellChargeNoteExecution : BmsPlayerTestScene
             traverse(4000);
             Assert.That(ticks.Where(t => t.Time == 4000).Select(t => t.Object), Is.EqualTo(new[] { 1 }), "ending the first chart object cannot skip its neighbour");
             Assert.That(recorded.GetActiveBodies(), Is.EqualTo(new[] { notes[1] }));
-            if (bounded) Assert.That(context.GetActiveBodies(), Is.EqualTo(new[] { notes[1] }));
+            Assert.That(context.GetActiveBodies(), Is.EqualTo(new[] { notes[1] }));
             Assert.That(output.BodyTicks.Select(t => (Array.IndexOf(notes, t.Note), t.Time)), Is.EqualTo(ticks));
             var trace = ticks.Select(t => $"{t.Object}:{t.Time}").ToArray();
-            TestContext.WriteLine("P3A0_HCN_MULTI " + JsonSerializer.Serialize(new { bounded, mixed, aliveOrder, ticks = trace }));
-            if (bounded) Assert.That(trace, Is.EqualTo(legacyTrace));
-            else { legacyTrace.Clear(); legacyTrace.AddRange(trace); }
+            TestContext.WriteLine("P3A0_HCN_MULTI " + JsonSerializer.Serialize(new { mixed, aliveOrder, ticks = trace }));
 
             void advance(double time) { manual.CurrentTime = time; clock.ProcessFrame(); }
             BmsFrameContext frame() => new(manual.CurrentTime, manual.Rate);
             void press(int i, double time)
             {
                 advance(time);
-                Assert.That(context.TryPressLongNote(drawables[i], HitResult.Perfect), Is.True);
+                Assert.That(context.TryPressRegisteredNote(notes[i], HitResult.Perfect, new BmsPressContext(time, frame())), Is.True);
                 Assert.That(recorded.TryPressRegisteredNote(notes[i], HitResult.Perfect, new BmsPressContext(time, frame())), Is.True);
-                Assert.That(drawables[0].LongNoteJudgement, Is.Not.SameAs(drawables[1].LongNoteJudgement));
+                Assert.That(context.GetLongNoteState(notes[i]).HeadTime, Is.EqualTo(time));
+                Assert.That(context.GetLongNoteState(notes[1]).HeadTime, Is.EqualTo(3000), "the other body's head history is independent");
             }
             void traverse(double time)
             {

@@ -10,9 +10,9 @@
 
 **完整实现核心 → Git 旧版对照与适配 → Mod 适配 → 最终集成。**
 
-当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次。列上下文已移除 Drawable、容器及图形时钟依赖，表示绑定与生命周期通知归入现有输出适配。各绘制子类组合自己的图形，容器提供共享视觉帧，由长按计算头尾布局。纯视觉观测已独立登记并按表示代次解绑，布局读取固定头位置和方向历史。收尾去重已从 `LastPostTime` 迁到绑定内的调度代次/模拟步骤。生产 Release 构建及 510 项定向回归通过。
+当前在 `codex/hitobject-judgement-refactor` 分支继续实现核心。独立 LN/CN/HCN 规则、类型化状态、按操作绑定及地雷规则已接入生产；多列引擎接受数值帧和输入批次。列上下文已移除 Drawable、容器及图形时钟依赖，表示绑定与生命周期通知归入现有输出适配。各绘制子类组合自己的图形，容器提供共享视觉帧，由长按计算头尾布局。纯视觉观测已独立登记并按表示代次解绑，布局读取固定头位置和方向历史。收尾去重已从 `LastPostTime` 迁到绑定内的调度代次/模拟步骤。生产 Release 构建及 591 项定向回归通过。
 
-核心尚未完成：仍需完成统一布局准备/应用契约，迁移其余旧入口测试，并补齐完整调度矩阵。无自动化调度记录器已迁移，真实键盘和回放生成的逻辑轨迹与原 fixture 一致；普通 Note 测试已改为正式框架出口与记录出口对照。完整测试项目仍受剩余旧 Controller 记录器、旧表现接口和已摘除 AutoScratch 的消费者阻塞；本次局部测试通过不代表整个测试项目已恢复。Git 旧版完整对照、性能验收及 Mod 适配均尚未进行。
+核心尚未完成：统一布局准备/应用契约已接入，仍需迁移其余旧生命周期和检查点测试，并补齐完整调度矩阵。无自动化调度记录器已迁移，真实键盘和回放生成的逻辑轨迹与原 fixture 一致；Note、LN、CN、HCN 执行测试已改为正式框架出口与记录出口对照。完整测试项目仍受剩余旧 Controller 记录器、旧表现接口和已摘除 AutoScratch 的消费者阻塞；本次局部测试通过不代表整个测试项目已恢复。Git 旧版完整对照、性能验收及 Mod 适配均尚未进行。
 
 快速导航：[实施顺序](#implementation-order) · [目标架构](#target-structure) · [生命周期](#state-lifecycle) · [调度](#scheduling-contracts) · [Git 对照](#git-comparison) · [验收](#behaviour-acceptance) · [验证命令](#verification-commands) · [完成条件](#completion)。
 
@@ -758,12 +758,15 @@ foreach ($refactorGroup in $refactorFilters.Keys) {
 - 对照发现已完成长按在下一批身体更新前未退出活跃列表，已恢复该检查点的清理顺序。每个绑定的收尾去重改用调度代次及模拟步骤；同时间多批输入、重应用后再次收尾和回退后的重执行保持原轨迹。
 - `TestSceneBmsNoteExecution` 的 25 项测试直接比较正式框架出口与无 Drawable 的记录出口，覆盖同步结果前后查询、候选、PMS 非消费 BAD、窗口边界、移除、重激活、裁剪和全部候选算法。删除同进程新旧开关比较，保留结果/反馈断言并加入明确的计分事件数量与顺序预期；此组提供执行等价证据，不作为 Git 跨版本比较。
 
-**本次验证范围。** 生产 Release 构建使用 `--no-restore -p:BuildProjectReferences=false`，0 警告、0 错误；引用已有 sibling 程序集，未构建或修改 sibling 源码。定向测试通过本地生成的 `artifacts/hitobject-core/core.csproj` 编译正式 `Normal/Gameplay/Judgement` 下的全部测试，以及所需 Player 辅助文件和下列定向视觉测试。覆盖规则、候选选择、独立参考窗口、HCN 血量历史、核心计划执行、多列引擎、真实长按玩法、生命周期、地雷回退、HCN 帧顺序、暂停恢复、裁剪、身体透明度、HCN 尾部视觉、Invisible Note、活跃索引、无自动化调度生成和普通 Note 出口对照。组合结果为 **510 项通过，0 失败、0 跳过**。该局部编译入口不添加生产兼容代码。完整测试项目构建首先报告剩余 `BmsJudgementCheckpointRecorder` 的旧 Controller 和 `BmsLampScoreSelectorTest` 的 AutoScratch 类型缺失；这不是所有未迁移调用的完整清单。
+- 公共 `UpdateVisualLayout` 已统一为 `PrepareVisual → 裁剪 → ApplyVisual`；具体长按缓存本次头尾坐标供绘制使用。准备布局不改变图形位置、尺寸、缩放、透明度或视觉时间历史，已由真实 Player 用例验证。
+- LN、CN、HCN 出口执行测试共 81 项通过，保留端点/提交时间、结果前后状态、PMS 宽限及回退、合成计分先于血量、成功尾后的 HCN 身体和同列多身体顺序断言。移除旧 Controller/表现接口探针，改用具体规则及当前状态发布、表现映射边界。迁移发现并修复 LN/CN 头 POOR 后错误准备固定头位置的表现差异，沿用旧测试的无准备预期。
+
+**本次验证范围。** 生产 Release 构建使用 `--no-restore -p:BuildProjectReferences=false`，0 警告、0 错误；引用已有 sibling 程序集，未构建或修改 sibling 源码。定向测试通过本地生成的 `artifacts/hitobject-core/core.csproj` 编译正式 `Normal/Gameplay/Judgement` 下的全部测试，以及所需 Player 辅助文件和下列定向视觉测试。覆盖规则、候选选择、独立参考窗口、HCN 血量历史、核心计划执行、多列引擎、真实长按玩法、生命周期、地雷回退、HCN 帧顺序、暂停恢复、裁剪、身体透明度、HCN 尾部视觉、Invisible Note、活跃索引、无自动化调度生成和 Note/LN/CN/HCN 出口对照。组合结果为 **591 项通过，0 失败、0 跳过**。该局部编译入口不添加生产兼容代码。完整测试项目构建首先报告剩余 `BmsJudgementCheckpointRecorder` 的旧 Controller 和 `BmsLampScoreSelectorTest` 的 AutoScratch 类型缺失；这不是所有未迁移调用的完整清单。
 
 本地组合复现命令（结果写入 `artifacts/hitobject-core/results`）：
 
 ```powershell
-dotnet test artifacts/hitobject-core/core.csproj -c Release --no-restore -p:BuildProjectReferences=false --filter '(FullyQualifiedName~.Normal.Gameplay.Judgement.|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaLandmineRewindLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaHcnFrameOrder|FullyQualifiedName~TestSceneBmsBeatorajaHcnLandmineFrameOrder|FullyQualifiedName~TestSceneBmsPauseRewindLongNote|FullyQualifiedName~TestSceneBmsVisualCulling|FullyQualifiedName~TestSceneBmsLongNoteBodyTint|FullyQualifiedName~TestSceneBmsInvisibleNote|FullyQualifiedName~TestSceneBmsJudgementIndexes|FullyQualifiedName~TestSceneBmsHcnTailVisuals|FullyQualifiedName~TestSceneBmsCoreSchedulingGeneration|FullyQualifiedName~TestSceneBmsNoteExecution)&FullyQualifiedName!~.Performance.' --logger 'trx;LogFileName=migration-combined.trx' --results-directory artifacts/hitobject-core/results
+dotnet test artifacts/hitobject-core/core.csproj -c Release --no-restore -p:BuildProjectReferences=false --filter '(FullyQualifiedName~.Normal.Gameplay.Judgement.|FullyQualifiedName~TestSceneBmsLongNoteJudgement|FullyQualifiedName~TestSceneBmsLongNoteLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaLandmineRewindLifecycle|FullyQualifiedName~TestSceneBmsBeatorajaHcnFrameOrder|FullyQualifiedName~TestSceneBmsBeatorajaHcnLandmineFrameOrder|FullyQualifiedName~TestSceneBmsPauseRewindLongNote|FullyQualifiedName~TestSceneBmsVisualCulling|FullyQualifiedName~TestSceneBmsLongNoteBodyTint|FullyQualifiedName~TestSceneBmsInvisibleNote|FullyQualifiedName~TestSceneBmsJudgementIndexes|FullyQualifiedName~TestSceneBmsHcnTailVisuals|FullyQualifiedName~TestSceneBmsCoreSchedulingGeneration|FullyQualifiedName~TestSceneBmsNoteExecution|FullyQualifiedName~TestSceneBmsLongNoteExecution|FullyQualifiedName~TestSceneBmsChargeNoteExecution|FullyQualifiedName~TestSceneBmsHellChargeNoteExecution)&FullyQualifiedName!~.Performance.' --logger 'trx;LogFileName=migration-combined.trx' --results-directory artifacts/hitobject-core/results
 ```
 
 这是实现期间的定向规则、计划执行和真实 Player 回归；冻结无自动化轨迹覆盖的生成检查已通过。完整调度矩阵、Git 新旧版本对照、全部音频/视觉反馈和性能均待验证；未运行 benchmark。局部编译项目和日志保留在忽略的 `artifacts` 中，稳定测试源文件及 fixture 仍在正式测试项目中。

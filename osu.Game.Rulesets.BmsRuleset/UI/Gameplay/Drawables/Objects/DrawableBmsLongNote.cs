@@ -45,6 +45,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private double lastHoldExplosionTime;
     private bool restoreHeadPin;
     private bool bodyGeometryValid;
+    private float preparedHeadY;
+    private float preparedTailY;
+    private bool preparedHoldingBody;
     private float lastHeadOffset;
     private float lastBodyTailOffset;
     private float lastTailOffset;
@@ -69,28 +72,28 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     /// <summary>
     /// Keeps the head-to-tail bounds with the object so column layout does not depend on its geometry.
     /// </summary>
-    internal override void UpdateVisualLayout(float y, in BmsColumnVisualFrame frame)
+    private protected override BmsVisualLayout PrepareVisual(float y, in BmsColumnVisualFrame frame)
     {
-        var endY = tailY(frame);
-        var headY = getVisualHeadY(y);
-        ApplyVisualLayout(new BmsVisualLayout(y, Math.Min(headY, endY), Math.Max(headY, endY)), frame.Height);
-        updateVisualGeometry(y, endY);
+        preparedTailY = tailY(frame);
+        preparedHoldingBody = isHoldingBody();
+        preparedHeadY = preparedHoldingBody ? visualState.ResolveHeldHeadY(y, Time.Current >= HitObject.StartTime) : y;
+        // A culled skin may change before re-entry, even when the projected endpoints are unchanged.
+        bodyGeometryValid &= !VisualsSuppressed;
+        return new BmsVisualLayout(y, Math.Min(preparedHeadY, preparedTailY), Math.Max(preparedHeadY, preparedTailY));
+    }
+
+    private protected override void ApplyVisual(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
+    {
+        base.ApplyVisual(frame, layout);
+        updateVisualGeometry(preparedHeadY, preparedTailY, preparedHoldingBody);
     }
 
     private float tailY(in BmsColumnVisualFrame frame)
         => frame.YAt(double.IsNaN(ln.VisualScrollPositionAtEndTime) ? ln.ScrollPositionAtEndTime : ln.VisualScrollPositionAtEndTime);
 
-    private void updateVisualGeometry(float headY, float endY)
+    private void updateVisualGeometry(float headY, float endY, bool holdingBody)
     {
-        if (VisualsSuppressed)
-        {
-            bodyGeometryValid = false;
-            return;
-        }
-
         const float max_piece_height = 4096;
-        var holdingBody = isHoldingBody();
-        headY = getVisualHeadY(headY);
 
         var myY = Y;
         var headOffset = headY - myY;
@@ -181,9 +184,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (isHoldingBody())
             visualState.ObserveHeldBodyDirection(y, tailY(frame), Time.Current >= HitObject.StartTime, resolveBodyDirection);
     }
-
-    private float getVisualHeadY(float y) => isHoldingBody()
-        ? visualState.ResolveHeldHeadY(y, Time.Current >= HitObject.StartTime) : y;
 
     protected override void ResetVisualState()
     {
@@ -321,7 +321,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         if (frame.IsPauseCompletion)
             return;
 
-        if (!previous.HeadJudged && presentation.HeadJudged)
+        if (!previous.HeadJudged && presentation.HeadJudged && !snapshot.TailJudged)
         {
             visualState.PrepareHeadPin();
             lastHoldExplosionTime = Time.Current - hold_explosion_interval;

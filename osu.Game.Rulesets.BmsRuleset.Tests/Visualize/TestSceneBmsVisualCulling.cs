@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Framework.Graphics.Pooling;
 using osu.Game.Beatmaps;
@@ -173,6 +174,13 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
             var observation = drawable.GetType().GetField("lastVisualObservation", fields)!.GetValue(drawable);
             var scroll = Playfield.ScrollController;
             var frame = new BmsColumnVisualFrame(scroll.CurrentScrollPosition, 1, 0, 700);
+            var graphics = drawable.ChildrenOfType<Drawable>().Prepend(drawable).ToArray();
+            var beforePreparation = graphics.Select(d => (d.Position, d.Size, d.Scale, d.Alpha)).ToArray();
+            var prepare = drawable.GetType().GetMethod("PrepareVisual", fields)!;
+            var prepared = (BmsVisualLayout)prepare.Invoke(drawable, [-1_000_000f, frame])!;
+            Assert.That(prepared.OriginY, Is.EqualTo(-1_000_000));
+            Assert.That(graphics.Select(d => (d.Position, d.Size, d.Scale, d.Alpha)), Is.EqualTo(beforePreparation),
+                "Preparing a culling boundary must not apply graphics or advance their animation.");
             for (var i = 0; i < 20; i++)
             {
                 drawable.UpdateVisualLayout(-100, frame);

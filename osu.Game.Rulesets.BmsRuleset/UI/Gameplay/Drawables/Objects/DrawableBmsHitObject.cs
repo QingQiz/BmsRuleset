@@ -23,26 +23,28 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     internal long BindingGeneration { get; private set; }
 
-    private protected void ApplyVisualLayout(in BmsVisualLayout layout, float columnHeight)
+    internal void UpdateVisualLayout(float y, in BmsColumnVisualFrame frame)
     {
+        var layout = PrepareVisual(y, frame);
         // Oversized skin art needs more slack than a fixed number of screens.
-        var padding = Math.Max(columnHeight, VisualHeight);
-        var suppress = SkipFurtherUpdates || layout.MaximumY < -columnHeight - padding || layout.MinimumY > padding;
+        var padding = Math.Max(frame.Height, VisualHeight);
+        var suppress = SkipFurtherUpdates || layout.MaximumY < -frame.Height - padding || layout.MinimumY > padding;
         if (VisualsSuppressed != suppress)
         {
             VisualsSuppressed = suppress;
             Invalidate(Invalidation.Presence);
         }
 
-        if (!suppress)
-        {
-            ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
-            Y = layout.OriginY;
-        }
+        if (!suppress) ApplyVisual(frame, layout);
     }
 
-    internal virtual void UpdateVisualLayout(float y, in BmsColumnVisualFrame frame)
-        => ApplyVisualLayout(new BmsVisualLayout(y, y, y), frame.Height);
+    private protected virtual BmsVisualLayout PrepareVisual(float y, in BmsColumnVisualFrame frame) => new(y, y, y);
+
+    private protected virtual void ApplyVisual(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
+    {
+        ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
+        Y = layout.OriginY;
+    }
 
     protected virtual float VisualHeight => 0;
 
