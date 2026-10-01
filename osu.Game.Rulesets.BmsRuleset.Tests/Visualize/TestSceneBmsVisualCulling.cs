@@ -6,6 +6,7 @@ using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Framework.Graphics.Pooling;
+using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -246,5 +247,63 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         seek(6300);
         AddAssert("culled body recovers health", () => Player.HealthProcessor.Health.Value > releasedHealth);
         AddAssert("body remains culled", () => !drawable.IsPresent);
+    }
+
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void CompletedHoldStaysHiddenWhenResumeRewindCullsItsChildren(BmsLongNoteMode longNoteMode)
+    {
+        load(true, longNoteMode);
+        AddStep("resume visibility survives a skipped child traversal", () =>
+        {
+            var previousClock = Playfield.Clock;
+            var processClock = Playfield.ProcessCustomClock;
+            var manual = new ManualClock { CurrentTime = 4800, IsRunning = true, Rate = 1 };
+            var clock = new FramedClock(manual);
+            clock.ProcessFrame();
+            Playfield.Clock = clock;
+            Playfield.ProcessCustomClock = false;
+            try
+            {
+                var column = (BmsColumn)Playfield.Stage.Columns[1];
+                var note = (BmsLongNote)hitObject;
+                advance(5000);
+                PressColumn(column, 5000);
+                advance(6990);
+                ReleaseColumn(column, 6990);
+                advance(7000);
+                advance(10000);
+                var state = column.Judgements.GetLongNoteState(note);
+                Assert.That(state.TailJudged, Is.True);
+                Assert.That(state.LongNoteStarted, Is.False);
+                Assert.That(Playfield.AllColumnAliveObjects().Any(d => ReferenceEquals(d.HitObject, note)), Is.False);
+                Playfield.BeginResumeRewind(10000, 0);
+                advance(5000);
+                var restored = (DrawableBmsHitObject)Playfield.AllColumnAliveObjects().Single(d => ReferenceEquals(d.HitObject, note));
+                var results = Player.Results.Count;
+                note.VisualScrollPositionAtEndTime = 1_000_000;
+                restored.UpdateVisualLayout(-1_000_000, new BmsColumnVisualFrame(0, 1, 0, 700));
+                Assert.That(restored.VisualsSuppressed, Is.True);
+                restored.Alpha = 1;
+                Assert.That(restored.UpdateSubTree(), Is.False, "The framework skips the culled child traversal.");
+                Assert.That(restored.Alpha, Is.Zero);
+                Assert.That(Player.Results, Has.Count.EqualTo(results));
+                Assert.That(column.Judgements.GetLongNoteState(note), Is.EqualTo(state));
+            }
+            finally
+            {
+                Playfield.Clock = previousClock;
+                Playfield.ProcessCustomClock = processClock;
+            }
+
+            void advance(double time)
+            {
+                manual.CurrentTime = time;
+                clock.ProcessFrame();
+                Playfield.EndGameplayFrame();
+                Playfield.UpdateSubTree();
+            }
+        });
     }
 }

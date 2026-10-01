@@ -8,7 +8,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 internal delegate BmsLongNotePresentation BmsLongNotePresentationMapping(BmsLongNote note, in BmsLongNoteState state, bool held, double time);
 
 internal readonly record struct BmsLongNotePresentation(
-    bool HeadJudged, bool HoldingBody, bool KeepAfterHeadResult, bool KeepAlive, bool Retired, double LifetimeEnd)
+    bool HeadJudged, bool HoldingBody, bool KeepAfterHeadResult, bool KeepAlive, bool Retired, bool ClearBodyOnRetire, double LifetimeEnd)
 {
     private static readonly BmsLongNotePresentationMapping longNoteMapping = longNote;
     private static readonly BmsLongNotePresentationMapping chargeNoteMapping = chargeNote;
@@ -30,11 +30,11 @@ internal readonly record struct BmsLongNotePresentation(
 
     private static BmsLongNotePresentation longNote(BmsLongNote note, in BmsLongNoteState state, bool held, double time)
         => new(state.HeadJudged, state.IsHolding && held, false, false,
-            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, note.EndTime);
+            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, state.TailResult != HitResult.Meh, note.EndTime);
 
     private static BmsLongNotePresentation chargeNote(BmsLongNote note, in BmsLongNoteState state, bool held, double time)
         => new(state.HeadJudged, state.IsHolding && held, true, false,
-            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, chargeLifetimeEnd(note));
+            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, state.TailResult != HitResult.Meh, chargeLifetimeEnd(note));
 
     private static BmsLongNotePresentation hellChargeNote(BmsLongNote note, in BmsLongNoteState state, bool held, double time)
     {
@@ -42,7 +42,7 @@ internal readonly record struct BmsLongNotePresentation(
         var successfulTail = state.TailJudged && state.TailResult is HitResult.Perfect or HitResult.Great or HitResult.Good;
         return new BmsLongNotePresentation(state.HeadJudged, state.LongNoteStarted && (held || successfulTail), true,
             state.LongNoteStarted && state.HeadResult == HitResult.Meh && time < chargeLifetimeEnd(note),
-            state.TailJudged && !state.LongNoteStarted, chargeLifetimeEnd(note));
+            state.TailJudged && !state.LongNoteStarted, false, chargeLifetimeEnd(note));
     }
 
     private static double chargeLifetimeEnd(BmsLongNote note)

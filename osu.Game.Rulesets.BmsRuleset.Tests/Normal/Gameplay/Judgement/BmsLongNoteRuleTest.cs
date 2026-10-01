@@ -12,6 +12,21 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 [TestFixture]
 public class BmsLongNoteRuleTest
 {
+    [Test]
+    public void TestRetirementPreservesExpiredBodies(
+        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode mode,
+        [Values] bool poorTail)
+    {
+        var run = new BmsLongNoteTestContext(mode);
+        run.Press(1000, HitResult.Perfect);
+        run.Release(poorTail ? 2000 : 1500, 1500);
+        run.Frame(1601, 101, false);
+
+        Assert.That(run.State.TailResult, Is.EqualTo(poorTail ? HitResult.Meh : HitResult.Perfect));
+        Assert.That(run.Presentation(time: 1601).Retired, Is.True);
+        Assert.That(run.Presentation(time: 1601).ClearBodyOnRetire,
+            Is.EqualTo(mode != BmsLongNoteMode.HellChargeNote && !poorTail));
+    }
 
     [Test]
     public void TestNormalTailCannotImproveGreatHead()

@@ -312,12 +312,14 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     private bool isHoldingBody() => mapPresentation(ln, state, isKeyHeld(), Time.Current).HoldingBody;
 
-    protected override void UpdateAfterChildren()
+    public override bool UpdateSubTree()
     {
-        base.UpdateAfterChildren();
+        var updated = base.UpdateSubTree();
+        // Culled representations still restore framework transforms during resume rewind.
         if (ParentColumn?.ResumeRewindEndTime is { } resumeTime
             && BmsLongNotePresentation.HideDuringResume(ln, state, Judged, resumeTime))
             Alpha = 0;
+        return updated;
     }
 
     private bool isKeyHeld() => ParentColumn?.Judgements.IsHoldInputActive(ln) == true;
@@ -341,9 +343,13 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         }
         if (presentation.Retired)
         {
-            visualState.Reset();
-            longNoteBody.Alpha = 0;
-            longNoteTail.Alpha = 0;
+            // Settled LN/CN tails clear immediately; body expiry retains its final geometry for rewind.
+            if (presentation.ClearBodyOnRetire)
+            {
+                visualState.Reset();
+                longNoteBody.Alpha = 0;
+                longNoteTail.Alpha = 0;
+            }
             Alpha = 0;
             LifetimeEnd = frame.SimulationTime;
         }
