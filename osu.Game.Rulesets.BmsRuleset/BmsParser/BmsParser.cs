@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 namespace osu.Game.Rulesets.BmsRuleset.BmsParser;
 

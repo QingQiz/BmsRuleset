@@ -1,6 +1,6 @@
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 public readonly record struct BmsJudgementCandidate(
     double StartTime,

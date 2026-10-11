@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 public sealed class BmsJudgementWindowTable
 {

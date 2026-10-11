@@ -4,7 +4,7 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Preview;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;

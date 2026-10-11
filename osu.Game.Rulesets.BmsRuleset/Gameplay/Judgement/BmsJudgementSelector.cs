@@ -6,7 +6,7 @@ using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 public static class BmsJudgementSelector
 {

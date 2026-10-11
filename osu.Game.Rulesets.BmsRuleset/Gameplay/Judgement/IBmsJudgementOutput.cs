@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;

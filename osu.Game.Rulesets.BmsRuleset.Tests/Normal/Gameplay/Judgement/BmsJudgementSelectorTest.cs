@@ -4,10 +4,10 @@ using System.Reflection;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 

@@ -4,7 +4,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 
 public static class BmsJudgementEventProjection
 {

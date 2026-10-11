@@ -1,8 +1,7 @@
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 
 public class BmsHitWindows(int rank = 2, BmsLayoutVariant layout = BmsLayoutVariant.Bme7K, int column = 1, double? judgementRate = null) : HitWindows
 {

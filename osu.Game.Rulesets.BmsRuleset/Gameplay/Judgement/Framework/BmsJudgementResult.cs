@@ -1,7 +1,7 @@
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 
 public class BmsJudgementResult(HitObject hitObject, Rulesets.Judgements.Judgement judgement) : JudgementResult(hitObject, judgement)
 {

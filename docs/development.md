@@ -4,8 +4,12 @@
 
 ## Architecture and Verification
 
-Core rules run independently of drawables; the framework bridge connects results and visual feedback. Player tests
-cover input, replay, rewind, Mods, pooling, culling, and visual feedback.
+`Gameplay/Judgement` owns judgement windows, candidate selection, note and hold state, and rewind. Its rules run
+independently of drawables; `Judgement/Framework` adapts results and hit windows to osu!, and the UI bridge connects
+the core to drawables and visual feedback. `Gameplay/Scoring` applies results to EX score, combo, and health;
+`Scoring/Events` stores and projects score and timing history. Result colours belong to `UI`.
+
+Player tests cover input, replay, rewind, Mods, pooling, culling, and visual feedback.
 
 Run the selected functional and instrumentation groups against existing sibling reference binaries:
 

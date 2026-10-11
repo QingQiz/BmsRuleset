@@ -3,7 +3,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+namespace osu.Game.Rulesets.BmsRuleset.UI;
 
 internal static class BmsHitResultColours
 {

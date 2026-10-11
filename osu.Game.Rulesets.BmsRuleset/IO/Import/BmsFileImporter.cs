@@ -6,6 +6,8 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using DifficultyNameUpdater = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyNameUpdater;
+using Realms;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -16,10 +18,8 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Database;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Difficulty;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using Realms;
-using DifficultyNameUpdater = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyNameUpdater;
 
 namespace osu.Game.Rulesets.BmsRuleset.IO.Import;
 

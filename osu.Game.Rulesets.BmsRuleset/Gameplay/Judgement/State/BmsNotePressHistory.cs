@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 
 internal sealed class BmsNotePressHistory
 {

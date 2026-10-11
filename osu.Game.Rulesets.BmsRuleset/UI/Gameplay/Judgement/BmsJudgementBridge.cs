@@ -1,10 +1,10 @@
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;

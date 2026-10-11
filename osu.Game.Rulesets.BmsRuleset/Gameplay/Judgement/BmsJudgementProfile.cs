@@ -1,4 +1,4 @@
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Judgements;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
 public sealed record BmsJudgementProfile(
     BmsJudgementWindowTable Normal,

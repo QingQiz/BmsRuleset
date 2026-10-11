@@ -12,7 +12,7 @@ using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Game.Database;
 using osu.Game.Online.Spectator;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.Replays;

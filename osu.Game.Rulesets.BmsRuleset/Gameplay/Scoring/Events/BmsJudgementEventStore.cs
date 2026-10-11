@@ -3,7 +3,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using osu.Game.Scoring;
 
-namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 
 public static class BmsJudgementEventStore
 {
