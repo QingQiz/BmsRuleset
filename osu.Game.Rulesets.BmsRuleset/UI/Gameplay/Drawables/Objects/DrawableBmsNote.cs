@@ -1,38 +1,31 @@
+using osu.Framework.Allocation;
+using osuTK;
 using osu.Game.Rulesets.BmsRuleset.Objects;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
 public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
     where TCol : struct, IColumnProvider
 {
-    protected override BmsSkinComponents SkinComponent => BmsSkinComponents.Note;
+    // The framework's reflection fallback misses the inherited protected draw-node factory.
+    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
 
-    // The framework already performs passive result checks; normal notes have no BMS-specific frame state.
-    internal override bool RequiresColumnFrameUpdate => false;
+    private BmsNoteVisual noteVisual = null!;
 
-    private double passivePoorOffset;
+    [BackgroundDependencyLoader]
+    private void load() => UseDirectVisual(noteVisual = new BmsNoteVisual(BmsSkinComponents.Note, LayoutVariant, Column));
 
-    internal override double NextPassiveJudgementTime => HitObject.StartTime + passivePoorOffset;
+    protected override float VisualHeight => noteVisual.VisualHeight * (ParentColumn?.NoteHeightScale ?? 1);
+
+    protected override void ApplyVisualHeightScale(float scale) => noteVisual.Scale = new Vector2(1, scale);
 
     protected override void OnApply()
     {
         base.OnApply();
 
-        var table = BmsJudgementProfileProvider.GetTable(HitObject.Beatmap.LayoutVariant, HitObject.Column, HitObject.EffectiveJudgementRate, tail: false);
-        passivePoorOffset = table.SlowWindowFor(HitResult.Ok);
-    }
-
-    protected override void CheckForResult(bool userTriggered, double timeOffset)
-    {
-        if (userTriggered || HitObject == null)
-            return;
-
-        if (timeOffset > passivePoorOffset)
-            ApplyBmsResult(HitResult.Meh);
+        ParentColumn?.JudgementBridge.RefreshNoteRepresentation(this);
     }
 
     protected override void UpdateHitStateTransforms(ArmedState state)
@@ -40,6 +33,7 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
         if (state != ArmedState.Hit)
         {
             base.UpdateHitStateTransforms(state);
+            BmsNoteVisual.ApplyResultEffects(this, state, Time.Current);
             return;
         }
 

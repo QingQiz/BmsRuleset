@@ -2,7 +2,7 @@ using System;
 using System.Reflection;
 using HarmonyLib;
 using osu.Framework.Bindables;
-using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;

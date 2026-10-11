@@ -1,8 +1,8 @@
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Statistics;
-using osu.Game.Rulesets.BmsRuleset.Course;
-using osu.Game.Rulesets.BmsRuleset.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Course;
 

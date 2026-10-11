@@ -14,12 +14,13 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Database;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osuTK;
-using DT = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
+using DifficultyNameUpdater = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyNameUpdater;
+using DT = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
 

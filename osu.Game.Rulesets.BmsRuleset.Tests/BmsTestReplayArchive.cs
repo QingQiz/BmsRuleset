@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using osu.Framework.IO.Stores;
 using osu.Game.Extensions;
 using osu.Game.Models;
-using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests;

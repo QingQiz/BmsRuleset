@@ -24,6 +24,8 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
     private AVFormatContext* formatContext;
     private AVIOContext* ioContext;
     private AVPacket* packet;
+    private AVFrame* decodedFrame;
+    private AVFrame* rgbaFrame;
     private AVStream* stream;
     private AVCodecContext* codecContext;
     private SwsContext* swsContext;
@@ -66,6 +68,20 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
             var packetPtr = packet;
             ffmpeg.av_packet_free(&packetPtr);
             packet = null;
+        }
+
+        if (decodedFrame != null)
+        {
+            var framePtr = decodedFrame;
+            ffmpeg.av_frame_free(&framePtr);
+            decodedFrame = null;
+        }
+
+        if (rgbaFrame != null)
+        {
+            var framePtr = rgbaFrame;
+            ffmpeg.av_frame_free(&framePtr);
+            rgbaFrame = null;
         }
 
         if (swsContext != null)
@@ -132,16 +148,6 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
 
         if (decoderFullyDrained)
             return false;
-
-        var decodedFrame = ffmpeg.av_frame_alloc();
-        var rgbaFrame = ffmpeg.av_frame_alloc();
-
-        if (decodedFrame == null || rgbaFrame == null)
-        {
-            error = "Supplemental FFmpeg decoder could not allocate packet/frame buffers.";
-            releaseFrames(decodedFrame, rgbaFrame);
-            return false;
-        }
 
         try
         {
@@ -226,7 +232,7 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
         }
         finally
         {
-            releaseFrames(decodedFrame, rgbaFrame);
+            ffmpeg.av_frame_unref(decodedFrame);
         }
     }
 
@@ -367,14 +373,18 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
         if (swsContext == null)
             throw new InvalidOperationException("sws_getCachedContext returned null.");
 
-        ffmpeg.av_frame_unref(rgbaFrame);
-        rgbaFrame->format = (int)AVPixelFormat.AV_PIX_FMT_RGBA;
-        rgbaFrame->width = width;
-        rgbaFrame->height = height;
+        if (rgbaFrame->data[0] == null || rgbaFrame->width != width || rgbaFrame->height != height)
+        {
+            // The output is copied before returning, so its native buffer can be reused until the decoded size changes.
+            ffmpeg.av_frame_unref(rgbaFrame);
+            rgbaFrame->format = (int)AVPixelFormat.AV_PIX_FMT_RGBA;
+            rgbaFrame->width = width;
+            rgbaFrame->height = height;
 
-        var getBufferResult = ffmpeg.av_frame_get_buffer(rgbaFrame, 0);
-        if (getBufferResult < 0)
-            throw new InvalidOperationException($"Failed to allocate RGBA frame buffer: {getErrorMessage(getBufferResult)}");
+            var getBufferResult = ffmpeg.av_frame_get_buffer(rgbaFrame, 0);
+            if (getBufferResult < 0)
+                throw new InvalidOperationException($"Failed to allocate RGBA frame buffer: {getErrorMessage(getBufferResult)}");
+        }
 
         var scaleResult = ffmpeg.sws_scale(
             swsContext,
@@ -468,6 +478,11 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
         var openCodecResult = ffmpeg.avcodec_open2(codecContext, decoder, null);
         if (openCodecResult < 0)
             throw new InvalidOperationException($"Error opening codec: {getErrorMessage(openCodecResult)}");
+
+        decodedFrame = ffmpeg.av_frame_alloc();
+        rgbaFrame = ffmpeg.av_frame_alloc();
+        if (decodedFrame == null || rgbaFrame == null)
+            throw new InvalidOperationException("Supplemental FFmpeg decoder could not allocate frame buffers.");
     }
 
     private AVCodec* findDecoder(AVCodecID codecId)
@@ -507,20 +522,5 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
             messageLength = buffer.Length;
 
         return $"{Encoding.ASCII.GetString(buffer, 0, messageLength)} ({errorCode})";
-    }
-
-    private void releaseFrames(AVFrame* decodedFrame, AVFrame* rgbaFrame)
-    {
-        if (decodedFrame != null)
-        {
-            var framePtr = decodedFrame;
-            ffmpeg.av_frame_free(&framePtr);
-        }
-
-        if (rgbaFrame != null)
-        {
-            var framePtr = rgbaFrame;
-            ffmpeg.av_frame_free(&framePtr);
-        }
     }
 }

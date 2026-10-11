@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using osuTK;
-using DT = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
+using DT = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
 

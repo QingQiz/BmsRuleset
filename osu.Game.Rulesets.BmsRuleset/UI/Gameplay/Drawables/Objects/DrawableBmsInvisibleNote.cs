@@ -3,32 +3,32 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
 public sealed partial class DrawableBmsInvisibleNote : DrawableBmsHitObject
 {
+    // The marker owns its masking node; this standard outer container can be flattened.
+    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
+
     private readonly Bindable<bool> showInvisibleNotes = new();
+    private Container marker = null!;
 
-    protected override bool UsesPassiveResultCheck => false;
-
-    internal override bool RequiresColumnFrameUpdate => false;
+    protected override void ApplyVisualHeightScale(float scale) => marker.Scale = new Vector2(1, scale);
 
     protected override bool SkipFurtherUpdates => !showInvisibleNotes.Value || Time.Current > HitObject.StartTime;
 
     protected override float VisualHeight => 8 * (ParentColumn?.NoteHeightScale ?? 1);
-
-    public override bool TryHit(HitResult result) => false;
 
     [BackgroundDependencyLoader(true)]
     private void load(BmsRulesetConfigManager? config)
     {
         config?.BindWith(BmsRulesetSetting.ShowInvisibleNotes, showInvisibleNotes);
 
-        Visuals.Add(NoteContainer = new Container
+        Visuals.Add(marker = new Container
         {
             RelativeSizeAxes = Axes.X,
             Child = new Container

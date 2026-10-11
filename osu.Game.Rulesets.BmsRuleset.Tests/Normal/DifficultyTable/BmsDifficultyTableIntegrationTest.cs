@@ -10,9 +10,10 @@ using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Overlays.Notifications;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Import;
+using DifficultyNameUpdater = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyNameUpdater;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.DifficultyTable;
 
@@ -84,7 +85,7 @@ public partial class BmsDifficultyTableIntegrationTest
                 {"name":"Updated", "symbol":"ST", "charts":[{"md5":"11111111111111111111111111111111","level":"2"}]}
                 """).ConfigureAwait(false);
             var store = new DifficultyTableStore(null, Path.Combine(storage.GetFullPath(string.Empty), "tables"));
-            var oldTable = new global::osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+            var oldTable = new global::osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable
             {
                 Name = "Original", SourcePath = path, Symbol = "ST",
                 Entries = [new TableEntry { Md5Hash = "11111111111111111111111111111111", Level = "1" }],
@@ -304,7 +305,7 @@ public partial class BmsDifficultyTableIntegrationTest
             realm.Write(r => r.All<BeatmapInfo>().Single().DifficultyName = original_name);
 
             var store = new DifficultyTableStore(null, Path.Combine(storage.GetFullPath(string.Empty), "dt-cache"));
-            var table = new global::osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+            var table = new global::osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable
             {
                 Name = "Bracket Preservation Test",
                 Symbol = "RT",
@@ -334,7 +335,7 @@ public partial class BmsDifficultyTableIntegrationTest
         {
             var syncManager = new CollectionSyncManager();
             var store = new DifficultyTableStore(null, Path.Combine(storage.GetFullPath(string.Empty), "dt-cache"), syncManager, realm);
-            var table = new global::osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+            var table = new global::osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable
             {
                 Name = "Collection Identity Test",
                 Symbol = "IT",
@@ -433,7 +434,7 @@ public partial class BmsDifficultyTableIntegrationTest
         {
             var ruleset = new BmsRuleset();
             var settingsStore = new SettingsStore(realm);
-            var table = new global::osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable
+            var table = new global::osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable
             {
                 Name = "Subdivision Persistence Test",
                 SourcePath = "subdivision-persistence-test",

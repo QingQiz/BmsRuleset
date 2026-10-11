@@ -1,8 +1,8 @@
 using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Pooling;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 

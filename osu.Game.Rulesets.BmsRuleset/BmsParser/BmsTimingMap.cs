@@ -352,8 +352,7 @@ public sealed class BmsTimingMap
 
     /// <summary>
     ///     Returns the index of the timing point whose interval contains <paramref name="time"/>.
-    ///     Uses a walking cursor for O(1) amortised queries during forward playback;
-    ///     falls back to binary search on seek (time jumps backwards).
+    ///     Uses a walking cursor for nearby playback queries and binary search for distant queries.
     /// </summary>
     private int findPoint(double time)
     {
@@ -372,8 +371,9 @@ public sealed class BmsTimingMap
         if (time >= pt.Time && time < pt.NextTime)
             return cursor;
 
-        // Walk forward (normal playback: time advances monotonically).
-        while (cursor + 1 < points.Length && time >= points[cursor + 1].Time)
+        // Lifetime refinement and LN endpoint queries share this cursor with playback.
+        // Bound the walk so alternating distant times cannot repeatedly scan the timeline.
+        for (var steps = 0; steps < 8 && cursor + 1 < points.Length && time >= points[cursor + 1].Time; steps++)
             cursor++;
 
         // Cursor now points at the right segment (walking succeeded).
@@ -385,7 +385,11 @@ public sealed class BmsTimingMap
         if (time >= cp.Time && time < cp.NextTime)
             return cursor;
 
-        // Seek: time jumped backwards — binary search.
+        return findPointByBinarySearch(time);
+    }
+
+    private int findPointByBinarySearch(double time)
+    {
         var lo = 0;
         var hi = points.Length - 1;
 

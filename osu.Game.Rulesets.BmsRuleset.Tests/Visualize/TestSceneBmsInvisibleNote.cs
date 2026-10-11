@@ -1,4 +1,5 @@
 #nullable enable
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Linq;
 using NUnit.Framework;
@@ -8,9 +9,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Replays;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Tests.Visual;
 using osuTK.Graphics;
@@ -63,8 +63,8 @@ public partial class TestSceneBmsInvisibleNote : BmsPlayerTestScene
         AddUntilStep("outline visible", () => drawable.IsPresent);
         AddAssert("yellow hollow rectangle", () => drawable.ChildrenOfType<Container>()
             .Any(c => c.Masking && c.BorderThickness == 2 && c.BorderColour == Color4.Yellow && c.DrawWidth > 0 && c.Height == 8));
-        AddAssert("press gives no judgement", () => Playfield.Stage.Columns[1].HandlePress(4800).Equals(PressOutcome.Empty));
-        AddStep("release column", () => Playfield.Stage.Columns[1].HandleRelease(4800));
+        AddAssert("press gives no judgement", () => PressColumn(Playfield.Stage.Columns[1], 4800).Equals(PressOutcome.Empty));
+        AddStep("release column", () => ReleaseColumn(Playfield.Stage.Columns[1], 4800));
         AddAssert("no score events", () => Player.Results.Count == 0 && !drawable.Judged);
         AddStep("disable display live", () => config.SetValue(BmsRulesetSetting.ShowInvisibleNotes, false));
         AddUntilStep("hidden again", () => !drawable.IsPresent);

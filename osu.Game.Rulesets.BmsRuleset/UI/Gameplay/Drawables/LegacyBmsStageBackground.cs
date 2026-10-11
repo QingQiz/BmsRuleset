@@ -4,7 +4,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -22,6 +22,10 @@ internal sealed partial class LegacyBmsStageBackground : CompositeDrawable
     private Drawable? leftSprite;
     private Drawable? rightSprite;
     private readonly string[] images;
+    private Vector2 appliedLeftScale;
+    private Vector2 appliedRightScale;
+    private bool leftScaleApplied;
+    private bool rightScaleApplied;
 
     [Resolved(CanBeNull = true)]
     private BmsPlayfield? playfield { get; set; }
@@ -57,13 +61,13 @@ internal sealed partial class LegacyBmsStageBackground : CompositeDrawable
         base.Update();
 
         if (leftSprite != null)
-            scaleStageSide(leftSprite);
+            scaleStageSide(leftSprite, ref appliedLeftScale, ref leftScaleApplied);
 
         if (rightSprite != null)
-            scaleStageSide(rightSprite);
+            scaleStageSide(rightSprite, ref appliedRightScale, ref rightScaleApplied);
     }
 
-    private void scaleStageSide(Drawable sprite)
+    private void scaleStageSide(Drawable sprite, ref Vector2 appliedScale, ref bool scaleApplied)
     {
         var height = sprite switch
         {
@@ -75,7 +79,13 @@ internal sealed partial class LegacyBmsStageBackground : CompositeDrawable
         if (height > 0)
         {
             var stageScaleX = playfield?.Stage.Scale.X ?? 1;
-            sprite.Scale = new Vector2(HorizontalScaleFor(stageScaleX), DrawHeight / height);
+            var scale = new Vector2(HorizontalScaleFor(stageScaleX), DrawHeight / height);
+            if (!scaleApplied || appliedScale != scale)
+            {
+                appliedScale = scale;
+                scaleApplied = true;
+                sprite.Scale = scale;
+            }
         }
     }
 

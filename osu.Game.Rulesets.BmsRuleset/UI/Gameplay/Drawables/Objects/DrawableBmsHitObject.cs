@@ -4,16 +4,14 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Objects;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
-using osuTK;
-using osuTK.Graphics;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
@@ -24,72 +22,83 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     internal bool VisualsSuppressed { get; private set; }
 
-    public override bool UpdateSubTree()
+    internal long BindingGeneration { get; private set; }
+
+    private BmsVisualTimeObserver? visualTimeObserver;
+    private BmsHitObject? observedVisualNote;
+    private long visualTimeGeneration;
+
+    internal bool HasVisualTimeObserver => visualTimeObserver != null;
+
+    protected private bool IsCurrentVisualTimeObserver(BmsVisualTimeObserver observer)
+        => visualTimeObserver == observer && visualTimeGeneration == BindingGeneration && ReferenceEquals(HitObject, observedVisualNote);
+
+    internal void SetVisualTimeObserver(BmsVisualTimeObserver observer)
     {
-        var updated = base.UpdateSubTree();
-        // CompositeDrawable skips UpdateAfterChildren when culled. Passive judgements must
-        // still run at the same point in the column traversal, rather than waiting for OnKilled.
-        if (UsesPassiveResultCheck && VisualsSuppressed && IsLoaded)
-            UpdateResult(false);
-        return updated;
+        visualTimeObserver = observer;
+        observedVisualNote = HitObject;
+        visualTimeGeneration = BindingGeneration;
     }
 
-    internal void UpdateVisualPosition(float y, float columnHeight, float? endY = null)
+    internal void ClearVisualTimeObserver(long generation)
     {
-        var headY = GetVisualHeadY(y, endY ?? y);
-        // The full head-to-tail interval includes long-note bodies spanning the viewport.
-        // Oversized skin art needs more slack than a fixed number of screens.
-        var padding = Math.Max(columnHeight, VisualHeight);
-        var suppress = SkipFurtherUpdates || Math.Max(headY, endY ?? headY) < -columnHeight - padding
-                                          || Math.Min(headY, endY ?? headY) > padding;
+        if (visualTimeGeneration != generation)
+            return;
+
+        visualTimeObserver = null;
+        observedVisualNote = null;
+    }
+
+    internal void ObserveVisualTime(float y, in BmsColumnVisualFrame frame)
+    {
+        var observer = visualTimeObserver;
+        if (observer != null && visualTimeGeneration == BindingGeneration && ReferenceEquals(HitObject, observedVisualNote))
+            observer(y, frame);
+    }
+
+    internal virtual void UpdateVisualFrame(float y, in BmsColumnVisualFrame frame)
+    {
+        if (HasVisualTimeObserver)
+            ObserveVisualTime(y, frame);
+        UpdateVisualLayout(y, frame);
+    }
+
+    internal void UpdateVisualLayout(float y, in BmsColumnVisualFrame frame)
+        => ApplyVisualLayout(frame, PrepareVisual(y, frame));
+
+    protected private void ApplyVisualLayout(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
+    {
+        var suppress = SkipFurtherUpdates;
+        // The padding is at least one column height. Intersecting that minimum range
+        // cannot be culled, so only outlying bounds need the skin's size-dependent height.
+        if (!suppress && (layout.MaximumY < -frame.Height - frame.Height || layout.MinimumY > frame.Height))
+        {
+            var padding = Math.Max(frame.Height, VisualHeight);
+            suppress = layout.MaximumY < -frame.Height - padding || layout.MinimumY > padding;
+        }
+
         if (VisualsSuppressed != suppress)
         {
             VisualsSuppressed = suppress;
             Invalidate(Invalidation.Presence);
         }
 
-        if (!suppress)
-        {
-            ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
-            Y = y;
-        }
+        if (!suppress) ApplyVisual(frame, layout);
     }
 
-    protected virtual float GetVisualHeadY(float y, float endY) => y;
+    protected private virtual BmsVisualLayout PrepareVisual(float y, in BmsColumnVisualFrame frame) => new(y, y, y);
+
+    protected private virtual void ApplyVisual(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
+    {
+        ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
+        Y = layout.OriginY;
+    }
 
     protected virtual float VisualHeight => 0;
 
     protected virtual bool SkipFurtherUpdates => false;
 
-    protected virtual bool RequiresResultBeforeKindPostState => false;
-
-    protected virtual bool UsesPassiveResultCheck => true;
-
-    internal virtual bool RequiresColumnFrameUpdate => true;
-
-    internal virtual double NextPassiveJudgementTime => double.NegativeInfinity;
-
-    internal virtual bool HasPendingHead => !Judged;
-
-    internal virtual bool RequiresActiveLongNoteUpdate => false;
-
-    internal event Action<DrawableBmsHitObject>? HeadJudged;
-
-    protected void NotifyHeadJudged() => HeadJudged?.Invoke(this);
-
-    internal virtual void UpdateDeferredLongNote(float y, float endY)
-    {
-    }
-
-    internal virtual void UpdateLandmine(bool holding)
-    {
-    }
-
-    internal virtual void UpdateHellChargeBody(bool holding)
-    {
-    }
-
-    internal virtual void RestoreRewoundState()
+    internal virtual void RestoreRewoundVisuals()
     {
     }
 
@@ -97,13 +106,40 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected double ScrollSpeedMultiplier => ParentColumn?.ScrollSpeedMultiplier ?? 1;
 
-    protected Container NoteContainer = null!;
-
     // A separate visual layer lets appearance fades compose with hit/miss transforms
     // and long-note release opacity without changing judgement updates.
-    protected Container Visuals { get; } = new() { RelativeSizeAxes = Axes.X };
+    private Drawable visualLayer;
 
-    internal void UpdateSoftConstantVisibility(float alpha) => Visuals.Alpha = alpha;
+    protected Container Visuals => (Container)visualLayer;
+
+    protected void UseDirectVisual(Drawable visual)
+    {
+        // Single-piece notes can compose the visibility fade on their existing skin wrapper.
+        // Removing the empty layer avoids another traversal and invalidation per scrolling note.
+        RemoveInternal(visualLayer, true);
+        AddInternal(visualLayer = visual);
+        if (visual is BmsNoteVisual noteVisual)
+        {
+            singlePieceVisual = noteVisual;
+            noteVisual.ComponentChanging += restoreSinglePieceWrapper;
+            noteVisual.ComponentChanged += refreshSinglePieceVisual;
+            noteVisual.ComponentInvalidated += restoreSinglePieceWrapper;
+        }
+    }
+
+    private float appliedSoftConstantAlpha = float.NaN;
+
+    internal void UpdateSoftConstantVisibility(float alpha)
+    {
+        // Alpha invalidation propagates through the whole visual tree; skip it when a
+        // non-fading soft-constant state leaves this note unchanged.
+        if (alpha == appliedSoftConstantAlpha)
+            return;
+
+        appliedSoftConstantAlpha = alpha;
+        visualLayer.Alpha = alpha;
+        refreshSinglePieceVisual();
+    }
 
     private float appliedNoteHeightScale = float.NaN;
 
@@ -116,21 +152,12 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         Anchor = Anchor.BottomLeft;
         Origin = Anchor.BottomLeft;
         RelativeSizeAxes = Axes.X;
-        AddInternal(Visuals);
+        AddInternal(visualLayer = new Container { RelativeSizeAxes = Axes.X });
     }
 
-    public virtual bool TryHit(HitResult result)
+    internal void ApplyBmsResult(HitResult result, bool suppressPenalty)
     {
-        if (Judged || result == HitResult.None)
-            return false;
-
-        ApplyBmsResult(result);
-        return true;
-    }
-
-    protected void ApplyBmsResult(HitResult result)
-    {
-        ((BmsJudgementResult)Result).SuppressPenalty = result == HitResult.Meh && ParentColumn?.HasPmsMistake(HitObject) == true;
+        ((BmsJudgementResult)Result).SuppressPenalty = suppressPenalty;
         ApplyResult(result);
     }
 
@@ -138,17 +165,13 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     {
     }
 
-    internal void UpdateColumnFrame()
+    public override void OnKilled()
     {
-        if (HitObject == null) return;
-
-        if (!Judged && !SkipFurtherUpdates)
-        {
-            if (!UpdateKindState() && RequiresResultBeforeKindPostState)
-                UpdateResult(false);
-        }
-
-        UpdateKindPostResultState();
+        base.OnKilled();
+        // The framework has stopped samples, while this removing representation can still submit its final result.
+        ParentColumn?.JudgementBridge.CompleteScheduledRemoval(this,
+            new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
+                (Clock as IGameplayClock)?.IsRewinding == true));
     }
 
     protected override void Update()
@@ -156,6 +179,12 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         base.Update();
 
         ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
+        refreshSinglePieceVisual();
+    }
+
+    protected override void UpdateAfterChildren()
+    {
+        // The column schedule owns passive results; the base hook only dispatches an unused per-object check.
     }
 
     protected override void LoadAsyncComplete()
@@ -176,31 +205,22 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
             return;
 
         appliedNoteHeightScale = scale;
-        NoteContainer.Scale = new Vector2(1, scale);
-        ApplyNoteHeightScaleToKind(scale);
+        ApplyVisualHeightScale(scale);
+        refreshSinglePieceVisual();
     }
 
-    protected virtual void ApplyNoteHeightScaleToKind(float scale)
+    protected virtual void ApplyVisualHeightScale(float scale)
     {
     }
 
-    protected virtual void ResetKindState()
-    {
-    }
-
-    protected virtual bool UpdateKindState() => false;
-
-    protected virtual void UpdateKindPostResultState()
-    {
-    }
-
-    protected virtual void AddKindDrawablesBeforeNote()
+    protected virtual void ResetVisualState()
     {
     }
 
     protected override void OnApply()
     {
         base.OnApply();
+        BindingGeneration++;
         if (VisualsSuppressed)
         {
             VisualsSuppressed = false;
@@ -208,28 +228,19 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         }
 
         Alpha = 1;
-        Visuals.Alpha = 1;
-        ResetKindState();
+        appliedSoftConstantAlpha = float.NaN;
+        visualLayer.Alpha = 1;
+        ResetVisualState();
     }
 
-    protected override void UpdateHitStateTransforms(ArmedState state)
+    protected override void OnFree()
     {
-        base.UpdateHitStateTransforms(state);
-        switch (state)
-        {
-            case ArmedState.Hit:
-                this.FadeOut();
-                LifetimeEnd = Time.Current;
-                break;
-
-            case ArmedState.Miss:
-                this.FadeColour(Color4.Red, 80).FadeOut(220).Expire();
-                LifetimeEnd = Time.Current + 300;
-                break;
-        }
+        // ApplyDefaults also frees the representation; its logical registration stays in place.
+        ParentColumn?.JudgementBridge.UnbindNoteRepresentation(this, BindingGeneration);
+        base.OnFree();
     }
 
-    protected override JudgementResult CreateResult(Judgement judgement) => new BmsJudgementResult(HitObject, judgement);
+    protected override JudgementResult CreateResult(osu.Game.Rulesets.Judgements.Judgement judgement) => new BmsJudgementResult(HitObject, judgement);
 
     protected override void LoadSamples()
     {
@@ -239,47 +250,5 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 public abstract partial class DrawableBmsHitObject<TCol> : DrawableBmsHitObject
     where TCol : struct, IColumnProvider
 {
-    protected abstract BmsSkinComponents SkinComponent { get; }
-
     protected int Column { get; } = default(TCol).Value;
-
-    private BmsCachedSkinnableDrawable? cachedSkinnableDrawable;
-
-    [BackgroundDependencyLoader]
-    private void load()
-    {
-        AddKindDrawablesBeforeNote();
-
-        NoteContainer = new Container
-        {
-            Anchor = Anchor.TopLeft,
-            Origin = Anchor.TopLeft,
-            RelativeSizeAxes = Axes.X,
-        };
-
-        cachedSkinnableDrawable = new BmsCachedSkinnableDrawable(
-            new BmsSkinComponentLookup(SkinComponent, LayoutVariant, Column))
-        {
-            ComponentAnchor = Anchor.BottomCentre,
-        };
-
-        NoteContainer.Add(cachedSkinnableDrawable);
-        Visuals.Add(NoteContainer);
-    }
-
-    protected float NoteVisualHeight
-    {
-        get
-        {
-            var drawable = cachedSkinnableDrawable?.Drawable;
-            if (drawable == null)
-                return 0;
-
-            // Width-relative skins still have an absolute height. Querying DrawHeight also resolves
-            // the parent's width layout, needlessly waking culled skin trees on every frame.
-            return (drawable.RelativeSizeAxes & Axes.Y) == 0 ? drawable.Height : drawable.DrawHeight;
-        }
-    }
-
-    protected override float VisualHeight => NoteVisualHeight * (ParentColumn?.NoteHeightScale ?? 1);
 }

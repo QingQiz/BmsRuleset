@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 

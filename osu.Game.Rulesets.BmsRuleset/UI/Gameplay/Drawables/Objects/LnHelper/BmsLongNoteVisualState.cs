@@ -43,15 +43,15 @@ internal sealed class BmsLongNoteVisualState
         previousVisualOffset = visualOffset;
     }
 
-    public float ResolveHeldHeadY(float realHeadY, float realTailY, bool canPin, Func<float, float, int> directionResolver)
+    public void ObserveHeldBodyDirection(float realHeadY, float realTailY, bool canPin, Func<float, float, int> directionResolver)
     {
         if (!canPin || headYAtStartTime == null)
-            return realHeadY;
+            return;
 
         heldBodyDirection ??= directionResolver(realHeadY, realTailY);
-
-        return headYAtStartTime.Value;
     }
+
+    public float ResolveHeldHeadY(float realHeadY, bool canPin) => canPin ? headYAtStartTime ?? realHeadY : realHeadY;
 
     public float VisibleBodyTailOffset(float headOffset, float tailOffset)
         => BmsLongNoteGeometry.VisibleBodyTailOffset(headOffset, tailOffset, heldBodyDirection);

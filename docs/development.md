@@ -2,9 +2,38 @@
 
 [Back to README](../README.md)
 
+## Architecture and Verification
+
+`Gameplay/Judgement` owns judgement windows, candidate selection, note and hold state, and rewind. Its rules run
+independently of drawables; `Judgement/Framework` adapts results and hit windows to osu!, and the UI bridge connects
+the core to drawables and visual feedback. `Gameplay/Scoring` applies results to EX score, combo, and health;
+`Scoring/Events` stores and projects score and timing history. Result colours belong to `UI`.
+
+Player tests cover input, replay, rewind, Mods, pooling, culling, and visual feedback.
+
+Run the selected functional and instrumentation groups against existing sibling reference binaries:
+
+```powershell
+./scripts/verify-judgement-migration.ps1
+```
+
+All test commands must use `--filter`. Tests tagged `JudgementInstrumentation` use a separate process
+with the repository's runsettings to keep method-entry observations visible; ordinary tests retain default
+JIT settings. Performance benchmarks require explicit approval.
+
+The verification script saves deterministic Player traces under `comparison/current` in its results directory.
+Use [compare-judgement-traces.py](../scripts/compare-judgement-traces.py) to compare traces from two builds:
+
+```powershell
+python scripts/compare-judgement-traces.py artifacts/baseline/comparison/current artifacts/candidate/comparison/current --output artifacts/comparison.json
+```
+
 ## Design Plans
 
-- [Online leaderboard plan (中文)](online-leaderboard-plan.zh-CN.md): osu! OAuth, full replay uploads, and SQLite storage. Design only; not implemented.
+- [Online leaderboard (中文)](plans/online-leaderboard-plan.zh-CN.md): osu! OAuth, replay uploads, and SQLite storage.
+- [BMSON support](plans/bmson-support-plan.md): native BMSON 1.0 parsing and shared runtime chart data.
+
+Both are proposals for features that are not implemented.
 
 ## Build Manually
 
@@ -48,7 +77,7 @@ Use the repository generator when updating the font.
 
 ## Gameplay Performance
 
-For reusable real Player profiling across charts, skins and long-note modes, see [Gameplay performance template (中文)](gameplay-diagnostic.zh-CN.md).
+See the [gameplay diagnostic (中文)](gameplay-diagnostic.zh-CN.md) for reusable capture instructions.
 
 ```powershell
 dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Tests.csproj -c Release --no-build --no-restore --filter 'FullyQualifiedName~TestSceneBmsInvertGameplay|FullyQualifiedName~TestSceneBmsReplayRewind|FullyQualifiedName~TestSceneBmsPauseRewind'
@@ -69,21 +98,19 @@ dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Test
 | **Parser**    | `#POORBGAxx` — per-slot POOR BGA crop definition (distinct from scalar `#POORBGA` mode)  | 2        |
 | **Parser**    | `#BGAEXPAND` — global BGA scaling mode (0=stretch, 1=keep aspect, 2=no expand)           | 2        |
 | **Parser**    | `#BGAOFF` — disable BGA for the chart                                                    | 2        |
-| **Parser**    | [BMSON support](bmson-support-plan.md)                                                   | 1        |
+| **Parser**    | [BMSON support](plans/bmson-support-plan.md)                                             | 1        |
 | **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                            |
 | **Parser**    | `#CDDA` — CD audio                                                                       |
 | **Parser**    | `#CHARFILE` / `#ExtChr` — character / skin                                               |
 | **Parser**    | `#EXBPMxx` — `#BPMxx` alias (BMSC parser bug workaround)                                 |
-| **Parser**    | `#EXWAVxx`, `#WAVCMD` — advanced audio controls                                          |
 | **Parser**    | `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — resource groups       |
 | **Parser**    | `#OCT/FP` — octave / pedal                                                               |
 | **Parser**    | `#OPTION` — forced option                                                                |
 | **Parser**    | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                       |
 | **Parser**    | `#MOVIE` — metadata only                                                                 |          |
 | **Parser**    | `#STP` — absolute STOP sequence                                                          |
-| **Parser**    | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — video |
+| **Parser**    | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#SEEKxx` — video |
 | **Parser**    | `#CHARSET` — character encoding specification                                            |
-| **Parser**    | `#ExtChr` — BM98 extended character sprite display                                       |
 | **Parser**    | Channel `17` / `27` — free-zone keys                                                     |
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                |
 | **Renderer**  | Configurable POOR BGA duration — fixed at 500 ms; beatoraja uses `misslayerDuration`     | 3        |
@@ -91,4 +118,3 @@ dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Test
 | **Skin**      | `HitGreat` → `HitGreatSlow` / `HitGreatFast` split images                                |
 | **Skin**      | E-POOR judgement image                                                                   | 3        |
 | **UI**        | Lane cover / skin / movement                                                             | 2        |
-| **Perf**      | Frame spikes during mass gameplay object activation and pool return                       | 4        |

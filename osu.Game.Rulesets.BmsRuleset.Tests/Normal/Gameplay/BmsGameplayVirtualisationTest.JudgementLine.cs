@@ -3,10 +3,10 @@ using NUnit.Framework;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay;

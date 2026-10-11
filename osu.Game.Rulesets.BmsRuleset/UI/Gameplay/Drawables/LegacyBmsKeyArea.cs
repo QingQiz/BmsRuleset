@@ -4,10 +4,10 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
@@ -21,6 +21,7 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
     private Drawable? upSprite;
     private Drawable? downSprite;
     private double releaseTime = double.NegativeInfinity;
+    private bool? appliedPressed;
 
     public LegacyBmsKeyArea(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup)
     {
@@ -51,17 +52,8 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
             d.Alpha = 0;
         });
 
-        InternalChild = new Container
-        {
-            Anchor = Anchor.BottomCentre,
-            Origin = Anchor.BottomCentre,
-            RelativeSizeAxes = Axes.Both,
-            Children =
-            [
-                upSprite ?? Empty(),
-                downSprite ?? Empty(),
-            ],
-        };
+        // Both pieces already anchor to this area's bottom; an extra identity container only adds traversal.
+        InternalChildren = [upSprite ?? Empty(), downSprite ?? Empty()];
     }
 
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
@@ -92,6 +84,10 @@ internal sealed partial class LegacyBmsKeyArea : CompositeDrawable, IKeyBindingH
             return;
 
         var pressed = Time.Current < releaseTime + BmsLegacySkinTransformer.HIT_EXPLOSION_FADE_IN_DURATION;
+        if (pressed == appliedPressed)
+            return;
+
+        appliedPressed = pressed;
         if (upSprite != null)
             upSprite.Alpha = pressed ? 0 : 1;
         downSprite.Alpha = pressed ? 1 : 0;

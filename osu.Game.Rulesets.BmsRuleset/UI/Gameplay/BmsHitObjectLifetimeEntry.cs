@@ -1,9 +1,9 @@
 using System;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
@@ -16,12 +16,6 @@ internal sealed class BmsHitObjectLifetimeEntry(
     double activationLeadTime = 0)
     : HitObjectLifetimeEntry(hitObject)
 {
-
-    // A resume rewind may return the drawable to its pool while its head/tail judgements remain valid.
-    internal BmsLongNoteJudgementController? LongNoteJudgementController { get; set; }
-
-    // Avoided mines have no result, so their crossing must survive drawable pooling separately.
-    internal double? LandmineHandledTime { get; set; }
 
     /// <summary>
     ///     Set to true once <see cref="RefreshLifetime"/> has run.
@@ -57,7 +51,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     ///     Mines only need a single frame to check whether the column is pressed; after that they
     ///     can die shortly afterwards. A 100 ms past-lifetime keeps the check reliable across frame boundaries.
     /// </summary>
-    internal const double MINE_PAST_LIFETIME = 100;
+    internal const double MINE_PAST_LIFETIME = BmsLandmineJudgementRule.PASSING_LIFETIME;
 
     /// <summary>
     ///     Step-size used when probing backwards from StartTime to find the earliest visible frame.

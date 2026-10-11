@@ -8,8 +8,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Tests.Visual;
@@ -91,15 +91,11 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     private static Drawable noteHeadOf(DrawableBmsHitObject longNote)
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-        return (Drawable)typeof(DrawableBmsHitObject).GetField("NoteContainer", flags)!.GetValue(longNote)!;
+        return (Drawable)longNote.GetType().GetField("head", flags)!.GetValue(longNote)!;
     }
 
     private static Drawable noteHeadDrawableOf(DrawableBmsHitObject longNote)
-    {
-        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-        var cachedSkinnableDrawable = longNote.GetType().BaseType!.GetField("cachedSkinnableDrawable", flags)!.GetValue(longNote)!;
-        return (Drawable)cachedSkinnableDrawable.GetType().GetProperty("Drawable", flags)!.GetValue(cachedSkinnableDrawable)!;
-    }
+        => ((BmsNoteVisual)noteHeadOf(longNote)).Drawable;
 
     [TestCase(BmsLongNoteMode.ChargeNote, 0.4f, false)]
     [TestCase(BmsLongNoteMode.HellChargeNote, 1f, true)]

@@ -6,7 +6,7 @@ using osu.Game.Rulesets.BmsRuleset.Media.Audio.Processing;
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 
 [TestFixture]
-public class BmsFixedRatePcmProcessorTest
+public partial class BmsFixedRatePcmProcessorTest
 {
     [Test]
     public void Mono48KhzIsContinuouslyResampledToStereo44Khz()

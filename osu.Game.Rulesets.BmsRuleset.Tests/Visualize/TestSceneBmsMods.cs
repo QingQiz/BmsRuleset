@@ -6,14 +6,16 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Mods;
-using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
-using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays;
@@ -63,11 +65,9 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
 
         AddUntilStep("scratch LN is automatically held", () =>
             Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SCENARIO_START_TIME + BmsTestBeatmaps.LN_SCENARIO_DURATION / 2
-            && Playfield.GetAliveObjectAtTime(BmsTestBeatmaps.LN_SCENARIO_START_TIME) is ILongNoteHolder
-            {
-                IsAutomaticallyHeld: true,
-                IsHoldingLongNote: true,
-            });
+            && Playfield.GetAliveObjectAtTime(BmsTestBeatmaps.LN_SCENARIO_START_TIME)?.HitObject is BmsLongNote note
+            && ((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements.PressedDirections != 0
+            && ((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements.GetLongNoteState(note).HeadJudged);
 
         AddUntilStep("scratch LN tail is judged", () =>
             Player.GameplayClockContainer.CurrentTime >= BmsTestBeatmaps.LN_SCENARIO_START_TIME + BmsTestBeatmaps.LN_SCENARIO_DURATION + 100);

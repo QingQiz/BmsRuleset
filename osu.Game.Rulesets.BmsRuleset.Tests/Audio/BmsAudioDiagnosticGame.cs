@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text.Json;
 using ManagedBass;
 using osu.Framework.Allocation;
+using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
@@ -51,6 +52,8 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
     private BmsAudioCaptureSession? captureSession;
     private BmsAudioCaptureSession? preLimiterCaptureSession;
     private BmsWasapiLoopbackCaptureSession? loopbackCaptureSession;
+    private readonly ManualClock sampleClockSource = new() { CurrentTime = -start_delay };
+    private FramedClock sampleClock = null!;
 
     internal int ResultCode { get; private set; }
 
@@ -112,10 +115,16 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
             }
         }
 
+        // Scheduling and asset lifetimes must share the interval clock. Absolute chart
+        // timestamps would otherwise queue --start 60 events a minute into the future.
+        sampleClock = new FramedClock(sampleClockSource);
         samplePlayback = new BmsSamplePlayback(
             parsed.SampleDefinitions,
             Path.GetDirectoryName(fullPath),
-            sampleUsages: events.Select(evt => new BmsSampleUsage(evt.SampleKey, evt.Time - requestedStartTime)));
+            sampleUsages: events.Select(evt => new BmsSampleUsage(evt.SampleKey, evt.Time - requestedStartTime)))
+        {
+            Clock = sampleClock,
+        };
         Add(samplePlayback);
 
         Console.WriteLine($"BMS_AUDIO_DIAGNOSTIC chart={fullPath}");
@@ -179,9 +188,12 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
                 loopbackCaptureSession = BmsWasapiLoopbackCaptureSession.Start(loopbackDevice ?? "55", captureDuration);
 
             playbackStartTime = Time.Current + start_delay;
+            samplePlayback.ResumeAll();
             Console.WriteLine("BMS_AUDIO_DIAGNOSTIC ready");
         }
 
+        sampleClockSource.CurrentTime = Time.Current - playbackStartTime;
+        sampleClock.ProcessFrame();
         var chartTime = requestedStartTime + Time.Current - playbackStartTime;
 
         var currentSchedulingLead = liveBatch ? 0 : scheduling_lead;
@@ -201,7 +213,7 @@ internal partial class BmsAudioDiagnosticGame : osu.Framework.Game
             if (evt.Time > chartTime)
             {
                 if (samplePlayback.CanSchedule(evt.SampleKey))
-                    samplePlayback.SchedulePlay(evt.SampleKey, volume, evt.Time);
+                    samplePlayback.SchedulePlay(evt.SampleKey, volume, evt.Time - requestedStartTime);
                 else
                 {
                     if (traceScheduling)

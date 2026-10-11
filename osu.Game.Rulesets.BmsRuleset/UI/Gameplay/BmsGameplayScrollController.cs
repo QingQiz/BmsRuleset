@@ -3,7 +3,7 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 
@@ -21,9 +21,9 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
         && timingMap.BpmEvents.All(e => double.IsFinite(e.Bpm) && e.Bpm > 0)
         && timingMap.ScrollEvents.All(e => double.IsFinite(e.Factor) && e.Factor >= 0);
 
-    public double ScrollRange => ComputeScrollTime(default_scroll_speed) * ScrollRangeScale * PlaybackRate;
+    public double ScrollRange { get; private set; } = ComputeScrollTime(default_scroll_speed);
 
-    public double ScrollSpeedMultiplier => ScrollSpeed / default_scroll_speed * ChartSpeedFactor;
+    public double ScrollSpeedMultiplier { get; private set; } = 1.0;
 
     public double MeasureLineFutureWindow
     {
@@ -46,25 +46,23 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 
     private double displayTime;
     private bool softConstantActive;
-    private double softConstantDuration;
-    private double softConstantFadeIn;
+    private bool softConstantHasFadeIn;
+    private double softConstantAlphaEndTime;
+    private double softConstantAlphaScale;
+
+    internal bool SoftConstantActive => softConstantActive && !scrollSpeedMultiplierLocked;
 
     public float GetSoftConstantAlpha(double startTime)
     {
         if (!softConstantActive || scrollSpeedMultiplierLocked)
             return 1;
 
-        // Use the same visual clock and real-time units as scroll positioning, including
-        // visual offset and playback rate. Chart slowdowns only change the reveal position.
-        var remaining = (startTime - displayTime) / PlaybackRate;
-        var duration = softConstantDuration;
-        var fadeIn = softConstantFadeIn;
+        // The reveal window is shared by every note in the frame. Precompute its
+        // real-time boundaries once so dense charts avoid repeated divisions.
+        if (!softConstantHasFadeIn)
+            return startTime < softConstantAlphaEndTime ? 1 : 0;
 
-        if (fadeIn == 0)
-            return remaining < duration ? 1 : 0;
-
-        var fadeStart = duration + Math.Max(0, fadeIn);
-        return (float)Math.Clamp((fadeStart - remaining) / Math.Abs(fadeIn), 0, 1);
+        return (float)Math.Clamp((softConstantAlphaEndTime - startTime) * softConstantAlphaScale, 0, 1);
     }
 
     /// <summary>
@@ -90,6 +88,9 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 
     public double PlaybackRate { get; private set; } = 1.0;
 
+    // All columns share these values; refresh them at the state boundary so layout reads avoid division.
+    private double scrollCoordinateScale = 1 / ComputeScrollTime(default_scroll_speed);
+
     private const int default_multiplier_index = 9;
 
     private const double default_scroll_speed = BmsRulesetConfigManager.DEFAULT_SCROLL_SPEED;
@@ -110,6 +111,7 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
     {
         const float reference_scroll_distance = 768f - 124.8f;
         ScrollRangeScale = (768f - hitTargetPosition) / reference_scroll_distance;
+        updateScrollRange();
     }
 
     public void SetConfiguredScrollSpeed(double speed)
@@ -121,6 +123,7 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
     public void SetPlaybackRate(double rate)
     {
         PlaybackRate = double.IsFinite(rate) && Math.Abs(rate) >= 0.001 ? Math.Abs(rate) : 1.0;
+        updateScrollRange();
     }
 
     public void AdjustScrollSpeed(double delta)
@@ -148,14 +151,21 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
         ChartSpeedFactor = ConstantScrollActive
             ? 1.0
             : TimingMap?.GetSpeedFactorAtTime(currentTime) ?? 1.0;
+        updateScrollSpeedMultiplier();
 
         // These values are shared by every alive note in the frame; cache them once to avoid
         // repeated bindable reads and scroll-time calculations during per-note layout.
         softConstantActive = SoftConstant.Value;
         if (softConstantActive)
         {
-            softConstantDuration = ComputeScrollTime(ScrollSpeed) * ScrollRangeScale;
-            softConstantFadeIn = SoftConstantFadeIn.Value;
+            var duration = ComputeScrollTime(ScrollSpeed) * ScrollRangeScale;
+            var fadeIn = SoftConstantFadeIn.Value;
+            var fadeStart = duration + Math.Max(0, fadeIn);
+            softConstantHasFadeIn = fadeIn != 0;
+            softConstantAlphaEndTime = displayTime + fadeStart * PlaybackRate;
+            softConstantAlphaScale = softConstantHasFadeIn
+                ? 1 / (Math.Abs(fadeIn) * PlaybackRate)
+                : 0;
         }
     }
 
@@ -181,18 +191,32 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 
     public double ScrollCoordinateScale(double parentHeight, double hitTargetPosition)
     {
-        var range = Math.Max(1.0, ScrollRange);
         var travelDistance = Math.Max(1f, (float)(parentHeight - hitTargetPosition));
-        return ScrollSpeedMultiplier / range * travelDistance;
+        return scrollCoordinateScale * travelDistance;
     }
 
     private void setScrollSpeedFromMultiplierIndex(bool fireEvent = true)
     {
         ScrollSpeed = configuredScrollSpeed * scroll_speed_multipliers[currentMultiplierIndex];
+        updateScrollSpeedMultiplier();
 
         if (fireEvent)
             ScrollSpeedChanged?.Invoke(scroll_speed_multipliers[currentMultiplierIndex]);
     }
+
+    private void updateScrollRange()
+    {
+        ScrollRange = ComputeScrollTime(default_scroll_speed) * ScrollRangeScale * PlaybackRate;
+        updateScrollCoordinateScale();
+    }
+
+    private void updateScrollSpeedMultiplier()
+    {
+        ScrollSpeedMultiplier = ScrollSpeed / default_scroll_speed * ChartSpeedFactor;
+        updateScrollCoordinateScale();
+    }
+
+    private void updateScrollCoordinateScale() => scrollCoordinateScale = ScrollSpeedMultiplier / Math.Max(1.0, ScrollRange);
 
     public event Action<double>? ScrollSpeedChanged;
 }

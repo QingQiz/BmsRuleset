@@ -5,8 +5,10 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
@@ -374,8 +376,6 @@ public class BmsLongNoteJudgementTest
     {
         var tracker = new BmsHellChargeBodyTracker();
         var ticks = new List<(bool Holding, double Scale)>();
-
-        tracker.MarkReleased();
         tracker.Update(elapsed: 1, holding: true, (holding, scale) => ticks.Add((holding, scale)));
 
         Assert.That(ticks, Is.Empty);
@@ -419,7 +419,7 @@ public class BmsLongNoteJudgementTest
     public void TestHellChargeTickCanTriggerFailure()
     {
         var processor = new BmsHealthProcessor();
-        processor.SetGaugeType(osu.Game.Rulesets.BmsRuleset.Scoring.Gauge.BmsGaugeType.Hard);
+        processor.SetGaugeType(BmsGaugeType.Hard);
         var beatmap = new BmsBeatmap
         {
             LayoutVariant = BmsLayoutVariant.Bme7K,
@@ -454,7 +454,6 @@ public class BmsLongNoteJudgementTest
 
         tracker.Update(150, true, apply, 1150);
         tracker.Update(100, true, apply, 1250);
-        tracker.MarkReleased(1250);
         tracker.Update(100, false, apply, 1350);
         tracker.Update(100, true, apply, 1450);
         tracker.Rewind(1150);
@@ -465,8 +464,6 @@ public class BmsLongNoteJudgementTest
         tracker.Update(1, true, apply, 1201);
         Assert.That(ticks, Has.Count.EqualTo(1));
         Assert.That(ticks[0], Is.EqualTo((true, BmsHellChargeBodyTracker.DEFAULT_TICK_SCALE)));
-
-        tracker.MarkReleased(1250);
         tracker.Update(100, false, apply, 1350);
         tracker.Rewind(1300);
         ticks.Clear();
@@ -636,11 +633,11 @@ public class BmsLongNoteJudgementTest
 
         visualState.PrepareHeadPin();
         visualState.UpdateHeadYAtStartTime(20, 980, 1000, 0);
-        var fallingHead = visualState.ResolveHeldHeadY(
-            realHeadY: 20, realTailY: 40, canPin: false, directionResolver: (_, _) => 1);
+        visualState.ObserveHeldBodyDirection(20, 40, false, (_, _) => 1);
+        var fallingHead = visualState.ResolveHeldHeadY(realHeadY: 20, canPin: false);
         visualState.UpdateHeadYAtStartTime(80, 1020, 1000, 0);
-        var fixedHead = visualState.ResolveHeldHeadY(
-            realHeadY: 80, realTailY: 100, canPin: true, directionResolver: (_, _) => 1);
+        visualState.ObserveHeldBodyDirection(80, 100, true, (_, _) => 1);
+        var fixedHead = visualState.ResolveHeldHeadY(realHeadY: 80, canPin: true);
 
         Assert.That(fallingHead, Is.EqualTo(20));
         Assert.That(fixedHead, Is.EqualTo(50));
@@ -655,10 +652,10 @@ public class BmsLongNoteJudgementTest
 
         visualState.PrepareHeadPin();
         visualState.UpdateHeadYAtStartTime(50, 980, 1000, 0);
-        var fallingHead = visualState.ResolveHeldHeadY(
-            realHeadY: 20, realTailY: 40, canPin: false, directionResolver: (_, _) => 1);
-        var completedHead = visualState.ResolveHeldHeadY(
-            realHeadY: 60, realTailY: 80, canPin: false, directionResolver: (_, _) => 1);
+        visualState.ObserveHeldBodyDirection(20, 40, false, (_, _) => 1);
+        var fallingHead = visualState.ResolveHeldHeadY(realHeadY: 20, canPin: false);
+        visualState.ObserveHeldBodyDirection(60, 80, false, (_, _) => 1);
+        var completedHead = visualState.ResolveHeldHeadY(realHeadY: 60, canPin: false);
 
         Assert.That(fallingHead, Is.EqualTo(20));
         Assert.That(completedHead, Is.EqualTo(60));
@@ -671,12 +668,12 @@ public class BmsLongNoteJudgementTest
 
         visualState.PrepareHeadPin();
         visualState.UpdateHeadYAtStartTime(50, 1000, 1000, 0);
-        Assert.That(visualState.ResolveHeldHeadY(
-            realHeadY: 50, realTailY: 70, canPin: true, directionResolver: (_, _) => 1), Is.EqualTo(50));
+        visualState.ObserveHeldBodyDirection(50, 70, true, (_, _) => 1);
+        Assert.That(visualState.ResolveHeldHeadY(realHeadY: 50, canPin: true), Is.EqualTo(50));
 
         visualState.PrepareHeadPin();
-        Assert.That(visualState.ResolveHeldHeadY(
-            realHeadY: 20, realTailY: 40, canPin: false, directionResolver: (_, _) => 1), Is.EqualTo(20));
+        visualState.ObserveHeldBodyDirection(20, 40, false, (_, _) => 1);
+        Assert.That(visualState.ResolveHeldHeadY(realHeadY: 20, canPin: false), Is.EqualTo(20));
     }
 
     [Test]

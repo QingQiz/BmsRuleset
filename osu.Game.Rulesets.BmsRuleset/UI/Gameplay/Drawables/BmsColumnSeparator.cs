@@ -1,5 +1,4 @@
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Skinning;
 using osuTK;
@@ -10,7 +9,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 /// <summary>
 /// Simple vertical lane separator used by legacy column backgrounds.
 /// </summary>
-internal sealed partial class BmsColumnSeparator : CompositeDrawable
+internal sealed partial class BmsColumnSeparator : Box
 {
     private const float legacy_width_scale = 0.740f;
 
@@ -20,11 +19,9 @@ internal sealed partial class BmsColumnSeparator : CompositeDrawable
         Width = width;
         // Legacy mania applies this correction to unscaled ColumnLineWidth values.
         Scale = new Vector2(legacy_width_scale, 1);
-        Alpha = width > 0 ? 1 : 0;
-
-        InternalChild = LegacyColourCompatibility.ApplyWithDoubledAlpha(new Box
-        {
-            RelativeSizeAxes = Axes.Both,
-        }, colour);
+        // The separator itself can draw the rectangle; a wrapping container adds no geometry.
+        LegacyColourCompatibility.ApplyWithDoubledAlpha(this, colour);
+        if (width <= 0)
+            Alpha = 0;
     }
 }

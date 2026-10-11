@@ -7,10 +7,11 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Replays;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
@@ -49,9 +50,8 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
         return beatmap;
     }
 
-    [TestCase(1)]
-    [TestCase(2)]
-    public void MineBeforeHcnBodyAtGaugeCeiling(int column)
+    [Test]
+    public void MineBeforeHcnBodyAtGaugeCeiling([Values(1, 2)] int column)
     {
         load(column, 240, false);
         // Java 9cddf911 JudgeManager 244-246 precedes all bodies at 306-338.

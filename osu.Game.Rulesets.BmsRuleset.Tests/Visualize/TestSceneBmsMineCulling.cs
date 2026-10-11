@@ -7,7 +7,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Tests.Visual;
 
@@ -76,7 +76,7 @@ public partial class TestSceneBmsMineCulling : BmsPlayerTestScene
         loadMine();
         AddStep("move mine outside viewport", () => mine.ScrollPositionAtStartTime = -1_000_000);
         AddUntilStep("mine culled", () => !drawable.IsPresent);
-        AddStep("hold mine column", () => Playfield.Stage.Columns[1].HandlePress(4800));
+        AddStep("hold mine column", () => PressColumn(Playfield.Stage.Columns[1], 4800));
         AddStep("advance to mine", () => Player.GameplayClockContainer.Seek(5000));
         AddUntilStep("mine judged despite culling", () => drawable.Judged);
         AddAssert("detonation reached score processor", () => Player.Results.Any(r => r.HitObject == mine));

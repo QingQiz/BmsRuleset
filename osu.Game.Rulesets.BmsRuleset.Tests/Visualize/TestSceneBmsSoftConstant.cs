@@ -1,11 +1,12 @@
 using System;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Tests.Visual;
 
@@ -88,7 +89,9 @@ public partial class TestSceneBmsSoftConstant : BmsPlayerTestScene
         });
     }
 
-    private static float visualAlpha(DrawableBmsHitObject note) => note.ChildrenOfType<Container>().First().Alpha;
+    private static float visualAlpha(DrawableBmsHitObject note)
+        => note.ChildrenOfType<Drawable>().First(child => ReferenceEquals(child.Parent, note)
+            && child is Container or BmsNoteVisual or osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.BmsResolvedNoteSprite).Alpha;
 
     private void seek(Func<double> time)
     {

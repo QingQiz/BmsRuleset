@@ -25,14 +25,14 @@ using osu.Game.Database;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
-using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.NoteTextures;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
@@ -847,18 +847,17 @@ public class BmsLegacySkinTransformerTest
 
         Assert.That(keyArea, Is.Not.Null);
         var sprite = keyArea!.ChildrenOfType<Sprite>().Single();
-        var container = keyArea!.ChildrenOfType<Container>().Single(c => c.Children.Contains(sprite));
+        var area = (CompositeDrawable)keyArea;
 
         Assert.Multiple(() =>
         {
-            Assert.That(keyArea.ChildrenOfType<Container>().Where(c => c.RelativeSizeAxes == Axes.Both && c.Padding.Bottom > 0), Is.Empty);
-            Assert.That(container.Anchor, Is.EqualTo(Anchor.BottomCentre));
-            Assert.That(container.Origin, Is.EqualTo(Anchor.BottomCentre));
-            Assert.That(container.RelativeSizeAxes, Is.EqualTo(Axes.Both));
-            Assert.That(container.Masking, Is.False);
-            Assert.That(container.Height, Is.EqualTo(1));
-            Assert.That(container.AutoSizeAxes, Is.EqualTo(Axes.None));
-            Assert.That(container.Y, Is.Zero);
+            Assert.That(area.ChildrenOfType<Container>(), Is.Empty);
+            Assert.That(area.Padding.Bottom, Is.Zero);
+            Assert.That(area.RelativeSizeAxes, Is.EqualTo(Axes.Both));
+            Assert.That(area.Masking, Is.False);
+            Assert.That(area.Height, Is.EqualTo(1));
+            Assert.That(area.AutoSizeAxes, Is.EqualTo(Axes.None));
+            Assert.That(area.Y, Is.Zero);
             Assert.That(sprite.Anchor, Is.EqualTo(Anchor.BottomCentre));
             Assert.That(sprite.Origin, Is.EqualTo(Anchor.BottomCentre));
             Assert.That(sprite.RelativeSizeAxes, Is.EqualTo(Axes.X));

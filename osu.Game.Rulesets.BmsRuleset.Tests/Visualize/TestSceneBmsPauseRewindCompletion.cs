@@ -6,8 +6,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.Mods;
@@ -76,7 +76,7 @@ public partial class TestSceneBmsPauseRewindCompletion : BmsPlayerTestScene
         AddStep("play head", () =>
         {
             if (hitHead)
-                Playfield.Stage.Columns[2].HandlePress(head_time);
+                PressColumn(Playfield.Stage.Columns[2], head_time);
         });
         AddStep("seek to pause time", () =>
         {

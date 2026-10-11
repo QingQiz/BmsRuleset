@@ -6,14 +6,14 @@ using NUnit.Framework;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
-using osu.Game.Scoring;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 
@@ -89,11 +89,11 @@ public class BmsBeatorajaReferenceTest
     [TestCase(BmsLongNoteMode.ChargeNote)]
     public void PmsDeferredReleasePreservesReleaseTiming(BmsLongNoteMode mode)
     {
-        var (controller, hooks) = makeController(mode, BmsLayoutVariant.Pms9K, 2000);
-        controller.TryHit(1000, HitResult.Perfect);
-        controller.TryRelease(1500, -1500, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Pms9K, 1, 2, true));
-        controller.UpdatePostResult(1700, 200, false);
-        Assert.That(hooks.Endpoints.Last().TimeOffset, Is.EqualTo(-1500), "JudgeManager uses tailTime - releasetime when the grace period expires.");
+        var run = new BmsLongNoteTestContext(mode, duration: 2000, layout: BmsLayoutVariant.Pms9K);
+        run.Press(1000, HitResult.Perfect);
+        run.Release(1500);
+        run.Frame(1700, 200, false);
+        Assert.That((mode == BmsLongNoteMode.LongNote ? run.MainResults.Last().Endpoints.Last() : run.Output.SyntheticEndpoints.Last()).TimeOffset, Is.EqualTo(-1500), "JudgeManager uses tailTime - releasetime when the grace period expires.");
     }
 
     [Test]
@@ -110,21 +110,21 @@ public class BmsBeatorajaReferenceTest
     [TestCase(false)]
     public void HcnBodyStopsBeforeEndpointFrame(bool holding)
     {
-        var (controller, hooks) = makeController(BmsLongNoteMode.HellChargeNote, BmsLayoutVariant.Bme7K, 201);
-        controller.TryHit(1000, HitResult.Perfect);
-        controller.UpdatePostResult(1200, 200, holding);
-        Assert.That(hooks.Ticks, Is.Empty);
-        controller.UpdatePostResult(1201, 1, holding);
-        Assert.That(hooks.Ticks, Is.Empty, "JudgeManager clears passing at the tail before updating the body accumulator.");
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, duration: 201, layout: BmsLayoutVariant.Bme7K);
+        run.Press(1000, HitResult.Perfect);
+        run.Frame(1200, 200, holding);
+        Assert.That(run.Output.BodyTicks, Is.Empty);
+        run.Frame(1201, 1, holding);
+        Assert.That(run.Output.BodyTicks, Is.Empty, "JudgeManager clears passing at the tail before updating the body accumulator.");
     }
 
     [Test]
     public void HcnDelayedFrameAppliesAtMostOneBodyTick()
     {
-        var (controller, hooks) = makeController(BmsLongNoteMode.HellChargeNote, BmsLayoutVariant.Bme7K, 2000);
-        controller.TryHit(1000, HitResult.Perfect);
-        controller.UpdatePostResult(1650, 650, true);
-        Assert.That(hooks.Ticks, Has.Count.EqualTo(1), "JudgeManager has one if, rather than a catch-up loop, per update.");
+        var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, duration: 2000, layout: BmsLayoutVariant.Bme7K);
+        run.Press(1000, HitResult.Perfect);
+        run.Frame(1650, 650, true);
+        Assert.That(run.Output.BodyTicks, Has.Count.EqualTo(1), "JudgeManager has one if, rather than a catch-up loop, per update.");
     }
 
     [TestCase(BmsLongNoteMode.ChargeNote)]
@@ -133,12 +133,10 @@ public class BmsBeatorajaReferenceTest
     {
         var note = new BmsLongNote { StartTime = 1000, Duration = 1000, Column = 0,
             Beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode } };
-        var hooks = new Hooks();
-        var controller = new BmsLongNoteJudgementController();
-        controller.Bind(note, hooks);
-        controller.TryHit(1000, HitResult.Perfect);
-        controller.TryRelease(2000, 0, BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, 0, 2, true));
-        Assert.That(controller.TailJudged, Is.False,
+        var run = new BmsLongNoteTestContext(note);
+        run.Press(1000, HitResult.Perfect);
+        run.Release(2000);
+        Assert.That(run.State.TailJudged, Is.False,
             "JudgeManager ignores scratch key-up inside tail hit windows; the reverse-direction key-down judges the tail.");
     }
 
@@ -182,26 +180,4 @@ public class BmsBeatorajaReferenceTest
         }
     }
 
-    private static (BmsLongNoteJudgementController, Hooks) makeController(BmsLongNoteMode mode, BmsLayoutVariant layout, double duration)
-    {
-        var note = new BmsLongNote { StartTime = 1000, Duration = duration, Column = 1,
-            Beatmap = new BmsBeatmap { LayoutVariant = layout, Rank = 2, LockedLongNoteMode = mode } };
-        var hooks = new Hooks();
-        var controller = new BmsLongNoteJudgementController();
-        controller.Bind(note, hooks);
-        return (controller, hooks);
-    }
-
-    private sealed class Hooks : IBmsLongNoteHooks
-    {
-        public List<BmsLongNoteEndpointResult> Endpoints { get; } = [];
-        public List<(bool Holding, double Scale)> Ticks { get; } = [];
-        public void OnUserHeadJudged() { }
-        public void OnHellChargeHeadPoor(double eventTime, double lifetimeEnd) { }
-        public void ApplyJudgementResult(HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints) => Endpoints.AddRange(endpoints);
-        public void ApplySyntheticEndpoint(HitResult result, BmsLongNoteEndpointResult endpoint) => Endpoints.Add(endpoint);
-        public void ApplyHellChargeTick(bool holding, double scale) => Ticks.Add((holding, scale));
-        public void ClearVisualIfTailWasNotPoor(HitResult result) { }
-        public void Retire() { }
-    }
 }

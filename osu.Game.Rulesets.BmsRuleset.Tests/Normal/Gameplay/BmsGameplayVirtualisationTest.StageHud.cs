@@ -10,7 +10,6 @@ using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -306,7 +305,7 @@ public partial class BmsGameplayVirtualisationTest
         Assert.Multiple(() =>
         {
             Assert.That(drawable.Scale, Is.EqualTo(Vector2.One));
-            Assert.That(drawable.TestNoteContainer.Scale, Is.EqualTo(new Vector2(1, 1.5f)));
+            Assert.That(drawable.TestVisual.Scale, Is.EqualTo(new Vector2(1, 1.5f)));
         });
     }
 
@@ -710,12 +709,14 @@ public partial class BmsGameplayVirtualisationTest
 
     private sealed partial class TestDrawableBmsHitObject : DrawableBmsHitObject
     {
-        public Container TestNoteContainer => NoteContainer;
+        public Container TestVisual { get; } = new();
 
         public TestDrawableBmsHitObject()
         {
-            NoteContainer = new Container();
+            Visuals.Add(TestVisual);
         }
+
+        protected override void ApplyVisualHeightScale(float scale) => TestVisual.Scale = new Vector2(1, scale);
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {

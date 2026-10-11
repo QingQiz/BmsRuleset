@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -6,8 +6,8 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -36,8 +36,6 @@ public sealed partial class BmsStage : CompositeDrawable
 
     internal float HudViewportHeight { get; private set; }
 
-    internal float HudBaseDrawHeight => HasHudTransform ? drawHeightBeforeHudTransform : DrawHeight;
-
     internal float SkinHitTargetPosition { get; private set; } = HIT_TARGET_POSITION;
 
     internal float HitTargetPositionOffset { get; private set; }
@@ -54,24 +52,31 @@ public sealed partial class BmsStage : CompositeDrawable
 
     private readonly BmsPlayfield playfield;
     private float heightBeforeHudTransform;
-    private float drawHeightBeforeHudTransform;
 
     internal void SetHudTransform(Vector2 offset, Vector2 scale, float viewportHeight)
     {
+        var height = (RelativeSizeAxes & Axes.Y) != 0
+            ? viewportHeight / Math.Max(1, playfield.DrawHeight)
+            : viewportHeight;
+
+        if (HasHudTransform
+            && PositionOffset == offset
+            && Scale == scale
+            && HudViewportHeight == viewportHeight
+            && Height == height)
+            return;
+
         if (!HasHudTransform)
-        {
             heightBeforeHudTransform = Height;
-            drawHeightBeforeHudTransform = DrawHeight;
-        }
 
-        PositionOffset = offset;
-        Scale = scale;
-        HudViewportHeight = viewportHeight;
-
-        if ((RelativeSizeAxes & Axes.Y) != 0)
-            Height = viewportHeight / Math.Max(1, playfield.DrawHeight);
-        else
-            Height = viewportHeight;
+        if (PositionOffset != offset)
+            PositionOffset = offset;
+        if (Scale != scale)
+            Scale = scale;
+        if (HudViewportHeight != viewportHeight)
+            HudViewportHeight = viewportHeight;
+        if (Height != height)
+            Height = height;
 
         HasHudTransform = true;
         updateStageCentre();
@@ -131,6 +136,10 @@ public sealed partial class BmsStage : CompositeDrawable
 
     private readonly SkinnableDrawable[] columnBackgrounds;
     private readonly SkinnableDrawable[] columnLights;
+    private readonly ColumnLayoutState[] columnBackgroundStates;
+    private readonly ColumnLayoutState[] columnLightStates;
+    private readonly ColumnLayoutState[] keyAreaStates;
+    private readonly ColumnLayoutState[] hitExplosionAreaStates;
 
     private readonly BmsLayoutVariant layoutVariant;
 
@@ -150,6 +159,10 @@ public sealed partial class BmsStage : CompositeDrawable
         Columns = new IBmsColumn[playfield.TotalColumns];
         columnBackgrounds = new SkinnableDrawable[playfield.TotalColumns];
         columnLights = new SkinnableDrawable[playfield.TotalColumns];
+        columnBackgroundStates = new ColumnLayoutState[playfield.TotalColumns];
+        columnLightStates = new ColumnLayoutState[playfield.TotalColumns];
+        keyAreaStates = new ColumnLayoutState[playfield.TotalColumns];
+        hitExplosionAreaStates = new ColumnLayoutState[playfield.TotalColumns];
 
         var columnFlow = new FillFlowContainer
         {
@@ -254,16 +267,35 @@ public sealed partial class BmsStage : CompositeDrawable
         for (var i = 0; i < Columns.Length; i++)
         {
             var column = (Drawable)Columns[i];
-            positionColumnLayer(columnBackgrounds[i], column);
-            positionColumnLayer(columnLights[i], column);
+            positionColumnLayer(columnBackgrounds[i], column, ref columnBackgroundStates[i]);
+            positionColumnLayer(columnLights[i], column, ref columnLightStates[i]);
         }
     }
 
-    private static void positionColumnLayer(Drawable layer, Drawable column)
+    private static void positionColumnLayer(Drawable layer, Drawable column, ref ColumnLayoutState state)
     {
-        layer.Width = column.DrawWidth;
-        layer.Margin = column.Margin;
-        layer.Alpha = column.Alpha;
+        var width = column.DrawWidth;
+        if (!state.Valid || state.Width != width)
+        {
+            state.Width = width;
+            layer.Width = width;
+        }
+
+        var margin = column.Margin;
+        if (!state.Valid || !state.Margin.Equals(margin))
+        {
+            state.Margin = margin;
+            layer.Margin = margin;
+        }
+
+        var alpha = column.Alpha;
+        if (!state.Valid || state.Alpha != alpha)
+        {
+            state.Alpha = alpha;
+            layer.Alpha = alpha;
+        }
+
+        state.Valid = true;
     }
 
     private void positionKeyAreas()
@@ -272,10 +304,32 @@ public sealed partial class BmsStage : CompositeDrawable
         {
             var col = (Drawable)Columns[i];
             var area = Columns[i].KeyArea;
-            area.Width = col.DrawWidth;
-            area.Margin = area.Parent == Columns[i].KeyAreaUnderNotesLayer ? new MarginPadding() : col.Margin;
-            area.Alpha = col.Alpha;
+            var margin = area.Parent == Columns[i].KeyAreaUnderNotesLayer ? new MarginPadding() : col.Margin;
+            positionKeyArea(area, col.DrawWidth, margin, col.Alpha, ref keyAreaStates[i]);
         }
+    }
+
+    private static void positionKeyArea(Drawable area, float width, MarginPadding margin, float alpha, ref ColumnLayoutState state)
+    {
+        if (!state.Valid || state.Width != width)
+        {
+            state.Width = width;
+            area.Width = width;
+        }
+
+        if (!state.Valid || !state.Margin.Equals(margin))
+        {
+            state.Margin = margin;
+            area.Margin = margin;
+        }
+
+        if (!state.Valid || state.Alpha != alpha)
+        {
+            state.Alpha = alpha;
+            area.Alpha = alpha;
+        }
+
+        state.Valid = true;
     }
 
     private void positionHitExplosionAreas()
@@ -287,9 +341,25 @@ public sealed partial class BmsStage : CompositeDrawable
         {
             var col = (Drawable)Columns[i];
             var area = Columns[i].HitExplosionArea;
-            area.Width = col.DrawWidth;
-            area.Margin = col.Margin;
+            positionHitExplosionArea(area, col.DrawWidth, col.Margin, ref hitExplosionAreaStates[i]);
         }
+    }
+
+    private static void positionHitExplosionArea(Drawable area, float width, MarginPadding margin, ref ColumnLayoutState state)
+    {
+        if (!state.Valid || state.Width != width)
+        {
+            state.Width = width;
+            area.Width = width;
+        }
+
+        if (!state.Valid || !state.Margin.Equals(margin))
+        {
+            state.Margin = margin;
+            area.Margin = margin;
+        }
+
+        state.Valid = true;
     }
 
     [BackgroundDependencyLoader]
@@ -394,13 +464,25 @@ public sealed partial class BmsStage : CompositeDrawable
     {
         if (HasHudTransform)
         {
-            Position = PositionOffset;
+            if (Position != PositionOffset)
+                Position = PositionOffset;
             return;
         }
 
         var nonScratchCentre = getNonScratchCentreX();
-        X = (DrawWidth / 2 - nonScratchCentre) * Scale.X;
-        Y = 0;
+        var x = (DrawWidth / 2 - nonScratchCentre) * Scale.X;
+        if (X != x)
+            X = x;
+        if (Y != 0)
+            Y = 0;
+    }
+
+    private struct ColumnLayoutState
+    {
+        internal float Width;
+        internal MarginPadding Margin;
+        internal float Alpha;
+        internal bool Valid;
     }
 
     private float getNonScratchCentreX()

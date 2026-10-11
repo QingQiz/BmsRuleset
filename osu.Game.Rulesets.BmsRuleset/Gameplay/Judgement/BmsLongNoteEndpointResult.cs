@@ -1,0 +1,23 @@
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.Scoring;
+
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+
+public enum BmsLongNoteEndpointKind
+{
+    Head,
+    Tail,
+}
+
+public readonly record struct BmsLongNoteEndpointResult(
+    BmsLongNote Source,
+    BmsLongNoteEndpointKind Kind,
+    double EventTime,
+    double GameplayRate,
+    HitResult Result,
+    double? ApplicationTime = null)
+{
+    public double ExpectedTime => Kind == BmsLongNoteEndpointKind.Head ? Source.StartTime : Source.EndTime;
+
+    public double TimeOffset => EventTime - ExpectedTime;
+}

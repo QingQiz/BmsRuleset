@@ -1,16 +1,20 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 
@@ -59,20 +63,81 @@ public partial class TestSceneBmsJudgementPerformance : BmsPlayerTestScene
             var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
             Assert.That(container.AliveEntries.Count, Is.EqualTo(count + 2));
             const int operations = 20000;
-            BmsJudgementPerformanceTest.Measure("Repress-empty-" + count, operations, () =>
+            var frame = currentFrame(container);
+            BmsJudgementPerformanceTest.Measure("Press-empty-" + count, operations, () =>
             {
                 var found = 0;
                 return new BmsJudgementPerformanceTest.Measurement(() =>
                 {
                     for (var i = 0; i < operations; i++)
-                        if (container.TryRepress(3000, false) != null)
+                        if (container.Judgements.HandleNotePress(new BmsPressContext(0, frame)).Kind == PressOutcomeKind.Hit)
                             found++;
                 }, () => { Assert.That(found, Is.Zero); return new { Found = found, Alive = container.AliveEntries.Count }; });
             });
             measurePhases(container, count, "idle", operations);
-            Assert.That(Playfield.GetAliveObjectAtTime(3000).TryHit(HitResult.Perfect), Is.True);
+            measureFrame(count, "idle", operations);
+            var head = Playfield.Beatmap.HitObjects.Single(n => n.Column == 1 && n.StartTime == 3000);
+            Assert.That(container.Judgements.TryPressRegisteredNote(head, HitResult.Perfect, new BmsPressContext(3000, frame)), Is.True);
             measurePhases(container, count, "active", operations);
+            measureFrame(count, "active", operations);
         });
+    }
+
+    [TestCase(64)]
+    [TestCase(2048)]
+    public void LoadedColumnVisualLayout(int count)
+    {
+        AddStep("load column visuals", () => { futureNotes = count; LoadPlayer(); });
+        AddUntilStep("loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
+        AddStep("activate future candidates", () =>
+        {
+            Playfield.ScrollController.SetConfiguredScrollSpeed(1);
+            Playfield.RefreshAllLifetimes();
+            Player.GameplayClockContainer.Stop();
+            Player.GameplayClockContainer.Seek(3000);
+        });
+        AddUntilStep("reached measurement time", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 3000) < .001);
+        AddStep("measure column visual layout", () =>
+        {
+            var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
+            Assert.That(container.AliveEntries.Count, Is.EqualTo(count + 2));
+            var update = typeof(BmsColumnHitObjectContainer).GetMethod("UpdateAfterChildrenLife", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .CreateDelegate<Action>(container);
+            const int operations = 2000;
+            BmsJudgementPerformanceTest.Measure("VisualLayout-" + count, operations, () =>
+            {
+                return new BmsJudgementPerformanceTest.Measurement(() =>
+                {
+                    for (var i = 0; i < operations; i++)
+                        update();
+                }, () =>
+                {
+                    Assert.That(container.AliveEntries.Count, Is.EqualTo(count + 2));
+                    return new { Alive = container.AliveEntries.Count, Height = container.DrawHeight };
+                });
+            });
+        });
+    }
+
+    private void measureFrame(int count, string state, int operations)
+    {
+        // Resolve the unchanged playfield boundary outside measurement so the same harness
+        // compares the old scheduler and the engine without reflection in the timed loop.
+        var processFrame = typeof(BmsPlayfield).GetMethod("processJudgementFrame", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<Action<bool>>(Playfield);
+        var score = Player.ScoreProcessor.TotalScore.Value;
+        var health = Player.HealthProcessor.Health.Value;
+        BmsJudgementPerformanceTest.Measure("Frame-" + state + "-" + count, operations, () =>
+            new BmsJudgementPerformanceTest.Measurement(() =>
+            {
+                for (var i = 0; i < operations; i++)
+                    processFrame(false);
+            }, () =>
+            {
+                Assert.That(Player.ScoreProcessor.TotalScore.Value, Is.EqualTo(score));
+                Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(health));
+                return new { Columns = Playfield.TotalColumns, Score = score, Health = health };
+            }));
     }
 
     private static void measurePhases(BmsColumnHitObjectContainer container, int count, string state, int operations)
@@ -81,8 +146,11 @@ public partial class TestSceneBmsJudgementPerformance : BmsPlayerTestScene
             {
                 for (var i = 0; i < operations; i++)
                 {
-                    container.UpdateLandmines(false);
-                    container.UpdateHellChargeBodies(false);
+                    container.Judgements.UpdateLandmines(currentFrame(container), false);
+                    container.Judgements.UpdateRegisteredBodies(currentFrame(container), container.Time.Elapsed, false);
                 }
             }, () => new { Alive = container.AliveEntries.Count, Active = container.AliveEntries.Values.Count(d => d.HitObject.StartTime == 3000 && d.Judged) }));
+
+    private static BmsFrameContext currentFrame(BmsColumnHitObjectContainer container)
+        => new(container.Time.Current, (container.Clock as IGameplayClock)?.GetTrueGameplayRate() ?? container.Clock.Rate);
 }

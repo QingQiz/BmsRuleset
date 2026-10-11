@@ -10,12 +10,13 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
-using osu.Game.Rulesets.BmsRuleset.Replays;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Mods;
@@ -467,8 +468,8 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     private static float headBottomOf(DrawableBmsHitObject longNote)
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-        var headContainer = (Container)longNote.GetType().GetField("NoteContainer", flags)!.GetValue(longNote)!;
-        return BmsPlayfieldAssertions.BottomOf(headContainer);
+        var head = (Drawable)longNote.GetType().GetField("head", flags)!.GetValue(longNote)!;
+        return BmsPlayfieldAssertions.BottomOf(head);
     }
 
     private static Drawable longNoteBodyOf(DrawableBmsHitObject longNote)
@@ -547,7 +548,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
 
     private void assertHealthDelta(string modeName, LongNoteVisualCase testCase, CaseExpectation expected, CaseSnapshot before, CaseSnapshot after)
     {
-        var history = ((osu.Game.Rulesets.BmsRuleset.Scoring.BmsHealthProcessor)Player.HealthProcessor).GaugeHistory;
+        var history = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory;
         var recent = string.Join(", ", history.TakeLast(12).Select(e => $"{e.Time}:{e.States[0].Health}"));
         Assert.That(after.Health, Is.EqualTo(expected.HealthAfter(before.Health)).Within(0.000001), $"{modeName} {testCase.Text}: health; {recent}");
     }

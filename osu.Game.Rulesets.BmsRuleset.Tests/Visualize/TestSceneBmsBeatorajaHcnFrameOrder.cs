@@ -7,10 +7,10 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Replays;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
@@ -50,9 +50,8 @@ public partial class TestSceneBmsBeatorajaHcnFrameOrder : BmsPlayerTestScene
         return beatmap;
     }
 
-    [TestCase(1)]
-    [TestCase(2)]
-    public void BodyBeforeOtherColumnBadAtGaugeCeiling(int column)
+    [Test]
+    public void BodyBeforeOtherColumnBadAtGaugeCeiling([Values(1, 2)] int column)
     {
         load(column, 320, false);
         // Java 9cddf911 JudgeManager 310-338 precedes every key change at 347.

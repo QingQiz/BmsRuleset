@@ -12,11 +12,11 @@ using osu.Framework.IO.Stores;
 using osu.Game.Extensions;
 using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Replays;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -90,6 +90,23 @@ public class BmsReplayArchiveTest
         Assert.That(events.Single().Source.IsScoring, Is.True);
         Assert.That(restored.ScoreInfo.HitEvents.Single().Result, Is.EqualTo(HitResult.Meh));
         Assert.That(restored.Replay.Frames.Single().Time, Is.EqualTo(1234));
+    }
+
+    [Test]
+    public void TestArchiveWithoutGeneratedInputMarkerUsesLegacyPlayback()
+    {
+        var original = createScore();
+        original.Replay.Frames[0] = new BmsReplayFrame(1234, BmsAction.Key1) { IncludesGeneratedInputs = true };
+        var restored = BmsTestReplayArchive.RoundTrip(original, json =>
+        {
+            var parsed = Newtonsoft.Json.Linq.JObject.Parse(json);
+            var marker = parsed.Descendants().OfType<Newtonsoft.Json.Linq.JProperty>()
+                .Single(p => p.Name.Replace("_", "").Equals("IncludesGeneratedInputs", StringComparison.OrdinalIgnoreCase));
+            marker.Remove();
+            return parsed.ToString();
+        });
+        Assert.That(((BmsReplayFrame)restored.Replay.Frames.Single()).IncludesGeneratedInputs, Is.False);
+        Assert.That(new BmsFramedReplayInputHandler(restored.Replay).IncludesGeneratedInputs, Is.False);
     }
 
     [Test]
@@ -379,7 +396,7 @@ public class BmsReplayArchiveTest
             {
                 Frames =
                 {
-                    new BmsReplayFrame(0),
+                    new BmsReplayFrame(0) { IncludesGeneratedInputs = true },
                     new BmsReplayFrame(1234, BmsAction.Key1, BmsAction.Scratch)
                     {
                         BranchDecisions = "2:1",

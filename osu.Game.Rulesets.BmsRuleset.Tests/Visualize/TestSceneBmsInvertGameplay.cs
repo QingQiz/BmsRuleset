@@ -7,13 +7,14 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Mods;
-using osu.Game.Rulesets.BmsRuleset.Mods.LongNoteMode;
-using osu.Game.Rulesets.BmsRuleset.Replays;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
@@ -125,7 +126,8 @@ public partial class TestSceneBmsInvertGameplay : BmsPlayerTestScene
     private void assertHolding()
         => AddAssert("converted long notes remain visible while held", () =>
             Playfield.AllColumnAliveObjects().Count(d => d.HitObject.StartTime == 1500
-                                                        && d is ILongNoteHolder { IsHoldingLongNote: true } && d.IsPresent)
+                                                        && d.HitObject is BmsLongNote note && d.IsPresent
+                                                        && ((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements.GetLongNoteState(note).IsHolding)
             == (doublePlay ? 16 : 8));
 
     private void assertCompleted(BmsLongNoteMode mode)

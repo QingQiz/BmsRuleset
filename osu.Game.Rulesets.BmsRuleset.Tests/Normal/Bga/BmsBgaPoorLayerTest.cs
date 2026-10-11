@@ -6,8 +6,9 @@ using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Judgements;
@@ -219,6 +220,44 @@ public partial class BmsBgaPoorLayerTest
         Assert.That(getDisplayField<double>("poorLayerUntil"), Is.EqualTo(1350), "successful rehit must not extend failure feedback");
         advanceTo(1351);
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
+    }
+
+    [TestCase(1)]
+    [TestCase(64)]
+    [TestCase(65)]
+    [TestCase(128)]
+    public void TestForwardAdvanceRetainsIncrementalBudgetAndRewindState(int pendingCount)
+    {
+        var events = new BmsBgaEvent[130];
+        var opacityEvents = new BmsBgaOpacityEvent[130];
+        for (var i = 0; i < events.Length; i++)
+        {
+            events[i] = new BmsBgaEvent(1001 + i, i, (ushort)(i + 1), BmsBgaLayer.Base, i);
+            opacityEvents[i] = new BmsBgaOpacityEvent(1001 + i, i, BmsBgaLayer.Base, (i + 1) / 130f, i);
+        }
+        typeof(BmsBgaDisplay).GetField("events", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(display, events);
+        typeof(BmsBgaDisplay).GetField("opacityEvents", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(display, opacityEvents);
+
+        advanceTo(1000 + pendingCount);
+        Assert.Multiple(() =>
+        {
+            Assert.That(getDisplayField<int>("nextEventIndex"), Is.EqualTo(pendingCount));
+            Assert.That(getDisplayField<int>("nextOpacityEventIndex"), Is.EqualTo(pendingCount));
+            Assert.That(getDisplayField<Dictionary<BmsBgaLayer, BmsBgaEvent>>("activeEvents")[BmsBgaLayer.Base], Is.SameAs(events[pendingCount - 1]));
+            Assert.That(layer(BmsBgaLayer.Base).Alpha, Is.EqualTo(opacityEvents[pendingCount - 1].Opacity));
+            Assert.That(getDisplayField<Dictionary<BmsBgaLayer, int>>("layerGenerations")[BmsBgaLayer.Base], Is.EqualTo(pendingCount > 64 ? 0 : pendingCount - 1));
+        });
+
+        // The cursor is no longer zero: later batches must measure their backlog from the consumed prefix.
+        advanceTo(1130);
+        Assert.That(getDisplayField<int>("nextEventIndex"), Is.EqualTo(events.Length));
+        Assert.That(layer(BmsBgaLayer.Base).Alpha, Is.EqualTo(1));
+        advanceTo(1002);
+        Assert.That(getDisplayField<Dictionary<BmsBgaLayer, BmsBgaEvent>>("activeEvents")[BmsBgaLayer.Base], Is.SameAs(events[1]));
+        Assert.That(layer(BmsBgaLayer.Base).Alpha, Is.EqualTo(opacityEvents[1].Opacity));
+        advanceTo(1000);
+        Assert.That(getDisplayField<Dictionary<BmsBgaLayer, BmsBgaEvent>>("activeEvents"), Is.Empty);
+        Assert.That(layer(BmsBgaLayer.Base).Alpha, Is.EqualTo(1));
     }
 
     private void applyResult(int index, HitResult type)

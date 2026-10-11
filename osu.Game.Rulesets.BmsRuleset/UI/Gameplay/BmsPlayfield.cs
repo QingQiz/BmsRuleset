@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -11,14 +11,17 @@ using osu.Framework.Platform;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Embedded;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Embedded;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -36,8 +39,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 ///     judgement display, scroll-speed HUD, and input routing for all BMS layout variants.
 /// </summary>
 [Cached]
-[Cached(typeof(IBmsLnScoring))]
-public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>, IBmsLnScoring
+public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsAction>
 {
 
     #region Constants
@@ -75,8 +77,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         Stage = new BmsStage(this);
         Stage.SkinHitTargetPositionChanged += onSkinHitTargetPositionChanged;
-        framePressedDirections = new int[TotalColumns];
-
         // beatoraja visits each side's ordinary lanes before its scratch. Our first
         // scratch is column zero, so visual column order would change gauge clipping.
         var firstScratchLane = LayoutVariant switch
@@ -89,6 +89,16 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
                                 .OrderBy(column => firstScratchLane < 0 || column.Index > firstScratchLane
                                     ? column.Index : column.Index == 0 ? firstScratchLane : column.Index - 1)
                                 .ToArray();
+        var judgementObjects = Beatmap.HitObjects.ToArray();
+        judgementEngine = new BmsJudgementEngine(judgementColumns.Select(column => new BmsJudgementColumnDefinition(
+            judgementObjects, LayoutVariant, column.Index, column.CanBatchUpdates, column.JudgementBridge = new BmsJudgementBridge(this, column))).ToArray());
+        foreach (var column in judgementColumns)
+        {
+            column.Judgements = judgementEngine.GetColumn(column.Index);
+            var container = (BmsColumnHitObjectContainer)column.HitObjectContainer;
+            container.Judgements = column.Judgements;
+            container.JudgementBridge = column.JudgementBridge;
+        }
 
         InternalChildren =
         [
@@ -221,12 +231,13 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [Resolved]
     private IBmsGameplayEvents gameplayEvents { get; set; } = null!;
 
+    private readonly BmsJudgementEngine judgementEngine;
+
+
     #endregion
 
     #region Input
 
-    private readonly List<(double Time, int Column, bool Pressed, bool ReverseScratch)> pendingInputs = [];
-    private readonly int[] framePressedDirections;
     private readonly BmsColumn[] judgementColumns;
 
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
@@ -247,7 +258,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (column == null || column.Value >= TotalColumns)
             return false;
 
-        pendingInputs.Add((Time.Current, column.Value, true, BmsKeyBindingConfiguration.IsReverseScratch(e.Action)));
+        judgementEngine.QueueInput(Time.Current, column.Value, true, BmsKeyBindingConfiguration.IsReverseScratch(e.Action));
         return true;
     }
 
@@ -265,63 +276,12 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (column == null || column.Value >= TotalColumns)
             return;
 
-        pendingInputs.Add((Time.Current, column.Value, false, BmsKeyBindingConfiguration.IsReverseScratch(e.Action)));
+        judgementEngine.QueueInput(Time.Current, column.Value, false, BmsKeyBindingConfiguration.IsReverseScratch(e.Action));
     }
 
     private void processJudgementFrame(bool suppressJudgements = false)
-    {
-        foreach (var column in judgementColumns)
-            framePressedDirections[column.Index] = column.PressedDirections;
-
-        foreach (var input in pendingInputs)
-        {
-            var direction = Stage.Columns[input.Column].IsScratch && input.ReverseScratch ? 2 : 1;
-            if (input.Pressed)
-                framePressedDirections[input.Column] |= direction;
-            else
-                framePressedDirections[input.Column] &= ~direction;
-        }
-
-        if (suppressJudgements || (Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0)
-        {
-            // Rewinding must keep the input state current without letting queued endpoints
-            // or passing judgements mutate the attempt that the result stacks are restoring.
-            foreach (var column in judgementColumns)
-                column.PressedDirections = framePressedDirections[column.Index];
-            pendingInputs.Clear();
-            return;
-        }
-
-        // beatoraja scans all passing mines before all HCN bodies, then input endpoints,
-        // then passive expiry. Gauge clipping makes each of these phase boundaries visible.
-        // The complete input batch supplies final physical held state for mines and bodies;
-        // successful tails only enable automatic body holding from the following frame.
-        // Resume lead-in preserves passing judgements, while unjudged boundary notes
-        // remain playable through the input phase below.
-        if (!IsResumeRewinding)
-        {
-            foreach (var column in judgementColumns)
-                ((BmsColumnHitObjectContainer)column.HitObjectContainer).UpdateLandmines(framePressedDirections[column.Index] != 0);
-
-            foreach (var column in judgementColumns)
-                ((BmsColumnHitObjectContainer)column.HitObjectContainer).UpdateHellChargeBodies(framePressedDirections[column.Index] != 0);
-        }
-
-        foreach (var input in pendingInputs)
-        {
-            var column = Stage.Columns[input.Column];
-            if (input.Pressed)
-            {
-                var outcome = column.HandlePress(input.Time, input.ReverseScratch);
-                if (outcome is { Kind: PressOutcomeKind.EmptyPoor, ExpectedTime: { } expectedTime })
-                    registerEmptyPoor(expectedTime, outcome.Column);
-            }
-            else
-                column.HandleRelease(input.Time, input.ReverseScratch);
-        }
-
-        pendingInputs.Clear();
-    }
+        => judgementEngine.ProcessFrame(new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
+            (Clock as IGameplayClock)?.IsRewinding == true), Time.Elapsed, JudgementAlgorithm, suppressJudgements, IsResumeRewinding);
 
     #endregion
 
@@ -384,7 +344,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         // Parent input is forwarded before FrameStabilityContainer advances our clock.
         // Flush that complete batch here so its original judgement time is preserved;
         // local devices and replay inputs are flushed later in UpdateSubTree.
-        if (IsLoaded && pendingInputs.Count > 0)
+        if (IsLoaded && judgementEngine.HasPendingInputs)
             processJudgementFrame();
 
         skinCache.RefreshIdleSkins();
@@ -403,10 +363,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     }
 
     internal void CompleteLongNotesAtPause(double currentTime)
-    {
-        foreach (var column in judgementColumns)
-            ((BmsColumnHitObjectContainer)column.HitObjectContainer).CompleteLongNotesAtPause(currentTime);
-    }
+        => judgementEngine.CompleteLongNotesAtPause(new BmsFrameContext(currentTime,
+            (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate));
 
     public override bool UpdateSubTreeMasking()
     {
@@ -429,7 +387,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             // Input is dispatched by our parent before this traversal. Holds still need passive
             // tails, HCN ticks and light pulses at every timestamp, without visiting future skins.
             foreach (var column in Stage.Columns)
-                ((BmsColumnHitObjectContainer)column.HitObjectContainer).UpdateDeferredLongNotes();
+                ((BmsColumnHitObjectContainer)column.HitObjectContainer).UpdateDeferredFrame();
             visualUpdatePending = true;
             return true;
         }
@@ -586,7 +544,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         var scale = Math.Min(1, availableWidth / Stage.DrawWidth);
 
         if (float.IsFinite(scale) && scale > 0)
-            Stage.Scale = new Vector2(scale, 1);
+        {
+            var stageScale = new Vector2(scale, 1);
+            if (Stage.Scale != stageScale)
+                Stage.Scale = stageScale;
+        }
     }
 
     #endregion
@@ -609,7 +571,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         requestJudgementDisplay(result.Type);
     }
 
-    private void registerEmptyPoor(double expectedTime, int column)
+    internal void RegisterEmptyPoor(double expectedTime, int column)
     {
         scoreProcessor?.RegisterEmptyPoor(Time.Current, expectedTime, column);
         healthProcessor?.RegisterEmptyPoor(Time.Current);
@@ -637,13 +599,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// <summary>
     ///     Registers a separate CN/HCN endpoint through the score and health processors.
     /// </summary>
-    public void ApplySyntheticLongNoteEndpoint(DrawableBmsHitObject drawable, BmsLongNoteEndpointResult endpoint)
+    internal void ApplySyntheticLongNoteEndpoint(BmsLongNoteEndpointResult endpoint, bool suppressPenalty)
     {
-        if (drawable.HitObject is not BmsLongNote)
-            return;
-
-        var suppressPenalty = endpoint.Kind == BmsLongNoteEndpointKind.Head && endpoint.Result == HitResult.Meh
-                                                                            && Stage.Columns[drawable.HitObject.Column] is BmsColumn sourceColumn && sourceColumn.HasPmsMistake(drawable.HitObject);
+        var note = endpoint.Source;
         var scoreResult = scoreProcessor?.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty);
 
         if (scoreResult != null)
@@ -655,8 +613,8 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         if (endpoint.Kind == BmsLongNoteEndpointKind.Tail && endpoint.Result.IsHit())
         {
-            var column = Math.Clamp(drawable.HitObject.Column, 0, Stage.Columns.Length - 1);
-            Stage.Columns[column].TriggerHitExplosion(drawable.HitObject is BmsLongNote);
+            var column = Math.Clamp(note.Column, 0, Stage.Columns.Length - 1);
+            Stage.Columns[column].TriggerHitExplosion(BmsHitLightStyle.Hold);
         }
 
         if (!suppressPenalty)

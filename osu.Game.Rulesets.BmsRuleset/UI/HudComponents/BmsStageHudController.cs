@@ -2,6 +2,7 @@ using System;
 using System.Collections.Specialized;
 using System.Linq;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Primitives;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Skinning;
 using osuTK;
@@ -19,6 +20,23 @@ internal sealed partial class BmsStageHudController : Component
     private BmsStageHud? stageHud;
     private ISerialisableDrawableContainer? stageHudContainer;
     private bool ensuringStageHud;
+
+    private BmsStageHud? cachedTransformHud;
+    private Drawable? cachedTransformParent;
+    private Quad cachedHudQuad;
+    private Quad cachedPlayfieldQuad;
+    private Vector2 cachedPlayfieldDrawSize;
+    private float cachedStageWidth;
+    private float cachedContentScale;
+    private float cachedWidthReference;
+    private bool stageTransformCacheValid;
+    private bool stageTransformInvalid;
+
+    private BmsStageHud? cachedOffsetRangeHud;
+    private float cachedSkinPosition;
+    private float cachedSkinLightPosition;
+    private float cachedStageHeight;
+    private bool offsetRangeCacheValid;
 
     public BmsStageHudController(BmsPlayfield playfield)
     {
@@ -41,6 +59,7 @@ internal sealed partial class BmsStageHudController : Component
             RegisterContainer(container);
 
         stageHud = hud;
+        invalidateCaches();
 
         // Width used to be stored relative to the skin editor canvas, which differs from the gameplay canvas.
         // Such values are unusably small as absolute widths and must be rebuilt from the current Stage.
@@ -69,6 +88,7 @@ internal sealed partial class BmsStageHudController : Component
             return;
 
         stageHud = null;
+        invalidateCaches();
         hud.SetCurrentStageWidth(0);
         playfield.Stage.SetHitTargetPositionOffset(0);
         playfield.Stage.SetLightPositionOffset(0);
@@ -129,6 +149,7 @@ internal sealed partial class BmsStageHudController : Component
                 stageHudContainer.Remove(duplicate, true);
 
             stageHud = keeper;
+            invalidateCaches();
             normaliseProportionalHudWidth();
             SetNoteHeightScale(keeper.NoteHeightScale.Value);
             tryInitialiseHudSize();
@@ -154,7 +175,7 @@ internal sealed partial class BmsStageHudController : Component
         var current = StageWidth;
         stageHud.SetCurrentStageWidth(current);
 
-        if (!isFiniteAndPositive(reference) || !isFiniteAndPositive(current) || !isFiniteAndPositive(stageHud.Width))
+        if (!isFiniteAndPositive(reference) || !isFiniteAndPositive(current) || !isFiniteAndPositive(stageHud.Width) || reference == current)
             return;
 
         // Keeping the HUD bounds in the current layout's units makes the editor handle match the
@@ -174,6 +195,7 @@ internal sealed partial class BmsStageHudController : Component
         if (e.OldItems?.OfType<BmsStageHud>().Any(hud => hud == stageHud) == true)
         {
             stageHud = null;
+            invalidateCaches();
             playfield.Stage.SetHitTargetPositionOffset(0);
             playfield.Stage.SetLightPositionOffset(0);
             playfield.Stage.SetNoteHeightScale(1);
@@ -201,6 +223,7 @@ internal sealed partial class BmsStageHudController : Component
             skinnableContainer.OnComponentsLoaded -= onComponentsLoaded;
 
         stageHudContainer = null;
+        invalidateCaches();
     }
 
     private void tryInitialiseHudSize()
@@ -236,11 +259,47 @@ internal sealed partial class BmsStageHudController : Component
     {
         if (stageHud?.Parent == null || playfield.DrawWidth <= 0 || playfield.DrawHeight <= 0)
         {
-            playfield.Stage.ClearHudTransform();
+            if (!stageTransformInvalid)
+            {
+                playfield.Stage.ClearHudTransform();
+                stageTransformInvalid = true;
+            }
+
+            stageTransformCacheValid = false;
             return;
         }
 
+        stageTransformInvalid = false;
+        var hud = stageHud;
+        var parent = hud.Parent;
         var hudQuad = stageHud.ScreenSpaceDrawQuad;
+        var playfieldQuad = playfield.ScreenSpaceDrawQuad;
+        var playfieldDrawSize = playfield.DrawSize;
+        var stageWidth = playfield.Stage.DrawWidth;
+        var contentScale = Math.Abs(hud.Scale.Y);
+        var widthReference = hud.ProportionalWidthReference.Value is > 0 and var reference ? reference : stageWidth;
+
+        if (stageTransformCacheValid
+            && cachedTransformHud == hud
+            && cachedTransformParent == parent
+            && cachedHudQuad.Equals(hudQuad)
+            && cachedPlayfieldQuad.Equals(playfieldQuad)
+            && cachedPlayfieldDrawSize == playfieldDrawSize
+            && cachedStageWidth == stageWidth
+            && cachedContentScale == contentScale
+            && cachedWidthReference == widthReference)
+            return;
+
+        cachedTransformHud = hud;
+        cachedTransformParent = parent;
+        cachedHudQuad = hudQuad;
+        cachedPlayfieldQuad = playfieldQuad;
+        cachedPlayfieldDrawSize = playfieldDrawSize;
+        cachedStageWidth = stageWidth;
+        cachedContentScale = contentScale;
+        cachedWidthReference = widthReference;
+        stageTransformCacheValid = true;
+
         var topLeft = playfield.ToLocalSpace(hudQuad.TopLeft);
         var topRight = playfield.ToLocalSpace(hudQuad.TopRight);
         var bottomLeft = playfield.ToLocalSpace(hudQuad.BottomLeft);
@@ -249,14 +308,19 @@ internal sealed partial class BmsStageHudController : Component
             Vector2.Distance(topLeft, bottomLeft));
         var localCentre = playfield.ToLocalSpace(hudQuad.Centre);
 
-        ApplyStageTransform(localSize, localCentre);
+        applyStageTransform(localSize, localCentre, contentScale, widthReference);
     }
 
     internal void ApplyStageTransform(Vector2 localSize, Vector2 localCentre)
     {
-        var stageSize = new Vector2(playfield.Stage.DrawWidth, playfield.Stage.HudBaseDrawHeight);
+        invalidateCaches();
         var contentScale = Math.Abs(stageHud?.Scale.Y ?? 0);
-        var widthReference = stageHud?.ProportionalWidthReference.Value is > 0 and var reference ? reference : stageSize.X;
+        var widthReference = stageHud?.ProportionalWidthReference.Value is > 0 and var reference ? reference : playfield.Stage.DrawWidth;
+        applyStageTransform(localSize, localCentre, contentScale, widthReference);
+    }
+
+    private void applyStageTransform(Vector2 localSize, Vector2 localCentre, float contentScale, float widthReference)
+    {
         var scale = new Vector2(localSize.X / widthReference, contentScale);
         var viewportHeight = localSize.Y / contentScale;
 
@@ -284,9 +348,29 @@ internal sealed partial class BmsStageHudController : Component
         if (!float.IsFinite(skinPosition) || !isFiniteAndPositive(stageHeight))
             return;
 
-        stageHud.SetJudgementLineOffsetRange(-skinPosition, stageHeight - skinPosition);
         var skinLightPosition = playfield.Stage.SkinLightPosition;
+
+        if (offsetRangeCacheValid
+            && cachedOffsetRangeHud == stageHud
+            && cachedSkinPosition == skinPosition
+            && cachedSkinLightPosition == skinLightPosition
+            && cachedStageHeight == stageHeight)
+            return;
+
+        cachedOffsetRangeHud = stageHud;
+        cachedSkinPosition = skinPosition;
+        cachedSkinLightPosition = skinLightPosition;
+        cachedStageHeight = stageHeight;
+        offsetRangeCacheValid = true;
+
+        stageHud.SetJudgementLineOffsetRange(-skinPosition, stageHeight - skinPosition);
         stageHud.SetLightPositionOffsetRange(-skinLightPosition, stageHeight - skinLightPosition);
+    }
+
+    private void invalidateCaches()
+    {
+        stageTransformCacheValid = false;
+        offsetRangeCacheValid = false;
     }
 
     private static bool isFiniteAndPositive(float value) => float.IsFinite(value) && value > 0;

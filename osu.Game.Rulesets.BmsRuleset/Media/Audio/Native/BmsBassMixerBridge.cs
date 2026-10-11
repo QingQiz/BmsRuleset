@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using System.Threading.Tasks;
 using HarmonyLib;
 using ManagedBass;
@@ -13,10 +12,9 @@ namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Native;
 
 internal sealed class BmsBassMixerBridge : IDisposable
 {
-    private readonly AudioMixer mixer;
     private readonly BmsPcmVoiceMixer voiceMixer;
-    private readonly PropertyInfo handleProperty;
-    private readonly MethodInfo enqueueActionMethod;
+    private readonly Func<int> getMixerHandle;
+    private readonly Func<Action, Task> enqueueAudioAction;
     private readonly StreamProcedure streamProcedure;
     private readonly object lifecycleLock = new();
 
@@ -32,15 +30,18 @@ internal sealed class BmsBassMixerBridge : IDisposable
 
         var mixerType = typeof(AudioMixer).Assembly.GetType("osu.Framework.Audio.Mixing.Bass.BassAudioMixer")
                         ?? throw new NotSupportedException("The framework BASS mixer type is unavailable.");
-        handleProperty = AccessTools.Property(mixerType, "Handle")
-                         ?? throw new NotSupportedException("The framework BASS mixer handle is unavailable.");
-        enqueueActionMethod = AccessTools.Method(typeof(AudioComponent), "EnqueueAction", [typeof(Action)])
-                              ?? throw new NotSupportedException("The framework audio action queue is unavailable.");
+        var handleGetter = AccessTools.Property(mixerType, "Handle")?.GetGetMethod(true)
+                           ?? throw new NotSupportedException("The framework BASS mixer handle is unavailable.");
+        var enqueueActionMethod = AccessTools.Method(typeof(AudioComponent), "EnqueueAction", [typeof(Action)])
+                                  ?? throw new NotSupportedException("The framework audio action queue is unavailable.");
 
         if (!mixerType.IsInstanceOfType(mixer))
             throw new NotSupportedException("The BMS PCM bridge requires framework's BASS mixer.");
 
-        this.mixer = mixer;
+        // Bind the existing API once: per-update reflection boxes the handle even when
+        // attachment is unchanged. Read the live value to retain device-change detection.
+        getMixerHandle = handleGetter.CreateDelegate<Func<int>>(mixer);
+        enqueueAudioAction = enqueueActionMethod.CreateDelegate<Func<Action, Task>>(mixer);
         this.voiceMixer = voiceMixer;
         streamProcedure = render;
     }
@@ -115,11 +116,6 @@ internal sealed class BmsBassMixerBridge : IDisposable
         streamHandle = 0;
         attachedMixerHandle = 0;
     }
-
-    private int getMixerHandle() => handleProperty.GetValue(mixer) as int? ?? 0;
-
-    private Task enqueueAudioAction(Action action) =>
-        enqueueActionMethod.Invoke(mixer, [action]) as Task ?? Task.CompletedTask;
 
     private unsafe int render(int handle, IntPtr buffer, int length, IntPtr user)
     {

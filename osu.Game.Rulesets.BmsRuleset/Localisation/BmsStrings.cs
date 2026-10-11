@@ -1,4 +1,7 @@
 using System;
+using System.Collections;
+using System.Collections.Frozen;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Resources;
 using osu.Framework.Localisation;
@@ -10,8 +13,7 @@ public static class BmsStrings
 {
     private const string resource_prefix = "osu.Game.Rulesets.BmsRuleset.Resources.Localisation.BmsStrings";
 
-    private static readonly ResourceManager english_resources = new(resource_prefix, typeof(BmsStrings).Assembly);
-    private static readonly ResourceManager chinese_resources = new($"{resource_prefix}.zh", typeof(BmsStrings).Assembly);
+    private static readonly FrozenDictionary<string, (string English, string Chinese)> templates = loadTemplates();
 
     public static LocalisableString Layout => get("layout");
 
@@ -700,6 +702,10 @@ public static class BmsStrings
 
     public static LocalisableString ModAutoScratch => get("mod_auto_scratch");
 
+    public static LocalisableString ModAutoScratchName => get("mod_auto_scratch_name");
+
+    public static LocalisableString ModAutoScratchAcronym => get("mod_auto_scratch_acronym");
+
     public static LocalisableString ModBackgroundKeysound => get("mod_background_keysound");
 
     public static LocalisableString ModBranchReplay => get("mod_branch_replay");
@@ -746,11 +752,28 @@ public static class BmsStrings
 
     private static LocalisableString get(string key, params object[] args)
     {
-        var english = english_resources.GetString(key, CultureInfo.InvariantCulture)
-                      ?? throw new InvalidOperationException($"Missing English localisation resource: {key}");
-        var chinese = chinese_resources.GetString(key, CultureInfo.InvariantCulture) ?? english;
+        if (!templates.TryGetValue(key, out var template))
+            throw new InvalidOperationException($"Missing English localisation resource: {key}");
 
-        return new BmsLocalisableString(key, english, chinese, args);
+        return new BmsLocalisableString(key, template.English, template.Chinese, args);
+    }
+
+    private static FrozenDictionary<string, (string English, string Chinese)> loadTemplates()
+    {
+        var english = new ResourceManager(resource_prefix, typeof(BmsStrings).Assembly);
+        var chinese = new ResourceManager($"{resource_prefix}.zh", typeof(BmsStrings).Assembly);
+        var result = new Dictionary<string, (string English, string Chinese)>(StringComparer.Ordinal);
+
+        // Embedded templates are immutable. A finite read-only table avoids resource-manager
+        // locks during HUD refreshes while language selection remains deferred to formatting.
+        foreach (DictionaryEntry entry in english.GetResourceSet(CultureInfo.InvariantCulture, true, true)!)
+        {
+            var key = (string)entry.Key;
+            var value = (string)entry.Value!;
+            result.Add(key, (value, chinese.GetString(key, CultureInfo.InvariantCulture) ?? value));
+        }
+
+        return result.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
     private sealed class BmsLocalisableString(string key, string english, string chinese, object[] args)

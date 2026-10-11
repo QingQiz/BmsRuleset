@@ -20,7 +20,7 @@ For long scratches, press one direction at the head and follow the [long-note ru
 | Double play, P2 | Right Shift | Right Ctrl |
 
 For keyboard play, bind both directions to comfortable keys. In CN and HCN, press the opposite direction near the
-tail to complete a long scratch. **Auto Scratch** handles scratch notes, holds, and tail reversals automatically.
+tail to complete a long scratch.
 
 ## Judgements and Scoring
 
@@ -83,7 +83,7 @@ The chart and the **Long Note (L1)**, **Charge Note (L2)**, or **Hell Charge Not
 
 | Mode | How to play | Judgement |
 |------|-------------|-----------|
-| **LN** | Press at the head and hold through the tail. | One result per long note. Holding through the tail uses the head judgement; an early release combines the head and release judgements, taking the worse result. A very early drop gives BAD. |
+| **LN** | Press at the head and hold through the tail. | One result per long note. While held, it settles with the head judgement once the tail has passed; an early release combines the head and release judgements, taking the worse result. A very early drop gives BAD. |
 | **CN** | Press at the head and release at the tail. | Head and tail each contribute their own judgement, EX score, combo, and gauge change. Missing the head gives POOR for both ends. |
 | **HCN** | Use CN timing, and keep holding through the body. | Head and tail are scored separately. During the body, holding builds recovery and releasing builds damage; reholding after a mistake can recover gauge. |
 
@@ -192,12 +192,12 @@ matching the selected mods.
 | Mod                      | Description                                                     | Options                                            |
 |--------------------------|-----------------------------------------------------------------|----------------------------------------------------|
 | Autoplay                 | Plays automatically                                             |         |
+| Auto Scratch (AS)        | Automatically presses, holds and releases scratch inputs, including CN/HCN tail reversals |         |
 | Double Time / Half Time  |                                                                 | Speed; adjust pitch                                |
 | Mirror                   | Mirrors the key layout                                          |         |
 | Invert (IN)              | Converts each note except the lane's last into a hold note      | Randomise LN length; seed                          |
 | 2P                       | Switches the layout from 1P to 2P                               |         |
 | Constant (CN)            | Disables scroll-speed changes, including #SPEED/#SCROLL/BPM     |         |
-| Auto Scratch (AS)        | Plays scratch notes, holds, and CN/HCN tail reversals automatically |         |
 | Hide Scratch (HS)        | Removes scratch notes and hides the lane                        |         |
 | No Mine (NM)             | Removes all landmines, including those in scratch lanes         |         |
 | Background Keysound (BK) | Plays keysounds automatically with the song                     |         |

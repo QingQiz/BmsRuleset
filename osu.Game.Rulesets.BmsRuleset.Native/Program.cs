@@ -17,7 +17,6 @@ if (string.IsNullOrEmpty(outputDirectory))
 }
 
 Directory.CreateDirectory(outputDirectory);
-
 using var source = File.OpenRead(inputPath);
 using var destination = File.Create(outputPath);
 using var brotli = new BrotliStream(destination, CompressionLevel.SmallestSize);

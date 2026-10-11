@@ -21,6 +21,10 @@
     </ItemGroup>
     <ItemGroup Label="Independent beatoraja reference">
         <EmbeddedResource Include="reference_fixtures\beatoraja_windows.csv"/>
+        <EmbeddedResource Include="reference_fixtures\column_judgement_p1_trace.json"/>
+        <EmbeddedResource Include="reference_fixtures\long_note_p2_trace.json"/>
+        <EmbeddedResource Include="reference_fixtures\judgement_p3_checkpoints.json"/>
+        <EmbeddedResource Include="reference_fixtures\judgement_p3a07_core.json"/>
     </ItemGroup>
     <ItemGroup Label="BGA Video Routing Fixtures">
         <!-- Copied to the output dir so BmsBgaVideoFactoryTest can hand real file paths to the

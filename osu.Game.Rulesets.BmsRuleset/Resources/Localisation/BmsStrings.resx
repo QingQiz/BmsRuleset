@@ -226,7 +226,9 @@
   <data name="main_bpm" xml:space="preserve"><value>Main BPM</value></data>
   <data name="min_bpm" xml:space="preserve"><value>Min BPM</value></data>
   <data name="mod_second_player" xml:space="preserve"><value>Switches to second-player cabinet layout (scratch on right).</value></data>
-  <data name="mod_auto_scratch" xml:space="preserve"><value>Automatically plays scratch notes, holds, and CN/HCN tail reversals.</value></data>
+  <data name="mod_auto_scratch" xml:space="preserve"><value>Automatically presses, holds, and releases scratch inputs, including CN/HCN tail reversals.</value></data>
+  <data name="mod_auto_scratch_name" xml:space="preserve"><value>Auto Scratch</value></data>
+  <data name="mod_auto_scratch_acronym" xml:space="preserve"><value>AS</value></data>
   <data name="mod_background_keysound" xml:space="preserve"><value>Play all keysounds automatically with the song.</value></data>
   <data name="mod_branch_replay" xml:space="preserve"><value>Stores BMS random/switch branch decisions for replay playback.</value></data>
   <data name="mod_constant" xml:space="preserve"><value>Disables BPM-based scroll speed changes.</value></data>

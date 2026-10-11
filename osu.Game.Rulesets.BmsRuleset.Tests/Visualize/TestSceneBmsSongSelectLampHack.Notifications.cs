@@ -11,22 +11,19 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
 using osu.Framework.Statistics;
-using osu.Framework.Testing;
 using osu.Framework.Testing.Drawables.Steps;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Graphics.Carousel;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.IO.Import;
 using osu.Game.Rulesets.BmsRuleset.Database;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
-using osu.Game.Tests.Visual;
+using DifficultyNameUpdater = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyNameUpdater;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
@@ -165,7 +162,7 @@ public partial class TestSceneBmsSongSelectLampHack
 
             var store = new DifficultyTableStore(null, Path.Combine(directory, "table-cache"));
             // Restore only populates the index, so exactly one real refresh is responsible for the measured changes.
-            store.RestoreTable(new DifficultyTable.DifficultyTable
+            store.RestoreTable(new Gameplay.DifficultyTable.DifficultyTable
             {
                 Name = "Notification storm",
                 Symbol = "ST",
@@ -370,7 +367,7 @@ public partial class TestSceneBmsSongSelectLampHack
             var previous = BmsRulesetRuntime.DifficultyTableStore;
             restoreNotificationTables = () => BmsRulesetRuntime.DifficultyTableStore = previous;
             var store = new DifficultyTableStore(null, Path.Combine(directory, "tables"));
-            store.RestoreTable(new DifficultyTable.DifficultyTable
+            store.RestoreTable(new Gameplay.DifficultyTable.DifficultyTable
             {
                 Name = "Missing charts", Symbol = "ST",
                 Entries = [new TableEntry { Md5Hash = importedHash, Level = "1" }, new TableEntry { Md5Hash = missing_hash, Level = "2" }],

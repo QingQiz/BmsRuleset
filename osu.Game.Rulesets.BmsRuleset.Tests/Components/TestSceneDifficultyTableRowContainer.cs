@@ -10,11 +10,11 @@ using osu.Framework.Timing;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
 using osu.Game.Tests.Visual;
 using osuTK;
-using DT = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
+using DT = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Components;
 

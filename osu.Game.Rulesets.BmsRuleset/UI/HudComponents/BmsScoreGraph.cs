@@ -12,8 +12,9 @@ using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
 using osu.Game.Rulesets.BmsRuleset.UI.Ranking;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Rulesets.Scoring;
@@ -128,6 +129,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
     private IReadOnlyList<int>? displayedPersonalBestJudgementCounts;
     private int displayedCurrentScore;
     private int displayedJudgedEvents;
+    private long displayedStatisticsVersion = -1;
     private bool currentDisplayValid;
 
     [Resolved(CanBeNull = true)]
@@ -349,17 +351,22 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
         if (scoreProcessor == null)
             return;
 
-        var currentScore = BmsExScore.Calculate(scoreProcessor.Statistics);
-        var judgedEvents = scoreProcessor.ScoringJudgementEventCount;
-
-        if (!currentDisplayValid || currentScore != displayedCurrentScore || judgedEvents != displayedJudgedEvents)
+        var statisticsChanged = !currentDisplayValid || displayedStatisticsVersion != scoreProcessor.StatisticsVersion;
+        if (statisticsChanged)
         {
-            updateScoreDisplay(currentScore, judgedEvents);
-            displayedCurrentScore = currentScore;
-            displayedJudgedEvents = judgedEvents;
-        }
+            var currentScore = BmsExScore.Calculate(scoreProcessor.Statistics);
+            var judgedEvents = scoreProcessor.ScoringJudgementEventCount;
 
-        updateCurrentJudgementCounts(scoreProcessor.Statistics, !currentDisplayValid);
+            if (!currentDisplayValid || currentScore != displayedCurrentScore || judgedEvents != displayedJudgedEvents)
+            {
+                updateScoreDisplay(currentScore, judgedEvents);
+                displayedCurrentScore = currentScore;
+                displayedJudgedEvents = judgedEvents;
+            }
+
+            updateCurrentJudgementCounts(scoreProcessor.Statistics, !currentDisplayValid);
+            displayedStatisticsVersion = scoreProcessor.StatisticsVersion;
+        }
 
         var personalBestCounts = drawableRuleset == null
             ? null
@@ -793,6 +800,7 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
         private readonly Box ghost;
         private readonly Box fill;
+        private float lastBarWidth = float.NaN;
 
         public ScoreBar(bool showGhost, int column)
         {
@@ -825,6 +833,11 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
             base.Update();
 
             var barWidth = Math.Clamp(DrawWidth * column_fill_ratio, minimum_bar_width, maximum_bar_width);
+
+            if (barWidth == lastBarWidth)
+                return;
+
+            lastBarWidth = barWidth;
             ghost.Width = fill.Width = barWidth;
         }
 

@@ -16,10 +16,10 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings.Sections.Maintenance;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osuTK;
-using DT = osu.Game.Rulesets.BmsRuleset.DifficultyTable.DifficultyTable;
+using DT = osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Settings.Components;
 

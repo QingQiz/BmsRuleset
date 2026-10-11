@@ -6,12 +6,12 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Utils;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
-using osu.Game.Rulesets.BmsRuleset.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Gauge;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 using osuTK.Graphics;
 using osu.Game.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
@@ -47,6 +47,14 @@ public sealed partial class BmsHealthDisplay : BmsHudComponent
     private BindableNumber<double>? health;
     private double displayedHealth;
     private BmsHealthProcessor? bmsHealthProcessor;
+
+    private float lastFillHeight = float.NaN;
+    private Color4 lastFillColour;
+    private bool hasFillColour;
+    private float lastGaugeSegmentHeight = float.NaN;
+    private float lastGaugeSegmentAlpha = float.NaN;
+    private float lastClearLineY = float.NaN;
+    private float lastClearLineAlpha = float.NaN;
 
     private readonly Bindable<BmsGaugeDisplayProfile> displayProfile =
         new(BmsGaugeProfileFactory.Create(BmsGaugeType.Normal).Display);
@@ -132,30 +140,71 @@ public sealed partial class BmsHealthDisplay : BmsHudComponent
     {
         var clampedHealth = double.IsFinite(displayedHealth) ? Math.Clamp(displayedHealth, 0, 1) : 0;
         var profile = displayProfile.Value;
-
-        normalFill.Height = (float)clampedHealth;
-        normalFill.Colour = profile.ColourMode == BmsGaugeColourMode.Fixed
+        var fillHeight = (float)clampedHealth;
+        var fillColour = profile.ColourMode == BmsGaugeColourMode.Fixed
             ? resolveFixedColour(profile)
             : grooveColour(clampedHealth, profile.ClearThreshold ?? clear_threshold, profile.RedZoneThreshold);
 
+        if (fillHeight != lastFillHeight)
+        {
+            lastFillHeight = fillHeight;
+            normalFill.Height = fillHeight;
+        }
+
+        if (!hasFillColour || fillColour != lastFillColour)
+        {
+            hasFillColour = true;
+            lastFillColour = fillColour;
+            normalFill.Colour = fillColour;
+        }
+
         if (profile.ClearThreshold is double threshold)
         {
-            gaugeSegment.Height = (float)threshold;
-            gaugeSegment.Alpha = 1;
+            var segmentHeight = (float)threshold;
+            if (segmentHeight != lastGaugeSegmentHeight)
+            {
+                lastGaugeSegmentHeight = segmentHeight;
+                gaugeSegment.Height = segmentHeight;
+            }
+
+            if (lastGaugeSegmentAlpha != 1)
+            {
+                lastGaugeSegmentAlpha = 1;
+                gaugeSegment.Alpha = 1;
+            }
         }
         else
         {
-            gaugeSegment.Alpha = 0;
+            if (lastGaugeSegmentAlpha != 0)
+            {
+                lastGaugeSegmentAlpha = 0;
+                gaugeSegment.Alpha = 0;
+            }
         }
 
         if (profile.ShowClearLine && profile.ClearThreshold is double clearThreshold)
         {
-            clearLine.Y = -(float)clearThreshold;
-            clearLine.Alpha = clampedHealth >= clearThreshold ? 0.85f : 1;
+            var clearLineY = -(float)clearThreshold;
+            if (clearLineY != lastClearLineY)
+            {
+                lastClearLineY = clearLineY;
+                clearLine.Y = clearLineY;
+            }
+
+            var clearLineAlpha = clampedHealth >= clearThreshold ? 0.85f : 1;
+            if (clearLineAlpha != lastClearLineAlpha)
+            {
+                lastClearLineAlpha = clearLineAlpha;
+                clearLine.Alpha = clearLineAlpha;
+            }
         }
         else
         {
-            clearLine.Alpha = 0;
+            if (lastClearLineAlpha != 0)
+            {
+                lastClearLineAlpha = 0;
+                clearLine.Alpha = 0;
+            }
         }
     }
 

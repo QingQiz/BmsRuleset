@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <!-- Method-entry probes cannot observe calls that the JIT has inlined. Performance runs use default settings. -->
+      <COMPlus_JitNoInline>1</COMPlus_JitNoInline>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

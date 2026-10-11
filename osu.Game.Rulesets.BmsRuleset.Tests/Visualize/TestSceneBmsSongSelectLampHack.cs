@@ -24,9 +24,9 @@ using osu.Game.Database;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Toolbar;
-using osu.Game.Rulesets.BmsRuleset.Mods;
-using osu.Game.Rulesets.BmsRuleset.Mods.Gauge;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
@@ -247,7 +247,7 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
         {
             previousStore = BmsRulesetRuntime.DifficultyTableStore;
             var store = new DifficultyTableStore(null, Path.Combine(LocalStorage.GetFullPath(string.Empty), "unavailable-table-carousel-test"));
-            store.RestoreTable(new DifficultyTable.DifficultyTable
+            store.RestoreTable(new Gameplay.DifficultyTable.DifficultyTable
             {
                 Name = "Test",
                 Symbol = "T",
@@ -304,7 +304,7 @@ public partial class TestSceneBmsSongSelectLampHack : ScreenTestScene
 
             previousStore = BmsRulesetRuntime.DifficultyTableStore;
             var store = new DifficultyTableStore(null, Path.Combine(LocalStorage.GetFullPath(string.Empty), "available-table-carousel-test"));
-            store.RestoreTable(new DifficultyTable.DifficultyTable
+            store.RestoreTable(new Gameplay.DifficultyTable.DifficultyTable
             {
                 Name = "Test",
                 Symbol = "T",

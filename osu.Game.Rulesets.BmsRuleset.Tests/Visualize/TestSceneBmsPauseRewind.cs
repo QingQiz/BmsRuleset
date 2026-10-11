@@ -36,7 +36,7 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
             Player.GameplayClockContainer.Start();
         });
         AddStep("stop at judged note", () => Player.GameplayClockContainer.Stop());
-        AddStep("judge note", () => Playfield.Stage.Columns[1].HandlePress(judged_note_time));
+        AddStep("judge note", () => PressColumn(Playfield.Stage.Columns[1], judged_note_time));
         AddAssert("note judged once", () => Player.ScoreProcessor.JudgedHits, () => Is.EqualTo(1));
 
         AddStep("seek to pause time", () =>
@@ -108,7 +108,7 @@ public partial class TestSceneBmsPauseRewind : BmsPlayerTestScene
         });
         AddUntilStep("note alive", () => (judgedNote = Playfield.GetAliveObjectAtTime(judged_note_time)) != null);
         AddStep("stop at judged note", () => Player.GameplayClockContainer.Stop());
-        AddStep("judge note", () => Playfield.Stage.Columns[1].HandlePress(judged_note_time));
+        AddStep("judge note", () => PressColumn(Playfield.Stage.Columns[1], judged_note_time));
         AddAssert("judged note hidden", () => judgedNote!.Alpha, () => Is.Zero);
         AddStep("seek before judgement", () =>
         {

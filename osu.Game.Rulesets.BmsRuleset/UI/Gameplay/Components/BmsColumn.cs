@@ -1,5 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions.ObjectExtensions;
@@ -8,17 +9,13 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
-using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
-using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -80,6 +77,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal bool PreserveLongNoteHistory => ParentPlayfield.PreserveLongNoteHistory;
 
+    internal double? ResumeRewindEndTime => ParentPlayfield.IsResumeRewinding ? ParentPlayfield.ResumeRewindEndTime : null;
+
     protected BmsPlayfield ParentPlayfield { get; }
 
     internal float GetLongNoteHeadYAtStartTime(BmsLongNote note)
@@ -95,17 +94,14 @@ public partial class BmsColumn : Playfield, IBmsColumn
     }
 
     private BmsColumnKeySound? keySound;
-    private readonly BmsNotePressHistory pressHistory = new();
-    private readonly BmsHitObject[] columnNotes;
+    internal BmsColumnJudgementRuntime Judgements { get; set; } = null!;
+    internal BmsJudgementBridge JudgementBridge { get; set; } = null!;
 
-    internal bool HasPmsMistake(BmsHitObject note) => BmsJudgementProfileProvider.IsPms(LayoutVariant) && pressHistory.Get(note).Mistake;
+    internal bool CanBatchUpdates => canBatchUpdates;
 
-    private readonly bool hasLongNotes;
     private readonly bool canBatchUpdates;
     private readonly BmsHitExplosionPool normalHitExplosionPool;
     private readonly BmsHitExplosionPool longNoteHitExplosionPool;
-    private readonly List<(DrawableBmsHitObject Drawable, BmsJudgementCandidate Candidate)> pressCandidates = [];
-    private readonly List<BmsJudgementCandidate> pressJudgementCandidates = [];
 
     internal BmsHitObjectPoolPlan.ColumnSizes InitialPoolSizes => ParentPlayfield.InitialPoolSizes[Index];
 
@@ -118,8 +114,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
         Index = index;
         LayoutVariant = playfield.LayoutVariant;
         IsScratch = BmsLayout.IsScratchColumn(index, LayoutVariant);
-        columnNotes = playfield.Beatmap.HitObjects.Where(h => h.Column == index && h is not BmsLandmine and not BmsInvisibleNote).OrderBy(h => h.StartTime).ToArray();
-        hasLongNotes = playfield.Beatmap.HitObjects.Any(h => h.Column == index && h is BmsLongNote);
         canBatchUpdates = playfield.Beatmap.HitObjects.All(h => h.Column != index || h is BmsNote or BmsLongNote);
 
         RelativeSizeAxes = Axes.Y;
@@ -149,7 +143,8 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     protected override void Dispose(bool isDisposing)
     {
-        NewResult -= onColumnNewResult;
+        if (JudgementBridge != null)
+            NewResult -= JudgementBridge.OnFrameworkNewResult;
         base.Dispose(isDisposing);
 
         if (skin.IsNotNull())
@@ -170,7 +165,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
             ParentPlayfield.ScrollController,
             () => HitTargetPosition,
             () => ParentPlayfield.IsResumeRewinding,
-            () => ParentPlayfield.ResumeRewindEndTime,
             canBatchUpdates);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
@@ -201,10 +195,10 @@ public partial class BmsColumn : Playfield, IBmsColumn
         if (invisibleNotes.Length > 0)
             ((BmsColumnHitObjectContainer)HitObjectContainer).RefreshAllEntries();
 
-        keySound = new BmsColumnKeySound(columnHitObjects, HitObjectContainer, invisibleNotes);
+        keySound = new BmsColumnKeySound(columnHitObjects, Judgements, invisibleNotes);
         AddInternal(keySound);
 
-        NewResult += onColumnNewResult;
+        NewResult += JudgementBridge.OnFrameworkNewResult;
     }
 
     protected override void Update()
@@ -213,7 +207,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
         if (!ParentPlayfield.IsResumeRewinding)
         {
             if (Time.Elapsed < 0)
-                pressHistory.Rewind(Time.Current);
+                Judgements.RewindPressHistory(Time.Current);
             base.Update();
         }
     }
@@ -280,9 +274,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
     /// own NewResult), LN head/tail endpoints, and the repeating hit light fired throughout an
     /// LN hold. Moved here from BmsPlayfield so the column owns its lane's hit-light visuals.
     /// </summary>
-    public void TriggerHitExplosion(bool isLongNote)
+    public void TriggerHitExplosion(BmsHitLightStyle style)
     {
-        var pool = isLongNote ? longNoteHitExplosionPool : normalHitExplosionPool;
+        var pool = style == BmsHitLightStyle.Hold ? longNoteHitExplosionPool : normalHitExplosionPool;
         var explosion = pool.Get();
         explosion.ApplyPositionOffset(ParentPlayfield.Stage.HitTargetPositionOffset);
         HitExplosionArea.Add(explosion);
@@ -311,207 +305,16 @@ public partial class BmsColumn : Playfield, IBmsColumn
         keySound?.PlayLandmineSound(hitObject.SampleVolume);
     }
 
-    private void onColumnNewResult(DrawableHitObject drawable, JudgementResult result)
-    {
-        if (drawable is not DrawableBmsHitObject bmsHitObject)
-            return;
-
-        // Landmines detonate via their own path (DrawableBmsLandmine + DetonateLandmine); no hit light.
-        if (bmsHitObject.HitObject is BmsLandmine)
-            return;
-
-        pressHistory.Record(bmsHitObject.HitObject, Time.Current, true);
-
-        // BMS POOR is represented by framework Meh, which IsHit() considers successful even though
-        // it must not produce the hit feedback reserved for BAD and better judgements.
-        if (ShouldTriggerHitExplosion(result.Type))
-            TriggerHitExplosion(bmsHitObject.HitObject is BmsLongNote);
-    }
-
+    // Framework Meh counts as a hit, but BMS POOR has no successful hit feedback.
     internal static bool ShouldTriggerHitExplosion(HitResult result) => result != HitResult.Meh && result.IsHit();
 
     #endregion
 
     #region Input
 
-    public bool IsPressed => pressedDirections != 0;
+    public bool IsPressed => Judgements.PressedDirections != 0;
 
-    private int pressedDirections;
-
-    internal int PressedDirections
-    {
-        get => pressedDirections;
-        set => pressedDirections = value;
-    }
-
-    internal bool LastPressWasReverseScratch { get; private set; }
-
-    public PressOutcome HandlePress(double time, bool reverseScratch = false)
-    {
-        LastPressWasReverseScratch = IsScratch && reverseScratch;
-        pressedDirections |= LastPressWasReverseScratch ? 2 : 1;
-
-        // Replay input also changes while moving backwards; retain key state without judging it.
-        if ((Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0)
-            return PressOutcome.Empty;
-
-        if (hasLongNotes && ((BmsColumnHitObjectContainer)HitObjectContainer).TryRepress(time, LastPressWasReverseScratch) is { } repressed)
-        {
-            if (repressed is ILongNoteHolder { IsHoldingLongNote: false } && repressed.HitObject is BmsLongNote held)
-                keySound?.PlaySample(held.TailSampleKey, held.TailSampleVolume);
-            return PressOutcome.Hit;
-        }
-
-        // The earliest pending exact-time head wins every judgement algorithm. The ordered
-        // live index avoids sorting thousands of future candidates for every replay press.
-        if (((BmsColumnHitObjectContainer)HitObjectContainer).FirstPendingHead is { } first
-            && first.HitObject.StartTime == time && first.HasPendingHead
-            && BmsJudgementProfileProvider.GetTable(LayoutVariant, Index, first.HitObject.EffectiveJudgementRate, false).ResultForOffset(0) == HitResult.Perfect
-            && first.TryHit(HitResult.Perfect))
-        {
-            pressHistory.Record(first.HitObject, time, true);
-            keySound?.PlaySample(first.HitObject.SampleKey, first.HitObject.SampleVolume);
-            return PressOutcome.Hit;
-        }
-
-        pressCandidates.Clear();
-        pressJudgementCandidates.Clear();
-
-        foreach (var alive in HitObjectContainer.AliveEntries.Values)
-        {
-            if (alive is not DrawableBmsHitObject d
-                || d.Judged
-                || d.HitObject is BmsLandmine or BmsInvisibleNote)
-            {
-                continue;
-            }
-
-            var candidate = new BmsJudgementCandidate(
-                d.HitObject.StartTime,
-                d.HitObject.GetEndTime(),
-                d.HitObject.Column,
-                d.HitObject.EffectiveJudgementRate,
-                d.HitObject is BmsLongNote,
-                !d.HasPendingHead,
-                pressHistory.Get(d.HitObject).Mistake);
-            pressCandidates.Add((d, candidate));
-            pressJudgementCandidates.Add(candidate);
-        }
-
-        // Consumed notes may already be pooled. Search the chart's fixed empty-POOR interval
-        // rather than retaining drawables or scanning the complete judgement history.
-        var low = 0;
-        var high = columnNotes.Length;
-        while (low < high)
-        {
-            var middle = low + (high - low) / 2;
-            if (columnNotes[middle].StartTime < time - 175)
-                low = middle + 1;
-            else
-                high = middle;
-        }
-
-        for (var i = low; i < columnNotes.Length && columnNotes[i].StartTime <= time + 500; i++)
-        {
-            var note = columnNotes[i];
-            var state = pressHistory.Get(note);
-            if (state.Judged)
-                pressJudgementCandidates.Add(new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), note.Column,
-                    note.EffectiveJudgementRate, note is BmsLongNote, true, state.Mistake));
-        }
-
-        var selection = BmsJudgementSelector.SelectPress(LayoutVariant, Index, pressJudgementCandidates, time, ParentPlayfield.JudgementAlgorithm);
-
-        if (!selection.IsEmptyPoor && selection.Candidate is { } selectedCandidate)
-        {
-            DrawableBmsHitObject? target = null;
-            foreach (var candidate in pressCandidates)
-            {
-                if (candidate.Candidate.Equals(selectedCandidate))
-                {
-                    target = candidate.Drawable;
-                    break;
-                }
-            }
-
-            if (target == null)
-                return PressOutcome.Empty;
-
-            if (selection.Result == HitResult.Ok && BmsJudgementProfileProvider.IsPms(LayoutVariant))
-            {
-                pressHistory.Record(target.HitObject, time, false, true);
-                ParentPlayfield.RegisterNonConsumingBad(target.HitObject.StartTime, Index);
-                keySound?.PlaySample(target.HitObject.SampleKey, target.HitObject.SampleVolume);
-                return PressOutcome.Hit;
-            }
-
-            if (target.TryHit(selection.Result))
-            {
-                pressHistory.Record(target.HitObject, time, true);
-                keySound?.PlaySample(target.HitObject.SampleKey, target.HitObject.SampleVolume);
-                return PressOutcome.Hit;
-            }
-        }
-
-        keySound?.PlayKeySound();
-
-        if (selection is { IsEmptyPoor: true, Candidate: { } emptyPoorCandidate })
-        {
-            // Lead-in key presses are preparation input, including for PMS mistake tracking.
-            if (ParentPlayfield.IsResumeRewinding)
-                return PressOutcome.Empty;
-
-            foreach (var candidate in pressCandidates)
-            {
-                if (candidate.Candidate.Equals(emptyPoorCandidate))
-                    pressHistory.Record(candidate.Drawable.HitObject, time, false, true);
-            }
-
-            return PressOutcome.ForEmptyPoor(emptyPoorCandidate.StartTime, emptyPoorCandidate.Column);
-        }
-
-        return PressOutcome.Empty;
-    }
-
-    public void HandleRelease(double time, bool reverseScratch = false)
-    {
-        var direction = IsScratch && reverseScratch ? 2 : 1;
-        if ((pressedDirections & direction) == 0)
-            return;
-
-        pressedDirections &= ~direction;
-
-        if ((Clock as IGameplayClock)?.IsRewinding == true || Time.Elapsed < 0)
-            return;
-
-        if (!hasLongNotes)
-            return;
-
-        // Release: find the earliest held LN in this column and let it judge the key-up.
-        // We must include LNs released before the tail window (a fast release is a drop,
-        // scored as POOR) — filtering by the release window here would leave the note
-        // frozen at the judgement line until its tail time passed.
-        DrawableBmsHitObject? heldNote = null;
-
-        foreach (var alive in HitObjectContainer.AliveEntries.Values)
-        {
-            if (alive is not DrawableBmsHitObject d) continue;
-            if (d is not ILongNoteHolder ln || !ln.IsHoldingLongNote)
-                continue;
-
-            if (heldNote == null || d.HitObject.GetEndTime() < heldNote.HitObject.GetEndTime())
-                heldNote = d;
-        }
-
-        if (heldNote is ILongNoteHolder ln2)
-        {
-            var tailTable = BmsJudgementProfileProvider.GetTable(LayoutVariant, Index, heldNote.HitObject.EffectiveJudgementRate, tail: true);
-            var releaseOffset = time - heldNote.HitObject.GetEndTime();
-
-            if (ln2.TryRelease(releaseOffset, tailTable, reverseScratch) && heldNote.HitObject is BmsLongNote ln)
-                keySound?.PlaySample(ln.TailSampleKey, ln.TailSampleVolume);
-        }
-    }
+    internal void PlayKeySound() => keySound?.PlayKeySound();
 
     #endregion
 

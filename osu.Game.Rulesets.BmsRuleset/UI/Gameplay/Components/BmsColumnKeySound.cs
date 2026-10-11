@@ -1,3 +1,5 @@
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using System;
 using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -6,18 +8,24 @@ using osu.Game.Audio;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Playback;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
-using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 
-public sealed partial class BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, HitObjectContainer hitObjectContainer,
-                                           IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
-    : CompositeDrawable
+internal sealed partial class BmsColumnKeySound : CompositeDrawable
 {
     public override bool IsPresent => false;
 
-    private readonly BmsKeySoundCursor cursor = new(hitObjects, invisibleNotes);
+    private readonly BmsKeySoundCursor cursor;
+    private readonly BmsColumnJudgementRuntime judgements;
+    private readonly Func<BmsHitObject, bool> isFinished;
+
+    internal BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, BmsColumnJudgementRuntime judgements,
+                              IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
+    {
+        this.judgements = judgements;
+        cursor = new BmsKeySoundCursor(hitObjects, invisibleNotes);
+        isFinished = hasNoteFinished;
+    }
 
     private readonly IBindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
@@ -40,7 +48,7 @@ public sealed partial class BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObj
         if (samplePlaybackDisabled.Value)
             return;
 
-        if (cursor.Next(Time.Current, hasNoteFinished) is not { } hitObject)
+        if (cursor.Next(Time.Current, isFinished) is not { } hitObject)
             return;
 
         PlaySample(hitObject.SampleKey, hitObject.SampleVolume);
@@ -58,33 +66,5 @@ public sealed partial class BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObj
         samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
     }
 
-    /// <summary>
-    /// A note is "finished" when its drawable has been judged, or when it has scrolled past
-    /// without a drawable (expired from the pool). The past-BAD-window case is owned by the
-    /// cursor's isPastBadWindow (its first loop skips those before calling this), so it isn't
-    /// re-checked here. Scoped to this column's own HitObjectContainer.
-    /// </summary>
-    private bool hasNoteFinished(BmsHitObject hitObject)
-    {
-        var currentTime = Time.Current;
-
-        DrawableBmsHitObject? drawable = null;
-
-        foreach (var (entry, d) in hitObjectContainer.AliveEntries)
-        {
-            if (entry.HitObject == hitObject && d is DrawableBmsHitObject bmsD)
-            {
-                drawable = bmsD;
-                break;
-            }
-        }
-
-        if (drawable?.Judged == true)
-            return true;
-
-        if (currentTime > hitObject.StartTime && drawable == null)
-            return true;
-
-        return false;
-    }
+    private bool hasNoteFinished(BmsHitObject note) => judgements.IsKeySoundFinished(note, Time.Current);
 }

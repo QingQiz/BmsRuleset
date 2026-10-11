@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Mixing.Pcm;
@@ -47,6 +48,26 @@ internal sealed class BmsVoiceCommandQueue
             throw new InvalidOperationException("A new command segment could not accept its initial batch.");
 
         publishNextSegment(segment, next);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool HasDueCommand(long frame)
+    {
+        // Poll only the timestamp until a command is due, without copying its payload
+        // or publishing a new read index that would let the producer overwrite it.
+        while (true)
+        {
+            var segment = readSegment;
+            var read = segment.ReadIndex;
+            if (read != Volatile.Read(ref segment.WriteIndex))
+                return segment.Commands[read].TargetFrame <= frame;
+
+            var next = Volatile.Read(ref segment.Next);
+            if (next == null)
+                return false;
+
+            readSegment = next;
+        }
     }
 
     internal bool TryPeek(out BmsVoiceCommand command)

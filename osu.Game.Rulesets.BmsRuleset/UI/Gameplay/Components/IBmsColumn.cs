@@ -1,5 +1,6 @@
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
@@ -24,11 +25,8 @@ public interface IBmsColumn
 
     bool Hidden { get; set; }
 
-    void TriggerHitExplosion(bool isLongNote);
+    void TriggerHitExplosion(BmsHitLightStyle style);
 
     void PlaySample(ushort? sampleKey, int volume);
 
-    PressOutcome HandlePress(double time, bool reverseScratch = false);
-
-    void HandleRelease(double time, bool reverseScratch = false);
 }

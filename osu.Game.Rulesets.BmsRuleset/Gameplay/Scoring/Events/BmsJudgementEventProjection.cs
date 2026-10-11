@@ -1,0 +1,123 @@
+using System.Collections.Generic;
+using System.Linq;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Scoring;
+
+namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
+
+public static class BmsJudgementEventProjection
+{
+    public static List<HitEvent> CreateScoringHitEvents(IEnumerable<BmsJudgementEvent> judgementEvents)
+    {
+        var events = judgementEvents.Where(e => !e.SuppressPenalty).ToArray();
+
+        var hitEvents = new List<HitEvent>(events.Length);
+        HitObject? lastHitObject = null;
+
+        foreach (var judgementEvent in events)
+        {
+            var observation = judgementEvent.TimingObservations[^1];
+            var hitObject = createScoringHitObject(judgementEvent.Source, observation);
+
+            // E-POOR stays anchored to the press for timeline ordering, while its timing error is
+            // measured against the upcoming note that caused the non-consuming miss row.
+            var hitEvent = new HitEvent(
+                judgementEvent.Source.Kind == BmsJudgementSourceKind.EmptyPoor
+                    ? observation.TimeOffset
+                    : observation.ActualTime - hitObject.GetEndTime(),
+                observation.GameplayRate,
+                judgementEvent.Result,
+                hitObject,
+                lastHitObject,
+                null);
+
+            hitEvents.Add(hitEvent);
+            lastHitObject = hitEvent.HitObject;
+        }
+
+        return hitEvents;
+    }
+
+    public static List<HitEvent> CreateTimingHitEvents(IEnumerable<BmsJudgementEvent> judgementEvents)
+    {
+        var observations = judgementEvents
+            .Where(e => !e.SuppressPenalty)
+            .SelectMany(judgementEvent => judgementEvent.TimingObservations.Select(observation => (judgementEvent.Source, Observation: observation)))
+            .OrderBy(item => item.Observation.ActualTime)
+            .ToArray();
+
+        var hitEvents = new List<HitEvent>(observations.Length);
+        HitObject? lastHitObject = null;
+
+        foreach (var (source, observation) in observations)
+        {
+            var hitEvent = CreateTimingHitEvent(source, observation, lastHitObject);
+            hitEvents.Add(hitEvent);
+            lastHitObject = hitEvent.HitObject;
+        }
+
+        return hitEvents;
+    }
+
+    internal static HitEvent CreateTimingHitEvent(BmsJudgementSource source, BmsTimingObservation observation, HitObject? lastHitObject)
+        => CreateTimingHitEvent(source, observation, createObservationHitObject(source, observation), lastHitObject);
+
+    internal static HitEvent CreateTimingHitEvent(BmsJudgementSource source, BmsTimingObservation observation, HitObject hitObject, HitObject? lastHitObject)
+        => new(
+            observation.TimeOffset,
+            observation.GameplayRate,
+            observation.Result,
+            hitObject,
+            lastHitObject,
+            null
+        );
+
+    private static HitObject createScoringHitObject(BmsJudgementSource source, BmsTimingObservation observation)
+    {
+        if (source.Kind == BmsJudgementSourceKind.NonConsumingBad)
+            return createNote(source, observation.ExpectedTime);
+
+        if (source.Kind == BmsJudgementSourceKind.LongNote
+            && observation.Kind == BmsTimingObservationKind.LongNoteHead)
+            return createNote(source, observation.ExpectedTime);
+
+        return createHitObject(source);
+    }
+
+    private static HitObject createObservationHitObject(BmsJudgementSource source, BmsTimingObservation observation)
+    {
+        if (source.Kind == BmsJudgementSourceKind.NonConsumingBad)
+            return createNote(source, observation.ExpectedTime);
+
+        if (source.Kind == BmsJudgementSourceKind.LongNote
+            && observation.Kind is BmsTimingObservationKind.LongNoteHead or BmsTimingObservationKind.LongNoteTail)
+            return createNote(source, observation.ExpectedTime);
+
+        return createHitObject(source);
+    }
+
+    private static HitObject createHitObject(BmsJudgementSource source)
+    {
+        HitObject hitObject = source.Kind switch
+        {
+            BmsJudgementSourceKind.LongNote => new BmsLongNote { Duration = source.Duration },
+            BmsJudgementSourceKind.Landmine => new BmsLandmine { LandmineDamagePercent = source.LandmineDamagePercent },
+            BmsJudgementSourceKind.Note => new BmsNote(),
+            _ => new HitObject(),
+        };
+
+        hitObject.StartTime = source.StartTime;
+
+        if (hitObject is BmsHitObject bms)
+            bms.Column = source.Column;
+
+        return hitObject;
+    }
+
+    private static BmsNote createNote(BmsJudgementSource source, double startTime) => new()
+    {
+        StartTime = startTime,
+        Column = source.Column,
+    };
+}

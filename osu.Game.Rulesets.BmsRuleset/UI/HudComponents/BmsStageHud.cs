@@ -140,14 +140,18 @@ internal sealed partial class BmsStageHud : BmsHudComponent
 
     internal void SetJudgementLineOffsetRange(float minimum, float maximum)
     {
-        JudgementLineOffset.MinValue = minimum;
-        JudgementLineOffset.MaxValue = maximum;
+        if (JudgementLineOffset.MinValue != minimum)
+            JudgementLineOffset.MinValue = minimum;
+        if (JudgementLineOffset.MaxValue != maximum)
+            JudgementLineOffset.MaxValue = maximum;
     }
 
     internal void SetLightPositionOffsetRange(float minimum, float maximum)
     {
-        LightPositionOffset.MinValue = minimum;
-        LightPositionOffset.MaxValue = maximum;
+        if (LightPositionOffset.MinValue != minimum)
+            LightPositionOffset.MinValue = minimum;
+        if (LightPositionOffset.MaxValue != maximum)
+            LightPositionOffset.MaxValue = maximum;
     }
 
     private void updateEditModeVisibility() => applyEditModeVisibility(SkinEditor?.State.Value == Visibility.Visible);

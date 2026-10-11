@@ -6,15 +6,18 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Replays;
-using osu.Game.Rulesets.BmsRuleset.Scoring.Judgements;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -41,9 +44,10 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
     public double? AudioCaptureStartChartMs { get; private set; }
 
     public bool AudioBlocked => readAudioBlocked?.Invoke() ?? true;
+
     public bool AudioPaused => readAudioPaused?.Invoke() ?? true;
 
-    public bool Ready => playbackStarted && Stopwatch.GetElapsedTime(playbackTimestamp).TotalSeconds >= 2;
+    public bool Ready => playbackStarted && Stopwatch.GetElapsedTime(playbackTimestamp).TotalSeconds >= options.WarmupSeconds;
 
     public double ChartTime => Player?.GameplayClockContainer?.CurrentTime ?? -1;
 
@@ -81,6 +85,8 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         EndTime = Math.Min(Chart.BeatmapInfo.Length - 1000, (options.Start + options.Duration) * 1000);
         if (EndTime <= options.Start * 1000 + 2000)
             throw new ArgumentException("Requested interval must leave at least two seconds of playback before chart completion.");
+        if (EndTime <= Math.Max(options.Start, options.WarmupSeconds) * 1000)
+            throw new ArgumentException("Playback warmup must finish before chart completion.");
 
         return Chart;
     }
@@ -92,6 +98,8 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         config.SetValue(BmsRulesetSetting.ScrollSpeed, options.ScrollSpeed);
         config.SetValue(BmsRulesetSetting.ReferenceBpmMode, options.ReferenceBpm);
         config.SetValue(BmsRulesetSetting.ShowInvisibleNotes, options.ShowInvisibleNotes);
+        config.SetValue(BmsRulesetSetting.SoftConstant, options.SoftConstant);
+        config.SetValue(BmsRulesetSetting.SoftConstantFadeIn, options.SoftConstantFadeIn);
         loading.Start();
         LoadPlayer(options.CreateMods());
     }
@@ -112,11 +120,12 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
                 {
                     var mixer = BmsAudioTestAccess.GetOutputMixer(((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback)
                                 ?? throw new InvalidOperationException("The gameplay PCM mixer is unavailable.");
-                    audioCapture = BmsAudioCaptureSession.Start(mixer, TimeSpan.FromSeconds(options.Duration + 30), !options.AudioOutput);
+                    audioCapture = BmsAudioCaptureSession.Start(mixer, TimeSpan.FromSeconds(options.Duration + options.WarmupSeconds + 30), !options.AudioOutput);
                     AudioCaptureStartChartMs = ChartTime;
                     // Capture non-zero PCM before muting the diagnostic output, without changing system volume.
                     Audio.Volume.Value = 1;
                 }
+
                 SeekMilliseconds = Stopwatch.GetElapsedTime(seekTimestamp).TotalMilliseconds;
                 Player.GameplayClockContainer.Start();
                 playbackTimestamp = Stopwatch.GetTimestamp();
@@ -129,13 +138,23 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         if (!Player.LoadedBeatmapSuccessfully)
             throw new InvalidOperationException("Player failed to load the chart.");
 
+        // Use the normal HUD setting so diagnostics exercise gameplay's layout path.
+        if (options.NoteHeightScale != 1)
+        {
+            var stageHuds = Player.HUDOverlay.ChildrenOfType<BmsStageHud>().ToArray();
+            if (stageHuds.Length != 1)
+                throw new InvalidOperationException($"Expected one stage HUD, found {stageHuds.Length}.");
+
+            stageHuds[0].NoteHeightScale.Value = (float)options.NoteHeightScale;
+        }
+
         // Conversion mods replace object identities. Reports and completeness checks must use
         // the same playable objects as the replay and score processor, including IN-generated LNs.
         Chart = (BmsBeatmap)Player.GameplayState.Beatmap;
         readAudioBlocked = BmsAudioTestAccess.CreatePlaybackBlockedReader(((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback);
         readAudioPaused = BmsAudioTestAccess.CreatePlaybackBlockedReader(((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback, voicesPaused: true);
         LoadMilliseconds = loading.Elapsed.TotalMilliseconds;
-        seekTime = Math.Max(0, options.Start * 1000 - 2000);
+        seekTime = Math.Max(0, (options.Start - options.WarmupSeconds) * 1000);
         Player.GameplayClockContainer.Stop();
         Player.GameplayClockContainer.Seek(seekTime);
         seekTimestamp = Stopwatch.GetTimestamp();
@@ -168,6 +187,12 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
 
     public string? CompletionError()
     {
+        // HUD height and config fade values use their normal setting precision (0.01 and 1).
+        if (Math.Abs(Playfield.Stage.NoteHeightScale - options.NoteHeightScale) > 0.005001
+            || Playfield.ScrollController.SoftConstant.Value != options.SoftConstant
+            || Playfield.ScrollController.SoftConstantActive != options.SoftConstant
+            || Math.Abs(Playfield.ScrollController.SoftConstantFadeIn.Value - options.SoftConstantFadeIn) > 0.500001)
+            return "Requested visual settings did not remain effective during the capture.";
         if (SimulationTime < EndTime - 100)
             return "Simulation could not keep up with the gameplay clock.";
         if (Player.ScoreProcessor.Statistics.Any(pair => pair.Key != HitResult.Perfect && pair.Value > 0))
@@ -175,7 +200,7 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
 
         var fullPlayback = options.Start == 0 && EndTime >= Chart.BeatmapInfo.Length - 1000;
         var expected = Chart.HitObjects.Where(h => h is not BmsLandmine
-            && (fullPlayback || h.StartTime >= options.Start * 1000 && h.GetEndTime() <= EndTime - 400)).ToHashSet();
+                                                   && (fullPlayback || h.StartTime >= options.Start * 1000 && h.GetEndTime() <= EndTime - 400)).ToHashSet();
         return CheckJudgementCompleteness(expected, Player.Results);
     }
 
@@ -188,7 +213,7 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         // CN/HCN commit their head first and score the tail through a synthetic object. Seeing
         // the source object alone is not enough to prove the whole long note was processed.
         var endpoints = results.OfType<BmsLongNoteJudgementResult>().SelectMany(r => r.EndpointResults)
-                               .Where(e => e.Result == HitResult.Perfect).Select(e => (e.Source, e.Kind)).ToHashSet();
+            .Where(e => e.Result == HitResult.Perfect).Select(e => (e.Source, e.Kind)).ToHashSet();
         var incomplete = expected.OfType<BmsLongNote>().Count(ln =>
             !endpoints.Contains((ln, BmsLongNoteEndpointKind.Head)) || !endpoints.Contains((ln, BmsLongNoteEndpointKind.Tail)));
         if (incomplete > 0)
@@ -213,6 +238,16 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         Judgements = Player?.ScoreProcessor?.Statistics.ToDictionary(p => p.Key.ToString(), p => p.Value),
     };
 
+    public object? DescribeVisualSettings() => !sought
+        ? null
+        : new
+        {
+            Playfield.Stage.NoteHeightScale,
+            SoftConstant = Playfield.ScrollController.SoftConstant.Value,
+            Playfield.ScrollController.SoftConstantActive,
+            SoftConstantFadeIn = Playfield.ScrollController.SoftConstantFadeIn.Value,
+        };
+
     public object DescribeAlive()
     {
         var objects = Playfield.Stage.Columns.SelectMany(c => c.HitObjectContainer.AliveEntries).ToArray();
@@ -232,4 +267,5 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
                 .OrderBy(g => g.Key).Select(g => new { SecondsAhead = g.Key, Count = g.Count() }).ToArray(),
         };
     }
+
 }

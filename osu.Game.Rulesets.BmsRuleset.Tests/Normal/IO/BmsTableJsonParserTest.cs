@@ -1,6 +1,6 @@
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.Rulesets.BmsRuleset.DifficultyTable;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.DifficultyTable;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.IO;
 

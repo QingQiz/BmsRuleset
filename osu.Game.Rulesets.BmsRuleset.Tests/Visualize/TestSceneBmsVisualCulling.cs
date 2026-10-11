@@ -1,16 +1,22 @@
 #nullable enable
 using System;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
+using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Framework.Graphics.Pooling;
+using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Visual;
 
@@ -97,7 +103,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         AddStep("warm overlapping feedback", () =>
         {
             for (var i = 0; i < 32; i++)
-                ((BmsColumn)Playfield.Stage.Columns[1]).TriggerHitExplosion(false);
+                ((BmsColumn)Playfield.Stage.Columns[1]).TriggerHitExplosion(BmsHitLightStyle.Note);
         });
         AddStep("record warmed pool", () => poolSize = ((BmsColumn)Playfield.Stage.Columns[1]).ChildrenOfType<DrawablePool<BmsHitExplosion>>().Sum(p => p.CurrentPoolSize));
         seek(4850);
@@ -108,7 +114,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         {
             var column = (BmsColumn)Playfield.Stage.Columns[1];
             for (var i = 0; i < 32; i++)
-                column.TriggerHitExplosion(false);
+                column.TriggerHitExplosion(BmsHitLightStyle.Note);
         });
         AddAssert("expired drawables are reused", () => ((BmsColumn)Playfield.Stage.Columns[1]).ChildrenOfType<DrawablePool<BmsHitExplosion>>().Sum(p => p.CurrentPoolSize) == poolSize);
     }
@@ -121,7 +127,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         for (var pulse = 0; pulse < 4; pulse++)
         {
             seek(4800 + pulse * 50);
-            AddStep("trigger independent pulse", () => ((BmsColumn)Playfield.Stage.Columns[1]).TriggerHitExplosion(isLongNote));
+            AddStep("trigger independent pulse", () => ((BmsColumn)Playfield.Stage.Columns[1]).TriggerHitExplosion(isLongNote ? BmsHitLightStyle.Hold : BmsHitLightStyle.Note));
         }
 
         seek(4990);
@@ -148,6 +154,52 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
             Player.Results.Single(r => r.HitObject == hitObject).TimeAbsolute <= 5281);
     }
 
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void RepeatedVisualLayoutDoesNotAdvanceJudgementOrVisualHistory(BmsLongNoteMode longNoteMode)
+    {
+        load(true, longNoteMode);
+        seek(5010);
+        AddStep("hold head and vary only the visual projection", () =>
+        {
+            var column = (BmsColumn)Playfield.Stage.Columns[1];
+            PressColumn(column, 5000);
+            var note = (BmsLongNote)hitObject;
+            var state = column.Judgements.GetLongNoteState(note);
+            var result = drawable.Result.Type;
+            var resultCount = Player.Results.Count;
+            var health = Player.HealthProcessor.Health.Value;
+            const BindingFlags fields = BindingFlags.Instance | BindingFlags.NonPublic;
+            var visualState = drawable.GetType().GetField("visualState", fields)!.GetValue(drawable)!;
+            var historyFields = visualState.GetType().GetFields(fields);
+            var history = historyFields.Select(f => f.GetValue(visualState)).ToArray();
+            var observation = drawable.GetType().GetField("lastVisualObservation", fields)!.GetValue(drawable);
+            var scroll = Playfield.ScrollController;
+            var frame = new BmsColumnVisualFrame(scroll.CurrentScrollPosition, 1, 0, 700);
+            var graphics = drawable.ChildrenOfType<Drawable>().Prepend(drawable).ToArray();
+            var beforePreparation = graphics.Select(d => (d.Position, d.Size, d.Scale, d.Alpha)).ToArray();
+            var prepare = drawable.GetType().GetMethod("PrepareVisual", fields)!;
+            var prepared = (BmsVisualLayout)prepare.Invoke(drawable, [-1_000_000f, frame])!;
+            Assert.That(prepared.OriginY, Is.EqualTo(-1_000_000));
+            Assert.That(graphics.Select(d => (d.Position, d.Size, d.Scale, d.Alpha)), Is.EqualTo(beforePreparation),
+                "Preparing a culling boundary must not apply graphics or advance their animation.");
+            for (var i = 0; i < 20; i++)
+            {
+                drawable.UpdateVisualLayout(-100, frame);
+                drawable.UpdateVisualLayout(-1_000_000, frame with { ScrollPosition = -1_000_000 });
+                column.JudgementBridge.ObserveSimulationStep(note, new BmsFrameContext(Playfield.Time.Current, 1));
+            }
+            Assert.That(column.Judgements.GetLongNoteState(note), Is.EqualTo(state));
+            Assert.That(drawable.Result.Type, Is.EqualTo(result));
+            Assert.That(Player.Results, Has.Count.EqualTo(resultCount));
+            Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(health));
+            Assert.That(historyFields.Select(f => f.GetValue(visualState)), Is.EqualTo(history),
+                "Layout reads the pin and direction history; a fabricated projection must not become a simulation observation.");
+            Assert.That(drawable.GetType().GetField("lastVisualObservation", fields)!.GetValue(drawable), Is.EqualTo(observation));
+        });
+    }
+
     [Test]
     public void TestOffscreenTapStillAcceptsInputAndReenters()
     {
@@ -157,7 +209,7 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         AddUntilStep("visible with fresh position", () => drawable.IsPresent && drawable.Y < 0 && drawable.Y > -drawable.Parent!.DrawHeight);
         hide();
         seek(5000);
-        AddStep("press while culled", () => Playfield.Stage.Columns[1].HandlePress(5000));
+        AddStep("press while culled", () => PressColumn(Playfield.Stage.Columns[1], 5000));
         AddAssert("input judged perfectly", () => Player.Results.Any(r => r.HitObject == hitObject && r.Type == HitResult.Perfect));
     }
 
@@ -191,11 +243,69 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         AddStep("capture head poor health", () => healthAfterHead = Player.HealthProcessor.Health.Value);
         seek(5700);
         AddAssert("culled body drains health", () => Player.HealthProcessor.Health.Value < healthAfterHead);
-        AddStep("hold culled HCN", () => Playfield.Stage.Columns[1].HandlePress(5700));
+        AddStep("hold culled HCN", () => PressColumn(Playfield.Stage.Columns[1], 5700));
         var releasedHealth = 0d;
         AddStep("capture released health", () => releasedHealth = Player.HealthProcessor.Health.Value);
         seek(6300);
         AddAssert("culled body recovers health", () => Player.HealthProcessor.Health.Value > releasedHealth);
         AddAssert("body remains culled", () => !drawable.IsPresent);
+    }
+
+    [TestCase(BmsLongNoteMode.LongNote)]
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void CompletedHoldStaysHiddenWhenResumeRewindCullsItsChildren(BmsLongNoteMode longNoteMode)
+    {
+        load(true, longNoteMode);
+        AddStep("resume visibility survives a skipped child traversal", () =>
+        {
+            var previousClock = Playfield.Clock;
+            var processClock = Playfield.ProcessCustomClock;
+            var manual = new ManualClock { CurrentTime = 4800, IsRunning = true, Rate = 1 };
+            var clock = new FramedClock(manual);
+            clock.ProcessFrame();
+            Playfield.Clock = clock;
+            Playfield.ProcessCustomClock = false;
+            try
+            {
+                var column = (BmsColumn)Playfield.Stage.Columns[1];
+                var note = (BmsLongNote)hitObject;
+                advance(5000);
+                PressColumn(column, 5000);
+                advance(6990);
+                ReleaseColumn(column, 6990);
+                advance(7000);
+                advance(10000);
+                var state = column.Judgements.GetLongNoteState(note);
+                Assert.That(state.TailJudged, Is.True);
+                Assert.That(state.LongNoteStarted, Is.False);
+                Assert.That(Playfield.AllColumnAliveObjects().Any(d => ReferenceEquals(d.HitObject, note)), Is.False);
+                Playfield.BeginResumeRewind(10000, 0);
+                advance(5000);
+                var restored = (DrawableBmsHitObject)Playfield.AllColumnAliveObjects().Single(d => ReferenceEquals(d.HitObject, note));
+                var results = Player.Results.Count;
+                note.VisualScrollPositionAtEndTime = 1_000_000;
+                restored.UpdateVisualLayout(-1_000_000, new BmsColumnVisualFrame(0, 1, 0, 700));
+                Assert.That(restored.VisualsSuppressed, Is.True);
+                restored.Alpha = 1;
+                Assert.That(restored.UpdateSubTree(), Is.False, "The framework skips the culled child traversal.");
+                Assert.That(restored.Alpha, Is.Zero);
+                Assert.That(Player.Results, Has.Count.EqualTo(results));
+                Assert.That(column.Judgements.GetLongNoteState(note), Is.EqualTo(state));
+            }
+            finally
+            {
+                Playfield.Clock = previousClock;
+                Playfield.ProcessCustomClock = processClock;
+            }
+
+            void advance(double time)
+            {
+                manual.CurrentTime = time;
+                clock.ProcessFrame();
+                Playfield.EndGameplayFrame();
+                Playfield.UpdateSubTree();
+            }
+        });
     }
 }

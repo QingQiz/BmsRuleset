@@ -5,8 +5,8 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.NoteTextures;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -14,10 +14,17 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 
 internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
 {
+    // The sprite or animation owns the drawing; retaining this composite node adds
+    // traversal without changing the inherited geometry or colour.
+    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
+
     private readonly float? widthForNoteHeightScale;
     private readonly BmsSkinComponentLookup lookup;
 
     private Drawable? noteAnimation;
+    private Texture? appliedTexture;
+    private float appliedDrawWidth;
+    private float appliedNoteWidth;
 
     public BmsResolvedNotePiece(BmsSkinComponentLookup lookup, Texture[] textures, float? widthForNoteHeightScale)
     {
@@ -54,6 +61,7 @@ internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
 
         var texture = noteAnimation switch
         {
+            BmsResolvedTextureAnimation animation when animation.FrameCount > 0 => animation.CurrentFrame,
             Sprite sprite => sprite.Texture,
             TextureAnimation animation when animation.FrameCount > 0 => animation.CurrentFrame,
             _ => null,
@@ -63,6 +71,12 @@ internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
             return;
 
         var noteWidth = widthForNoteHeightScale ?? DrawWidth;
+        if (ReferenceEquals(texture, appliedTexture) && DrawWidth == appliedDrawWidth && noteWidth == appliedNoteWidth)
+            return;
+
+        appliedTexture = texture;
+        appliedDrawWidth = DrawWidth;
+        appliedNoteWidth = noteWidth;
         noteAnimation?.Scale = Vector2.Divide(new Vector2(DrawWidth, noteWidth), Math.Max(1, texture.DisplayWidth));
     }
 
@@ -74,15 +88,6 @@ internal sealed partial class BmsResolvedNotePiece : CompositeDrawable
         if (textures.Length == 1)
             return new Sprite { Texture = textures[0] };
 
-        var animation = new TextureAnimation
-        {
-            DefaultFrameLength = 1000 / 60d,
-            Loop = looping,
-        };
-
-        foreach (var texture in textures)
-            animation.AddFrame(texture);
-
-        return animation;
+        return new BmsResolvedTextureAnimation(textures) { Loop = looping };
     }
 }

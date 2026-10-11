@@ -64,4 +64,37 @@ public class BmsSupplementalVideoDecoderSmokeTest
         Assert.That(decoder, Is.Null);
         Assert.That(error, Is.Not.Empty);
     }
+
+    [Test]
+    public void TestBundledMpegDecodesThroughEndOfStream()
+    {
+        requireNativeArtifacts();
+
+        var bytes = File.ReadAllBytes(Path.Combine(TestContext.CurrentContext.TestDirectory, "bga_fixtures", "mpeg1.mpg"));
+        Assert.That(BmsSupplementalVideoDecoder.TryCreate(bytes, out var decoder, out var error), Is.True, error);
+
+        using var activeDecoder = decoder!;
+        var frameCount = 0;
+        var previousTime = double.NegativeInfinity;
+
+        while (activeDecoder.TryDecodeNextFrame(out var frame, out error))
+        {
+            Assert.That(frame, Is.Not.Null);
+            using (frame)
+            {
+                Assert.That(frame!.Width, Is.EqualTo(64));
+                Assert.That(frame.Height, Is.EqualTo(64));
+                Assert.That(frame.Time, Is.GreaterThanOrEqualTo(previousTime));
+                previousTime = frame.Time;
+            }
+
+            frameCount++;
+        }
+
+        Assert.That(error, Is.Null);
+        Assert.That(frameCount, Is.EqualTo(13));
+        Assert.That(activeDecoder.TryDecodeNextFrame(out var exhaustedFrame, out error), Is.False);
+        Assert.That(exhaustedFrame, Is.Null);
+        Assert.That(error, Is.Null);
+    }
 }

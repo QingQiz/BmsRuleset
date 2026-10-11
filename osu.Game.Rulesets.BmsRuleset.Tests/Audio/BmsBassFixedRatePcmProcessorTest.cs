@@ -46,6 +46,26 @@ public class BmsBassFixedRatePcmProcessorTest
         });
     }
 
+    [TestCase(1.0)]
+    [TestCase(0.75)]
+    public void DecodingSurvivesOutputDeviceRecreation(double rate)
+    {
+        var wave = createWave(44100, 44100 * 2, 440);
+        using var processor = BmsFixedRatePcmProcessor.CreateFromMemory(wave, rate);
+        using var chunks = processor.ProcessChunks().GetEnumerator();
+        Assert.That(chunks.MoveNext(), Is.True);
+        var frames = (long)chunks.Current.FrameCount;
+
+        // Device replacement must leave the worker's independent decode stream alive.
+        Bass.Free();
+        Assert.That(Bass.Init(0, 44100, DeviceInitFlags.Default, IntPtr.Zero, IntPtr.Zero), Is.True);
+
+        while (chunks.MoveNext())
+            frames += chunks.Current.FrameCount;
+
+        Assert.That(frames, Is.EqualTo(44100 * 2 / rate).Within(2500));
+    }
+
     [Test]
     public async Task AssetCacheDeduplicatesAndPublishesStartupBuffer()
     {
@@ -66,6 +86,40 @@ public class BmsBassFixedRatePcmProcessorTest
         await BmsPcmTestHelpers.WaitForCompletionAsync(first.Asset);
         Assert.That(first.Asset.IsComplete, Is.True);
 
+    }
+
+    [TestCase(1.0, false)]
+    [TestCase(0.75, false)]
+    [TestCase(1.0, true)]
+    [TestCase(0.75, true)]
+    public async Task CacheCancellationReleasesConcurrentDecodeSources(double rate, bool recreateDevice)
+    {
+        var wave = createWave(44100, 44100 * 10, 440);
+        var cache = new BmsPcmAssetCache((_, _) => Task.FromResult<byte[]?>(wave), rate);
+        var leases = Enumerable.Range(0, 64).Select(i => cache.Acquire($"cancellation-{i}.wav")).ToArray();
+        try
+        {
+            await Task.WhenAll(leases.Select(lease => lease.Ready)).WaitAsync(TimeSpan.FromSeconds(20));
+            Assert.That(leases.All(lease => lease.Asset.PublishedFrameCount >= BmsFixedRatePcmProcessor.DEFAULT_CHUNK_FRAMES * 2), Is.True);
+            var incomplete = leases.Count(lease => !lease.Asset.IsComplete);
+            TestContext.Progress.WriteLine($"Decode sources pending at cancellation: {incomplete}/64; rate {rate}; recreate {recreateDevice}");
+            Assert.That(incomplete, Is.GreaterThan(0), "The fixture must cancel live decoders, not only completed assets.");
+            if (recreateDevice)
+            {
+                Bass.Free();
+                Assert.That(Bass.Init(0, 44100, DeviceInitFlags.Default, IntPtr.Zero, IntPtr.Zero), Is.True);
+            }
+            // Ready releases the processing slot while each decoder retains its native
+            // stream. Cancellation must join those workers before clearing the assets.
+            cache.Dispose();
+            Assert.That(leases.All(lease => lease.Asset.State == BmsPcmAssetState.Disposed), Is.True);
+        }
+        finally
+        {
+            cache.Dispose();
+            foreach (var lease in leases)
+                lease.Dispose();
+        }
     }
 
     [Test]

@@ -14,17 +14,17 @@ using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Components;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Configuration;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Legacy;
-using osu.Game.Rulesets.BmsRuleset.Skinning.NoteTextures;
-using osu.Game.Rulesets.BmsRuleset.Skinning.Runtime;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.NoteTextures;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
 using osuTK.Graphics;
@@ -103,7 +103,7 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
             bodyAnimationFrameCount(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 2
             && currentBodyAnimationFrame(longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column))) == 1);
         this.AddSetupAssert("animated LN tail renders multi-frame drawable", () =>
-            liveSkinCoverageLongNote(animated_tail_column)?.ChildrenOfType<TextureAnimation>().Any(a => a.FrameCount == 2) == true);
+            liveSkinCoverageLongNote(animated_tail_column)?.ChildrenOfType<Drawable>().OfType<IFramedAnimation>().Any(a => a.FrameCount == 2) == true);
         this.AddSetupStep("capture LN body sprites", () =>
             bodySpritesBeforeReload = longNoteBodyOf(liveSkinCoverageLongNote(animated_body_column)).ChildrenOfType<Sprite>().ToArray());
         this.AddSetupStep("reload skin source", () =>
@@ -291,13 +291,13 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         ISkinSource skinSource()
             => ((BmsTestSkins.SkinnedTestPlayer)Player).SkinSource;
 
-        AddAssert("note factory produces resolved note piece",
-            () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1))?.Create(),
-            Is.TypeOf<BmsResolvedNotePiece>);
+        AddAssert("static note factory produces a direct sprite",
+            () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 2))?.Create(),
+            Is.TypeOf<BmsResolvedNoteSprite>);
         AddAssert("animated note factories produce multi-frame animations",
             () => BmsTestLegacySkin.ANIMATED_NOTE_COLUMNS.All(c =>
                 (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, c))?.Create() as BmsResolvedNotePiece)
-                ?.ChildrenOfType<TextureAnimation>().SingleOrDefault()?.FrameCount == 2));
+                ?.ChildrenOfType<Drawable>().OfType<IFramedAnimation>().SingleOrDefault()?.FrameCount == 2));
         AddAssert("animated hold body textures resolve as animation frames",
             () =>
             {
@@ -317,15 +317,14 @@ public partial class TestSceneBmsSkins : BmsPlayerTestScene
         AddAssert("1x1 hold tail factories resolve per column",
             () => BmsTestLegacySkin.ONE_PIXEL_TAIL_COLUMNS.All(c =>
             {
-                var sprite = (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, BmsLayoutVariant.Bme7K, c))?.Create() as BmsResolvedNotePiece)
-                    ?.ChildrenOfType<Sprite>().SingleOrDefault();
-
+                var drawable = factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, BmsLayoutVariant.Bme7K, c))?.Create();
+                var sprite = drawable as Sprite ?? drawable?.ChildrenOfType<Sprite>().SingleOrDefault();
                 return sprite?.Texture?.DisplayWidth == 1 && sprite.Texture.DisplayHeight == 1;
             }));
         AddAssert("animated hold tail factories produce multi-frame animations",
             () => BmsTestLegacySkin.ANIMATED_HOLD_TAIL_COLUMNS.All(c =>
                 (factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteTail, BmsLayoutVariant.Bme7K, c))?.Create() as BmsResolvedNotePiece)
-                ?.ChildrenOfType<TextureAnimation>().SingleOrDefault()?.FrameCount == 2));
+                ?.ChildrenOfType<Drawable>().OfType<IFramedAnimation>().SingleOrDefault()?.FrameCount == 2));
         AddAssert("explosion factory produces resolved explosion",
             () => factorySource()?.GetDrawableFactory(new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1))?.Create(),
             Is.TypeOf<LegacyBmsHitExplosion>);

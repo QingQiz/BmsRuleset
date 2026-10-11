@@ -10,7 +10,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Media.Video.Supplemental;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
@@ -56,6 +56,60 @@ public class BmsBgaDisplaySizingTest
         setDrawableRuleset(source, drawableRuleset);
         setRehostedDisplay(source, clone);
         setRehostedDisplayHost(source, host);
+        syncRehostedDisplay(source);
+
+        assertQuadsNearlyEqual(source.ScreenSpaceDrawQuad, clone.ScreenSpaceDrawQuad);
+    }
+
+    [Test]
+    public void TestRehostedDisplayTracksLocalCoordinatesWithUnchangedPlayfieldBounds()
+    {
+        var root = new Container { Size = new Vector2(1280, 720) };
+        var hudParent = new Container { Size = root.Size };
+        var drawableRuleset = new BmsDrawableRuleset(new BmsRuleset(), new BmsBeatmap());
+        var playfield = (BmsPlayfield)drawableRuleset.Playfield;
+        using var source = new BmsBgaDisplay { Position = new Vector2(23, 37), Size = new Vector2(320, 240) };
+        using var clone = new BmsBgaDisplay();
+        using var host = createRehostedDisplayHost();
+
+        root.Add(hudParent);
+        hudParent.Add(source);
+        root.Add(playfield);
+        playfield.AddBehindStage(host);
+        host.Add(clone);
+        setDrawableParent(hudParent, root);
+        setDrawableParent(source, hudParent);
+        setDrawableParent(playfield, root);
+        setDrawableParent(host, playfield);
+        setDrawableParent(clone, host);
+        playfield.Anchor = playfield.Origin = Anchor.TopLeft;
+        playfield.RelativeSizeAxes = Axes.None;
+        playfield.Size = root.Size;
+        setDrawableRuleset(source, drawableRuleset);
+        setRehostedDisplay(source, clone);
+        setRehostedDisplayHost(source, host);
+        // These layout-only objects bypass loading, so enable geometry invalidation explicitly.
+        var loadState = typeof(Drawable).GetField("loadState", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Drawable[] layoutObjects = [root, hudParent, playfield, source, host, clone];
+        foreach (var drawable in layoutObjects)
+        {
+            loadState.SetValue(drawable, LoadState.Ready);
+            drawable.Invalidate();
+        }
+        syncRehostedDisplay(source);
+        assertQuadsNearlyEqual(source.ScreenSpaceDrawQuad, clone.ScreenSpaceDrawQuad);
+        syncRehostedDisplay(source);
+        var previousSourceBounds = source.ScreenSpaceDrawQuad;
+        var previousBounds = playfield.ScreenSpaceDrawQuad;
+        var previousDrawInfo = playfield.DrawInfo;
+
+        playfield.Size *= 0.5f;
+        playfield.Scale *= 2;
+        foreach (var drawable in layoutObjects)
+            drawable.Invalidate();
+        Assert.That(playfield.ScreenSpaceDrawQuad, Is.EqualTo(previousBounds));
+        Assert.That(source.ScreenSpaceDrawQuad, Is.EqualTo(previousSourceBounds));
+        Assert.That(playfield.DrawInfo, Is.Not.EqualTo(previousDrawInfo));
         syncRehostedDisplay(source);
 
         assertQuadsNearlyEqual(source.ScreenSpaceDrawQuad, clone.ScreenSpaceDrawQuad);

@@ -4,7 +4,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
-using osu.Game.Rulesets.BmsRuleset.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Configuration;
 
