@@ -24,12 +24,59 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     internal long BindingGeneration { get; private set; }
 
-    internal void UpdateVisualLayout(float y, in BmsColumnVisualFrame frame)
+    private BmsVisualTimeObserver? visualTimeObserver;
+    private BmsHitObject? observedVisualNote;
+    private long visualTimeGeneration;
+
+    internal bool HasVisualTimeObserver => visualTimeObserver != null;
+
+    protected private bool IsCurrentVisualTimeObserver(BmsVisualTimeObserver observer)
+        => visualTimeObserver == observer && visualTimeGeneration == BindingGeneration && ReferenceEquals(HitObject, observedVisualNote);
+
+    internal void SetVisualTimeObserver(BmsVisualTimeObserver observer)
     {
-        var layout = PrepareVisual(y, frame);
-        // Oversized skin art needs more slack than a fixed number of screens.
-        var padding = Math.Max(frame.Height, VisualHeight);
-        var suppress = SkipFurtherUpdates || layout.MaximumY < -frame.Height - padding || layout.MinimumY > padding;
+        visualTimeObserver = observer;
+        observedVisualNote = HitObject;
+        visualTimeGeneration = BindingGeneration;
+    }
+
+    internal void ClearVisualTimeObserver(long generation)
+    {
+        if (visualTimeGeneration != generation)
+            return;
+
+        visualTimeObserver = null;
+        observedVisualNote = null;
+    }
+
+    internal void ObserveVisualTime(float y, in BmsColumnVisualFrame frame)
+    {
+        var observer = visualTimeObserver;
+        if (observer != null && visualTimeGeneration == BindingGeneration && ReferenceEquals(HitObject, observedVisualNote))
+            observer(y, frame);
+    }
+
+    internal virtual void UpdateVisualFrame(float y, in BmsColumnVisualFrame frame)
+    {
+        if (HasVisualTimeObserver)
+            ObserveVisualTime(y, frame);
+        UpdateVisualLayout(y, frame);
+    }
+
+    internal void UpdateVisualLayout(float y, in BmsColumnVisualFrame frame)
+        => ApplyVisualLayout(frame, PrepareVisual(y, frame));
+
+    protected private void ApplyVisualLayout(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
+    {
+        var suppress = SkipFurtherUpdates;
+        // The padding is at least one column height. Intersecting that minimum range
+        // cannot be culled, so only outlying bounds need the skin's size-dependent height.
+        if (!suppress && (layout.MaximumY < -frame.Height - frame.Height || layout.MinimumY > frame.Height))
+        {
+            var padding = Math.Max(frame.Height, VisualHeight);
+            suppress = layout.MaximumY < -frame.Height - padding || layout.MinimumY > padding;
+        }
+
         if (VisualsSuppressed != suppress)
         {
             VisualsSuppressed = suppress;
@@ -61,9 +108,38 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     // A separate visual layer lets appearance fades compose with hit/miss transforms
     // and long-note release opacity without changing judgement updates.
-    protected Container Visuals { get; } = new() { RelativeSizeAxes = Axes.X };
+    private Drawable visualLayer;
 
-    internal void UpdateSoftConstantVisibility(float alpha) => Visuals.Alpha = alpha;
+    protected Container Visuals => (Container)visualLayer;
+
+    protected void UseDirectVisual(Drawable visual)
+    {
+        // Single-piece notes can compose the visibility fade on their existing skin wrapper.
+        // Removing the empty layer avoids another traversal and invalidation per scrolling note.
+        RemoveInternal(visualLayer, true);
+        AddInternal(visualLayer = visual);
+        if (visual is BmsNoteVisual noteVisual)
+        {
+            singlePieceVisual = noteVisual;
+            noteVisual.ComponentChanging += restoreSinglePieceWrapper;
+            noteVisual.ComponentChanged += refreshSinglePieceVisual;
+            noteVisual.ComponentInvalidated += restoreSinglePieceWrapper;
+        }
+    }
+
+    private float appliedSoftConstantAlpha = float.NaN;
+
+    internal void UpdateSoftConstantVisibility(float alpha)
+    {
+        // Alpha invalidation propagates through the whole visual tree; skip it when a
+        // non-fading soft-constant state leaves this note unchanged.
+        if (alpha == appliedSoftConstantAlpha)
+            return;
+
+        appliedSoftConstantAlpha = alpha;
+        visualLayer.Alpha = alpha;
+        refreshSinglePieceVisual();
+    }
 
     private float appliedNoteHeightScale = float.NaN;
 
@@ -76,7 +152,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         Anchor = Anchor.BottomLeft;
         Origin = Anchor.BottomLeft;
         RelativeSizeAxes = Axes.X;
-        AddInternal(Visuals);
+        AddInternal(visualLayer = new Container { RelativeSizeAxes = Axes.X });
     }
 
     internal void ApplyBmsResult(HitResult result, bool suppressPenalty)
@@ -103,6 +179,12 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         base.Update();
 
         ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
+        refreshSinglePieceVisual();
+    }
+
+    protected override void UpdateAfterChildren()
+    {
+        // The column schedule owns passive results; the base hook only dispatches an unused per-object check.
     }
 
     protected override void LoadAsyncComplete()
@@ -124,6 +206,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
         appliedNoteHeightScale = scale;
         ApplyVisualHeightScale(scale);
+        refreshSinglePieceVisual();
     }
 
     protected virtual void ApplyVisualHeightScale(float scale)
@@ -145,7 +228,8 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         }
 
         Alpha = 1;
-        Visuals.Alpha = 1;
+        appliedSoftConstantAlpha = float.NaN;
+        visualLayer.Alpha = 1;
         ResetVisualState();
     }
 

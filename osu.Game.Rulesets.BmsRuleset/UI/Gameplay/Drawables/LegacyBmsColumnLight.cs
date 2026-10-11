@@ -28,6 +28,7 @@ internal sealed partial class LegacyBmsColumnLight : CompositeDrawable, IKeyBind
     private Drawable? light;
     private double releaseTime = double.NegativeInfinity;
     private float releaseStrength;
+    private float appliedStrength = float.NaN;
 
     private float currentStrength => (float)(releaseStrength * (1 - Math.Clamp((Time.Current - releaseTime) / 250, 0, 1)));
 
@@ -112,7 +113,12 @@ internal sealed partial class LegacyBmsColumnLight : CompositeDrawable, IKeyBind
             return;
 
         // Only the final input state is drawn; interpolation keeps the original 250 ms release.
-        light.Alpha = currentStrength;
-        light.Scale = new Vector2(1, currentStrength);
+        var strength = currentStrength;
+        if (strength == appliedStrength)
+            return;
+
+        appliedStrength = strength;
+        light.Alpha = strength;
+        light.Scale = new Vector2(1, strength);
     }
 }

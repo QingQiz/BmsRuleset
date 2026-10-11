@@ -9,8 +9,9 @@ public sealed class BmsJudgementWindowTable
 {
     private readonly double? goodFastDTime;
     private readonly double? passivePoorOffset;
+    private readonly BmsJudgementWindow[] hitWindows;
 
-    public IReadOnlyList<BmsJudgementWindow> HitWindows { get; }
+    public IReadOnlyList<BmsJudgementWindow> HitWindows => hitWindows;
 
     public BmsJudgementWindow? EPoorWindow { get; }
 
@@ -45,7 +46,7 @@ public sealed class BmsJudgementWindowTable
             }
         }
 
-        HitWindows = hits;
+        hitWindows = hits;
         EPoorWindow = epoor;
     }
 
@@ -53,7 +54,7 @@ public sealed class BmsJudgementWindowTable
 
     public HitResult ResultForOffset(double timeOffset)
     {
-        foreach (var row in HitWindows)
+        foreach (var row in hitWindows)
         {
             if (row.ContainsOffset(timeOffset))
                 return row.Result;
@@ -100,7 +101,7 @@ public sealed class BmsJudgementWindowTable
         if (result == HitResult.Miss)
             return EPoorWindow;
 
-        foreach (var row in HitWindows)
+        foreach (var row in hitWindows)
         {
             if (row.Result == result)
                 return row;

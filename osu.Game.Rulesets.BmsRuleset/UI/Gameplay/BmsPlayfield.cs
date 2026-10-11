@@ -544,7 +544,11 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         var scale = Math.Min(1, availableWidth / Stage.DrawWidth);
 
         if (float.IsFinite(scale) && scale > 0)
-            Stage.Scale = new Vector2(scale, 1);
+        {
+            var stageScale = new Vector2(scale, 1);
+            if (Stage.Scale != stageScale)
+                Stage.Scale = stageScale;
+        }
     }
 
     #endregion

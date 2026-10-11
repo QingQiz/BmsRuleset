@@ -83,7 +83,7 @@ The chart and the **Long Note (L1)**, **Charge Note (L2)**, or **Hell Charge Not
 
 | Mode | How to play | Judgement |
 |------|-------------|-----------|
-| **LN** | Press at the head and hold through the tail. | One result per long note. Holding through the tail uses the head judgement; an early release combines the head and release judgements, taking the worse result. A very early drop gives BAD. |
+| **LN** | Press at the head and hold through the tail. | One result per long note. While held, it settles with the head judgement once the tail has passed; an early release combines the head and release judgements, taking the worse result. A very early drop gives BAD. |
 | **CN** | Press at the head and release at the tail. | Head and tail each contribute their own judgement, EX score, combo, and gauge change. Missing the head gives POOR for both ends. |
 | **HCN** | Use CN timing, and keep holding through the body. | Head and tail are scored separately. During the body, holding builds recovery and releasing builds damage; reholding after a mistake can recover gauge. |
 

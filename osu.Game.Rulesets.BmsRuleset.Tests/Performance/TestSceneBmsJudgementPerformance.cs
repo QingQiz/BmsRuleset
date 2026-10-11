@@ -83,6 +83,42 @@ public partial class TestSceneBmsJudgementPerformance : BmsPlayerTestScene
         });
     }
 
+    [TestCase(64)]
+    [TestCase(2048)]
+    public void LoadedColumnVisualLayout(int count)
+    {
+        AddStep("load column visuals", () => { futureNotes = count; LoadPlayer(); });
+        AddUntilStep("loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
+        AddStep("activate future candidates", () =>
+        {
+            Playfield.ScrollController.SetConfiguredScrollSpeed(1);
+            Playfield.RefreshAllLifetimes();
+            Player.GameplayClockContainer.Stop();
+            Player.GameplayClockContainer.Seek(3000);
+        });
+        AddUntilStep("reached measurement time", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 3000) < .001);
+        AddStep("measure column visual layout", () =>
+        {
+            var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
+            Assert.That(container.AliveEntries.Count, Is.EqualTo(count + 2));
+            var update = typeof(BmsColumnHitObjectContainer).GetMethod("UpdateAfterChildrenLife", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .CreateDelegate<Action>(container);
+            const int operations = 2000;
+            BmsJudgementPerformanceTest.Measure("VisualLayout-" + count, operations, () =>
+            {
+                return new BmsJudgementPerformanceTest.Measurement(() =>
+                {
+                    for (var i = 0; i < operations; i++)
+                        update();
+                }, () =>
+                {
+                    Assert.That(container.AliveEntries.Count, Is.EqualTo(count + 2));
+                    return new { Alive = container.AliveEntries.Count, Height = container.DrawHeight };
+                });
+            });
+        });
+    }
+
     private void measureFrame(int count, string state, int operations)
     {
         // Resolve the unchanged playfield boundary outside measurement so the same harness

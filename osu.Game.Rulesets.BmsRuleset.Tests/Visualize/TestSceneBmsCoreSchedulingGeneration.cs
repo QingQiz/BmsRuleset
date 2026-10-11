@@ -338,7 +338,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         {
             var container = Playfield.Stage.Columns[1].HitObjectContainer;
             var target = Playfield.Beatmap.HitObjects.OfType<BmsNote>().First(n => n.StartTime == 3400);
-            target.StartTime = 3350;
+            target.StartTime = 2700;
             var expected = container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Where(d => d.HitObject is BmsNote)
                 .OrderBy(d => container.IndexOf(d)).Select(d => Playfield.Beatmap.HitObjects.IndexOf(d.HitObject).ToString()).ToArray();
             startRecording();
@@ -593,7 +593,36 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             if (name == "long.finish") parts[11] = string.Join(",", parts[11].Split(',').Where(p => p.StartsWith("holding=")));
             selected.Add(string.Join("|", parts.Skip(1)));
         }
-        return selected.ToArray();
+        var effects = new List<string>();
+        for (var i = 0; i < selected.Count; i++)
+        {
+            var parts = selected[i].Split('|');
+            if (i + 1 < selected.Count && parts[3] is "subtree/note.passive>" or "subtree/long.passive>")
+            {
+                parts[3] = parts[3][..^1] + "<";
+                // Eliminating an empty scan may omit this pair. Preserve changed snapshots,
+                // nested effects and every layout/removal operation from the frozen observation.
+                if (string.Join("|", parts) == selected[i + 1])
+                {
+                    i++;
+                    continue;
+                }
+            }
+            effects.Add(selected[i]);
+        }
+        return effects.ToArray();
+    }
+
+    [Test]
+    public void TraceNormalizationRetainsChangedNestedAndLayoutOperations()
+    {
+        const string before = "0|0|0|0|core.subtree/note.passive>|3000|1|1|0|1|0/0/0||0,None,,,|None@3400:-:0:-:False|0,1|/|0,0,0,0,0.2|0,0|1|-";
+        var after = before.Replace("passive>", "passive<");
+        Assert.That(logicalRows([before, after]), Is.Empty);
+        Assert.That(logicalRows([before, after.Replace("None@3400", "Meh@3400")]), Has.Length.EqualTo(2));
+        Assert.That(logicalRows([before, before.Replace("core.subtree/note.passive>", "note.passive/result.notify="), after]), Has.Length.EqualTo(3));
+        Assert.That(logicalRows([before.Replace("core.subtree", "core.layout"), after.Replace("core.subtree", "core.layout")]), Has.Length.EqualTo(2));
+        Assert.That(logicalRows([before]), Has.Length.EqualTo(1));
     }
 
     private static string[] semanticRows(IEnumerable<string> rows) => rows.Select(r => r.Split('|'))

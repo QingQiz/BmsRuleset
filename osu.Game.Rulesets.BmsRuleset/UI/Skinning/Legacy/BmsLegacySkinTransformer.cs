@@ -214,7 +214,11 @@ public partial class BmsLegacySkinTransformer : LegacySkinTransformer, IBmsGamep
     {
         var textures = BmsLegacyTextureResolver.ResolveNoteTextures(this, lookup);
         var widthForNoteHeightScale = GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale)?.Value;
-        return new BmsResolvedDrawableFactory(() => new BmsResolvedNotePiece(lookup, textures, widthForNoteHeightScale));
+
+        // Composite scaling preserves the original presence and geometry of zero, mirrored or sub-pixel assets.
+        return textures.Length == 1 && textures[0].DisplayWidth >= 1 && (widthForNoteHeightScale == null || widthForNoteHeightScale > 0)
+            ? new BmsResolvedDrawableFactory(() => new BmsResolvedNoteSprite(textures[0], widthForNoteHeightScale))
+            : new BmsResolvedDrawableFactory(() => new BmsResolvedNotePiece(lookup, textures, widthForNoteHeightScale));
     }
 
     private BmsResolvedDrawableFactory createHitExplosionFactory(BmsSkinComponentLookup lookup)

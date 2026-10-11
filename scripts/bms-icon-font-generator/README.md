@@ -1,6 +1,6 @@
 # BMS icon font generator
 
-Generates the monochrome 64×64 glyphs used by `BmsIcons`. This is the maintained version of the temporary `.codex-temp/BmsIconFontGenerator` tool and its `create-bms-icons` skill copy. Use this repository version to retain the complete glyph set, including No Mine.
+Generates the monochrome 64×64 glyphs used by `BmsIcons`, including the complete set of nine current icons.
 
 [Back to development guide](../../docs/development.md#mod-icons)
 

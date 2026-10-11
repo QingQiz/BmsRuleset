@@ -37,6 +37,11 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     public int ScoringJudgementEventCount { get; private set; }
 
+    /// <summary>
+    ///     Changes whenever the result-count dictionary changes, including rewound non-consuming judgements.
+    /// </summary>
+    public long StatisticsVersion { get; private set; }
+
     public event Action<BmsTimingObservation>? EmptyPoorRegistered;
 
     public event Action<BmsTimingObservation>? NonConsumingJudgementRegistered;
@@ -111,6 +116,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     public void RegisterNonConsumingJudgement(HitResult result, double eventTime, double expectedTime, int column)
     {
         ScoreResultCounts[result] = ScoreResultCounts.GetValueOrDefault(result) + 1;
+        StatisticsVersion++;
         var comboChange = result == HitResult.Ok || BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout) ? -Combo.Value : 0;
         Combo.Value += comboChange;
         nonConsumingComboChanges.Add(comboChange);
@@ -127,14 +133,19 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     internal void RewindEmptyPoors(double time)
     {
+        var changed = false;
         while (nonConsumingEvents.Count > 0 && nonConsumingEvents[^1].Source.StartTime > time)
         {
+            changed = true;
             removeJudgementEvent(nonConsumingEvents[^1]);
             ScoreResultCounts[nonConsumingEvents[^1].Result]--;
             nonConsumingEvents.RemoveAt(nonConsumingEvents.Count - 1);
             Combo.Value -= nonConsumingComboChanges[^1];
             nonConsumingComboChanges.RemoveAt(nonConsumingComboChanges.Count - 1);
         }
+
+        if (changed)
+            StatisticsVersion++;
     }
 
     /// <summary>
@@ -190,6 +201,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         timingHitEventEntries.Clear();
         timingHitEvents.Clear();
         ScoringJudgementEventCount = 0;
+        StatisticsVersion++;
     }
 
     /// <summary>
@@ -211,6 +223,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     /// </summary>
     protected override void ApplyScoreChange(JudgementResult result)
     {
+        StatisticsVersion++;
         // Count independently of hit-event recording, which can be disabled by the host.
         if (result.HitObject is BmsHitObject and not BmsLandmine)
             ScoringJudgementEventCount++;
@@ -237,6 +250,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     protected override void RemoveScoreChange(JudgementResult result)
     {
+        StatisticsVersion++;
         base.RemoveScoreChange(result);
         if (result is BmsJudgementResult { SuppressPenalty: true })
             ScoreResultCounts[result.Type]++;
@@ -252,7 +266,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     {
         var frameworkEvent = base.CreateHitEvent(result);
         var judgementEvent = createJudgementEvent(result);
-        addJudgementEvent(judgementEvent);
+        var timingHitEvent = addJudgementEvent(judgementEvent);
         eventsByResult.Add(result, judgementEvent);
 
         if (judgementEvent.SuppressPenalty)
@@ -261,6 +275,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         return BmsJudgementEventProjection.CreateTimingHitEvent(
             judgementEvent.Source,
             judgementEvent.TimingObservations[^1],
+            timingHitEvent!.Value.HitObject,
             frameworkEvent.LastHitObject);
     }
 
@@ -279,10 +294,10 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         ? HitResult.IgnoreMiss
         : base.GetSimulatedHitResult(judgement);
 
-    private void addJudgementEvent(BmsJudgementEvent judgementEvent)
+    private HitEvent? addJudgementEvent(BmsJudgementEvent judgementEvent)
     {
         judgementEvents.Add(judgementEvent);
-        addTimingHitEvents(judgementEvent);
+        return addTimingHitEvents(judgementEvent);
     }
 
     private void removeJudgementEvent(BmsJudgementEvent judgementEvent)
@@ -301,10 +316,12 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         removeTimingHitEvents(judgementEvent);
     }
 
-    private void addTimingHitEvents(BmsJudgementEvent judgementEvent)
+    private HitEvent? addTimingHitEvents(BmsJudgementEvent judgementEvent)
     {
         if (judgementEvent.SuppressPenalty)
-            return;
+            return null;
+
+        HitEvent? lastTimingHitEvent = null;
 
         foreach (var observation in judgementEvent.TimingObservations)
         {
@@ -313,8 +330,11 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
             timingHitEventEntries.Insert(insertionIndex, new TimingHitEventEntry(judgementEvent, observation, hitObject));
             timingHitEvents.Insert(insertionIndex, createTimingHitEvent(insertionIndex));
+            lastTimingHitEvent = timingHitEvents[insertionIndex];
             repairNextTimingHitEvent(insertionIndex);
         }
+
+        return lastTimingHitEvent;
     }
 
     private void removeTimingHitEvents(BmsJudgementEvent judgementEvent)
@@ -420,7 +440,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
                 endpoint.ExpectedTime,
                 endpoint.EventTime,
                 endpoint.GameplayRate,
-                endpoint.Result));
+                endpoint.Result)).ToArray();
 
             return new BmsJudgementEvent(
                 BmsJudgementSource.From(longNoteResult.EndpointResults.Count > 1 ? source : result.HitObject),

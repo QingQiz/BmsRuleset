@@ -239,7 +239,10 @@ public partial class TestSceneBmsLongNoteExecution : BmsPlayerTestScene
                         break;
                     case Scenario.Automatic:
                         passive(4000);
-                        assertTimes(4003, 4000, 1.25);
+                        Assert.That(results[0].HasResult, Is.False, "Automatic LN completion requires passing the tail.");
+                        Assert.That(output.GetMainResult(longNote).HasResult, Is.False);
+                        passive(4000.001);
+                        assertTimes(4003, 4000.001, 1.25);
                         break;
                     case Scenario.PmsExpiry:
                     case Scenario.PmsRescue:

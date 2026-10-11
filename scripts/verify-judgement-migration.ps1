@@ -25,18 +25,18 @@ if (-not $SkipBuild) {
 
 $patterns = @(
     '.Normal.Gameplay.', '.Normal.Mods.', '.Normal.Replay.', '.Normal.Localisation.', '.Normal.AutoGeneration.',
-    'BmsKeySoundCursorTest', 'BmsScoreSelectionModTest', 'BmsAudioVolumeRoutingTest', 'BmsSamplePlaybackTest'
+    'BmsKeySoundCursorTest', 'BmsScoreSelectionModTest', 'BmsAudioVolumeRoutingTest', 'BmsSamplePlaybackTest', 'BmsTimingMapQueryTest'
 )
 $scenes = @(
     'AutoScratchInput', 'Beatoraja', 'CautionAutoplay', 'ChargeNoteExecution', 'ColumnJudgement', 'CoreSchedulingGeneration',
-    'DenseReplay', 'GitComparison', 'HcnTailVisuals', 'HellChargeNoteExecution', 'HitExplosionLimit',
+    'DenseReplay', 'GitComparison', 'HcnTailVisuals', 'HellChargeNoteExecution',
     'InitialBackgroundAudio', 'InvertGameplay', 'InvisibleNote', 'JudgementAlgorithm', 'JudgementCheckpoints',
     'JudgementIndexes', 'JudgementLifecycleExecution', 'LandmineKeyboardInput', 'LongNoteBodyTint',
     'LongNoteExecution', 'LongNoteJudgement', 'LongNoteLifecycle', 'MineCulling', 'Mods', 'NoteExecution',
     'PauseRewind', 'ReplayRewind', 'ShortLnAutoplay', 'Skins', 'VisualCulling'
 )
 $patterns += $scenes | ForEach-Object { 'TestSceneBms' + $_ }
-$scope = '(' + (($patterns | ForEach-Object { 'FullyQualifiedName~' + $_ }) -join '|') + ')&FullyQualifiedName!~.Performance.'
+$scope = '(' + (($patterns | ForEach-Object { 'FullyQualifiedName~' + $_ }) -join '|') + ')&FullyQualifiedName!~.Performance.&TestCategory!=Performance'
 $commands = [System.Collections.Generic.List[object]]::new()
 $summary = [System.Collections.Generic.List[object]]::new()
 $previousComparison = $env:BMS_COMPARISON_RESULTS

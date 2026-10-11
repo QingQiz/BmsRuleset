@@ -20,11 +20,7 @@ internal readonly struct BmsJudgementExecutionContext(BmsColumnJudgementRuntime 
         => output.ApplyMainResult(note, result, endpoints, frame, result == HitResult.Meh && column.HasPmsMistake(note));
 
     internal void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
-    {
-        // Synchronous observers see the new rule state with the preceding index checkpoint.
-        output.PublishState(note, state, frame);
-        column.RefreshExecutionState(note);
-    }
+        => column.PublishExecutionState(note, state, frame);
 
     internal void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame)
         => output.ApplySyntheticEndpoint(endpoint, frame,

@@ -61,11 +61,14 @@ public static class BmsJudgementEventProjection
     }
 
     internal static HitEvent CreateTimingHitEvent(BmsJudgementSource source, BmsTimingObservation observation, HitObject? lastHitObject)
+        => CreateTimingHitEvent(source, observation, createObservationHitObject(source, observation), lastHitObject);
+
+    internal static HitEvent CreateTimingHitEvent(BmsJudgementSource source, BmsTimingObservation observation, HitObject hitObject, HitObject? lastHitObject)
         => new(
             observation.TimeOffset,
             observation.GameplayRate,
             observation.Result,
-            createObservationHitObject(source, observation),
+            hitObject,
             lastHitObject,
             null
         );

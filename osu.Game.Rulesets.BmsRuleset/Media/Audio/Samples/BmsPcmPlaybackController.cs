@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.IO.ResourceStore;
@@ -36,6 +37,8 @@ internal sealed class BmsPcmPlaybackController : IDisposable
     private BmsPcmAssetCache? assetCache;
     private SampleLifetime[] lifetimes = [];
     private int nextLifetimeIndex;
+    private double nextLeaseMaintenanceTime;
+    private bool leaseMaintenancePending = true;
     private int epoch;
     private float lastMasterGain;
     private bool playbackBlocked;
@@ -177,7 +180,8 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         }
 
         var targetFrame = mixer.RenderedFrames;
-        var plays = new List<BmsVoicePlay>();
+        // The live index already bounds this batch, so avoid repeated list growth and copying.
+        var plays = new List<BmsVoicePlay>(livePlays.Count);
 
         foreach (var pending in livePlays)
         {
@@ -200,7 +204,11 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         clearLivePlays();
 
         if (plays.Count > 0)
-            mixer.SubmitPlayBatch(plays.ToArray());
+        {
+            // The mixer copies the span synchronously into its command queue, so the list buffer
+            // can be submitted directly.
+            mixer.SubmitPlayBatch(CollectionsMarshal.AsSpan(plays));
+        }
     }
 
     internal void Play(ushort sampleKey, int volume, double offset)
@@ -304,21 +312,45 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             submitSingle(asset, sampleKey, pending.Volume, pending.Offset + elapsed);
         }
 
+        maintainLeases(chartTime);
+        assetCache?.EvictUnused();
+    }
+
+    private void maintainLeases(double chartTime)
+    {
+        // A completed asset's duration stays fixed while its lease pins it in the cache.
+        // Between acquisitions and the next expiry, rescanning those assets cannot change anything.
+        if (!leaseMaintenancePending && chartTime <= nextLeaseMaintenanceTime)
+            return;
+
+        leaseMaintenancePending = false;
+        nextLeaseMaintenanceTime = double.PositiveInfinity;
+
         foreach (var (sampleKey, lease) in leases)
         {
-            rememberSampleLength(sampleKey, lease.Asset);
+            var complete = lease.Asset.IsComplete;
+            var length = rememberSampleLength(sampleKey, lease.Asset);
 
-            if (!lifetimeEnds.TryGetValue(sampleKey, out var lastTriggerTime) || !lease.Asset.IsComplete)
+            if (!complete)
+            {
+                // Decoder progress can publish a length or complete before the following frame.
+                leaseMaintenancePending = true;
+                continue;
+            }
+
+            if (!lifetimeEnds.TryGetValue(sampleKey, out var lastTriggerTime))
                 continue;
 
-            if (chartTime <= lastTriggerTime + getOriginalLength(lease.Asset))
+            var endTime = lastTriggerTime + length;
+            if (chartTime <= endTime)
+            {
+                nextLeaseMaintenanceTime = Math.Min(nextLeaseMaintenanceTime, endTime);
                 continue;
+            }
 
             leases.Remove(sampleKey);
             lease.Dispose();
         }
-
-        assetCache?.EvictUnused();
     }
 
     public void Dispose()
@@ -386,6 +418,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             return;
 
         leases[sampleKey] = assetCache.Acquire(identity);
+        leaseMaintenancePending = true;
     }
 
     private void resolveResources()
@@ -461,6 +494,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
 
     private void rebuildLifetimeSchedule(double chartTime)
     {
+        leaseMaintenancePending = true;
         nextLifetimeIndex = 0;
 
         while (nextLifetimeIndex < lifetimes.Length && lifetimes[nextLifetimeIndex].StartTime <= chartTime)

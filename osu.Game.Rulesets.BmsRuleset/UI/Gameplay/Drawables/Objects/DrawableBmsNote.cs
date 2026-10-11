@@ -9,10 +9,13 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
     where TCol : struct, IColumnProvider
 {
+    // The framework's reflection fallback misses the inherited protected draw-node factory.
+    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
+
     private BmsNoteVisual noteVisual = null!;
 
     [BackgroundDependencyLoader]
-    private void load() => Visuals.Add(noteVisual = new BmsNoteVisual(BmsSkinComponents.Note, LayoutVariant, Column));
+    private void load() => UseDirectVisual(noteVisual = new BmsNoteVisual(BmsSkinComponents.Note, LayoutVariant, Column));
 
     protected override float VisualHeight => noteVisual.VisualHeight * (ParentColumn?.NoteHeightScale ?? 1);
 

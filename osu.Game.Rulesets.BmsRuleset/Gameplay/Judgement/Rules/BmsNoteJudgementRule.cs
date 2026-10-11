@@ -30,8 +30,9 @@ internal sealed class BmsNoteJudgementRule
         if (frame.IsRewinding)
             return;
 
-        var result = JudgePassive(note, windows, frame.SimulationTime, execution.GetMainResult(note).HasResult);
-        if (result != HitResult.None)
+        // Future heads cannot expire, so their passive traversal needs no framework result lookup.
+        var result = JudgePassive(note, windows, frame.SimulationTime, false);
+        if (result != HitResult.None && !execution.GetMainResult(note).HasResult)
             execution.ApplyMainResult(note, result, frame);
     }
 }

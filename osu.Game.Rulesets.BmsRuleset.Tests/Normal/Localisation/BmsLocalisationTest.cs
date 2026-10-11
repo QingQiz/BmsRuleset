@@ -65,6 +65,41 @@ public class BmsLocalisationTest
     }
 
     [Test]
+    public void TestFormattedInstancesKeepIndependentArgumentsWhenLanguageChanges()
+    {
+        var first = localisation.GetLocalisedBindableString(BmsStrings.LoadedTable("Satellite", 3));
+        var second = localisation.GetLocalisedBindableString(BmsStrings.LoadedTable("Stella", 7));
+
+        config.SetValue(FrameworkSetting.Locale, "zh");
+        Assert.That(first.Value, Is.EqualTo("已载入难度表：Satellite（3 张谱面）"));
+        Assert.That(second.Value, Is.EqualTo("已载入难度表：Stella（7 张谱面）"));
+
+        var chinese = second.Value;
+        config.SetValue(FrameworkSetting.Locale, "en");
+        Assert.That(first.Value, Does.Contain("Satellite").And.Contain("3"));
+        Assert.That(second.Value, Does.Contain("Stella").And.Contain("7"));
+        Assert.That(second.Value, Is.Not.EqualTo(chinese));
+
+        config.SetValue(FrameworkSetting.Locale, "zh");
+        Assert.That(second.Value, Is.EqualTo(chinese));
+    }
+
+    [Test]
+    public void TestSharedTemplatesSupportConcurrentIndependentReaders()
+    {
+        var results = new string[1000];
+
+        Parallel.For(0, results.Length, i =>
+        {
+            // Descriptors retain their own arguments even when readers share immutable templates.
+            results[i] = BmsStrings.LoadedTable("Satellite", i).ToString();
+        });
+
+        for (var i = 0; i < results.Length; i++)
+            Assert.That(results[i], Is.EqualTo(BmsStrings.LoadedTable("Satellite", i).ToString()));
+    }
+
+    [Test]
     public void TestStandardDeviationUpdatesWhenLanguageChanges()
     {
         var text = localisation.GetLocalisedBindableString(BmsStrings.StandardDeviation(12.34));

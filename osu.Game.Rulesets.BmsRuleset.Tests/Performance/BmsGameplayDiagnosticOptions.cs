@@ -23,21 +23,29 @@ internal sealed class BmsGameplayDiagnosticOptions
 
     public double Duration { get; private set; } = 30;
 
+    public double WarmupSeconds { get; private set; } = 2;
+
     public double ScrollSpeed { get; private set; } = 8;
+
+    public double NoteHeightScale { get; private set; } = 1;
+
+    public bool SoftConstant { get; private set; }
+
+    public double SoftConstantFadeIn { get; private set; }
 
     public double UpdateHz { get; private set; }
 
     public double DrawHz { get; private set; }
-
-    public int HitExplosionLimit { get; private set; }
-
-    public BmsHitExplosionOverflowPolicy HitExplosionPolicy { get; private set; }
 
     public bool Headless { get; private set; }
 
     public bool AudioOutput { get; private set; }
 
     public bool CaptureAudio { get; private set; }
+
+    public bool OmitSnapshots { get; private set; }
+
+    public bool OmitAudioProbe { get; private set; }
 
     public bool ShowInvisibleNotes { get; private set; }
 
@@ -64,6 +72,12 @@ internal sealed class BmsGameplayDiagnosticOptions
                 continue;
             }
 
+            if (argument == "--soft-constant")
+            {
+                result.SoftConstant = true;
+                continue;
+            }
+
             if (argument == "--headless")
             {
                 result.Headless = true;
@@ -79,6 +93,18 @@ internal sealed class BmsGameplayDiagnosticOptions
             if (argument == "--capture-audio")
             {
                 result.CaptureAudio = true;
+                continue;
+            }
+
+            if (argument == "--omit-snapshots")
+            {
+                result.OmitSnapshots = true;
+                continue;
+            }
+
+            if (argument == "--omit-audio-probe")
+            {
+                result.OmitAudioProbe = true;
                 continue;
             }
 
@@ -104,20 +130,17 @@ internal sealed class BmsGameplayDiagnosticOptions
 
                 case "--duration": result.Duration = number(value, 3, 3600); break;
 
+                case "--warmup-seconds": result.WarmupSeconds = number(value, 0, 120); break;
+
                 case "--scroll-speed": result.ScrollSpeed = number(value, 1, 50); break;
+
+                case "--note-height-scale": result.NoteHeightScale = number(value, 0.01, 5); break;
+
+                case "--soft-constant-fade-in": result.SoftConstantFadeIn = number(value, -1000, 1000); break;
 
                 case "--update-hz": result.UpdateHz = number(value, 0, 10000); break;
 
                 case "--draw-hz": result.DrawHz = number(value, 0, 10000); break;
-
-                case "--hit-explosion-limit":
-                    var limit = number(value, 0, 256);
-                    if (limit != Math.Truncate(limit))
-                        throw new ArgumentException("Hit explosion limit must be an integer.");
-                    result.HitExplosionLimit = (int)limit;
-                    break;
-
-                case "--hit-explosion-policy": result.HitExplosionPolicy = enumValue<BmsHitExplosionOverflowPolicy>(value); break;
 
                 case "--skin": result.Skin = enumValue<BmsTestSkins.SkinKind>(value); break;
 
@@ -135,6 +158,8 @@ internal sealed class BmsGameplayDiagnosticOptions
 
         if (filter != "gameplay")
             throw new ArgumentException("Select this diagnostic explicitly with --filter gameplay.");
+        if (result.WarmupSeconds >= result.Start + result.Duration)
+            throw new ArgumentException("Playback warmup must finish before the requested interval ends.");
         if (result.InvertRandomSeed.HasValue && !result.Invert)
             throw new ArgumentException("--invert-random-seed requires --invert.");
         if (!File.Exists(result.Chart))

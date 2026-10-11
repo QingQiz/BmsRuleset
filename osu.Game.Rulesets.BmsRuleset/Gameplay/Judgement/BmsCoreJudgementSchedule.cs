@@ -3,7 +3,12 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
-internal readonly record struct BmsScheduledObject(BmsHitObject Object, long BindingToken);
+internal readonly record struct BmsScheduledObject(BmsCoreJudgementSchedule.Binding Binding)
+{
+    internal BmsHitObject Object => Binding?.Object!;
+
+    internal long BindingToken => Binding?.Token ?? 0;
+}
 
 /// <summary>
 /// Orders passive and post-result operations at lifecycle boundaries.
@@ -12,6 +17,7 @@ internal readonly record struct BmsScheduledObject(BmsHitObject Object, long Bin
 internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
 {
     private readonly Dictionary<BmsHitObject, Binding> bindings = new(ReferenceEqualityComparer.Instance);
+    private readonly object bindingOwner = new();
     private readonly List<BmsScheduledObject> plan = [];
     private long revision;
     private long bindingRevision;
@@ -32,7 +38,7 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
     {
         if (bindings.TryGetValue(note, out var binding) && !binding.Removing)
         {
-            item = new BmsScheduledObject(note, binding.Token);
+            item = new BmsScheduledObject(binding);
             return true;
         }
 
@@ -51,16 +57,18 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
     internal BmsScheduledObject Bind(BmsHitObject note)
     {
         // Drawable-local generations can collide when a different pooled representation replaces this object.
-        var item = new BmsScheduledObject(note, checked(++nextBindingToken));
-        bindings[note] = new Binding(item.BindingToken);
+        var binding = new Binding(bindingOwner, note, checked(++nextBindingToken));
+        if (bindings.TryGetValue(note, out var previous)) previous.Bound = false;
+        bindings[note] = binding;
         InvalidateOrder();
-        return item;
+        return new BmsScheduledObject(binding);
     }
 
     internal void Unbind(BmsScheduledObject item)
     {
-        if (bindings.TryGetValue(item.Object, out var binding) && binding.Token == item.BindingToken)
+        if (bound(item))
         {
+            item.Binding.Bound = false;
             bindings.Remove(item.Object);
             InvalidateOrder();
         }
@@ -68,11 +76,7 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
 
     internal void BeginRemoval(BmsScheduledObject item)
     {
-        if (bindings.TryGetValue(item.Object, out var binding) && binding.Token == item.BindingToken)
-        {
-            binding.Removing = true;
-            bindings[item.Object] = binding;
-        }
+        if (bound(item)) item.Binding.Removing = true;
     }
 
     internal void Rewind()
@@ -100,13 +104,23 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
     {
         if (frozen || frame.IsRewinding || elapsed < 0 || !begin(ref lastLayout)) return;
 
-        var version = snapshot(order);
+        if (order.Count == 0)
+        {
+            if (order is BmsScheduledOrder cachedOrder)
+                cachedOrder.GetSnapshot();
+            // An empty reentrant layout still interrupts the outer cursor, without clearing its shared buffer.
+            revision++;
+            return;
+        }
+
+        var plan = snapshot(order);
+        var version = ++revision;
         for (var i = 0; i < plan.Count; i++)
         {
             if (version != revision) return;
 
             var item = plan[i];
-            if (current(item) && item.Object is BmsLongNote)
+            if (item.Object is BmsLongNote && current(item))
                 updateLongNote(item, frame, elapsed, version);
         }
     }
@@ -115,7 +129,9 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
     {
         if (!begin(ref lastSubtree)) return;
 
-        var version = snapshot(order);
+        var plan = snapshot(order);
+        var version = ++revision;
+
         for (var i = 0; i < plan.Count; i++)
         {
             if (version != revision) return;
@@ -154,11 +170,10 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
 
     internal void CompleteRemoval(BmsScheduledObject item, in BmsFrameContext frame)
     {
-        if (!bindings.TryGetValue(item.Object, out var binding) || binding.Token != item.BindingToken || !binding.Removing || binding.RemovalChecked)
+        if (!bound(item) || !item.Binding.Removing || item.Binding.RemovalChecked)
             return;
 
-        binding.RemovalChecked = true;
-        bindings[item.Object] = binding;
+        item.Binding.RemovalChecked = true;
         if (item.Object is BmsNote || !column.GetNoteResult(item.Object).HasResult)
             CheckPassive(item.Object, frame);
     }
@@ -170,12 +185,11 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
         // Synchronous output may remove or rebind this object. Never let the old plan borrow its replacement.
         if (version != revision || !current(item)) return;
 
-        var binding = bindings[item.Object];
+        var binding = item.Binding;
         var step = (Epoch, Step, rewindRevision);
         if (binding.LastPostStep == step) return;
 
         binding.LastPostStep = step;
-        bindings[item.Object] = binding;
         column.ObserveSimulationStep(item.Object, frame);
         if (version != revision || !current(item)) return;
 
@@ -189,7 +203,10 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
         => column.UpdateRegisteredLongNote(note, frame, elapsed, holding);
 
     private bool current(BmsScheduledObject item)
-        => bindings.TryGetValue(item.Object, out var binding) && binding.Token == item.BindingToken && !binding.Removing;
+        => bound(item) && !item.Binding.Removing;
+
+    private bool bound(BmsScheduledObject item)
+        => ReferenceEquals(item.Binding?.Owner, bindingOwner) && item.Binding.Bound;
 
     private bool begin(ref (long Epoch, long Batch, long Bindings) previous)
     {
@@ -200,17 +217,27 @@ internal sealed class BmsCoreJudgementSchedule(BmsColumnJudgementRuntime column)
         return true;
     }
 
-    private long snapshot(IReadOnlyList<BmsScheduledObject> order)
+    private List<BmsScheduledObject> snapshot(IReadOnlyList<BmsScheduledObject> order)
     {
+        if (order is BmsScheduledOrder cachedOrder)
+            return cachedOrder.GetSnapshot();
+
         // Membership changes invalidate handles, not this cursor; removing the current item cannot skip its successor.
         plan.Clear();
         for (var i = 0; i < order.Count; i++) plan.Add(order[i]);
-        return ++revision;
+        return plan;
     }
 
-    private struct Binding(long token)
+    // Old snapshots keep this identity; replacement invalidates it instead of lending them the new binding.
+    internal sealed class Binding(object owner, BmsHitObject note, long token)
     {
+        internal object Owner { get; } = owner;
+
+        internal BmsHitObject Object { get; } = note;
+
         internal long Token { get; } = token;
+
+        internal bool Bound = true;
 
         internal bool Removing;
 

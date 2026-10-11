@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.Objects;
@@ -23,14 +24,21 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private bool hasUpdated;
     private bool updatePending;
     private double lastFullUpdateTime;
+
     private double latestLifetimeStart = double.PositiveInfinity;
+
+    // The alive map reuses removed dictionary slots. A registration is append-only when
+    // it raises the largest alive-map count observed by this container; otherwise its
+    // slot may precede an existing entry and the judgement order must be rebuilt.
+    private int maximumAliveEntryCount;
+    private long aliveEntriesVersion;
     private bool coreOrderDirty = true;
-    private readonly List<BmsScheduledObject> coreLayoutOrder = [];
-    private readonly List<BmsScheduledObject> coreSubtreeOrder = [];
-    private readonly List<(int Position, BmsScheduledObject Object)> corePositions = [];
-    private readonly Dictionary<DrawableBmsHitObject, Bindable<double>> coreStartTimes = [];
+    private readonly BmsScheduledOrder coreLayoutOrder = new();
+    private readonly BmsScheduledOrder coreSubtreeOrder = new();
+    private readonly Dictionary<DrawableBmsHitObject, Action<ValueChangedEvent<double>>> coreStartTimes = [];
 
     internal BmsColumnJudgementRuntime Judgements { get; set; } = null!;
+
     internal BmsJudgementBridge JudgementBridge { get; set; } = null!;
 
     public override void Add(HitObjectLifetimeEntry entry)
@@ -54,21 +62,29 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
     protected override void AddDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
     {
+        var aliveCount = AliveEntries.Count;
+        var appended = aliveCount > maximumAliveEntryCount;
+        if (appended)
+            maximumAliveEntryCount = aliveCount;
+        var version = ++aliveEntriesVersion;
+
         base.AddDrawable(entry, drawable);
         if (drawable is not DrawableBmsHitObject note)
             return;
 
-        JudgementBridge.Register(note);
+        // Usage callbacks can mutate the container before registration finishes.
+        JudgementBridge.Register(note, appended && version == aliveEntriesVersion);
         InvalidateCoreOrder();
     }
 
     protected override void RemoveDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
     {
+        aliveEntriesVersion++;
         InvalidateCoreOrder();
-        if (drawable is DrawableBmsHitObject old && coreStartTimes.Remove(old, out var startTime))
-            startTime.UnbindAll();
-        if (drawable is DrawableBmsHitObject note)
-            JudgementBridge.Unregister(note);
+        if (drawable is DrawableBmsHitObject old && coreStartTimes.Remove(old, out var startTimeChanged))
+            old.StartTimeBindable.ValueChanged -= startTimeChanged;
+        if (drawable is DrawableBmsHitObject unregisteredNote)
+            JudgementBridge.Unregister(unregisteredNote);
 
         base.RemoveDrawable(entry, drawable);
         if (drawable is DrawableBmsHitObject removed)
@@ -152,41 +168,49 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     {
         base.UpdateAfterChildrenLife();
 
+        updateVisuals(visualFrame());
+    }
+
+    private void updateVisuals(BmsColumnVisualFrame frame)
+    {
+
         refreshCoreOrder();
 
-        var frame = visualFrame();
-
-        // Position all alive entries in this column
         foreach (var entry in AliveEntries)
         {
             if (entry.Value is not DrawableBmsHitObject note)
                 continue;
 
             var hitObject = note.HitObject!;
-            note.UpdateSoftConstantVisibility(scrollController.GetSoftConstantAlpha(hitObject.StartTime));
-            var startPosition = scrollController.GetVisualScrollPosition(hitObject.StartTime, hitObject.ScrollPositionAtStartTime);
-            var y = frame.YAt(startPosition);
-            observeVisualTime(note, y, frame);
-            note.UpdateVisualLayout(y, frame);
+            var startTime = scrollController.ConstantScrollActive || scrollController.SoftConstantActive ? hitObject.StartTime : 0;
+            note.UpdateSoftConstantVisibility(scrollController.SoftConstantActive ? scrollController.GetSoftConstantAlpha(startTime) : 1);
+            var startPosition = scrollController.ConstantScrollActive ? startTime : hitObject.ScrollPositionAtStartTime;
+            note.UpdateVisualFrame(frame.YAt(startPosition), frame);
         }
 
         // Geometry observes the pre-passive state; result feedback can then retire or recolour that presentation.
-        Judgements.Schedule.RunLayout(coreLayoutOrder, coreFrame(), Time.Elapsed, isResumeRewinding());
-        Judgements.Schedule.RunSubtree(coreSubtreeOrder, coreFrame());
+        var frameContext = coreFrame();
+        var elapsed = Time.Elapsed;
+        var rewinding = isResumeRewinding();
+        Judgements.Schedule.RunLayout(coreLayoutOrder, frameContext, elapsed, rewinding);
+        Judgements.Schedule.RunSubtree(coreSubtreeOrder, frameContext);
     }
 
     internal void InvalidateCoreOrder()
     {
         coreOrderDirty = true;
+        // Until the existing lifetime-order refresh observes all current bindings,
+        // keep the original draw path rather than snapshotting a stale static prefix.
+        spriteBatchHasMultiplePieces = true;
         Judgements?.Schedule.InvalidateOrder();
     }
 
     private BmsColumnVisualFrame visualFrame()
     {
         var hitTarget = getHitTargetPosition();
-        var scale = scrollController.ScrollSpeedMultiplier / Math.Max(1.0, scrollController.ScrollRange)
-                    * Math.Max(1f, DrawHeight - hitTarget);
-        return new BmsColumnVisualFrame(scrollController.CurrentScrollPosition, scale, hitTarget, DrawHeight);
+        var height = DrawHeight;
+        var scale = scrollController.ScrollCoordinateScale(height, hitTarget);
+        return new BmsColumnVisualFrame(scrollController.CurrentScrollPosition, scale, hitTarget, height);
     }
 
     private BmsFrameContext coreFrame()
@@ -195,35 +219,59 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     private void refreshCoreOrder()
     {
         if (!coreOrderDirty) return;
+
         coreLayoutOrder.Clear();
         coreSubtreeOrder.Clear();
-        corePositions.Clear();
+        spriteBatchHasMultiplePieces = false;
         foreach (var drawable in AliveEntries.Values)
         {
-            if (drawable is not DrawableBmsHitObject note || !JudgementBridge.TryGetScheduledObject(note, out var item)) continue;
-            if (!coreStartTimes.ContainsKey(note))
+            if (drawable is not DrawableBmsHitObject note)
             {
-                var startTime = note.StartTimeBindable.GetBoundCopy();
-                startTime.BindValueChanged(_ =>
-                {
-                    Judgements.RefreshNoteTiming(note.HitObject);
-                    InvalidateCoreOrder();
-                });
-                coreStartTimes.Add(note, startTime);
+                spriteBatchHasMultiplePieces = true;
+                continue;
             }
-            coreLayoutOrder.Add(item);
-            corePositions.Add((IndexOf(note), item));
+
+            // These representations cannot supply a single Sprite. Reuse this
+            // lifecycle traversal so mixed columns never prepare a doomed prefix.
+            if (note.HitObject is BmsLongNote or BmsInvisibleNote)
+                spriteBatchHasMultiplePieces = true;
+            if (!JudgementBridge.TryGetScheduledObject(note, out var item)) continue;
+
+            if (!coreStartTimes.ContainsKey(note))
+                observeStartTime(note);
+            // Only long notes have a post-layout operation; keep tap-heavy frames out of the layout plan.
+            if (item.Object is BmsLongNote)
+                coreLayoutOrder.Add(item);
         }
-        // Alive-map order differs from the native child order, including equal-time reverse child IDs.
-        corePositions.Sort((left, right) => left.Position.CompareTo(right.Position));
-        foreach (var position in corePositions) coreSubtreeOrder.Add(position.Object);
+
+        // The framework already owns the exact subtree order, including equal-time child IDs.
+        for (var i = 0; i < InternalChildren.Count; i++)
+        {
+            if (InternalChildren[i] is DrawableBmsHitObject note && JudgementBridge.TryGetScheduledObject(note, out var item))
+                coreSubtreeOrder.Add(item);
+        }
+
         coreOrderDirty = false;
+    }
+
+    private void observeStartTime(DrawableBmsHitObject note)
+    {
+        // Keep the capture at the binding boundary; rebuilding order must not allocate for existing bindings.
+        Action<ValueChangedEvent<double>> changed = _ =>
+        {
+            Judgements.RefreshNoteTiming(note.HitObject);
+            InvalidateCoreOrder();
+        };
+        note.StartTimeBindable.ValueChanged += changed;
+        coreStartTimes.Add(note, changed);
     }
 
     protected override void Dispose(bool isDisposing)
     {
-        foreach (var startTime in coreStartTimes.Values) startTime.UnbindAll();
+        foreach (var (note, changed) in coreStartTimes) note.StartTimeBindable.ValueChanged -= changed;
         coreStartTimes.Clear();
+        foreach (var (drawable, observation) in visualObservations)
+            drawable.ClearVisualTimeObserver(observation.Generation);
         visualObservations.Clear();
         base.Dispose(isDisposing);
     }

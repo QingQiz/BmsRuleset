@@ -23,6 +23,9 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCol>
     where TCol : struct, IColumnProvider
 {
+    // The framework's reflection fallback misses the inherited protected draw-node factory.
+    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
+
     private BmsNoteVisual head = null!;
 
     protected override float VisualHeight => head.VisualHeight * (ParentColumn?.NoteHeightScale ?? 1);
@@ -79,9 +82,28 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     /// Keeps the head-to-tail bounds with the object so column layout does not depend on its geometry.
     /// </summary>
     protected private override BmsVisualLayout PrepareVisual(float y, in BmsColumnVisualFrame frame)
+        => prepareVisual(y, readPresentation(Time.Current), tailY(frame));
+
+    internal override void UpdateVisualFrame(float y, in BmsColumnVisualFrame frame)
     {
-        preparedTailY = tailY(frame);
-        preparedPresentation = readPresentation(Time.Current);
+        if (!IsCurrentVisualTimeObserver(visualTimeObserver))
+        {
+            base.UpdateVisualFrame(y, frame);
+            return;
+        }
+
+        // Only the full simulation traversal records visual history. Share its read with
+        // geometry preparation without caching across same-time input or result callbacks.
+        var current = readPresentation(Time.Current);
+        var tail = tailY(frame);
+        observeVisualTime(y, frame, current, tail);
+        ApplyVisualLayout(frame, prepareVisual(y, current, tail));
+    }
+
+    private BmsVisualLayout prepareVisual(float y, in BmsLongNotePresentation current, float tail)
+    {
+        preparedTailY = tail;
+        preparedPresentation = current;
         preparedHoldingBody = preparedPresentation.HoldingBody;
         preparedHeadY = preparedHoldingBody ? visualState.ResolveHeldHeadY(y, preparedPresentation.HeadReached) : y;
         // A culled skin may change before re-entry, even when the projected endpoints are unchanged.
@@ -172,6 +194,11 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private void observeVisualTime(float y, in BmsColumnVisualFrame frame)
     {
         var current = readPresentation(Time.Current);
+        observeVisualTime(y, frame, current, current.HoldingBody ? tailY(frame) : 0);
+    }
+
+    private void observeVisualTime(float y, in BmsColumnVisualFrame frame, in BmsLongNotePresentation current, float tail)
+    {
         if (restoreHeadPin)
         {
             // Seeking into a hold can reactivate it without observing its head cross the line.
@@ -190,7 +217,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         }
 
         if (current.HoldingBody)
-            visualState.ObserveHeldBodyDirection(y, tailY(frame), current.HeadReached, resolveBodyDirection);
+            visualState.ObserveHeldBodyDirection(y, tail, current.HeadReached, resolveBodyDirection);
     }
 
     protected override void ResetVisualState()
@@ -291,6 +318,10 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             return;
 
         lastSimulationTime = frame.SimulationTime;
+
+        // Future and expired bodies cannot pulse; avoid mapping their full presentation at every replay slice.
+        if (frame.SimulationTime < ln.StartTime || frame.SimulationTime > ln.EndTime)
+            return;
 
         var current = readPresentation(frame.SimulationTime);
         if (current.HoldLightActive && frame.SimulationTime - lastHoldExplosionTime >= hold_explosion_interval)

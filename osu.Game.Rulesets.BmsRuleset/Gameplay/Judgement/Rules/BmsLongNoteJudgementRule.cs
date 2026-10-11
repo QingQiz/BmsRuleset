@@ -80,7 +80,7 @@ internal sealed class BmsLongNoteJudgementRule
             hold.TailResult = HitResult.Meh;
             execution.PublishState(hold.Note, state.State, frame);
         }
-        else if (frame.SimulationTime >= hold.Note.EndTime)
+        else if (frame.SimulationTime > hold.Note.EndTime)
             applyTail(state, execution, hold.HeadWindow, frame.SimulationTime - hold.Note.EndTime, frame, true);
     }
 

@@ -76,7 +76,7 @@ internal sealed partial class LegacyBmsColumnBackground : CompositeDrawable
                         X = isLastColumn ? -0.16f : 0,
                         Anchor = Anchor.TopRight,
                         Origin = Anchor.TopLeft,
-                        Alpha = hasRightLine ? 1 : 0,
+                        Alpha = hasRightLine ? lineColour.A : 0,
                     },
                 ],
             },

@@ -67,6 +67,8 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
         };
         if (layout == BmsLayoutVariant.Bme7KDouble)
             beatmap.HitObjects.Add(new BmsLongNote { StartTime = 3000, Duration = 1000, Column = 15, SampleKey = 23, TailSampleKey = 24 });
+        if (!autoScratchMine)
+            beatmap.HitObjects.RemoveAll(n => n is BmsLandmine && n.Column == 0);
         beatmap.HitObjects = beatmap.HitObjects.OrderBy(n => n.StartTime).ToList();
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);
         return beatmap;
@@ -92,13 +94,16 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
             foreach (var frame in result.Cast<BmsReplayFrame>().Where(f => f.Time >= 3000 && f.Time < 4002))
                 frame.Actions.Add(frame.Time < 3990 ? BmsAction.P2Scratch : BmsAction.P2ScratchReverse);
         }
+
         return result;
     }
 
     [Test]
     public void CaptureKeyboard(
-        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode noteMode,
-        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Bme7K2P)] BmsLayoutVariant variant,
+        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)]
+        BmsLongNoteMode noteMode,
+        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Bme7K2P)]
+        BmsLayoutVariant variant,
         [Values(false, true)] bool deferred)
     {
         load(noteMode, variant, false, BmsJudgementAlgorithm.Combo, BmsTestSkins.SkinKind.Argon);
@@ -123,6 +128,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
                     observer.Mark("reapply");
                 }
             }
+
             if (deferred) Playfield.EndGameplayFrame();
             foreach (var time in new[] { 4500d, 6000, 2998, 3000, 3202 })
             {
@@ -130,15 +136,19 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
                 inputManager.UpdateSubTree();
                 observer.Mark("lifecycle");
             }
+
             observer.Save($"keyboard-{mode}-{layout}-{deferred}");
         }));
     }
 
     [Test]
     public void CaptureReplay(
-        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)] BmsLongNoteMode noteMode,
-        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Bme7K2P)] BmsLayoutVariant variant,
-        [Values(null, BmsJudgementAlgorithm.Combo, BmsJudgementAlgorithm.Duration, BmsJudgementAlgorithm.Lowest, BmsJudgementAlgorithm.Score)] BmsJudgementAlgorithm? selection)
+        [Values(BmsLongNoteMode.LongNote, BmsLongNoteMode.ChargeNote, BmsLongNoteMode.HellChargeNote)]
+        BmsLongNoteMode noteMode,
+        [Values(BmsLayoutVariant.Bme7K, BmsLayoutVariant.Pms9K, BmsLayoutVariant.Bme7KDouble, BmsLayoutVariant.Bme7K2P)]
+        BmsLayoutVariant variant,
+        [Values(null, BmsJudgementAlgorithm.Combo, BmsJudgementAlgorithm.Duration, BmsJudgementAlgorithm.Lowest, BmsJudgementAlgorithm.Score)]
+        BmsJudgementAlgorithm? selection)
     {
         load(noteMode, variant, true, selection, BmsTestSkins.SkinKind.Argon);
         AddStep("record replay catchup and rewind", () => captureReplay($"replay-{mode}-{layout}-{selection?.ToString() ?? "legacy"}"));
@@ -165,6 +175,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
             Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(time).Within(.001));
             observer.Mark("seek");
         }
+
         observer.Save(scenario);
         budgetHost = null;
     }
@@ -180,7 +191,12 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
     {
         AddStep("load comparison chart", () =>
         {
-            mode = noteMode; layout = variant; replay = useReplay; algorithm = selection; skin = kind;
+            mode = noteMode;
+            layout = variant;
+            replay = useReplay;
+            algorithm = selection;
+            skin = kind;
+            autoScratchMine = true;
             LoadPlayer();
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
@@ -216,7 +232,11 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
         {
             Playfield.EndGameplayFrame();
             inputManager.UpdateSubTree();
-            action(time => { manual.CurrentTime = time; framed.ProcessFrame(); }, keyboard);
+            action(time =>
+            {
+                manual.CurrentTime = time;
+                framed.ProcessFrame();
+            }, keyboard);
         }
         finally
         {
@@ -233,7 +253,13 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
     private sealed class KeyboardDevice : InputHandler
     {
         internal List<IInput> Inputs { get; } = [];
+
         public override bool IsActive => true;
-        public override void CollectPendingInputs(List<IInput> inputs) { inputs.AddRange(Inputs); Inputs.Clear(); }
+
+        public override void CollectPendingInputs(List<IInput> inputs)
+        {
+            inputs.AddRange(Inputs);
+            Inputs.Clear();
+        }
     }
 }

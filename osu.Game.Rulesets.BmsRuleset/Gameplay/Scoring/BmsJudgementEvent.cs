@@ -82,12 +82,35 @@ public sealed record BmsJudgementEvent
         ArgumentNullException.ThrowIfNull(timingObservations);
 
         var observations = timingObservations.ToArray();
-        if (observations.Length == 0)
-            throw new ArgumentException(@"At least one timing observation is required.", nameof(timingObservations));
+        validateObservations(observations);
 
         Source = source;
         Result = result;
         SuppressPenalty = suppressPenalty;
         TimingObservations = Array.AsReadOnly(observations);
+    }
+
+    internal BmsJudgementEvent(
+        BmsJudgementSource source,
+        HitResult result,
+        BmsTimingObservation[] timingObservations,
+        bool suppressPenalty = false)
+    {
+        ArgumentNullException.ThrowIfNull(timingObservations);
+        validateObservations(timingObservations);
+
+        Source = source;
+        Result = result;
+        SuppressPenalty = suppressPenalty;
+
+        // The array is created by the ruleset and never retained elsewhere, so
+        // keep it directly as the read-only interface and avoid a wrapper object.
+        TimingObservations = timingObservations;
+    }
+
+    private static void validateObservations(BmsTimingObservation[] observations)
+    {
+        if (observations.Length == 0)
+            throw new ArgumentException(@"At least one timing observation is required.", nameof(observations));
     }
 }

@@ -25,6 +25,7 @@ internal sealed class BmsColumnJudgementRuntime
     private readonly IBmsJudgementOutput noteOutput;
     private readonly BmsHoldRegistry holds;
     private readonly BmsLandmineRegistry landmines;
+    private int statePublicationDepth;
 
     internal BmsJudgementRules Rules { get; }
 
@@ -58,6 +59,21 @@ internal sealed class BmsColumnJudgementRuntime
     internal void RewindPressHistory(double time) => pressHistory.Rewind(time);
 
     internal void RefreshPassiveDeadline(double now) => Notes.RefreshDeadline(now);
+
+    internal bool CanSkipPassiveChecks(double now)
+        => statePublicationDepth == 0 && Notes.CanSkipPassiveChecks(now);
+
+    internal void PublishExecutionState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
+    {
+        // Observers precede the index checkpoint. Reentrant schedules cannot borrow that stale activity bound.
+        statePublicationDepth++;
+        try
+        {
+            noteOutput.PublishState(note, state, frame);
+            RefreshExecutionState(note);
+        }
+        finally { statePublicationDepth--; }
+    }
 
     internal bool RequiresActiveLongNoteUpdate(BmsHitObject note) => Notes.RequiresActiveLongNoteUpdate(note);
 
@@ -180,14 +196,19 @@ internal sealed class BmsColumnJudgementRuntime
 
     internal void RestoreExecutionState(in BmsFrameContext frame)
     {
-        for (var i = 0; i < Notes.ActiveSlots.Count; i++)
+        statePublicationDepth++;
+        try
         {
-            var slot = Notes.ActiveSlots[i];
-            if (NoteRegistrations[slot].Object is BmsLongNote note)
-                noteOutput.PublishState(note, holds.GetState(noteSlots[note]), frame);
-        }
+            for (var i = 0; i < Notes.ActiveSlots.Count; i++)
+            {
+                var slot = Notes.ActiveSlots[i];
+                if (NoteRegistrations[slot].Object is BmsLongNote note)
+                    noteOutput.PublishState(note, holds.GetState(noteSlots[note]), frame);
+            }
 
-        Notes.Rebuild();
+            Notes.Rebuild();
+        }
+        finally { statePublicationDepth--; }
     }
 
 

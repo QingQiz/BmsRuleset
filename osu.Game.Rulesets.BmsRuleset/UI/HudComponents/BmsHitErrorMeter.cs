@@ -8,8 +8,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Pooling;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Layout;
+using osu.Framework.Utils;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -25,6 +26,7 @@ using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 using osuTK;
+using RectangleF = osu.Framework.Graphics.Primitives.RectangleF;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
@@ -72,7 +74,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     private const float bar_height = 3;
 
-    private readonly DrawablePool<JudgementLine> judgementLinePool = new(50);
+    private readonly JudgementLinePool judgementLinePool = new();
 
     private BmsHitErrorMeterDomain domain;
     private BmsJudgementWindowTable headWindows = null!;
@@ -85,7 +87,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     private Box background = null!;
     private Box emptyPoorColourBar = null!;
     private Container windowColourBar = null!;
-    private Container judgementsContainer = null!;
+    private JudgementsContainer judgementsContainer = null!;
 
     public BmsHitErrorMeter()
     {
@@ -134,7 +136,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
                 Height = 1,
             },
             judgementLinePool,
-            judgementsContainer = new Container
+            judgementsContainer = new JudgementsContainer(this)
             {
                 Name = "judgements",
                 RelativeSizeAxes = Axes.Both,
@@ -170,6 +172,8 @@ public partial class BmsHitErrorMeter : HitErrorMeter
                 if (line.PoorIsFast is { } isFast)
                     line.X = domain.RelativePosition(isFast ? fastPoorDisplayOffset : slowPoorDisplayOffset);
             }
+
+            judgementsContainer.RequestUpdate();
         }, true);
         BackgroundOpacity.BindValueChanged(opacity => background.Alpha = opacity.NewValue, true);
         ColourBarHeight.BindValueChanged(height =>
@@ -177,6 +181,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
             windowColourBar.Height = height.NewValue * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
             windowColourBar.Alpha = height.NewValue > 0 ? 1 : 0;
         }, true);
+        JudgementLineThickness.BindValueChanged(_ => judgementsContainer.RequestUpdate());
     }
 
     private void createColourBar(Container target, BmsJudgementWindowTable windows)
@@ -220,16 +225,31 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         if (!judgement.Type.IsScorable() || judgement.Type.IsBonus() || judgement.HitObject is BmsLandmine)
             return;
 
-        foreach (var observation in GetTimingObservations(judgement))
+        if (judgement is BmsJudgementResult { SuppressPenalty: true })
+            return;
+
+        // Keep the allocation-free path here because this method runs for every scored object;
+        // GetTimingObservations remains a convenient materialised view for callers and tests.
+        if (judgement is BmsLongNoteJudgementResult longNoteResult)
         {
-            var displayOffset = GetDisplayOffset(observation, fastPoorDisplayOffset, slowPoorDisplayOffset, ShowPoor.Value);
+            foreach (var endpoint in longNoteResult.EndpointResults)
+                processObservation(new BmsHitErrorTimingObservation(endpoint.TimeOffset, endpoint.Result));
 
-            if (displayOffset == null)
-                continue;
-
-            addJudgement(displayOffset.Value, observation.Result, AffectsMovingAverage(observation.Result),
-                observation.Result == HitResult.Meh ? observation.TimeOffset < 0 : null);
+            return;
         }
+
+        processObservation(new BmsHitErrorTimingObservation(judgement.TimeOffset, judgement.Type));
+    }
+
+    private void processObservation(BmsHitErrorTimingObservation observation)
+    {
+        var displayOffset = GetDisplayOffset(observation, fastPoorDisplayOffset, slowPoorDisplayOffset, ShowPoor.Value);
+
+        if (displayOffset == null)
+            return;
+
+        addJudgement(displayOffset.Value, observation.Result, AffectsMovingAverage(observation.Result),
+            observation.Result == HitResult.Meh ? observation.TimeOffset < 0 : null);
     }
 
     private void onNonConsumingJudgementRegistered(BmsTimingObservation observation)
@@ -243,13 +263,11 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     {
         var relativePosition = domain.RelativePosition(timeOffset);
 
-        judgementLinePool.Get(drawableJudgement =>
-        {
-            drawableJudgement.X = relativePosition;
-            drawableJudgement.PoorIsFast = poorIsFast;
-            drawableJudgement.Colour = BmsHitResultColours.ForHitResult(result);
-            judgementsContainer.Add(drawableJudgement);
-        });
+        var drawableJudgement = judgementLinePool.Get();
+        drawableJudgement.X = relativePosition;
+        drawableJudgement.PoorIsFast = poorIsFast;
+        drawableJudgement.Colour = BmsHitResultColours.ForHitResult(result);
+        judgementsContainer.AddJudgement(drawableJudgement);
 
         if (affectMovingAverage)
         {
@@ -339,6 +357,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
         floatingAverage = 0;
         arrow.MoveToX(domain.RelativePosition(0));
+        judgementsContainer.RequestUpdate();
     }
 
     protected override void Dispose(bool isDisposing)
@@ -349,24 +368,192 @@ public partial class BmsHitErrorMeter : HitErrorMeter
         base.Dispose(isDisposing);
     }
 
-    internal partial class JudgementLine : PoolableDrawable
+    private sealed partial class JudgementsContainer(BmsHitErrorMeter meter) : Container
+    {
+        // A single line can extend beyond this container's bounds. Keep that path flattened;
+        // larger groups retain a node so unchanged buffered child lists can skip traversal.
+        protected override bool CanBeFlattened => AliveInternalChildren.Count < 2 && !Masking && !HasProxy && !ForceLocalVertexBatch;
+
+        private long childDrawVersion;
+
+        private double lastUpdate = double.NegativeInfinity;
+        private bool updateRequested;
+        private long maskingVersion;
+        private long maskedVersion = -1;
+        private long maskingInvalidationId = -1;
+        private RectangleF maskingBounds;
+        private bool maskingUpdated;
+
+        public void AddJudgement(JudgementLine line)
+        {
+            Add(line);
+            RequestUpdate();
+        }
+
+        public void RequestUpdate()
+        {
+            updateRequested = true;
+            maskingVersion++;
+            InvalidateChildDrawNodes();
+        }
+
+        public void InvalidateChildDrawNodes() => childDrawVersion++;
+
+        protected override bool OnInvalidate(Invalidation invalidation, InvalidationSource source)
+        {
+            InvalidateChildDrawNodes();
+            return base.OnInvalidate(invalidation, source);
+        }
+
+        protected override DrawNode CreateDrawNode() => new JudgementsDrawNode(this);
+
+        public override bool UpdateSubTree()
+        {
+            var now = Time.Current;
+            var updateInterval = Math.Min(8, meter.JudgementFadeDuration.Value * 1000 / 60);
+
+            // Long fades need fewer samples than high-frequency gameplay updates, while
+            // short user-configured fades retain enough steps to appear smooth.
+            if (!updateRequested && now >= lastUpdate && now - lastUpdate < updateInterval)
+                return false;
+
+            updateRequested = false;
+            lastUpdate = now;
+            var updated = base.UpdateSubTree();
+            // Fades and lifetimes may change child presence without invalidating the parent.
+            // Between these updates, the leaf boxes have no independent animation or input.
+            maskingVersion++;
+            if (updated)
+                InvalidateChildDrawNodes();
+            return updated;
+        }
+
+        public override bool UpdateSubTreeMasking()
+        {
+            var bounds = ComputeMaskingBounds();
+            if (maskedVersion == maskingVersion && maskingInvalidationId == InvalidationID && maskingBounds == bounds)
+                return maskingUpdated;
+
+            if (maskingBounds != bounds)
+                InvalidateChildDrawNodes();
+            maskingUpdated = base.UpdateSubTreeMasking();
+            maskingInvalidationId = InvalidationID;
+            maskingBounds = bounds;
+            maskedVersion = maskingVersion;
+            return maskingUpdated;
+        }
+
+        private sealed class JudgementsDrawNode(JudgementsContainer source) : CompositeDrawableDrawNode(source)
+        {
+            private long childVersion = -1;
+
+            // The framework evaluates this on the update thread while preparing this buffer slot.
+            // Reuse only its own child nodes; drawing still uses the immutable standard node state.
+            public override bool AddChildDrawNodes
+            {
+                get
+                {
+                    var version = ((JudgementsContainer)Source).childDrawVersion;
+                    if (childVersion == version)
+                        return false;
+
+                    childVersion = version;
+                    return true;
+                }
+            }
+        }
+    }
+
+    internal partial class JudgementLinePool : CompositeDrawable
+    {
+        // The framework pool requires a composite wrapper. Keep leaf boxes here to avoid
+        // a second drawable and its colour invalidations for every fading judgement.
+        private readonly Stack<JudgementLine> available = new();
+        private bool disposed;
+
+        public int CurrentPoolSize { get; private set; }
+
+        public int CountInUse { get; private set; }
+
+        public int CountAvailable => available.Count;
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            for (var i = 0; i < 50; i++)
+                available.Push(create());
+
+            LoadComponents(available.ToArray());
+        }
+
+        public JudgementLine Get()
+        {
+            if (!available.TryPop(out var line))
+            {
+                line = create();
+                LoadComponent(line);
+            }
+
+            CountInUse++;
+            line.Activate();
+            return line;
+        }
+
+        public void Return(JudgementLine line)
+        {
+            CountInUse--;
+
+            if (disposed)
+                line.Dispose();
+            else
+                available.Push(line);
+        }
+
+        private JudgementLine create()
+        {
+            CurrentPoolSize++;
+            return new JudgementLine(this);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            disposed = true;
+
+            foreach (var line in available)
+                line.Dispose();
+
+            available.Clear();
+            base.Dispose(isDisposing);
+        }
+    }
+
+    internal partial class JudgementLine : Box
     {
         public bool? PoorIsFast { get; set; }
 
+        private readonly JudgementLinePool pool;
         private readonly BindableNumber<float> judgementLineThickness = new BindableFloat();
+        private bool inUse;
+        private bool waitingForPrepare;
+        private double fadeStart;
+        private double fadeEnd;
+
+        public override bool DisposeOnDeathRemoval => false;
+
+        public override bool IsPresent => inUse && (waitingForPrepare || base.IsPresent);
 
         [Resolved]
         private BmsHitErrorMeter hitErrorMeter { get; set; } = null!;
 
-        public JudgementLine()
+        public JudgementLine(JudgementLinePool pool)
         {
+            this.pool = pool;
             RelativeSizeAxes = Axes.Y;
             Height = 1;
             RelativePositionAxes = Axes.X;
             Blending = BlendingParameters.Additive;
             Anchor = Anchor.CentreLeft;
             Origin = Anchor.Centre;
-            InternalChild = new Box { RelativeSizeAxes = Axes.Both };
         }
 
         protected override void LoadComplete()
@@ -377,14 +564,51 @@ public partial class BmsHitErrorMeter : HitErrorMeter
             judgementLineThickness.BindValueChanged(thickness => Width = thickness.NewValue, true);
         }
 
-        protected override void PrepareForUse()
+        public void Activate()
         {
-            base.PrepareForUse();
+            inUse = true;
+            waitingForPrepare = true;
+            LifetimeStart = double.MinValue;
+            LifetimeEnd = double.MaxValue;
+        }
 
-            this.FadeTo(0.4f)
-                .Then()
-                .FadeOut(hitErrorMeter.JudgementFadeDuration.Value * 1000)
-                .Expire();
+        public override bool UpdateSubTree()
+        {
+            // Update before the presence check so rewinding can reveal a nearly faded line.
+            // Each line has one fixed linear fade, so it needs no transform queue.
+            if (!waitingForPrepare)
+                Alpha = Interpolation.ValueAt(Math.Clamp(Time.Current, fadeStart, fadeEnd), 0.4f, 0, fadeStart, fadeEnd);
+
+            return base.UpdateSubTree();
+        }
+
+        protected override void Update()
+        {
+            if (waitingForPrepare)
+            {
+                waitingForPrepare = false;
+                fadeStart = Time.Current;
+                fadeEnd = fadeStart + hitErrorMeter.JudgementFadeDuration.Value * 1000;
+                Alpha = 0.4f;
+                // Match Expire()'s extra millisecond after the last transform finishes.
+                LifetimeEnd = fadeEnd + 1;
+            }
+
+            base.Update();
+        }
+
+        protected override bool OnInvalidate(Invalidation invalidation, InvalidationSource source)
+        {
+            // Child colour invalidation does not reach the parent, but changes its buffered leaf state.
+            (Parent as JudgementsContainer)?.InvalidateChildDrawNodes();
+            if (source != InvalidationSource.Child && (invalidation & Invalidation.Parent) != 0 && inUse && Parent == null)
+            {
+                inUse = false;
+                waitingForPrepare = false;
+                pool.Return(this);
+            }
+
+            return base.OnInvalidate(invalidation, source);
         }
     }
 }

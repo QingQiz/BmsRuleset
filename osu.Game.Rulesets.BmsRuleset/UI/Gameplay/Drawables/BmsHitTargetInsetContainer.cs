@@ -10,17 +10,12 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 /// </summary>
 internal sealed partial class BmsHitTargetInsetContainer : Container
 {
-    protected override Container<Drawable> Content => content;
-
-    private readonly Container content;
-
     [Resolved(CanBeNull = true)]
     private BmsPlayfield? playfield { get; set; }
 
     public BmsHitTargetInsetContainer()
     {
         RelativeSizeAxes = Axes.Both;
-        InternalChild = content = new Container { RelativeSizeAxes = Axes.Both };
     }
 
     protected override void Update()
@@ -29,10 +24,10 @@ internal sealed partial class BmsHitTargetInsetContainer : Container
 
         var bottomInset = playfield?.Stage.HitTargetPosition ?? BmsStage.HIT_TARGET_POSITION;
 
-        if (content.Padding.Bottom == bottomInset)
+        if (Padding.Bottom == bottomInset)
             return;
 
-        content.Padding = new MarginPadding
+        Padding = new MarginPadding
         {
             Bottom = bottomInset,
         };

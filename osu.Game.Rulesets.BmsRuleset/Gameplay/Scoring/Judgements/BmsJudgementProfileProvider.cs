@@ -13,6 +13,15 @@ public static class BmsJudgementProfileProvider
     private static readonly double[] pms_rank_rates = [0.33, 0.50, 0.70, 1.00, 1.33];
     private static readonly ConcurrentDictionary<ProfileKey, BmsJudgementProfile> profiles = new();
 
+    // Most chart updates reuse one layout/rate. Keep the shared profile identity while avoiding
+    // concurrent-dictionary lookups on every presentation read. The active mod list is stable for
+    // a play, so cache its four transformed tables as well instead of reapplying each mod per read.
+    [ThreadStatic]
+    private static (ProfileKey Key, BmsJudgementProfile? Profile) lastProfile;
+
+    [ThreadStatic]
+    private static WindowTableCache lastWindowTables;
+
     private static IReadOnlyList<IApplicableToJudgementWindow> activeWindowMods = [];
 
     internal static void SetActiveWindowMods(IReadOnlyList<IApplicableToJudgementWindow> mods)
@@ -40,19 +49,32 @@ public static class BmsJudgementProfileProvider
 
     private static BmsJudgementWindowTable getTable(BmsLayoutVariant layout, int column, double judgementRate, bool tail)
     {
-        var profile = profiles.GetOrAdd(new ProfileKey(layout, judgementRate), static key => createProfile(key.Layout, key.Rate));
+        var key = new ProfileKey(layout, judgementRate);
+        if (!lastWindowTables.IsCurrent(key, activeWindowMods))
+        {
+            if (lastProfile.Profile == null || lastProfile.Key != key)
+                lastProfile = (key, profiles.GetOrAdd(key, static k => createProfile(k.Layout, k.Rate)));
+
+            var profile = lastProfile.Profile;
+            lastWindowTables = new WindowTableCache(
+                key,
+                activeWindowMods,
+                applyWindowMods(profile.Normal),
+                applyWindowMods(profile.Scratch),
+                applyWindowMods(profile.LongNoteTail),
+                applyWindowMods(profile.LongScratchTail));
+        }
+
         var scratch = BmsLayout.IsScratchColumn(column, layout);
+        return tail
+            ? scratch ? lastWindowTables.LongScratchTail : lastWindowTables.LongNoteTail
+            : scratch ? lastWindowTables.Scratch : lastWindowTables.Normal;
+    }
 
-        var table = tail
-            ? scratch
-                ? profile.LongScratchTail
-                : profile.LongNoteTail
-            : scratch
-                ? profile.Scratch
-                : profile.Normal;
-
-        foreach (var mod in activeWindowMods)
-            table = mod.ApplyToJudgementWindow(table);
+    private static BmsJudgementWindowTable applyWindowMods(BmsJudgementWindowTable table)
+    {
+        for (var i = 0; i < activeWindowMods.Count; i++)
+            table = activeWindowMods[i].ApplyToJudgementWindow(table);
 
         return table;
     }
@@ -75,6 +97,18 @@ public static class BmsJudgementProfileProvider
         };
 
     private readonly record struct ProfileKey(BmsLayoutVariant Layout, double Rate);
+
+    private readonly record struct WindowTableCache(
+        ProfileKey Key,
+        IReadOnlyList<IApplicableToJudgementWindow>? Mods,
+        BmsJudgementWindowTable Normal,
+        BmsJudgementWindowTable Scratch,
+        BmsJudgementWindowTable LongNoteTail,
+        BmsJudgementWindowTable LongScratchTail)
+    {
+        internal bool IsCurrent(ProfileKey key, IReadOnlyList<IApplicableToJudgementWindow> mods)
+            => Key == key && ReferenceEquals(Mods, mods);
+    }
 
     public static bool IsPms(BmsLayoutVariant layout)
         => layout is BmsLayoutVariant.Pms9K or BmsLayoutVariant.Pms9K2P or BmsLayoutVariant.Pms9KDouble;

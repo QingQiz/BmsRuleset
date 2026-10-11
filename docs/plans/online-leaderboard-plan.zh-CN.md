@@ -1,10 +1,10 @@
 # BMS 在线成绩榜单计划
 
-[返回开发文档](development.md)
+[返回开发文档](../development.md)
 
 日期：2026-09-09。状态：设计草案，尚未实现。
 
-本文记录已经确定的产品方向、建议的首版范围和后续实施顺序。本次只编写计划，不创建服务端项目、不修改规则集逻辑、不注册 OAuth 应用，也不部署服务。
+本文记录已经确定的产品方向、建议的首版范围和后续实施顺序。
 
 ## 已确定的方向
 
@@ -37,17 +37,17 @@
 
 | 代码 | 已有能力／实施注意事项 |
 | --- | --- |
-| [BmsReplayArchive](../osu.Game.Rulesets.BmsRuleset/Replays/BmsReplayArchive.cs) | 当前格式版本为 3，GZip 压缩 JSON，包含输入帧、判定事件和血条历史；旧数据允许纯 JSON。它不序列化完整 `ScoreInfo`。 |
-| [BmsReplayFrame](../osu.Game.Rulesets.BmsRuleset/Replays/BmsReplayFrame.cs) | 支持动作、时间、分支记录及判定算法；存在专用的负时间分支元数据帧。 |
-| [BmsBranchReplayState](../osu.Game.Rulesets.BmsRuleset/Replays/BmsBranchReplayState.cs) | 随机分支决策还会保存在成绩的系统 Mod 中，上传时不能统一丢弃系统 Mods。 |
-| [BmsReplayPatcher](../osu.Game.Rulesets.BmsRuleset/Replays/BmsReplayPatcher.cs) | 本地成绩导入后附加回放文件，复制成绩时保留判定和血条附加数据。上传快照必须考虑此异步流程。 |
-| [BmsSoloSongSelect](../osu.Game.Rulesets.BmsRuleset/UI/SongSelect/BmsSoloSongSelect.cs) | 普通游玩目前创建 `SoloPlayer`，可在此引入规则集自己的派生 Player。 |
-| [BmsCourseGameplay](../osu.Game.Rulesets.BmsRuleset/Course/BmsCourseGameplay.cs) | 课程使用独立的 `BmsCoursePlayer`；不能因其继承 `SoloPlayer` 而自动纳入单曲上传。 |
-| [BmsScoreProcessor](../osu.Game.Rulesets.BmsRuleset/Scoring/BmsScoreProcessor.cs) | 生成判定及成绩，最终 Mods 可能包含自动血条归属和暂停标记。`PopulateScore()` 不是一次性联网提交点。 |
-| [BmsExScore](../osu.Game.Rulesets.BmsRuleset/Scoring/BmsExScore.cs) | EX 为 `2 × Perfect + Great`，计分事件与逐条时间观测不是一对一关系。 |
-| [BmsFileImporter](../osu.Game.Rulesets.BmsRuleset/IO/Import/BmsFileImporter.cs) | 原生 BMS 的 `BeatmapInfo.Hash` 保存原始文件 SHA-256，`MD5Hash` 用于难度表兼容。 |
-| [BmsBeatmapLeaderboardWedge](../osu.Game.Rulesets.BmsRuleset/UI/SongSelect/Components/BmsBeatmapLeaderboardWedge.cs) | 已有本地查询和成绩行展示，非本地范围目前走 osu! 的 leaderboard manager，需要新增自有数据源。 |
-| [BmsLeaderboardScore](../osu.Game.Rulesets.BmsRuleset/UI/SongSelect/Components/BmsLeaderboardScore.cs) | 可复用外观，但在线成绩的下载、链接、选中和回放动作需要独立适配。 |
+| [BmsReplayArchive](../../osu.Game.Rulesets.BmsRuleset/Gameplay/Replays/BmsReplayArchive.cs) | 当前格式版本为 3，GZip 压缩 JSON，包含输入帧、判定事件和血条历史；旧数据允许纯 JSON。它不序列化完整 `ScoreInfo`。 |
+| [BmsReplayFrame](../../osu.Game.Rulesets.BmsRuleset/Gameplay/Replays/BmsReplayFrame.cs) | 支持动作、时间、分支记录及判定算法；存在专用的负时间分支元数据帧。 |
+| [BmsBranchReplayState](../../osu.Game.Rulesets.BmsRuleset/Gameplay/Replays/BmsBranchReplayState.cs) | 随机分支决策还会保存在成绩的系统 Mod 中，上传时不能统一丢弃系统 Mods。 |
+| [BmsReplayPatcher](../../osu.Game.Rulesets.BmsRuleset/Gameplay/Replays/BmsReplayPatcher.cs) | 本地成绩导入后附加回放文件，复制成绩时保留判定和血条附加数据。上传快照必须考虑此异步流程。 |
+| [BmsSoloSongSelect](../../osu.Game.Rulesets.BmsRuleset/UI/SongSelect/BmsSoloSongSelect.cs) | 普通游玩目前创建 `SoloPlayer`，可在此引入规则集自己的派生 Player。 |
+| [BmsCourseGameplay](../../osu.Game.Rulesets.BmsRuleset/Gameplay/Course/BmsCourseGameplay.cs) | 课程使用独立的 `BmsCoursePlayer`；不能因其继承 `SoloPlayer` 而自动纳入单曲上传。 |
+| [BmsScoreProcessor](../../osu.Game.Rulesets.BmsRuleset/Gameplay/Scoring/BmsScoreProcessor.cs) | 生成判定及成绩，最终 Mods 可能包含自动血条归属和暂停标记。`PopulateScore()` 不是一次性联网提交点。 |
+| [BmsExScore](../../osu.Game.Rulesets.BmsRuleset/Gameplay/Scoring/BmsExScore.cs) | EX 为 `2 × Perfect + Great`，计分事件与逐条时间观测不是一对一关系。 |
+| [BmsFileImporter](../../osu.Game.Rulesets.BmsRuleset/IO/Import/BmsFileImporter.cs) | 原生 BMS 的 `BeatmapInfo.Hash` 保存原始文件 SHA-256，`MD5Hash` 用于难度表兼容。 |
+| [BmsBeatmapLeaderboardWedge](../../osu.Game.Rulesets.BmsRuleset/UI/SongSelect/Components/BmsBeatmapLeaderboardWedge.cs) | 已有本地查询和成绩行展示，非本地范围目前走 osu! 的 leaderboard manager，需要新增自有数据源。 |
+| [BmsLeaderboardScore](../../osu.Game.Rulesets.BmsRuleset/UI/SongSelect/Components/BmsLeaderboardScore.cs) | 可复用外观，但在线成绩的下载、链接、选中和回放动作需要独立适配。 |
 
 服务端不直接引用整个游戏程序集，也不反序列化 Realm 实体。新增独立、版本化的 DTO 和纯数据校验代码；需要共享的逻辑应从本仓库提取，不能依赖游戏窗口、音频或本地谱面运行。
 

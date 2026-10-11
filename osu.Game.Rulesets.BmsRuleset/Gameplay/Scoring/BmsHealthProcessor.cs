@@ -38,9 +38,7 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     public BmsGaugeProfile GaugeProfile { get; private set; } = BmsGaugeProfileFactory.Create(BmsGaugeType.Normal);
 
-    public IReadOnlyList<BmsGaugeStateSnapshot> CurrentGaugeStates => gaugeStates
-        .Select(state => new BmsGaugeStateSnapshot(state.GaugeType, state.CurrentHp, state.IsHpFailed))
-        .ToArray();
+    public IReadOnlyList<BmsGaugeStateSnapshot> CurrentGaugeStates => snapshotGaugeStates();
 
     internal bool IsCourseGaugeMode { get; private set; }
 
@@ -483,14 +481,20 @@ public partial class BmsHealthProcessor : HealthProcessor
             ? gaugeStates[activeGaugeIndex].GaugeType
             : gaugeStates[^1].GaugeType;
 
-        gaugeHistory.Add(new BmsGaugeHistoryEvent(
-            eventTime,
-            activeGaugeType,
-            gaugeStates.Select(state => new BmsGaugeStateSnapshot(
-                state.GaugeType,
-                state.CurrentHp,
-                state.IsHpFailed)).ToArray()));
+        gaugeHistory.Add(new BmsGaugeHistoryEvent(eventTime, activeGaugeType, snapshotGaugeStates()));
         rewindHistory.Add((applicationTime ?? eventTime, HasFailed, HasEverFailed));
+    }
+
+    private BmsGaugeStateSnapshot[] snapshotGaugeStates()
+    {
+        var snapshots = new BmsGaugeStateSnapshot[gaugeStates.Count];
+        for (var i = 0; i < gaugeStates.Count; i++)
+        {
+            var state = gaugeStates[i];
+            snapshots[i] = new BmsGaugeStateSnapshot(state.GaugeType, state.CurrentHp, state.IsHpFailed);
+        }
+
+        return snapshots;
     }
 
     // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract

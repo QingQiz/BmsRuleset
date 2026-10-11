@@ -95,12 +95,7 @@ public partial class TestSceneBmsLongNoteBodyTint : BmsPlayerTestScene
     }
 
     private static Drawable noteHeadDrawableOf(DrawableBmsHitObject longNote)
-    {
-        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-        var head = noteHeadOf(longNote);
-        var cachedSkinnableDrawable = typeof(BmsNoteVisual).GetField("skin", flags)!.GetValue(head)!;
-        return (Drawable)cachedSkinnableDrawable.GetType().GetProperty("Drawable", flags)!.GetValue(cachedSkinnableDrawable)!;
-    }
+        => ((BmsNoteVisual)noteHeadOf(longNote)).Drawable;
 
     [TestCase(BmsLongNoteMode.ChargeNote, 0.4f, false)]
     [TestCase(BmsLongNoteMode.HellChargeNote, 1f, true)]

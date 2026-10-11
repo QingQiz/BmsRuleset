@@ -61,9 +61,10 @@ internal readonly record struct BmsLongNotePresentation(
     {
         // A successful early tail keeps the remaining HCN body visually held.
         var successfulTail = state.TailJudged && state.TailResult is HitResult.Perfect or HitResult.Great or HitResult.Good;
+        var lifetimeEnd = chargeLifetimeEnd(note);
         return complete(new BmsLongNotePresentation(state.HeadJudged, state.LongNoteStarted && (context.Held || successfulTail), true,
-            state.LongNoteStarted && state.HeadResult == HitResult.Meh && context.Time < chargeLifetimeEnd(note),
-            state.TailJudged && !state.LongNoteStarted, false, chargeLifetimeEnd(note), holdLightActive(note, state, context.Time)), note, state, context);
+            state.LongNoteStarted && state.HeadResult == HitResult.Meh && context.Time < lifetimeEnd,
+            state.TailJudged && !state.LongNoteStarted, false, lifetimeEnd, holdLightActive(note, state, context.Time)), note, state, context);
     }
 
     private static BmsLongNotePresentation complete(BmsLongNotePresentation presentation, BmsLongNote note,

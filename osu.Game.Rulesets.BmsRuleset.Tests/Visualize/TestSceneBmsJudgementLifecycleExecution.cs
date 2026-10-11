@@ -155,6 +155,37 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
     }
 
     [Test]
+    public void RebindingTheSameGenerationInvalidatesCapturedResultCallbacks([Values] Kind objectKind)
+    {
+        load(objectKind);
+        AddStep("replace the binding while retaining the drawable generation", () => withClock(session =>
+        {
+            var drawable = session.Drawable;
+            var generation = drawable.BindingGeneration;
+            var oldCallback = session.CaptureResultCallback();
+            session.ProductionOutput.UnbindNoteRepresentation(drawable, generation);
+            Assert.Throws<InvalidOperationException>(() => session.ProductionOutput.GetRepresentation(session.Note));
+            session.ProductionOutput.RefreshNoteRepresentation(drawable);
+            Assert.That(drawable.BindingGeneration, Is.EqualTo(generation));
+            Assert.That(session.ProductionOutput.GetRepresentation(session.Note), Is.SameAs(drawable));
+            Assert.That(session.CaptureResultCallback(), Is.Not.SameAs(oldCallback));
+            var checkpoint = readField<Action<BmsHitObject>>(session.ProductionOutput, "resultCheckpoint");
+            var historyCheckpoint = readField<Action<BmsHitObject, double>>(session.ProductionOutput, "resultHistoryCheckpoint");
+            var calls = 0;
+            session.ProductionOutput.SetResultCheckpoints(historyCheckpoint, note => { calls++; checkpoint(note); });
+            try
+            {
+                oldCallback(drawable, drawable.Result);
+                Assert.That(calls, Is.Zero);
+                session.CaptureResultCallback()(drawable, drawable.Result);
+                Assert.That(calls, Is.EqualTo(1));
+                Assert.That(session.ProductionOutput.GetRepresentation(session.Note), Is.SameAs(drawable));
+            }
+            finally { session.ProductionOutput.SetResultCheckpoints(historyCheckpoint, checkpoint); }
+        }));
+    }
+
+    [Test]
     public void RemovalKeepsTheLastCheckBoundAndInvalidatesPooledCallbacks([Values] Kind objectKind, [Values] bool nonBatch)
     {
         load(objectKind, nonBatch: nonBatch);

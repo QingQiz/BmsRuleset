@@ -257,6 +257,19 @@ internal sealed class BmsColumnNoteIndex
         passiveDeadlineDirty = false;
     }
 
+    internal bool CanSkipPassiveChecks(double now)
+    {
+        if (!canBatchUpdates || activeLongNotes.Count != 0)
+            return false;
+
+        if (passiveDeadlineDirty)
+            RefreshDeadline(now);
+
+        // A head bound cannot cover release resolution or tails. At the bound itself,
+        // retain each rule's subtraction comparison rather than relying on rounded addition.
+        return now < NextPassiveUpdateTime;
+    }
+
     internal bool RequiresActiveLongNoteUpdate(BmsHitObject note)
     {
         if (note is not BmsLongNote longNote)

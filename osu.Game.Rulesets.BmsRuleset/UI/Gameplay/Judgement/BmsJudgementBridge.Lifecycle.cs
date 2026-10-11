@@ -53,7 +53,7 @@ internal sealed partial class BmsJudgementBridge
         context.RestoreExecutionState(frame);
     }
 
-    internal void Register(DrawableBmsHitObject drawable)
+    internal void Register(DrawableBmsHitObject drawable, bool appended = false)
     {
         if (drawable.HitObject is BmsLandmine mine)
         {
@@ -69,7 +69,8 @@ internal sealed partial class BmsJudgementBridge
         else
             return;
 
-        refreshActiveOrder();
+        if (!appended)
+            refreshActiveOrder();
     }
 
     internal void Unregister(DrawableBmsHitObject drawable)
@@ -84,7 +85,6 @@ internal sealed partial class BmsJudgementBridge
 
         context.BeginNoteRemoval(drawable.HitObject);
         if (TryGetScheduledObject(drawable, out var scheduled)) context.Schedule.BeginRemoval(scheduled);
-        refreshActiveOrder();
     }
 
     internal void UnbindRemovedNote(DrawableBmsHitObject drawable) => UnbindNoteRepresentation(drawable, drawable.BindingGeneration);

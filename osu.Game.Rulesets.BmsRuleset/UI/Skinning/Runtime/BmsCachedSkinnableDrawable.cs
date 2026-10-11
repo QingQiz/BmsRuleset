@@ -9,6 +9,10 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 
 internal partial class BmsCachedSkinnableDrawable : SkinReloadableDrawable
 {
+    // The wrapper delegates all rendering to its skin child. Its standard composite
+    // node can be omitted even when the framework misidentifies the protected factory.
+    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
+
     public Anchor? ComponentAnchor { get; init; } = Anchor.Centre;
 
     public Drawable Drawable { get; private set; } = null!;
@@ -32,6 +36,7 @@ internal partial class BmsCachedSkinnableDrawable : SkinReloadableDrawable
     {
         if (IsDisposed || LoadState < LoadState.Ready)
             return;
+
         FlushPendingSkinChanges();
         if (Drawable.LoadState < LoadState.Ready)
             LoadComponent(Drawable);

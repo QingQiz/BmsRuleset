@@ -11,18 +11,19 @@ public sealed partial class BmsColumnHitObjectContainer
     private readonly Dictionary<DrawableBmsHitObject, VisualObservation> visualObservations = [];
 
     internal void ObserveVisualTime(DrawableBmsHitObject drawable, BmsVisualTimeObserver observer)
-        => visualObservations[drawable] = new VisualObservation(drawable.HitObject, drawable.BindingGeneration, observer);
+    {
+        var observation = new VisualObservation(drawable.HitObject, drawable.BindingGeneration, observer);
+        visualObservations[drawable] = observation;
+        drawable.SetVisualTimeObserver(observation.Observer);
+    }
 
     internal void RemoveVisualObservation(DrawableBmsHitObject drawable, long generation)
     {
         if (visualObservations.TryGetValue(drawable, out var observation) && observation.Generation == generation)
+        {
             visualObservations.Remove(drawable);
-    }
-
-    private void observeVisualTime(DrawableBmsHitObject drawable, float y, in BmsColumnVisualFrame frame)
-    {
-        if (visualObservations.TryGetValue(drawable, out var observation) && observation.IsCurrent(drawable))
-            observation.Observer(y, frame);
+            drawable.ClearVisualTimeObserver(generation);
+        }
     }
 
     private void observeDeferredVisuals(in BmsColumnVisualFrame frame)

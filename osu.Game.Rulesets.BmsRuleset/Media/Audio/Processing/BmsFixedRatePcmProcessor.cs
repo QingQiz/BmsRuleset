@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Threading;
 using ManagedBass;
 using ManagedBass.Fx;
@@ -142,8 +143,11 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
                 if (samplesRead % sourceChannels != 0)
                     throw new InvalidOperationException("The PCM source returned an incomplete sample frame.");
 
-                for (var i = 0; i < samplesRead; i++)
-                    pendingSamples.Add(inputBuffer[i]);
+                var pendingCount = pendingSamples.Count;
+                var pendingEnd = checked(pendingCount + samplesRead);
+                pendingSamples.EnsureCapacity(pendingEnd);
+                CollectionsMarshal.SetCount(pendingSamples, pendingEnd);
+                inputBuffer.AsSpan(0, samplesRead).CopyTo(CollectionsMarshal.AsSpan(pendingSamples)[pendingCount..]);
 
                 sourceFramesRead += samplesRead / sourceChannels;
             }
@@ -163,6 +167,7 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
 
     private sealed class BmsBassPcmSource : IBmsPcmSource
     {
+        private const int decode_device = 0x20000;
         private readonly byte[]? retainedData;
         private int outputHandle;
 
@@ -186,6 +191,8 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
 
             try
             {
+                // Output-device replacement must not free streams owned by background decode workers.
+                detachFromOutputDevice(outputHandle);
                 if (Math.Abs(rate - 1) > 0.000001)
                 {
                     var tempoHandle = BassFx.TempoCreate(sourceHandle, BassFlags.Decode | BassFlags.FxFreeSource);
@@ -193,6 +200,7 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
                         throw new InvalidOperationException($"BASS_FX failed to create a tempo stream: {Bass.LastError}.");
 
                     outputHandle = tempoHandle;
+                    detachFromOutputDevice(outputHandle);
 
                     Bass.ChannelSetAttribute(outputHandle, ChannelAttribute.TempoUseQuickAlgorithm, 1);
                     Bass.ChannelSetAttribute(outputHandle, ChannelAttribute.TempoOverlapMilliseconds, 4);
@@ -211,6 +219,12 @@ internal sealed class BmsFixedRatePcmProcessor : IDisposable
                 Dispose();
                 throw;
             }
+        }
+
+        private static void detachFromOutputDevice(int handle)
+        {
+            if (Bass.ChannelGetDevice(handle) != decode_device && !Bass.ChannelSetDevice(handle, decode_device))
+                throw new InvalidOperationException($"BASS failed to isolate a decode stream from output-device changes: {Bass.LastError}.");
         }
 
         internal static BmsBassPcmSource FromMemory(byte[] data, double rate)

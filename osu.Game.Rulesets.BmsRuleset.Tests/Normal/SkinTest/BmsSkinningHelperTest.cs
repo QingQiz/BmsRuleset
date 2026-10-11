@@ -95,6 +95,29 @@ public class BmsSkinningHelperTest
         }
     }
 
+    private class LegacyNoteConfigSkin(DummyRenderer renderer) : CountingTextureSkin(renderer)
+    {
+        public float ReferenceWidth { get; init; }
+        public float TextureScale { get; init; } = 1;
+
+        public override Texture GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT)
+        {
+            var texture = base.GetTexture(componentName, wrapModeS, wrapModeT);
+            if (texture != null)
+                texture.ScaleAdjust = TextureScale;
+            return texture;
+        }
+
+        public override IBindable<TValue> GetConfig<TLookup, TValue>(TLookup lookup)
+        {
+            if (lookup is LegacyManiaSkinConfigurationLookup legacyLookup
+                && legacyLookup.Lookup == LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale)
+                return SkinUtils.As<TValue>(new Bindable<float>(ReferenceWidth));
+
+            return base.GetConfig<TLookup, TValue>(lookup);
+        }
+    }
+
     private class CountingComponentSkin : ISkin
     {
         public int DrawableLookups { get; private set; }
@@ -477,7 +500,7 @@ public class BmsSkinningHelperTest
         var explosionFactory = ((IBmsGameplaySkinDrawableSource)transformer).GetDrawableFactory(
             new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, BmsLayoutVariant.Bme7K, 1));
 
-        Assert.That(noteFactory!.Create(), Is.TypeOf<BmsResolvedNotePiece>());
+        Assert.That(noteFactory!.Create(), Is.TypeOf<BmsResolvedNoteSprite>());
         Assert.That(explosionFactory!.Create(), Is.TypeOf<LegacyBmsHitExplosion>());
     }
 
@@ -502,6 +525,31 @@ public class BmsSkinningHelperTest
             Assert.That(((IBmsGameplaySkinDrawableSource)transformer).GetDrawableFactory(
                 new BmsSkinComponentLookup(BmsSkinComponents.HoldNoteBody, BmsLayoutVariant.Bme7K, 1)), Is.Null);
         });
+    }
+
+    [TestCase(0f, 1f)]
+    [TestCase(-30f, 1f)]
+    [TestCase(30f, 40f)]
+    public void TestLegacyNoteFactoryPreservesSpecialCompositeScaling(float referenceWidth, float textureScale)
+    {
+        var skin = new LegacyNoteConfigSkin(renderer)
+        {
+            ReferenceWidth = referenceWidth,
+            TextureScale = textureScale,
+            TextureSizes = { ["mania-key1"] = (1, 1), ["mania-note1"] = (20, 10) },
+        };
+        var transformer = new BmsLegacySkinTransformer(skin, new BmsBeatmap
+        {
+            LayoutVariant = BmsLayoutVariant.Bme7K,
+            TotalColumns = 8,
+        });
+        var factory = ((IBmsGameplaySkinDrawableSource)transformer).GetDrawableFactory(
+            new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1));
+
+        Assert.That(transformer.GetManiaConfig<float>(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale)!.Value,
+            Is.EqualTo(referenceWidth));
+        using var drawable = factory!.Create();
+        Assert.That(drawable, Is.TypeOf<BmsResolvedNotePiece>());
     }
 
     [Test]

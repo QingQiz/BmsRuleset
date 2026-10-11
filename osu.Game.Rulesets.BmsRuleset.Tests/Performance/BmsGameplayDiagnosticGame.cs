@@ -9,10 +9,14 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Platform;
+using osu.Framework.Threading;
+using osu.Game.Beatmaps;
+using osu.Game.Database;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 
@@ -27,21 +31,46 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
     private readonly List<object> aliveSnapshots = [];
     private double nextSnapshot;
     private readonly List<object> memorySnapshots = [];
+    private readonly List<SnapshotOverhead> snapshotOverheads = [];
+    private double? boundarySetupMilliseconds;
+    private object? visualSettingsAtStart;
     private readonly List<object> framePacingChanges = [];
     private FramePacing? previousPacing;
     private FrameworkConfigManager frameworkConfig = null!;
     private Func<bool>? getVerticalSync;
     private BmsGameplayAudioProbe? audioProbe;
-    private BmsHitExplosionLimitProbe? hitExplosionLimitProbe;
     private readonly List<object> startupSlowFrames = [];
     private double startupMaxUpdateMs;
+    private TimeSpan? initialProcessCpu;
+    private (int ThreadId, long Bytes)? initialUpdateAllocation;
+    private BmsThreadCpuCounter.Snapshot? initialUpdateThreadCpu;
+    private BmsThreadCpuCounter.CycleSnapshot? initialUpdateThreadCycles;
+    private BmsThreadCpuCounter.CapturedThread? drawThreadCounter;
+    private BmsThreadCpuCounter.Snapshot? initialDrawThreadCpu;
+    private BmsThreadCpuCounter.CycleSnapshot? initialDrawThreadCycles;
+    private Func<ulong>? getDrawFrameIndex;
+    private ulong? initialDrawFrameIndex;
+    private BmsGameplayAudioProbe.Totals? initialAudio;
 
     public int ResultCode { get; private set; } = 1;
 
+    internal double CurrentChartTime => scene?.ChartTime ?? -1;
+
+    // This host reads a standalone chart directly. Creating the normal library updater
+    // downloads and decompresses online.db in each fresh report directory during sampling.
+    protected override IBeatmapUpdater CreateBeatmapUpdater() => new DiagnosticBeatmapUpdater();
+
     private readonly record struct Frame(double ChartMs, double SimulationMs, double UpdateMs, double IntervalMs, double GcPauseMs, long AllocatedBytes, int AliveObjects, bool AudioBlocked, bool AudioPaused);
 
-    private readonly record struct FramePacing(bool WindowActive, double UpdateClockHz, bool UpdateThrottling,
-                                              double? DrawClockHz, bool? DrawThrottling, bool? RendererVerticalSync);
+    private readonly record struct FramePacing(
+        bool WindowActive,
+        double UpdateClockHz,
+        bool UpdateThrottling,
+        double? DrawClockHz,
+        bool? DrawThrottling,
+        bool? RendererVerticalSync);
+
+    private readonly record struct SnapshotOverhead(double ChartMs, double MemoryMs, double AliveMs, double LogMs);
 
     protected override IDictionary<FrameworkSetting, object> GetFrameworkConfigDefaults() => new Dictionary<FrameworkSetting, object>
     {
@@ -77,11 +106,17 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
         // accessor once so recording state changes does not box a reflection result each frame.
         if (!options.Headless)
             getVerticalSync = typeof(IRenderer).GetProperty("VerticalSync", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?
-                                              .GetGetMethod(true)?.CreateDelegate<Func<bool>>(Host.Renderer);
+                .GetGetMethod(true)?.CreateDelegate<Func<bool>>(Host.Renderer);
         configureFramePacing();
-        audioProbe = new BmsGameplayAudioProbe();
-        if (options.HitExplosionLimit > 0)
-            hitExplosionLimitProbe = new BmsHitExplosionLimitProbe(options.HitExplosionLimit, options.HitExplosionPolicy);
+        if (Host.DrawThread is { } drawThread)
+        {
+            getDrawFrameIndex = typeof(GameThread).GetProperty("FrameIndex", BindingFlags.Instance | BindingFlags.NonPublic)?
+                .GetGetMethod(true)?.CreateDelegate<Func<ulong>>(drawThread);
+            drawThread.Scheduler.Add(() => Volatile.Write(ref drawThreadCounter, BmsThreadCpuCounter.CaptureCurrentThread()));
+        }
+
+        if (!options.OmitAudioProbe)
+            audioProbe = new BmsGameplayAudioProbe();
         Add(scene = new BmsGameplayDiagnosticScene(options));
     }
 
@@ -113,7 +148,7 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
         if (finished || scene == null)
             return updated;
 
-        if (timeout.Elapsed.TotalSeconds > options.Duration + 120)
+        if (timeout.Elapsed.TotalSeconds > options.Duration + options.WarmupSeconds + 120)
         {
             Finish("Timed out waiting for gameplay to complete.");
             return updated;
@@ -137,14 +172,34 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             previousPacing = pacing;
         }
 
-        initialCollections ??= [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
+        if (initialProcessCpu == null)
+        {
+            var boundaryStart = Stopwatch.GetTimestamp();
+            visualSettingsAtStart = scene.DescribeVisualSettings();
+            initialCollections = [GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)];
+            using var process = Process.GetCurrentProcess();
+            initialProcessCpu = process.TotalProcessorTime;
+            initialUpdateAllocation = (Environment.CurrentManagedThreadId, GC.GetAllocatedBytesForCurrentThread());
+            initialUpdateThreadCpu = BmsThreadCpuCounter.Read();
+            initialUpdateThreadCycles = BmsThreadCpuCounter.ReadCycles();
+            var drawCounter = Volatile.Read(ref drawThreadCounter);
+            initialDrawThreadCpu = drawCounter?.Read();
+            initialDrawThreadCycles = drawCounter?.ReadCycles();
+            initialDrawFrameIndex = getDrawFrameIndex?.Invoke();
+            initialAudio = audioProbe?.ReadTotals();
+            boundarySetupMilliseconds = Stopwatch.GetElapsedTime(boundaryStart).TotalMilliseconds;
+            if (options.OmitSnapshots)
+                Console.WriteLine(FormattableString.Invariant($"BMS_GAMEPLAY chart_ms={scene.ChartTime:F0} simulation_ms={scene.SimulationTime:F0} update_ms={elapsed:F3} alive={scene.AliveObjects()}"));
+        }
+
         if (previousFrame != 0)
             frames.Add(new Frame(scene.ChartTime, scene.SimulationTime, elapsed, Stopwatch.GetElapsedTime(previousFrame, start).TotalMilliseconds,
                 gcPause.TotalMilliseconds, allocated, scene.AliveObjects(), scene.AudioBlocked, scene.AudioPaused));
         previousFrame = start;
 
-        if (scene.ChartTime >= nextSnapshot)
+        if (!options.OmitSnapshots && scene.ChartTime >= nextSnapshot)
         {
+            var snapshotStart = Stopwatch.GetTimestamp();
             using var process = Process.GetCurrentProcess();
             memorySnapshots.Add(new
             {
@@ -154,8 +209,15 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
                 process.PrivateMemorySize64,
                 process.PeakWorkingSet64,
             });
+            var memoryEnd = Stopwatch.GetTimestamp();
             aliveSnapshots.Add(scene.DescribeAlive());
+            var aliveEnd = Stopwatch.GetTimestamp();
             Console.WriteLine(FormattableString.Invariant($"BMS_GAMEPLAY chart_ms={scene.ChartTime:F0} simulation_ms={scene.SimulationTime:F0} update_ms={elapsed:F3} alive={scene.AliveObjects()}"));
+            var logEnd = Stopwatch.GetTimestamp();
+            snapshotOverheads.Add(new SnapshotOverhead(scene.ChartTime,
+                Stopwatch.GetElapsedTime(snapshotStart, memoryEnd).TotalMilliseconds,
+                Stopwatch.GetElapsedTime(memoryEnd, aliveEnd).TotalMilliseconds,
+                Stopwatch.GetElapsedTime(aliveEnd, logEnd).TotalMilliseconds));
             nextSnapshot = scene.ChartTime + 10000;
         }
 
@@ -172,6 +234,20 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
         finished = true;
         try
         {
+            using var process = Process.GetCurrentProcess();
+            var processCpuMilliseconds = initialProcessCpu == null ? null : (double?)(process.TotalProcessorTime - initialProcessCpu.Value).TotalMilliseconds;
+            var updateThreadCpuMilliseconds = BmsThreadCpuCounter.ElapsedMilliseconds(initialUpdateThreadCpu, BmsThreadCpuCounter.Read());
+            var updateThreadCycles = BmsThreadCpuCounter.ElapsedCycles(initialUpdateThreadCycles, BmsThreadCpuCounter.ReadCycles());
+            var allocationThreadId = Environment.CurrentManagedThreadId;
+            var updateThreadAllocatedBytes = initialUpdateAllocation is { } allocation && allocation.ThreadId == allocationThreadId
+                ? (long?)(GC.GetAllocatedBytesForCurrentThread() - allocation.Bytes)
+                : null;
+            var drawCounter = Volatile.Read(ref drawThreadCounter);
+            var drawThreadCpuMilliseconds = BmsThreadCpuCounter.ElapsedMilliseconds(initialDrawThreadCpu, drawCounter?.Read());
+            var drawThreadCycles = BmsThreadCpuCounter.ElapsedCycles(initialDrawThreadCycles, drawCounter?.ReadCycles());
+            var drawFrameIndex = getDrawFrameIndex?.Invoke();
+            var drawThreadFrames = initialDrawFrameIndex is { } first && drawFrameIndex is { } last && last >= first ? (ulong?)(last - first) : null;
+            var audioDuringMeasurement = initialAudio is { } start ? audioProbe?.ReadTotals().Since(start) : null;
             Directory.CreateDirectory(options.Output);
             scene?.SaveAudioCapture();
             using (var writer = new StreamWriter(Path.Combine(options.Output, "frames.csv")))
@@ -204,17 +280,30 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
                     ExecutionMode = frameworkConfig?.Get<ExecutionMode>(FrameworkSetting.ExecutionMode).ToString(),
                     Changes = framePacingChanges,
                 },
-                Measurement = "Whole game UpdateSubTree CPU wall time; excludes draw-node generation, GPU work and throttle. Interval includes pacing. Headless skips GPU rendering. Seek simulation completes before two seconds of playback warmup.",
+                Measurement =
+                    "UpdateMs is whole game UpdateSubTree wall time, including preemption and excluding draw-node generation, GPU work and throttle. ProcessCpuMilliseconds includes all process threads over the measured interval. UpdateThreadCpuMilliseconds and DrawThreadCpuMilliseconds are Windows kernel plus user CPU time over the interval; they are null when unavailable. UpdateThreadCycles and DrawThreadCycles measure scheduled execution on their respective threads, without phase or component probes; CPU frequency changes prevent conversion to milliseconds. DrawThreadFrames counts draw-thread iterations, not GPU presentations. Headless skips GPU rendering. Seek simulation completes before the playback warmup specified by Options.WarmupSeconds. Warmup can shorten the measured interval when Start is less than WarmupSeconds.",
+                ProcessCpuMilliseconds = processCpuMilliseconds,
+                UpdateThreadCpuMilliseconds = updateThreadCpuMilliseconds,
+                UpdateThreadCycles = updateThreadCycles,
+                UpdateThreadAllocatedBytes = updateThreadAllocatedBytes,
+                UpdateAllocationBoundary = new { StartThreadId = initialUpdateAllocation?.ThreadId, EndThreadId = allocationThreadId },
+                DrawThreadCpuMilliseconds = drawThreadCpuMilliseconds,
+                DrawThreadCycles = drawThreadCycles,
+                DrawThreadFrames = drawThreadFrames,
                 LoadMs = scene?.LoadMilliseconds,
                 SeekMs = scene?.SeekMilliseconds,
                 StartupMaxUpdateMs = startupMaxUpdateMs,
                 StartupSlowFrames = startupSlowFrames,
                 Audio = audioProbe?.Snapshot(),
-                HitExplosionExperiment = hitExplosionLimitProbe?.Snapshot(),
+                AudioDuringMeasurement = audioDuringMeasurement,
+                LibraryMetadataUpdates = false,
                 Chart = scene?.Chart == null ? null : scene.DescribeChart(),
+                VisualSettings = scene?.Chart == null ? null : scene.DescribeVisualSettings(),
+                VisualSettingsAtStart = visualSettingsAtStart,
                 Summary = summarise(frames),
                 AliveSnapshots = aliveSnapshots,
                 MemorySnapshots = memorySnapshots,
+                DiagnosticOverhead = new { BoundarySetupMs = boundarySetupMilliseconds, Snapshots = snapshotOverheads },
                 Seconds = frames.GroupBy(f => (int)(f.ChartMs / 1000)).Select(g => new { Second = g.Key, Statistics = summarise(g.ToArray()) }),
                 GarbageCollections = initialCollections == null ? null : Enumerable.Range(0, 3).Select(i => GC.CollectionCount(i) - initialCollections[i]).ToArray(),
             };
@@ -230,8 +319,24 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
     protected override void Dispose(bool isDisposing)
     {
         base.Dispose(isDisposing);
+        Volatile.Read(ref drawThreadCounter)?.Dispose();
         audioProbe?.Dispose();
-        hitExplosionLimitProbe?.Dispose();
+    }
+
+    private sealed class DiagnosticBeatmapUpdater : IBeatmapUpdater
+    {
+        public void Queue(Live<BeatmapSetInfo> beatmapSet, MetadataLookupScope lookupScope = MetadataLookupScope.LocalCacheFirst)
+            => throw new NotSupportedException("The standalone gameplay diagnostic cannot update the beatmap library.");
+
+        public void Process(BeatmapSetInfo beatmapSet, MetadataLookupScope lookupScope = MetadataLookupScope.LocalCacheFirst)
+            => throw new NotSupportedException("The standalone gameplay diagnostic cannot update the beatmap library.");
+
+        public void ProcessObjectCounts(BeatmapInfo beatmapInfo, MetadataLookupScope lookupScope = MetadataLookupScope.LocalCacheFirst)
+            => throw new NotSupportedException("The standalone gameplay diagnostic cannot update the beatmap library.");
+
+        public void Dispose()
+        {
+        }
     }
 
     private static object summarise(IReadOnlyCollection<Frame> source)

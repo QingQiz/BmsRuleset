@@ -2,24 +2,34 @@
 
 [Back to README](../README.md)
 
+## Architecture and Verification
+
+Core rules run independently of drawables; the framework bridge connects results and visual feedback. Player tests
+cover input, replay, rewind, Mods, pooling, culling, and visual feedback.
+
+Run the selected functional and instrumentation groups against existing sibling reference binaries:
+
+```powershell
+./scripts/verify-judgement-migration.ps1
+```
+
+All test commands must use `--filter`. Tests tagged `JudgementInstrumentation` use a separate process
+with the repository's runsettings to keep method-entry observations visible; ordinary tests retain default
+JIT settings. Performance benchmarks require explicit approval.
+
+The verification script saves deterministic Player traces under `comparison/current` in its results directory.
+Use [compare-judgement-traces.py](../scripts/compare-judgement-traces.py) to compare traces from two builds:
+
+```powershell
+python scripts/compare-judgement-traces.py artifacts/baseline/comparison/current artifacts/candidate/comparison/current --output artifacts/comparison.json
+```
+
 ## Design Plans
 
-- [Online leaderboard plan (中文)](online-leaderboard-plan.zh-CN.md): osu! OAuth, full replay uploads, and SQLite storage. Design only; not implemented.
-- [HitObject implementation scheme (中文)](hitobject-refactor-plan.zh-CN.md): records core and Mod migration, judgement ownership boundaries, Git-based behaviour comparison and remaining acceptance work. See the [target architecture](hitobject-refactor-plan.zh-CN.md#target-structure), [Git baselines and comparison procedure](hitobject-refactor-plan.zh-CN.md#git-comparison), [validation commands](hitobject-refactor-plan.zh-CN.md#verification-commands) and [completion criteria](hitobject-refactor-plan.zh-CN.md#completion).
+- [Online leaderboard (中文)](plans/online-leaderboard-plan.zh-CN.md): osu! OAuth, replay uploads, and SQLite storage.
+- [BMSON support](plans/bmson-support-plan.md): native BMSON 1.0 parsing and shared runtime chart data.
 
-### HitObject implementation status
-
-The core, Mods, production consumers and test consumers now use the final engine contracts. See [Judgement engine](judgement-engine.md) for ownership, timing, presentation and verification entry points. Performance acceptance and final integration remain open.
-
-Independent LN/CN/HCN rules, typed runtime state, operation bindings, landmine rules and the data-driven multi-column frame entry are connected to production. `Gameplay/Judgement` contains the pure core; `BmsColumnJudgementRuntime` coordinates separate index, hold and landmine components. `UI/Gameplay/Judgement/BmsJudgementBridge` owns representation bindings and adapts lifecycle inputs and result outputs. Presentation mappings live with the drawables. The core has no UI, Drawable or graphical-clock dependency. Each drawable composes its own graphics and registers the feedback it needs, with callbacks checked against its binding generation. Layout preparation reads visual history without advancing it. Post-result scheduling uses the engine's epoch and simulation step per binding. The ruleset and the complete test project build in Release with no warnings or errors.
-
-Note, LN, CN and HCN execution tests compare framework and recording outputs directly, including pending tails, synthetic endpoints, body ticks, scratch timing and PMS rewind. The shared recorder observes automatic scheduling and preserves the frozen fixtures. Git comparisons use the same portable Player scene on both versions. Method-probe fixtures run in an explicit instrumentation profile with inlining disabled; ordinary regression and performance processes retain their default JIT settings. See the [validation record](hitobject-refactor-plan.zh-CN.md#handoff-evidence) and [preserved Git baselines](hitobject-refactor-plan.zh-CN.md#git-baselines).
-
-AutoScratch owns its input schedule directly in the mod. Its `IBmsActionProducer` implementation runs after input handling at every simulation frame, compares the cached next action time, and sends due presses/releases through the framework. `IBmsActionFilter` keeps ownership decisions in the mod; the input manager only invokes these interfaces. Ordinary rewind restores scheduled key state; resume rewind preserves it, and drawable reapplication leaves it intact. Generated inputs are recorded, while legacy AS replays use local generation. Autoplay and AS share input timing and the ordinary judgement path. See [AutoScratch input](judgement-engine.md#autoscratch-input).
-
-The core also owns the deferred hold plan and rewind coordination. Resume visibility belongs to the long-note presentation and runs even when its children are culled. Framework history and index notifications retain separate synchronous checkpoints; synthetic PMS penalty decisions remain in the core. Empty-press keysounds query core activation/results. PCM mixing and gameplay volume routing are unchanged from the original baseline.
-
-Use `scripts/verify-judgement-migration.ps1` for the filtered functional and instrumentation groups. The original runtime checkpoint exposed culled resume visibility, mode-specific body retirement and inlined observation boundaries; the production corrections are committed in `b7fb1cd7`. The ownership refactor adds coverage for direct start-time changes, sparse hold bindings, rejected activation plans and simulation feedback generations. Performance testing is currently paused at the user's request. Earlier measurements do not establish performance acceptance for this refactor.
+Both are proposals for features that are not implemented.
 
 ## Build Manually
 
@@ -63,7 +73,7 @@ Use the repository generator when updating the font.
 
 ## Gameplay Performance
 
-For reusable real Player profiling across charts, skins and long-note modes, see [Gameplay performance template (中文)](gameplay-diagnostic.zh-CN.md).
+See the [gameplay diagnostic (中文)](gameplay-diagnostic.zh-CN.md) for reusable capture instructions.
 
 ```powershell
 dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Tests.csproj -c Release --no-build --no-restore --filter 'FullyQualifiedName~TestSceneBmsInvertGameplay|FullyQualifiedName~TestSceneBmsReplayRewind|FullyQualifiedName~TestSceneBmsPauseRewind'
@@ -84,21 +94,19 @@ dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Test
 | **Parser**    | `#POORBGAxx` — per-slot POOR BGA crop definition (distinct from scalar `#POORBGA` mode)  | 2        |
 | **Parser**    | `#BGAEXPAND` — global BGA scaling mode (0=stretch, 1=keep aspect, 2=no expand)           | 2        |
 | **Parser**    | `#BGAOFF` — disable BGA for the chart                                                    | 2        |
-| **Parser**    | [BMSON support](bmson-support-plan.md)                                                   | 1        |
+| **Parser**    | [BMSON support](plans/bmson-support-plan.md)                                             | 1        |
 | **Parser**    | `#BMPxx` / `#EXBMPxx` — image definitions (non-resource-scan)                            |
 | **Parser**    | `#CDDA` — CD audio                                                                       |
 | **Parser**    | `#CHARFILE` / `#ExtChr` — character / skin                                               |
 | **Parser**    | `#EXBPMxx` — `#BPMxx` alias (BMSC parser bug workaround)                                 |
-| **Parser**    | `#EXWAVxx`, `#WAVCMD` — advanced audio controls                                          |
 | **Parser**    | `#MATERIALS` / `#MATERIALSWAV` / `#MATERIALSBMP` / `#DIVIDEPROP` — resource groups       |
 | **Parser**    | `#OCT/FP` — octave / pedal                                                               |
 | **Parser**    | `#OPTION` — forced option                                                                |
 | **Parser**    | `#PATH_WAV` / `#PATH_BMP` — resource path prefixes                                       |
 | **Parser**    | `#MOVIE` — metadata only                                                                 |          |
 | **Parser**    | `#STP` — absolute STOP sequence                                                          |
-| **Parser**    | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#MOVIE` / `#SEEKxx` — video |
+| **Parser**    | `#VIDEOFILE` / `#VIDEOf/s` / `#VIDEOCOLORS` / `#VIDEODLY` / `#SEEKxx` — video |
 | **Parser**    | `#CHARSET` — character encoding specification                                            |
-| **Parser**    | `#ExtChr` — BM98 extended character sprite display                                       |
 | **Parser**    | Channel `17` / `27` — free-zone keys                                                     |
 | **Parser**    | Channel `A6` / `#CHANGEOPTIONxx` — dynamic option changes                                |
 | **Renderer**  | Configurable POOR BGA duration — fixed at 500 ms; beatoraja uses `misslayerDuration`     | 3        |
@@ -106,4 +114,3 @@ dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Test
 | **Skin**      | `HitGreat` → `HitGreatSlow` / `HitGreatFast` split images                                |
 | **Skin**      | E-POOR judgement image                                                                   | 3        |
 | **UI**        | Lane cover / skin / movement                                                             | 2        |
-| **Perf**      | Frame spikes during mass gameplay object activation and pool return                       | 4        |

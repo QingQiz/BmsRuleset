@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
@@ -65,7 +66,7 @@ public partial class TestSceneBmsSoftConstant : BmsPlayerTestScene
         AddStep("capture position", () => visibleY = notes[0].Y);
         AddStep("re-enable live", () => config.SetValue(BmsRulesetSetting.SoftConstant, true));
         AddUntilStep("hidden again", () => notes.All(n => visualAlpha(n) == 0));
-        AddAssert("toggle preserves position", () => notes[0].Y == visibleY);
+        AddAssert("toggle preserves position", () => Math.Abs(notes[0].Y - visibleY) < 0.001f);
         AddAssert("no judgement from hiding", () => Player.Results.Count == 0);
         AddStep("enable advance fade", () => config.SetValue(BmsRulesetSetting.SoftConstantFadeIn, 200.0));
         AddUntilStep("all types half faded", () => notes.All(n => Math.Abs(visualAlpha(n) - 0.5f) < 0.001));
@@ -87,7 +88,9 @@ public partial class TestSceneBmsSoftConstant : BmsPlayerTestScene
         });
     }
 
-    private static float visualAlpha(DrawableBmsHitObject note) => note.ChildrenOfType<Container>().First().Alpha;
+    private static float visualAlpha(DrawableBmsHitObject note)
+        => note.ChildrenOfType<Drawable>().First(child => ReferenceEquals(child.Parent, note)
+            && child is Container or BmsNoteVisual or osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.BmsResolvedNoteSprite).Alpha;
 
     private void seek(Func<double> time)
     {

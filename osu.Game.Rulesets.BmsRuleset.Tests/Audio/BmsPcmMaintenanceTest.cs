@@ -139,6 +139,39 @@ public class BmsPcmMaintenanceTest
     }
 
     [Test]
+    public void ConsecutiveLiveBatchesKeepCommandsIndependentUntilTheMixerConsumesThem()
+    {
+        using var controller = CreateController(10);
+        var resources = Field<Dictionary<ushort, string>>(controller, "resolvedResources");
+        var leases = Field<Dictionary<ushort, BmsPcmAssetLease>>(controller, "leases");
+        var mixer = Field<BmsPcmVoiceMixer>(controller, "mixer");
+        var reference = new BmsPcmVoiceMixer();
+        var firstBatch = new BmsVoicePlay[8];
+        for (ushort key = 0; key < 10; key++)
+            resources[key] = key.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        for (ushort key = 0; key < firstBatch.Length; key++)
+        {
+            controller.QueueLivePlay(key, 10 + key);
+            firstBatch[key] = new BmsVoicePlay(leases[key].Asset, new BmsTerminationDomain(key), 0, (10 + key) / 100f);
+        }
+        controller.SubmitLivePlayBatch();
+        reference.SubmitPlayBatch(firstBatch);
+
+        controller.QueueLivePlay(8, 40);
+        controller.SubmitLivePlayBatch();
+        reference.SubmitPlayBatch([new BmsVoicePlay(leases[8].Asset, new BmsTerminationDomain(8), 0, 0.4f)]);
+        controller.QueuePlay(9, 100, 1000);
+        controller.SubmitLivePlayBatch();
+        controller.SubmitLivePlayBatch();
+
+        var actual = BmsPcmTestHelpers.RenderFrames(mixer, 4);
+        var expected = BmsPcmTestHelpers.RenderFrames(reference, 4);
+        Assert.That(expected[0], Is.GreaterThan(0));
+        Assert.That(actual, Is.EqualTo(expected), "Smaller, expired and empty batches must not overwrite queued PCM commands or replay stale entries.");
+        Assert.That(mixer.ActiveVoiceCount, Is.Zero);
+    }
+
+    [Test]
     public void CatchUpSustainsExistingAudioButPauseAndSeekStillStopIt()
     {
         using var controller = CreateController(1);

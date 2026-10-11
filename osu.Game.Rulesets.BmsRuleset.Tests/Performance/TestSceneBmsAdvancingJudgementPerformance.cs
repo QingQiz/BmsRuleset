@@ -13,6 +13,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -30,7 +31,9 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
     private double endTime;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
-        => CreateBmsPlayer(beatmap => [.. new BmsAutoGenerator(beatmap).Generate().Frames]);
+        => CreateBmsPlayer(beatmap => profile == "passive"
+            ? [new BmsReplayFrame(0), new BmsReplayFrame(endTime + 10000)]
+            : [.. new BmsAutoGenerator(beatmap).Generate().Frames]);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -43,10 +46,11 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
         {
             var time = 3000 + i * (profile == "dense" ? .5 : 4);
             var column = profile == "dense" ? 1 : i % 7 + 1;
-            beatmap.HitObjects.Add(profile is "overlap" or "rewind" or "mine-hcn"
+            beatmap.HitObjects.Add(profile is "overlap" or "rewind" or "mine-hcn" or "pause"
                 ? new BmsLongNote { StartTime = time, Duration = 1000, Column = column }
                 : new BmsNote { StartTime = time, Column = column });
         }
+
         endTime = beatmap.HitObjects.Max(n => n.GetEndTime()) + 500;
         if (profile == "mine-hcn")
         {
@@ -54,6 +58,7 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
             for (var time = 3201d; time < endTime - 500; time += 201)
                 beatmap.HitObjects.Add(new BmsLandmine { StartTime = time, Column = 0, LandmineDamagePercent = .1 });
         }
+
         beatmap.HitObjects.Add(new BmsNote { StartTime = endTime + 5000, Column = 1 });
         beatmap.HitObjects = beatmap.HitObjects.OrderBy(n => n.StartTime).ToList();
         BmsTestBeatmaps.SetupBeatmapInfo(beatmap, ruleset);
@@ -61,15 +66,30 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
     }
 
     [Test]
-    public void AdvancingPlayer([Values(64, 2048)] int objects, [Values("tap", "dense", "overlap", "mine-hcn", "rewind")] string workload)
+    public void AdvancingPlayer([Values(64, 2048)] int objects, [Values("tap", "dense", "overlap", "mine-hcn", "rewind", "passive", "pause", "overlap-nb", "overlap-ng", "overlap-ne")] string workload)
     {
         var samples = new List<Sample>();
         for (var run = -2; run < 7; run++)
         {
             var sampleIndex = run;
-            AddStep("load fresh sample " + run, () => { count = objects; profile = workload; LoadPlayer(); });
+            AddStep("load fresh sample " + run, () =>
+            {
+                count = objects;
+                profile = workload.StartsWith("overlap-", StringComparison.Ordinal) ? "overlap" : workload;
+                LoadPlayer(workload switch
+                {
+                    "overlap-nb" => [new BmsModNoBad()],
+                    "overlap-ng" => [new BmsModNoGood()],
+                    "overlap-ne" => [new BmsModNoGreat()],
+                    _ => [],
+                });
+            });
             AddUntilStep("sample loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
-            AddStep("seek sample start", () => { Player.GameplayClockContainer.Stop(); Player.GameplayClockContainer.Seek(2998); });
+            AddStep("seek sample start", () =>
+            {
+                Player.GameplayClockContainer.Stop();
+                Player.GameplayClockContainer.Seek(2998);
+            });
             AddUntilStep("sample at start", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 2998) < .001);
             AddStep("measure advancing sample " + run, () =>
             {
@@ -82,21 +102,32 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
                 var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
                 var start = Stopwatch.GetTimestamp();
                 var peakAlive = 0;
+                var pauses = 0;
                 for (var i = 0; i < times.Length; i++)
                 {
                     var frameStart = Stopwatch.GetTimestamp();
-                    Player.GameplayClockContainer.Seek(times[i]);
+                    Player.GameplayClockContainer.Seek(times[i].Time);
                     var attempts = 0;
                     do
                     {
                         Player.DrawableRuleset.UpdateSubTree();
                         if (++attempts > 1000) throw new InvalidOperationException("Replay catchup failed to reach the fixed input time.");
-                    } while (Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - times[i]) > .001);
+                    } while (Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - times[i].Time) > .001);
+
+                    if (times[i].Pause)
+                    {
+                        // Exercise the same hold completion and preparation rewind used by Player resume.
+                        Playfield.CompleteLongNotesAtPause(times[i].Time);
+                        Playfield.BeginResumeRewind(times[i].Time, 2998);
+                        pauses++;
+                    }
+
                     frameTimes[i] = Stopwatch.GetElapsedTime(frameStart).TotalMilliseconds;
                     var alive = 0;
                     foreach (var column in Playfield.Stage.Columns) alive += column.HitObjectContainer.AliveEntries.Count;
                     peakAlive = Math.Max(peakAlive, alive);
                 }
+
                 var elapsed = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
                 var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
                 var retained = GC.GetTotalMemory(true) - retainedBefore;
@@ -104,12 +135,14 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
                 var health = (BmsHealthProcessor)Player.HealthProcessor;
                 Assert.That(score.JudgementEvents.Count, Is.GreaterThanOrEqualTo(objects), "Every sample must execute new results instead of repeatedly timing completed notes.");
                 Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(endTime).Within(.001));
+                Assert.That(pauses, Is.EqualTo(workload == "pause" ? 2 : 0));
                 var verification = JsonSerializer.Serialize(new { score.JudgementEvents, health.GaugeHistory, Score = score.TotalScore.Value, Combo = score.Combo.Value });
                 var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(verification)));
                 if (sampleIndex >= 0)
                     samples.Add(new Sample(elapsed, allocated, retained, peakAlive, frameTimes, score.JudgementEvents.Count, health.GaugeHistory.Count, hash));
             });
         }
+
         AddStep("write measured samples", () =>
         {
             Assert.That(samples, Has.Count.EqualTo(7));
@@ -136,25 +169,47 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
         });
     }
 
-    private double[] timeline()
+    private SampleFrame[] timeline()
     {
-        var times = new List<double>();
-        append(3000);
+        var times = new List<SampleFrame>();
+        if (profile == "pause")
+        {
+            var pauseTime = 3000 + (endTime - 3500) / 2;
+            var rewindTime = Math.Max(2998, pauseTime - 5000);
+            append(3000, pauseTime);
+            times.Add(new SampleFrame(pauseTime, true));
+            append(rewindTime, pauseTime - 16);
+            times.Add(new SampleFrame(pauseTime - 16, true));
+            append(rewindTime, endTime);
+            return times.ToArray();
+        }
+
+        append(3000, endTime);
         if (profile == "rewind")
         {
             var rewindTime = 3000 + (endTime - 3500) / 2;
-            times.Add(rewindTime);
-            append(rewindTime + 16);
+            times.Add(new SampleFrame(rewindTime));
+            append(rewindTime + 16, endTime);
         }
+
         return times.ToArray();
 
-        void append(double from)
+        void append(double from, double to)
         {
-            for (var time = from; time < endTime; time += 16) times.Add(time);
-            times.Add(endTime);
+            for (var time = from; time < to; time += 16) times.Add(new SampleFrame(time));
+            times.Add(new SampleFrame(to));
         }
     }
 
-    private sealed record Sample(double Milliseconds, long AllocatedBytes, long RetainedBytes, int PeakAlive, double[] FrameMilliseconds,
-                                 int Results, int GaugeHistoryEntries, string VerificationHash);
+    private readonly record struct SampleFrame(double Time, bool Pause = false);
+
+    private sealed record Sample(
+        double Milliseconds,
+        long AllocatedBytes,
+        long RetainedBytes,
+        int PeakAlive,
+        double[] FrameMilliseconds,
+        int Results,
+        int GaugeHistoryEntries,
+        string VerificationHash);
 }

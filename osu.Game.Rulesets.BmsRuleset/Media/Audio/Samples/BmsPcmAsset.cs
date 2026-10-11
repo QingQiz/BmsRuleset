@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
@@ -67,7 +68,7 @@ internal sealed class BmsPcmAsset
             throw new InvalidOperationException("PCM chunks cannot be published after processing has ended.");
 
         var expectedStart = Interlocked.Read(ref publishedFrameCount);
-        if (chunk.StartFrame != expectedStart || chunk.FrameCount <= 0 || chunk.Samples.Length != chunk.FrameCount * Channels)
+        if (chunk.StartFrame != expectedStart || chunk.FrameCount <= 0 || chunk.Samples.Length != (long)chunk.FrameCount * Channels)
             throw new ArgumentException(@"PCM chunks must be contiguous and contain complete interleaved frames.", nameof(chunk));
 
         var chunkIndex = Volatile.Read(ref publishedChunkCount);
@@ -141,6 +142,7 @@ internal sealed class BmsPcmAsset
         internal BmsPcmChunk Chunk;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool TryReadStereoFrame(long frame, ref ReadCursor cursor, out float left, out float right)
     {
         if (State == BmsPcmAssetState.Disposed)
@@ -151,22 +153,31 @@ internal sealed class BmsPcmAsset
 
         // Voices advance sequentially but may share an asset at different offsets. Keep
         // the published chunk on each voice, avoiding a search for every sample frame.
-        var chunk = cursor.Chunk;
+        ref var chunk = ref cursor.Chunk;
         if (!ReferenceEquals(cursor.Owner, this) || frame < chunk.StartFrame || frame >= chunk.EndFrame)
         {
-            if (!tryFindChunk(frame, out chunk))
+            if (!refreshCursor(frame, ref cursor))
             {
                 left = right = 0;
                 return false;
             }
-
-            cursor.Owner = this;
-            cursor.Chunk = chunk;
         }
 
         var index = checked((int)((frame - chunk.StartFrame) * Channels));
         left = chunk.Samples[index];
         right = Channels == 1 ? left : chunk.Samples[index + 1];
+        return true;
+    }
+
+    private bool refreshCursor(long frame, ref ReadCursor cursor)
+    {
+        // Keep chunk lookup and reference writes off the per-sample cache-hit path.
+        // A failed lookup leaves the previous cursor usable for a later seek or retry.
+        if (!tryFindChunk(frame, out var chunk))
+            return false;
+
+        cursor.Owner = this;
+        cursor.Chunk = chunk;
         return true;
     }
 

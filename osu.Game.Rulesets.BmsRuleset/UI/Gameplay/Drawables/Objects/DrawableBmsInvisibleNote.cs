@@ -11,6 +11,9 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
 public sealed partial class DrawableBmsInvisibleNote : DrawableBmsHitObject
 {
+    // The marker owns its masking node; this standard outer container can be flattened.
+    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
+
     private readonly Bindable<bool> showInvisibleNotes = new();
     private Container marker = null!;
 

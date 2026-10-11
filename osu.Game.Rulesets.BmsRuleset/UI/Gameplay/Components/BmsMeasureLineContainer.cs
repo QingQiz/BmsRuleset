@@ -20,6 +20,9 @@ public sealed partial class BmsMeasureLineContainer : Container
 
     private MeasureLineInfo[] lines = [];
     private bool scrollPositionsMonotonic = true;
+    private int lastActiveFirst = -1;
+    private int lastActiveLast = -1;
+    private bool activeRangeValid;
     private BmsGameplayScrollController? scrollController;
     private BmsStage? stage;
 
@@ -33,6 +36,9 @@ public sealed partial class BmsMeasureLineContainer : Container
         Clear(false);
         activeLines.Clear();
         pooledLines.Clear();
+        activeRangeValid = false;
+        lastActiveFirst = -1;
+        lastActiveLast = -1;
 
         scrollController = owner;
         stage = ownerStage;
@@ -100,6 +106,9 @@ public sealed partial class BmsMeasureLineContainer : Container
 
     private void updateRangeByScan(double min, double max)
     {
+        // The scan can change activeLines without preserving the contiguous range cached by
+        // the monotonic paths. Invalidate it before a later mode switch back to binary search.
+        activeRangeValid = false;
         removalBuffer.Clear();
 
         foreach (var (index, _) in activeLines)
@@ -122,6 +131,11 @@ public sealed partial class BmsMeasureLineContainer : Container
 
     private void syncActiveRange(int first, int last, Func<MeasureLineInfo, double> valueSelector)
     {
+        // The scroll position changes every frame, but the visible measure indices usually do not.
+        // Avoid walking the active dictionary and rechecking every line until a boundary moves.
+        if (activeRangeValid && lastActiveFirst == first && lastActiveLast == last)
+            return;
+
         removalBuffer.Clear();
 
         foreach (var index in activeLines.Keys)
@@ -139,6 +153,10 @@ public sealed partial class BmsMeasureLineContainer : Container
             if (double.IsFinite(value))
                 showLine(i);
         }
+
+        lastActiveFirst = first;
+        lastActiveLast = last;
+        activeRangeValid = true;
     }
 
     private void showLine(int index)

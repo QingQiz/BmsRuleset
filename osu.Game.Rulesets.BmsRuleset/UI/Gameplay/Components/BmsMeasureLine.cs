@@ -2,6 +2,7 @@ using System;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 
@@ -18,6 +19,13 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
     // Progress = chosenValue - CurrentScrollPosition/Time.Current.
     private double scrollAtTick;
     private double timeAtTick;
+
+    private float lastY = float.NaN;
+    private float lastWidth = float.NaN;
+    private float lastHeight = float.NaN;
+    private float lastAlpha = float.NaN;
+    private Color4 lastColour;
+    private bool hasColour;
 
     public BmsMeasureLine()
     {
@@ -44,7 +52,12 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
 
         if (Parent == null || scrollController == null || stage == null || !stage.IsLoaded || stage.DrawHeight <= 0)
         {
-            Alpha = 0;
+            if (lastAlpha != 0)
+            {
+                lastAlpha = 0;
+                Alpha = 0;
+            }
+
             return;
         }
 
@@ -56,7 +69,12 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
         // the measure line should no longer be displayed.
         if (progress < 0)
         {
-            Alpha = 0;
+            if (lastAlpha != 0)
+            {
+                lastAlpha = 0;
+                Alpha = 0;
+            }
+
             return;
         }
 
@@ -64,15 +82,50 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
 
         if (!float.IsFinite(y))
         {
-            Alpha = 0;
+            if (lastAlpha != 0)
+            {
+                lastAlpha = 0;
+                Alpha = 0;
+            }
+
             return;
         }
 
-        X = 0;
-        Y = y - stage.BarLineHeight / 2;
-        Width = Math.Max(1, stage.DrawWidth);
-        Height = Math.Max(0, stage.BarLineHeight);
-        Alpha = Height > 0 ? 1 : 0;
-        line.Colour = stage.BarLineColour;
+        var barLineHeight = stage.BarLineHeight;
+        var lineY = y - barLineHeight / 2;
+        if (lineY != lastY)
+        {
+            lastY = lineY;
+            Y = lineY;
+        }
+
+        var lineWidth = Math.Max(1, stage.DrawWidth);
+        if (lineWidth != lastWidth)
+        {
+            lastWidth = lineWidth;
+            Width = lineWidth;
+        }
+
+        var lineHeight = Math.Max(0, barLineHeight);
+        if (lineHeight != lastHeight)
+        {
+            lastHeight = lineHeight;
+            Height = lineHeight;
+        }
+
+        var lineAlpha = lineHeight > 0 ? 1f : 0f;
+        if (lineAlpha != lastAlpha)
+        {
+            lastAlpha = lineAlpha;
+            Alpha = lineAlpha;
+        }
+
+        var colour = stage.BarLineColour;
+        if (!hasColour || colour != lastColour)
+        {
+            hasColour = true;
+            lastColour = colour;
+            line.Colour = colour;
+        }
     }
 }

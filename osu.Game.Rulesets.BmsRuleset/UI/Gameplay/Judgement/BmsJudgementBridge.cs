@@ -71,6 +71,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         if (binding == null || binding.Generation != generation)
             return;
 
+        binding.Bound = false;
         boundObjects.Remove(drawable);
         representations.Remove(binding.Note);
         drawable.OnNewResult -= binding.ResultHandler;
@@ -82,8 +83,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
             : throw new InvalidOperationException("A main result requires the current representation.");
 
     private bool isCurrent(Binding binding)
-        => binding.Drawable.BindingGeneration == binding.Generation && ReferenceEquals(binding.Drawable.HitObject, binding.Note)
-                                                                    && boundObjects.TryGetValue(binding.Drawable, out var current) && ReferenceEquals(current, binding);
+        => binding.Bound && binding.Drawable.BindingGeneration == binding.Generation && ReferenceEquals(binding.Drawable.HitObject, binding.Note);
 
     private sealed class Binding
     {
@@ -91,7 +91,12 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         internal readonly DrawableBmsHitObject Drawable;
         internal readonly long Generation;
         internal readonly Action<DrawableHitObject, JudgementResult> ResultHandler;
+
         internal BmsScheduledObject? ScheduledObject;
+
+        // Captured callbacks retain their own binding identity even if the same drawable
+        // is rebound without advancing its local generation.
+        internal bool Bound = true;
 
         internal Binding(BmsHitObject note, DrawableBmsHitObject drawable, long generation, BmsJudgementBridge output)
         {

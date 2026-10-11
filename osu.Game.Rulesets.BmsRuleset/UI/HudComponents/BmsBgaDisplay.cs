@@ -35,6 +35,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
 public sealed partial class BmsBgaDisplay : BmsHudComponent
 {
+    private const int maximum_incremental_events = 64;
+
     private static readonly string[] video_resource_extensions =
     [
         ".mp4",
@@ -85,6 +87,12 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
     private BmsScoreProcessor? scoreProcessor;
     private BmsBgaDisplay? rehostedDisplay;
     private RehostedDisplayHost? rehostedDisplayHost;
+    private Quad cachedRehostSourceQuad;
+    private DrawInfo cachedRehostPlayfieldDrawInfo;
+    private BmsPlayfield? cachedRehostPlayfield;
+    private BmsBgaDisplay? cachedRehostedDisplay;
+    private RehostedDisplayHost? cachedRehostedDisplayHost;
+    private bool rehostTransformCacheValid;
     private IBindable<double>? bgaDim;
     private readonly bool isRehostedDisplay;
 
@@ -161,13 +169,13 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
 
         var time = drawableRuleset.FrameStableClock.CurrentTime;
 
-        var pendingEvents = upperBound(events, time) - nextEventIndex;
-        var pendingOpacityEvents = upperBound(opacityEvents, time) - nextOpacityEventIndex;
-
         // Replaying every BGA event after a seek (or a long pause) can create hundreds of
         // textures/video drawables in one update. Rebuild only the final state for each layer;
         // normal frame-sized advances retain the ordered path below.
-        if (time < lastTime || pendingEvents > 64 || pendingOpacityEvents > 64)
+        // Sorted events let the first item beyond the budget prove a backlog without two binary searches per frame.
+        if (time < lastTime
+            || events.Length - nextEventIndex > maximum_incremental_events && events[nextEventIndex + maximum_incremental_events].Time <= time
+            || opacityEvents.Length - nextOpacityEventIndex > maximum_incremental_events && opacityEvents[nextOpacityEventIndex + maximum_incremental_events].Time <= time)
             rebuildStateAt(time);
 
         lastTime = time;
@@ -460,11 +468,28 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             return;
 
         var sourceQuad = ScreenSpaceDrawQuad;
+        var playfieldDrawInfo = playfield.DrawInfo;
+
+        if (rehostTransformCacheValid
+            && cachedRehostedDisplay == rehostedDisplay
+            && cachedRehostedDisplayHost == rehostedDisplayHost
+            && cachedRehostPlayfield == playfield
+            && cachedRehostSourceQuad.Equals(sourceQuad)
+            && cachedRehostPlayfieldDrawInfo.Equals(playfieldDrawInfo))
+            return;
+
         var topLeft = playfield.ToLocalSpace(sourceQuad.TopLeft);
         var topRight = playfield.ToLocalSpace(sourceQuad.TopRight);
         var bottomLeft = playfield.ToLocalSpace(sourceQuad.BottomLeft);
         var xAxis = topRight - topLeft;
         var yAxis = bottomLeft - topLeft;
+
+        cachedRehostSourceQuad = sourceQuad;
+        cachedRehostPlayfieldDrawInfo = playfieldDrawInfo;
+        cachedRehostPlayfield = playfield;
+        cachedRehostedDisplay = rehostedDisplay;
+        cachedRehostedDisplayHost = rehostedDisplayHost;
+        rehostTransformCacheValid = true;
 
         rehostedDisplayHost.Position = topLeft;
         rehostedDisplayHost.Size = new Vector2(xAxis.Length, yAxis.Length);
