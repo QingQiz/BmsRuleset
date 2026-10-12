@@ -295,9 +295,14 @@ public static class BmsReplayPatcher
     {
         var screens = validScreens?.ToArray() ?? [];
 
-        return screens.Contains(typeof(Screens.Select.SongSelect)) && !screens.Contains(typeof(BmsSongSelect))
-            ? screens.Append(typeof(BmsSongSelect))
-            : screens;
+        if (screens.Contains(typeof(Screens.Select.SongSelect)) && !screens.Contains(typeof(BmsSongSelect)))
+            return screens.Append(typeof(BmsSongSelect));
+
+        // Skin-editor gameplay previews must retain the custom solo selection screen as their return target.
+        if (screens.Contains(typeof(Screens.Select.SoloSongSelect)) && !screens.Contains(typeof(BmsSoloSongSelect)))
+            return screens.Append(typeof(BmsSoloSongSelect));
+
+        return screens;
     }
 
     private static bool isBmsScore(ScoreInfo score) => score.Ruleset.ShortName == Constant.SHORT_NAME;

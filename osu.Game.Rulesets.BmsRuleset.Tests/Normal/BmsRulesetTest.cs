@@ -369,6 +369,16 @@ public class BmsRulesetTest
     }
 
     [Test]
+    public void TestBmsSoloSongSelectIsAcceptedAsSkinEditorGameplayParent()
+    {
+        var validScreens = BmsReplayPatcher.AddBmsSongSelect([typeof(osu.Game.Screens.Play.Player), typeof(osu.Game.Screens.Select.SoloSongSelect)]).ToArray();
+
+        Assert.That(validScreens.Any(type => type.IsAssignableFrom(typeof(BmsSoloSongSelect))), Is.True);
+        Assert.That(validScreens, Does.Not.Contain(typeof(BmsSongSelect)));
+        Assert.That(BmsReplayPatcher.AddBmsSongSelect(validScreens), Is.EqualTo(validScreens));
+    }
+
+    [Test]
     public void TestPresentScorePatchDoesNotBroadenMismatchedScorePath()
     {
         var validScreens = BmsReplayPatcher.AddBmsSongSelect(Array.Empty<Type>()).ToArray();
