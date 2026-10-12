@@ -76,7 +76,11 @@ public partial class BmsBackgroundAudioPlayer(
     {
         base.Update();
 
-        if (seeking && (seekTargetTime >= seekStartTime ? Time.Current >= seekTargetTime : Time.Current <= seekTargetTime))
+        // A running source advances the rewind destination before frame-stable simulation arrives.
+        // Resuming forward playback below the starting point also completes that seek.
+        if (seeking && (seekTargetTime >= seekStartTime
+                ? Time.Current >= seekTargetTime
+                : Time.Current <= seekTargetTime || (Time.Current < seekStartTime && gameplayClock is { IsRewinding: false })))
             seeking = false;
         updatePlaybackBlocked();
 

@@ -216,6 +216,28 @@ public class BmsBackgroundAudioContinuityTest
         Assert.That(mixer.ActiveVoiceCount, Is.EqualTo(1), "Only the new target's key should play.");
     }
 
+    [Test]
+    public void RunningRewindResumesAudioWhenSourceAdvancesPastOriginalTarget()
+    {
+        createBackground([new BmsBackgroundAudioPlayer.BgmEvent(0, 1)]);
+        advanceTo(1500);
+        assertSounding();
+        background.NotifySeek(500);
+        clock.IsRewinding = true;
+        clock.CatchingUp.Value = disabled.Value = true;
+        advanceTo(550);
+        Assert.That(BmsPcmTestHelpers.RenderFrames(mixer, 441), Is.All.Zero);
+
+        clock.IsRewinding = false;
+        clock.CatchingUp.Value = disabled.Value = false;
+        advanceTo(560);
+        assertSounding();
+        controller.QueueLivePlay(0, 100);
+        controller.SubmitLivePlayBatch();
+        assertSounding();
+        Assert.That(mixer.ActiveVoiceCount, Is.EqualTo(2), "Background and new replay keys resume without another seek.");
+    }
+
     private void createBackground(BmsBackgroundAudioPlayer.BgmEvent[] events)
     {
         background = new BmsBackgroundAudioPlayer(events, paused) { Clock = clock };

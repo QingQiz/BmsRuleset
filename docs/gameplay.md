@@ -77,8 +77,6 @@ its layout, RANK/EXRANK, and active judgement-window mods.
 The algorithm is fixed at play start; setting changes apply to the next play. Replays use the recorded algorithm.
 Replays recorded before this setting existed use the original selection behaviour.
 
-Playing a replay rebuilds its statistics from the recorded inputs when its saved judgement data is incomplete.
-
 ### Long Notes
 
 The chart and the **Long Note (L1)**, **Charge Note (L2)**, or **Hell Charge Note (L3)** mod determine the long-note mode.
