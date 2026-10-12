@@ -22,6 +22,8 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
     private const float content_padding = 8;
     private const float heading_spacing = 6;
     private const float first_row_weight = 1.4f;
+    private const float scatter_row_weight = 1.3f;
+    private const float offset_row_weight = 0.7f;
     private readonly StatisticCell[] cells;
     private readonly BmsGaugeHistoryGraph gauge;
     private readonly BmsTimelineStatistic timeline;
@@ -82,10 +84,10 @@ internal partial class BmsResultStatisticsGrid : CompositeDrawable
     {
         base.UpdateAfterChildren();
 
-        // Timeline contains three subplots, so its shared row needs more height than either lower chart.
-        var rowHeight = DrawHeight / (Math.Max(0, cells.Length - 2) + first_row_weight);
+        // The timeline's three subplots and scatter's timing range need more height than the offset histogram.
+        var rowHeight = DrawHeight / (first_row_weight + scatter_row_weight + offset_row_weight);
         for (var i = 0; i < cells.Length; i++)
-            cells[i].FitSummaryToHeight(rowHeight * (i < 2 ? first_row_weight : 1));
+            cells[i].FitSummaryToHeight(rowHeight * (i < 2 ? first_row_weight : i == 2 ? scatter_row_weight : offset_row_weight));
     }
 
     private partial class StatisticCell : CompositeDrawable

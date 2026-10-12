@@ -320,7 +320,8 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
 
                 var textBounds = text.ScreenSpaceDrawQuad.AABBFloat;
                 var cellBounds = cell.ScreenSpaceDrawQuad.AABBFloat;
-                return textBounds.Left < cellBounds.Left - 1 || textBounds.Right > cellBounds.Right + 1;
+                return textBounds.Left < cellBounds.Left - 1 || textBounds.Right > cellBounds.Right + 1
+                                                           || textBounds.Top < cellBounds.Top - 1 || textBounds.Bottom > cellBounds.Bottom + 1;
             }).Select(text => text.Text.ToString()).ToArray(), () => Is.Empty);
         AddAssert("offset tick labels do not overlap", () =>
         {
@@ -362,7 +363,7 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
             var chartBounds = chart.ScreenSpaceDrawQuad.AABBFloat;
             return chartBounds.Top >= bounds.Top && chartBounds.Bottom <= bounds.Bottom + 1
                                                  && chartBounds.Left >= bounds.Left && chartBounds.Right <= bounds.Right + 1
-                                                 && chartBounds.Height > 80;
+                                                 && chartBounds.Height > (chart is BmsHitOffsetStatistic ? 50 : 80);
         }) && grid.ChildrenOfType<OsuScrollContainer>().Single().ScrollableExtent < 1;
     }
 
@@ -394,7 +395,8 @@ public partial class TestSceneBmsResultScreenStatistics : OsuManualInputManagerT
         return Math.Abs(gauge.Top - timeline.Top) < 1 && gauge.Right < timeline.Left
                                                       && scatter.Top > Math.Max(gauge.Bottom, timeline.Bottom) && offset.Top > scatter.Bottom
                                                       && Math.Abs(scatter.Left - gauge.Left) < 1 && Math.Abs(scatter.Right - timeline.Right) < 1
-                                                      && Math.Abs(offset.Left - scatter.Left) < 1 && Math.Abs(offset.Right - scatter.Right) < 1;
+                                                      && Math.Abs(offset.Left - scatter.Left) < 1 && Math.Abs(offset.Right - scatter.Right) < 1
+                                                      && scatter.Height > offset.Height;
     }
 
     [Test]
