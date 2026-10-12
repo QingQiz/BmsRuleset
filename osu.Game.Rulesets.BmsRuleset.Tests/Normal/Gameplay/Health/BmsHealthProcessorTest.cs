@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Timing;
@@ -17,6 +18,87 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Health;
 [TestFixture]
 public class BmsHealthProcessorTest
 {
+    [Test]
+    public void RecordingWarmedGaugeHistoryDoesNotAllocateSnapshots()
+    {
+        const int events = 2048;
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeTypes(BmsModAutoGauge.AUTO_GAUGE_CHAIN);
+        for (var i = 0; i < events; i++)
+            processor.ApplyHellChargeTick(true, eventTime: i);
+        processor.Rewind(-1);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < events; i++)
+            processor.ApplyHellChargeTick(true, eventTime: i);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        TestContext.WriteLine($"{events} warmed six-layer gauge updates allocated {allocated} bytes.");
+
+        Assert.That(processor.GaugeHistory, Has.Count.EqualTo(events));
+        Assert.That(allocated, Is.LessThan(4096), "Recording must defer snapshot objects until history is read.");
+    }
+
+    [Test]
+    public void GaugeHistoryMatchesAppliedStatesAcrossRewindAndNewBranch([Values] BmsGaugeProfileFamily family)
+    {
+        var processor = new BmsHealthProcessor();
+        processor.SetGaugeTypes(Enum.GetValues<BmsGaugeType>(), profileFamilyOverride: family);
+        var history = processor.GaugeHistory;
+        var expected = new List<BmsGaugeStateSnapshot[]>();
+        for (var i = 0; i < 40; i++)
+        {
+            // Guts, recovery ceilings and failed layers must keep their exact applied values.
+            if (i % 3 == 0)
+                processor.RegisterNonConsumingJudgement(HitResult.Ok, i / 2);
+            else
+                processor.ApplyHellChargeTick(i % 3 == 1, eventTime: i / 2);
+            expected.Add(processor.CurrentGaugeStates.ToArray());
+        }
+
+        Assert.That(history, Has.Count.EqualTo(expected.Count));
+        for (var i = 0; i < expected.Count; i++)
+            Assert.That(history[i].States, Is.EqualTo(expected[i]), "event " + i);
+
+        var discarded = history[^1];
+        processor.Rewind(7);
+        Assert.That(history, Has.Count.EqualTo(16));
+        Assert.That(processor.CurrentGaugeStates, Is.EqualTo(expected[15]));
+        processor.ApplyHellChargeTick(true, eventTime: 8);
+        Assert.That(history, Has.Count.EqualTo(17));
+        Assert.That(history[^1].States, Is.EqualTo(processor.CurrentGaugeStates));
+        Assert.That(discarded.States, Is.EqualTo(expected[^1]), "Read snapshots must survive truncation and storage reuse.");
+
+        processor.Rewind(7);
+        Assert.That(processor.CurrentGaugeStates, Is.EqualTo(expected[15]));
+    }
+
+    [Test]
+    public void GaugeHistoryRestoresFailureAtApplicationTime()
+    {
+        var processor = createProcessorWithClock(1200);
+        processor.SetGaugeType(BmsGaugeType.Hazard);
+        processor.ApplyHellChargeTick(true, eventTime: 500);
+        var note = new BmsNote { StartTime = 1000, Column = 1 };
+        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Ok });
+        Assert.That(processor.GaugeHistory[^1].Time, Is.EqualTo(1000));
+        Assert.That(processor.HasFailed, Is.True);
+        Assert.That(processor.HasEverFailed, Is.True);
+
+        processor.Rewind(1200);
+        Assert.That(processor.HasFailed, Is.True);
+        Assert.That(processor.HasEverFailed, Is.True);
+        Assert.That(processor.Health.Value, Is.Zero);
+
+        processor.Rewind(Math.BitDecrement(1200));
+        Assert.That(processor.GaugeHistory, Has.Count.EqualTo(1));
+        Assert.That(processor.HasFailed, Is.False);
+        Assert.That(processor.HasEverFailed, Is.False);
+        Assert.That(processor.Health.Value, Is.EqualTo(1));
+        processor.ApplyHellChargeTick(true, eventTime: 1300);
+        Assert.That(processor.HasFailed, Is.False);
+        Assert.That(processor.GaugeHistory[^1].States.Single().Failed, Is.False);
+    }
+
     [Test]
     public void TestRewindRestoresFailureAndAllGaugeLayers()
     {

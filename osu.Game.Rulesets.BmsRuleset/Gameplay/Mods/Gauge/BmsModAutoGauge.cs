@@ -77,7 +77,7 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
         score.Mods = [.. score.Mods.Where(m => m is not BmsModGauge)];
 
         if (resolvedHealthProcessor.GaugeHistory.Count > 0)
-            BmsScoreGaugeHistoryStore.Set(score, resolvedHealthProcessor.GaugeHistory);
+            BmsScoreGaugeHistoryStore.SetView(score, resolvedHealthProcessor.GaugeHistory);
 
         // Normal is represented by AG alone, so an earlier live-population attribution must be removed.
         var mod = BmsModGauge.CreateForType(resolvedHealthProcessor.WorstGaugeType);

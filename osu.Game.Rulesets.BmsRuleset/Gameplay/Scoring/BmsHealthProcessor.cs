@@ -45,8 +45,7 @@ public partial class BmsHealthProcessor : HealthProcessor
     internal BmsGaugeProfileFamily? ConfiguredProfileFamily { get; private set; }
 
     private readonly List<GaugeState> gaugeStates = [];
-    private readonly List<BmsGaugeHistoryEvent> gaugeHistory = [];
-    private readonly List<(double Time, bool Failed, bool EverFailed)> rewindHistory = [];
+    private readonly GaugeHistoryBuffer gaugeHistory = new();
     private IReadOnlyList<BmsGaugeStateSnapshot>? initialGaugeStates;
 
     // The framework only restores this flag from a drawable result. Body ticks and Empty POORs
@@ -269,7 +268,6 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.Value = GaugeProfile.InitialHealth;
         HasEverFailed = false;
         gaugeHistory.Clear();
-        rewindHistory.Clear();
         initialGaugeStates = null;
 
         // Reset all gauge states to their initial values for a fresh play.
@@ -305,19 +303,15 @@ public partial class BmsHealthProcessor : HealthProcessor
     {
         // Column result stacks revert independently. Restore all gauge layers after those stacks,
         // using application time rather than an LN's expected endpoint or clamped judgement time.
-        while (rewindHistory.Count > 0 && rewindHistory[^1].Time > time)
-        {
-            rewindHistory.RemoveAt(rewindHistory.Count - 1);
-            gaugeHistory.RemoveAt(gaugeHistory.Count - 1);
-        }
+        var failure = gaugeHistory.Rewind(time);
 
         var states = gaugeHistory.Count > 0 ? gaugeHistory[^1].States : initialGaugeStates;
         if (states == null)
             return;
 
         RestoreGaugeStates(states);
-        HasEverFailed = rewindHistory.Count > 0 && rewindHistory[^1].EverFailed;
-        set_failed(this, rewindHistory.Count > 0 && rewindHistory[^1].Failed);
+        HasEverFailed = failure.EverFailed;
+        set_failed(this, failure.Failed);
         endResultIndex = activeGaugeIndex;
     }
 
@@ -481,8 +475,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             ? gaugeStates[activeGaugeIndex].GaugeType
             : gaugeStates[^1].GaugeType;
 
-        gaugeHistory.Add(new BmsGaugeHistoryEvent(eventTime, activeGaugeType, snapshotGaugeStates()));
-        rewindHistory.Add((applicationTime ?? eventTime, HasFailed, HasEverFailed));
+        gaugeHistory.Record(gaugeStates, eventTime, applicationTime ?? eventTime, activeGaugeType, HasFailed, HasEverFailed);
     }
 
     private BmsGaugeStateSnapshot[] snapshotGaugeStates()

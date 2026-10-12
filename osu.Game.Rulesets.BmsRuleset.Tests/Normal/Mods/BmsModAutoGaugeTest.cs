@@ -82,6 +82,32 @@ public class BmsModAutoGaugeTest
     }
 
     [Test]
+    public void LiveGaugeHistoryFollowsRewindWhileClonedScoreKeepsItsSnapshot()
+    {
+        var (autoGauge, hp) = createAutoGaugeResolvedToExHard();
+        var score = new ScoreInfo { Mods = [autoGauge] };
+        autoGauge.ApplyToScore(score);
+        Assert.That(BmsScoreGaugeHistoryStore.TryGet(score, out var history), Is.True);
+        var initialCount = history.Count;
+
+        hp.RegisterEmptyPoor(2000);
+        autoGauge.ApplyToScore(score);
+        Assert.That(BmsScoreGaugeHistoryStore.TryGet(score, out var updated), Is.True);
+        Assert.That(updated, Is.SameAs(history), "Live population must share history instead of copying every prior event.");
+        Assert.That(history, Has.Count.EqualTo(initialCount + 1));
+
+        var clone = BmsScoreGaugeHistoryStore.Clone(score);
+        Assert.That(BmsScoreGaugeHistoryStore.TryGet(clone, out var saved), Is.True);
+        var savedStates = saved[^1].States.ToArray();
+        hp.Rewind(1500);
+        Assert.That(history, Has.Count.EqualTo(initialCount));
+        hp.ApplyHellChargeTick(true, eventTime: 1800);
+        Assert.That(saved, Has.Count.EqualTo(initialCount + 1));
+        Assert.That(saved[^1].Time, Is.EqualTo(2000));
+        Assert.That(saved[^1].States, Is.EqualTo(savedStates));
+    }
+
+    [Test]
     public void TestAutoGaugeAttributionDispatchedFromPopulateScore()
     {
         var (autoGauge, _) = createAutoGaugeResolvedToExHard();

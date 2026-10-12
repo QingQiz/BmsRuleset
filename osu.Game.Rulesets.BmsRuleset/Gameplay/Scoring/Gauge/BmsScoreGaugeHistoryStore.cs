@@ -14,11 +14,20 @@ public static class BmsScoreGaugeHistoryStore
         var copy = history
             .Select(e => e with { States = e.States.ToArray() })
             .ToArray();
+        set(score, copy);
+    }
 
+    internal static void SetView(ScoreInfo score, IReadOnlyList<BmsGaugeHistoryEvent> history) => set(score, history);
+
+    private static void set(ScoreInfo score, IReadOnlyList<BmsGaugeHistoryEvent> history)
+    {
         lock (histories)
         {
+            if (histories.TryGetValue(score, out var existing) && ReferenceEquals(existing.History, history))
+                return;
+
             histories.Remove(score);
-            histories.Add(score, new Holder(copy));
+            histories.Add(score, new Holder(history));
         }
     }
 

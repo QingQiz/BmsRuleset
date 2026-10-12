@@ -14,6 +14,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -66,7 +67,7 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
     }
 
     [Test]
-    public void AdvancingPlayer([Values(64, 2048)] int objects, [Values("tap", "dense", "overlap", "mine-hcn", "rewind", "passive", "pause", "overlap-nb", "overlap-ng", "overlap-ne")] string workload)
+    public void AdvancingPlayer([Values(64, 2048)] int objects, [Values("tap", "tap-ag", "dense", "overlap", "overlap-ag", "mine-hcn", "rewind", "passive", "pause", "overlap-nb", "overlap-ng", "overlap-ne")] string workload)
     {
         var samples = new List<Sample>();
         for (var run = -2; run < 7; run++)
@@ -75,9 +76,11 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
             AddStep("load fresh sample " + run, () =>
             {
                 count = objects;
-                profile = workload.StartsWith("overlap-", StringComparison.Ordinal) ? "overlap" : workload;
+                profile = workload.EndsWith("-ag", StringComparison.Ordinal) ? workload[..^3]
+                    : workload.StartsWith("overlap-", StringComparison.Ordinal) ? "overlap" : workload;
                 LoadPlayer(workload switch
                 {
+                    "tap-ag" or "overlap-ag" => [new BmsModAutoGauge()],
                     "overlap-nb" => [new BmsModNoBad()],
                     "overlap-ng" => [new BmsModNoGood()],
                     "overlap-ne" => [new BmsModNoGreat()],

@@ -11,6 +11,10 @@ the core to drawables and visual feedback. `Gameplay/Scoring` applies results to
 
 Player tests cover input, replay, rewind, Mods, pooling, culling, and visual feedback.
 
+Gauge history records exact values in contiguous buffers during gameplay. Snapshot objects are expanded when
+history is read for rewind or score export; live Auto Gauge score population shares the history view. Saved
+scores copy that view so subsequent seeks and retries cannot change their graphs.
+
 Run the selected functional and instrumentation groups against existing sibling reference binaries:
 
 ```powershell
@@ -78,6 +82,15 @@ Use the repository generator when updating the font.
 ## Gameplay Performance
 
 See the [gameplay diagnostic (中文)](gameplay-diagnostic.zh-CN.md) for reusable capture instructions.
+
+With benchmark approval, the gauge history group measures recording with fresh and reused buffers, live
+Auto Gauge score population, rewind, and score export. The advancing Player group includes `tap-ag` and
+`overlap-ag` workloads for measuring Auto Gauge through gameplay. Each benchmark uses two warmup runs and
+seven measured samples; set `BMS_PERFORMANCE_RESULTS` to save its JSON reports.
+
+```powershell
+dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Tests.csproj -c Release --no-build --no-restore --filter 'FullyQualifiedName~BmsGaugeHistoryPerformanceTest'
+```
 
 ```powershell
 dotnet test osu.Game.Rulesets.BmsRuleset.Tests/osu.Game.Rulesets.BmsRuleset.Tests.csproj -c Release --no-build --no-restore --filter 'FullyQualifiedName~TestSceneBmsInvertGameplay|FullyQualifiedName~TestSceneBmsReplayRewind|FullyQualifiedName~TestSceneBmsPauseRewind'
