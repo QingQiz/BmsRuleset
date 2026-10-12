@@ -336,7 +336,10 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             // store as before. Files the supplemental probe rejects are left for the factory's lazy
             // path (framework/missing) — no warm source is created for them.
             if (isVideo(resolvedPath))
-                videoPreloader?.Preload(resolvedPath, resources.Get(resolvedPath));
+            {
+                if (videoPreloader != null && resources.Get(resolvedPath) is { } bytes)
+                    videoPreloader.Preload(resolvedPath, bytes);
+            }
             else
                 textures.Get(resolvedPath);
         }
@@ -746,15 +749,15 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
                 Get(name);
         }
 
-        public byte[] Get(string? name)
+        public byte[]? Get(string? name)
         {
             if (string.IsNullOrWhiteSpace(name))
-                return null!;
+                return null;
 
             lock (cacheLock)
             {
                 if (cache.TryGetValue(name, out var cached))
-                    return cached!;
+                    return cached;
             }
 
             var resolved = ResolveLookup(name);
@@ -762,7 +765,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             if (resolved == null)
             {
                 setCache(name, null);
-                return null!;
+                return null;
             }
 
             lock (cacheLock)
@@ -770,7 +773,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
                 if (cache.TryGetValue(resolved, out var resolvedCached))
                 {
                     cache[name] = resolvedCached;
-                    return resolvedCached!;
+                    return resolvedCached;
                 }
             }
 
@@ -778,7 +781,7 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             if (stream == null)
             {
                 setCache(name, null);
-                return null!;
+                return null;
             }
 
             using var memory = new MemoryStream();
@@ -794,13 +797,18 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
             return bytes;
         }
 
-        public Task<byte[]> GetAsync(string? name, CancellationToken cancellationToken = default) =>
+        public Task<byte[]?> GetAsync(string? name, CancellationToken cancellationToken = default) =>
             Task.Run(() => Get(name), cancellationToken);
 
-        public Stream GetStream(string? name)
+        // The framework's generic store contract omits nullability for missing resources.
+        byte[] IResourceStore<byte[]>.Get(string name) => Get(name)!;
+
+        Task<byte[]> IResourceStore<byte[]>.GetAsync(string name, CancellationToken cancellationToken) => GetAsync(name, cancellationToken)!;
+
+        public Stream? GetStream(string? name)
         {
             var bytes = Get(name);
-            return new MemoryStream(bytes, false);
+            return bytes == null ? null : new MemoryStream(bytes, false);
         }
 
         public string? ResolveLookup(string? name)

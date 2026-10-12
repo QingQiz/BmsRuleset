@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -36,7 +37,7 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data) : IDisposable
         wakeSignal.Set();
     }
 
-    public bool TryTakeLatestFrame(out BmsSupplementalVideoFrame? frame)
+    public bool TryTakeLatestFrame([NotNullWhen(true)] out BmsSupplementalVideoFrame? frame)
     {
         frame = null;
         var targetTime = readTargetTime();
@@ -65,9 +66,6 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data) : IDisposable
             return;
         }
 
-        if (decoder == null)
-            return;
-
         using (decoder)
         {
             double lastFrameTime = 0;
@@ -90,9 +88,6 @@ internal sealed class BmsSupplementalVideoFrameSource(byte[] data) : IDisposable
                     wakeSignal.WaitOne(8);
                     continue;
                 }
-
-                if (decoded == null)
-                    continue;
 
                 lastFrameTime = decoded.Time;
 

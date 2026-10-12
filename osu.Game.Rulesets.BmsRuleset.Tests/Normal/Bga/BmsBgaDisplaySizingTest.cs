@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -8,6 +9,7 @@ using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering.Dummy;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.IO.Stores;
 using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
@@ -341,6 +343,45 @@ public class BmsBgaDisplaySizingTest
             using var stream = invokeGetStream(store, "movie.dat");
 
             Assert.That(stream.ReadByte(), Is.EqualTo(3));
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [TestCase(null)]
+    [TestCase("")]
+    [TestCase("missing.mp4")]
+    public async Task TestMissingBgaResourceReturnsNull(string name)
+    {
+        using var store = new BmsBgaDisplay.BmsBgaResourceStore(null, null);
+        var frameworkStore = (IResourceStore<byte[]>)store;
+
+        Assert.That(store.Get(name), Is.Null);
+        Assert.That(await store.GetAsync(name), Is.Null);
+        Assert.That(store.GetStream(name), Is.Null);
+        Assert.That(frameworkStore.Get(name), Is.Null);
+        Assert.That(await frameworkStore.GetAsync(name), Is.Null);
+        Assert.That(frameworkStore.GetStream(name), Is.Null);
+    }
+
+    [Test]
+    public void TestBgaResourceRemovedBeforeDeferredStreamOpenReturnsNull()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"{nameof(BmsBgaDisplaySizingTest)}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var path = Path.Combine(directory, "movie.mp4");
+            File.WriteAllBytes(path, [1]);
+
+            using var store = new BmsBgaDisplay.BmsBgaResourceStore(directory, null);
+            Assert.That(store.ResolveLookup("movie.mp4"), Is.EqualTo("movie.mp4"));
+            File.Delete(path);
+
+            Assert.That(store.GetStream("movie.mp4"), Is.Null);
         }
         finally
         {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,16 +30,21 @@ internal sealed class BmsAudioResourceStore(string basePath, CancellationToken c
             resources.AddExtension(extension);
     }
 
-    public byte[] Get(string? name)
+    public byte[]? Get(string? name)
     {
         if (!fileStore.TryResolve(name, out var path))
-            return null!;
+            return null;
 
-        return isFlac(path) ? getDecodedWave(path, name)! : fileStore.Get(name);
+        return isFlac(path) ? getDecodedWave(path, name) : fileStore.Get(name);
     }
 
-    public Task<byte[]> GetAsync(string? name, CancellationToken ct = default)
+    public Task<byte[]?> GetAsync(string? name, CancellationToken ct = default)
         => Task.Run(() => Get(name), ct);
+
+    // The framework's generic store contract omits nullability for missing resources.
+    byte[] IResourceStore<byte[]>.Get(string name) => Get(name)!;
+
+    Task<byte[]> IResourceStore<byte[]>.GetAsync(string name, CancellationToken cancellationToken) => GetAsync(name, cancellationToken)!;
 
     public Stream? GetStream(string? name)
     {
@@ -54,7 +60,7 @@ internal sealed class BmsAudioResourceStore(string basePath, CancellationToken c
 
     public IEnumerable<string> GetAvailableResources() => [];
 
-    internal bool TryResolve(string? name, out string path) => fileStore.TryResolve(name, out path);
+    internal bool TryResolve(string? name, [NotNullWhen(true)] out string? path) => fileStore.TryResolve(name, out path);
 
     public void Dispose()
     {

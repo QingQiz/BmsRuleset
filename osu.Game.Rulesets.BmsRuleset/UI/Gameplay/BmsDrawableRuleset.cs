@@ -120,7 +120,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
     public override DrawableHitObject<BmsHitObject>? CreateDrawableRepresentation(BmsHitObject h) => null;
 
-    public override void SetReplayScore(Score replayScore)
+    public override void SetReplayScore(Score? replayScore)
     {
         base.SetReplayScore(replayScore);
 

@@ -175,7 +175,7 @@ internal partial class BmsPanelLocalRankDisplay : CompositeDrawable
     {
         var currentBeatmap = Beatmap;
         var currentUser = localUser.Value;
-        var currentRuleset = ruleset?.Value;
+        var currentRuleset = ruleset.Value;
         var currentMods = selectedMods?.Value;
 
         if (currentRuleset == null || currentBeatmap == null || currentUser == null)

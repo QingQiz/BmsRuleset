@@ -64,9 +64,9 @@ public static class BmsReplayArchive
         var payload = new Payload
         {
             HasReceivedAllFrames = score.Replay.HasReceivedAllFrames,
-            Frames = score.Replay.Frames.OfType<BmsReplayFrame>().ToList(),
-            JudgementEvents = judgementEvents.Select(JudgementEventData.From).ToList(),
-            GaugeHistory = gaugeHistory.Select(GaugeHistoryEventData.From).ToList(),
+            Frames = [.. score.Replay.Frames.OfType<BmsReplayFrame>()],
+            JudgementEvents = [.. judgementEvents.Select(JudgementEventData.From)],
+            GaugeHistory = [.. gaugeHistory.Select(GaugeHistoryEventData.From)],
         };
 
         return Encoding.UTF8.GetBytes(payload.Serialize());
@@ -116,19 +116,28 @@ public static class BmsReplayArchive
             // type's default (null for List<>) — overriding the = [] initialiser. Older archives
             // may omit frames entirely, so guard against the serializer replacing the
             // collection initialiser with null.
-            // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
-            Frames = (payload.Frames ?? []).Cast<osu.Game.Rulesets.Replays.ReplayFrame>().ToList(),
+            Frames = (payload.Frames ?? []).OfType<osu.Game.Rulesets.Replays.ReplayFrame>().ToList(),
         };
 
         if (payload.Version == current_version)
         {
-            // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
-            var judgementEvents = (payload.JudgementEvents ?? []).Select(e => e.ToJudgementEvent()).ToArray();
+            var judgementEvents = new List<BmsJudgementEvent>();
+            foreach (var data in payload.JudgementEvents ?? [])
+            {
+                var judgementEvent = data?.ToJudgementEvent();
+                if (judgementEvent == null)
+                {
+                    // Partial ledgers distort the summary; playback can rebuild it from the preserved input frames.
+                    clearDerivedStatistics(score.ScoreInfo);
+                    return score;
+                }
+
+                judgementEvents.Add(judgementEvent);
+            }
             score.ScoreInfo.HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents(judgementEvents);
             BmsJudgementEventStore.Set(score.ScoreInfo, judgementEvents);
 
-            // ReSharper disable once NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
-            var gaugeHistory = (payload.GaugeHistory ?? []).Select(e => e.ToGaugeHistoryEvent()).ToArray();
+            var gaugeHistory = (payload.GaugeHistory ?? []).OfType<GaugeHistoryEventData>().Select(e => e.ToGaugeHistoryEvent()).ToArray();
             if (gaugeHistory.Length > 0)
                 BmsScoreGaugeHistoryStore.Set(score.ScoreInfo, gaugeHistory);
             else
@@ -138,12 +147,17 @@ public static class BmsReplayArchive
         {
             // Input frames remain useful across schema changes; derived statistics are rebuilt
             // by replay playback instead of guessing at a no-longer-compatible event model.
-            score.ScoreInfo.HitEvents = [];
-            BmsJudgementEventStore.Clear(score.ScoreInfo);
-            BmsScoreGaugeHistoryStore.Clear(score.ScoreInfo);
+            clearDerivedStatistics(score.ScoreInfo);
         }
 
         return score;
+    }
+
+    private static void clearDerivedStatistics(ScoreInfo scoreInfo)
+    {
+        scoreInfo.HitEvents = [];
+        BmsJudgementEventStore.Clear(scoreInfo);
+        BmsScoreGaugeHistoryStore.Clear(scoreInfo);
     }
 
     private class Payload
@@ -153,11 +167,11 @@ public static class BmsReplayArchive
 
         public bool HasReceivedAllFrames { get; init; } = true;
 
-        public List<BmsReplayFrame> Frames { get; init; } = [];
+        public List<BmsReplayFrame?>? Frames { get; init; } = [];
 
-        public List<JudgementEventData> JudgementEvents { get; init; } = [];
+        public List<JudgementEventData?>? JudgementEvents { get; init; } = [];
 
-        public List<GaugeHistoryEventData> GaugeHistory { get; init; } = [];
+        public List<GaugeHistoryEventData?>? GaugeHistory { get; init; } = [];
     }
 
     private class JudgementEventData
@@ -166,23 +180,29 @@ public static class BmsReplayArchive
 
         public bool SuppressPenalty { get; init; }
 
-        public JudgementSourceData Source { get; init; } = new();
+        public JudgementSourceData? Source { get; init; }
 
-        public List<TimingObservationData> TimingObservations { get; init; } = [];
+        public List<TimingObservationData?>? TimingObservations { get; init; } = [];
 
         public static JudgementEventData From(BmsJudgementEvent judgementEvent) => new()
         {
             Result = judgementEvent.Result,
             SuppressPenalty = judgementEvent.SuppressPenalty,
             Source = JudgementSourceData.From(judgementEvent.Source),
-            TimingObservations = judgementEvent.TimingObservations.Select(TimingObservationData.From).ToList(),
+            TimingObservations = [.. judgementEvent.TimingObservations.Select(TimingObservationData.From)],
         };
 
-        public BmsJudgementEvent ToJudgementEvent() => new(
-            Source.ToJudgementSource(),
-            Result,
-            TimingObservations.Select(observation => observation.ToTimingObservation()),
-            SuppressPenalty);
+        public BmsJudgementEvent? ToJudgementEvent()
+        {
+            if (Source == null || TimingObservations is not { Count: > 0 } data)
+                return null;
+
+            var observations = data.OfType<TimingObservationData>().Select(observation => observation.ToTimingObservation()).ToArray();
+            if (observations.Length != data.Count)
+                return null;
+
+            return new BmsJudgementEvent(Source.ToJudgementSource(), Result, observations, SuppressPenalty);
+        }
     }
 
     private class TimingObservationData
@@ -220,19 +240,19 @@ public static class BmsReplayArchive
 
         public BmsGaugeType ActiveGaugeType { get; init; }
 
-        public List<GaugeStateData> States { get; init; } = [];
+        public List<GaugeStateData?>? States { get; init; } = [];
 
         public static GaugeHistoryEventData From(BmsGaugeHistoryEvent gaugeEvent) => new()
         {
             Time = gaugeEvent.Time,
             ActiveGaugeType = gaugeEvent.ActiveGaugeType,
-            States = gaugeEvent.States.Select(GaugeStateData.From).ToList(),
+            States = [.. gaugeEvent.States.Select(GaugeStateData.From)],
         };
 
         public BmsGaugeHistoryEvent ToGaugeHistoryEvent() => new(
             Time,
             ActiveGaugeType,
-            States.Select(state => state.ToGaugeStateSnapshot()).ToArray());
+            (States ?? []).OfType<GaugeStateData>().Select(state => state.ToGaugeStateSnapshot()).ToArray());
     }
 
     private class GaugeStateData

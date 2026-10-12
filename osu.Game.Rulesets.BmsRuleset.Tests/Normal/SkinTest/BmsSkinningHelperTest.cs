@@ -311,13 +311,13 @@ public class BmsSkinningHelperTest
         using var cache = new BmsGameplaySkinCache(skin);
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
 
-        Assert.That(cache.GetDrawableFactory(lookup)!.Create(), Is.Not.Null);
-        Assert.That(cache.GetDrawableFactory(lookup)!.Create(), Is.Not.Null);
+        Assert.That(cache.GetDrawableFactory(lookup).Create(), Is.Not.Null);
+        Assert.That(cache.GetDrawableFactory(lookup).Create(), Is.Not.Null);
         Assert.That(skin.FactoryLookups, Is.EqualTo(1));
 
         skin.TriggerSourceChanged();
 
-        Assert.That(cache.GetDrawableFactory(lookup)!.Create(), Is.Not.Null);
+        Assert.That(cache.GetDrawableFactory(lookup).Create(), Is.Not.Null);
         Assert.That(skin.FactoryLookups, Is.EqualTo(2));
     }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using HarmonyLib;
@@ -95,16 +96,16 @@ internal static class BmsFrameStatisticsPatcher
             throw new InvalidOperationException($"Expected one frame statistics dequeue call, found {replacements}.");
     }
 
-    private static bool tryDequeueOnce<T>(ConcurrentQueue<T> queue, out T frame)
+    private static bool tryDequeueOnce<T>(ConcurrentQueue<T> queue, [MaybeNullWhen(false)] out T frame)
         where T : class
     {
         if (remainingFrames <= 0)
         {
-            frame = null!;
+            frame = null;
             return false;
         }
 
         remainingFrames--;
-        return queue.TryDequeue(out frame!);
+        return queue.TryDequeue(out frame);
     }
 }

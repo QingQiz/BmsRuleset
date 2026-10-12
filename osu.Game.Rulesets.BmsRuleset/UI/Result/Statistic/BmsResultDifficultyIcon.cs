@@ -76,7 +76,7 @@ internal sealed partial class BmsResultDifficultyIcon : CompositeDrawable, IHasC
 
     ITooltip<BmsResultDifficultyIcon> IHasCustomTooltip<BmsResultDifficultyIcon>.GetCustomTooltip() => new DifficultyTooltip();
 
-    BmsResultDifficultyIcon IHasCustomTooltip<BmsResultDifficultyIcon>.TooltipContent => ShowTooltip ? this : null!;
+    BmsResultDifficultyIcon? IHasCustomTooltip<BmsResultDifficultyIcon>.TooltipContent => ShowTooltip ? this : null;
 
     private partial class DifficultyTooltip : VisibilityContainer, ITooltip<BmsResultDifficultyIcon>
     {

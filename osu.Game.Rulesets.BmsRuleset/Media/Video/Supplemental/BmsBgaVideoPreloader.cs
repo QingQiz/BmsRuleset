@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using osu.Framework.Graphics;
 using osu.Framework.Timing;
 
@@ -30,7 +31,7 @@ internal sealed class BmsBgaVideoPreloader : IDisposable
         if (!BmsSupplementalVideoDecoder.TryCreate(bytes, out var probe, out _))
             return;
 
-        probe?.Dispose();
+        probe.Dispose();
 
         var source = new BmsSupplementalVideoFrameSource(bytes);
         source.Start();
@@ -40,7 +41,7 @@ internal sealed class BmsBgaVideoPreloader : IDisposable
     // One-shot: ownership of the warm frame source transfers to the drawable. A later request for
     // the same path misses and falls back to a fresh factory create — acceptable mid-game (poor BGA,
     // layer swaps) and never at gameplay entry, which is the only place the hitch was visible.
-    public bool TryCreateDrawable(string path, IClock clock, double eventStartTime, out Drawable? drawable)
+    public bool TryCreateDrawable(string path, IClock clock, double eventStartTime, [NotNullWhen(true)] out Drawable? drawable)
     {
         drawable = null;
 

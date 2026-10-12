@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using osu.Framework.IO.Stores;
 using osu.Game.Extensions;
@@ -175,6 +176,112 @@ public class BmsReplayArchiveTest
         Assert.That(history[0].ActiveGaugeType, Is.EqualTo(BmsGaugeType.Normal));
         Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Hard).Failed, Is.True);
         Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health, Is.EqualTo(0.42));
+    }
+
+    [TestCase("source", "missing")]
+    [TestCase("source", "null")]
+    [TestCase("timing_observations", "missing")]
+    [TestCase("timing_observations", "null")]
+    [TestCase("timing_observations", "empty")]
+    [TestCase("timing_observations", "null_element")]
+    [TestCase("event", "null")]
+    public void TestIncompleteJudgementDataPreservesFramesWithoutPartialStatistics(string field, string corruption)
+    {
+        var original = createScore();
+        original.ScoreInfo.Ruleset = new BmsRuleset().RulesetInfo;
+        var judgementEvent = new BmsJudgementEvent(
+            BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 2 }),
+            HitResult.Great,
+            [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 988, 1, HitResult.Great)]);
+        BmsJudgementEventStore.Set(original.ScoreInfo, [judgementEvent, judgementEvent]);
+        original.ScoreInfo.HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents([judgementEvent, judgementEvent]);
+        BmsScoreGaugeHistoryStore.Set(original.ScoreInfo,
+        [new BmsGaugeHistoryEvent(1000, BmsGaugeType.Hard, [new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0.75, false)])]);
+
+        var restored = BmsTestReplayArchive.RoundTrip(original, json =>
+        {
+            var parsed = JObject.Parse(json);
+            var events = (JArray)parsed["judgement_events"]!;
+            var data = (JObject)events[1]!;
+            switch (corruption)
+            {
+                case "missing":
+                    data.Property(field)!.Remove();
+                    break;
+
+                case "null" when field == "event":
+                    events[1] = JValue.CreateNull();
+                    break;
+
+                case "null":
+                    data[field] = JValue.CreateNull();
+                    break;
+
+                case "empty":
+                    data[field] = new JArray();
+                    break;
+
+                case "null_element":
+                    ((JArray)data[field]!).Add(JValue.CreateNull());
+                    break;
+            }
+            return parsed.ToString();
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored.Replay.Frames.Single().IsEquivalentTo(original.Replay.Frames.Single()), Is.True);
+            Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
+            Assert.That(BmsJudgementEventStore.TryGet(restored.ScoreInfo, out _), Is.False);
+            Assert.That(BmsScoreGaugeHistoryStore.TryGet(restored.ScoreInfo, out _), Is.False);
+        });
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestMissingGaugeStatesRestoresEmptyStates(bool explicitNull)
+    {
+        var original = createScore();
+        BmsScoreGaugeHistoryStore.Set(original.ScoreInfo,
+        [new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal, [new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.42, false)])]);
+
+        var restored = BmsTestReplayArchive.RoundTrip(original, json =>
+        {
+            var parsed = JObject.Parse(json);
+            var data = (JObject)parsed["gauge_history"]![0]!;
+            if (explicitNull)
+                data["states"] = JValue.CreateNull();
+            else
+                data.Property("states")!.Remove();
+            return parsed.ToString();
+        });
+
+        Assert.That(BmsScoreGaugeHistoryStore.TryGet(restored.ScoreInfo, out var history), Is.True);
+        Assert.That(history.Single().Time, Is.EqualTo(1000));
+        Assert.That(history.Single().ActiveGaugeType, Is.EqualTo(BmsGaugeType.Normal));
+        Assert.That(history.Single().States, Is.Empty);
+        Assert.That(restored.Replay.Frames.Single().Time, Is.EqualTo(1234));
+    }
+
+    [Test]
+    public void TestNullFramesAndGaugeEntriesPreserveValidEntries()
+    {
+        var original = createScore();
+        var state = new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.42, false);
+        BmsScoreGaugeHistoryStore.Set(original.ScoreInfo, [new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal, [state])]);
+
+        var restored = BmsTestReplayArchive.RoundTrip(original, json =>
+        {
+            var parsed = JObject.Parse(json);
+            ((JArray)parsed["frames"]!).Add(JValue.CreateNull());
+            ((JArray)parsed["gauge_history"]![0]!["states"]!).Add(JValue.CreateNull());
+            ((JArray)parsed["gauge_history"]!).Add(JValue.CreateNull());
+            return parsed.ToString();
+        });
+
+        Assert.That(restored.Replay.Frames.Single().IsEquivalentTo(original.Replay.Frames.Single()), Is.True);
+        Assert.That(BmsScoreGaugeHistoryStore.TryGet(restored.ScoreInfo, out var history), Is.True);
+        Assert.That(history.Single().States, Is.EqualTo([state]));
     }
 
     [Test]

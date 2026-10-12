@@ -37,10 +37,10 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     private readonly ScoreInfo? score;
     private readonly IBeatmap? playableBeatmap;
     private readonly IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)>? stages;
-    private IReadOnlyList<GaugeSeries> series = null!;
-    private IReadOnlyList<float> stageBoundaries = null!;
-    private Drawable graph = null!;
-    private Drawable legend = null!;
+    private IReadOnlyList<GaugeSeries>? series;
+    private IReadOnlyList<float> stageBoundaries = [];
+    private Drawable? graph;
+    private Drawable? legend;
 
     internal BmsGaugeHistoryGraph(IReadOnlyList<GaugeSeries> series, IReadOnlyList<float> stageBoundaries)
     {
@@ -70,21 +70,17 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     [BackgroundDependencyLoader]
     private void load()
     {
-        if (series != null)
+        if (series == null)
         {
-            rebuild();
-            return;
-        }
-
-        if (score != null)
-        {
-            series = CreateSeries(score, playableBeatmap!);
-            stageBoundaries = [];
-        }
-        else
-        {
-            series = CreateCourseSeries(stages!);
-            stageBoundaries = CreateCourseStageBoundaries(stages!);
+            if (score != null && playableBeatmap != null)
+            {
+                series = CreateSeries(score, playableBeatmap);
+            }
+            else if (stages != null)
+            {
+                series = CreateCourseSeries(stages);
+                stageBoundaries = CreateCourseStageBoundaries(stages);
+            }
         }
 
         rebuild();
@@ -100,6 +96,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
 
     private void rebuild()
     {
+        var currentSeries = series ?? throw new InvalidOperationException("Gauge data has not been initialised.");
         var height = graph?.Height ?? graph_height;
         InternalChild = new FillFlowContainer
         {
@@ -109,8 +106,8 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
             Spacing = new Vector2(0, 8),
             Children =
             [
-                graph = createGraph(),
-                legend = createLegend(),
+                graph = createGraph(currentSeries),
+                legend = createLegend(currentSeries),
             ],
         };
         graph.Height = height;
@@ -118,7 +115,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
 
     void IBmsResultStatistic.FitSummaryToHeight(float height)
     {
-        if (IsLoaded)
+        if (IsLoaded && graph != null && legend != null)
             graph.Height = Math.Max(0, height - legend.DrawHeight - 8);
     }
 
@@ -323,7 +320,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
             [points]);
     }
 
-    private Drawable createGraph()
+    private Drawable createGraph(IReadOnlyList<GaugeSeries> series)
     {
         var plotBackground = new Box
         {
@@ -435,7 +432,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         };
     }
 
-    private Drawable createLegend() => new FillFlowContainer
+    private Drawable createLegend(IReadOnlyList<GaugeSeries> series) => new FillFlowContainer
     {
         RelativeSizeAxes = Axes.X,
         AutoSizeAxes = Axes.Y,

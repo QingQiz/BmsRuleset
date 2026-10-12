@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 internal sealed class BmsGameplaySkinCache : IDisposable
 {
     private readonly ISkinSource skin;
-    private readonly Dictionary<BmsDrawableFactoryCacheKey, BmsResolvedDrawableFactory?> drawableFactories = new();
+    private readonly Dictionary<BmsDrawableFactoryCacheKey, BmsResolvedDrawableFactory> drawableFactories = new();
     private readonly Dictionary<BmsDrawableFactoryCacheKey, BmsResolvedNoteMetrics> noteMetrics = new();
     private readonly Dictionary<BmsLongNoteBodyCacheKey, BmsLongNoteBodyTextureSet?> longNoteBodyTextureSets = new();
     private readonly BmsLongNoteBodySource.BmsLongNoteBodyTextureCache rawLongNoteBodyTextures = new();
@@ -83,7 +83,7 @@ internal sealed class BmsGameplaySkinCache : IDisposable
         }
     }
 
-    public BmsResolvedDrawableFactory? GetDrawableFactory(BmsSkinComponentLookup lookup)
+    public BmsResolvedDrawableFactory GetDrawableFactory(BmsSkinComponentLookup lookup)
     {
         var key = BmsDrawableFactoryCacheKey.From(lookup);
 

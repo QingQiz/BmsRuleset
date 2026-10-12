@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Reflection;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -48,9 +49,9 @@ public static class BmsDefaultHud
         return null;
     }
 
-    private static bool tryGetBmsMainHudLookupFromUserLookup(ISkinComponentLookup lookup, out GlobalSkinnableContainerLookup mainHudLookup)
+    private static bool tryGetBmsMainHudLookupFromUserLookup(ISkinComponentLookup lookup, [NotNullWhen(true)] out GlobalSkinnableContainerLookup? mainHudLookup)
     {
-        mainHudLookup = null!;
+        mainHudLookup = null;
 
         if (lookup.GetType().FullName != "osu.Game.Skinning.UserSkinComponentLookup")
             return false;

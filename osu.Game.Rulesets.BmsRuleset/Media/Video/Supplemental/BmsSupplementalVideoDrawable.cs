@@ -99,7 +99,7 @@ internal sealed partial class BmsSupplementalVideoDrawable : CompositeDrawable
         if (!frameSource.TryTakeLatestFrame(out var frame))
             return;
 
-        var currentFrame = frame!;
+        var currentFrame = frame;
 
         using (currentFrame)
         using (var upload = currentFrame.CreateUpload())

@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -41,7 +42,7 @@ internal sealed unsafe class BmsFlacDecoder : IDisposable
         seekCallback = streamSeekCallback;
     }
 
-    public static bool TryDecodeToWave(byte[] data, out byte[]? wave, out string? error)
+    public static bool TryDecodeToWave(byte[] data, [NotNullWhen(true)] out byte[]? wave, out string? error)
     {
         wave = null;
 
@@ -50,7 +51,7 @@ internal sealed unsafe class BmsFlacDecoder : IDisposable
 
         try
         {
-            using var decoder = new BmsFlacDecoder(ffmpeg!, data);
+            using var decoder = new BmsFlacDecoder(ffmpeg, data);
             decoder.prepareDecoding();
             wave = decoder.decodeToWave();
             error = null;

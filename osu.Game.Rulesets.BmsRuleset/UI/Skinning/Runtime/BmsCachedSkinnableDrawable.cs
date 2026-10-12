@@ -55,7 +55,7 @@ internal partial class BmsCachedSkinnableDrawable : SkinReloadableDrawable
     protected override void SkinChanged(ISkinSource skin)
     {
         var retrieved = gameplaySkinCache != null
-            ? gameplaySkinCache.GetDrawableFactory(componentLookup)?.Create()
+            ? gameplaySkinCache.GetDrawableFactory(componentLookup).Create()
             : skin.GetDrawableComponent(componentLookup);
 
         if (retrieved == null)

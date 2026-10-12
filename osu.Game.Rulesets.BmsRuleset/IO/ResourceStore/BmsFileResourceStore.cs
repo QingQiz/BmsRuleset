@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -36,10 +37,15 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
         aliasIndex = null;
     }
 
-    public byte[] Get(string? name) => TryResolve(name, out var path) ? File.ReadAllBytes(path) : null!;
+    public byte[]? Get(string? name) => TryResolve(name, out var path) ? File.ReadAllBytes(path) : null;
 
-    public Task<byte[]> GetAsync(string? name, CancellationToken cancellationToken = default)
+    public Task<byte[]?> GetAsync(string? name, CancellationToken cancellationToken = default)
         => Task.Run(() => Get(name), cancellationToken);
+
+    // The framework's generic store contract omits nullability for missing resources.
+    byte[] IResourceStore<byte[]>.Get(string name) => Get(name)!;
+
+    Task<byte[]> IResourceStore<byte[]>.GetAsync(string name, CancellationToken cancellationToken) => GetAsync(name, cancellationToken)!;
 
     public Stream? GetStream(string? name)
     {
@@ -69,9 +75,9 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
     /// Resolves <paramref name="name"/> against <c>basePath</c> to a canonical full path,
     /// returning false if the result falls outside <c>basePath</c> or does not exist.
     /// </summary>
-    internal bool TryResolve(string? name, out string path)
+    internal bool TryResolve(string? name, [NotNullWhen(true)] out string? path)
     {
-        path = null!;
+        path = null;
 
         if (string.IsNullOrEmpty(name))
             return false;
@@ -83,13 +89,13 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
         catch (Exception)
         {
             // Chart-controlled value containing illegal path characters.
-            path = null!;
+            path = null;
             return false;
         }
 
         if (!IsPathInsideDirectory(path, basePath))
         {
-            path = null!;
+            path = null;
             return false;
         }
 
@@ -101,7 +107,7 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
         if (getAliasIndex().TryResolve(relativePath, out path) && File.Exists(path))
             return true;
 
-        path = null!;
+        path = null;
         return false;
     }
 
@@ -185,7 +191,7 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
             }
         }
 
-        public bool TryResolve(string alias, out string path)
+        public bool TryResolve(string alias, [NotNullWhen(true)] out string? path)
         {
             if (aliases.TryGetValue(alias, out var candidate) && candidate != null)
             {
@@ -193,7 +199,7 @@ public class BmsFileResourceStore(string basePath) : IResourceStore<byte[]>
                 return true;
             }
 
-            path = null!;
+            path = null;
             return false;
         }
 

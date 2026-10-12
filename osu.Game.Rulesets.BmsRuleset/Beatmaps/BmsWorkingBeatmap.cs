@@ -109,7 +109,7 @@ public class BmsWorkingBeatmap : WorkingBeatmap
         track.RestorePreview(gameplayTime);
     }
 
-    protected override Track GetBeatmapTrack()
+    protected override Track? GetBeatmapTrack()
     {
         var beatmap = Beatmap;
 
@@ -131,7 +131,7 @@ public class BmsWorkingBeatmap : WorkingBeatmap
             return track;
         }
 
-        return null!; // fall back to TrackVirtual by WorkingBeatmap.LoadTrack
+        return null; // fall back to TrackVirtual by WorkingBeatmap.LoadTrack
     }
 
     private static IReadOnlyList<BmsPreviewSampleEvent> createPreviewEvents(
@@ -190,7 +190,7 @@ public class BmsWorkingBeatmap : WorkingBeatmap
 
     // BMS charts do not contain osu! beatmap skins. Keeping this source out of the skin chain also
     // prevents an empty LegacyBeatmapSkin from overriding the selected user skin during gameplay.
-    protected override ISkin GetSkin() => null!;
+    protected override ISkin? GetSkin() => null;
 
     protected override Storyboard GetStoryboard() => inner.Storyboard;
 

@@ -68,12 +68,12 @@ internal sealed partial class BmsStageHudController : Component
 
         normaliseProportionalHudWidth();
         scheduleStageHudSingleton();
-        SetNoteHeightScale(stageHud?.NoteHeightScale.Value ?? 1);
+        SetNoteHeightScale(hud.NoteHeightScale.Value);
         tryInitialiseHudSize();
         updateStageTransform();
         updatePositionOffsetRanges();
-        SetHitTargetPositionOffset(stageHud!.JudgementLineOffset.Value);
-        SetLightPositionOffset(stageHud.LightPositionOffset.Value);
+        SetHitTargetPositionOffset(hud.JudgementLineOffset.Value);
+        SetLightPositionOffset(hud.LightPositionOffset.Value);
     }
 
     internal void SetHitTargetPositionOffset(float offset) => playfield.Stage.SetHitTargetPositionOffset(offset);

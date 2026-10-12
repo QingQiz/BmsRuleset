@@ -315,8 +315,7 @@ internal abstract partial class BmsBeatmapPanel : Panel
     {
         if (CurrentBeatmap == null)
         {
-            if (KeyCountText != null)
-                KeyCountText.Alpha = 0;
+            KeyCountText.Alpha = 0;
             return;
         }
 

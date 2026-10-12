@@ -1237,7 +1237,7 @@ public class BmsLegacySkinTransformerTest
         using var cache = new BmsGameplaySkinCache(source);
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
 
-        Assert.That(cache.GetDrawableFactory(lookup)?.Create(), Is.Not.Null);
+        Assert.That(cache.GetDrawableFactory(lookup).Create(), Is.Not.Null);
     }
 
     [Test]
@@ -1258,7 +1258,7 @@ public class BmsLegacySkinTransformerTest
         using var cache = new BmsGameplaySkinCache(source);
         var lookup = new BmsSkinComponentLookup(BmsSkinComponents.Note, BmsLayoutVariant.Bme7K, 1);
 
-        Assert.That(cache.GetDrawableFactory(lookup)?.Create(), Is.SameAs(parentDrawable));
+        Assert.That(cache.GetDrawableFactory(lookup).Create(), Is.SameAs(parentDrawable));
     }
 
     [Test]

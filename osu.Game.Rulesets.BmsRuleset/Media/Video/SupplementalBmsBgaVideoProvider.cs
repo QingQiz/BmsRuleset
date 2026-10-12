@@ -75,7 +75,7 @@ internal sealed class SupplementalBmsBgaVideoProvider : IBmsBgaVideoProvider
             if (!BmsSupplementalVideoDecoder.TryCreate(memory.ToArray(), out var decoder, out _))
                 return false;
 
-            decoder!.Dispose();
+            decoder.Dispose();
             return true;
         }
         finally

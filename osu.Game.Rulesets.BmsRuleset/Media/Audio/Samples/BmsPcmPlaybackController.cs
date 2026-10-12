@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -399,7 +400,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             sourceOffset,
             epoch);
 
-    private bool tryGetReadyAsset(ushort sampleKey, out BmsPcmAsset asset)
+    private bool tryGetReadyAsset(ushort sampleKey, [NotNullWhen(true)] out BmsPcmAsset? asset)
     {
         if (leases.TryGetValue(sampleKey, out var lease)
             && lease.Asset.State is BmsPcmAssetState.Ready or BmsPcmAssetState.Complete)
@@ -408,7 +409,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
             return true;
         }
 
-        asset = null!;
+        asset = null;
         return false;
     }
 
@@ -439,7 +440,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
         }
     }
 
-    private bool tryResolveWithExtensions(string lookup, out string identity)
+    private bool tryResolveWithExtensions(string lookup, [NotNullWhen(true)] out string? identity)
     {
         if (resourceStore!.TryResolve(lookup, out identity))
             return true;
@@ -451,7 +452,7 @@ internal sealed class BmsPcmPlaybackController : IDisposable
                 return true;
         }
 
-        identity = null!;
+        identity = null;
         return false;
     }
 

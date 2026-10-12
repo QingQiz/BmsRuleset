@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
@@ -206,7 +207,7 @@ internal sealed unsafe class BmsSupplementalFFmpegFuncs
         }
     }
 
-    public static bool TryCreate(out BmsSupplementalFFmpegFuncs? funcs, out string? error)
+    public static bool TryCreate([NotNullWhen(true)] out BmsSupplementalFFmpegFuncs? funcs, out string? error)
     {
         (funcs, error) = resolved.Value;
         return funcs != null;

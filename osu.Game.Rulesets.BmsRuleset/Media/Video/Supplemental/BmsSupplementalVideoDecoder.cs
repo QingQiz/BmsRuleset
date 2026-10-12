@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -116,7 +117,7 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
 
     #endregion
 
-    public static bool TryCreate(byte[] data, out BmsSupplementalVideoDecoder? decoder, out string? error)
+    public static bool TryCreate(byte[] data, [NotNullWhen(true)] out BmsSupplementalVideoDecoder? decoder, out string? error)
     {
         decoder = null;
         error = null;
@@ -126,7 +127,7 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
 
         try
         {
-            decoder = new BmsSupplementalVideoDecoder(ffmpeg!, data);
+            decoder = new BmsSupplementalVideoDecoder(ffmpeg, data);
             decoder.prepareDecoding();
             return true;
         }
@@ -139,7 +140,7 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
         }
     }
 
-    public bool TryDecodeNextFrame(out BmsSupplementalVideoFrame? frame, out string? error)
+    public bool TryDecodeNextFrame([NotNullWhen(true)] out BmsSupplementalVideoFrame? frame, out string? error)
     {
         frame = null;
         error = null;
@@ -279,7 +280,7 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
         return decoder.dataStream.Position;
     }
 
-    private bool trySendPendingPacket(AVFrame* decodedFrame, AVFrame* rgbaFrame, out BmsSupplementalVideoFrame? frame, out string? error)
+    private bool trySendPendingPacket(AVFrame* decodedFrame, AVFrame* rgbaFrame, [NotNullWhen(true)] out BmsSupplementalVideoFrame? frame, out string? error)
     {
         frame = null;
         error = null;
@@ -307,7 +308,7 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
         return false;
     }
 
-    private bool tryDrainDecoder(AVFrame* decodedFrame, AVFrame* rgbaFrame, out BmsSupplementalVideoFrame? frame, out string? error)
+    private bool tryDrainDecoder(AVFrame* decodedFrame, AVFrame* rgbaFrame, [NotNullWhen(true)] out BmsSupplementalVideoFrame? frame, out string? error)
     {
         frame = null;
         error = null;
@@ -336,7 +337,7 @@ internal sealed unsafe class BmsSupplementalVideoDecoder : IDisposable
         return false;
     }
 
-    private bool tryReceiveDecodedFrame(AVFrame* decodedFrame, AVFrame* rgbaFrame, out BmsSupplementalVideoFrame? frame, out string? error)
+    private bool tryReceiveDecodedFrame(AVFrame* decodedFrame, AVFrame* rgbaFrame, [NotNullWhen(true)] out BmsSupplementalVideoFrame? frame, out string? error)
     {
         frame = null;
         error = null;

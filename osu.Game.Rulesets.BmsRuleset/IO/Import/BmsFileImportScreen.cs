@@ -1,5 +1,3 @@
-#nullable disable
-
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -23,7 +21,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.IO.Import;
 
-public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) : OsuScreen
+public partial class BmsFileImportScreen(BmsRulesetConfigManager? config = null) : OsuScreen
 {
     public override bool HideOverlaysOnEnter => true;
 
@@ -40,24 +38,23 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
     [Cached]
     private OverlayColourProvider colourProvider = new(OverlayColourScheme.Purple);
 
-    private FillFlowContainer buttonGroup;
-    private Bindable<string> lastImportPath;
+    private Bindable<string>? lastImportPath;
 
-    private BmsFileImporter importer;
+    private BmsFileImporter? importer;
     private LoadingLayer loadingLayer = null!;
     private bool isImporting;
 
     [Resolved(CanBeNull = true)]
-    private BmsRulesetConfigManager resolvedConfig { get; set; }
+    private BmsRulesetConfigManager? resolvedConfig { get; set; }
 
     [Resolved(CanBeNull = true)]
-    private RealmAccess realm { get; set; }
+    private RealmAccess? realm { get; set; }
 
     [Resolved(CanBeNull = true)]
-    private Storage storage { get; set; }
+    private Storage? storage { get; set; }
 
     [Resolved(CanBeNull = true)]
-    private INotificationOverlay notifications { get; set; }
+    private INotificationOverlay? notifications { get; set; }
 
     public override void OnEntering(ScreenTransitionEvent e)
     {
@@ -83,9 +80,9 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
         importer = realm != null && storage != null
             ? new BmsFileImporter(realm, storage, notifications)
-            : null!;
+            : null;
 
-        buttonGroup = new FillFlowContainer
+        var buttonGroup = new FillFlowContainer
         {
             Anchor = Anchor.BottomCentre,
             Origin = Anchor.BottomCentre,
@@ -102,13 +99,18 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
                     Text = BmsStrings.ImportSelectedFile,
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
-                    Action = () => startImport(fileSelector.CurrentFile.Value?.FullName),
+                    Action = () =>
+                    {
+                        if (fileSelector.CurrentFile.Value is { } file)
+                            startImport(file.FullName);
+                    },
                 },
                 buttons[1] = new RoundedButton
                 {
                     Text = BmsStrings.ImportCurrentFolder,
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
+                    Enabled = { Value = importer != null },
                     Action = () => Task.Run(() => startDirectoryImport(false)),
                 },
                 buttons[2] = new RoundedButton
@@ -117,6 +119,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
                     TooltipText = BmsStrings.ImportDirectoryRecursiveTooltip,
                     RelativeSizeAxes = Axes.X,
                     Height = button_height,
+                    Enabled = { Value = importer != null },
                     Action = () => Task.Run(() => startDirectoryImport(true)),
                 },
             ],
@@ -199,7 +202,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
                           && newDirectory.Exists
                           && newDirectory.EnumerateFiles().Any(f => Constant.BMS_EXTENSIONS.Contains(f.Extension));
 
-        buttons[1].Enabled.Value = hasBmsFiles;
+        buttons[1].Enabled.Value = importer != null && hasBmsFiles;
 
         if (newDirectory != null)
         {
@@ -209,20 +212,20 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
     private void fileChanged(ValueChangedEvent<FileInfo> selectedFile)
     {
-        buttons[0].Enabled.Value = selectedFile.NewValue != null;
+        buttons[0].Enabled.Value = importer != null && selectedFile.NewValue != null;
         currentFileText.Text = selectedFile.NewValue?.Name ?? BmsStrings.SelectFileOrFolder;
     }
 
     private void startImport(params string[] paths)
     {
-        if (paths.Length == 0)
+        if (importer is not { } currentImporter || paths.Length == 0)
             return;
 
         // Schedule the UI setup (FadeIn + flag) on the update thread so this method is safe to
         // call from button actions, directory-change handlers, or thread-pool continuations.
         Task.Run(async () =>
         {
-            await importer.Import(paths).ConfigureAwait(false);
+            await currentImporter.Import(paths).ConfigureAwait(false);
             Schedule(() =>
             {
                 loadingLayer.FadeOut(duration);
@@ -234,7 +237,7 @@ public partial class BmsFileImportScreen(BmsRulesetConfigManager config = null) 
 
     private void startDirectoryImport(bool recursive)
     {
-        if (isImporting) return;
+        if (importer == null || isImporting) return;
 
         Schedule(() =>
         {

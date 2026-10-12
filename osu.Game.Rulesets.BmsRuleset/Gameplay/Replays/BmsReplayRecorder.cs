@@ -10,7 +10,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 
 public partial class BmsReplayRecorder(Score score, BmsJudgementAlgorithm algorithm = BmsJudgementAlgorithm.Combo) : ReplayRecorder<BmsAction>(score)
 {
-    protected override ReplayFrame HandleFrame(Vector2 mousePosition, List<BmsAction> actions, ReplayFrame previousFrame) =>
+    protected override ReplayFrame HandleFrame(Vector2 mousePosition, List<BmsAction> actions, ReplayFrame? previousFrame) =>
         new BmsReplayFrame(Time.Current, actions.ToArray())
         {
             // Keep the session choice with the input frames so archive export and score cloning
