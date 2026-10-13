@@ -21,6 +21,7 @@
 
 ## Documentation and In-Game Descriptions
 
+- Do not edit README files for internal refactors, replay storage changes, or test changes unless explicitly requested. Update gameplay documentation only when players need to know about a changed behaviour.
 - When settings, mods, or gameplay behaviour change, update the corresponding sections of the documentation as part of the same change.
 - Write documentation for players: explain how to use features and their effects on gameplay, without implementation details.
 - Keep documentation brief and focused on essential usage and effects. Cover edge cases, mod combinations, and detailed behaviour only when explicitly requested.
