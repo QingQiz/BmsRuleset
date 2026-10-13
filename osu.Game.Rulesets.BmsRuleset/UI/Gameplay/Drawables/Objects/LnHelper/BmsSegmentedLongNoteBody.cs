@@ -29,6 +29,8 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 /// </remarks>
 public sealed partial class BmsSegmentedLongNoteBody : CompositeDrawable
 {
+    // UV-cropped animation frames need no composite node; spatial slices retain their mask.
+    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
 
     public Color4 BodyColour
     {

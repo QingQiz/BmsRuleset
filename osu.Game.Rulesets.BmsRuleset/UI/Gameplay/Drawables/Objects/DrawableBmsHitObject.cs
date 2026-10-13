@@ -114,7 +114,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected void UseDirectVisual(Drawable visual)
     {
-        // Single-piece notes can compose the visibility fade on their existing skin wrapper.
+        // A single visual can compose the visibility fade independently of hit/miss transforms.
         // Removing the empty layer avoids another traversal and invalidation per scrolling note.
         RemoveInternal(visualLayer, true);
         AddInternal(visualLayer = visual);
@@ -152,7 +152,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
         Anchor = Anchor.BottomLeft;
         Origin = Anchor.BottomLeft;
         RelativeSizeAxes = Axes.X;
-        AddInternal(visualLayer = new Container { RelativeSizeAxes = Axes.X });
+        AddInternal(visualLayer = new VisualContainer { RelativeSizeAxes = Axes.X });
     }
 
     internal void ApplyBmsResult(HitResult result, bool suppressPenalty)
@@ -244,6 +244,12 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected override void LoadSamples()
     {
+    }
+
+    private sealed partial class VisualContainer : Container
+    {
+        // The framework's reflection fallback misses the inherited protected draw-node factory.
+        protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
     }
 }
 

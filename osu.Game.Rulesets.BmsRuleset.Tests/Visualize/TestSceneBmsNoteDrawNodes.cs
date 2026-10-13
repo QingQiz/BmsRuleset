@@ -19,6 +19,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 using osu.Game.Tests.Visual;
 using osuTK;
@@ -104,9 +105,14 @@ public partial class TestSceneBmsNoteDrawNodes : BmsPlayerTestScene
             wrappers = Playfield.ChildrenOfType<DrawableBmsHitObject>().Cast<CompositeDrawable>()
                                 .Concat(Playfield.ChildrenOfType<BmsCachedSkinnableDrawable>())
                                 .Concat(Playfield.ChildrenOfType<BmsResolvedNotePiece>())
+                                .Concat(Playfield.ChildrenOfType<DrawableBmsHitObject>()
+                                                 .Where(note => note.HitObject is BmsLongNote)
+                                                 .Select(note => (CompositeDrawable)visualLayer.GetValue(note)!))
+                                .Concat(Playfield.ChildrenOfType<BmsSegmentedLongNoteBody>().Where(body => !body.Masking))
                                 .Where(wrapper => wrapper.IsLoaded).ToArray();
             return wrappers.OfType<DrawableBmsHitObject>().Count(note => note.IsPresent) == 4
                    && wrappers.OfType<BmsCachedSkinnableDrawable>().Any()
+                   && (skin != BmsTestSkins.SkinKind.Legacy || wrappers.OfType<BmsSegmentedLongNoteBody>().Any())
                    && (wrappers.OfType<BmsResolvedNotePiece>().Any()
                        || Playfield.ChildrenOfType<BmsResolvedNoteSprite>().Any(sprite => sprite.IsLoaded));
         });
@@ -143,6 +149,54 @@ public partial class TestSceneBmsNoteDrawNodes : BmsPlayerTestScene
                 note.UpdateSoftConstantVisibility(1);
                 localVertexBatch.SetValue(visual, false);
             }
+        });
+        AddStep("compare invisible marker with former composition", () =>
+        {
+            var note = wrappers.OfType<DrawableBmsInvisibleNote>().Single();
+            var marker = note.ChildrenOfType<Container>().Single();
+            Assert.That(marker.Parent, Is.SameAs(note));
+            Assert.That(marker.Masking, Is.True);
+            Assert.That(visualLayer.GetValue(note), Is.SameAs(marker));
+
+            float[] heights = [0.5f, 1, 1.37f];
+            float[] alphas = [1, 0.4f];
+            foreach (var height in heights)
+            foreach (var alpha in alphas)
+            {
+                Playfield.Stage.SetNoteHeightScale(height);
+                note.UpdateSoftConstantVisibility(alpha);
+                note.Alpha = 0.6f;
+                note.UpdateSubTree();
+                for (var slot = 0; slot < 3; slot++)
+                {
+                    var direct = snapshot(generate(note, ++frame, slot, true), out _, out _);
+                    var originalMarker = new Container { RelativeSizeAxes = Axes.X, Scale = marker.Scale };
+                    var originalLayer = new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Alpha = marker.Alpha,
+                        Child = originalMarker,
+                    };
+                    remove(note, marker, false);
+                    marker.Scale = Vector2.One;
+                    marker.Alpha = 1;
+                    originalMarker.Add(marker);
+                    add(note, originalLayer);
+                    note.UpdateSubTree();
+                    var composed = snapshot(generate(note, ++frame, slot, true), out _, out _);
+                    Assert.That(composed, Is.EqualTo(direct), $"Buffer {slot} changed invisible marker state at height {height}, alpha {alpha}.");
+                    originalMarker.Remove(marker, false);
+                    remove(note, originalLayer, true);
+                    add(note, marker);
+                    marker.Scale = new Vector2(1, height);
+                    marker.Alpha = alpha;
+                    note.UpdateSubTree();
+                }
+            }
+            Playfield.Stage.SetNoteHeightScale(1);
+            note.UpdateSoftConstantVisibility(1);
+            note.Alpha = 1;
+            note.UpdateSubTree();
         });
         AddStep("compare direct key pieces with former composition", () =>
         {
@@ -192,6 +246,9 @@ public partial class TestSceneBmsNoteDrawNodes : BmsPlayerTestScene
         {
             foreach (var wrapper in wrappers)
             {
+                localVertexBatch.SetValue(wrapper, true);
+                Assert.That(canFlatten(wrapper), Is.False);
+                localVertexBatch.SetValue(wrapper, false);
                 masking.SetValue(wrapper, true);
                 Assert.That(canFlatten(wrapper), Is.False);
                 masking.SetValue(wrapper, false);
@@ -246,7 +303,7 @@ public partial class TestSceneBmsNoteDrawNodes : BmsPlayerTestScene
                     states.AddRange(batch.Select(sprite => (object)((IDrawable)sprite.Sprite, sprite.Texture, sprite.Quad, sprite.Colour)));
                     return;
                 }
-                if (readSource(child) is BmsCachedSkinnableDrawable or BmsResolvedNotePiece)
+                if (readSource(child) is CompositeDrawable wrapper && wrapper is not DrawableBmsHitObject && wrappers.Contains(wrapper))
                     count++;
                 if (readSource(child) is DrawableBmsHitObject)
                     notes++;

@@ -28,21 +28,17 @@ public sealed partial class DrawableBmsInvisibleNote : DrawableBmsHitObject
     {
         config?.BindWith(BmsRulesetSetting.ShowInvisibleNotes, showInvisibleNotes);
 
-        Visuals.Add(marker = new Container
+        UseDirectVisual(marker = new Container
         {
+            Anchor = Anchor.TopLeft,
+            Origin = Anchor.BottomLeft,
             RelativeSizeAxes = Axes.X,
-            Child = new Container
-            {
-                Anchor = Anchor.TopLeft,
-                Origin = Anchor.BottomLeft,
-                RelativeSizeAxes = Axes.X,
-                Height = 8,
-                Masking = true,
-                BorderThickness = 2,
-                BorderColour = Color4.Yellow,
-                // A transparent interior keeps simultaneous visible notes readable.
-                Child = new Box { RelativeSizeAxes = Axes.Both, Alpha = 0, AlwaysPresent = true },
-            },
+            Height = 8,
+            Masking = true,
+            BorderThickness = 2,
+            BorderColour = Color4.Yellow,
+            // A transparent interior keeps simultaneous visible notes readable.
+            Child = new Box { RelativeSizeAxes = Axes.Both, Alpha = 0, AlwaysPresent = true },
         });
     }
 
