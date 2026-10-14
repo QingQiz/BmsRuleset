@@ -24,6 +24,21 @@ public static class BmsJudgementProfileProvider
 
     private static IReadOnlyList<IApplicableToJudgementWindow> activeWindowMods = [];
 
+    [ThreadStatic]
+    private static IReadOnlyList<IApplicableToJudgementWindow>? simulationWindowMods;
+
+    internal static IDisposable UseWindowMods(IReadOnlyList<IApplicableToJudgementWindow> mods)
+    {
+        var previous = simulationWindowMods;
+        simulationWindowMods = mods;
+        return new WindowModScope(previous);
+    }
+
+    private sealed class WindowModScope(IReadOnlyList<IApplicableToJudgementWindow>? previous) : IDisposable
+    {
+        public void Dispose() => simulationWindowMods = previous;
+    }
+
     internal static void SetActiveWindowMods(IReadOnlyList<IApplicableToJudgementWindow> mods)
         => activeWindowMods = mods;
 
@@ -50,7 +65,8 @@ public static class BmsJudgementProfileProvider
     private static BmsJudgementWindowTable getTable(BmsLayoutVariant layout, int column, double judgementRate, bool tail)
     {
         var key = new ProfileKey(layout, judgementRate);
-        if (!lastWindowTables.IsCurrent(key, activeWindowMods))
+        var mods = simulationWindowMods ?? activeWindowMods;
+        if (!lastWindowTables.IsCurrent(key, mods))
         {
             if (lastProfile.Profile == null || lastProfile.Key != key)
                 lastProfile = (key, profiles.GetOrAdd(key, static k => createProfile(k.Layout, k.Rate)));
@@ -58,23 +74,25 @@ public static class BmsJudgementProfileProvider
             var profile = lastProfile.Profile;
             lastWindowTables = new WindowTableCache(
                 key,
-                activeWindowMods,
-                applyWindowMods(profile.Normal),
-                applyWindowMods(profile.Scratch),
-                applyWindowMods(profile.LongNoteTail),
-                applyWindowMods(profile.LongScratchTail));
+                mods,
+                applyWindowMods(profile.Normal, mods),
+                applyWindowMods(profile.Scratch, mods),
+                applyWindowMods(profile.LongNoteTail, mods),
+                applyWindowMods(profile.LongScratchTail, mods));
         }
 
         var scratch = BmsLayout.IsScratchColumn(column, layout);
         return tail
             ? scratch ? lastWindowTables.LongScratchTail : lastWindowTables.LongNoteTail
-            : scratch ? lastWindowTables.Scratch : lastWindowTables.Normal;
+            : scratch
+                ? lastWindowTables.Scratch
+                : lastWindowTables.Normal;
     }
 
-    private static BmsJudgementWindowTable applyWindowMods(BmsJudgementWindowTable table)
+    private static BmsJudgementWindowTable applyWindowMods(BmsJudgementWindowTable table, IReadOnlyList<IApplicableToJudgementWindow> mods)
     {
-        for (var i = 0; i < activeWindowMods.Count; i++)
-            table = activeWindowMods[i].ApplyToJudgementWindow(table);
+        for (var i = 0; i < mods.Count; i++)
+            table = mods[i].ApplyToJudgementWindow(table);
 
         return table;
     }
@@ -175,7 +193,7 @@ public static class BmsJudgementProfileProvider
         var windows = new BmsJudgementWindow[rows.Length];
         for (var i = 0; i < rows.Length; i++)
         {
-            var fixedWindow = i == 4 || pms && i is 0 or 3;
+            var fixedWindow = i == 4 || (pms && i is 0 or 3);
             // beatoraja stores integral microseconds, including after rank multiplication.
             var slow = fixedWindow ? rows[i].slow : Math.Truncate(rows[i].slow * 1000 * rate) / 1000;
             var fast = fixedWindow ? rows[i].fast : Math.Truncate(rows[i].fast * 1000 * rate) / 1000;

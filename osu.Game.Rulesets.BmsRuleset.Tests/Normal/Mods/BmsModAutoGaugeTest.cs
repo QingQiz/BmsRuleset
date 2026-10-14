@@ -1,5 +1,8 @@
 using System.Linq;
 using NUnit.Framework;
+using osu.Game.Configuration;
+using osu.Game.IO.Serialization;
+using osu.Game.Online.API;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -66,45 +69,6 @@ public class BmsModAutoGaugeTest
         // Auto Gauge is preserved; the resolved tier mod (ExHard) is appended alongside.
         Assert.That(score.Mods, Has.One.TypeOf<BmsModExHardGauge>());
         Assert.That(score.Mods, Contains.Item(autoGauge));
-    }
-
-    [Test]
-    public void TestAutoGaugeAttachesGaugeHistoryOnApplyToScore()
-    {
-        var (autoGauge, _) = createAutoGaugeResolvedToExHard();
-        var score = new ScoreInfo { Mods = [autoGauge] };
-
-        autoGauge.ApplyToScore(score);
-
-        Assert.That(BmsScoreGaugeHistoryStore.TryGet(score, out var history), Is.True);
-        Assert.That(history, Is.Not.Empty);
-        Assert.That(history.Last().ActiveGaugeType, Is.EqualTo(BmsGaugeType.ExHard));
-    }
-
-    [Test]
-    public void LiveGaugeHistoryFollowsRewindWhileClonedScoreKeepsItsSnapshot()
-    {
-        var (autoGauge, hp) = createAutoGaugeResolvedToExHard();
-        var score = new ScoreInfo { Mods = [autoGauge] };
-        autoGauge.ApplyToScore(score);
-        Assert.That(BmsScoreGaugeHistoryStore.TryGet(score, out var history), Is.True);
-        var initialCount = history.Count;
-
-        hp.RegisterEmptyPoor(2000);
-        autoGauge.ApplyToScore(score);
-        Assert.That(BmsScoreGaugeHistoryStore.TryGet(score, out var updated), Is.True);
-        Assert.That(updated, Is.SameAs(history), "Live population must share history instead of copying every prior event.");
-        Assert.That(history, Has.Count.EqualTo(initialCount + 1));
-
-        var clone = BmsScoreGaugeHistoryStore.Clone(score);
-        Assert.That(BmsScoreGaugeHistoryStore.TryGet(clone, out var saved), Is.True);
-        var savedStates = saved[^1].States.ToArray();
-        hp.Rewind(1500);
-        Assert.That(history, Has.Count.EqualTo(initialCount));
-        hp.ApplyHellChargeTick(true, eventTime: 1800);
-        Assert.That(saved, Has.Count.EqualTo(initialCount + 1));
-        Assert.That(saved[^1].Time, Is.EqualTo(2000));
-        Assert.That(saved[^1].States, Is.EqualTo(savedStates));
     }
 
     [Test]
@@ -203,5 +167,66 @@ public class BmsModAutoGaugeTest
         new BmsModClassGauge().ApplyToHealthProcessor(hp);
 
         Assert.That(hp.GaugeProfile.PerfectGain, Is.EqualTo(0.0001).Within(0.000001));
+    }
+
+    [Test]
+    public void TestCourseStartingStatesSurviveCloneAndModSerialisation()
+    {
+        var mod = new BmsModAutoGauge
+        {
+            ClassHealth = { Value = 0.81 },
+            ExClassHealth = { Value = 0.42 },
+            GaugeProfileFamily = { Value = BmsGaugeProfileFamily.Lr2 },
+        };
+        var clone = mod.DeepClone();
+        var saved = new APIMod(clone).Serialize().Deserialize<APIMod>();
+        var restored = (BmsModAutoGauge)saved.ToMod(new BmsRuleset());
+        using var health = new BmsHealthProcessor();
+        health.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K });
+        restored.ApplyToHealthProcessor(health);
+        restored.ApplyToScore(new ScoreInfo { Mods = [restored] });
+        Assert.Multiple(() =>
+        {
+            Assert.That(health.IsCourseGaugeMode, Is.True);
+            Assert.That(health.ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
+            Assert.That(health.CurrentGaugeStates, Is.EqualTo(new[]
+            {
+                new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
+                new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
+            }));
+            Assert.That(restored.ExHardClassHealth.Value, Is.Null);
+        });
+
+        foreach (var control in restored.CreateSettingsControls())
+        {
+            Assert.That(control.IsPresent, Is.False);
+            control.Dispose();
+        }
+    }
+
+    [TestCase(BmsGaugeType.Class)]
+    [TestCase(BmsGaugeType.ExClass)]
+    [TestCase(BmsGaugeType.ExHardClass)]
+    public void TestSingleCourseStartingHealthSurvivesModSerialisation(BmsGaugeType type)
+    {
+        var mod = BmsModGauge.CreateForType(type)!;
+        mod.InitialHealth.Value = 0.42;
+        mod.GaugeProfileFamily.Value = BmsGaugeProfileFamily.FiveKeys;
+        var saved = new APIMod(mod.DeepClone()).Serialize().Deserialize<APIMod>();
+        var restored = (BmsModGauge)saved.ToMod(new BmsRuleset());
+        using var health = new BmsHealthProcessor();
+        health.ApplyBeatmap(new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K });
+        restored.ApplyToHealthProcessor(health);
+        Assert.Multiple(() =>
+        {
+            Assert.That(health.IsCourseGaugeMode, Is.True);
+            Assert.That(health.ConfiguredProfileFamily, Is.EqualTo(BmsGaugeProfileFamily.FiveKeys));
+            Assert.That(health.CurrentGaugeStates.Single(), Is.EqualTo(new BmsGaugeStateSnapshot(type, 0.42, false)));
+        });
+        foreach (var control in restored.CreateSettingsControls())
+        {
+            Assert.That(control.IsPresent, Is.False);
+            control.Dispose();
+        }
     }
 }

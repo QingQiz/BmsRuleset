@@ -19,9 +19,9 @@ internal sealed class BmsHellChargeNoteJudgementRule
             return true;
         }
 
-        state.Body.Reset();
+        state.Body.Reset(Math.Max(hold.Note.StartTime, press.Frame.SimulationTime));
         hold.HeadJudged = true;
-        hold.Started = result != HitResult.Meh;
+        hold.Started = true;
         hold.HeadResult = result;
         hold.HeadOffset = press.Frame.SimulationTime - hold.Note.StartTime;
         hold.HeadReverseScratch = press.ReverseScratch;
@@ -75,13 +75,6 @@ internal sealed class BmsHellChargeNoteJudgementRule
             return;
 
         ref var hold = ref state.Hold;
-        if (execution.GetMainResult(hold.Note).HasResult)
-        {
-            if (state.State.HasPendingTail)
-                Finish(state, execution, frame, 0, false);
-            return;
-        }
-
         var previous = state.State;
         resolveRelease(state, execution, frame);
         if (!hold.TailJudged)
@@ -110,7 +103,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
             Reset(state);
         else
         {
-            updateBody(state, execution, frame, elapsed, holding);
+            updateBody(state, execution, frame, holding);
             resolveRelease(state, execution, frame);
             if (hold.HeadJudged && !hold.TailJudged && hold.HeadWindow.IsPastPassivePoorOffset(frame.SimulationTime - hold.Note.EndTime))
                 missTail(state, execution, frame);
@@ -122,7 +115,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
             execution.PublishState(hold.Note, state.State, frame);
     }
 
-    internal bool CompleteAtPause(BmsHellChargeNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame)
+    internal bool CompleteAtEnd(BmsHellChargeNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame)
     {
         ref var hold = ref state.Hold;
         if (!hold.Holding)
@@ -132,7 +125,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
         hold.SetPendingRelease(frame.SimulationTime, null);
         applyTail(state, execution, released - hold.Note.EndTime, frame.SimulationTime, frame);
         hold.Started = false;
-        execution.PublishState(hold.Note, state.State, frame with { IsPauseCompletion = true });
+        execution.PublishState(hold.Note, state.State, frame);
         return true;
     }
 
@@ -171,32 +164,33 @@ internal sealed class BmsHellChargeNoteJudgementRule
     internal void UpdateBody(BmsHellChargeNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame, double elapsed, bool holding)
     {
         var previous = state.State;
-        updateBody(state, execution, frame, elapsed, holding);
+        updateBody(state, execution, frame, holding);
         if (previous != state.State)
             execution.PublishState(state.Hold.Note, state.State, frame);
     }
 
-    private static void updateBody(BmsHellChargeNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame, double elapsed, bool holding)
+    private static void updateBody(BmsHellChargeNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame, bool holding)
     {
-        if (frame.IsRewinding || elapsed <= 0 || frame.SimulationTime <= state.LastBodyTime)
+        if (frame.IsRewinding || frame.SimulationTime < state.LastBodyTime || state.LastBodyTime >= state.Hold.Note.EndTime)
             return;
 
-        state.LastBodyTime = frame.SimulationTime;
         ref var hold = ref state.Hold;
-        if (hold.Started && frame.SimulationTime > hold.Note.StartTime + hold.HeadOffset)
-        {
-            if (frame.SimulationTime >= hold.Note.EndTime)
-                state.Body.End(frame.SimulationTime);
-            else if (frame.SimulationTime >= hold.Note.StartTime)
-            {
-                var chargeElapsed = Math.Max(0, Math.Min(frame.SimulationTime, hold.Note.EndTime)
-                                                - Math.Max(frame.SimulationTime - elapsed, hold.Note.StartTime));
-                var successfulTail = hold.TailJudged && hold.TailResult is HitResult.Perfect or HitResult.Great or HitResult.Good
-                                                     && hold.TailTime < frame.SimulationTime;
-                state.Body.Update(chargeElapsed, holding || successfulTail, hold.Note, execution, frame);
-            }
-        }
+        if (!hold.Started) return;
+
+        var end = Math.Min(frame.SimulationTime, hold.Note.EndTime);
+        var successfulTail = hold.TailJudged && hold.TailResult is HitResult.Perfect or HitResult.Great or HitResult.Good;
+        if (successfulTail && hold.TailTime is { } tailTime && tailTime > state.LastBodyTime && tailTime < end)
+            state.Body.Update(tailTime, holding, hold.Note, execution, frame);
+        state.Body.Update(end, holding || (successfulTail && hold.TailTime <= end), hold.Note, execution, frame);
+        state.LastBodyTime = frame.SimulationTime;
+        if (frame.SimulationTime >= hold.Note.EndTime) state.Body.End(hold.Note.EndTime);
     }
+
+    internal double NextBodyTime(BmsHellChargeNoteRuntime state, bool holding)
+        => !state.State.HasActiveBody
+            ? double.PositiveInfinity
+            : Math.Min(state.Hold.Note.EndTime,
+                state.Body.NextTickTime(holding || (state.Hold.TailJudged && state.Hold.TailResult is HitResult.Perfect or HitResult.Great or HitResult.Good)));
 
     private static void startMissedHead(BmsHellChargeNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame)
     {
@@ -208,7 +202,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
         hold.Started = true;
         hold.HeadResult = HitResult.Meh;
         hold.HeadOffset = frame.SimulationTime - hold.Note.StartTime;
-        state.Body.Reset();
+        state.Body.Reset(Math.Max(hold.Note.StartTime, frame.SimulationTime));
         execution.PublishState(hold.Note, state.State, frame);
         execution.ApplySyntheticEndpoint(hold.Endpoint(BmsLongNoteEndpointKind.Head, frame.SimulationTime, frame.GameplayRate, HitResult.Meh), frame);
         missTail(state, execution, frame);

@@ -18,7 +18,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     internal const double MAX_DEFERRED_UPDATE_TIME = 16;
     private readonly BmsGameplayScrollController scrollController;
     private readonly Func<float> getHitTargetPosition;
-    private readonly Func<bool> isResumeRewinding;
     private readonly bool canBatchUpdates;
     private bool frameOpen;
     private bool hasUpdated;
@@ -27,14 +26,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
     private double latestLifetimeStart = double.PositiveInfinity;
 
-    // The alive map reuses removed dictionary slots. A registration is append-only when
-    // it raises the largest alive-map count observed by this container; otherwise its
-    // slot may precede an existing entry and the judgement order must be rebuilt.
-    private int maximumAliveEntryCount;
-    private long aliveEntriesVersion;
     private bool coreOrderDirty = true;
-    private readonly BmsScheduledOrder coreLayoutOrder = new();
-    private readonly BmsScheduledOrder coreSubtreeOrder = new();
     private readonly Dictionary<DrawableBmsHitObject, Action<ValueChangedEvent<double>>> coreStartTimes = [];
 
     internal BmsColumnJudgementRuntime Judgements { get; set; } = null!;
@@ -50,42 +42,29 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     internal BmsColumnHitObjectContainer(
         BmsGameplayScrollController scrollController,
         Func<float> getHitTargetPosition,
-        Func<bool> isResumeRewinding,
         bool canBatchUpdates = false)
     {
         this.scrollController = scrollController;
         this.getHitTargetPosition = getHitTargetPosition;
-        this.isResumeRewinding = isResumeRewinding;
         this.canBatchUpdates = canBatchUpdates;
         RelativeSizeAxes = Axes.Both;
     }
 
     protected override void AddDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
     {
-        var aliveCount = AliveEntries.Count;
-        var appended = aliveCount > maximumAliveEntryCount;
-        if (appended)
-            maximumAliveEntryCount = aliveCount;
-        var version = ++aliveEntriesVersion;
-
         base.AddDrawable(entry, drawable);
         if (drawable is not DrawableBmsHitObject note)
             return;
 
-        // Usage callbacks can mutate the container before registration finishes.
-        JudgementBridge.Register(note, appended && version == aliveEntriesVersion);
+        JudgementBridge.Register(note);
         InvalidateCoreOrder();
     }
 
     protected override void RemoveDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
     {
-        aliveEntriesVersion++;
         InvalidateCoreOrder();
         if (drawable is DrawableBmsHitObject old && coreStartTimes.Remove(old, out var startTimeChanged))
             old.StartTimeBindable.ValueChanged -= startTimeChanged;
-        if (drawable is DrawableBmsHitObject unregisteredNote)
-            JudgementBridge.Unregister(unregisteredNote);
-
         base.RemoveDrawable(entry, drawable);
         if (drawable is DrawableBmsHitObject removed)
             JudgementBridge.UnbindRemovedNote(removed);
@@ -105,17 +84,14 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     }
 
     internal bool CanDeferUpdate => canBatchUpdates && frameOpen && hasUpdated && Time.Elapsed >= 0
-                                    && (Clock as IGameplayClock)?.IsRewinding != true && !isResumeRewinding()
+                                    && (Clock as IGameplayClock)?.IsRewinding != true
                                     && Time.Current >= lastFullUpdateTime
-                                    && (Time.Current - lastFullUpdateTime < MAX_DEFERRED_UPDATE_TIME || lastFullUpdateTime >= latestLifetimeStart)
-                                    && Time.Current <= Judgements.NextPassiveUpdateTime;
+                                    && (Time.Current - lastFullUpdateTime < MAX_DEFERRED_UPDATE_TIME || lastFullUpdateTime >= latestLifetimeStart);
 
     public override bool UpdateSubTree()
     {
         var now = Time.Current;
-        // Replay input and active holds still advance at every timestamp. Between unjudged-head
-        // POOR deadlines, the remaining skin trees only need the final frame's update.
-        // Lifetimes include this deferral budget so even the earliest E-POOR input finds its note.
+        // The engine advances independently; skins can share the final outer frame's traversal.
         if (CanDeferUpdate)
         {
             updatePending = true;
@@ -127,7 +103,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         hasUpdated = true;
         updatePending = false;
         lastFullUpdateTime = now;
-        Judgements.RefreshPassiveDeadline(now);
 
         return updated;
     }
@@ -135,7 +110,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     internal void UpdateDeferredFrame()
     {
         observeDeferredVisuals(visualFrame());
-        Judgements.Schedule.RunDeferred(coreFrame(), Time.Elapsed);
     }
 
     /// <summary>
@@ -188,12 +162,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             note.UpdateVisualFrame(frame.YAt(startPosition), frame);
         }
 
-        // Geometry observes the pre-passive state; result feedback can then retire or recolour that presentation.
-        var frameContext = coreFrame();
-        var elapsed = Time.Elapsed;
-        var rewinding = isResumeRewinding();
-        Judgements.Schedule.RunLayout(coreLayoutOrder, frameContext, elapsed, rewinding);
-        Judgements.Schedule.RunSubtree(coreSubtreeOrder, frameContext);
     }
 
     internal void InvalidateCoreOrder()
@@ -202,7 +170,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         // Until the existing lifetime-order refresh observes all current bindings,
         // keep the original draw path rather than snapshotting a stale static prefix.
         spriteBatchHasMultiplePieces = true;
-        Judgements?.Schedule.InvalidateOrder();
     }
 
     private BmsColumnVisualFrame visualFrame()
@@ -220,8 +187,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     {
         if (!coreOrderDirty) return;
 
-        coreLayoutOrder.Clear();
-        coreSubtreeOrder.Clear();
         spriteBatchHasMultiplePieces = false;
         foreach (var drawable in AliveEntries.Values)
         {
@@ -235,20 +200,8 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             // lifecycle traversal so mixed columns never prepare a doomed prefix.
             if (note.HitObject is BmsLongNote or BmsInvisibleNote)
                 spriteBatchHasMultiplePieces = true;
-            if (!JudgementBridge.TryGetScheduledObject(note, out var item)) continue;
-
             if (!coreStartTimes.ContainsKey(note))
                 observeStartTime(note);
-            // Only long notes have a post-layout operation; keep tap-heavy frames out of the layout plan.
-            if (item.Object is BmsLongNote)
-                coreLayoutOrder.Add(item);
-        }
-
-        // The framework already owns the exact subtree order, including equal-time child IDs.
-        for (var i = 0; i < InternalChildren.Count; i++)
-        {
-            if (InternalChildren[i] is DrawableBmsHitObject note && JudgementBridge.TryGetScheduledObject(note, out var item))
-                coreSubtreeOrder.Add(item);
         }
 
         coreOrderDirty = false;
@@ -279,7 +232,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     protected override void Update()
     {
         base.Update();
-        if (Time.Elapsed >= 0 || isResumeRewinding())
+        if (Time.Elapsed >= 0)
             return;
 
         JudgementBridge.RestoreRewoundState(coreFrame());

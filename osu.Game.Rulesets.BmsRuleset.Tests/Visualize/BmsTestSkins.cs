@@ -3,9 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Game.Extensions;
 using osu.Game.IO;
 using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Scoring;
 using osu.Game.Skinning;
@@ -54,7 +58,9 @@ public static partial class BmsTestSkins
     /// </summary>
     public partial class SkinnedTestPlayer(
         ISkinSource skinSource,
-        Func<BmsBeatmap, IList<ReplayFrame>>? createReplay)
+        Func<BmsBeatmap, IList<ReplayFrame>>? createReplay,
+        BmsJudgementAlgorithm? replayAlgorithm = null,
+        IReadOnlyList<Mod>? replayMods = null)
         : TestPlayer(allowPause: false, showResults: false)
     {
 
@@ -72,10 +78,17 @@ public static partial class BmsTestSkins
             if (createReplay == null) return;
 
             var beatmap = (BmsBeatmap)GameplayState.Beatmap;
+            var frames = createReplay(beatmap).ToList();
+            if (frames.FirstOrDefault() is BmsReplayFrame first && replayAlgorithm is { } algorithm)
+                frames[0] = new BmsReplayFrame(first.Time, first.Actions.ToArray()) { Algorithm = algorithm };
 
             DrawableRuleset?.SetReplayScore(new Score
             {
-                Replay = new Replay { Frames = createReplay(beatmap).ToList() },
+                Replay = new Replay { Frames = frames },
+                ScoreInfo = new ScoreInfo
+                {
+                    Mods = replayMods?.Select(mod => mod.DeepClone()).ToArray() ?? [],
+                },
             });
         }
     }

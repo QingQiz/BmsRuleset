@@ -274,8 +274,7 @@ public partial class BmsScoreProcessorTest
         {
             Assert.That(score.HitEvents, Has.Count.EqualTo(1));
             Assert.That(score.HitEvents.Single().HitObject.StartTime, Is.EqualTo(1234));
-            Assert.That(BmsJudgementEventStore.TryGet(score, out var judgementEvents), Is.True);
-            Assert.That(judgementEvents, Has.Count.EqualTo(1));
+            Assert.That(processor.JudgementEvents, Has.Count.EqualTo(1));
         });
     }
 

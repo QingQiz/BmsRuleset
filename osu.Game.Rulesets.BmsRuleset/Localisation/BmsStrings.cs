@@ -706,6 +706,10 @@ public static class BmsStrings
 
     public static LocalisableString ModAutoScratchAcronym => get("mod_auto_scratch_acronym");
 
+    public static LocalisableString CourseInitialHealth => get("course_initial_health");
+
+    public static LocalisableString CourseGaugeProfile => get("course_gauge_profile");
+
     public static LocalisableString ModBackgroundKeysound => get("mod_background_keysound");
 
     public static LocalisableString ModBranchReplay => get("mod_branch_replay");

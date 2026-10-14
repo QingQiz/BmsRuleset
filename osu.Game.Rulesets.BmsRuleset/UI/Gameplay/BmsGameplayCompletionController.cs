@@ -3,7 +3,6 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
@@ -57,9 +56,6 @@ internal sealed class BmsGameplayCompletionController : IDisposable
         {
             var passed = bmsHealthProcessor.HasPassedAtEnd();
             scoreProcessor.PopulateScore(gameplayState.Score.ScoreInfo);
-
-            if (bmsHealthProcessor.GaugeHistory.Count > 0)
-                BmsScoreGaugeHistoryStore.Set(gameplayState.Score.ScoreInfo, bmsHealthProcessor.GaugeHistory);
 
             if (!passed)
                 scoreProcessor.FailScore(gameplayState.Score.ScoreInfo);

@@ -51,28 +51,27 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
     }
 
     [Test]
-    public void MineBeforeHcnBodyAtGaugeCeiling([Values(1, 2)] int column)
+    public void ElapsedHcnBodyPrecedesMineAtGaugeCeiling([Values(1, 2)] int column)
     {
         load(column, 240, false);
-        // Java 9cddf911 JudgeManager 244-246 precedes all bodies at 306-338.
         // NORMAL TOTAL240 / 3 endpoints: head +80%, body +40%, mine -10%.
         checkpoint("first", 3200, 1, false, []);
-        checkpoint("first", 3201, 1, true, [.9, 1]);
+        checkpoint("first", 3201, .9, true, [1, .9]);
         checkpoint("rewound", 3200, 1, false, []);
-        checkpoint("replayed", 3201, 1, true, [.9, 1]);
+        checkpoint("replayed", 3201, .9, true, [1, .9]);
         assertTimeline();
     }
 
     [Test]
-    public void UnsaturatedMineAndHcnBodyApplyExactlyOnceInReferenceOrder()
+    public void UnsaturatedHcnBodyAndMineApplyExactlyOnceInTimeOrder()
     {
         load(2, 12, false);
         // TOTAL12 / 3 gives head +4% and body +2%; neither operation clips.
-        // Final 16% alone cannot distinguish ordering, but [14%,16%] can.
+        // The intermediate recovery distinguishes the chronological order despite equal final health.
         checkpoint("first", 3200, .24, false, []);
-        checkpoint("first", 3201, .16, true, [.14, .16]);
+        checkpoint("first", 3201, .16, true, [.26, .16]);
         checkpoint("rewound", 3200, .24, false, []);
-        checkpoint("replayed", 3201, .16, true, [.14, .16]);
+        checkpoint("replayed", 3201, .16, true, [.26, .16]);
         assertTimeline();
     }
 
@@ -113,7 +112,8 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
         {
             var health = Player.HealthProcessor.Health.Value;
             var history = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.ToArray();
-            var frameHealth = history.Where(e => e.Time == time)
+            var interval = history.Where(e => e.Time > (time == 3202 ? 3201 : 3200) && e.Time <= time).ToArray();
+            var frameHealth = interval
                 .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.ToArray();
             HitResult[] expectedResults = expectedMine ? [HitResult.Perfect, HitResult.Meh] : [HitResult.Perfect];
@@ -133,6 +133,8 @@ public partial class TestSceneBmsBeatorajaHcnLandmineFrameOrder : BmsPlayerTestS
             {
                 Assert.That(health, Is.EqualTo(expectedHealth).Within(1e-8), "final health " + label);
                 Assert.That(frameHealth, Is.EqualTo(expectedFrameHealth).Within(1e-8), "ordered NORMAL gauge history " + label);
+                if (time == 3201)
+                    Assert.That(interval.Select(e => e.Time), Is.EqualTo(expectedMine ? new[] { Math.BitIncrement(3200), time } : new[] { Math.BitIncrement(3200) }));
                 Assert.That(history.Any(e => e.Time > time), Is.False, "no future gauge history after rewind " + label);
                 Assert.That(events.Select(e => e.Result), Is.EqualTo(expectedResults), "results, without extra endpoints " + label);
                 Assert.That(events.Select(e => e.Source.Kind), Is.EqualTo(expectedKinds), "source kinds " + label);

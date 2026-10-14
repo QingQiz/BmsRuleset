@@ -12,7 +12,6 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -102,14 +101,15 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
     }
 
     internal static TimelineData CreateData(ScoreInfo score, IBeatmap playableBeatmap)
+        => CreateData(playableBeatmap, score.HitEvents, score.HitEvents);
+
+    internal static TimelineData CreateData(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> timingEvents, IReadOnlyList<HitEvent> scoringEvents)
     {
         var variant = playableBeatmap is BmsBeatmap bms ? bms.LayoutVariant : BmsLayoutVariant.Bms5K;
 
         var beatmapMax = playableBeatmap.HitObjects.Select(h => h.GetEndTime()).DefaultIfEmpty(0).Max();
-        var timingHitEvents = score.HitEvents.ToArray();
-        var scoringHitEvents = BmsJudgementEventStore.TryGet(score, out var judgementEvents)
-            ? BmsJudgementEventProjection.CreateScoringHitEvents(judgementEvents).ToArray()
-            : timingHitEvents;
+        var timingHitEvents = timingEvents.ToArray();
+        var scoringHitEvents = scoringEvents.ToArray();
         var hitEventsMax = timingHitEvents.Length == 0 ? 0 : timingHitEvents.Max(e => e.HitObject.GetEndTime());
         var duration = Math.Max(1, Math.Max(beatmapMax, hitEventsMax));
 
@@ -120,18 +120,20 @@ public sealed partial class BmsTimelineStatistic : CompositeDrawable, IBmsResult
     }
 
     internal static TimelineData CreateCourseData(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
+        => CreateCourseData(stages.Select(stage => stage.Score != null
+            ? CreateData(stage.Score, stage.Beatmap)
+            : createUnplayedData(stage.Beatmap)).ToArray());
+
+    internal static TimelineData CreateCourseData(IReadOnlyList<TimelineData> stageData)
     {
-        if (stages.Count == 0)
+        if (stageData.Count == 0)
             return new TimelineData(new SubplotData([], []), new SubplotData([], []), new SubplotData([], []), [], 1);
 
-        var stageData = stages.Select(stage => stage.Score != null
-            ? CreateData(stage.Score, stage.Beatmap)
-            : createUnplayedData(stage.Beatmap)).ToArray();
         var totalDuration = stageData.Sum(stage => stage.Duration);
-        var boundaries = new float[stages.Count - 1];
+        var boundaries = new float[stageData.Count - 1];
         double elapsed = 0;
 
-        for (var i = 0; i < stageData.Length; i++)
+        for (var i = 0; i < stageData.Count; i++)
         {
             var stage = stageData[i];
 

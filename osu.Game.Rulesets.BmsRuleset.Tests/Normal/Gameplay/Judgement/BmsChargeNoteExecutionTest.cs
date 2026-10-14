@@ -94,20 +94,6 @@ public class BmsChargeNoteExecutionTest
     }
 
     [Test]
-    public void LastTailCheckCannotRestoreRemovedMembership()
-    {
-        var (context, output, note) = create();
-        context.HandleNotePress(new BmsPressContext(3000, new BmsFrameContext(3000, 1)));
-        context.BeginNoteRemoval(note);
-        output.SyntheticEndpoint = (_, _) => Assert.That(context.GetPendingLongNoteTails(), Is.Empty);
-        output.StatePublished = (_, _, _) => Assert.That(context.GetPendingLongNoteTails(), Is.Empty);
-        context.CheckRegisteredNotePassive(note, new BmsFrameContext(5000, 1));
-        context.CheckRegisteredNotePassive(note, new BmsFrameContext(5001, 1));
-        Assert.That(output.SyntheticEndpoints, Has.Count.EqualTo(1));
-        Assert.That(context.GetPendingLongNoteTails(), Is.Empty);
-    }
-
-    [Test]
     public void ScratchReleaseRetainsTailUntilReversePress()
     {
         var (context, output, note) = create(0);
@@ -132,8 +118,8 @@ public class BmsChargeNoteExecutionTest
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, LockedLongNoteMode = BmsLongNoteMode.ChargeNote, Rank = 2 };
         var note = new BmsLongNote { Beatmap = beatmap, Column = column, StartTime = 3000, Duration = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var context = new BmsJudgementEngine([note], beatmap.LayoutVariant, column, true, output).GetColumn(column);
-        context.ActivateNote(note);
+        var context = new BmsJudgementEngine([note], beatmap.LayoutVariant, column, output).GetColumn(column);
+
         return (context, output, note);
     }
 }

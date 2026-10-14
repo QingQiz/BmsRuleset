@@ -46,7 +46,7 @@ internal partial class BmsResultOverview : CompositeDrawable
         SetScore(score);
     }
 
-    internal void SetScore(ScoreInfo score)
+    internal void SetScore(ScoreInfo score, IReadOnlyList<HitEvent>? hitEvents = null)
     {
         Score = score;
         var maximum = BmsExScore.Calculate(score.MaximumStatistics);
@@ -62,7 +62,7 @@ internal partial class BmsResultOverview : CompositeDrawable
                 new[] { createCombo(score.MaxCombo, score.GetMaximumAchievableCombo()) },
             },
         };
-        timingContent.Child = new BmsResultFastSlow(score.HitEvents);
+        timingContent.Child = new BmsResultFastSlow(hitEvents ?? score.HitEvents);
         var judgements = new GridContainer
         {
             RelativeSizeAxes = Axes.Both,
@@ -115,8 +115,7 @@ internal partial class BmsResultOverview : CompositeDrawable
             ? DrawHeight * 0.51f
             : Math.Min(bannerHeight + rankHeight + 24 + 16, DrawHeight * 0.51f) + 8;
         var statisticsHeight = Math.Max(0, DrawHeight - headerHeight);
-        if (soloHeader != null)
-            soloHeader.RowDimensions = [new Dimension(GridSizeMode.Absolute, bannerHeight + 8), new Dimension()];
+        soloHeader?.RowDimensions = [new Dimension(GridSizeMode.Absolute, bannerHeight + 8), new Dimension()];
         layout.RowDimensions =
         [
             new Dimension(GridSizeMode.Absolute, headerHeight),

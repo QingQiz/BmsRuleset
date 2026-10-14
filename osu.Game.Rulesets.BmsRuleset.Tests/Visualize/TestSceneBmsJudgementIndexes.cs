@@ -32,66 +32,12 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
     private bool includeLongNotes;
     private static int repressCalls;
     private static int unrelatedBodyCalls;
-    private static int layoutDepth;
-    private static int layoutCalls;
-    private static int layoutBindingCalls;
-    private static int unrelatedLayoutBindingCalls;
-    private static int layoutEntries;
-    private static int unrelatedLayoutEntries;
-    private static int snapshotRebuilds;
-    private static int snapshotEntries;
-
-    [TestCase(false, false)]
-    [TestCase(true, false)]
-    [TestCase(false, true)]
-    [TestCase(true, true)]
-    public void LayoutBindingChecksOnlyVisitLongNotes(bool mine, bool longNotes)
-    {
-        load(mine, longNotes: longNotes);
-        seek(3000);
-        AddStep("layout skips unrelated bindings", () =>
-        {
-            var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
-            Assert.That(container.AliveEntries.Values.Count(d => d.HitObject is BmsNote), Is.GreaterThan(64));
-            if (longNotes)
-                Assert.That(container.AliveEntries.Values.Count(d => d.HitObject is BmsLongNote), Is.GreaterThan(64));
-            else
-                Assert.That(container.AliveEntries.Values.Count(d => d.HitObject is BmsLongNote), Is.Zero);
-            using var layoutProbe = new ScopedMethodProbe(typeof(BmsCoreJudgementSchedule).GetMethod("RunLayout", BindingFlags.Instance | BindingFlags.NonPublic)!,
-                typeof(TestSceneBmsJudgementIndexes).GetMethod(nameof(beginLayout), BindingFlags.Static | BindingFlags.NonPublic)!,
-                typeof(TestSceneBmsJudgementIndexes).GetMethod(nameof(endLayout), BindingFlags.Static | BindingFlags.NonPublic)!);
-            using var bindingProbe = new ScopedMethodProbe(typeof(BmsCoreJudgementSchedule).GetMethod("current", BindingFlags.Instance | BindingFlags.NonPublic)!,
-                typeof(TestSceneBmsJudgementIndexes).GetMethod(nameof(countLayoutBinding), BindingFlags.Static | BindingFlags.NonPublic)!);
-            layoutDepth = layoutCalls = layoutBindingCalls = unrelatedLayoutBindingCalls = 0;
-            layoutEntries = unrelatedLayoutEntries = 0;
-            container.Judgements.Schedule.BeginBatch(0, 1000, 1000);
-            container.UpdateSubTree();
-
-            Assert.That(layoutDepth, Is.Zero);
-            Assert.That(layoutCalls, Is.EqualTo(1));
-            Assert.That(unrelatedLayoutEntries, Is.Zero, "The cached layout order must contain only long notes.");
-            if (longNotes)
-            {
-                Assert.That(layoutEntries, Is.GreaterThan(64));
-                Assert.That(layoutBindingCalls, Is.GreaterThan(64));
-            }
-            else
-            {
-                Assert.That(layoutEntries, Is.Zero);
-                Assert.That(layoutBindingCalls, Is.Zero);
-            }
-
-            Assert.That(unrelatedLayoutBindingCalls, Is.Zero, "Tap and mine bindings have no post-layout operation.");
-            TestContext.WriteLine($"LAYOUT_BINDINGS mine={mine} longNotes={longNotes} entries={layoutEntries} calls={layoutBindingCalls} unrelated={unrelatedLayoutBindingCalls}");
-        });
-    }
-
     [Test]
-    public void RebuildingScheduleOrderReusesExistingBindings()
+    public void RefreshingVisualMembershipDoesNotAllocateBindings()
     {
         load(false);
         seek(3000);
-        AddStep("rebuild order without allocating bindings", () =>
+        AddStep("refresh visuals without allocating bindings", () =>
         {
             var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
             Assert.That(container.AliveEntries.Count, Is.GreaterThan(128));
@@ -112,63 +58,6 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
 
             allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
             Assert.That(allocated, Is.Zero);
-        });
-    }
-
-    [TestCase(false)]
-    [TestCase(true)]
-    public void StableColumnFramesDoNotCopyScheduleOrder(bool longNotes)
-    {
-        load(true, longNotes: longNotes);
-        seek(3000);
-        AddStep("copy schedule order only after membership changes", () =>
-        {
-            var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
-            Assert.That(container.AliveEntries.Count, Is.GreaterThan(128));
-            container.Judgements.Schedule.BeginBatch(0, 1000, 1000);
-            container.UpdateSubTree();
-            var snapshotMethod = typeof(BmsCoreJudgementSchedule).Assembly
-                                     .GetType("osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.BmsScheduledOrder")
-                                     ?.GetMethod("refreshSnapshot", BindingFlags.Instance | BindingFlags.NonPublic)
-                                 ?? typeof(BmsCoreJudgementSchedule).GetMethod("snapshot", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            using var probe = new ScopedMethodProbe(snapshotMethod,
-                typeof(TestSceneBmsJudgementIndexes).GetMethod(nameof(countSnapshotRebuild), BindingFlags.Static | BindingFlags.NonPublic)!);
-            snapshotRebuilds = snapshotEntries = 0;
-
-            for (var i = 0; i < 32; i++)
-            {
-                container.Judgements.Schedule.BeginBatch(0, 1001 + i, 1001 + i);
-                container.UpdateSubTree();
-            }
-
-            Assert.That(snapshotRebuilds, Is.Zero);
-            Assert.That(snapshotEntries, Is.Zero);
-
-            container.InvalidateCoreOrder();
-            container.Judgements.Schedule.BeginBatch(0, 2000, 2000);
-            container.UpdateSubTree();
-            const int maximumRebuilds = 2;
-            Assert.That(snapshotRebuilds, Is.InRange(1, maximumRebuilds),
-                "A membership change must publish the changed cached order before the next stable frame.");
-            var layoutOrder = (IReadOnlyList<BmsScheduledObject>)typeof(BmsColumnHitObjectContainer)
-                .GetField("coreLayoutOrder", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(container)!;
-            var subtreeOrder = (IReadOnlyList<BmsScheduledObject>)typeof(BmsColumnHitObjectContainer)
-                .GetField("coreSubtreeOrder", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(container)!;
-            Assert.That(subtreeOrder.Count, Is.GreaterThanOrEqualTo(future_note_count));
-            Assert.That(snapshotEntries, Is.GreaterThan(0));
-            Assert.That(snapshotEntries, Is.LessThanOrEqualTo(layoutOrder.Count + subtreeOrder.Count));
-            var rebuiltEntries = snapshotEntries;
-            var rebuiltRebuilds = snapshotRebuilds;
-
-            for (var i = 0; i < 32; i++)
-            {
-                container.Judgements.Schedule.BeginBatch(0, 2001 + i, 2001 + i);
-                container.UpdateSubTree();
-            }
-
-            Assert.That(snapshotRebuilds, Is.EqualTo(rebuiltRebuilds));
-            Assert.That(snapshotEntries, Is.EqualTo(rebuiltEntries));
-            TestContext.WriteLine($"SCHEDULE_SNAPSHOTS longNotes={longNotes} stableFrames=64 rebuilds={snapshotRebuilds} entries={snapshotEntries}");
         });
     }
 
@@ -293,37 +182,6 @@ public partial class TestSceneBmsJudgementIndexes : BmsPlayerTestScene
     }
 
     private static void countRepress() => repressCalls++;
-
-    private static void countSnapshotRebuild(object __instance, object[] __args)
-    {
-        snapshotRebuilds++;
-        var order = __instance as IReadOnlyList<BmsScheduledObject> ?? (IReadOnlyList<BmsScheduledObject>)__args[0];
-        snapshotEntries += order.Count;
-    }
-
-    private static void beginLayout(IReadOnlyList<BmsScheduledObject> order)
-    {
-        layoutDepth++;
-        layoutCalls++;
-        layoutEntries += order.Count;
-        for (var i = 0; i < order.Count; i++)
-        {
-            if (order[i].Object is not BmsLongNote)
-                unrelatedLayoutEntries++;
-        }
-    }
-
-    private static void endLayout() => layoutDepth--;
-
-    private static void countLayoutBinding(BmsScheduledObject item)
-    {
-        if (layoutDepth == 0)
-            return;
-
-        layoutBindingCalls++;
-        if (item.Object is not BmsLongNote)
-            unrelatedLayoutBindingCalls++;
-    }
 
     private static void countUnstartedBody(BmsHellChargeNoteRuntime state)
     {

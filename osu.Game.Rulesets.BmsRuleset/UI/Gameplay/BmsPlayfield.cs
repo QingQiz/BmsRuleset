@@ -46,10 +46,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private const float minimum_side_padding = 20;
 
-    internal const double RESUME_REWIND_DURATION = 5000;
-
-    internal const double RESUME_REWIND_ANIMATION_DURATION = 400;
-
     #endregion
 
     #region Construction
@@ -77,21 +73,10 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         Stage = new BmsStage(this);
         Stage.SkinHitTargetPositionChanged += onSkinHitTargetPositionChanged;
-        // beatoraja visits each side's ordinary lanes before its scratch. Our first
-        // scratch is column zero, so visual column order would change gauge clipping.
-        var firstScratchLane = LayoutVariant switch
-        {
-            BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bms5KDouble => 5,
-            BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P or BmsLayoutVariant.Bme7KDouble => 7,
-            _ => -1,
-        };
-        judgementColumns = Stage.Columns.Cast<BmsColumn>()
-                                .OrderBy(column => firstScratchLane < 0 || column.Index > firstScratchLane
-                                    ? column.Index : column.Index == 0 ? firstScratchLane : column.Index - 1)
-                                .ToArray();
+        var judgementColumns = Stage.Columns.Cast<BmsColumn>().ToArray();
         var judgementObjects = Beatmap.HitObjects.ToArray();
         judgementEngine = new BmsJudgementEngine(judgementColumns.Select(column => new BmsJudgementColumnDefinition(
-            judgementObjects, LayoutVariant, column.Index, column.CanBatchUpdates, column.JudgementBridge = new BmsJudgementBridge(this, column))).ToArray());
+            judgementObjects, LayoutVariant, column.Index, column.JudgementBridge = new BmsJudgementBridge(this, column))).ToArray());
         foreach (var column in judgementColumns)
         {
             column.Judgements = judgementEngine.GetColumn(column.Index);
@@ -194,8 +179,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     // Null identifies replays recorded before selectable algorithms were introduced.
     internal BmsJudgementAlgorithm? JudgementAlgorithm { get; set; } = BmsJudgementAlgorithm.Combo;
 
-    // Live play finalises active holds at pause boundaries, while replay playback must retain
-    // HCN frame history so arbitrary replay seeks can reconstruct the accumulator.
+    // Replay seeks need HCN history; live play only advances the current state.
     internal bool PreserveLongNoteHistory { get; private set; }
 
     internal void SetReplayPlayback(bool replayPlayback) => PreserveLongNoteHistory = replayPlayback;
@@ -233,12 +217,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private readonly BmsJudgementEngine judgementEngine;
 
-
     #endregion
 
     #region Input
-
-    private readonly BmsColumn[] judgementColumns;
 
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
     {
@@ -279,9 +260,16 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         judgementEngine.QueueInput(Time.Current, column.Value, false, BmsKeyBindingConfiguration.IsReverseScratch(e.Action));
     }
 
-    private void processJudgementFrame(bool suppressJudgements = false)
+    private void processJudgementFrame()
         => judgementEngine.ProcessFrame(new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
-            (Clock as IGameplayClock)?.IsRewinding == true), Time.Elapsed, JudgementAlgorithm, suppressJudgements, IsResumeRewinding);
+            (Clock as IGameplayClock)?.IsRewinding == true), Time.Elapsed, JudgementAlgorithm);
+
+    internal void CompleteAtEnd(double time)
+    {
+        processJudgementFrame();
+        judgementEngine.CompleteLongNotesAtEnd(new BmsFrameContext(time,
+            (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate));
+    }
 
     #endregion
 
@@ -335,9 +323,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     #region Lifecycle
 
-    private bool visualUpdatePending;
-
-    internal bool HasPendingVisualUpdate => visualUpdatePending;
+    internal bool HasPendingVisualUpdate { get; private set; }
 
     internal void BeginGameplayFrame()
     {
@@ -348,7 +334,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             processJudgementFrame();
 
         skinCache.RefreshIdleSkins();
-        visualUpdatePending = false;
+        HasPendingVisualUpdate = false;
         foreach (var column in Stage.Columns)
             ((BmsColumnHitObjectContainer)column.HitObjectContainer).BeginGameplayFrame();
     }
@@ -356,22 +342,15 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     internal void EndGameplayFrame()
     {
         foreach (var column in Stage.Columns)
-            ((BmsColumnHitObjectContainer)column.HitObjectContainer).EndGameplayFrame(!visualUpdatePending);
-        if (visualUpdatePending)
+            ((BmsColumnHitObjectContainer)column.HitObjectContainer).EndGameplayFrame(!HasPendingVisualUpdate);
+        if (HasPendingVisualUpdate)
             base.UpdateSubTree();
-        visualUpdatePending = false;
+        HasPendingVisualUpdate = false;
     }
 
-    internal void CompleteLongNotesAtPause(double currentTime)
-        => judgementEngine.CompleteLongNotesAtPause(new BmsFrameContext(currentTime,
-            (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate));
-
-    public override bool UpdateSubTreeMasking()
-    {
-        // Frame stability requests masking after every replay input. While visual traversal is
-        // deferred, the final game-frame pass will mask the complete, current set of pulses.
-        return !visualUpdatePending && base.UpdateSubTreeMasking();
-    }
+    // Frame stability requests masking after every replay input. While visual traversal is
+    // deferred, the final game-frame pass will mask the complete, current set of pulses.
+    public override bool UpdateSubTreeMasking() => !HasPendingVisualUpdate && base.UpdateSubTreeMasking();
 
     public override bool UpdateSubTree()
     {
@@ -388,58 +367,20 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             // tails, HCN ticks and light pulses at every timestamp, without visiting future skins.
             foreach (var column in Stage.Columns)
                 ((BmsColumnHitObjectContainer)column.HitObjectContainer).UpdateDeferredFrame();
-            visualUpdatePending = true;
+            HasPendingVisualUpdate = true;
             return true;
         }
 
-        visualUpdatePending = false;
+        HasPendingVisualUpdate = false;
         return base.UpdateSubTree();
     }
 
-    private double resumeRewindInitialVisualOffset;
-
     private readonly List<(double Time, BmsLongNoteJudgementResult Result)> syntheticResults = [];
-
-    private double resumeRewindAnimationElapsed = RESUME_REWIND_ANIMATION_DURATION;
-
-    internal double ResumeRewindStartTime { get; private set; } = double.MinValue;
-
-    internal double ResumeRewindEndTime { get; private set; } = double.MinValue;
-
-    internal bool IsResumeRewinding => Time.Current < ResumeRewindEndTime;
-
-    internal bool IsResumeRewindAnimating => resumeRewindAnimationElapsed < RESUME_REWIND_ANIMATION_DURATION;
 
     internal double DisplayTime { get; private set; }
 
-    internal double BeginResumeRewind(double pauseTime, double minimumTime)
-    {
-        var continuesExistingRewind = pauseTime >= ResumeRewindStartTime && pauseTime < ResumeRewindEndTime;
-        var rewindTarget = continuesExistingRewind
-            ? ResumeRewindStartTime
-            : ComputeResumeRewindTarget(pauseTime, minimumTime);
-
-        if (!continuesExistingRewind)
-            ResumeRewindStartTime = rewindTarget;
-
-        ResumeRewindEndTime = Math.Max(ResumeRewindEndTime, pauseTime);
-        processJudgementFrame(suppressJudgements: true);
-        resumeRewindInitialVisualOffset = pauseTime - rewindTarget;
-        resumeRewindAnimationElapsed = 0;
-        return rewindTarget;
-    }
-
-    internal static double ComputeResumeRewindTarget(double pauseTime, double minimumTime) =>
-        Math.Max(minimumTime, pauseTime - RESUME_REWIND_DURATION);
-
-    internal static double ComputeResumeRewindVisualOffset(double initialOffset, double elapsed)
-    {
-        var progress = Math.Clamp(elapsed / RESUME_REWIND_ANIMATION_DURATION, 0, 1);
-        return initialOffset * Math.Pow(1 - progress, 3);
-    }
-
-    internal static double ComputeDisplayTime(double currentTime, double visualOffset, double playbackRate, double resumeRewindOffset) =>
-        currentTime + visualOffset * playbackRate + resumeRewindOffset;
+    internal static double ComputeDisplayTime(double currentTime, double visualOffset, double playbackRate) =>
+        currentTime + visualOffset * playbackRate;
 
     [BackgroundDependencyLoader(true)]
     private void load()
@@ -478,28 +419,20 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     protected override void Update()
     {
-        if (IsResumeRewindAnimating && Time.Elapsed > 0)
-            resumeRewindAnimationElapsed += Time.Elapsed / Math.Max(Math.Abs(Clock.Rate), 0.01);
-
         updateScrollPosition();
 
-        // Playfield.Update normally reverts results newer than the clock. During the resume lead-in,
-        // those results belong to the completed attempt and must remain authoritative.
-        if (!IsResumeRewinding)
+        if (Time.Elapsed < 0)
+            scoreProcessor?.RewindEmptyPoors(Time.Current);
+
+        while (syntheticResults.Count > 0 && syntheticResults[^1].Time > Time.Current)
         {
-            if (Time.Elapsed < 0)
-                scoreProcessor?.RewindEmptyPoors(Time.Current);
-
-            while (syntheticResults.Count > 0 && syntheticResults[^1].Time > Time.Current)
-            {
-                var result = syntheticResults[^1].Result;
-                syntheticResults.RemoveAt(syntheticResults.Count - 1);
-                healthProcessor?.RevertResult(result);
-                scoreProcessor?.RevertResult(result);
-            }
-
-            base.Update();
+            var result = syntheticResults[^1].Result;
+            syntheticResults.RemoveAt(syntheticResults.Count - 1);
+            healthProcessor?.RevertResult(result);
+            scoreProcessor?.RevertResult(result);
         }
+
+        base.Update();
 
         triggerEvents();
         updateStageScale();
@@ -507,15 +440,14 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private void updateScrollPosition()
     {
-        var resumeRewindOffset = ComputeResumeRewindVisualOffset(resumeRewindInitialVisualOffset, resumeRewindAnimationElapsed);
-        DisplayTime = ComputeDisplayTime(Time.Current, VisualOffset.Value, ScrollController.PlaybackRate, resumeRewindOffset);
+        DisplayTime = ComputeDisplayTime(Time.Current, VisualOffset.Value, ScrollController.PlaybackRate);
         ScrollController.Update(DisplayTime);
     }
 
     protected override void UpdateAfterChildren()
     {
         base.UpdateAfterChildren();
-        if (Time.Elapsed < 0 && !IsResumeRewinding)
+        if (Time.Elapsed < 0)
             healthProcessor?.Rewind(Time.Current);
     }
 
@@ -571,17 +503,17 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         requestJudgementDisplay(result.Type);
     }
 
-    internal void RegisterEmptyPoor(double expectedTime, int column)
+    internal void RegisterEmptyPoor(double expectedTime, int column, double? eventTime = null)
     {
-        scoreProcessor?.RegisterEmptyPoor(Time.Current, expectedTime, column);
-        healthProcessor?.RegisterEmptyPoor(Time.Current);
+        scoreProcessor?.RegisterEmptyPoor(eventTime ?? Time.Current, expectedTime, column);
+        healthProcessor?.RegisterEmptyPoor(eventTime ?? Time.Current);
         requestJudgementDisplay(HitResult.Miss);
     }
 
-    internal void RegisterNonConsumingBad(double expectedTime, int column)
+    internal void RegisterNonConsumingBad(double expectedTime, int column, double? eventTime = null)
     {
-        scoreProcessor?.RegisterNonConsumingJudgement(HitResult.Ok, Time.Current, expectedTime, column);
-        healthProcessor?.RegisterNonConsumingJudgement(HitResult.Ok, Time.Current);
+        scoreProcessor?.RegisterNonConsumingJudgement(HitResult.Ok, eventTime ?? Time.Current, expectedTime, column);
+        healthProcessor?.RegisterNonConsumingJudgement(HitResult.Ok, eventTime ?? Time.Current);
         requestJudgementDisplay(HitResult.Ok);
     }
 
@@ -608,7 +540,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         {
             healthProcessor?.ApplySyntheticLongNoteEndpoint(scoreResult);
             // Synthetic endpoints have no drawable entry in the framework's rewind stack.
-            syntheticResults.Add((Time.Current, scoreResult));
+            syntheticResults.Add((endpoint.ApplicationTime ?? endpoint.EventTime, scoreResult));
         }
 
         if (endpoint.Kind == BmsLongNoteEndpointKind.Tail && endpoint.Result.IsHit())
@@ -624,7 +556,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     /// <summary>
     ///     Applies a HellChargeNote body gauge tick for the currently pressed column.
     /// </summary>
-    public void ApplyHellChargeTick(bool holding, double scale = 0.5) => healthProcessor?.ApplyHellChargeTick(holding, scale, Time.Current);
+    public void ApplyHellChargeTick(bool holding, double scale = 0.5, double? eventTime = null) => healthProcessor?.ApplyHellChargeTick(holding, scale, eventTime ?? Time.Current);
 
     #endregion
 

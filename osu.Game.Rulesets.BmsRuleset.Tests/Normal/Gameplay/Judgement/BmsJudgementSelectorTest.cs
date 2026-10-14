@@ -68,8 +68,8 @@ public class BmsJudgementSelectorTest
     [TestCase(BmsJudgementAlgorithm.Duration, 1450)]
     [TestCase(BmsJudgementAlgorithm.Lowest, 1000)]
     [TestCase(BmsJudgementAlgorithm.Score, 1000)]
-    [TestCase(null, 1450)]
-    public void TestOverlappingBadWindowsPreserveLegacyReplayBehaviour(BmsJudgementAlgorithm? algorithm, double expectedTime)
+    [TestCase(null, 1000)]
+    public void TestOverlappingBadWindowsUseConfiguredOrDefaultAlgorithm(BmsJudgementAlgorithm? algorithm, double expectedTime)
     {
         var selection = BmsJudgementSelector.SelectPress(BmsLayoutVariant.Bme7K, 1, [note(1450), note(1000)], 1250, algorithm);
 

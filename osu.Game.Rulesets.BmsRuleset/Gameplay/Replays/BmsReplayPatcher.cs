@@ -12,11 +12,8 @@ using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Game.Database;
 using osu.Game.Online.Spectator;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.Replays;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
@@ -47,8 +44,6 @@ public static class BmsReplayPatcher
         {
             var importScoreTarget = AccessTools.Method(typeof(Player), "ImportScore", [typeof(Score)]);
             var importScorePostfixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(importScorePostfix));
-            var scoreDeepCloneTarget = AccessTools.Method(typeof(Score), nameof(Score.DeepClone));
-            var scoreDeepClonePostfixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(scoreDeepClonePostfix));
             var getScoreTarget = AccessTools.Method(typeof(ScoreImporter), nameof(ScoreImporter.GetScore), [typeof(ScoreInfo)]);
             var getScorePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(getScorePrefix));
             var replayFailIndicatorDisposeTarget = AccessTools.Method(typeof(ReplayFailIndicator), "Dispose", [typeof(bool)]);
@@ -71,8 +66,6 @@ public static class BmsReplayPatcher
             {
                 (name: "Player.ImportScore", member: importScoreTarget),
                 (name: "BmsReplayPatcher.importScorePostfix", member: importScorePostfixMethod),
-                (name: "Score.DeepClone", member: scoreDeepCloneTarget),
-                (name: "BmsReplayPatcher.scoreDeepClonePostfix", member: scoreDeepClonePostfixMethod),
                 (name: "ScoreImporter.GetScore", member: getScoreTarget),
                 (name: "BmsReplayPatcher.getScorePrefix", member: getScorePrefixMethod),
                 (name: "ReplayFailIndicator.Dispose", member: replayFailIndicatorDisposeTarget),
@@ -99,7 +92,6 @@ public static class BmsReplayPatcher
 
             var harmony = new Harmony(harmony_id);
             harmony.Patch(importScoreTarget, postfix: new HarmonyMethod(importScorePostfixMethod));
-            harmony.Patch(scoreDeepCloneTarget, postfix: new HarmonyMethod(scoreDeepClonePostfixMethod));
             harmony.Patch(getScoreTarget, prefix: new HarmonyMethod(getScorePrefixMethod));
             harmony.Patch(replayFailIndicatorDisposeTarget, prefix: new HarmonyMethod(replayFailIndicatorDisposePrefixMethod));
             harmony.Patch(mainMenuLogoArrivingTarget, prefix: new HarmonyMethod(mainMenuLogoArrivingPrefixMethod));
@@ -154,12 +146,10 @@ public static class BmsReplayPatcher
     });
 
     // ReSharper disable InconsistentNaming
-    private static bool spectatorHandleFramePrefix(ReplayFrame frame)
-    {
+    private static bool spectatorHandleFramePrefix(ReplayFrame frame) =>
         // BMS frames cannot be uploaded through the official spectator protocol. Local recording
         // has already saved the frame; skipping here also avoids scheduling a log for every frame.
-        return frame is not BmsReplayFrame;
-    }
+        frame is not BmsReplayFrame;
 
     private static void importScorePostfix(Player __instance, Score score, ref Task __result)
     {
@@ -167,20 +157,6 @@ public static class BmsReplayPatcher
             return;
 
         __result = importScoreWithReplay(__instance, score, __result);
-    }
-
-    private static void scoreDeepClonePostfix(Score __instance, Score __result)
-    {
-        if (!isBmsScore(__instance.ScoreInfo))
-            return;
-
-        // Player clones a completed score before the replay archive is created. These sidecars
-        // carry data that ScoreInfo.DeepClone cannot know about, so keep them with that clone.
-        if (BmsJudgementEventStore.TryGet(__instance.ScoreInfo, out var judgementEvents))
-            BmsJudgementEventStore.Set(__result.ScoreInfo, judgementEvents);
-
-        if (BmsScoreGaugeHistoryStore.TryGet(__instance.ScoreInfo, out var gaugeHistory))
-            BmsScoreGaugeHistoryStore.Set(__result.ScoreInfo, gaugeHistory);
     }
 
     private static bool getScorePrefix(ScoreInfo score, ScoreImporter __instance, ref Score __result)
@@ -204,67 +180,11 @@ public static class BmsReplayPatcher
         return false;
     }
 
-    internal static void RestoreScoreData(ScoreManager scoreManager, ScoreInfo scoreInfo)
+    internal static Task<Score> LoadScoreAsync(ScoreManager scoreManager, ScoreInfo scoreInfo, CancellationToken cancellationToken)
     {
-        if (!isBmsScore(scoreInfo))
-            return;
-
-        try
-        {
-            var data = readScoreData(scoreManager, scoreInfo);
-            if (data == null)
-                return;
-
-            applyScoreData(scoreInfo, data);
-        }
-        catch (Exception e)
-        {
-            BmsLogger.Error(e, "BMS replay patch failed to restore score data.");
-        }
-    }
-
-    internal static async Task RestoreScoreDataAsync(ScoreManager scoreManager, ScoreInfo scoreInfo, CancellationToken cancellationToken)
-    {
-        if (!isBmsScore(scoreInfo)
-            || (scoreInfo.HitEvents.Count > 0 && BmsScoreGaugeHistoryStore.TryGet(scoreInfo, out var history) && history.Count > 0))
-            return;
-
-        var data = await Task.Run(() => readScoreData(scoreManager, scoreInfo), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        if (data != null)
-            applyScoreData(scoreInfo, data);
+        return Task.Run(() => scoreManager.GetScore(scoreInfo) ?? new Score { ScoreInfo = scoreInfo }, cancellationToken);
     }
-
-    private static RestoredScoreData? readScoreData(ScoreManager scoreManager, ScoreInfo scoreInfo)
-    {
-        var scoreWithReplay = scoreManager.GetScore(scoreInfo);
-        if (scoreWithReplay == null)
-            return null;
-
-        var hitEvents = scoreWithReplay.ScoreInfo.HitEvents.Count > 0 ? scoreWithReplay.ScoreInfo.HitEvents : null;
-        var judgementEvents = BmsJudgementEventStore.TryGet(scoreWithReplay.ScoreInfo, out var restoredJudgementEvents) && restoredJudgementEvents.Count > 0
-            ? restoredJudgementEvents
-            : null;
-        var gaugeHistory = BmsScoreGaugeHistoryStore.TryGet(scoreWithReplay.ScoreInfo, out var restoredGaugeHistory) && restoredGaugeHistory.Count > 0
-            ? restoredGaugeHistory
-            : null;
-
-        return hitEvents == null && judgementEvents == null && gaugeHistory == null
-            ? null
-            : new RestoredScoreData(hitEvents, judgementEvents, gaugeHistory);
-    }
-
-    private static void applyScoreData(ScoreInfo scoreInfo, RestoredScoreData data)
-    {
-        if (data.HitEvents != null)
-            scoreInfo.HitEvents = data.HitEvents;
-        if (data.JudgementEvents != null)
-            BmsJudgementEventStore.Set(scoreInfo, data.JudgementEvents);
-        if (data.GaugeHistory != null)
-            BmsScoreGaugeHistoryStore.Set(scoreInfo, data.GaugeHistory);
-    }
-
-    private sealed record RestoredScoreData(List<HitEvent>? HitEvents, IReadOnlyList<BmsJudgementEvent>? JudgementEvents, IReadOnlyList<BmsGaugeHistoryEvent>? GaugeHistory);
 
     private static void replayFailIndicatorDisposePrefix(ReplayFailIndicator __instance)
     {

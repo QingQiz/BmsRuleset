@@ -24,15 +24,16 @@ internal sealed class BmsLandmineJudgementRule
         if (frame.IsRewinding || state.State.HandledTime.HasValue || frame.SimulationTime < note.StartTime || output.GetMainResult(note).HasResult)
             return;
 
-        var detonated = holding && frame.SimulationTime < note.StartTime + PASSING_LIFETIME;
-        state.State = new BmsLandmineState(frame.SimulationTime, detonated);
+        var detonated = holding;
+        var eventFrame = frame with { SimulationTime = note.StartTime };
+        state.State = new BmsLandmineState(note.StartTime, detonated);
         if (detonated)
         {
             output.PlayLandmineSample(note);
-            output.ApplyMainResult(note, HitResult.Meh, frame, false);
+            output.ApplyMainResult(note, HitResult.Meh, eventFrame, false);
         }
 
-        output.PublishState(note, state.State, frame);
+        output.PublishState(note, state.State, eventFrame);
     }
 
     internal void Rewind(BmsLandmineRuntime state, double time)

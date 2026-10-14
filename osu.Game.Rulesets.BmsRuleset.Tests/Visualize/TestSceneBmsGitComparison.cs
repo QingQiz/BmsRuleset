@@ -41,7 +41,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
     private BmsInputManager inputManager = null!;
     private static FrameStabilityContainer? budgetHost;
 
-    protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(replay ? _ => frames() : null, skin);
+    protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(replay ? _ => frames() : null, skin, algorithm);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -82,7 +82,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
         var reverse = BmsKeyBindingConfiguration.ReverseScratchAction(first) ?? first;
         IList<ReplayFrame> result =
         [
-            new BmsReplayFrame(0) { JudgementAlgorithm = algorithm },
+            new BmsReplayFrame(0),
             new BmsReplayFrame(3000, first, second), new BmsReplayFrame(3001, first), new BmsReplayFrame(3002, first, second),
             new BmsReplayFrame(3201, first), new BmsReplayFrame(3202, first, second), new BmsReplayFrame(3350, first),
             new BmsReplayFrame(3400, first, second), new BmsReplayFrame(3400, first), new BmsReplayFrame(3400, first, second),

@@ -138,6 +138,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
     {
         try
         {
+            ((BmsPlayfield)DrawableRuleset.Playfield).CompleteAtEnd(DrawableRuleset.FrameStableClock.CurrentTime);
             base.ConcludeFailedScore(score);
 
             if (session.CanContinue && session.CurrentStage.Status == BmsCourseStageStatus.Playing)
@@ -180,6 +181,7 @@ internal partial class BmsCoursePlayer : SoloPlayer
         {
             abortScorePending = true;
             GameplayClockContainer.Stop();
+            ((BmsPlayfield)DrawableRuleset.Playfield).CompleteAtEnd(DrawableRuleset.FrameStableClock.CurrentTime);
             DrawableRuleset.SetRecordTarget(null);
             ScoreProcessor.PopulateScore(Score.ScoreInfo);
             ScoreProcessor.FailScore(Score.ScoreInfo);

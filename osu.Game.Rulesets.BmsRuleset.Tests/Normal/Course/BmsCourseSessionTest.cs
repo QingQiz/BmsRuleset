@@ -653,35 +653,22 @@ public class BmsCourseSessionTest
     }
 
     [Test]
-    public void TestCourseScoreCloneRetainsGaugeHistory()
+    public void TestCourseScoreCloneRetainsSummaryAndFinalGaugeStates()
     {
         var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
         var score = createScore(true);
-        BmsScoreGaugeHistoryStore.Set(score,
-        [
-            new BmsGaugeHistoryEvent(1000, BmsGaugeType.ExClass,
-            [
-                new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
-                new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
-                new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
-            ]),
-        ]);
-
-        session.BeginCurrentStage();
-        session.CompleteCurrentStage(score,
+        BmsGaugeStateSnapshot[] states =
         [
             new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
             new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
             new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
-        ]);
+        ];
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(score, states);
 
-        Assert.That(BmsScoreGaugeHistoryStore.TryGet(session.CurrentStage.Score!, out var history), Is.True);
-        Assert.That(history.Single().States.Select(state => state.GaugeType), Is.EqualTo(
-        [
-            BmsGaugeType.ExHardClass,
-            BmsGaugeType.ExClass,
-            BmsGaugeType.Class,
-        ]));
+        Assert.That(session.CurrentStage.Score, Is.Not.SameAs(score));
+        Assert.That(session.CurrentStage.Score!.TotalScore, Is.EqualTo(score.TotalScore));
+        Assert.That(session.CurrentGaugeStates, Is.EqualTo(states).And.Not.SameAs(states));
     }
 
     [Test]
@@ -748,6 +735,58 @@ public class BmsCourseSessionTest
         {
             Assert.That(singleGauge.CurrentGaugeStates, Is.Empty);
             Assert.That(autoGauge.CurrentGaugeStates, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void TestStageGaugeModsCarryStartingHealthWithoutMutatingEarlierStages()
+    {
+        var session = createSession(mods: [new BmsModClassGauge()]);
+        var firstStage = session.Mods.OfType<BmsModClassGauge>().Single();
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(true), gaugeStates(0.42));
+        session.RequestAdvance();
+        session.Advance();
+
+        var secondStage = session.Mods.OfType<BmsModClassGauge>().Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(secondStage, Is.Not.SameAs(firstStage));
+            Assert.That(firstStage.InitialHealth.Value, Is.EqualTo(1));
+            Assert.That(secondStage.InitialHealth.Value, Is.EqualTo(0.42));
+        });
+        using var health = new BmsHealthProcessor();
+        ((BmsModClassGauge)secondStage.DeepClone()).ApplyToHealthProcessor(health);
+        Assert.That(health.CurrentGaugeStates, Is.EqualTo(gaugeStates(0.42)));
+    }
+
+    [Test]
+    public void TestStageAutoGaugeModKeepsOnlySurvivingStartingHealth()
+    {
+        var session = createSession(mods: [new BmsModAutoGauge()], gaugeType: BmsGaugeType.ExHardClass);
+        var firstStage = session.Mods.OfType<BmsModAutoGauge>().Single();
+        session.BeginCurrentStage();
+        session.CompleteCurrentStage(createScore(true),
+        [
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExHardClass, 0, true),
+            new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
+            new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
+        ]);
+        session.RequestAdvance();
+        session.Advance();
+
+        var secondStage = session.Mods.OfType<BmsModAutoGauge>().Single();
+        using var health = new BmsHealthProcessor();
+        ((BmsModAutoGauge)secondStage.DeepClone()).ApplyToHealthProcessor(health);
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstStage.ExHardClassHealth.Value, Is.EqualTo(1));
+            Assert.That(secondStage.ExHardClassHealth.Value, Is.Null);
+            Assert.That(health.CurrentGaugeStates, Is.EqualTo(new[]
+            {
+                new BmsGaugeStateSnapshot(BmsGaugeType.ExClass, 0.42, false),
+                new BmsGaugeStateSnapshot(BmsGaugeType.Class, 0.81, false),
+            }));
         });
     }
 

@@ -122,7 +122,7 @@ internal sealed class BmsChargeNoteJudgementRule
             execution.PublishState(hold.Note, state.State, frame);
     }
 
-    internal bool CompleteAtPause(BmsChargeNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame)
+    internal bool CompleteAtEnd(BmsChargeNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame)
     {
         ref var hold = ref state.Hold;
         if (!hold.Holding)
@@ -134,7 +134,7 @@ internal sealed class BmsChargeNoteJudgementRule
         if (hold.Started)
         {
             hold.Started = false;
-            execution.PublishState(hold.Note, state.State, frame with { IsPauseCompletion = true });
+            execution.PublishState(hold.Note, state.State, frame);
         }
 
         return true;

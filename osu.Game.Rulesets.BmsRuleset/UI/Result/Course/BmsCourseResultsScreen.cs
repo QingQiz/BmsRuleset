@@ -10,10 +10,8 @@ using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
-using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 
@@ -35,9 +33,6 @@ internal partial class BmsCourseResultsScreen : BmsResultsScreen
     [Resolved]
     private OsuColour colours { get; set; } = null!;
 
-    [Resolved]
-    private ScoreManager scores { get; set; } = null!;
-
     internal BmsCourseResultsScreen(BmsCourseSession session, bool recordResult = true)
         : base(null)
     {
@@ -48,18 +43,14 @@ internal partial class BmsCourseResultsScreen : BmsResultsScreen
         AllowRetry = false;
     }
 
-    protected override BmsStatisticsPanel CreateStatisticsPanel() => new(false);
+    protected override BmsStatisticsPanel CreateStatisticsPanel() => new(false)
+    {
+        StatisticsLoaded = hitEvents => courseLayout.ShowScore(SelectedScore.Value, hitEvents),
+    };
 
     protected override void LoadComplete()
     {
         base.LoadComplete();
-
-        // Both columns need restored replay timing before building their summaries.
-        foreach (var stage in session.Stages)
-        {
-            if (stage.Score != null)
-                BmsReplayPatcher.RestoreScoreData(scores, stage.Score);
-        }
 
         var aggregateScore = BmsCourseScoreAggregation.CreateScore(session);
         if (recordResult)

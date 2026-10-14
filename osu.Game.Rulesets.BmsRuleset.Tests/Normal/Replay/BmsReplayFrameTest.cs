@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Framework.Timing;
@@ -15,69 +16,61 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Replay;
 public partial class BmsReplayFrameTest
 {
     [Test]
-    public void TestReplayFrameRoundTripsThroughJson([Values] BmsJudgementAlgorithm algorithm)
+    public void TestReplayFrameContainsOnlyTimeAndActions()
     {
-        var original = new BmsReplayFrame(1234, BmsAction.Key1, BmsAction.Scratch)
-        {
-            BranchDecisions = "2:1",
-            JudgementAlgorithm = algorithm,
-            IncludesGeneratedInputs = true,
-        };
-
+        var original = new BmsReplayFrame(1234.125, BmsAction.Key1, BmsAction.ScratchReverse);
         var deserialised = original.Serialize().Deserialize<BmsReplayFrame>();
-
         Assert.That(deserialised.Time, Is.EqualTo(original.Time));
         Assert.That(deserialised.Actions, Is.EqualTo(original.Actions));
-        Assert.That(deserialised.BranchDecisions, Is.EqualTo(original.BranchDecisions));
-        Assert.That(deserialised.JudgementAlgorithm, Is.EqualTo(algorithm));
-        Assert.That(deserialised.IncludesGeneratedInputs, Is.True);
     }
 
     [Test]
-    public void TestLegacyFrameHasNoAlgorithm()
+    public void TestRecorderStoresAlgorithmOnFirstInput([Values] BmsJudgementAlgorithm algorithm)
     {
-        var frame = """{"time": 1234, "actions": []}""".Deserialize<BmsReplayFrame>();
-
-        Assert.That(frame.JudgementAlgorithm, Is.Null);
-        Assert.That(frame.IncludesGeneratedInputs, Is.False);
-    }
-
-    [Test]
-    public void TestAlgorithmMetadataPreventsFrameDeduplication()
-    {
-        var legacy = new BmsReplayFrame(1000, BmsAction.Key1);
-        var combo = new BmsReplayFrame(1000, BmsAction.Key1) { JudgementAlgorithm = BmsJudgementAlgorithm.Combo };
-        var duration = new BmsReplayFrame(1000, BmsAction.Key1) { JudgementAlgorithm = BmsJudgementAlgorithm.Duration };
-
-        Assert.That(combo.IsEquivalentTo(legacy), Is.False);
-        Assert.That(combo.IsEquivalentTo(duration), Is.False);
-    }
-
-    [Test]
-    public void TestGeneratedInputMarkerPreventsFrameDeduplication()
-    {
-        var marked = new BmsReplayFrame(1000, BmsAction.Scratch) { IncludesGeneratedInputs = true };
-        Assert.That(marked.IsEquivalentTo(new BmsReplayFrame(1000, BmsAction.Scratch)), Is.False);
-    }
-
-    [Test]
-    public void TestRecorderStoresSessionAlgorithmInFirstFrame([Values] BmsJudgementAlgorithm algorithm)
-    {
-        using var recorder = new TestRecorder(new Score(), algorithm) { Clock = new FramedClock(new ManualClock()) };
-        var first = recorder.CreateFrame([BmsAction.Key1], null);
-        var second = recorder.CreateFrame([], first);
-
-        Assert.That(first.JudgementAlgorithm, Is.EqualTo(algorithm));
+        var score = new Score();
+        using var recorder = new TestRecorder(score, algorithm) { Clock = new FramedClock(new ManualClock()) };
+        var first = recorder.CreateFrame([BmsAction.Key1], null)!;
+        var second = recorder.CreateFrame([], first)!;
+        Assert.That(first.Algorithm, Is.EqualTo(algorithm));
+        Assert.That(second.Algorithm, Is.EqualTo(BmsJudgementAlgorithm.Combo));
+        Assert.That(score.ScoreInfo.Mods, Is.Empty);
         Assert.That(first.Actions, Is.EqualTo((BmsAction[])[BmsAction.Key1]));
-        Assert.That(first.IncludesGeneratedInputs, Is.True);
-        Assert.That(second.IncludesGeneratedInputs, Is.False);
-        Assert.That(second.JudgementAlgorithm, Is.Null);
         Assert.That(second.Actions, Is.Empty);
+    }
+
+    [Test]
+    public void TestRecorderOmitsIdleSamplesAndPreservesSameTimeChanges()
+    {
+        var source = new ManualClock();
+        var clock = new FramedClock(source);
+        using var recorder = new TestRecorder(new Score(), BmsJudgementAlgorithm.Combo) { Clock = clock };
+        var initial = recorder.CreateFrame([], null)!;
+        source.CurrentTime = 1000.125;
+        clock.ProcessFrame();
+        Assert.That(recorder.CreateFrame([], initial), Is.Null);
+        var press = recorder.CreateFrame([BmsAction.Key1], initial)!;
+        Assert.That(press.Time, Is.EqualTo(1000.125));
+        Assert.That(recorder.CreateFrame([BmsAction.Key1], press), Is.Null);
+        var release = recorder.CreateFrame([], press)!;
+        var repress = recorder.CreateFrame([BmsAction.Key1], release)!;
+        Assert.That(release.Time, Is.EqualTo(press.Time));
+        Assert.That(repress.Time, Is.EqualTo(press.Time));
+        source.CurrentTime = 500;
+        clock.ProcessFrame();
+        Assert.That(recorder.CreateFrame([BmsAction.Key1], repress)?.Time, Is.EqualTo(500));
+    }
+
+    [Test]
+    public void TestActionOrderChangesDoNotCreateAnOperation()
+    {
+        using var recorder = new TestRecorder(new Score(), BmsJudgementAlgorithm.Combo) { Clock = new FramedClock(new ManualClock()) };
+        var previous = recorder.CreateFrame([BmsAction.Key1, BmsAction.Key2], null)!;
+        Assert.That(recorder.CreateFrame([BmsAction.Key2, BmsAction.Key1], previous), Is.Null);
     }
 
     private partial class TestRecorder(Score score, BmsJudgementAlgorithm algorithm) : BmsReplayRecorder(score, algorithm)
     {
-        public BmsReplayFrame CreateFrame(List<BmsAction> actions, ReplayFrame previousFrame)
-            => (BmsReplayFrame)HandleFrame(Vector2.Zero, actions, previousFrame);
+        public BmsReplayFrame? CreateFrame(List<BmsAction> actions, ReplayFrame? previousFrame)
+            => (BmsReplayFrame?)HandleFrame(Vector2.Zero, actions, previousFrame);
     }
 }

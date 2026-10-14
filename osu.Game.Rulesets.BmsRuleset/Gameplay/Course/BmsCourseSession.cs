@@ -51,7 +51,7 @@ internal sealed class BmsCourseSession
 
     internal IReadOnlyList<BmsCourseStageAttempt> Stages => stages;
 
-    internal IReadOnlyList<Mod> Mods { get; }
+    internal IReadOnlyList<Mod> Mods { get; private set; }
 
     internal BmsGaugeType GaugeType { get; }
 
@@ -90,6 +90,7 @@ internal sealed class BmsCourseSession
         gaugeProfileFamilyOverride = ResolveCourseGaugeProfileFamily(course.Constraints);
         HasNoSpeedConstraint = course.Constraints.Any(constraint => constraint.Equals("no_speed", StringComparison.OrdinalIgnoreCase));
         CurrentGaugeStates = [];
+        updateGaugeSettings();
 
         if (this.stages.Length == 0)
             throw new ArgumentException(@"A BMS course must contain at least one stage.", nameof(stages));
@@ -201,6 +202,9 @@ internal sealed class BmsCourseSession
 
         AdvanceRequested = false;
         CurrentStageIndex++;
+        // Each stage owns its settings so advancing cannot mutate the preceding stage's saved score.
+        Mods = Mods.Select(mod => mod.DeepClone()).ToArray();
+        updateGaugeSettings();
     }
 
     internal static BmsModGauge CreateGaugeMod(BmsGaugeType gaugeType) => gaugeType switch
@@ -419,11 +423,31 @@ internal sealed class BmsCourseSession
             initialStates: initialStates);
     }
 
+    private void updateGaugeSettings()
+    {
+        var initialStates = CurrentGaugeStates.Where(state => !state.Failed).ToArray();
+        if (Mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge)
+        {
+            autoGauge.GaugeProfileFamily.Value = gaugeProfileFamilyOverride;
+            autoGauge.ClassHealth.Value = startingHealth(BmsGaugeType.Class);
+            autoGauge.ExClassHealth.Value = startingHealth(BmsGaugeType.ExClass);
+            autoGauge.ExHardClassHealth.Value = startingHealth(BmsGaugeType.ExHardClass);
+        }
+        else if (Mods.OfType<BmsModGauge>().FirstOrDefault() is { } gauge)
+        {
+            gauge.GaugeProfileFamily.Value = gaugeProfileFamilyOverride;
+            gauge.InitialHealth.Value = startingHealth(GaugeType);
+        }
+
+        double? startingHealth(BmsGaugeType type)
+            => CurrentGaugeStates.Count == 0 ? 1 : initialStates.FirstOrDefault(state => state.GaugeType == type)?.Health;
+    }
+
     private void storeResult(ScoreInfo score, IReadOnlyList<BmsGaugeStateSnapshot> gaugeStates, BmsCourseStageStatus stageStatus)
     {
         CurrentGaugeStates = gaugeStates.Select(state => state with { }).ToArray();
         CurrentHealth = CurrentGaugeStates.FirstOrDefault(state => !state.Failed)?.Health ?? 0;
-        CurrentStage.Score = BmsScoreGaugeHistoryStore.Clone(score);
+        CurrentStage.Score = score.DeepClone();
         CurrentStage.EndingHealth = CurrentHealth;
         CurrentStage.Status = stageStatus;
     }

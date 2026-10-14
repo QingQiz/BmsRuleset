@@ -81,7 +81,7 @@ public static class BmsJudgementSelector
 
             if (result != HitResult.None)
             {
-                if (selected == null || shouldReplaceSelected(selected.Value, candidate, inputTime, selectedResult, result, selectedTable!, table, algorithm))
+                if (selected == null || shouldReplaceSelected(selected.Value, candidate, inputTime, selectedTable!, table, algorithm))
                 {
                     selected = candidate;
                     selectedResult = result;
@@ -113,50 +113,24 @@ public static class BmsJudgementSelector
         BmsJudgementCandidate current,
         BmsJudgementCandidate next,
         double inputTime,
-        HitResult currentResult,
-        HitResult nextResult,
         BmsJudgementWindowTable currentTable,
         BmsJudgementWindowTable nextTable,
         BmsJudgementAlgorithm? algorithm)
     {
         // Match beatoraja's JudgeAlgorithm comparisons, including strict late and inclusive early
         // boundaries. Use each note's own table because BMS judgement rates can change mid-chart.
-        return algorithm switch
+        return (algorithm ?? BmsJudgementAlgorithm.Combo) switch
         {
             BmsJudgementAlgorithm.Combo => isPastWindow(HitResult.Good),
             BmsJudgementAlgorithm.Duration => Math.Abs(current.StartTime - inputTime) > Math.Abs(next.StartTime - inputTime),
             BmsJudgementAlgorithm.Lowest => false,
             BmsJudgementAlgorithm.Score => isPastWindow(HitResult.Great),
-            // Unversioned replays must retain the original selector, including its BAD fallback.
-            null => shouldReplaceLegacySelection(current, next, inputTime, currentResult, nextResult, nextTable.GoodFastDTime),
             _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm, null),
         };
 
         bool isPastWindow(HitResult threshold) =>
             current.StartTime - inputTime < -currentTable.SlowWindowFor(threshold)
             && next.StartTime - inputTime <= nextTable.FastWindowFor(threshold);
-    }
-
-    private static bool shouldReplaceLegacySelection(
-        BmsJudgementCandidate current,
-        BmsJudgementCandidate next,
-        double inputTime,
-        HitResult currentResult,
-        HitResult nextResult,
-        double goodFastDTime)
-    {
-        var nextOffset = inputTime - next.StartTime;
-        var currentDTime = current.StartTime - inputTime;
-
-        if (currentDTime < -goodFastDTime && nextResult is HitResult.Perfect or HitResult.Great or HitResult.Good)
-            return true;
-
-        if (currentResult is HitResult.Ok or HitResult.Meh && nextResult is HitResult.Perfect or HitResult.Great or HitResult.Good)
-            return true;
-
-        return currentResult is HitResult.Ok or HitResult.Meh
-               && nextResult is HitResult.Ok or HitResult.Meh
-               && Math.Abs(nextOffset) < Math.Abs(inputTime - current.StartTime);
     }
 
     private sealed class CandidateComparer : IComparer<BmsJudgementCandidate>

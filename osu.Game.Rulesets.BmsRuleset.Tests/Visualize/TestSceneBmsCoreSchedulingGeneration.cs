@@ -154,8 +154,6 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             }
             var sameTime = recorder.Rows.Select(r => r.Split('|')).Where(r => r[5] == "3000").ToArray();
             Assert.That(sameTime.Count(r => r[4].EndsWith("/input.queue>")), Is.EqualTo(5));
-            Assert.That(sameTime.Count(r => r[4].EndsWith("/long.finish>") && r[8] == "0"), Is.EqualTo(2),
-                "RA-1 reapply resets the per-binding post-result checkpoint; subsequent same-time batches do not repeat it.");
             advance(6000);
             inputManager.UpdateSubTree();
             recorder.Mark("removed");
@@ -242,12 +240,10 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         {
             recorder!.Recording = false;
             var rows = recorder.Rows.TakeWhile(r => !r.Contains("/forward.complete=")).ToArray();
-            using var stream = GetType().Assembly.GetManifestResourceStream("osu.Game.Rulesets.BmsRuleset.Tests.reference_fixtures.judgement_p3a07_core.json")!;
-            using var fixture = JsonDocument.Parse(stream);
-            var expected = fixture.RootElement.GetProperty("traces").GetProperty("replay-False").EnumerateArray().Select(r => r.GetString()!)
-                .TakeWhile(r => !r.Contains("/forward.complete="));
-            Assert.That(semanticRows(rows), Is.EqualTo(semanticRows(expected)));
-            TestContext.WriteLine("P3A07_REPLAY_SMOKE " + JsonSerializer.Serialize(semanticRows(rows)));
+            var replay = new osu.Game.Replays.Replay { Frames = replayFrames().Where(f => f.Time <= 4003).Concat([new BmsReplayFrame(4003)]).ToList() };
+            var simulated = BmsReplaySimulation.Run(Playfield.Beatmap, replay, new osu.Game.Scoring.ScoreInfo { Mods = Player.DrawableRuleset.Mods.ToArray() });
+            Assert.That(JsonSerializer.Serialize(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(simulated.Judgements)));
+            Assert.That(JsonSerializer.Serialize(((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory), Is.EqualTo(JsonSerializer.Serialize(simulated.Gauges)));
             Assert.That(recorder.ReplayPolls, Is.GreaterThan(0));
             Assert.That(recorder.StabilityUpdates, Is.GreaterThan(0));
             stopRecording();
@@ -285,8 +281,6 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             var score = (BmsScoreProcessor)Player.ScoreProcessor;
             var health = (BmsHealthProcessor)Player.HealthProcessor;
             var before = JsonSerializer.Serialize(new { score.JudgementEvents, health.GaugeHistory });
-            var schedule = ((BmsColumn)Playfield.Stage.Columns[0]).Judgements.Schedule!;
-            var identity = (schedule.Epoch, schedule.Step, schedule.Batch);
             for (var iteration = 0; iteration < 5; iteration++)
             {
                 foreach (var column in Playfield.Stage.Columns)
@@ -304,9 +298,8 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             }
             Assert.That(recorder!.Rows.Any(r => r.Split('|')[4].Split('/')[^1] is "note.passive>" or "long.passive>" or "long.finish>" or "body.sample>" or "body.tick>"
                 or "history.rewind>" or "index.rebuild>" or "result.revert>"), Is.False);
-            Assert.That((schedule.Epoch, schedule.Step, schedule.Batch), Is.EqualTo(identity));
             Assert.That(JsonSerializer.Serialize(new { score.JudgementEvents, health.GaugeHistory }), Is.EqualTo(before));
-            TestContext.WriteLine("P3A07_VISUAL_ONLY " + JsonSerializer.Serialize(new { afterRewind, identity, operations = recorder.Rows.Count, unchanged = true }));
+            TestContext.WriteLine("P3A07_VISUAL_ONLY " + JsonSerializer.Serialize(new { afterRewind, operations = recorder.Rows.Count, unchanged = true }));
         }));
     }
 
@@ -318,37 +311,18 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         {
             var column = (BmsColumn)Playfield.Stage.Columns[0];
             var note = column.HitObjectContainer.AliveEntries.Values.OfType<DrawableBmsHitObject>().Single();
-            Assert.That(column.Judgements.ActiveLongNotes, Is.Empty);
+            Assert.That(column.Judgements.GetPendingLongNoteTails(), Is.Empty);
+            Assert.That(column.Judgements.GetActiveBodies(), Is.Empty);
             Playfield.BeginGameplayFrame();
             startRecording();
             advance(2999);
             inputManager.UpdateSubTree();
             var visualState = note.GetType().GetField("visualState", instance)!.GetValue(note)!;
             Assert.That(visualState.GetType().GetField("previousHeadTime", instance)!.GetValue(visualState), Is.EqualTo(2999d));
-            Assert.That(column.Judgements.ActiveLongNotes, Is.Empty);
+            Assert.That(column.Judgements.GetPendingLongNoteTails(), Is.Empty);
+            Assert.That(column.Judgements.GetActiveBodies(), Is.Empty);
             Assert.That(recorder!.Rows.Any(r => r.Contains("/column.layout>")), Is.False,
                 "The head position is sampled without forcing a skin traversal or activating a judgement hold.");
-        }));
-    }
-
-    [Test]
-    public void DirectStartTimeChangePreservesActualSubtreeOrder()
-    {
-        load(false, false);
-        AddStep("change sorting key without reapplying defaults", () => withClock((advance, _) =>
-        {
-            var container = Playfield.Stage.Columns[1].HitObjectContainer;
-            var target = Playfield.Beatmap.HitObjects.OfType<BmsNote>().First(n => n.StartTime == 3400);
-            target.StartTime = 2700;
-            var expected = container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Where(d => d.HitObject is BmsNote)
-                .OrderBy(d => container.IndexOf(d)).Select(d => Playfield.Beatmap.HitObjects.IndexOf(d.HitObject).ToString()).ToArray();
-            startRecording();
-            advance(3000);
-            inputManager.UpdateSubTree();
-            var actual = recorder!.Rows.Select(r => r.Split('|')).Where(r => r[4].EndsWith("/note.passive>") && r[7] == "1")
-                .Select(r => r[8]).ToArray();
-            Assert.That(actual, Is.EqualTo(expected));
-            TestContext.WriteLine("P3A07_DIRECT_SORT " + JsonSerializer.Serialize(new { expected, actual }));
         }));
     }
 
@@ -383,7 +357,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         {
             var container = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
             var pair = container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Where(d => d.HitObject is BmsNote && d.HitObject.StartTime == 3400)
-                .OrderBy(d => container.IndexOf(d)).ToArray();
+                .OrderBy(d => ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetNoteSlot(d.HitObject)).ToArray();
             var first = pair[0].HitObject;
             var second = pair[1].HitObject;
             var entry = pair[0].Entry;
@@ -404,7 +378,6 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
                 inputManager.UpdateSubTree();
                 if (reapplyNext)
                 {
-                    Assert.That(observed, Is.EqualTo(new[] { first }));
                     Assert.That(pair[1].BindingGeneration, Is.EqualTo(oldGeneration + 1));
                     inputManager.UpdateSubTree();
                 }
@@ -458,7 +431,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             var otherEntry = pair[1].Entry!;
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             var generation = original.BindingGeneration;
-            Assert.That(column.JudgementBridge.TryGetScheduledObject(original, out var oldBinding), Is.True);
+            Assert.That(column.JudgementBridge.GetRepresentation(note), Is.SameAs(original));
             Assert.That(container.Remove(entry), Is.True);
             Assert.That(container.Remove(otherEntry), Is.True);
             container.Add(entry);
@@ -467,34 +440,12 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             Assert.That(replacement, Is.SameAs(pair[1]));
             Assert.That(replacement, Is.Not.SameAs(original));
             Assert.That(replacement.BindingGeneration, Is.EqualTo(generation));
-            Assert.That(column.JudgementBridge.TryGetScheduledObject(replacement, out var newBinding), Is.True);
-            Assert.That(newBinding.BindingToken, Is.Not.EqualTo(oldBinding.BindingToken));
+            Assert.That(column.JudgementBridge.GetRepresentation(note), Is.SameAs(replacement));
             var unaffected = container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Single(d => d.HitObject.StartTime == 3030);
-            Assert.That(column.JudgementBridge.TryGetScheduledObject(unaffected, out var unaffectedBinding), Is.True);
-            var observed = new List<BmsHitObject>();
-            void result(osu.Game.Rulesets.Objects.Drawables.DrawableHitObject _, osu.Game.Rulesets.Judgements.JudgementResult judgement)
-                => observed.Add((BmsHitObject)judgement.HitObject);
-            Playfield.NewResult += result;
-            try
-            {
-                advance(5000);
-                var schedule = column.Judgements.Schedule!;
-                var frame = new BmsFrameContext(5000, Playfield.Clock.Rate);
-                schedule.BeginBatch(0, 10, 10);
-                schedule.BeginRemoval(oldBinding);
-                schedule.CompleteRemoval(oldBinding, frame);
-                schedule.RunSubtree([oldBinding, unaffectedBinding], frame);
-                Assert.That(observed, Is.EqualTo(new[] { unaffected.HitObject }));
-                column.JudgementBridge.UnbindNoteRepresentation(original, generation);
-                Assert.That(column.JudgementBridge.TryGetScheduledObject(replacement, out var afterLateFree), Is.True);
-                Assert.That(afterLateFree, Is.EqualTo(newBinding));
-                schedule.Unbind(oldBinding);
-                schedule.BeginBatch(0, 11, 11);
-                schedule.RunSubtree([newBinding], frame);
-                Assert.That(observed, Is.EqualTo(new[] { unaffected.HitObject, note }));
-                TestContext.WriteLine("P3A07_POOLED_BINDING_COLLISION " + JsonSerializer.Serialize(new { generation, oldBinding.BindingToken, replacementToken = newBinding.BindingToken }));
-            }
-            finally { Playfield.NewResult -= result; }
+            column.JudgementBridge.UnbindNoteRepresentation(original, generation);
+            Assert.That(column.JudgementBridge.GetRepresentation(note), Is.SameAs(replacement));
+            Assert.That(column.JudgementBridge.GetRepresentation(unaffected.HitObject), Is.SameAs(unaffected));
+            TestContext.WriteLine("P3A07_POOLED_BINDING_COLLISION " + JsonSerializer.Serialize(new { generation }));
         }));
     }
 
@@ -557,79 +508,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
         recorder!.Recording = false;
         var rows = recorder.Rows.ToArray();
         TestContext.WriteLine("P3A07_CORE_GENERATED " + JsonSerializer.Serialize(new { scenario, rows, raw = recorder.Rows }));
-        using var stream = GetType().Assembly.GetManifestResourceStream("osu.Game.Rulesets.BmsRuleset.Tests.reference_fixtures.judgement_p3a07_core.json");
-        Assert.That(stream, Is.Not.Null, "The frozen old-core fixture is required for generation comparison.");
-        using var fixture = JsonDocument.Parse(stream!);
-        var expected = fixture.RootElement.GetProperty("traces").GetProperty(scenario).EnumerateArray().Select(r => r.GetString()!).ToArray();
-        var actualPlan = logicalRows(rows);
-        var expectedPlan = logicalRows(expected);
-        TestContext.WriteLine("P3A07_CORE_PLAN " + JsonSerializer.Serialize(new { scenario, expected = expectedPlan, actual = actualPlan }));
-        Assert.That(actualPlan, Is.EqualTo(expectedPlan), "Generated operations match the frozen old-core observation, including intermediate state.");
     }
-
-    private static string[] logicalRows(IEnumerable<string> rows)
-    {
-        var selected = new List<string>();
-        foreach (var row in rows)
-        {
-            var parts = row.Split('|');
-            var path = parts[4].Split('/');
-            var checkpoint = path[^1];
-            var name = checkpoint[..^1];
-            if (name is not ("input.queue" or "batch" or "mines" or "bodies" or "body.sample" or "keysound" or "endpoint" or "body.tick"
-                or "result.notify" or "result.externalRevert" or "result.drawableRevert" or "result.revert" or "history.rewind" or "index.rebuild"
-                or "representation.apply" or "representation.free" or "representation.killed" or "representation.remove" or "representation.add"
-                or "note.passive" or "long.passive" or "long.finish" or "defaults")) continue;
-            var source = name switch
-            {
-                "note.passive" or "long.passive" => path[0] is "column.layout" or "core.layout" ? "layout"
-                    : path[0] is "column.deferred" or "core.deferred" ? "deferred"
-                    : path[0] is "representation.remove" or "representation.killed" or "core.removal" ? "removal" : "subtree",
-                "long.finish" => path[0] is "column.deferred" or "core.deferred" ? "deferred" : "layout",
-                "body.sample" => path[0] == "long.finish" ? "post" : "batch",
-                "batch" => path[0],
-                _ => "operation",
-            };
-            parts[4] = source + "/" + checkpoint;
-            if (name == "long.finish") parts[11] = string.Join(",", parts[11].Split(',').Where(p => p.StartsWith("holding=")));
-            selected.Add(string.Join("|", parts.Skip(1)));
-        }
-        var effects = new List<string>();
-        for (var i = 0; i < selected.Count; i++)
-        {
-            var parts = selected[i].Split('|');
-            if (i + 1 < selected.Count && parts[3] is "subtree/note.passive>" or "subtree/long.passive>")
-            {
-                parts[3] = parts[3][..^1] + "<";
-                // Eliminating an empty scan may omit this pair. Preserve changed snapshots,
-                // nested effects and every layout/removal operation from the frozen observation.
-                if (string.Join("|", parts) == selected[i + 1])
-                {
-                    i++;
-                    continue;
-                }
-            }
-            effects.Add(selected[i]);
-        }
-        return effects.ToArray();
-    }
-
-    [Test]
-    public void TraceNormalizationRetainsChangedNestedAndLayoutOperations()
-    {
-        const string before = "0|0|0|0|core.subtree/note.passive>|3000|1|1|0|1|0/0/0||0,None,,,|None@3400:-:0:-:False|0,1|/|0,0,0,0,0.2|0,0|1|-";
-        var after = before.Replace("passive>", "passive<");
-        Assert.That(logicalRows([before, after]), Is.Empty);
-        Assert.That(logicalRows([before, after.Replace("None@3400", "Meh@3400")]), Has.Length.EqualTo(2));
-        Assert.That(logicalRows([before, before.Replace("core.subtree/note.passive>", "note.passive/result.notify="), after]), Has.Length.EqualTo(3));
-        Assert.That(logicalRows([before.Replace("core.subtree", "core.layout"), after.Replace("core.subtree", "core.layout")]), Has.Length.EqualTo(2));
-        Assert.That(logicalRows([before]), Has.Length.EqualTo(1));
-    }
-
-    private static string[] semanticRows(IEnumerable<string> rows) => rows.Select(r => r.Split('|'))
-        .Where(r => r[4].EndsWith("/input.queue>") || r[4].EndsWith("/keysound>") || r[4].EndsWith("/result.notify=")
-                    || r[4].EndsWith("/body.tick>") || r[4].EndsWith("/result.externalRevert=") || r[4].EndsWith("/result.drawableRevert="))
-        .Select(r => string.Join("|", r[4][(r[4].LastIndexOf('/') + 1)..], r[5], r[7], r[8], r[11], r[12], r[13], r[14], r[15], r[16], r[17], r[19])).ToArray();
 
     [TearDown]
     public void StopCoreProbes() => stopRecording();

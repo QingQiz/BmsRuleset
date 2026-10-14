@@ -24,20 +24,19 @@ public class BmsAutoGenerator(BmsBeatmap beatmap, bool scratchOnly = false) : Au
     {
         var active = new List<BmsAction>();
 
-        foreach (var group in GenerateActionPoints().GroupBy(p => p.Time).OrderBy(g => g.Key))
+        foreach (var point in GenerateActionPoints().OrderBy(p => p.Time).ThenBy(p => p.Press))
         {
-            foreach (var point in group.OrderBy(p => p.Press))
+            if (point.Press)
             {
-                if (point.Press)
-                {
-                    if (!active.Contains(point.Action))
-                        active.Add(point.Action);
-                }
-                else
-                    active.Remove(point.Action);
-            }
+                if (active.Contains(point.Action))
+                    continue;
 
-            Frames.Add(new BmsReplayFrame(group.Key, active.ToArray()) { IncludesGeneratedInputs = Frames.Count == 0 });
+                active.Add(point.Action);
+            }
+            else if (!active.Remove(point.Action))
+                continue;
+
+            Frames.Add(new BmsReplayFrame(point.Time, active.ToArray()));
         }
     }
 
@@ -108,10 +107,12 @@ public class BmsAutoGenerator(BmsBeatmap beatmap, bool scratchOnly = false) : Au
                 && BmsKeyBindingConfiguration.ReverseScratchAction(action) is { } reverseAction)
             {
                 yield return new ActionPoint(releaseTime, reverseAction, true);
+
                 // A same-time head uses the forward direction; release the reversal before its tail,
                 // rather than at its head where release-before-press ordering would leave it stuck.
                 var nextReversalTime = nextObject is BmsLongNote nextHold && nextHold.StartTime <= releaseTime
-                    ? nextHold.EndTime : nextObject?.StartTime;
+                    ? nextHold.EndTime
+                    : nextObject?.StartTime;
                 yield return new ActionPoint(calculateTapReleaseTime(releaseTime, nextReversalTime), reverseAction, false);
             }
         }

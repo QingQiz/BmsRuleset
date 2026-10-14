@@ -86,7 +86,6 @@ public partial class TestSceneBmsAutoScratchInput : BmsPlayerTestScene
             Assert.That(actual.Select(o => o.ExpectedTime), Is.EqualTo(new[] { 3000d, 3200, 3800 }));
             Assert.That(actual.All(o => o.Result.IsHit()), Is.True);
             var frames = Player.Score.Replay.Frames.OfType<BmsReplayFrame>().ToArray();
-            Assert.That(frames.Any(f => f.IncludesGeneratedInputs), Is.True);
             Assert.That(frames.Any(f => f.Time == 3000 && f.Actions.Contains(BmsAction.Scratch)), Is.True);
             Assert.That(frames.Any(f => f.Time >= 3810 && !f.Actions.Contains(BmsAction.Scratch) && !f.Actions.Contains(BmsAction.ScratchReverse)), Is.True);
             Assert.That(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.Any(e => e.Source.Kind == BmsJudgementSourceKind.Landmine && e.Result == HitResult.Meh), Is.False);
@@ -124,7 +123,7 @@ public partial class TestSceneBmsAutoScratchInput : BmsPlayerTestScene
     }
 
     [Test]
-    public void RewindRearmsInputAndResumeRewindPreservesHold()
+    public void RewindRearmsInputAndReplaysTheHold()
     {
         load(BmsLongNoteMode.ChargeNote);
         seek(3300);
@@ -135,14 +134,8 @@ public partial class TestSceneBmsAutoScratchInput : BmsPlayerTestScene
         seek(3200);
         seek(3300);
         AddAssert("head replayed and held", () => scratch.PressedDirections, () => Is.EqualTo(1));
-        var events = 0;
-        AddStep("start resume rewind", () => { events = observations().Length; Playfield.BeginResumeRewind(3300, 0); });
-        seek(2999);
-        AddAssert("resume rewind does not regenerate", () => observations().Length, () => Is.EqualTo(events));
-        seek(3300);
-        AddAssert("hold retained through resume", () => scratch.PressedDirections, () => Is.EqualTo(1));
         seek(3800);
-        AddAssert("single successful tail after resume", () => observations().Count(o => o.Kind == BmsTimingObservationKind.LongNoteTail && o.Result.IsHit()), () => Is.EqualTo(1));
+        AddAssert("single successful tail after rewind", () => observations().Count(o => o.Kind == BmsTimingObservationKind.LongNoteTail && o.Result.IsHit()), () => Is.EqualTo(1));
     }
 
     private Gameplay.Judgement.BmsColumnJudgementRuntime scratch => ((BmsColumn)Playfield.Stage.Columns[0]).Judgements;
@@ -152,7 +145,7 @@ public partial class TestSceneBmsAutoScratchInput : BmsPlayerTestScene
 
     private static IList<ReplayFrame> recordedFrames() =>
     [
-        new BmsReplayFrame(0) { IncludesGeneratedInputs = true }, new BmsReplayFrame(3017, BmsAction.Scratch), new BmsReplayFrame(3027),
+        new BmsReplayFrame(0), new BmsReplayFrame(3017, BmsAction.Scratch), new BmsReplayFrame(3027),
         new BmsReplayFrame(3219, BmsAction.Scratch), new BmsReplayFrame(3800, BmsAction.ScratchReverse), new BmsReplayFrame(3810), new BmsReplayFrame(60000),
     ];
 

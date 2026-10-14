@@ -45,7 +45,7 @@ public partial class TestSceneBmsBeatorajaJudgements : BmsPlayerTestScene
 
     private IList<ReplayFrame> createReplay(BmsBeatmap beatmap) =>
     [
-        new BmsReplayFrame(0) { JudgementAlgorithm = BmsJudgementAlgorithm.Combo },
+        new BmsReplayFrame(0),
         new BmsReplayFrame(2850, layout == BmsLayoutVariant.Pms9K ? BmsAction.PmsKey2 : BmsAction.Key1),
         new BmsReplayFrame(2851),
         new BmsReplayFrame(3000, layout == BmsLayoutVariant.Pms9K ? BmsAction.PmsKey2 : BmsAction.Key1),

@@ -15,7 +15,9 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
@@ -66,7 +68,6 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     private readonly BmsGameplayEvents gameplayEvents = new();
 
     private readonly BmsGameplayAudioController audioController;
-    private BmsGameplayPauseController? pauseController;
     private BmsGameplayCompletionController? completionController;
     private BmsGameplaySettingsController? settingsController;
     private double previousVisualUpdateMs;
@@ -87,9 +88,6 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     [Resolved(CanBeNull = true)]
     private GameplayClockContainer? gameplayClockContainer { get; set; }
 
-    [Resolved(CanBeNull = true)]
-    private Player? player { get; set; }
-
     [Resolved]
     private GameHost host { get; set; } = null!;
 
@@ -107,8 +105,6 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         if (!isDisposing)
             return;
 
-        pauseController?.Dispose();
-        pauseController = null;
         completionController?.Dispose();
         completionController = null;
         settingsController?.Dispose();
@@ -128,6 +124,7 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
             bmsPlayfield.SetReplayPlayback(replayScore != null);
 
         updateJudgementAlgorithm();
+        if (IsLoaded) restoreReplayHealth();
 
         if (replayScore != null && Beatmap is BmsBeatmap bmsBeatmap)
             BmsBranchReplayState.EnsureBranchReplayMod(replayScore, bmsBeatmap.BranchDecisions);
@@ -137,8 +134,21 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     {
         // Snapshot once per play; a live config binding would make recorded inputs ambiguous.
         ((BmsPlayfield)Playfield).JudgementAlgorithm = ReplayScore != null
-            ? ReplayScore.Replay.Frames.OfType<BmsReplayFrame>().FirstOrDefault()?.JudgementAlgorithm
+            ? BmsReplayFrame.GetAlgorithm(ReplayScore.Replay)
             : (Config as BmsRulesetConfigManager)?.Get<BmsJudgementAlgorithm>(BmsRulesetSetting.JudgementAlgorithm) ?? BmsJudgementAlgorithm.Combo;
+    }
+
+    private void restoreReplayHealth()
+    {
+        if (ReplayScore != null && healthProcessor is BmsHealthProcessor health)
+        {
+            var mods = ReplayScore.ScoreInfo.Mods;
+            if (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge)
+                autoGauge.ApplyToHealthProcessor(health);
+            else
+                foreach (var mod in mods.OfType<BmsModGauge>())
+                    mod.ApplyToHealthProcessor(health);
+        }
     }
 
     private IReadOnlyList<IApplicableToJudgementWindow> windowMods = [];
@@ -156,21 +166,9 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
     protected override void LoadComplete()
     {
         base.LoadComplete();
+        restoreReplayHealth();
 
-        if (gameplayClockContainer != null)
-        {
-            audioController.BindPauseSource(gameplayClockContainer.IsPaused);
-            pauseController = new BmsGameplayPauseController(
-                this,
-                (BmsPlayfield)Playfield,
-                gameplayClockContainer,
-                gameplayState,
-                player,
-                audioController.StopPreviewForGameplay,
-                action => SchedulerAfterChildren.Add(action));
-        }
-        else
-            audioController.BindPauseSource(IsPaused);
+        audioController.BindPauseSource(gameplayClockContainer?.IsPaused ?? IsPaused);
 
         if (scoreProcessor != null && healthProcessor != null && gameplayState != null)
             completionController = new BmsGameplayCompletionController(
@@ -199,8 +197,8 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
         var catchUpStart = Stopwatch.GetTimestamp();
         var catchUpBudget = Math.Min(50, previousVisualUpdateMs);
         while (ReplayScore != null && FrameStableClock is FrameStabilityContainer { IsRunning: true, IsRewinding: false } stability
-               && FrameStableClock.IsCatchingUp.Value && ((BmsPlayfield)Playfield).HasPendingVisualUpdate
-               && Stopwatch.GetElapsedTime(catchUpStart).TotalMilliseconds < catchUpBudget)
+                                   && FrameStableClock.IsCatchingUp.Value && ((BmsPlayfield)Playfield).HasPendingVisualUpdate
+                                   && Stopwatch.GetElapsedTime(catchUpStart).TotalMilliseconds < catchUpBudget)
         {
             var previousTime = stability.CurrentTime;
             stability.UpdateSubTree();
@@ -220,7 +218,13 @@ public partial class BmsDrawableRuleset : DrawableRuleset<BmsHitObject>
 
     protected override PassThroughInputManager CreateInputManager() => new BmsInputManager(Ruleset.RulesetInfo, Variant);
 
-    protected override ReplayInputHandler CreateReplayInputHandler(Replay replay) => new BmsFramedReplayInputHandler(replay);
+    protected override ResumeOverlay CreateResumeOverlay() => new DelayedResumeOverlay();
+
+    protected override ReplayInputHandler CreateReplayInputHandler(Replay replay)
+    {
+        var playfield = (BmsPlayfield)Playfield;
+        return new BmsFramedReplayInputHandler(replay, playfield.CompleteAtEnd);
+    }
 
     protected override ReplayRecorder CreateReplayRecorder(Score score)
     {

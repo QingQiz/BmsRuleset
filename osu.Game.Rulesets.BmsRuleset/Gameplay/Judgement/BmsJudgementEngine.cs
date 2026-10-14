@@ -8,7 +8,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 
-internal readonly record struct BmsJudgementColumnDefinition(BmsHitObject[] Objects, BmsLayoutVariant Layout, int Index, bool BatchUpdates, IBmsJudgementOutput Output);
+internal readonly record struct BmsJudgementColumnDefinition(BmsHitObject[] Objects, BmsLayoutVariant Layout, int Index, IBmsJudgementOutput Output);
 
 internal sealed class BmsJudgementRules
 {
@@ -28,10 +28,8 @@ internal sealed class BmsJudgementEngine
     private readonly BmsColumnJudgementRuntime[] columns;
     private readonly BmsColumnJudgementRuntime[] columnsByIndex;
     private readonly List<BmsJudgementInput> pendingInputs = [];
-    private readonly int[] framePressedDirections;
     private long scheduleEpoch;
     private long scheduleStep;
-    private long scheduleBatch;
     private double scheduleTime = double.NaN;
     private bool processing;
 
@@ -42,22 +40,45 @@ internal sealed class BmsJudgementEngine
 
         columns = new BmsColumnJudgementRuntime[definitions.Length];
         columnsByIndex = new BmsColumnJudgementRuntime[definitions.Max(d => d.Index) + 1];
-        framePressedDirections = new int[columnsByIndex.Length];
-        for (var i = 0; i < definitions.Length; i++)
+        // beatoraja visits each side's ordinary lanes before its scratch; gauge clipping depends on this order.
+        var firstScratchLane = definitions[0].Layout switch
         {
-            var definition = definitions[i];
-            var column = new BmsColumnJudgementRuntime(definition.Objects, definition.Layout, definition.Index, definition.BatchUpdates, definition.Output, rules);
+            BmsLayoutVariant.Bms5K or BmsLayoutVariant.Bms5K2P or BmsLayoutVariant.Bms5KDouble => 5,
+            BmsLayoutVariant.Bme7K or BmsLayoutVariant.Bme7K2P or BmsLayoutVariant.Bme7KDouble => 7,
+            _ => -1,
+        };
+        var orderedDefinitions = definitions.OrderBy(definition => firstScratchLane < 0 || definition.Index > firstScratchLane
+            ? definition.Index
+            : definition.Index == 0 ? firstScratchLane : definition.Index - 1).ToArray();
+        for (var i = 0; i < orderedDefinitions.Length; i++)
+        {
+            var definition = orderedDefinitions[i];
+            var column = new BmsColumnJudgementRuntime(definition.Objects, definition.Layout, definition.Index, definition.Output, rules);
             columns[i] = column;
             columnsByIndex[column.Index] = column;
         }
     }
 
-    internal BmsJudgementEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, bool batchUpdates, IBmsJudgementOutput output)
-        : this(new BmsJudgementColumnDefinition(notes, layout, column, batchUpdates, output))
+    internal BmsJudgementEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, IBmsJudgementOutput output)
+        : this(new BmsJudgementColumnDefinition(notes, layout, column, output))
     {
     }
 
     internal bool HasPendingInputs => pendingInputs.Count > 0;
+
+    internal double NextEventTime
+    {
+        get
+        {
+            var next = double.PositiveInfinity;
+            foreach (var column in columns)
+            {
+                next = Math.Min(next, Math.Min(column.NextAutomaticTime, column.NextBodyTime(column.PressedDirections != 0)));
+            }
+
+            return next;
+        }
+    }
 
     internal BmsColumnJudgementRuntime GetColumn(int index)
         => index >= 0 && index < columnsByIndex.Length && columnsByIndex[index] is { } column
@@ -70,8 +91,7 @@ internal sealed class BmsJudgementEngine
         pendingInputs.Add(new BmsJudgementInput(time, column, pressed, reverseScratch));
     }
 
-    internal void ProcessFrame(in BmsFrameContext frame, double elapsed, BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo,
-                               bool suppressJudgements = false, bool resumeRewinding = false)
+    internal void ProcessFrame(in BmsFrameContext frame, double elapsed, BmsJudgementAlgorithm? algorithm = BmsJudgementAlgorithm.Combo)
     {
         if (processing)
             throw new InvalidOperationException("Result observers may queue inputs, but cannot recursively process a frame.");
@@ -88,52 +108,42 @@ internal sealed class BmsJudgementEngine
                 scheduleStep++;
             }
 
-            scheduleBatch++;
             foreach (var column in columns)
             {
-                column.Schedule.BeginBatch(scheduleEpoch, scheduleStep, scheduleBatch);
-                framePressedDirections[column.Index] = column.PressedDirections;
+                column.Schedule.BeginStep(scheduleEpoch, scheduleStep);
             }
 
-            for (var i = 0; i < inputCount; i++)
+            if (frame.IsRewinding || elapsed < 0)
             {
-                var input = pendingInputs[i];
-                var direction = columnsByIndex[input.Column].IsScratch && input.ReverseScratch ? 2 : 1;
-                if (input.Pressed)
-                    framePressedDirections[input.Column] |= direction;
-                else
-                    framePressedDirections[input.Column] &= ~direction;
-            }
-
-            if (suppressJudgements || frame.IsRewinding || elapsed < 0)
-            {
-                foreach (var column in columns)
-                    column.PressedDirections = framePressedDirections[column.Index];
+                for (var i = 0; i < inputCount; i++) applyInputState(pendingInputs[i]);
                 return;
             }
 
-            // The batch's final physical state drives all mines, then all bodies, before its ordered inputs.
-            if (!resumeRewinding)
+            for (var i = 0; i < inputCount;)
             {
-                foreach (var column in columns)
-                    column.UpdateLandmines(frame, framePressedDirections[column.Index] != 0);
-                foreach (var column in columns)
-                    column.UpdateRegisteredBodies(frame, elapsed, framePressedDirections[column.Index] != 0);
+                var time = pendingInputs[i].Time;
+                advance(time, frame, false);
+                var inputFrame = frame with { SimulationTime = time };
+                updateBodies(inputFrame);
+                do
+                {
+                    var input = pendingInputs[i++];
+                    var column = columnsByIndex[input.Column];
+                    if (input.Pressed)
+                    {
+                        var outcome = column.HandleNotePress(new BmsPressContext(time, inputFrame, input.ReverseScratch), algorithm);
+                        if (outcome is { Kind: PressOutcomeKind.EmptyPoor, ExpectedTime: { } expectedTime })
+                            column.ApplyEmptyPoor(expectedTime, inputFrame);
+                    }
+                    else column.HandleExecutionRelease(time, inputFrame, input.ReverseScratch);
+                } while (i < inputCount && pendingInputs[i].Time == time);
+
+                updateBodies(inputFrame);
+                foreach (var column in columns) column.ProcessAutomatic(inputFrame);
             }
 
-            for (var i = 0; i < inputCount; i++)
-            {
-                var input = pendingInputs[i];
-                var column = columnsByIndex[input.Column];
-                if (input.Pressed)
-                {
-                    var outcome = column.HandleNotePress(new BmsPressContext(input.Time, frame, input.ReverseScratch, resumeRewinding), algorithm);
-                    if (outcome is { Kind: PressOutcomeKind.EmptyPoor, ExpectedTime: { } expectedTime })
-                        column.ApplyEmptyPoor(expectedTime, frame);
-                }
-                else
-                    column.HandleExecutionRelease(input.Time, frame, input.ReverseScratch);
-            }
+            advance(frame.SimulationTime, frame, true);
+            updateBodies(frame);
         }
         finally
         {
@@ -143,10 +153,39 @@ internal sealed class BmsJudgementEngine
         }
     }
 
-    internal void CompleteLongNotesAtPause(in BmsFrameContext frame)
+    internal void CompleteLongNotesAtEnd(in BmsFrameContext frame)
+    {
+        advance(frame.SimulationTime, frame, false);
+        updateBodies(frame);
+        foreach (var column in columns) column.CompleteLongNotesAtEnd(frame);
+        foreach (var column in columns) column.ProcessAutomatic(frame);
+    }
+
+    private void advance(double time, in BmsFrameContext frame, bool inclusive)
+    {
+        while (true)
+        {
+            var next = NextEventTime;
+            if (next > time || (!inclusive && next == time) || !double.IsFinite(next)) return;
+
+            var step = frame with { SimulationTime = next };
+            updateBodies(step);
+            foreach (var column in columns) column.ProcessAutomatic(step);
+        }
+    }
+
+    private void updateBodies(in BmsFrameContext frame)
     {
         foreach (var column in columns)
-            column.CompleteLongNotesAtPause(frame);
+            column.UpdateRegisteredBodies(frame, 0, column.PressedDirections != 0);
+    }
+
+    private void applyInputState(in BmsJudgementInput input)
+    {
+        var column = columnsByIndex[input.Column];
+        var direction = column.IsScratch && input.ReverseScratch ? 2 : 1;
+        if (input.Pressed) column.PressedDirections |= direction;
+        else column.PressedDirections &= ~direction;
     }
 
     private readonly record struct BmsJudgementInput(double Time, int Column, bool Pressed, bool ReverseScratch);

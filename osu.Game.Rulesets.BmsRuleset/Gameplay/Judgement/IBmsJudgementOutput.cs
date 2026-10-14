@@ -28,8 +28,6 @@ internal interface IBmsJudgementOutput
 
     void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame);
 
-    void ObserveSimulationStep(BmsHitObject note, in BmsFrameContext frame);
-
     /// <summary>
     /// Observes rule state synchronously before the execution context refreshes derived indexes.
     /// Main results are queried separately because publishing a head need not submit a main result.
@@ -56,6 +54,6 @@ internal readonly record struct BmsMainResultState(HitResult Type, double TimeAb
     internal bool HasResult => Type != HitResult.None;
 }
 
-internal readonly record struct BmsFrameContext(double SimulationTime, double GameplayRate, bool IsRewinding = false, bool IsPauseCompletion = false);
+internal readonly record struct BmsFrameContext(double SimulationTime, double GameplayRate, bool IsRewinding = false);
 
-internal readonly record struct BmsPressContext(double InputTime, BmsFrameContext Frame, bool ReverseScratch = false, bool IsResumeRewinding = false);
+internal readonly record struct BmsPressContext(double InputTime, BmsFrameContext Frame, bool ReverseScratch = false);

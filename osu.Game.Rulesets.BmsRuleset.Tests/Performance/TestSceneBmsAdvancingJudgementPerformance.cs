@@ -47,7 +47,7 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
         {
             var time = 3000 + i * (profile == "dense" ? .5 : 4);
             var column = profile == "dense" ? 1 : i % 7 + 1;
-            beatmap.HitObjects.Add(profile is "overlap" or "rewind" or "mine-hcn" or "pause"
+            beatmap.HitObjects.Add(profile is "overlap" or "rewind" or "mine-hcn"
                 ? new BmsLongNote { StartTime = time, Duration = 1000, Column = column }
                 : new BmsNote { StartTime = time, Column = column });
         }
@@ -67,7 +67,7 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
     }
 
     [Test]
-    public void AdvancingPlayer([Values(64, 2048)] int objects, [Values("tap", "tap-ag", "dense", "overlap", "overlap-ag", "mine-hcn", "rewind", "passive", "pause", "overlap-nb", "overlap-ng", "overlap-ne")] string workload)
+    public void AdvancingPlayer([Values(64, 2048)] int objects, [Values("tap", "tap-ag", "dense", "overlap", "overlap-ag", "mine-hcn", "rewind", "passive", "overlap-nb", "overlap-ng", "overlap-ne")] string workload)
     {
         var samples = new List<Sample>();
         for (var run = -2; run < 7; run++)
@@ -105,7 +105,6 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
                 var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
                 var start = Stopwatch.GetTimestamp();
                 var peakAlive = 0;
-                var pauses = 0;
                 for (var i = 0; i < times.Length; i++)
                 {
                     var frameStart = Stopwatch.GetTimestamp();
@@ -116,14 +115,6 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
                         Player.DrawableRuleset.UpdateSubTree();
                         if (++attempts > 1000) throw new InvalidOperationException("Replay catchup failed to reach the fixed input time.");
                     } while (Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - times[i].Time) > .001);
-
-                    if (times[i].Pause)
-                    {
-                        // Exercise the same hold completion and preparation rewind used by Player resume.
-                        Playfield.CompleteLongNotesAtPause(times[i].Time);
-                        Playfield.BeginResumeRewind(times[i].Time, 2998);
-                        pauses++;
-                    }
 
                     frameTimes[i] = Stopwatch.GetElapsedTime(frameStart).TotalMilliseconds;
                     var alive = 0;
@@ -138,7 +129,6 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
                 var health = (BmsHealthProcessor)Player.HealthProcessor;
                 Assert.That(score.JudgementEvents.Count, Is.GreaterThanOrEqualTo(objects), "Every sample must execute new results instead of repeatedly timing completed notes.");
                 Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(endTime).Within(.001));
-                Assert.That(pauses, Is.EqualTo(workload == "pause" ? 2 : 0));
                 var verification = JsonSerializer.Serialize(new { score.JudgementEvents, health.GaugeHistory, Score = score.TotalScore.Value, Combo = score.Combo.Value });
                 var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(verification)));
                 if (sampleIndex >= 0)
@@ -175,18 +165,6 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
     private SampleFrame[] timeline()
     {
         var times = new List<SampleFrame>();
-        if (profile == "pause")
-        {
-            var pauseTime = 3000 + (endTime - 3500) / 2;
-            var rewindTime = Math.Max(2998, pauseTime - 5000);
-            append(3000, pauseTime);
-            times.Add(new SampleFrame(pauseTime, true));
-            append(rewindTime, pauseTime - 16);
-            times.Add(new SampleFrame(pauseTime - 16, true));
-            append(rewindTime, endTime);
-            return times.ToArray();
-        }
-
         append(3000, endTime);
         if (profile == "rewind")
         {
@@ -204,7 +182,7 @@ public partial class TestSceneBmsAdvancingJudgementPerformance : BmsPlayerTestSc
         }
     }
 
-    private readonly record struct SampleFrame(double Time, bool Pause = false);
+    private readonly record struct SampleFrame(double Time);
 
     private sealed record Sample(
         double Milliseconds,

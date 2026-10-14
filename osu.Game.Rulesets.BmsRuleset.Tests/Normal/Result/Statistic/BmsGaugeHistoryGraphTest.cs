@@ -70,7 +70,7 @@ public class BmsGaugeHistoryGraphTest
             HitEvents = [new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 3000 }, null, null)],
         };
 
-        BmsScoreGaugeHistoryStore.Set(score,
+        BmsGaugeHistoryEvent[] history =
         [
             new BmsGaugeHistoryEvent(1000, BmsGaugeType.Hard,
             [
@@ -82,9 +82,9 @@ public class BmsGaugeHistoryGraphTest
                 new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
                 new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.82, false),
             ]),
-        ]);
+        ];
 
-        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap()).ToArray();
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap(), score.HitEvents, history).ToArray();
 
         Assert.That(series.Single(s => s.Name == "Hard").FailurePoint, Is.Not.Null);
         Assert.That(series.Single(s => s.Name == "Hard").Points.Last().Health, Is.Zero);
@@ -109,9 +109,8 @@ public class BmsGaugeHistoryGraphTest
         {
             Mods = [new BmsModHardGauge()], HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents(events)
         };
-        BmsJudgementEventStore.Set(score, events);
-
-        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap()).Single();
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap(),
+            BmsJudgementEventProjection.CreateScoringHitEvents(events), []).Single();
 
         Assert.That(series.Points[1].Health, Is.GreaterThan(series.Points[2].Health));
         Assert.That(series.Points.Select(p => p.Time), Is.Ordered.Ascending);
@@ -141,16 +140,16 @@ public class BmsGaugeHistoryGraphTest
     public void TestCourseGaugeDoesNotContinueAfterPreviousStageFailure()
     {
         var firstScore = new ScoreInfo { Mods = [new BmsModAutoGauge()] };
-        BmsScoreGaugeHistoryStore.Set(firstScore,
+        BmsGaugeHistoryEvent[] firstHistory =
         [
             new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal,
             [
                 new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
                 new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.5, false),
             ]),
-        ]);
+        ];
         var secondScore = new ScoreInfo { Mods = [new BmsModAutoGauge()] };
-        BmsScoreGaugeHistoryStore.Set(secondScore,
+        BmsGaugeHistoryEvent[] secondHistory =
         [
             new BmsGaugeHistoryEvent(0, BmsGaugeType.Normal,
             [
@@ -160,13 +159,13 @@ public class BmsGaugeHistoryGraphTest
             [
                 new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.6, false),
             ]),
-        ]);
+        ];
 
-        var series = BmsGaugeHistoryGraph.CreateCourseSeries(
+        var series = BmsResultStatisticsData.CreateCourse(
         [
-            (firstScore, createBeatmap()),
-            (secondScore, createBeatmap()),
-        ]);
+            (createBeatmap(), BmsResultStatisticsData.Create(firstScore, createBeatmap(), gauges: firstHistory)),
+            (createBeatmap(), BmsResultStatisticsData.Create(secondScore, createBeatmap(), gauges: secondHistory)),
+        ]).Gauges;
 
         Assert.Multiple(() =>
         {
@@ -310,15 +309,15 @@ public class BmsGaugeHistoryGraphTest
     public void TestGaugeFailedByEventAtStageStartIsDisplayed()
     {
         var score = new ScoreInfo { Mods = [new BmsModHardGauge()] };
-        BmsScoreGaugeHistoryStore.Set(score,
+        BmsGaugeHistoryEvent[] history =
         [
             new BmsGaugeHistoryEvent(0, BmsGaugeType.Hard,
             [
                 new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
             ]),
-        ]);
+        ];
 
-        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap());
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap(), score.HitEvents, history);
 
         Assert.That(series.Select(gauge => gauge.Name), Is.EqualTo(["Hard"]));
     }
@@ -382,13 +381,13 @@ public class BmsGaugeHistoryGraphTest
     public void TestInvertGaugeFailureUsesPlayableBeatmapDuration()
     {
         var score = new ScoreInfo { Mods = [new BmsModInvert(), new BmsModHardGauge()] };
-        BmsScoreGaugeHistoryStore.Set(score,
+        BmsGaugeHistoryEvent[] history =
         [
             new BmsGaugeHistoryEvent(1500, BmsGaugeType.Hard,
             [
                 new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
             ]),
-        ]);
+        ];
         var beatmap = new BmsBeatmap
         {
             HitObjects =
@@ -398,7 +397,7 @@ public class BmsGaugeHistoryGraphTest
             },
         };
 
-        var series = BmsGaugeHistoryGraph.CreateSeries(score, beatmap).Single();
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, beatmap, score.HitEvents, history).Single();
 
         Assert.That(series.FailurePoint, Is.Not.Null);
         Assert.That(series.FailurePoint!.Value.Time, Is.EqualTo(0.5f));
@@ -409,7 +408,7 @@ public class BmsGaugeHistoryGraphTest
     public void TestPersistedHistoryPreservesCanonicalSnapshotOrder()
     {
         var score = new ScoreInfo { Mods = [new BmsModAutoGauge()] };
-        BmsScoreGaugeHistoryStore.Set(score,
+        BmsGaugeHistoryEvent[] history =
         [
             new BmsGaugeHistoryEvent(2000, BmsGaugeType.Normal,
             [
@@ -421,9 +420,9 @@ public class BmsGaugeHistoryGraphTest
                 new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.6, false),
                 new BmsGaugeStateSnapshot(BmsGaugeType.Easy, 0.9, false),
             ]),
-        ]);
+        ];
 
-        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap());
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap(), score.HitEvents, history);
 
         var easySeries = series.Single(s => s.Name == "Easy");
 
@@ -439,16 +438,16 @@ public class BmsGaugeHistoryGraphTest
         {
             Mods = [new BmsModAutoGauge(), new BmsModEasyGauge()],
         };
-        BmsScoreGaugeHistoryStore.Set(score,
+        BmsGaugeHistoryEvent[] history =
         [
             new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal,
             [
                 new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.6, false),
                 new BmsGaugeStateSnapshot(BmsGaugeType.Easy, 0.7, false),
             ]),
-        ]);
+        ];
 
-        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap());
+        var series = BmsGaugeHistoryGraph.CreateSeries(score, createBeatmap(), score.HitEvents, history);
 
         Assert.That(series.Single(s => s.Name == "Easy").IsFinalUsedGauge, Is.True);
         Assert.That(series.Single(s => s.Name == "Normal").IsFinalUsedGauge, Is.False);

@@ -14,10 +14,10 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 public class BmsBeatorajaFrameHistoryTest
 {
     [TestCase(1200, .24)]
-    [TestCase(1200.5, .24)]
+    [TestCase(1200.5, .26)]
     [TestCase(1201, .26)]
     [TestCase(2399.75, .36)]
-    public void CompressedSteadyFramesReplayTheSameGaugeTicks(double rewindTime, double expectedHealth)
+    public void SteadyAndUnobservedTimesReplayTheSameGaugeTicks(double rewindTime, double expectedHealth)
     {
         using var run = new Run();
         run.Head();
@@ -35,19 +35,18 @@ public class BmsBeatorajaFrameHistoryTest
         run.Expect(.46);
     }
 
-    // JudgeManager 315-335: signed microsecond accumulator, strict 200ms threshold,
-    // one tick per frame. GaugeProperty.NORMAL: TOTAL12 / three endpoints => +4%,
+    // GaugeProperty.NORMAL: TOTAL12 / three endpoints => +4%,
     // half GREAT +2%, half BAD -1.5%. These expectations do not call the calculator.
     [TestCase(1650)]
     [TestCase(1650.5)]
-    public void BacklogRewindRestoresOnlyAppliedFrame(double rewindTime)
+    public void DelayedUpdateSettlesAllTicksAndRewindRestoresElapsedTime(double rewindTime)
     {
         using var run = new Run();
         run.Head();
-        run.Frame(1650, 650, true); run.Expect(0.26);
-        run.Frame(1651, 1, true); run.Expect(0.28);
-        run.Rewind(rewindTime); run.Expect(0.26);
-        run.Frame(1651, 1, true); run.Expect(0.28);
+        run.Frame(1650, 650, true); run.Expect(0.30);
+        run.Frame(1651, 1, true); run.Expect(0.30);
+        run.Rewind(rewindTime); run.Expect(0.30);
+        run.Frame(1651, 1, true); run.Expect(0.30);
         run.Frame(1652, 1, true); run.Expect(0.30);
         run.Frame(1800, 148, true); run.Expect(0.30);
         run.Frame(1801, 1, true); run.Expect(0.32);
@@ -70,36 +69,36 @@ public class BmsBeatorajaFrameHistoryTest
     }
 
     [Test]
-    public void BacklogDoesNotPayRecoveryWhileReleased()
+    public void HeldAndReleasedIntervalsSettleIndependentlyOfUpdateCadence()
     {
         using var run = new Run();
         run.Head();
-        run.Frame(1650, 650, true); run.Expect(0.26);
-        run.Release(1650); run.Expect(0.20);
-        run.Frame(1750, 100, false); run.Expect(0.20);
-        run.Frame(2301, 551, false); run.Expect(0.185);
-        run.Frame(2951, 650, true); run.Expect(0.205);
-        run.Rewind(1750); run.Expect(0.20);
-        run.Frame(2301, 551, false); run.Frame(2951, 650, true); run.Expect(0.205);
+        run.Frame(1650, 650, true); run.Expect(0.30);
+        run.Release(1650); run.Expect(0.24);
+        run.Frame(1750, 100, false); run.Expect(0.24);
+        run.Frame(2301, 551, false); run.Expect(0.195);
+        run.Frame(2951, 650, true); run.Expect(0.255);
+        run.Rewind(1750); run.Expect(0.24);
+        run.Frame(2301, 551, false); run.Frame(2951, 650, true); run.Expect(0.255);
     }
 
     [TestCase(2999)]
     [TestCase(3000)]
     [TestCase(3001)]
-    public void TailFrameClearsBacklogAndReplaysWithoutExtraBodyTick(double rewindTime)
+    public void TailClipsElapsedBodyTimeAndReplaysWithoutExtraTicks(double rewindTime)
     {
         using var run = new Run();
         run.Head();
-        run.Frame(2999, 1999, true); run.Expect(0.26);
-        run.Frame(3000, 1, true); run.Release(3000); run.Expect(0.30);
-        run.Frame(3001, 1, true); run.Expect(0.30);
+        run.Frame(2999, 1999, true); run.Expect(0.42);
+        run.Frame(3000, 1, true); run.Release(3000); run.Expect(0.46);
+        run.Frame(3001, 1, true); run.Expect(0.46);
         run.Rewind(rewindTime);
         if (rewindTime < 3000)
         {
-            run.Expect(0.26);
+            run.Expect(0.42);
             run.Frame(3000, 1, true); run.Release(3000);
         }
-        run.Frame(3002, 2, true); run.Expect(0.30);
+        run.Frame(3002, 2, true); run.Expect(0.46);
     }
 
     private sealed class Run : IDisposable

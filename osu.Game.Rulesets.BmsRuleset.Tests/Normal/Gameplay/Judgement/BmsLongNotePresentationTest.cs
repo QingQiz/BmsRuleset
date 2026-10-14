@@ -46,9 +46,8 @@ public class BmsLongNotePresentationTest
         run.Press(1000, HitResult.Perfect);
         Assert.That(run.Output.GetMainResult(run.Note).HasResult, Is.False);
         var current = BmsLongNotePresentation.SelectMapping(BmsLongNoteMode.LongNote)(run.Note, run.State,
-            new BmsLongNotePresentationContext(1100, true, HasMainResult: false, ResumeTime: 1200));
+            new BmsLongNotePresentationContext(1100, true));
         Assert.That(current.HoldingBody && current.AnimateBody && current.PrepareHeadPin, Is.True);
-        Assert.That(current.HiddenDuringResume, Is.False);
     }
 
     [Test]
@@ -65,19 +64,6 @@ public class BmsLongNotePresentationTest
         var after = run.Presentation(false, 1600);
         Assert.That(after.Retired, Is.True);
         Assert.That(after.HoldingBody || after.AnimateBody || after.ClearBodyOnRetire, Is.False);
-    }
-
-    [TestCase(false, false)]
-    [TestCase(true, true)]
-    public void ResumeVisibilityRespectsSyntheticCompletionWithoutMainResult(bool mainResult, bool hidden)
-    {
-        var note = createNote(BmsLongNoteMode.HellChargeNote);
-        var state = held with { HeadResult = HitResult.Meh, TailJudged = true, TailResult = HitResult.Meh, HasActiveBody = true };
-        var map = BmsLongNotePresentation.SelectMapping(BmsLongNoteMode.HellChargeNote);
-        var context = new BmsLongNotePresentationContext(1100, false, mainResult, 1200);
-        Assert.That(map(note, state, context).HiddenDuringResume, Is.EqualTo(hidden));
-        Assert.That(map(note, state, context with { ResumeTime = 1500 }).HiddenDuringResume, Is.True);
-        Assert.That(map(note, state, context with { ResumeTime = null }).HiddenDuringResume, Is.False);
     }
 
     private static BmsLongNote createNote(BmsLongNoteMode mode) => new()

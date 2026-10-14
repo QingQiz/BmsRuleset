@@ -46,7 +46,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private BmsLongNotePresentationMapping mapPresentation = null!;
     private readonly BmsLongNoteStateObserver stateObserver;
     private readonly BmsVisualTimeObserver visualTimeObserver;
-    private readonly BmsSimulationStepObserver simulationObserver;
     private (double Time, double Offset, BmsColumnVisualFrame Frame)? lastVisualObservation;
 
     private double lastHoldExplosionTime;
@@ -64,7 +63,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     private float noteHeightScale = 1;
     private bool lastHoldingBody;
     private bool lastReleasedFast;
-    private double lastSimulationTime = double.NaN;
     private BmsSegmentedLongNoteBody longNoteBody = null!;
     private BmsCachedSkinnableDrawable longNoteTail = null!;
 
@@ -75,7 +73,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         resolveBodyDirection = bodyDirectionBeforeTailPasses;
         stateObserver = applyPresentation;
         visualTimeObserver = observeVisualTime;
-        simulationObserver = observeSimulationStep;
     }
 
     /// <summary>
@@ -95,6 +92,14 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         // Only the full simulation traversal records visual history. Share its read with
         // geometry preparation without caching across same-time input or result callbacks.
         var current = readPresentation(Time.Current);
+        // Hold feedback follows visible frames, independently of the next judgement deadline.
+        if (Time.Current >= ln.StartTime && Time.Current <= ln.EndTime && current.HoldLightActive
+            && Time.Current - lastHoldExplosionTime >= hold_explosion_interval)
+        {
+            ParentColumn?.TriggerHitExplosion(current.HitLightStyle);
+            lastHoldExplosionTime = Time.Current;
+        }
+
         var tail = tailY(frame);
         observeVisualTime(y, frame, current, tail);
         ApplyVisualLayout(frame, prepareVisual(y, current, tail));
@@ -111,9 +116,9 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         return new BmsVisualLayout(y, Math.Min(preparedHeadY, preparedTailY), Math.Max(preparedHeadY, preparedTailY));
     }
 
-    protected private override void ApplyVisual(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
+    protected private override void ApplyVisual(in BmsVisualLayout layout)
     {
-        base.ApplyVisual(frame, layout);
+        base.ApplyVisual(layout);
         updateVisualGeometry(preparedHeadY, preparedTailY, preparedHoldingBody);
     }
 
@@ -222,7 +227,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     protected override void ResetVisualState()
     {
-        lastSimulationTime = double.NaN;
         lastVisualObservation = null;
         visualState.Reset();
         bodyGeometryValid = false;
@@ -247,7 +251,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
             mapPresentation = BmsLongNotePresentation.SelectMapping(ln.Beatmap.LockedLongNoteMode);
             ParentColumn!.JudgementBridge.ObserveLongNoteState(this, stateObserver);
             ParentColumn.JudgementBridge.ObserveVisualTime(this, visualTimeObserver);
-            ParentColumn.JudgementBridge.ObserveSimulationSteps(this, simulationObserver);
             presentation = readPresentation(Time.Current);
             restoreHeadPin = presentation.RestoreHeadPin;
 
@@ -284,7 +287,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
     internal override void RestoreRewoundVisuals()
     {
-        lastSimulationTime = double.NaN;
         lastVisualObservation = null;
         visualState.Reset();
         bodyGeometryValid = false;
@@ -308,51 +310,16 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         BmsNoteVisual.ApplyResultEffects(this, state, Time.Current);
     }
 
-    private void observeSimulationStep(in BmsFrameContext frame)
-    {
-        if (HitObject == null)
-            return;
-
-        // Repeated traversals at the same simulation timestamp must not emit another hold-light pulse.
-        if (lastSimulationTime == frame.SimulationTime)
-            return;
-
-        lastSimulationTime = frame.SimulationTime;
-
-        // Future and expired bodies cannot pulse; avoid mapping their full presentation at every replay slice.
-        if (frame.SimulationTime < ln.StartTime || frame.SimulationTime > ln.EndTime)
-            return;
-
-        var current = readPresentation(frame.SimulationTime);
-        if (current.HoldLightActive && frame.SimulationTime - lastHoldExplosionTime >= hold_explosion_interval)
-        {
-            ParentColumn?.TriggerHitExplosion(current.HitLightStyle);
-            lastHoldExplosionTime = frame.SimulationTime;
-        }
-    }
-
     private BmsLongNotePresentation readPresentation(double time)
         => mapPresentation(ln, ParentColumn!.Judgements.GetLongNoteState(ln), presentationContext(time));
 
     private BmsLongNotePresentationContext presentationContext(double time)
-        => new(time, ParentColumn?.Judgements.PressedDirections is > 0, Judged, ParentColumn?.ResumeRewindEndTime);
-
-    public override bool UpdateSubTree()
-    {
-        var updated = base.UpdateSubTree();
-        // Culled representations still restore framework transforms during resume rewind.
-        if (ParentColumn?.ResumeRewindEndTime != null && HitObject != null && readPresentation(Time.Current).HiddenDuringResume)
-            Alpha = 0;
-        return updated;
-    }
+        => new(time, ParentColumn?.Judgements.PressedDirections is > 0);
 
     private void applyPresentation(in BmsLongNoteState snapshot, in BmsFrameContext frame)
     {
         var previous = presentation;
         presentation = mapPresentation(ln, snapshot, presentationContext(frame.SimulationTime));
-        if (frame.IsPauseCompletion)
-            return;
-
         if (!previous.HeadJudged && presentation.PrepareHeadPin)
         {
             visualState.PrepareHeadPin();

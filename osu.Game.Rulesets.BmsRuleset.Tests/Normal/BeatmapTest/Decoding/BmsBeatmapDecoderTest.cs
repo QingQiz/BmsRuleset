@@ -246,7 +246,7 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestAutoplayExtensionPathCarriesBranchDecisionFrame()
+    public void TestAutoplayExtensionStoresBranchDecisionsInScore()
     {
         var beatmap = new BmsBeatmap
         {
@@ -259,8 +259,10 @@ public class BmsBeatmapDecoderTest
         ICreateReplayData autoplay = new BmsModAutoplay();
 
         var score = autoplay.CreateScoreFromReplayData(beatmap, [(Mod)autoplay]);
+        BmsBranchReplayState.EnsureBranchReplayMod(score, beatmap.BranchDecisions);
 
-        Assert.That(score.Replay.Frames.OfType<BmsReplayFrame>().First().BranchDecisions, Is.EqualTo("3:1"));
+        Assert.That(score.ScoreInfo.Mods.OfType<BmsModBranchReplay>().Single().Decisions.Value, Is.EqualTo("3:1"));
+        Assert.That(score.Replay.Frames.First().Time, Is.EqualTo(1000));
     }
 
     [Test]
@@ -280,7 +282,7 @@ public class BmsBeatmapDecoderTest
         var score = BmsModAutoplay.CreateScoreWithBranchDecisions(beatmap, replayData);
 
         Assert.That(score.ScoreInfo.Mods.OfType<BmsModBranchReplay>().Single().Decisions.Value, Is.EqualTo("2:2"));
-        Assert.That(replayData.Replay.Frames.OfType<BmsReplayFrame>().First().BranchDecisions, Is.EqualTo("2:2"));
+        Assert.That(replayData.Replay.Frames.First().Time, Is.EqualTo(1000));
     }
 
     [Test]

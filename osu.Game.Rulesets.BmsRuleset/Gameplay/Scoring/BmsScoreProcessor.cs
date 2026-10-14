@@ -161,6 +161,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             Type = endpointResult.Result,
             SuppressPenalty = suppressPenalty,
         };
+        result.SetTiming(endpointResult.ApplicationTime ?? endpointResult.EventTime, endpointResult.GameplayRate);
         ApplyResult(result);
         return result;
     }
@@ -169,7 +170,6 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     {
         base.PopulateScore(score);
         score.HitEvents = timingHitEvents;
-        BmsJudgementEventStore.SetView(score, judgementEvents);
 
         // Attribution (e.g. which gauge an Auto Gauge run resolved to) is owned by the mods
         // that introduce the behaviour, so the score processor stays free of gauge-specific logic.
@@ -457,7 +457,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             new BmsTimingObservation(
                 BmsTimingObservationKind.Note,
                 expectedTime,
-                expectedTime + result.TimeOffset,
+                result is BmsJudgementResult bms ? bms.EventTime : expectedTime + result.TimeOffset,
                 result.GameplayRate,
                 result.Type),
         ], result is BmsJudgementResult { SuppressPenalty: true });

@@ -104,7 +104,7 @@ internal sealed class BmsLongNoteJudgementRule
         }
     }
 
-    internal bool CompleteAtPause(BmsLongNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame)
+    internal bool CompleteAtEnd(BmsLongNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame)
     {
         ref var hold = ref state.Hold;
         if (!hold.Holding)
@@ -116,7 +116,7 @@ internal sealed class BmsLongNoteJudgementRule
         if (hold.Started)
         {
             hold.Started = false;
-            execution.PublishState(hold.Note, state.State, frame with { IsPauseCompletion = true });
+            execution.PublishState(hold.Note, state.State, frame);
         }
 
         return true;

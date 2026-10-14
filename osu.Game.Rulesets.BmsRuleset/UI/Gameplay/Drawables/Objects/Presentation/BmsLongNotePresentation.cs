@@ -5,7 +5,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
 
-internal readonly record struct BmsLongNotePresentationContext(double Time, bool Held, bool HasMainResult = false, double? ResumeTime = null);
+internal readonly record struct BmsLongNotePresentationContext(double Time, bool Held);
 
 internal delegate BmsLongNotePresentation BmsLongNotePresentationMapping(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context);
 
@@ -30,8 +30,6 @@ internal readonly record struct BmsLongNotePresentation(
     internal bool HeadReached { get; init; }
 
     internal bool KeepVisibleAfterHit { get; init; }
-
-    internal bool HiddenDuringResume { get; init; }
 
     private static readonly BmsLongNotePresentationMapping long_note_mapping = longNote;
     private static readonly BmsLongNotePresentationMapping charge_note_mapping = chargeNote;
@@ -77,8 +75,6 @@ internal readonly record struct BmsLongNotePresentation(
             RestoreHeadPin = state.LongNoteStarted,
             HeadReached = context.Time >= note.StartTime,
             KeepVisibleAfterHit = context.Time < note.EndTime || (presentation.KeepAfterHeadResult && !state.TailJudged),
-            // HCN head-POOR can complete both endpoints synthetically without a main result.
-            HiddenDuringResume = context.ResumeTime is { } resumeTime && (note.EndTime <= resumeTime || (context.HasMainResult && !state.IsHolding)),
         };
 
     private static bool holdLightActive(BmsLongNote note, in BmsLongNoteState state, double time)

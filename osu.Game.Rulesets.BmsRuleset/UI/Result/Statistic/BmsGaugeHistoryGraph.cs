@@ -13,7 +13,6 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -120,20 +119,19 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     }
 
     internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap)
+        => CreateSeries(score, playableBeatmap, score.HitEvents, []);
+
+    internal static IReadOnlyList<GaugeSeries> CreateSeries(ScoreInfo score, IBeatmap playableBeatmap,
+                                                            IReadOnlyList<HitEvent> hitEvents, IReadOnlyList<BmsGaugeHistoryEvent> gaugeHistory)
     {
         var profileFamily = playableBeatmap is BmsBeatmap bmsBeatmap
             ? BmsGaugeProfileFamilyProvider.FromLayout(bmsBeatmap.LayoutVariant)
             : BmsGaugeProfileFamily.SevenKeys;
 
-        if (BmsScoreGaugeHistoryStore.TryGet(score, out var gaugeHistory) && gaugeHistory.Count > 0)
+        if (gaugeHistory.Count > 0)
             return createSeries(score, gaugeHistory, graphDuration(playableBeatmap, gaugeHistory.Max(e => e.Time)), profileFamily);
 
-        var hitEvents = (BmsJudgementEventStore.TryGet(score, out var judgementEvents)
-                ? BmsJudgementEventProjection.CreateScoringHitEvents(judgementEvents)
-                : score.HitEvents)
-            .ToArray();
-
-        if (hitEvents.Length == 0)
+        if (hitEvents.Count == 0)
             return [];
 
         var noteCount = playableBeatmap.HitObjects.Count(h => h is not BmsLandmine);
@@ -156,8 +154,14 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
 
         var stageSeries = stages.Select(stage => stage.Score != null ? CreateSeries(stage.Score, stage.Beatmap) : []).ToArray();
         var durations = stages.Select(courseStageDuration).ToArray();
+        return CreateCourseSeries(stageSeries, durations);
+    }
+
+    internal static IReadOnlyList<GaugeSeries> CreateCourseSeries(
+        IReadOnlyList<IReadOnlyList<GaugeSeries>> stageSeries, IReadOnlyList<double> durations)
+    {
         var totalDuration = durations.Sum();
-        var stageOffsets = new double[stages.Count];
+        var stageOffsets = new double[stageSeries.Count];
 
         for (var i = 1; i < stageOffsets.Length; i++)
             stageOffsets[i] = stageOffsets[i - 1] + durations[i - 1];
@@ -205,13 +209,15 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
     }
 
     internal static IReadOnlyList<float> CreateCourseStageBoundaries(IReadOnlyList<(ScoreInfo? Score, IBeatmap Beatmap)> stages)
+        => CreateCourseStageBoundaries(stages.Select(courseStageDuration).ToArray());
+
+    internal static IReadOnlyList<float> CreateCourseStageBoundaries(IReadOnlyList<double> durations)
     {
-        if (stages.Count < 2)
+        if (durations.Count < 2)
             return [];
 
-        var durations = stages.Select(courseStageDuration).ToArray();
         var totalDuration = durations.Sum();
-        var boundaries = new float[stages.Count - 1];
+        var boundaries = new float[durations.Count - 1];
         double elapsed = 0;
 
         for (var i = 0; i < boundaries.Length; i++)
@@ -228,12 +234,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         if (stage.Score == null)
             return graphDuration(stage.Beatmap, 0);
 
-        if (BmsScoreGaugeHistoryStore.TryGet(stage.Score, out var gaugeHistory) && gaugeHistory.Count > 0)
-            return graphDuration(stage.Beatmap, gaugeHistory.Max(e => e.Time));
-
-        var hitEvents = BmsJudgementEventStore.TryGet(stage.Score, out var judgementEvents)
-            ? BmsJudgementEventProjection.CreateScoringHitEvents(judgementEvents)
-            : stage.Score.HitEvents;
+        var hitEvents = stage.Score.HitEvents;
         var lastEventTime = hitEvents.Select(e => e.HitObject.GetEndTime()).DefaultIfEmpty(0).Max();
 
         return graphDuration(stage.Beatmap, lastEventTime);
@@ -245,7 +246,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         double duration,
         BmsGaugeProfileFamily profileFamily)
     {
-        var ordered = gaugeHistory.ToArray();
+        var ordered = gaugeHistory as BmsGaugeHistoryEvent[] ?? gaugeHistory.ToArray();
 
         var gaugeTypes = ordered
             .SelectMany(e => e.States.Select(s => s.GaugeType))
@@ -329,7 +330,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
             Alpha = 0.22f,
         };
 
-        var graph = new Container
+        var g = new Container
         {
             RelativeSizeAxes = Axes.Both,
             Children =
@@ -341,7 +342,7 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         };
 
         var dataLayer = new Container { Name = "Gauge data", RelativeSizeAxes = Axes.Both, Alpha = 0 };
-        graph.Add(dataLayer);
+        g.Add(dataLayer);
         dataLayer.OnLoadComplete += _ => dataLayer.FadeIn(450, Easing.OutQuint);
 
         foreach (var gauge in series)
@@ -363,14 +364,14 @@ public sealed partial class BmsGaugeHistoryGraph : CompositeDrawable, IBmsResult
         }
 
         foreach (var boundary in stageBoundaries)
-            graph.Add(createStageBoundary(boundary));
+            g.Add(createStageBoundary(boundary));
 
         return new Container
         {
             RelativeSizeAxes = Axes.X,
             Height = graph_height,
             Padding = new MarginPadding { Left = 28, Right = 7, Vertical = 7 },
-            Child = graph,
+            Child = g,
         };
     }
 

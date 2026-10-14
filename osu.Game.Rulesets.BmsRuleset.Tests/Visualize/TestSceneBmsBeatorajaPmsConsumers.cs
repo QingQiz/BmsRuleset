@@ -113,17 +113,19 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
         {
             assertState(0.44, 1, [0, 2, 2, 4]);
             var saved = new Score(); score.PopulateScore(saved.ScoreInfo);
-            var restored = BmsTestReplayArchive.RoundTrip(saved);
-            Assert.That(BmsJudgementEventStore.TryGet(restored.ScoreInfo, out var events), Is.True);
+            saved.Replay = new osu.Game.Replays.Replay();
+            var restored = BmsTestReplayArchive.RoundTrip(saved, legacy: true);
+            var events = score.JudgementEvents;
             Assert.That(BmsExScore.CreateProgression(events), Is.EqualTo(new[] { 0, 2, 2, 4 }));
             Assert.That(events.Single(e => e.SuppressPenalty).Source.IsScoring, Is.True);
             Assert.That(restored.ScoreInfo.Statistics.GetValueOrDefault(HitResult.Miss), Is.EqualTo(1));
             Assert.That(restored.ScoreInfo.Statistics.GetValueOrDefault(HitResult.Meh), Is.Zero);
-            Assert.That(restored.ScoreInfo.HitEvents.Select(e => e.Result), Is.EqualTo(new[] { HitResult.Perfect, HitResult.Miss, HitResult.Perfect }));
+            Assert.That(BmsJudgementEventProjection.CreateTimingHitEvents(events).Select(e => e.Result), Is.EqualTo(new[] { HitResult.Perfect, HitResult.Miss, HitResult.Perfect }));
             Assert.That(BmsScoreGraph.ScoreAtProgress(4, BmsExScore.CreateProgression(events), 2, 3), Is.EqualTo(2));
             Assert.That(score.Accuracy.Value, Is.EqualTo(2d / 3).Within(1e-10));
             // GaugeProperty.NORMAL_PMS has a 120% ceiling; graph positions are normalised to it.
-            Assert.That(BmsGaugeHistoryGraph.CreateSeries(restored.ScoreInfo, Player.GameplayState.Beatmap).Single().Points.Last().Health,
+            Assert.That(BmsGaugeHistoryGraph.CreateSeries(restored.ScoreInfo, Player.GameplayState.Beatmap,
+                    BmsJudgementEventProjection.CreateScoringHitEvents(events), []).Single().Points.Last().Health,
                 Is.EqualTo(44d / 120).Within(1e-8), "archive fallback gauge must not charge suppressed POOR again");
         }
     }

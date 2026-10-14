@@ -13,8 +13,6 @@ using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.Scoring;
@@ -41,13 +39,6 @@ public partial class TestSceneBmsSongSelectLampHack
             var info = createScore(lampBeatmapSet.Beatmaps.First(), ScoreRank.A, stats((HitResult.Great, 1)));
             score = new Score { ScoreInfo = scoreManager.Import(info)!.Value.Detach() };
             score.Replay.Frames.Add(new BmsReplayFrame(1234, BmsAction.Key1));
-            BmsJudgementEventStore.Set(score.ScoreInfo,
-            [
-                new BmsJudgementEvent(new BmsJudgementSource(1200, 0, BmsJudgementSourceKind.Note), HitResult.Great,
-                    [new BmsTimingObservation(BmsTimingObservationKind.Note, 1200, 1234, 1, HitResult.Great)]),
-            ]);
-            BmsScoreGaugeHistoryStore.Set(score.ScoreInfo,
-                [new BmsGaugeHistoryEvent(1234, BmsGaugeType.Normal, [new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.8, false)])]);
             attachment = BmsReplayPatcher.AttachReplayAsync(scoreManager, Realm, score);
         });
         AddUntilStep("attachment completes", () => attachment.IsCompleted);
@@ -65,9 +56,8 @@ public partial class TestSceneBmsSongSelectLampHack
         {
             var result = restored.GetAwaiter().GetResult();
             return result.Replay.Frames.Single().Time == 1234
-                   && result.ScoreInfo.HitEvents.Single().TimeOffset == 34
-                   && BmsScoreGaugeHistoryStore.TryGet(result.ScoreInfo, out var history)
-                   && history.Single().States.Single().Health == 0.8;
+                   && result.ScoreInfo.Statistics.GetValueOrDefault(HitResult.Great) == 1
+                   && result.ScoreInfo.HitEvents.Count == 0;
         });
     }
 

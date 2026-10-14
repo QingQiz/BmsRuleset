@@ -24,7 +24,7 @@ public partial class TestSceneBmsJudgementAlgorithm : BmsPlayerTestScene
     private bool useReplay;
     private BmsJudgementAlgorithm? replayAlgorithm;
 
-    protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(useReplay ? createReplay : null);
+    protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(useReplay ? createReplay : null, replayAlgorithm: replayAlgorithm);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -48,7 +48,7 @@ public partial class TestSceneBmsJudgementAlgorithm : BmsPlayerTestScene
 
     private IList<ReplayFrame> createReplay(BmsBeatmap beatmap) =>
     [
-        new BmsReplayFrame(0) { JudgementAlgorithm = replayAlgorithm },
+        new BmsReplayFrame(0),
         new BmsReplayFrame(3100, BmsAction.Key1),
         new BmsReplayFrame(3101),
         new BmsReplayFrame(6250, BmsAction.Key1),
@@ -79,7 +79,7 @@ public partial class TestSceneBmsJudgementAlgorithm : BmsPlayerTestScene
     [TestCase(BmsJudgementAlgorithm.Duration, 3100, HitResult.Perfect, 6450)]
     [TestCase(BmsJudgementAlgorithm.Lowest, 3000, HitResult.Good, 6000)]
     [TestCase(BmsJudgementAlgorithm.Score, 3100, HitResult.Perfect, 6000)]
-    [TestCase(null, 3000, HitResult.Good, 6450)]
+    [TestCase(null, 3000, HitResult.Good, 6000)]
     public void TestReplayUsesRecordedSelection(BmsJudgementAlgorithm? algorithm, double goodTarget, HitResult goodResult, double badTarget)
     {
         AddStep("load replay with different local setting", () =>
@@ -90,7 +90,7 @@ public partial class TestSceneBmsJudgementAlgorithm : BmsPlayerTestScene
             LoadPlayer();
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        AddAssert("replay algorithm applied", () => Playfield.JudgementAlgorithm == algorithm);
+        AddAssert("replay algorithm applied", () => Playfield.JudgementAlgorithm == (algorithm ?? BmsJudgementAlgorithm.Combo));
         AddUntilStep("first press judged", () => Player.GameplayClockContainer.CurrentTime > 3150);
         AddAssert("first press selects expected note", () => ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents
             .Any(e => e.Source.StartTime == goodTarget && e.Result == goodResult));

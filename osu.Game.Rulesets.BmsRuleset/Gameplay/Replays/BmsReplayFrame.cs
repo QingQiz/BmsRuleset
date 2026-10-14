@@ -1,6 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.Replays;
@@ -9,17 +9,15 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 
 public class BmsReplayFrame : ReplayFrame
 {
-    public const double BRANCH_DECISION_FRAME_TIME = -1000000000;
+    // Replay.DeepClone preserves frames but drops subclass fields, so keep the archive header on the first input.
+    internal BmsJudgementAlgorithm Algorithm { get; init; }
+
+    internal static BmsJudgementAlgorithm GetAlgorithm(Replay replay)
+        => replay.Frames.OfType<BmsReplayFrame>().FirstOrDefault()?.Algorithm ?? BmsJudgementAlgorithm.Combo;
 
     // deserialization requires a setter
     // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
     public List<BmsAction> Actions { get; set; } = [];
-
-    public string BranchDecisions { get; init; } = string.Empty;
-
-    public BmsJudgementAlgorithm? JudgementAlgorithm { get; init; }
-
-    public bool IncludesGeneratedInputs { get; init; }
 
     // deserialization requires a default ctor
     // ReSharper disable once UnusedMember.Global
@@ -33,17 +31,8 @@ public class BmsReplayFrame : ReplayFrame
         Actions.AddRange(actions);
     }
 
-    public BmsReplayFrame(double time, string branchDecisions)
-        : base(time)
-    {
-        BranchDecisions = branchDecisions;
-    }
-
     public override bool IsEquivalentTo(ReplayFrame other) =>
         other is BmsReplayFrame bmsFrame
-        && Math.Abs(Time - bmsFrame.Time) < 0.0001
-        && BranchDecisions == bmsFrame.BranchDecisions
-        && JudgementAlgorithm == bmsFrame.JudgementAlgorithm
-        && IncludesGeneratedInputs == bmsFrame.IncludesGeneratedInputs
+        && Time == bmsFrame.Time
         && Actions.SequenceEqual(bmsFrame.Actions);
 }

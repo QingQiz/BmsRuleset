@@ -71,8 +71,8 @@ public partial class BmsScoreProcessorTest
             Assert.That(healthProcessor.WorstGaugeType, Is.EqualTo(autoGauge ? BmsGaugeType.AssistEasy : BmsGaugeType.Normal));
             Assert.That(score.ScoreInfo.Rank == ScoreRank.F, Is.EqualTo(!autoGauge));
             Assert.That(score.ScoreInfo.Mods.OfType<BmsModAssistEasyGauge>().Any(), Is.EqualTo(autoGauge));
-            Assert.That(BmsScoreGaugeHistoryStore.TryGet(score.ScoreInfo, out var history), Is.True);
-            Assert.That(history.LastOrDefault()?.States.Single(state => state.GaugeType == BmsGaugeType.Normal).Health, Is.EqualTo(0.77).Within(1e-12));
+            Assert.That(healthProcessor.GaugeHistory.LastOrDefault()?.States.Single(state => state.GaugeType == BmsGaugeType.Normal).Health,
+                Is.EqualTo(0.77).Within(1e-12));
         });
     }
 

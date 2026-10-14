@@ -175,15 +175,14 @@ public partial class TestSceneBmsBeatorajaLongNotes : BmsPlayerTestScene
     }
 
     [Test]
-    public void TestHcnSuccessfulReleaseAffectsBodyStartingNextFrame()
+    public void TestHcnSuccessfulReleaseSettlesHeldTimeBeforeTheTail()
     {
-        // At 4800 the signed accumulator is exactly 200ms. At 4801 input is already
-        // released, but the tail is not judged until after body processing (Java 310-347).
+        // The strict boundary is crossed while held, before the successful release.
         load(BmsLayoutVariant.Bme7K, BmsLongNoteMode.HellChargeNote, 0, 4801, null, 3000, 1901);
         checkpoint(4800, "before release", () => assertOutcome(new[] { HitResult.Perfect }, 0.40, 1));
-        checkpoint(4801, "successful release frame", () => assertOutcome(new[] { HitResult.Perfect, HitResult.Great }, 0.44, 2));
-        checkpoint(4802, "held-by-success reaches strict boundary", () => assertOutcome(new[] { HitResult.Perfect, HitResult.Great }, 0.44, 2));
-        checkpoint(4803, "held-by-success recovery", () => assertOutcome(new[] { HitResult.Perfect, HitResult.Great }, 0.46, 2));
+        checkpoint(4801, "successful release frame", () => assertOutcome(new[] { HitResult.Perfect, HitResult.Great }, 0.46, 2));
+        checkpoint(4802, "held-by-success continues", () => assertOutcome(new[] { HitResult.Perfect, HitResult.Great }, 0.46, 2));
+        checkpoint(4803, "recovery already applied", () => assertOutcome(new[] { HitResult.Perfect, HitResult.Great }, 0.46, 2));
     }
 
     private void load(BmsLayoutVariant variant, BmsLongNoteMode noteMode, double offset, double release, double? repress, double start = 3000, double length = 2000)

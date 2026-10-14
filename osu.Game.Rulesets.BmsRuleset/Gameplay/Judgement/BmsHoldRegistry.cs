@@ -62,10 +62,10 @@ internal sealed class BmsHoldRegistry
         return binding.Operations.GetState(binding.StateIndex);
     }
 
-    internal double HeadDeadline(int slot)
+    internal double NextEventTime(int slot)
     {
         var binding = bindings[bindingIndices[slot]];
-        return binding.Operations.HeadDeadline(binding.StateIndex);
+        return binding.Operations.NextEventTime(binding.StateIndex);
     }
 
     private bool press(int slot, HitResult result, in BmsPressContext press)
@@ -98,10 +98,10 @@ internal sealed class BmsHoldRegistry
         binding.Operations.Finish(binding.StateIndex, frame, elapsed, holding);
     }
 
-    internal bool Pause(int slot, in BmsFrameContext frame)
+    internal bool CompleteAtEnd(int slot, in BmsFrameContext frame)
     {
         var binding = bindings[bindingIndices[slot]];
-        return binding.Operations.Pause(binding.StateIndex, frame);
+        return binding.Operations.CompleteAtEnd(binding.StateIndex, frame);
     }
 
     internal void Rewind(double time)
@@ -113,6 +113,9 @@ internal sealed class BmsHoldRegistry
 
     internal void UpdateBody(int slot, in BmsFrameContext frame, double elapsed, bool holding)
         => hellCharge!.UpdateBody(bindings[bindingIndices[slot]].StateIndex, frame, elapsed, holding);
+
+    internal double NextBodyTime(int slot, bool holding)
+        => hellCharge!.NextBodyTime(bindings[bindingIndices[slot]].StateIndex, holding);
 
     internal void Configure(int slot, bool preserveHistory)
     {
@@ -136,7 +139,7 @@ internal sealed class BmsHoldRegistry
 
         internal abstract BmsLongNoteState GetState(int index);
 
-        internal abstract double HeadDeadline(int index);
+        internal abstract double NextEventTime(int index);
 
         internal abstract bool Press(int index, HitResult result, in BmsPressContext press);
 
@@ -148,7 +151,7 @@ internal sealed class BmsHoldRegistry
 
         internal abstract void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding);
 
-        internal abstract bool Pause(int index, in BmsFrameContext frame);
+        internal abstract bool CompleteAtEnd(int index, in BmsFrameContext frame);
 
         internal abstract void Rewind(int index, double time);
 
@@ -170,7 +173,7 @@ internal sealed class BmsHoldRegistry
 
         internal override BmsLongNoteState GetState(int index) => states[index].State;
 
-        internal override double HeadDeadline(int index) => states[index].Hold.NextHeadTime;
+        internal override double NextEventTime(int index) => states[index].Hold.NextEventTime(Mode);
 
         internal override bool Press(int index, HitResult result, in BmsPressContext press) => rule.TryPress(states[index], Execution, result, press);
 
@@ -182,7 +185,7 @@ internal sealed class BmsHoldRegistry
 
         internal override void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(states[index], Execution, frame, elapsed, holding);
 
-        internal override bool Pause(int index, in BmsFrameContext frame) => rule.CompleteAtPause(states[index], Execution, frame);
+        internal override bool CompleteAtEnd(int index, in BmsFrameContext frame) => rule.CompleteAtEnd(states[index], Execution, frame);
 
         internal override void Rewind(int index, double time) => rule.Rewind(states[index], time);
 
@@ -207,7 +210,7 @@ internal sealed class BmsHoldRegistry
 
         internal override BmsLongNoteState GetState(int index) => states[index].State;
 
-        internal override double HeadDeadline(int index) => states[index].Hold.NextHeadTime;
+        internal override double NextEventTime(int index) => states[index].Hold.NextEventTime(Mode);
 
         internal override bool Press(int index, HitResult result, in BmsPressContext press) => rule.TryPress(states[index], Execution, result, press);
 
@@ -219,7 +222,7 @@ internal sealed class BmsHoldRegistry
 
         internal override void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(states[index], Execution, frame, elapsed, holding);
 
-        internal override bool Pause(int index, in BmsFrameContext frame) => rule.CompleteAtPause(states[index], Execution, frame);
+        internal override bool CompleteAtEnd(int index, in BmsFrameContext frame) => rule.CompleteAtEnd(states[index], Execution, frame);
 
         internal override void Rewind(int index, double time) => rule.Rewind(states[index], time);
 
@@ -244,7 +247,7 @@ internal sealed class BmsHoldRegistry
 
         internal override BmsLongNoteState GetState(int index) => states[index].State;
 
-        internal override double HeadDeadline(int index) => states[index].Hold.NextHeadTime;
+        internal override double NextEventTime(int index) => states[index].Hold.NextEventTime(Mode);
 
         internal override bool Press(int index, HitResult result, in BmsPressContext press) => rule.TryPress(states[index], Execution, result, press);
 
@@ -256,7 +259,7 @@ internal sealed class BmsHoldRegistry
 
         internal override void Finish(int index, in BmsFrameContext frame, double elapsed, bool holding) => rule.Finish(states[index], Execution, frame, elapsed, holding);
 
-        internal override bool Pause(int index, in BmsFrameContext frame) => rule.CompleteAtPause(states[index], Execution, frame);
+        internal override bool CompleteAtEnd(int index, in BmsFrameContext frame) => rule.CompleteAtEnd(states[index], Execution, frame);
 
         internal override void Rewind(int index, double time) => rule.Rewind(states[index], time);
 
@@ -268,5 +271,7 @@ internal sealed class BmsHoldRegistry
 
         internal void UpdateBody(int index, in BmsFrameContext frame, double elapsed, bool holding)
             => rule.UpdateBody(states[index], Execution, frame, elapsed, holding);
+
+        internal double NextBodyTime(int index, bool holding) => rule.NextBodyTime(states[index], holding);
     }
 }

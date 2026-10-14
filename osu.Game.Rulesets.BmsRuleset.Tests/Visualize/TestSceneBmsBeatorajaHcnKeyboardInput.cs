@@ -51,7 +51,7 @@ public partial class TestSceneBmsBeatorajaHcnKeyboardInput : BmsPlayerTestScene
 
     [TestCase(false)]
     [TestCase(true)]
-    public void KeyboardTailInputUsesCurrentFrameBodyStateWithoutReplay(bool reverseScratch)
+    public void KeyboardTailInputSettlesHeldTimeBeforeReleaseWithoutReplay(bool reverseScratch)
     {
         AddStep("load without any replay", () =>
         {
@@ -89,11 +89,10 @@ public partial class TestSceneBmsBeatorajaHcnKeyboardInput : BmsPlayerTestScene
         checkpoint(3200, .24, [HitResult.Perfect], [3000], [0], []);
         checkpoint(3201, .26, [HitResult.Perfect], [3000], [0], [.26]);
         checkpoint(4000, .32, [HitResult.Perfect], [3000], [0], []);
-        // NORMAL TOTAL12 / 3: PG/GREAT +4%, body +2%. Java reads all held keys before
-        // body, then judges the -100ms GREAT tail. A reversal is still held; key-up is not.
-        checkpoint(4001, reverseScratch ? .38 : .36, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100], reverseScratch ? [.34, .38] : [.36]);
-        checkpoint(4002, reverseScratch ? .38 : .36, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100], []);
-        checkpoint(4003, .38, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100], reverseScratch ? [] : [.38]);
+        // Both release and reversal occur after the elapsed held interval crosses its threshold.
+        checkpoint(4001, .38, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100], [.34, .38]);
+        checkpoint(4002, .38, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100], []);
+        checkpoint(4003, .38, [HitResult.Perfect, HitResult.Great], [3000, 4001], [0, -100], []);
         AddStep("assert keyboard transition phase and complete timeline", () => Assert.Multiple(() =>
         {
             assertNoReplay();
@@ -140,7 +139,7 @@ public partial class TestSceneBmsBeatorajaHcnKeyboardInput : BmsPlayerTestScene
             assertNoReplay();
             var health = Player.HealthProcessor.Health.Value;
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.ToArray();
-            var frameHealth = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Where(e => e.Time == time)
+            var frameHealth = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.Where(e => e.Time > time - 1 && e.Time <= time)
                 .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
             TestContext.WriteLine($"{time}: HP={health:R}; frame=[{string.Join(",", frameHealth)}]; replay=null; "
                                   + string.Join("; ", events.Select(e => $"{e.Result}@{e.TimingObservations.Single().ActualTime}")));

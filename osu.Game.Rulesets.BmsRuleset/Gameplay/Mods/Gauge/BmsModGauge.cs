@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Bindables;
 using osu.Framework.Localisation;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -28,12 +30,30 @@ public abstract class BmsModGauge : Mod, IApplicableToHealthProcessor
 
     public abstract BmsGaugeType GaugeType { get; }
 
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsCourseGaugeSetting<double?>))]
+    public Bindable<double?> InitialHealth { get; } = new();
+
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseGaugeProfile), SettingControlType = typeof(BmsCourseGaugeSetting<BmsGaugeProfileFamily?>))]
+    public Bindable<BmsGaugeProfileFamily?> GaugeProfileFamily { get; } = new();
+
+    public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription => [];
+
     public override Type[] IncompatibleMods => gauge_mod_types.Where(t => t != GetType()).ToArray();
 
     public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
     {
-        if (healthProcessor is BmsHealthProcessor bmsHealthProcessor)
-            bmsHealthProcessor.SetGaugeType(GaugeType, bmsHealthProcessor.ConfiguredProfileFamily);
+        if (healthProcessor is not BmsHealthProcessor health)
+            return;
+
+        var family = GaugeProfileFamily.Value ?? health.ConfiguredProfileFamily;
+        if (GaugeType is BmsGaugeType.Class or BmsGaugeType.ExClass or BmsGaugeType.ExHardClass)
+            health.ConfigureGaugeContext(true, family);
+
+        if (InitialHealth.Value is { } initialHealth)
+            health.SetGaugeTypes([GaugeType], replaceExisting: true, profileFamilyOverride: family,
+                initialStates: [new BmsGaugeStateSnapshot(GaugeType, initialHealth, false)]);
+        else
+            health.SetGaugeType(GaugeType, family);
     }
 
     public static BmsModGauge? CreateForType(BmsGaugeType type) =>

@@ -295,9 +295,16 @@ public partial class BmsHealthProcessor : HealthProcessor
         // Synthetic results have no framework RawTime, so retain that application time explicitly.
         var applicationTime = result is BmsLongNoteJudgementResult longNoteResult
             ? longNoteResult.EndpointResults[^1].ApplicationTime ?? result.TimeAbsolute
-            : result.TimeAbsolute;
-        recordGaugeHistory(applicationTime, Clock?.CurrentTime ?? applicationTime);
+            : result is BmsJudgementResult bms
+                ? bms.EventTime
+                : result.TimeAbsolute;
+        // Engine results have already resolved their logical application time; display delivery
+        // must not move the rewind boundary when one update catches up several events.
+        recordGaugeHistory(applicationTime, result is BmsJudgementResult ? applicationTime : Clock?.CurrentTime ?? applicationTime);
     }
+
+    // Gauge layers deplete at exact zero; the framework's epsilon can fail AG before its active layer is replaced.
+    protected override bool CheckDefaultFailCondition(JudgementResult result) => Health.Value <= 0;
 
     internal void Rewind(double time)
     {

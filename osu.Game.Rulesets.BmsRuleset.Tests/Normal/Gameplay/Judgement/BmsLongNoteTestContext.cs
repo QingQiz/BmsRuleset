@@ -44,8 +44,8 @@ internal sealed class BmsLongNoteTestContext
     internal BmsLongNoteTestContext(BmsLongNote note)
     {
         Note = note;
-        Column = new BmsJudgementEngine([note], note.Beatmap.LayoutVariant, note.Column, true, Output).GetColumn(note.Column);
-        Column.ActivateNote(note);
+        Column = new BmsJudgementEngine([note], note.Beatmap.LayoutVariant, note.Column, Output).GetColumn(note.Column);
+
         Output.BeforeResultCheckpoint = (_, _) => MainResults.Add((Output.GetMainResult(Note).Type, Output.GetEndpoints(Note).ToArray()));
         Output.StatePublished = (_, state, frame) =>
         {
@@ -81,7 +81,7 @@ internal sealed class BmsLongNoteTestContext
         => Column.UpdateRegisteredLongNote(Note, new BmsFrameContext(time, 1), elapsed, holding);
 
     internal void Passive(double time) => Column.CheckRegisteredNotePassive(Note, new BmsFrameContext(time, 1));
-    internal void Pause(double time) => Column.CompleteLongNotesAtPause(new BmsFrameContext(time, 1));
+    internal void End(double time) => Column.CompleteLongNotesAtEnd(new BmsFrameContext(time, 1));
 
     internal void Rewind(double time)
     {

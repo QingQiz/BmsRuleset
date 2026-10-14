@@ -10,7 +10,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Scoring;
 
@@ -34,7 +33,7 @@ internal partial class BmsCourseStageResultsScreen : BmsResultsScreen
     private OsuColour colours { get; set; } = null!;
 
     internal BmsCourseStageResultsScreen(ScoreInfo score, Action nextStage, Action abandonCourse)
-        : base(cloneScore(score))
+        : base(score.DeepClone())
     {
         this.nextStage = nextStage;
         this.abandonCourse = abandonCourse;
@@ -42,9 +41,6 @@ internal partial class BmsCourseStageResultsScreen : BmsResultsScreen
         AllowWatchingReplay = false;
         AllowRetry = false;
     }
-
-    private static ScoreInfo cloneScore(ScoreInfo score)
-        => BmsScoreGaugeHistoryStore.Clone(score);
 
     [BackgroundDependencyLoader]
     private void load(AudioManager audio)

@@ -11,9 +11,11 @@ using osu.Framework.Platform;
 using osu.Game.Database;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Replays;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Play;
 using osu.Game.Tests.Visual;
 
@@ -40,7 +42,7 @@ public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageReso
     private protected PressOutcome PressColumn(IBmsColumn column, double inputTime, bool reverseScratch = false)
     {
         var source = (BmsColumn)column;
-        return source.Judgements.HandleNotePress(new BmsPressContext(inputTime, frameFor(source), reverseScratch, Playfield.IsResumeRewinding),
+        return source.Judgements.HandleNotePress(new BmsPressContext(inputTime, frameFor(source), reverseScratch),
             Playfield.JudgementAlgorithm);
     }
 
@@ -66,8 +68,10 @@ public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageReso
     /// </summary>
     protected BmsTestSkins.SkinnedTestPlayer CreateBmsPlayer(
         Func<BmsBeatmap, IList<ReplayFrame>>? createReplay,
-        BmsTestSkins.SkinKind skin = BmsTestSkins.SkinKind.Argon)
-        => new(BmsTestSkins.CreateSkinSource(skin, this), createReplay);
+        BmsTestSkins.SkinKind skin = BmsTestSkins.SkinKind.Argon,
+        BmsJudgementAlgorithm? replayAlgorithm = null,
+        IReadOnlyList<Mod>? replayMods = null)
+        => new(BmsTestSkins.CreateSkinSource(skin, this), createReplay, replayAlgorithm, replayMods);
 
     #region IStorageResourceProvider
 

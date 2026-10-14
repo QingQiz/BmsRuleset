@@ -7,11 +7,16 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -140,6 +145,9 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
     [Resolved(CanBeNull = true)]
     private ScoreManager? scoreManager { get; set; }
+
+    [Resolved(CanBeNull = true)]
+    private BeatmapManager? beatmapManager { get; set; }
 
     [Resolved(CanBeNull = true)]
     private DrawableRuleset? drawableRuleset { get; set; }
@@ -409,13 +417,22 @@ public sealed partial class BmsScoreGraph : BmsHudComponent
 
             var scoreWithReplay = scoreManager.GetScore(personalBest);
 
-            if (scoreWithReplay != null
-                && BmsJudgementEventStore.TryGet(scoreWithReplay.ScoreInfo, out var judgementEvents)
-                && judgementEvents.Count > 0)
+            if (scoreWithReplay == null)
+                return;
+
+            var replay = scoreWithReplay.Replay;
+            IReadOnlyList<BmsJudgementEvent> judgementEvents = [];
+            if (beatmapManager != null && replay.HasReceivedAllFrames && replay.Frames.Count > 0)
             {
-                personalBestProgression = BmsExScore.CreateProgression(judgementEvents);
-                personalBestJudgementProgress.SetProgression(CreateJudgementProgression(judgementEvents));
+                var mods = scoreWithReplay.ScoreInfo.Mods;
+                using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgementWindow>().ToArray());
+                var beatmap = beatmapManager.GetWorkingBeatmap(personalBest.BeatmapInfo).GetPlayableBeatmap(personalBest.Ruleset, mods);
+                if (beatmap is BmsBeatmap bmsBeatmap)
+                    judgementEvents = BmsReplaySimulation.Run(bmsBeatmap, replay, scoreWithReplay.ScoreInfo).Judgements;
             }
+
+            personalBestProgression = BmsExScore.CreateProgression(judgementEvents);
+            personalBestJudgementProgress.SetProgression(CreateJudgementProgression(judgementEvents));
         }
         catch (Exception exception)
         {

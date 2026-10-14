@@ -108,23 +108,28 @@ public class BmsBeatorajaReferenceTest
 
     [TestCase(true)]
     [TestCase(false)]
-    public void HcnBodyStopsBeforeEndpointFrame(bool holding)
+    public void HcnBodySettlesElapsedTimeThroughTheTail(bool holding)
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, duration: 201, layout: BmsLayoutVariant.Bme7K);
         run.Press(1000, HitResult.Perfect);
         run.Frame(1200, 200, holding);
         Assert.That(run.Output.BodyTicks, Is.Empty);
         run.Frame(1201, 1, holding);
-        Assert.That(run.Output.BodyTicks, Is.Empty, "JudgeManager clears passing at the tail before updating the body accumulator.");
+        Assert.That(run.Output.BodyTicks.Single().Time, Is.EqualTo(System.Math.BitIncrement(1200)));
+        run.Frame(1400, 199, holding);
+        Assert.That(run.Output.BodyTicks, Has.Count.EqualTo(1));
     }
 
     [Test]
-    public void HcnDelayedFrameAppliesAtMostOneBodyTick()
+    public void HcnDelayedFrameSettlesAllElapsedTicks()
     {
         var run = new BmsLongNoteTestContext(BmsLongNoteMode.HellChargeNote, duration: 2000, layout: BmsLayoutVariant.Bme7K);
         run.Press(1000, HitResult.Perfect);
         run.Frame(1650, 650, true);
-        Assert.That(run.Output.BodyTicks, Has.Count.EqualTo(1), "JudgeManager has one if, rather than a catch-up loop, per update.");
+        Assert.That(run.Output.BodyTicks.Select(tick => tick.Time), Is.EqualTo(new[]
+        {
+            System.Math.BitIncrement(1200), System.Math.BitIncrement(1400), System.Math.BitIncrement(1600),
+        }));
     }
 
     [TestCase(BmsLongNoteMode.ChargeNote)]

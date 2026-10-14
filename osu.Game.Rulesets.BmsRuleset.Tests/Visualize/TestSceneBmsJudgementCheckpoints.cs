@@ -32,8 +32,9 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
     private BmsCoreSchedulingRecorder? recorder;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(_ => replayInputs
-        ? [new BmsReplayFrame(0), new BmsReplayFrame(3000, BmsAction.Key1), new BmsReplayFrame(3001),
-            new BmsReplayFrame(3002, BmsAction.Key1), new BmsReplayFrame(3003), new BmsReplayFrame(60000)]
+        ? [new BmsReplayFrame(0), new BmsReplayFrame(3000, BmsAction.Key1, BmsAction.Scratch),
+            new BmsReplayFrame(3001, BmsAction.Scratch), new BmsReplayFrame(3001), new BmsReplayFrame(3001, BmsAction.Scratch),
+            new BmsReplayFrame(3002, BmsAction.Key1, BmsAction.Scratch), new BmsReplayFrame(3003, BmsAction.Scratch), new BmsReplayFrame(60000)]
         : [new BmsReplayFrame(0), new BmsReplayFrame(60000)]);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
@@ -134,6 +135,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             var drawable = (DrawableBmsHitObject)Playfield.GetAliveObjectAtTime(3001)!;
             var note = drawable.HitObject;
             var entry = drawable.Entry;
+            var result = drawable.Result;
             var context = ((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements;
             var state = context.GetLongNoteState((BmsLongNote)note);
             var events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.Count;
@@ -149,19 +151,46 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             Assert.That(drawable.Result.TimeOffset, Is.Zero, "The framework reapplies the main result time at the end of the object.");
             Assert.That(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents, Has.Count.EqualTo(events));
             Assert.That(recorder.Rows.Skip(reapplyStart).Any(r => r.Contains("/representation.killed")), Is.False, "ApplyDefaults must preserve the lifetime registration.");
-            Assert.That(context.ActiveLongNotes.Count(n => ReferenceEquals(n, note)), Is.EqualTo(1));
+            Assert.That(context.GetPendingLongNoteTails().Count(n => ReferenceEquals(n, note)), Is.EqualTo(1));
 
             advance(3301);
             Playfield.UpdateSubTree();
+            var wasBoundAtRewind = ReferenceEquals(drawable.HitObject, note);
             advance(2999);
             Playfield.UpdateSubTree();
             recorder.Mark("rewind.restored");
             Assert.That(context.FirstPendingNote?.StartTime, Is.EqualTo(3000));
-            assertRevertObservations(requireDrawable: true);
+            assertRevertObservations(requireDrawable: wasBoundAtRewind);
+            Assert.That(result.HasResult, Is.False, "The entry retains and resets the result after its representation returns to the pool.");
             advance(3000);
             Playfield.UpdateSubTree();
             recorder.Mark("replay.press");
             finishRecording($"lifecycle-{longNoteMode}");
+        }));
+    }
+
+    [TestCase(BmsLongNoteMode.ChargeNote)]
+    [TestCase(BmsLongNoteMode.HellChargeNote)]
+    public void ReappliedHeadRevertsWhileItsLongNoteIsStillBound(BmsLongNoteMode longNoteMode)
+    {
+        load(longNoteMode);
+        AddStep("rewind a held head before its tail", () => withClock(advance =>
+        {
+            startRecording();
+            advance(3001);
+            Playfield.UpdateSubTree();
+            var drawable = (DrawableBmsHitObject)Playfield.GetAliveObjectAtTime(3001)!;
+            var note = (BmsLongNote)drawable.HitObject;
+            var result = drawable.Result;
+            note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
+            Assert.That(drawable.HitObject, Is.SameAs(note));
+            Assert.That(result.HasResult, Is.True);
+
+            advance(2999);
+            Playfield.UpdateSubTree();
+            assertRevertObservations(requireDrawable: true);
+            Assert.That(result.HasResult, Is.False);
+            Assert.That(((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements.GetLongNoteState(note).HeadJudged, Is.False);
         }));
     }
 
@@ -238,14 +267,14 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             string[] inputTimes = ["3000", "3001", "3002", "3003"];
             var manualInputs = rows.Where(r => r[4].EndsWith("/input.queue>") && r[11].Contains("column=1")).ToArray();
             Assert.That(manualInputs.Select(r => r[5]), Is.EqualTo(inputTimes));
-            var generatedInputs = rows.Where(r => r[4].EndsWith("/input.queue>") && r[11].Contains("column=0")).ToArray();
-            Assert.That(generatedInputs.Select(r => r[5]), Is.EqualTo(new[] { "3000", "3001", "3001" }));
+            var scratchInputs = rows.Where(r => r[4].EndsWith("/input.queue>") && r[11].Contains("column=0")).ToArray();
+            Assert.That(scratchInputs.Select(r => r[5]), Is.EqualTo(new[] { "3000", "3001", "3001" }));
             Assert.That(rows.Any(r => r[4].EndsWith("/column.deferred>")), Is.True);
             Assert.That(rows.Any(r => r[4] == "frame.end/playfield.update>"), Is.True);
             TestContext.WriteLine("P3A0_REPLAY " + JsonSerializer.Serialize(new
             {
                 inputs = rows.Where(r => r[4].EndsWith("/input.queue>")).Select(r => new { frame = r[1], step = r[2], time = r[5], args = r[11] }),
-                generated = generatedInputs.Select(r => new { frame = r[1], step = r[2], time = r[5], state = r[12] }),
+                scratch = scratchInputs.Select(r => new { frame = r[1], step = r[2], time = r[5], state = r[12] }),
                 events = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents,
             }));
             stopRecording();

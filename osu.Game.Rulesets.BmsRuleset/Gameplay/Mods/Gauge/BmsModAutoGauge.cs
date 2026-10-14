@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
@@ -24,6 +27,20 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
     public override LocalisableString Description => BmsStrings.ModAutoGauge;
 
     public override ModType Type => ModType.Automation;
+
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsCourseGaugeSetting<double?>))]
+    public Bindable<double?> ClassHealth { get; } = new();
+
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsCourseGaugeSetting<double?>))]
+    public Bindable<double?> ExClassHealth { get; } = new();
+
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseInitialHealth), SettingControlType = typeof(BmsCourseGaugeSetting<double?>))]
+    public Bindable<double?> ExHardClassHealth { get; } = new();
+
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.CourseGaugeProfile), SettingControlType = typeof(BmsCourseGaugeSetting<BmsGaugeProfileFamily?>))]
+    public Bindable<BmsGaugeProfileFamily?> GaugeProfileFamily { get; } = new();
+
+    public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription => [];
 
     /// <summary>
     ///     Incompatible with all other gauge mods (same mutual-exclusion set as <see cref="BmsModGauge" />).
@@ -57,6 +74,22 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
         if (healthProcessor is BmsHealthProcessor bmsHp)
         {
             resolvedHealthProcessor = bmsHp;
+            var initialStates = new[]
+            {
+                (Type: BmsGaugeType.Class, Health: ClassHealth.Value),
+                (Type: BmsGaugeType.ExClass, Health: ExClassHealth.Value),
+                (Type: BmsGaugeType.ExHardClass, Health: ExHardClassHealth.Value),
+            }.Where(state => state.Health.HasValue)
+                .Select(state => new BmsGaugeStateSnapshot(state.Type, state.Health.GetValueOrDefault(), false)).ToArray();
+            if (initialStates.Length > 0)
+            {
+                var family = GaugeProfileFamily.Value ?? bmsHp.ConfiguredProfileFamily;
+                bmsHp.ConfigureGaugeContext(true, family);
+                bmsHp.SetGaugeTypes(initialStates.Select(state => state.GaugeType), replaceExisting: true,
+                    profileFamilyOverride: family, initialStates: initialStates);
+                return;
+            }
+
             var gaugeTypes = bmsHp.IsCourseGaugeMode && bmsHp.CurrentGaugeStates.Count > 0
                 ? bmsHp.CurrentGaugeStates.Select(state => state.GaugeType)
                 : bmsHp.IsCourseGaugeMode
@@ -75,9 +108,6 @@ public class BmsModAutoGauge : Mod, IApplicableToHealthProcessor, IApplicableToS
             return;
 
         score.Mods = [.. score.Mods.Where(m => m is not BmsModGauge)];
-
-        if (resolvedHealthProcessor.GaugeHistory.Count > 0)
-            BmsScoreGaugeHistoryStore.SetView(score, resolvedHealthProcessor.GaugeHistory);
 
         // Normal is represented by AG alone, so an earlier live-population attribution must be removed.
         var mod = BmsModGauge.CreateForType(resolvedHealthProcessor.WorstGaugeType);

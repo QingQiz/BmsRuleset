@@ -405,4 +405,10 @@
   <data name="action_p2_scratch_reverse" xml:space="preserve">
     <value>P2 Reverse Scratch</value>
   </data>
+  <data name="course_initial_health" xml:space="preserve">
+    <value>Course starting health</value>
+  </data>
+  <data name="course_gauge_profile" xml:space="preserve">
+    <value>Course gauge profile</value>
+  </data>
 </root>

@@ -46,7 +46,7 @@ public class BmsGaugeHistoryPerformanceTest
                 }
             }, () =>
             {
-                Assert.That(BmsScoreGaugeHistoryStore.TryGet(score, out var history), Is.True);
+                var history = processor.GaugeHistory;
                 Assert.That(history, Has.Count.EqualTo(count));
                 Assert.That(history[^1].States, Is.EqualTo(processor.CurrentGaugeStates));
                 return verify(processor, count);
@@ -71,27 +71,6 @@ public class BmsGaugeHistoryPerformanceTest
             {
                 Assert.That(processor.CurrentGaugeStates, Is.EqualTo(initial));
                 return verify(processor, 1);
-            });
-        });
-    }
-
-    [Test]
-    public void ExportGaugeHistory([Values(1, 6)] int layers)
-    {
-        const int count = 20000;
-        BmsJudgementPerformanceTest.Measure($"Gauge-export-{layers}", count, () =>
-        {
-            var processor = createProcessor(layers);
-            record(processor, count);
-            var score = new ScoreInfo();
-            return new BmsJudgementPerformanceTest.Measurement(() => BmsScoreGaugeHistoryStore.Set(score, processor.GaugeHistory), () =>
-            {
-                Assert.That(BmsScoreGaugeHistoryStore.TryGet(score, out var history), Is.True);
-                Assert.That(history, Has.Count.EqualTo(count));
-                Assert.That(history[^1].States, Is.EqualTo(processor.CurrentGaugeStates));
-                processor.Rewind(-1);
-                Assert.That(history, Has.Count.EqualTo(count), "Exported scores must retain their history after a seek.");
-                return new { HistoryEntries = history.Count, States = history[^1].States };
             });
         });
     }

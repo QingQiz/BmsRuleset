@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -9,35 +11,69 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
-using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.IO.Import;
+using osu.Game.Rulesets.BmsRuleset.IO.Input;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Course;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Lamp;
 using osu.Game.Scoring;
-using osu.Game.Tests.Beatmaps;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 
 public partial class TestSceneBmsCourseSelect
 {
-    [TestCase(false)]
-    [TestCase(true)]
-    public void TestAbortFirstCourseStageSavesHistory(bool failImport)
+    [TestCase(false, null)]
+    [TestCase(true, null)]
+    [TestCase(false, BmsLongNoteMode.LongNote)]
+    [TestCase(false, BmsLongNoteMode.ChargeNote)]
+    [TestCase(false, BmsLongNoteMode.HellChargeNote)]
+    public void TestAbortFirstCourseStageSavesHistory(bool failImport, BmsLongNoteMode? mode)
     {
         BeatmapInfo stageBeatmap = null!;
         BmsCourseSession session = null!;
         DeferredImportCoursePlayer player = null!;
+        BmsBeatmap playable = null!;
+        BmsJudgementEvent[] liveEvents = [];
+        BmsGaugeHistoryEvent[] liveGauges = [];
         var courseId = Guid.NewGuid().ToString();
+        var directory = string.Empty;
+        Task import = null!;
 
+        AddStep("import actual stage chart", () =>
+        {
+            directory = Path.Combine(LocalStorage.GetFullPath(string.Empty), $"dan-abort-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            var notes = mode is { } longNoteMode
+                ? $"#LNMODE {(int)longNoteMode}\n#01551:01\n#03051:01\n#06019:01"
+                : "#00011:0001\n#03019:01";
+            File.WriteAllText(Path.Combine(directory, "stage.bms"), $"""
+                #PLAYER 1
+                #TITLE Dan Abort {courseId}
+                #ARTIST Test
+                #BPM 120
+                #PLAYLEVEL 1
+                #DIFFICULTY 1
+                {notes}
+                """);
+            import = new BmsFileImporter(Realm, LocalStorage).Import(directory);
+        });
+        AddUntilStep("chart imported", () => import.IsCompleted);
         AddStep("configure course", () =>
         {
-            var ruleset = rulesets.AvailableRulesets.Single(info => info.ShortName == Constant.SHORT_NAME);
-            stageBeatmap = beatmaps.Import(createBeatmapSet(ruleset))!.Value.Beatmaps.Single().Detach();
+            import.GetAwaiter().GetResult();
+            stageBeatmap = Realm.Run(realm => realm.All<BeatmapInfo>().AsEnumerable()
+                .Single(chart => chart.Metadata.Source == directory).Detach());
             var stage = new BmsCourseStage("Stage", "1", BeatmapHash: stageBeatmap.Hash);
             var course = new BmsCourseDefinition(courseId, "Table", "Course", [stage, stage], []);
             session = new BmsCourseSession(course,
@@ -52,32 +88,44 @@ public partial class TestSceneBmsCourseSelect
         AddUntilStep("course selection ready", () => controller.SelectedCourse?.Id == courseId && !controller.CourseCarousel.IsFiltering);
         AddStep("play first course stage", () =>
         {
-            var beatmap = new BmsBeatmap
-            {
-                BeatmapInfo = stageBeatmap,
-                LayoutVariant = BmsLayoutVariant.Bme7K,
-                TotalColumns = 8,
-                HitObjects =
-                {
-                    new BmsNote { StartTime = 1000, Column = 1 },
-                    new BmsNote { StartTime = 60000, Column = 1 },
-                },
-            };
-            BmsTestBeatmaps.SetupBeatmapInfo(beatmap, stageBeatmap.Ruleset);
-            Beatmap.Value = new TestWorkingBeatmap(beatmap, audioManager: Audio);
+            Beatmap.Value = beatmaps.GetWorkingBeatmap(stageBeatmap);
             SelectedMods.Value = session.Mods;
             session.BeginCurrentStage();
             Stack.Push(player = new DeferredImportCoursePlayer(session, failImport));
         });
         AddUntilStep("course player loaded", () => player.IsLoaded && player.LoadedBeatmapSuccessfully && player.Alpha == 1);
-        AddUntilStep("partial score recorded", () => player.GameplayState.ScoreProcessor.JudgedHits > 0);
+        if (mode != null)
+        {
+            AddUntilStep("recorder loaded", () => ((BmsInputManager)player.ChildrenOfType<BmsDrawableRuleset>().Single().KeyBindingInputManager).Recorder?.IsLoaded == true);
+            AddStep("skip empty lead-in", () =>
+            {
+                playable = player.ChildrenOfType<BmsPlayfield>().Single().Beatmap;
+                player.ChildrenOfType<GameplayClockContainer>().Single().Seek(30000);
+            });
+            AddUntilStep("press at the long note head", () =>
+            {
+                if (player.ChildrenOfType<BmsDrawableRuleset>().Single().FrameStableClock.CurrentTime < 30000)
+                    return false;
+                ((BmsInputManager)player.ChildrenOfType<BmsDrawableRuleset>().Single().KeyBindingInputManager).KeyBindingContainer.TriggerPressed(BmsAction.Key1);
+                return true;
+            });
+            AddUntilStep("long note held", () => ((BmsColumn)player.ChildrenOfType<BmsPlayfield>().Single().Stage.Columns[1])
+                .Judgements.GetLongNoteState(playable.HitObjects.OfType<BmsLongNote>().Single()).IsHolding);
+        }
+        else
+            AddUntilStep("partial score recorded", () => player.GameplayState.ScoreProcessor.JudgedHits > 0);
         AddStep("abort stage", () => player.Exit());
         AddUntilStep("score import started", () => player.ImportCount == 1);
         AddAssert("exit waits for import", () => Stack.CurrentScreen, () => Is.SameAs(player));
         AddAssert("course is not recorded before import", () => BmsRulesetRuntime.CourseResults!.GetHistory(courseId), () => Is.Empty);
         AddStep("repeat exit while importing", () => player.Exit());
         AddAssert("import is not duplicated", () => player.ImportCount, () => Is.EqualTo(1));
-        AddStep("finish score import", () => player.AllowImport());
+        AddStep("finish score import", () =>
+        {
+            liveEvents = ((BmsScoreProcessor)player.GameplayState.ScoreProcessor).JudgementEvents.ToArray();
+            liveGauges = ((BmsHealthProcessor)player.GameplayState.HealthProcessor).GaugeHistory.ToArray();
+            player.AllowImport();
+        });
         AddUntilStep("player exits", () => Stack.CurrentScreen, () => Is.SameAs(songSelect));
         AddAssert("course aborted", () => session.Status, () => Is.EqualTo(BmsCourseStatus.Aborted));
         AddAssert("later stage remains unplayed", () => session.Stages[1].Status, () => Is.EqualTo(BmsCourseStageStatus.NotPlayed));
@@ -96,6 +144,22 @@ public partial class TestSceneBmsCourseSelect
                     Assert.That(score.Statistics.Values.Sum(), Is.GreaterThan(0));
                 });
             }));
+        }
+
+        if (mode != null)
+        {
+            AddStep("saved input replay reproduces the aborted hold", () =>
+            {
+                var info = Realm.Run(realm => realm.Find<ScoreInfo>(session.CurrentStage.Score!.ID)!.Detach());
+                var saved = scoreManager.GetScore(info)!;
+                var frames = saved.Replay.Frames.OfType<BmsReplayFrame>().ToArray();
+                Assert.That(frames[^1].Actions, Does.Contain(BmsAction.Key1));
+                Assert.That(frames.Zip(frames.Skip(1)).Any(pair => pair.Second.Time < pair.First.Time), Is.False);
+                Assert.That(liveEvents.SelectMany(item => item.TimingObservations).Count(item => item.Kind == BmsTimingObservationKind.LongNoteTail), Is.EqualTo(1));
+                var simulated = BmsReplaySimulation.Run(playable, saved.Replay, saved.ScoreInfo);
+                Assert.That(JsonSerializer.Serialize(simulated.Judgements), Is.EqualTo(JsonSerializer.Serialize(liveEvents)));
+                Assert.That(JsonSerializer.Serialize(simulated.Gauges), Is.EqualTo(JsonSerializer.Serialize(liveGauges)));
+            });
         }
 
         AddStep("show course results", () => Stack.Push(new BmsCourseResultsScreen(session)));

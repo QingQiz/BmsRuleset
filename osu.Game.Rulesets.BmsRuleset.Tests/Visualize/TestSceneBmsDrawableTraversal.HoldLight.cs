@@ -48,8 +48,6 @@ public partial class TestSceneBmsDrawableTraversal
             var container = (BmsColumnHitObjectContainer)column.HitObjectContainer;
             var drawable = container.AliveEntries.Values.OfType<DrawableBmsHitObject>().Single();
             var note = (BmsLongNote)drawable.HitObject;
-            var callback = drawable.GetType().GetMethod("observeSimulationStep", flags)!;
-            var lastTime = drawable.GetType().GetField("lastSimulationTime", flags)!;
             var lastPulse = drawable.GetType().GetField("lastHoldExplosionTime", flags)!;
             var previousClock = Playfield.Clock;
             var previousProcessClock = Playfield.ProcessCustomClock;
@@ -84,12 +82,6 @@ public partial class TestSceneBmsDrawableTraversal
                 Assert.That(column.Judgements.GetLongNoteState(note).TailJudged, Is.True);
                 runTimeline("judged tail", [6980, 6981, 7000, 7001, 7100]);
 
-                advance(4800);
-                column.Judgements.RewindLongNotes(4800);
-                drawable.RestoreRewoundVisuals();
-                column.Judgements.RestoreExecutionState(new BmsFrameContext(4800, 1));
-                Assert.That(column.Judgements.GetLongNoteState(note).HeadJudged, Is.False);
-                runTimeline("rewound", [4800, 4999, 5000, 5079, 5080]);
             }
             finally
             {
@@ -108,7 +100,7 @@ public partial class TestSceneBmsDrawableTraversal
 
             void runTimeline(string phase, double[] times)
             {
-                var referenceLastTime = (double)lastTime.GetValue(drawable)!;
+                var referenceLastTime = double.NaN;
                 var referenceLastPulse = (double)lastPulse.GetValue(drawable)!;
                 var mapping = BmsLongNotePresentation.SelectMapping(mode);
                 var expectedPulses = new List<double>();
@@ -117,8 +109,6 @@ public partial class TestSceneBmsDrawableTraversal
                 var state = column.Judgements.GetLongNoteState(note);
                 var results = Player.Results.Count;
                 var health = Player.HealthProcessor.Health.Value;
-                var graphics = drawable.ChildrenOfType<Drawable>().Prepend(drawable).ToArray();
-                var geometry = graphics.Select(d => (d.Position, d.Size, d.Scale, d.Alpha)).ToArray();
                 presentationReads = 0;
                 holdPulseTimes.Clear();
                 foreach (var time in times)
@@ -130,8 +120,7 @@ public partial class TestSceneBmsDrawableTraversal
                         if (time >= note.StartTime && time <= note.EndTime)
                         {
                             unguardedReads++;
-                            var current = mapping(note, state, new BmsLongNotePresentationContext(time, column.Judgements.PressedDirections > 0,
-                                drawable.Judged, column.ResumeRewindEndTime));
+                            var current = mapping(note, state, new BmsLongNotePresentationContext(time, column.Judgements.PressedDirections > 0));
                             if (time - referenceLastPulse >= BmsLegacySkinTransformer.HIT_EXPLOSION_FADE_IN_DURATION)
                                 dueReads++;
                             // This is the original decision order, evaluated independently of the drawable.
@@ -143,14 +132,13 @@ public partial class TestSceneBmsDrawableTraversal
                         }
                     }
                     pulseSimulationTime = time;
-                    callback.Invoke(drawable, [new BmsFrameContext(time, 1)]);
+                    container.UpdateSubTree();
                     Assert.That(holdPulseTimes, Is.EqualTo(expectedPulses), $"{phase} at {time}");
                     Assert.That(lastPulse.GetValue(drawable), Is.EqualTo(referenceLastPulse), $"{phase} at {time}");
                 }
                 Assert.That(column.Judgements.GetLongNoteState(note), Is.EqualTo(state), phase);
                 Assert.That(Player.Results.Count, Is.EqualTo(results), phase);
                 Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(health), phase);
-                Assert.That(graphics.Select(d => (d.Position, d.Size, d.Scale, d.Alpha)), Is.EqualTo(geometry), phase);
                 TestContext.WriteLine($"HOLD_PULSES skin={skin} mode={mode} phase={phase} calls={times.Length} reads={presentationReads} originalReads={unguardedReads} dueReads={dueReads} pulses={holdPulseTimes.Count}");
             }
         });

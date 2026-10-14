@@ -1,20 +1,25 @@
 #nullable enable
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Replays;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.Replays;
+using osu.Game.Scoring;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -27,6 +32,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
     private bool includeMine;
     private bool duplicateHeads;
     private DrawableBmsHitObject first = null!;
+    private ScoreInfo simulationScore = null!;
     private BmsScoreProcessor score => (BmsScoreProcessor)Player.ScoreProcessor;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
@@ -64,6 +70,10 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         double? originalHeadTime = null;
         AddStep("load long notes", () => { mode = longNoteMode; includeMine = mine; duplicateHeads = false; LoadPlayer(); });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        AddStep("capture score mods", () =>
+        {
+            simulationScore = new ScoreInfo { Mods = Player.ScoreProcessor.Mods.Value.ToArray() };
+        });
         seek(5000);
         AddStep("observe synchronous head and tail submission", () =>
         {
@@ -87,7 +97,6 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         AddStep("pool return releases both sides of the binding", () =>
         {
             var context = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements;
-            Assert.That(context.Schedule.TryGetCurrent(note, out _), Is.False);
             Assert.Throws<InvalidOperationException>(() => ((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.GetRepresentation(note));
             Assert.That(context.GetLongNoteState(note).HeadTime, Is.EqualTo(originalHeadTime));
         });
@@ -146,7 +155,6 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             var result = drawable.Result;
             var events = JsonSerializer.Serialize(score.JudgementEvents);
             var order = context.GetNoteCandidates().ToArray();
-            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.TryGetScheduledObject(drawable, out var previous), Is.True);
             var generation = drawable.BindingGeneration;
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
@@ -154,16 +162,11 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.GetRepresentation(note), Is.SameAs(drawable));
             Assert.That(context.GetLongNoteState(note), Is.EqualTo(state));
             Assert.That(context.GetNoteCandidates(), Is.EqualTo(order));
-            Assert.That(context.ActiveLongNotes.Count(n => ReferenceEquals(n, note)), Is.EqualTo(1));
             Assert.That(context.GetPendingLongNoteTails().Count(n => ReferenceEquals(n, note)), Is.EqualTo(1));
             Assert.That(drawable.Result, Is.SameAs(result));
             Assert.That(result.TimeOffset, Is.Zero, "Preserve the framework's existing ApplyDefaults timestamp semantics.");
-            context.Schedule.BeginRemoval(previous);
-            context.Schedule.CompleteRemoval(previous, new BmsFrameContext(Playfield.Time.Current, 1));
-            context.Schedule.Unbind(previous);
-            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.TryGetScheduledObject(drawable, out var current), Is.True);
-            Assert.That(current.BindingToken, Is.Not.EqualTo(previous.BindingToken));
-            Assert.That(context.Schedule.TryGetCurrent(note, out _), Is.True);
+            ((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.UnbindNoteRepresentation(drawable, generation);
+            Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).JudgementBridge.GetRepresentation(note), Is.SameAs(drawable));
             Assert.That(context.GetLongNoteState(note).TailJudged, Is.False);
             Assert.That(JsonSerializer.Serialize(score.JudgementEvents), Is.EqualTo(events));
         });
@@ -227,8 +230,25 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
                 health = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory,
             });
             TestContext.WriteLine("P3_TRACE " + trace);
-            Assert.That(trace, Is.EqualTo(JsonSerializer.Serialize(baseline.RootElement.GetProperty("traces").GetProperty(scenario).GetProperty(checkpoint))),
-                "Ordered trace recorded on P2 before migrating long-note ownership.");
+            var time = Playfield.Time.Current;
+            List<BmsReplayFrame> frames = [new(0), new(5000, BmsAction.Key1)];
+            if (time >= 6900) frames.Add(new(6900));
+            if (time >= 9000) frames.Add(new(9000, BmsAction.Key1));
+            // A completed replay settles held tails, so compare it at checkpoints after releasing.
+            if (frames[^1].Actions.Count == 0)
+            {
+                frames.Add(new(time));
+                var replay = new Replay { Frames = frames.Cast<ReplayFrame>().ToList(), HasReceivedAllFrames = true };
+                var expected = BmsReplaySimulation.Run(Playfield.Beatmap, replay, simulationScore);
+                Assert.That(JsonSerializer.Serialize(score.JudgementEvents), Is.EqualTo(JsonSerializer.Serialize(expected.Judgements)));
+                Assert.That(JsonSerializer.Serialize(((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory), Is.EqualTo(JsonSerializer.Serialize(expected.Gauges)));
+            }
+
+            // Keep the pre-refactor score expectations while allowing intentional logical timestamp changes.
+            var previous = baseline.RootElement.GetProperty("traces").GetProperty(scenario).GetProperty(checkpoint);
+            Assert.That(JsonSerializer.Serialize(BmsExScore.CreateProgression(score.JudgementEvents)), Is.EqualTo(JsonSerializer.Serialize(previous.GetProperty("progression"))));
+            Assert.That(score.Combo.Value, Is.EqualTo(previous.GetProperty("combo").GetInt32()));
+            Assert.That(score.TotalScore.Value, Is.EqualTo(previous.GetProperty("total").GetInt64()));
         });
     }
 

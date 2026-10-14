@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
@@ -11,11 +13,9 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens.Play;
+using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
-
-internal delegate void BmsSimulationStepObserver(in BmsFrameContext frame);
 
 internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 {
@@ -26,7 +26,6 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     private readonly Dictionary<BmsHitObject, BmsJudgementResult> results = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLongNoteStateObserver Observer)> presentationObservers = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLandmineStateObserver Observer)> landmineObservers = new(ReferenceEqualityComparer.Instance);
-    private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsSimulationStepObserver Observer)> simulationObservers = [];
     private Action<BmsHitObject> resultCheckpoint = null!;
     private Action<BmsHitObject, double> resultHistoryCheckpoint = null!;
 
@@ -38,6 +37,9 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
     internal void Bind(DrawableBmsHitObject drawable)
     {
+        if (boundObjects.TryGetValue(drawable, out var previous) && isCurrent(previous))
+            return;
+
         var binding = new Binding(drawable.HitObject, drawable, drawable.BindingGeneration, this);
         representations.Add(binding.Note, binding);
         boundObjects.Add(drawable, binding);
@@ -48,20 +50,13 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     internal void ObserveLongNoteState(DrawableBmsHitObject drawable, BmsLongNoteStateObserver observer)
         => presentationObservers[drawable] = (drawable.BindingGeneration, observer);
 
-    internal void ObserveSimulationSteps(DrawableBmsHitObject drawable, BmsSimulationStepObserver observer)
-        => simulationObservers[drawable] = (drawable.BindingGeneration, observer);
-
     internal void ObserveLandmineState(DrawableBmsHitObject drawable, BmsLandmineStateObserver observer)
         => landmineObservers[drawable] = (drawable.BindingGeneration, observer);
 
     internal void Unbind(DrawableBmsHitObject drawable, long generation)
     {
-        if (boundObjects.TryGetValue(drawable, out var binding) && binding.Generation == generation && binding.ScheduledObject is { } scheduled)
-            context.Schedule.Unbind(scheduled);
-
+        boundObjects.TryGetValue(drawable, out var binding);
         container.RemoveVisualObservation(drawable, generation);
-        if (simulationObservers.TryGetValue(drawable, out var stepObserver) && stepObserver.Generation == generation)
-            simulationObservers.Remove(drawable);
         if (presentationObservers.TryGetValue(drawable, out var observer) && observer.Generation == generation)
             presentationObservers.Remove(drawable);
         if (landmineObservers.TryGetValue(drawable, out var mineObserver) && mineObserver.Generation == generation)
@@ -92,8 +87,6 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         internal readonly long Generation;
         internal readonly Action<DrawableHitObject, JudgementResult> ResultHandler;
 
-        internal BmsScheduledObject? ScheduledObject;
-
         // Captured callbacks retain their own binding identity even if the same drawable
         // is rebound without advancing its local generation.
         internal bool Bound = true;
@@ -114,9 +107,9 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     public BmsMainResultState GetMainResult(BmsHitObject note)
     {
         if (!results.TryGetValue(note, out var result))
-            throw new InvalidOperationException("The framework has not supplied this note's result.");
+            return new BmsMainResultState(HitResult.None, note.GetEndTime(), 0, null, false);
 
-        return new BmsMainResultState(result.Type, result.TimeAbsolute, result.TimeOffset, result.GameplayRate, result.SuppressPenalty);
+        return new BmsMainResultState(result.Type, result.EventTime, result.EventTime - note.GetEndTime(), result.GameplayRate, result.SuppressPenalty);
     }
 
     public void SetResultCheckpoints(Action<BmsHitObject, double> recordHistory, Action<BmsHitObject> refreshIndexes)
@@ -132,75 +125,93 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
         // The column notification precedes the bound result callback; retain both observation boundaries.
         // An earlier observer may have returned the drawable to its pool, so the result owns the identity.
-        resultHistoryCheckpoint(note, column.Time.Current);
+        resultHistoryCheckpoint(note, ((BmsJudgementResult)result).EventTime);
         if (BmsColumn.ShouldTriggerHitExplosion(result.Type))
             column.TriggerHitExplosion(note is BmsLongNote ? BmsHitLightStyle.Hold : BmsHitLightStyle.Note);
     }
 
     public void ApplyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty)
-    {
-        var drawable = GetRepresentation(note);
-        var rate = (drawable.Clock as IGameplayClock)?.GetTrueGameplayRate() ?? drawable.Clock.Rate;
-        if (drawable.Time.Current != frame.SimulationTime || rate != frame.GameplayRate)
-            throw new InvalidOperationException("The main result must use the framework's application time and gameplay rate.");
+        => applyMainResult(note, result, frame, suppressPenalty);
 
-        drawable.ApplyBmsResult(result, suppressPenalty);
+    private void applyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty,
+                                 IReadOnlyList<BmsLongNoteEndpointResult>? endpoints = null)
+    {
+        var temporary = !representations.TryGetValue(note, out var binding) || !isCurrent(binding);
+        // A delayed update can pass the entire visible lifetime. Borrow its ordinary framework
+        // entry so score notification and rewind still use the same path as visible notes.
+        var drawable = temporary
+            ? (DrawableBmsHitObject)getPooledRepresentation(column, note, null)
+            : binding!.Drawable;
+        var generation = drawable.BindingGeneration;
+        Action<DrawableHitObject, JudgementResult>? temporaryNotification = null;
+        if (temporary)
+        {
+            Bind(drawable);
+            var resultHandler = boundObjects[drawable].ResultHandler;
+            drawable.OnNewResult -= resultHandler;
+            // Framework notification must capture the entry before an index observer can return it.
+            temporaryNotification = (sender, judgement) =>
+            {
+                if (drawable.BindingGeneration == generation && ReferenceEquals(drawable.HitObject, note))
+                    notifyNewResult(column, sender, judgement);
+            };
+            drawable.OnNewResult += temporaryNotification;
+            drawable.OnNewResult += resultHandler;
+        }
+
+        try
+        {
+            if (endpoints != null)
+                ((BmsLongNoteJudgementResult)drawable.Result).SetEndpointResults(endpoints);
+            drawable.ApplyBmsResult(result, suppressPenalty, frame);
+        }
+        finally
+        {
+            if (temporaryNotification != null)
+                drawable.OnNewResult -= temporaryNotification;
+            if (temporary && drawable.IsInUse && drawable.BindingGeneration == generation && ReferenceEquals(drawable.HitObject, note))
+                drawable.Return();
+        }
     }
+
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "onNewResult")]
+    private static extern void notifyNewResult(Playfield playfield, DrawableHitObject drawable, JudgementResult result);
+
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "osu.Game.Rulesets.UI.IPooledHitObjectProvider.GetPooledDrawableRepresentation")]
+    private static extern DrawableHitObject getPooledRepresentation(Playfield playfield, HitObject note, DrawableHitObject? parent);
 
     public void ApplyMainResult(BmsLongNote note, HitResult result, IReadOnlyList<BmsLongNoteEndpointResult> endpoints, in BmsFrameContext frame, bool suppressPenalty)
-    {
-        ((BmsLongNoteJudgementResult)GetRepresentation(note).Result).SetEndpointResults(endpoints);
-        ApplyMainResult(note, result, frame, suppressPenalty);
-    }
+        => applyMainResult(note, result, frame, suppressPenalty, endpoints);
 
     public void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
     {
-        var drawable = GetRepresentation(note);
-        var observer = presentationObservers[drawable];
-        if (observer.Generation == drawable.BindingGeneration)
-            observer.Observer(state, frame);
-    }
+        if (!representations.TryGetValue(note, out var binding) || !isCurrent(binding)) return;
 
-    public void ObserveSimulationStep(BmsHitObject note, in BmsFrameContext frame)
-    {
-        // Feedback keeps its synchronous checkpoint while concrete representations opt in at binding time.
-        var drawable = GetRepresentation(note);
-        if (simulationObservers.TryGetValue(drawable, out var observer) && observer.Generation == drawable.BindingGeneration)
-            observer.Observer(frame);
+        var drawable = binding.Drawable;
+        if (presentationObservers.TryGetValue(drawable, out var observer) && observer.Generation == drawable.BindingGeneration)
+            observer.Observer(state, frame);
     }
 
     public void ApplySyntheticEndpoint(BmsLongNoteEndpointResult endpoint, in BmsFrameContext frame, bool suppressPenalty)
     {
-        var drawable = GetRepresentation(endpoint.Source);
-        if (drawable.Time.Current != frame.SimulationTime || playfield.Time.Current != frame.SimulationTime)
-            throw new InvalidOperationException("Supplementary endpoints require the current representation and application time.");
-
         playfield.ApplySyntheticLongNoteEndpoint(endpoint, suppressPenalty);
     }
 
     public void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame)
     {
-        var drawable = GetRepresentation(note);
-        var observer = landmineObservers[drawable];
-        if (observer.Generation == drawable.BindingGeneration)
+        if (!representations.TryGetValue(note, out var binding) || !isCurrent(binding)) return;
+
+        var drawable = binding.Drawable;
+        if (landmineObservers.TryGetValue(drawable, out var observer) && observer.Generation == drawable.BindingGeneration)
             observer.Observer(state, frame);
     }
 
     public void ApplyBodyTick(BmsLongNote note, bool holding, double scale, in BmsFrameContext frame)
-    {
-        var drawable = GetRepresentation(note);
-        if (drawable.Time.Current != frame.SimulationTime || playfield.Time.Current != frame.SimulationTime)
-            throw new InvalidOperationException("Body ticks require the current representation and simulation time.");
-
-        playfield.ApplyHellChargeTick(holding, scale);
-    }
+        => playfield.ApplyHellChargeTick(holding, scale, frame.SimulationTime);
 
     public void ApplyNonConsumingBad(BmsHitObject note, in BmsFrameContext frame)
     {
-        if (playfield.Time.Current != frame.SimulationTime)
-            throw new InvalidOperationException("Supplementary results must use the current application time.");
-
-        playfield.RegisterNonConsumingBad(note.StartTime, note.Column);
+        playfield.RegisterNonConsumingBad(note.StartTime, note.Column, frame.SimulationTime);
     }
 
     public void PlaySample(BmsHitObject note) => column.PlaySample(note.SampleKey, note.SampleVolume);
@@ -209,7 +220,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
     public void PlayKeySound() => column.PlayKeySound();
 
-    public void ApplyEmptyPoor(double expectedTime, int columnIndex, in BmsFrameContext frame) => playfield.RegisterEmptyPoor(expectedTime, columnIndex);
+    public void ApplyEmptyPoor(double expectedTime, int columnIndex, in BmsFrameContext frame) => playfield.RegisterEmptyPoor(expectedTime, columnIndex, frame.SimulationTime);
 
     public void PlayLandmineSample(BmsLandmine note) => column.DetonateLandmine(note);
 }

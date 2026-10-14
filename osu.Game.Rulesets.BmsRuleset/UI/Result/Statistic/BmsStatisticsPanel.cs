@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
@@ -8,8 +10,11 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Containers;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
 using osuTK;
@@ -22,6 +27,8 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
     private const double content_fade_duration = 450;
 
     internal readonly Bindable<ScoreInfo?> Score = new();
+
+    internal Action<IReadOnlyList<HitEvent>>? StatisticsLoaded;
 
     protected override bool StartHidden => true;
 
@@ -50,20 +57,21 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
     [BackgroundDependencyLoader]
     private void load() => Score.BindValueChanged(populate, true);
 
-    protected virtual Task RestoreReplayDataAsync(ScoreInfo score, CancellationToken cancellationToken) =>
-        BmsReplayPatcher.RestoreScoreDataAsync(scores, score, cancellationToken);
+    protected virtual Task<Score> LoadReplayAsync(ScoreInfo score, CancellationToken cancellationToken) =>
+        BmsReplayPatcher.LoadScoreAsync(scores, score, cancellationToken);
 
     protected virtual async Task<BmsResultStatisticsData?> LoadStatisticsAsync(ScoreInfo score, CancellationToken cancellationToken)
     {
-        if (score.HitEvents.Count == 0)
-            return null;
-
+        var replay = await LoadReplayAsync(score, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         var workingBeatmap = Beatmaps.GetWorkingBeatmap(score.BeatmapInfo);
         return await Task.Run(() =>
         {
-            var playableBeatmap = workingBeatmap.GetPlayableBeatmap(score.Ruleset, score.Mods);
+            var mods = replay.ScoreInfo.Mods;
+            using var windows = BmsJudgementProfileProvider.UseWindowMods(mods.OfType<IApplicableToJudgementWindow>().ToArray());
+            var playableBeatmap = workingBeatmap.GetPlayableBeatmap(score.Ruleset, mods, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            return BmsResultStatisticsData.Create(score, playableBeatmap);
+            return BmsResultStatisticsData.Load(replay.ScoreInfo, playableBeatmap, replay.Replay, cancellationToken);
         }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -77,8 +85,7 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
         if (change.NewValue is not { } score)
             return;
 
-        if (overview != null)
-            overview.Child = new BmsResultOverview(score);
+        overview?.Child = new BmsResultOverview(score);
 
         content.Child = statistics = new BmsResultStatisticsGrid();
         var cancellation = loadCancellation = new CancellationTokenSource();
@@ -89,8 +96,6 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
     {
         try
         {
-            await RestoreReplayDataAsync(score, cancellationToken).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
             var data = await LoadStatisticsAsync(score, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -100,10 +105,13 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
                     return;
 
                 if (overview?.Child is BmsResultOverview resultOverview)
-                    resultOverview.SetScore(score);
+                    resultOverview.SetScore(score, data?.HitEvents);
 
                 if (data != null)
+                {
                     statistics!.SetData(data);
+                    StatisticsLoaded?.Invoke(data.HitEvents);
+                }
                 else
                     showUnavailable(new FillFlowContainer
                     {
@@ -169,9 +177,9 @@ internal partial class BmsStatisticsPanel : VisibilityContainer
         if (statistics is not { IsLoaded: true } currentStatistics || unavailableTransitionStarted)
             return;
 
-        // A cached failure can arrive during the screen's entrance; only count time the charts are visible to the user.
+        // Loading can fail during the screen's entrance; only count time the charts are visible to the user.
         if (State.Value != Visibility.Visible || DrawColourInfo.Colour.MinAlpha < 0.99f
-                                               || currentStatistics.DrawWidth <= 0 || currentStatistics.DrawHeight <= 0)
+                                              || currentStatistics.DrawWidth <= 0 || currentStatistics.DrawHeight <= 0)
         {
             chartsVisibleSince = null;
             return;

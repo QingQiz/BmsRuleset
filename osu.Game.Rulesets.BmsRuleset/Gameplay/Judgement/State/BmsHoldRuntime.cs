@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
@@ -34,7 +35,23 @@ internal struct BmsHoldRuntime
 
     internal readonly bool Holding => Started && !TailJudged;
 
-    internal readonly double NextHeadTime => HeadJudged ? double.PositiveInfinity : Note.StartTime + HeadWindow.SlowWindowFor(HitResult.Ok);
+    internal readonly double NextEventTime(BmsLongNoteMode mode)
+    {
+        if (!HeadJudged) return BmsJudgementWindowTable.TimeAfter(Note.StartTime, HeadWindow.SlowWindowFor(HitResult.Ok));
+
+        var next = double.PositiveInfinity;
+        if (!TailJudged)
+        {
+            next = mode == BmsLongNoteMode.LongNote && Started
+                ? BmsJudgementWindowTable.TimeAfter(Note.EndTime, 0)
+                : BmsJudgementWindowTable.TimeAfter(Note.EndTime, HeadWindow.SlowWindowFor(HitResult.Ok));
+            if (PendingRelease is { } released) next = Math.Min(next, released + ReleaseMargin);
+        }
+
+        if (Started && TailJudged)
+            next = Math.Min(next, mode == BmsLongNoteMode.HellChargeNote ? Note.EndTime : BmsJudgementWindowTable.TimeAfter(Note.EndTime, 50));
+        return next;
+    }
 
     internal readonly BmsLongNoteState Snapshot(bool activeBody = false)
         => new(HeadJudged, Started, TailJudged, HeadResult, HeadJudged ? Note.StartTime + HeadOffset : null,

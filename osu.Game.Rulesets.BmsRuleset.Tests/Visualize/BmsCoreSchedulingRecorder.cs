@@ -81,12 +81,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             probe(typeof(BmsColumnJudgementRuntime), "UpdateLandmines", "mines");
             probe(typeof(BmsColumnJudgementRuntime), "UpdateRegisteredBodies", "bodies");
             probe(typeof(BmsColumnJudgementRuntime), "TryPressRegisteredNote", "core.press");
-            probe(typeof(BmsCoreJudgementSchedule), "CheckPassive", "core.passive");
-            probe(typeof(BmsCoreJudgementSchedule), "FinishLongNote", "long.finish");
-            probe(typeof(BmsCoreJudgementSchedule), "RunLayout", "core.layout");
-            probe(typeof(BmsCoreJudgementSchedule), "RunSubtree", "core.subtree");
-            probe(typeof(BmsCoreJudgementSchedule), "RunDeferred", "core.deferred");
-            probe(typeof(BmsCoreJudgementSchedule), "CompleteRemoval", "core.removal");
+            probe(typeof(BmsColumnJudgementRuntime), "ProcessAutomatic", "automatic");
             foreach (var type in ruleTypes)
             {
                 probe(type, "TryRelease", "long.release");
@@ -94,7 +89,6 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             }
             probe(typeof(BmsJudgementBridge), "PublishState", "state.publish",
                 [typeof(BmsLongNote), typeof(BmsLongNoteState).MakeByRefType(), typeof(BmsFrameContext).MakeByRefType()]);
-            probe(typeof(BmsJudgementBridge), "Unregister", "index.remove");
             probe(typeof(BmsColumnJudgementRuntime), "RewindLongNotes", "history.rewind");
             probe(typeof(BmsColumnJudgementRuntime), "RestoreExecutionState", "index.rebuild");
             probe(typeof(BmsHellChargeNoteJudgementRule), "updateBody", "body.sample");
@@ -106,7 +100,6 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             probe(typeof(DrawableHitObject), "OnApply", "representation.apply", [typeof(HitObjectLifetimeEntry)]);
             probe(typeof(DrawableHitObject), "OnFree", "representation.free", [typeof(HitObjectLifetimeEntry)]);
             probe(typeof(DrawableHitObject), "OnKilled", "representation.killed");
-            probe(typeof(DrawableBmsHitObject), "OnKilled", "representation.killed");
             probe(typeof(Playfield), "revertResult", "result.revert");
             playfield.NewResult += newResult;
             playfield.RevertResult += revertResult;
@@ -137,15 +130,6 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         __state = recorder?.Recording == true && recorder.owns(__instance, __args);
         if (!__state)
             return;
-
-        // Long-note removal includes its last passive check; ordinary-note removal observes the
-        // framework sample-stop boundary before that check, as in the frozen framework trace.
-        if (__originalMethod.Name == "OnKilled" && __instance is DrawableBmsHitObject killed
-            && (__originalMethod.DeclaringType == typeof(DrawableBmsHitObject)) != (killed.HitObject is BmsLongNote))
-        {
-            __state = false;
-            return;
-        }
 
         var name = recorder!.names[__originalMethod];
         if (name == "frame.begin") recorder.frame++;
@@ -244,7 +228,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             .Where(p => p.Second is bool or double or int or ushort or Enum)
             .Select(p => p.First.Name + "=" + format(p.Second)));
         // Preserve the frozen trace schema while numerical contexts replace clock-dependent arguments.
-        if (name == "batch") argumentText = "suppressJudgements=" + format(args.OfType<bool>().First());
+        if (name == "batch") argumentText = "suppressJudgements=" + format(args.OfType<bool>().FirstOrDefault());
         if (name == "bodies") argumentText = "holding=" + format(args.OfType<bool>().Single());
         if (name == "body.tick") argumentText = "holding=" + format(args[0]) + ",scale=" + format(args[1]);
         // The suppression flag moved from the playfield into the core; the baseline encoded only endpoint data here.
@@ -263,7 +247,7 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         var pending = string.Join(",", playfield.Stage.Columns.Take(2).Cast<BmsColumn>()
             .Select(c => c.Judgements.FirstPendingNote is { } first ? identities[first] : -1));
         var active = string.Join("/", playfield.Stage.Columns.Take(2).Cast<BmsColumn>()
-            .Select(c => string.Join(",", c.Judgements.ActiveLongNotes.Select(n => identities[n]))));
+            .Select(c => string.Join(",", c.Judgements.GetPendingLongNoteTails().Concat(c.Judgements.GetActiveBodies()).Distinct().Select(n => identities[n]))));
         var rawTime = result == null ? null : typeof(JudgementResult).GetProperty("RawTime", instance)!.GetValue(result);
         var resultState = result == null ? "-" : $"{result.Type}@{format(result.TimeAbsolute)}:{format(rawTime)}:{format(result.TimeOffset)}:{format(result.GameplayRate)}:{(result as BmsJudgementResult)?.SuppressPenalty}";
         var status = string.Join(",", score.JudgementEvents.Count, BmsExScore.CreateProgression(score.JudgementEvents)[^1],

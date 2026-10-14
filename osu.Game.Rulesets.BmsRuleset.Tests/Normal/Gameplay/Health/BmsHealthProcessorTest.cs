@@ -6,6 +6,8 @@ using osu.Framework.Timing;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
@@ -97,6 +99,40 @@ public class BmsHealthProcessorTest
         processor.ApplyHellChargeTick(true, eventTime: 1300);
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.GaugeHistory[^1].States.Single().Failed, Is.False);
+    }
+
+    [TestCase(false, 1000)]
+    [TestCase(true, 1100)]
+    public void DelayedEngineResultRewindsAtItsLogicalApplicationTime(bool syntheticTail, double applicationTime)
+    {
+        var processor = createProcessorWithClock(1200);
+        processor.SetGaugeType(BmsGaugeType.Hazard);
+        processor.ApplyHellChargeTick(true, eventTime: 500);
+        BmsJudgementResult result;
+        if (syntheticTail)
+        {
+            var note = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
+            result = new BmsLongNoteJudgementResult(note, note.CreateJudgement(),
+                [new BmsLongNoteEndpointResult(note, BmsLongNoteEndpointKind.Tail, 1000, 1, HitResult.Ok, applicationTime)]);
+        }
+        else
+        {
+            var note = new BmsNote { StartTime = 1000, Column = 1 };
+            result = new BmsJudgementResult(note, note.CreateJudgement());
+        }
+        result.Type = HitResult.Ok;
+        result.SetTiming(1000, 1);
+        processor.ApplyResult(result);
+        Assert.That(processor.GaugeHistory[^1].Time, Is.EqualTo(applicationTime));
+
+        processor.Rewind(applicationTime);
+        Assert.That(processor.HasFailed, Is.True);
+        Assert.That(processor.Health.Value, Is.Zero);
+        processor.Rewind(Math.BitDecrement(applicationTime));
+        Assert.That(processor.HasFailed, Is.False);
+        Assert.That(processor.HasEverFailed, Is.False);
+        Assert.That(processor.Health.Value, Is.EqualTo(1));
+        Assert.That(processor.GaugeHistory, Has.Count.EqualTo(1));
     }
 
     [Test]
@@ -842,6 +878,57 @@ public class BmsHealthProcessorTest
             Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExHardClass));
             Assert.That(processor.DisplayProfile.Value.FillColour, Is.EqualTo(new Color4(255, 215, 0, 255)));
         });
+    }
+
+    [Test]
+    public void TestCourseAutoGaugeDoesNotFailBeforeDepletedLayerIsReplaced()
+    {
+        using var processor = new BmsHealthProcessor();
+        processor.SetGaugeTypes(BmsModAutoGauge.COURSE_AUTO_GAUGE_CHAIN, profileFamilyOverride: BmsGaugeProfileFamily.Lr2);
+        var note = new BmsNote { StartTime = 1000, Column = 1 };
+        for (var miss = 0; miss < 5; miss++)
+            processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(processor.Health.Value, Is.GreaterThan(0).And.LessThan(1e-15));
+            Assert.That(processor.HasFailed, Is.False);
+            Assert.That(processor.HasEverFailed, Is.False);
+        });
+
+        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Meh });
+        Assert.Multiple(() =>
+        {
+            Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.ExClass));
+            Assert.That(processor.Health.Value, Is.EqualTo(0.4).Within(1e-15));
+            Assert.That(processor.CurrentGaugeStates.First().Failed, Is.True);
+            Assert.That(processor.HasFailed, Is.False);
+            Assert.That(processor.HasEverFailed, Is.False);
+        });
+    }
+
+    [Test]
+    public void TestTinyCarriedHealthSurvivesJudgementWithoutGaugeChange(
+        [Values(BmsGaugeType.Class, BmsGaugeType.ExClass, BmsGaugeType.ExHardClass)] BmsGaugeType type,
+        [Values(1e-9, double.Epsilon)] double remaining)
+    {
+        using var processor = new BmsHealthProcessor();
+        processor.SetGaugeTypes([type], profileFamilyOverride: BmsGaugeProfileFamily.FiveKeys,
+            initialStates: [new(type, remaining, false)]);
+        var note = new BmsNote { StartTime = 1000, Column = 1 };
+        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Good });
+        Assert.Multiple(() =>
+        {
+            Assert.That(processor.Health.Value, Is.EqualTo(remaining));
+            Assert.That(processor.HasFailed, Is.False);
+            Assert.That(processor.HasEverFailed, Is.False);
+            Assert.That(processor.HasPassedAtEnd(), Is.True);
+        });
+
+        processor.ApplyResult(new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Ok });
+        Assert.That(processor.Health.Value, Is.Zero);
+        Assert.That(processor.HasFailed, Is.True);
+        Assert.That(processor.HasPassedAtEnd(), Is.False);
     }
 
     [Test]

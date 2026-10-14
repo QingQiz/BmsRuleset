@@ -77,8 +77,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal bool PreserveLongNoteHistory => ParentPlayfield.PreserveLongNoteHistory;
 
-    internal double? ResumeRewindEndTime => ParentPlayfield.IsResumeRewinding ? ParentPlayfield.ResumeRewindEndTime : null;
-
     protected BmsPlayfield ParentPlayfield { get; }
 
     internal float GetLongNoteHeadYAtStartTime(BmsLongNote note)
@@ -164,7 +162,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
         => new BmsColumnHitObjectContainer(
             ParentPlayfield.ScrollController,
             () => HitTargetPosition,
-            () => ParentPlayfield.IsResumeRewinding,
             canBatchUpdates);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
@@ -203,13 +200,9 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     protected override void Update()
     {
-        // Each column owns its result stack, so it must suppress the framework's rewind reversion too.
-        if (!ParentPlayfield.IsResumeRewinding)
-        {
-            if (Time.Elapsed < 0)
-                Judgements.RewindPressHistory(Time.Current);
-            base.Update();
-        }
+        if (Time.Elapsed < 0)
+            Judgements.RewindPressHistory(Time.Current);
+        base.Update();
     }
 
     private static float defaultColumnWidth(int index, BmsLayoutVariant layoutVariant) =>

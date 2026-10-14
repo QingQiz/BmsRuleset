@@ -73,9 +73,10 @@ public class BmsLongNoteRuleTest
         run.Press(1000, HitResult.Perfect);
         run.Frame(1800, 800, true);
         run.Release(1890);
+        Assert.That(run.Output.BodyTicks, Has.Count.EqualTo(4));
         run.Output.BodyTicks.Clear();
         run.Frame(1999, 199, false);
-        Assert.That(run.Output.BodyTicks.Select(t => (t.Holding, t.Scale)), Is.EqualTo(new[] { (true, 0.5) }));
+        Assert.That(run.Output.BodyTicks, Is.Empty);
         Assert.That(run.State.LongNoteStarted, Is.True);
         Assert.That(run.Presentation().Retired, Is.False);
     }
@@ -193,6 +194,8 @@ public class BmsLongNoteRuleTest
         run.Release(1500);
 
         var expected = new List<(string, bool, bool, bool)> { ("state", true, false, true), ("main", true, false, true) };
+        if (mode == BmsLongNoteMode.HellChargeNote)
+            expected.Add(("state", true, false, true));
         if (mode != BmsLongNoteMode.LongNote)
             expected.Add(("synthetic Tail", true, false, true));
         expected.Add(("state", true, true, mode == BmsLongNoteMode.HellChargeNote));
@@ -383,12 +386,12 @@ public class BmsLongNoteRuleTest
     [TestCase(BmsLongNoteMode.LongNote)]
     [TestCase(BmsLongNoteMode.ChargeNote)]
     [TestCase(BmsLongNoteMode.HellChargeNote)]
-    public void TestPauseCompletesActiveLongNote(BmsLongNoteMode mode)
+    public void TestEndSettlesActiveLongNote(BmsLongNoteMode mode)
     {
         var run = new BmsLongNoteTestContext(mode, 1000, 1000);
         run.Press(1000, HitResult.Perfect);
 
-        run.Pause(1200);
+        run.End(1200);
         Assert.Multiple(() =>
         {
             Assert.That(run.State.TailJudged, Is.True);

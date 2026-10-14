@@ -74,7 +74,7 @@ public class BmsLongNoteExecutionTest
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K };
         BmsHitObject[] notes = Enumerable.Range(0, 1024).Select(i => (BmsHitObject)new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 + i }).ToArray();
-        var column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, true, new BmsRecordingJudgementOutput()).GetColumn(1);
+        var column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, new BmsRecordingJudgementOutput()).GetColumn(1);
         var holds = BmsJudgementStateInspection.GetHolds(column);
         Assert.That((Array)typeof(BmsHoldRegistry).GetField("bindingIndices", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(holds)!, Is.Empty);
         Assert.DoesNotThrow(() => column.RewindLongNotes(0));
@@ -87,13 +87,13 @@ public class BmsLongNoteExecutionTest
         BmsHitObject[] notes = Enumerable.Range(0, 1024).Select(i => (BmsHitObject)new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 + i }).ToArray();
         notes[100] = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1100, Duration = 1000 };
         notes[900] = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1900, Duration = 1000 };
-        var column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, true, new BmsRecordingJudgementOutput()).GetColumn(1);
+        var column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, new BmsRecordingJudgementOutput()).GetColumn(1);
         var holds = BmsJudgementStateInspection.GetHolds(column);
         var bindings = (Array)typeof(BmsHoldRegistry).GetField("bindings", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(holds)!;
         Assert.That(bindings, Has.Length.EqualTo(2));
         Assert.That(column.NoteRegistrations[100].Press, Is.SameAs(column.NoteRegistrations[900].Press));
         Assert.That(BmsJudgementStateInspection.GetRuntime(column, notes[100]), Is.Not.SameAs(BmsJudgementStateInspection.GetRuntime(column, notes[900])));
-        column.ActivateNote(notes[900]);
+
         column.TryPressRegisteredNote(notes[900], HitResult.Perfect, new BmsPressContext(1900, new BmsFrameContext(1900, 1)));
         Assert.That(column.GetLongNoteState((BmsLongNote)notes[900]).HeadJudged, Is.True);
         Assert.That(column.GetLongNoteState((BmsLongNote)notes[100]).HeadJudged, Is.False);
@@ -129,30 +129,12 @@ public class BmsLongNoteExecutionTest
         Assert.That(reverted, Has.Count.EqualTo(2));
     }
 
-    [Test]
-    public void RemovingLongNoteCannotReenterIndexesDuringLastPassiveResult()
-    {
-        var (context, output, notes) = create();
-        var note = (BmsLongNote)notes[0];
-        context.BeginNoteRemoval(note);
-        output.StatePublished = (source, _, _) =>
-        {
-            Assert.That(context.IsNoteCandidate(source), Is.False);
-            Assert.That(context.GetHoldingNotes(), Is.Empty);
-        };
-        context.CheckRegisteredNotePassive(note, new BmsFrameContext(5000, 1));
-        context.CheckRegisteredNotePassive(note, new BmsFrameContext(5001, 1));
-        Assert.That(output.MainResults, Is.EqualTo(1));
-        Assert.That(context.GetLongNoteState(note).TailJudged, Is.True);
-        Assert.That(context.IsNoteCandidate(note), Is.False);
-    }
-
     [TestCase((BmsLongNoteMode)999)]
     public void UncoveredModesFailAtComposition(BmsLongNoteMode mode)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, LockedLongNoteMode = mode, Rank = 2 };
         var note = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 3000, Duration = 1000 };
-        Assert.Throws<InvalidOperationException>(() => new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, true, new BmsRecordingJudgementOutput()));
+        Assert.Throws<InvalidOperationException>(() => new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, new BmsRecordingJudgementOutput()));
     }
 
     private static (BmsColumnJudgementRuntime Context, BmsRecordingJudgementOutput Output, BmsHitObject[] Notes) create(int count = 1)
@@ -161,8 +143,8 @@ public class BmsLongNoteExecutionTest
         var notes = Enumerable.Range(0, count).Select(i => (BmsHitObject)new BmsLongNote
             { Beatmap = beatmap, Column = 1, StartTime = 3000 + i, Duration = 1000 }).Append(new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 6000 }).ToArray();
         var output = new BmsRecordingJudgementOutput();
-        var context = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, true, output).GetColumn(1);
-        foreach (var note in notes) context.ActivateNote(note);
+        var context = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, output).GetColumn(1);
+
         return (context, output, notes);
     }
 }

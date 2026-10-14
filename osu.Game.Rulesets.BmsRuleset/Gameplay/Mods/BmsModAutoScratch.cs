@@ -18,7 +18,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 
 public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHitObject>, IApplicableToScoreSelection, IBmsActionProducer, IBmsActionFilter
 {
-    private static readonly BmsAction[] scratchActions = [BmsAction.Scratch, BmsAction.ScratchReverse, BmsAction.P2Scratch, BmsAction.P2ScratchReverse];
+    private static readonly BmsAction[] scratch_actions = [BmsAction.Scratch, BmsAction.ScratchReverse, BmsAction.P2Scratch, BmsAction.P2ScratchReverse];
     private (double Time, uint Actions)[] frames = [];
     private int nextFrame;
     private uint pressedActions;
@@ -29,15 +29,16 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
     private BmsPlayfield playfield = null!;
     private BmsInputManager input = null!;
 
-    private bool usesRecordedInputs => input.ReplayInputHandler is BmsFramedReplayInputHandler { IncludesGeneratedInputs: true };
+    private bool usesRecordedInputs => input.ReplayInputHandler != null;
 
     void IBmsActionProducer.UpdateActions(double time)
     {
-        if (!playfield.IsResumeRewinding && !usesRecordedInputs)
+        if (!usesRecordedInputs)
             UpdateActions(time);
     }
 
     bool IBmsActionFilter.AllowPhysicalAction(BmsAction action) => !isScratch(action);
+
     bool IBmsActionFilter.AllowReplayAction(BmsAction action) => usesRecordedInputs || !isScratch(action);
 
     private static bool isScratch(BmsAction action)
@@ -70,11 +71,12 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
         var actions = 0u;
         foreach (var point in new BmsAutoGenerator(beatmap, scratchOnly: true).GenerateActionPoints().OrderBy(p => p.Time).ThenBy(p => p.Press))
         {
-            var direction = 1u << Array.IndexOf(scratchActions, point.Action);
+            var direction = 1u << Array.IndexOf(scratch_actions, point.Action);
             actions = point.Press ? actions | direction : actions & ~direction;
             // Adjacent holds need a release and a new press even at the same timestamp.
             schedule.Add((point.Time, actions));
         }
+
         frames = schedule.ToArray();
         nextFrame = 0;
         pressedActions = 0;
@@ -95,10 +97,12 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
                 if (frames[middle].Time <= time) low = middle + 1;
                 else high = middle;
             }
+
             nextFrame = low;
             applyActions(low == 0 ? 0 : frames[low - 1].Actions);
             nextTime = nextFrame < frames.Length ? frames[nextFrame].Time : double.PositiveInfinity;
         }
+
         lastTime = time;
         if (time < nextTime) return;
 
@@ -115,8 +119,8 @@ public partial class BmsModAutoScratch : Mod, IApplicableToDrawableRuleset<BmsHi
             var released = pressedActions & ~targetActions;
             var index = BitOperations.TrailingZeroCount(released != 0 ? released : targetActions & ~pressedActions);
             pressedActions ^= 1u << index;
-            if (released != 0) release(scratchActions[index]);
-            else press(scratchActions[index]);
+            if (released != 0) release(scratch_actions[index]);
+            else press(scratch_actions[index]);
         }
     }
 }

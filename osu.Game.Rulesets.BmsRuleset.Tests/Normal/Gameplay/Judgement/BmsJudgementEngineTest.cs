@@ -45,7 +45,7 @@ public class BmsJudgementEngineTest
     }
 
     [Test]
-    public void EveryColumnMinePrecedesEveryBodyAndEveryInput()
+    public void ElapsedBodyTicksPrecedeCurrentMinesAndInputs()
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = BmsLongNoteMode.HellChargeNote };
         var hold = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 };
@@ -60,17 +60,17 @@ public class BmsJudgementEngineTest
             output.BodyTick = (source, _, _, _) => events.Add($"body:{source.Column}");
         }
         var engine = new BmsJudgementEngine(Enumerable.Range(1, 3).Select(i =>
-            new BmsJudgementColumnDefinition(objects, beatmap.LayoutVariant, i, false, outputs[i - 1])).ToArray());
-        engine.GetColumn(1).ActivateNote(hold);
-        engine.GetColumn(2).ActivateLandmine(mine);
-        engine.GetColumn(3).ActivateNote(note);
+            new BmsJudgementColumnDefinition(objects, beatmap.LayoutVariant, i, outputs[i - 1])).ToArray());
+
+
+
         engine.QueueInput(1000, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1000, 1), 1);
         events.Clear();
         engine.QueueInput(1201, 2, true, false);
         engine.QueueInput(1201, 3, true, false);
         engine.ProcessFrame(new BmsFrameContext(1201, 1), 201);
-        Assert.That(events, Is.EqualTo(new[] { "result:2", "body:1", "result:3" }));
+        Assert.That(events, Is.EqualTo(new[] { "body:1", "result:3", "result:2" }));
         Assert.That(outputs[0].BodyTicks.Single().Holding, Is.True);
         Assert.That(engine.GetColumn(2).GetLandmineState(mine).Detonated, Is.True);
         Assert.That(engine.GetColumn(1).Rules, Is.SameAs(engine.GetColumn(3).Rules));
@@ -78,17 +78,17 @@ public class BmsJudgementEngineTest
 
     [TestCase(-0.001, true, false, false)]
     [TestCase(0, true, true, true)]
-    [TestCase(99.999, true, true, true)]
+    [TestCase(99.999, true, true, false)]
     [TestCase(100, true, true, false)]
     [TestCase(0, false, true, false)]
-    public void LandmineUsesPassingBoundaryAndIsNeverAPressCandidate(double offset, bool held, bool handled, bool detonated)
+    public void LandmineUsesChartTimeAndIsNeverAPressCandidate(double offset, bool held, bool handled, bool detonated)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2 };
         var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = new BmsJudgementEngine([mine], beatmap.LayoutVariant, 1, false, output);
+        var engine = new BmsJudgementEngine([mine], beatmap.LayoutVariant, 1, output);
         var column = engine.GetColumn(1);
-        column.ActivateLandmine(mine);
+
         if (held)
             engine.QueueInput(1000 + offset, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1000 + offset, 1), 1);
@@ -103,22 +103,22 @@ public class BmsJudgementEngineTest
 
     [TestCase(false)]
     [TestCase(true)]
-    public void LandmineHistorySurvivesDeactivationAndRewindsAtProcessingTime(bool held)
+    public void LandmineHistoryRewindsAtChartTime(bool held)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K };
         var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = new BmsJudgementEngine([mine], beatmap.LayoutVariant, 1, false, output);
+        var engine = new BmsJudgementEngine([mine], beatmap.LayoutVariant, 1, output);
         var column = engine.GetColumn(1);
-        column.ActivateLandmine(mine);
+
         column.UpdateLandmines(new BmsFrameContext(1007, 1), held);
-        column.RemoveLandmine(mine);
+
         column.RewindLandmines(1007);
-        Assert.That(column.GetLandmineState(mine).HandledTime, Is.EqualTo(1007));
-        output.RevertAfter(1006);
-        column.RewindLandmines(1006);
+        Assert.That(column.GetLandmineState(mine).HandledTime, Is.EqualTo(1000));
+        output.RevertAfter(999);
+        column.RewindLandmines(999);
         Assert.That(column.GetLandmineState(mine).HandledTime, Is.Null);
-        column.ActivateLandmine(mine);
+
         column.UpdateLandmines(new BmsFrameContext(1007, 1), true);
         Assert.That(column.GetLandmineState(mine).Detonated, Is.True);
         Assert.That(output.MainResults, Is.EqualTo(held ? 2 : 1));
@@ -131,10 +131,10 @@ public class BmsJudgementEngineTest
         var first = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var second = new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = new BmsJudgementEngine([first, second], beatmap.LayoutVariant, 1, true, output);
+        var engine = new BmsJudgementEngine([first, second], beatmap.LayoutVariant, 1, output);
         var column = engine.GetColumn(1);
-        column.ActivateNote(first);
-        column.ActivateNote(second);
+
+
         output.BeforeResultCheckpoint = (note, _) =>
         {
             if (ReferenceEquals(note, first))
@@ -152,25 +152,17 @@ public class BmsJudgementEngineTest
     [TestCase(BmsLongNoteMode.LongNote)]
     [TestCase(BmsLongNoteMode.ChargeNote)]
     [TestCase(BmsLongNoteMode.HellChargeNote)]
-    public void PauseCompletesHoldsThroughTheSameEngine(BmsLongNoteMode mode)
+    public void EndSettlesHoldsThroughTheSameEngine(BmsLongNoteMode mode)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode };
         var note = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, true, output);
+        var engine = new BmsJudgementEngine([note], beatmap.LayoutVariant, 1, output);
         var column = engine.GetColumn(1);
-        column.ActivateNote(note);
+
         engine.QueueInput(1000, 1, true, false);
         engine.ProcessFrame(new BmsFrameContext(1000, 1), 1);
-        var publications = new List<bool>();
-        output.StatePublished = (_, _, frame) => publications.Add(frame.IsPauseCompletion);
-        engine.CompleteLongNotesAtPause(new BmsFrameContext(1200, 1.5));
-        Assert.That(publications, Is.EqualTo(mode switch
-        {
-            BmsLongNoteMode.LongNote => new[] { false },
-            BmsLongNoteMode.ChargeNote => new[] { false, true },
-            _ => new[] { true },
-        }));
+        engine.CompleteLongNotesAtEnd(new BmsFrameContext(1200, 1.5));
         Assert.That(column.GetLongNoteState(note).TailJudged, Is.True);
         Assert.That(column.GetLongNoteState(note).LongNoteStarted, Is.False);
         Assert.That(column.GetHoldingNotes(), Is.Empty);
@@ -187,10 +179,10 @@ public class BmsJudgementEngineTest
         var note = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 1000, Duration = 1000 };
         var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = 1000 };
         var output = new BmsRecordingJudgementOutput();
-        var engine = new BmsJudgementEngine([note, mine], beatmap.LayoutVariant, 1, false, output);
+        var engine = new BmsJudgementEngine([note, mine], beatmap.LayoutVariant, 1, output);
         var column = engine.GetColumn(1);
-        column.ActivateNote(note);
-        column.ActivateLandmine(mine);
+
+
         engine.QueueInput(1000, 1, true, false);
         engine.QueueInput(1000, 1, false, false);
         engine.ProcessFrame(new BmsFrameContext(1000, 1), 500);

@@ -83,12 +83,12 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
             Invalidate(Invalidation.Presence);
         }
 
-        if (!suppress) ApplyVisual(frame, layout);
+        if (!suppress) ApplyVisual(layout);
     }
 
     protected private virtual BmsVisualLayout PrepareVisual(float y, in BmsColumnVisualFrame frame) => new(y, y, y);
 
-    protected private virtual void ApplyVisual(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
+    protected private virtual void ApplyVisual(in BmsVisualLayout layout)
     {
         ApplyNoteHeightScale(ParentColumn?.NoteHeightScale ?? 1);
         Y = layout.OriginY;
@@ -149,29 +149,32 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     protected DrawableBmsHitObject()
         : base(null!)
     {
+        // Stay ahead of framework listeners even when ApplyDefaults reuses the same representation.
+        OnNewResult += applyJudgementTime;
         Anchor = Anchor.BottomLeft;
         Origin = Anchor.BottomLeft;
         RelativeSizeAxes = Axes.X;
         AddInternal(visualLayer = new VisualContainer { RelativeSizeAxes = Axes.X });
     }
 
-    internal void ApplyBmsResult(HitResult result, bool suppressPenalty)
+    private BmsFrameContext? judgementFrame;
+
+    internal void ApplyBmsResult(HitResult result, bool suppressPenalty, BmsFrameContext? frame = null)
     {
+        judgementFrame = frame;
         ((BmsJudgementResult)Result).SuppressPenalty = suppressPenalty;
         ApplyResult(result);
     }
 
-    public override void PlaySamples()
+    private void applyJudgementTime(DrawableHitObject drawable, JudgementResult result)
     {
+        // The framework stamps the display frame before notifying score and health listeners.
+        if (judgementFrame is { } frame)
+            ((BmsJudgementResult)result).SetTiming(frame.SimulationTime, frame.GameplayRate);
     }
 
-    public override void OnKilled()
+    public override void PlaySamples()
     {
-        base.OnKilled();
-        // The framework has stopped samples, while this removing representation can still submit its final result.
-        ParentColumn?.JudgementBridge.CompleteScheduledRemoval(this,
-            new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
-                (Clock as IGameplayClock)?.IsRewinding == true));
     }
 
     protected override void Update()
@@ -184,7 +187,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected override void UpdateAfterChildren()
     {
-        // The column schedule owns passive results; the base hook only dispatches an unused per-object check.
+        // The engine owns passive results; the base hook only dispatches an unused per-object check.
     }
 
     protected override void LoadAsyncComplete()
@@ -220,6 +223,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     protected override void OnApply()
     {
         base.OnApply();
+        judgementFrame = null;
         BindingGeneration++;
         if (VisualsSuppressed)
         {

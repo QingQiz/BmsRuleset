@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -14,11 +15,10 @@ using osu.Game.Extensions;
 using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -27,535 +27,219 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Replay;
 [TestFixture]
 public class BmsReplayArchiveTest
 {
-
     private static Score createScore() => new()
     {
-        Replay =
-        {
-            Frames =
-            {
-                new BmsReplayFrame(1234, BmsAction.Key1),
-            },
-        },
+        Replay = { Frames = [new BmsReplayFrame(1234.125, BmsAction.Key1)] },
     };
 
-    private static void assertHitEvent(HitEvent hitEvent, double offset, double gameplayRate, HitResult result, Type hitObjectType, double startTime, int column)
-    {
-        Assert.That(hitEvent.TimeOffset, Is.EqualTo(offset));
-        Assert.That(hitEvent.GameplayRate, Is.EqualTo(gameplayRate));
-        Assert.That(hitEvent.Result, Is.EqualTo(result));
-        Assert.That(hitEvent.HitObject, Is.TypeOf(hitObjectType));
-        Assert.That(hitEvent.HitObject.StartTime, Is.EqualTo(startTime));
-        Assert.That(((BmsHitObject)hitEvent.HitObject).Column, Is.EqualTo(column));
-    }
-
-    private sealed class TestResourceStore(string filename, byte[] content) : IResourceStore<byte[]>
-    {
-
-        #region Disposal
-
-        public void Dispose()
-        {
-        }
-
-        #endregion
-
-        public byte[] Get(string name) => name == filename ? content : null!;
-
-        public Stream GetStream(string name) => new MemoryStream(Get(name));
-
-        public Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = default)
-            => Task.FromResult(Get(name));
-
-        public IEnumerable<string> GetAvailableResources() => [filename];
-    }
-
     [Test]
-    public void TestMissingSuppressionFieldDefaultsToFalse()
+    public void TestArchiveContainsOnlyOperations()
     {
         var original = createScore();
-        BmsJudgementEventStore.Set(original.ScoreInfo,
-        [new BmsJudgementEvent(BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 1 }), HitResult.Meh,
-            [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 1200, 1, HitResult.Meh)], suppressPenalty: true)]);
-        var restored = BmsTestReplayArchive.RoundTrip(original, json =>
-        {
-            var parsed = Newtonsoft.Json.Linq.JObject.Parse(json);
-            var fields = parsed.Descendants().OfType<Newtonsoft.Json.Linq.JProperty>()
-                .Where(p => p.Name.Replace("_", "").Equals("SuppressPenalty", StringComparison.OrdinalIgnoreCase)).ToArray();
-            Assert.That(fields, Has.Length.EqualTo(1));
-            fields[0].Remove();
-            return parsed.ToString();
-        });
-        Assert.That(BmsJudgementEventStore.TryGet(restored.ScoreInfo, out var events), Is.True);
-        Assert.That(events.Single().SuppressPenalty, Is.False);
-        Assert.That(events.Single().Source.IsScoring, Is.True);
-        Assert.That(restored.ScoreInfo.HitEvents.Single().Result, Is.EqualTo(HitResult.Meh));
-        Assert.That(restored.Replay.Frames.Single().Time, Is.EqualTo(1234));
-    }
-
-    [Test]
-    public void TestArchiveWithoutGeneratedInputMarkerUsesLegacyPlayback()
-    {
-        var original = createScore();
-        original.Replay.Frames[0] = new BmsReplayFrame(1234, BmsAction.Key1) { IncludesGeneratedInputs = true };
-        var restored = BmsTestReplayArchive.RoundTrip(original, json =>
-        {
-            var parsed = Newtonsoft.Json.Linq.JObject.Parse(json);
-            var marker = parsed.Descendants().OfType<Newtonsoft.Json.Linq.JProperty>()
-                .Single(p => p.Name.Replace("_", "").Equals("IncludesGeneratedInputs", StringComparison.OrdinalIgnoreCase));
-            marker.Remove();
-            return parsed.ToString();
-        });
-        Assert.That(((BmsReplayFrame)restored.Replay.Frames.Single()).IncludesGeneratedInputs, Is.False);
-        Assert.That(new BmsFramedReplayInputHandler(restored.Replay).IncludesGeneratedInputs, Is.False);
-    }
-
-    [Test]
-    public void TestArchiveIsGzipCompressed()
-    {
-        using var archive = BmsReplayArchive.Create(createScore());
-        var bytes = archive.Get(BmsReplayArchive.FILENAME);
-
-        Assert.That(bytes.Length, Is.GreaterThanOrEqualTo(2));
-        Assert.That(bytes[0], Is.EqualTo((byte)0x1f));
-        Assert.That(bytes[1], Is.EqualTo((byte)0x8b));
-    }
-
-    [Test]
-    public void TestJudgementAlgorithmSurvivesCloneAndArchive([Values] BmsJudgementAlgorithm algorithm)
-    {
-        var original = createScore();
-        original.Replay.Frames[0] = new BmsReplayFrame(1234, BmsAction.Key1) { JudgementAlgorithm = algorithm };
-
-        using var archive = BmsReplayArchive.Create(original.DeepClone());
-        var replayFile = new RealmFile { Hash = "abcdef" };
-        var readTarget = new ScoreInfo();
-        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
-
-        var restored = BmsReplayArchive.ReadScore(
-            readTarget,
-            new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
-
-        Assert.That(((BmsReplayFrame)restored.Replay.Frames[0]).JudgementAlgorithm, Is.EqualTo(algorithm));
-    }
-
-    [Test]
-    public void TestCreatedArchiveReturnsHashOfItsContent()
-    {
-        using var archive = BmsReplayArchive.Create(createScore(), out var hash);
-        var bytes = archive.Get(BmsReplayArchive.FILENAME);
-        var expectedHash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-
-        Assert.That(hash, Is.EqualTo(expectedHash));
-    }
-
-    [Test]
-    public void TestGaugeHistoryRoundTripsThroughArchive()
-    {
-        var original = createScore();
-        BmsScoreGaugeHistoryStore.Set(original.ScoreInfo,
+        original.Replay.Frames =
         [
-            new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal,
-            [
-                new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
-                new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.42, false),
-            ]),
-        ]);
-
-        using var archive = BmsReplayArchive.Create(original);
-        var replayFile = new RealmFile { Hash = "abcdef" };
-        var readTarget = new ScoreInfo();
-        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
-
-        var restored = BmsReplayArchive.ReadScore(
-            readTarget,
-            new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
-
-        Assert.That(BmsScoreGaugeHistoryStore.TryGet(restored.ScoreInfo, out var history), Is.True);
-        Assert.That(history, Has.Count.EqualTo(1));
-        Assert.That(history[0].ActiveGaugeType, Is.EqualTo(BmsGaugeType.Normal));
-        Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Hard).Failed, Is.True);
-        Assert.That(history[0].States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health, Is.EqualTo(0.42));
-    }
-
-    [TestCase("source", "missing")]
-    [TestCase("source", "null")]
-    [TestCase("timing_observations", "missing")]
-    [TestCase("timing_observations", "null")]
-    [TestCase("timing_observations", "empty")]
-    [TestCase("timing_observations", "null_element")]
-    [TestCase("event", "null")]
-    public void TestIncompleteJudgementDataPreservesFramesWithoutPartialStatistics(string field, string corruption)
-    {
-        var original = createScore();
-        original.ScoreInfo.Ruleset = new BmsRuleset().RulesetInfo;
-        var judgementEvent = new BmsJudgementEvent(
-            BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 2 }),
-            HitResult.Great,
-            [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 988, 1, HitResult.Great)]);
-        BmsJudgementEventStore.Set(original.ScoreInfo, [judgementEvent, judgementEvent]);
-        original.ScoreInfo.HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents([judgementEvent, judgementEvent]);
-        BmsScoreGaugeHistoryStore.Set(original.ScoreInfo,
-        [new BmsGaugeHistoryEvent(1000, BmsGaugeType.Hard, [new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0.75, false)])]);
-
+            new BmsReplayFrame(0),
+            new BmsReplayFrame(20),
+            new BmsReplayFrame(1000.125, BmsAction.Key1),
+            new BmsReplayFrame(1020.125, BmsAction.Key1),
+            new BmsReplayFrame(1020.125),
+            new BmsReplayFrame(1020.125, BmsAction.Key1),
+            new BmsReplayFrame(900, BmsAction.Key1),
+            new BmsReplayFrame(950, BmsAction.Key1),
+        ];
         var restored = BmsTestReplayArchive.RoundTrip(original, json =>
         {
-            var parsed = JObject.Parse(json);
-            var events = (JArray)parsed["judgement_events"]!;
-            var data = (JObject)events[1]!;
-            switch (corruption)
+            var payload = JObject.Parse(json);
+            var frames = (JArray)payload["frames"]!;
+            Assert.Multiple(() =>
             {
-                case "missing":
-                    data.Property(field)!.Remove();
-                    break;
-
-                case "null" when field == "event":
-                    events[1] = JValue.CreateNull();
-                    break;
-
-                case "null":
-                    data[field] = JValue.CreateNull();
-                    break;
-
-                case "empty":
-                    data[field] = new JArray();
-                    break;
-
-                case "null_element":
-                    ((JArray)data[field]!).Add(JValue.CreateNull());
-                    break;
-            }
-            return parsed.ToString();
+                Assert.That(frames, Has.Count.EqualTo(4));
+                Assert.That(payload.Properties().Select(property => property.Name), Is.EquivalentTo(new[] { "algorithm", "frames" }));
+                Assert.That(frames.OfType<JObject>().All(frame => frame.Properties().All(property => property.Name is "time" or "actions")), Is.True);
+            });
+            return json;
         });
+        Assert.That(restored.Replay.Frames.Select(frame => frame.Time), Is.EqualTo(new[] { 0, 900, 1020.125, 1020.125 }));
+        Assert.That(restored.Replay.Frames.Cast<BmsReplayFrame>().Select(frame => frame.Actions.Count), Is.EqualTo(new[] { 0, 1, 0, 1 }));
+    }
 
+    [Test]
+    public void TestArchiveReadsOnlyOperationsInTimeOrder()
+    {
+        var original = createScore();
+        original.Replay.Frames =
+        [
+            new BmsReplayFrame(0),
+            new BmsReplayFrame(1000, BmsAction.Key1),
+            new BmsReplayFrame(2500, BmsAction.Key1),
+            new BmsReplayFrame(1500, BmsAction.Key1),
+            new BmsReplayFrame(2000, BmsAction.Key1),
+            new BmsReplayFrame(3000),
+        ];
+        var restored = BmsTestReplayArchive.RoundTrip(original);
+        Assert.That(restored.Replay.Frames.Select(frame => frame.Time), Is.EqualTo(new[] { 0, 1000, 3000 }));
+    }
+
+    [Test]
+    public void TestAlgorithmAndCourseGaugeSurviveScoreClone([Values] BmsJudgementAlgorithm algorithm)
+    {
+        var original = createScore();
+        original.Replay.Frames = [new BmsReplayFrame(1234.125, BmsAction.Key1) { Algorithm = algorithm }, new BmsReplayFrame(5000.375, BmsAction.Key1)];
+        original.ScoreInfo.Ruleset = new BmsRuleset().RulesetInfo;
+        original.ScoreInfo.Mods = [new BmsModClassGauge
+        {
+            GaugeProfileFamily = { Value = BmsGaugeProfileFamily.Lr2 },
+            InitialHealth = { Value = 0.4 },
+        }];
+        var restored = BmsTestReplayArchive.RoundTrip(original.DeepClone());
+        Assert.That(restored.Replay.Frames[0].IsEquivalentTo(original.Replay.Frames[0]), Is.True);
+        Assert.That(restored.Replay.Frames[^1].Time, Is.EqualTo(5000.375));
+        var gauge = restored.ScoreInfo.Mods.OfType<BmsModClassGauge>().Single();
         Assert.Multiple(() =>
         {
-            Assert.That(restored.Replay.Frames.Single().IsEquivalentTo(original.Replay.Frames.Single()), Is.True);
-            Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
-            Assert.That(BmsJudgementEventStore.TryGet(restored.ScoreInfo, out _), Is.False);
-            Assert.That(BmsScoreGaugeHistoryStore.TryGet(restored.ScoreInfo, out _), Is.False);
+            Assert.That(BmsReplayFrame.GetAlgorithm(restored.Replay), Is.EqualTo(algorithm));
+            Assert.That(gauge.GaugeProfileFamily.Value, Is.EqualTo(BmsGaugeProfileFamily.Lr2));
+            Assert.That(gauge.InitialHealth.Value, Is.EqualTo(0.4));
         });
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void TestMissingGaugeStatesRestoresEmptyStates(bool explicitNull)
+    [Test]
+    public void TestAllActionsAndSameTimestampSequenceRoundTrip()
     {
         var original = createScore();
-        BmsScoreGaugeHistoryStore.Set(original.ScoreInfo,
-        [new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal, [new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.42, false)])]);
-
-        var restored = BmsTestReplayArchive.RoundTrip(original, json =>
+        original.Replay.Frames = [new BmsReplayFrame(-1234.375)];
+        foreach (var action in Enum.GetValues<BmsAction>())
         {
-            var parsed = JObject.Parse(json);
-            var data = (JObject)parsed["gauge_history"]![0]!;
-            if (explicitNull)
-                data["states"] = JValue.CreateNull();
-            else
-                data.Property("states")!.Remove();
-            return parsed.ToString();
-        });
-
-        Assert.That(BmsScoreGaugeHistoryStore.TryGet(restored.ScoreInfo, out var history), Is.True);
-        Assert.That(history.Single().Time, Is.EqualTo(1000));
-        Assert.That(history.Single().ActiveGaugeType, Is.EqualTo(BmsGaugeType.Normal));
-        Assert.That(history.Single().States, Is.Empty);
-        Assert.That(restored.Replay.Frames.Single().Time, Is.EqualTo(1234));
+            original.Replay.Frames.Add(new BmsReplayFrame(1000.125, action));
+            original.Replay.Frames.Add(new BmsReplayFrame(1000.125));
+        }
+        var restored = BmsTestReplayArchive.RoundTrip(original);
+        Assert.That(restored.Replay.Frames, Has.Count.EqualTo(original.Replay.Frames.Count));
+        Assert.That(restored.Replay.Frames.Zip(original.Replay.Frames).All(pair => pair.First.IsEquivalentTo(pair.Second)), Is.True);
     }
 
-    [Test]
-    public void TestNullFramesAndGaugeEntriesPreserveValidEntries()
+    [TestCase(1, false)]
+    [TestCase(2, true)]
+    [TestCase(3, true)]
+    [TestCase(4, true)]
+    public void TestOldArchivesImportOnlyInputs(int version, bool compressed)
     {
-        var original = createScore();
-        var state = new BmsGaugeStateSnapshot(BmsGaugeType.Normal, 0.42, false);
-        BmsScoreGaugeHistoryStore.Set(original.ScoreInfo, [new BmsGaugeHistoryEvent(1000, BmsGaugeType.Normal, [state])]);
-
-        var restored = BmsTestReplayArchive.RoundTrip(original, json =>
+        var payload = new JObject
         {
-            var parsed = JObject.Parse(json);
-            ((JArray)parsed["frames"]!).Add(JValue.CreateNull());
-            ((JArray)parsed["gauge_history"]![0]!["states"]!).Add(JValue.CreateNull());
-            ((JArray)parsed["gauge_history"]!).Add(JValue.CreateNull());
-            return parsed.ToString();
-        });
-
-        Assert.That(restored.Replay.Frames.Single().IsEquivalentTo(original.Replay.Frames.Single()), Is.True);
-        Assert.That(BmsScoreGaugeHistoryStore.TryGet(restored.ScoreInfo, out var history), Is.True);
-        Assert.That(history.Single().States, Is.EqualTo([state]));
-    }
-
-    [Test]
-    public void TestJudgementLedgerRoundTripsThroughArchive()
-    {
-        var original = createScore();
-        BmsJudgementEventStore.Set(original.ScoreInfo,
-        [
-            new BmsJudgementEvent(
-                BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 2 }),
-                HitResult.Great,
-                [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 988, 1, HitResult.Great)]),
-            new BmsJudgementEvent(
-                BmsJudgementSource.From(new BmsLongNote { StartTime = 2000, Duration = 500, Column = 4 }),
-                HitResult.Ok,
-                [
-                    new BmsTimingObservation(BmsTimingObservationKind.LongNoteHead, 2000, 2034, 1.25, HitResult.Great),
-                    new BmsTimingObservation(BmsTimingObservationKind.LongNoteTail, 2500, 2519, 1.25, HitResult.Ok),
-                ]),
-            new BmsJudgementEvent(
-                BmsJudgementSource.From(new BmsLandmine { StartTime = 3000, Column = 1, LandmineDamagePercent = 50 }),
-                HitResult.Meh,
-                [new BmsTimingObservation(BmsTimingObservationKind.Note, 3000, 3000, 1, HitResult.Meh)]),
-            new BmsJudgementEvent(
-                new BmsJudgementSource(3600, 3, BmsJudgementSourceKind.EmptyPoor),
-                HitResult.Miss,
-                [new BmsTimingObservation(BmsTimingObservationKind.Note, 4000, 3600, 1, HitResult.Miss)]),
-        ]);
-
-        using var archive = BmsReplayArchive.Create(original);
-        var replayFile = new RealmFile { Hash = "abcdef" };
-        var readTarget = new ScoreInfo();
-        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
-
-        var restored = BmsReplayArchive.ReadScore(
-            readTarget,
-            new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
-
-        Assert.That(BmsJudgementEventStore.TryGet(restored.ScoreInfo, out var restoredEvents), Is.True);
-        Assert.That(restoredEvents, Has.Count.EqualTo(4));
-        Assert.That(restoredEvents[1].Source.Kind, Is.EqualTo(BmsJudgementSourceKind.LongNote));
-        Assert.That(restoredEvents[1].Result, Is.EqualTo(HitResult.Ok));
-        Assert.That(restoredEvents[1].TimingObservations.Select(o => o.Kind),
-            Is.EqualTo([BmsTimingObservationKind.LongNoteHead, BmsTimingObservationKind.LongNoteTail]));
-
-        Assert.That(restored.ScoreInfo.HitEvents, Has.Count.EqualTo(5));
-        assertHitEvent(restored.ScoreInfo.HitEvents[0], -12, 1, HitResult.Great, typeof(BmsNote), 1000, 2);
-        assertHitEvent(restored.ScoreInfo.HitEvents[1], 34, 1.25, HitResult.Great, typeof(BmsNote), 2000, 4);
-        assertHitEvent(restored.ScoreInfo.HitEvents[2], 19, 1.25, HitResult.Ok, typeof(BmsNote), 2500, 4);
-        assertHitEvent(restored.ScoreInfo.HitEvents[3], 0, 1, HitResult.Meh, typeof(BmsLandmine), 3000, 1);
-        Assert.That(restoredEvents[1].Source.Duration, Is.EqualTo(500));
-        Assert.That(restoredEvents[2].Source.LandmineDamagePercent, Is.EqualTo(50));
-
-        // Empty POOR: round-trips as a base HitObject (no BmsHitObject), preserving press time + Miss.
-        var emptyPoor = restored.ScoreInfo.HitEvents[4];
-        Assert.That(emptyPoor.TimeOffset, Is.EqualTo(-400));
-        Assert.That(emptyPoor.GameplayRate, Is.EqualTo(1));
-        Assert.That(emptyPoor.Result, Is.EqualTo(HitResult.Miss));
-        Assert.That(emptyPoor.HitObject, Is.TypeOf<HitObject>());
-        Assert.That(emptyPoor.HitObject, Is.Not.TypeOf<BmsHitObject>());
-        Assert.That(emptyPoor.HitObject.StartTime, Is.EqualTo(3600));
-    }
-
-    [Test]
-    public void TestOldJudgementSchemaRestoresFramesWithoutStatistics()
-    {
-        var original = createScore();
-        BmsJudgementEventStore.Set(original.ScoreInfo,
-        [
-            new BmsJudgementEvent(
-                BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 2 }),
-                HitResult.Great,
-                [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 988, 1, HitResult.Great)]),
-        ]);
-
-        using var archive = BmsReplayArchive.Create(original);
-        using var decompressed = new MemoryStream();
-        using (var gz = new GZipStream(new MemoryStream(archive.Get(BmsReplayArchive.FILENAME)), CompressionMode.Decompress))
-            gz.CopyTo(decompressed);
-
-        var currentJson = Encoding.UTF8.GetString(decompressed.ToArray());
-        var oldJson = currentJson.Replace("\"version\": 3", "\"version\": 2");
-        Assert.That(oldJson, Is.Not.EqualTo(currentJson));
-
-        var replayFile = new RealmFile { Hash = "abcdef" };
-        var readTarget = new ScoreInfo();
-        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
-
-        var restored = BmsReplayArchive.ReadScore(
-            readTarget,
-            new TestResourceStore(replayFile.GetStoragePath(), Encoding.UTF8.GetBytes(oldJson)));
-
+            ["version"] = version,
+            ["has_received_all_frames"] = true,
+            ["frames"] = new JArray
+            {
+                new JObject { ["time"] = -1000000000, ["actions"] = new JArray(), ["branch_decisions"] = "2:1" },
+                new JObject
+                {
+                    ["time"] = 0, ["actions"] = new JArray(), ["judgement_algorithm"] = 1,
+                    ["header"] = "unused old statistics header",
+                    ["includes_generated_inputs"] = true, ["course_gauge_mode"] = true,
+                    ["gauge_profile_family"] = 1, ["initial_gauge_states"] = new JArray(),
+                },
+                new JObject { ["time"] = 20, ["actions"] = new JArray() },
+                new JObject { ["time"] = 1000.125, ["actions"] = new JArray((int)BmsAction.Key1) },
+                new JObject { ["time"] = 1020.125, ["actions"] = new JArray((int)BmsAction.Key1) },
+                new JObject { ["time"] = 1020.125, ["actions"] = new JArray() },
+                new JObject { ["time"] = 1020.125, ["actions"] = new JArray((int)BmsAction.Key1) },
+            },
+            ["judgement_events"] = "deliberately not a judgement ledger",
+            ["gauge_history"] = "deliberately not a gauge history",
+            ["input_indices"] = "unused old compaction data",
+            ["frame_times"] = new JArray(0, 20, 1000.125, 1020.125, 1020.125, 1020.125, 5000.375),
+        };
+        var restored = read(encode(payload.ToString(), compressed));
+        var frames = restored.Replay.Frames.Cast<BmsReplayFrame>().ToArray();
         Assert.Multiple(() =>
         {
-            Assert.That(restored.Replay.Frames, Has.Count.EqualTo(1));
+            Assert.That(frames.Select(frame => frame.Time), Is.EqualTo(new[] { 0, 1000.125, 1020.125, 1020.125, 5000.375 }));
+            Assert.That(restored.ScoreInfo.Mods, Is.Empty);
+            Assert.That(BmsReplayFrame.GetAlgorithm(restored.Replay), Is.EqualTo(BmsJudgementAlgorithm.Combo));
             Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
-            Assert.That(BmsJudgementEventStore.TryGet(restored.ScoreInfo, out _), Is.False);
         });
     }
 
     [Test]
-    public void TestReadScoreClearsStaleGaugeHistoryWhenArchiveHasNone()
+    public void TestEmptyOldArchiveNeedsNoStatisticsOrFrameFields()
     {
-        using var archive = BmsReplayArchive.Create(createScore());
-        var replayFile = new RealmFile { Hash = "abcdef" };
-        var readTarget = new ScoreInfo();
-        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
-        BmsScoreGaugeHistoryStore.Set(readTarget,
-        [
-            new BmsGaugeHistoryEvent(1000, BmsGaugeType.Hard,
-            [
-                new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0, true),
-            ]),
-        ]);
-
-        var restored = BmsReplayArchive.ReadScore(
-            readTarget,
-            new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
-
-        Assert.That(BmsScoreGaugeHistoryStore.TryGet(restored.ScoreInfo, out var history) && history.Count > 0, Is.False);
-    }
-
-    [Test]
-    public void TestReadScoreHandlesArchiveMissingHitEventsField()
-    {
-        // A pre-HitEvents archive (e.g. released 2026.624.3) has no hit_events field at all.
-        // osu!'s DefaultValueHandling.IgnoreAndPopulate populates the absent field with the type
-        // default (null), so ReadScore must degrade to "no hit events" instead of throwing
-        // ArgumentNullException at .Select — this is the regression guard for that crash.
-        var legacyBytes = """{"version":1,"has_received_all_frames":true,"frames":[]}"""u8.ToArray();
-
-        var replayFile = new RealmFile { Hash = "abcdef" };
-        var readTarget = new ScoreInfo();
-        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
-
-        var restored = BmsReplayArchive.ReadScore(readTarget, new TestResourceStore(replayFile.GetStoragePath(), legacyBytes));
-
+        var restored = read("""{"version":1,"has_received_all_frames":true}"""u8.ToArray());
         Assert.That(restored.Replay.Frames, Is.Empty);
         Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
     }
 
     [Test]
-    public void TestReadScoreHandlesLegacyPlainJsonArchive()
+    public void TestBareInputArraysRemainReadable()
     {
-        // Stand in for an archive written before the gzip switch: decompress a current archive
-        // back to plain JSON, then hand that plain JSON to ReadScore. Verifies the gzip-magic
-        // fallback so old scores/replays load instead of crashing.
-        var original = createScore();
-        BmsJudgementEventStore.Set(original.ScoreInfo,
-        [
-            new BmsJudgementEvent(
-                BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 2 }),
-                HitResult.Great,
-                [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 988, 1, HitResult.Great)]),
-            new BmsJudgementEvent(
-                BmsJudgementSource.From(new HitObject { StartTime = 2000 }),
-                HitResult.Miss,
-                [new BmsTimingObservation(BmsTimingObservationKind.Note, 2000, 2000, 1, HitResult.Miss)]),
-        ]);
-
-        using var gzipArchive = BmsReplayArchive.Create(original);
-        var gzipBytes = gzipArchive.Get(BmsReplayArchive.FILENAME);
-
-        byte[] plainJsonBytes;
-        using (var decompressed = new MemoryStream())
-        {
-            using (var gz = new GZipStream(new MemoryStream(gzipBytes), CompressionMode.Decompress))
-                gz.CopyTo(decompressed);
-            plainJsonBytes = decompressed.ToArray();
-        }
-
-        // Plain JSON starts with '{', not the gzip magic 0x1f 0x8b — confirms the legacy path is taken.
-        Assert.That(plainJsonBytes[0], Is.EqualTo((byte)'{'));
-
-        var replayFile = new RealmFile { Hash = "abcdef" };
-        var readTarget = new ScoreInfo();
-        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
-
-        var restored = BmsReplayArchive.ReadScore(
-            readTarget,
-            new TestResourceStore(replayFile.GetStoragePath(), plainJsonBytes));
-
-        Assert.That(restored.Replay.Frames, Has.Count.EqualTo(1));
-        Assert.That(restored.ScoreInfo.HitEvents, Has.Count.EqualTo(2));
-        assertHitEvent(restored.ScoreInfo.HitEvents[0], -12, 1, HitResult.Great, typeof(BmsNote), 1000, 2);
-        Assert.That(restored.ScoreInfo.HitEvents[1].Result, Is.EqualTo(HitResult.Miss));
-        Assert.That(restored.ScoreInfo.HitEvents[1].HitObject, Is.TypeOf<HitObject>());
-        Assert.That(restored.ScoreInfo.HitEvents[1].HitObject.StartTime, Is.EqualTo(2000));
+        var restored = read("""[{"time":0,"actions":[]},{"time":1000,"actions":[0]}]"""u8.ToArray());
+        Assert.That(restored.Replay.Frames.Select(frame => frame.Time), Is.EqualTo(new double[] { 0, 1000 }));
+        Assert.That(BmsReplayFrame.GetAlgorithm(restored.Replay), Is.EqualTo(BmsJudgementAlgorithm.Combo));
     }
 
     [Test]
-    public void TestReplayArchiveUsesOsrFilename()
+    public void TestAlgorithmParticipatesInArchiveHash()
+    {
+        var original = createScore();
+        var hash = BmsReplayArchive.ComputeHash(original);
+        var first = (BmsReplayFrame)original.Replay.Frames[0];
+        original.Replay.Frames[0] = new BmsReplayFrame(first.Time, first.Actions.ToArray()) { Algorithm = BmsJudgementAlgorithm.Duration };
+        Assert.That(BmsReplayArchive.ComputeHash(original), Is.Not.EqualTo(hash));
+    }
+
+    [Test]
+    public void TestReadScoreClearsStaleDerivedTiming()
     {
         using var archive = BmsReplayArchive.Create(createScore());
-
-        Assert.That(archive.Filenames.Single(), Is.EqualTo("replay.osr"));
-    }
-
-    [Test]
-    public void TestReplayHashUsesArchiveContent()
-    {
-        var first = createScore();
-        var second = createScore();
-
-        Assert.That(BmsReplayArchive.ComputeHash(first), Is.Not.Empty);
-        Assert.That(BmsReplayArchive.ComputeHash(second), Is.EqualTo(BmsReplayArchive.ComputeHash(first)));
-
-        ((BmsReplayFrame)second.Replay.Frames.Single()).Actions.Add(BmsAction.Key2);
-
-        Assert.That(BmsReplayArchive.ComputeHash(second), Is.Not.EqualTo(BmsReplayArchive.ComputeHash(first)));
-    }
-
-    [Test]
-    public void TestReplayRoundTripsThroughArchive()
-    {
-        var original = new Score
+        var info = new ScoreInfo
         {
-            Replay =
-            {
-                Frames =
-                {
-                    new BmsReplayFrame(0) { IncludesGeneratedInputs = true },
-                    new BmsReplayFrame(1234, BmsAction.Key1, BmsAction.Scratch)
-                    {
-                        BranchDecisions = "2:1",
-                    },
-                },
-            },
+            HitEvents = [new HitEvent(0, 1, HitResult.Perfect, new BmsNote { StartTime = 1000 }, null, null)],
         };
-
-        using var archive = BmsReplayArchive.Create(original);
-        var replayFile = new RealmFile { Hash = "abcdef" };
-        var readTarget = new ScoreInfo();
-        readTarget.Files.Add(new RealmNamedFileUsage(replayFile, BmsReplayArchive.FILENAME));
-
-        var restored = BmsReplayArchive.ReadScore(
-            readTarget,
-            new TestResourceStore(replayFile.GetStoragePath(), archive.Get(BmsReplayArchive.FILENAME)));
-
-        var frames = restored.Replay.Frames.Cast<BmsReplayFrame>().ToArray();
-
-        Assert.That(frames, Has.Length.EqualTo(2));
-        Assert.That(frames[0].IsEquivalentTo(original.Replay.Frames[0]), Is.True);
-        Assert.That(frames[1].IsEquivalentTo(original.Replay.Frames[1]), Is.True);
+        var restored = read(archive.Get(BmsReplayArchive.FILENAME), info);
+        Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
     }
 
     [Test]
-    public void TestSidecarDataSurvivesScoreCloneBeforeArchiveCreation()
+    public void TestArchiveHashIsItsContentHash()
     {
-        var ruleset = new BmsRuleset();
         var original = createScore();
-        original.ScoreInfo.Ruleset = ruleset.RulesetInfo;
-        var judgementEvent = new BmsJudgementEvent(
-            BmsJudgementSource.From(new BmsNote { StartTime = 1000, Column = 2 }),
-            HitResult.Great,
-            [new BmsTimingObservation(BmsTimingObservationKind.Note, 1000, 988, 1, HitResult.Great)]);
-        var gaugeEvent = new BmsGaugeHistoryEvent(1000, BmsGaugeType.Hard,
-        [
-            new BmsGaugeStateSnapshot(BmsGaugeType.Hard, 0.75, false),
-        ]);
-        BmsJudgementEventStore.Set(original.ScoreInfo, [judgementEvent]);
-        BmsScoreGaugeHistoryStore.Set(original.ScoreInfo, [gaugeEvent]);
+        using var archive = BmsReplayArchive.Create(original, out var hash);
+        var content = archive.Get(BmsReplayArchive.FILENAME);
+        Assert.That(hash, Is.EqualTo(Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant()));
+        Assert.That(BmsReplayArchive.ComputeHash(original), Is.EqualTo(hash));
+        ((BmsReplayFrame)original.Replay.Frames[0]).Actions.Add(BmsAction.Key2);
+        Assert.That(BmsReplayArchive.ComputeHash(original), Is.Not.EqualTo(hash));
+        Assert.That(archive.Filenames.Single(), Is.EqualTo(BmsReplayArchive.FILENAME));
+        Assert.That(content.Take(2), Is.EqualTo(new byte[] { 0x1f, 0x8b }));
+    }
 
-        var clone = original.DeepClone();
+    private static Score read(byte[] content, ScoreInfo? info = null)
+    {
+        var file = new RealmFile { Hash = "abcdef" };
+        info ??= new ScoreInfo();
+        info.Files.Add(new RealmNamedFileUsage(file, BmsReplayArchive.FILENAME));
+        using var store = new TestResourceStore(file.GetStoragePath(), content);
+        return BmsReplayArchive.ReadScore(info, store);
+    }
 
-        Assert.Multiple(() =>
+    private static byte[] encode(string json, bool compressed)
+    {
+        var bytes = Encoding.UTF8.GetBytes(json);
+        if (!compressed)
+            return bytes;
+        using var stream = new MemoryStream();
+        using (var gzip = new GZipStream(stream, CompressionLevel.Optimal, leaveOpen: true))
+            gzip.Write(bytes);
+        return stream.ToArray();
+    }
+
+    private sealed class TestResourceStore(string filename, byte[] content) : IResourceStore<byte[]>
+    {
+        public byte[] Get(string name) => name == filename ? content : null!;
+        public Stream GetStream(string name) => new MemoryStream(Get(name));
+        public Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult(Get(name));
+        public IEnumerable<string> GetAvailableResources() => [filename];
+        public void Dispose()
         {
-            Assert.That(BmsJudgementEventStore.TryGet(clone.ScoreInfo, out var judgementEvents), Is.True);
-            Assert.That(judgementEvents, Is.EqualTo([judgementEvent]));
-            Assert.That(BmsScoreGaugeHistoryStore.TryGet(clone.ScoreInfo, out var gaugeHistory), Is.True);
-            Assert.That(gaugeHistory, Has.Count.EqualTo(1));
-            Assert.That(gaugeHistory[0].Time, Is.EqualTo(gaugeEvent.Time));
-            Assert.That(gaugeHistory[0].ActiveGaugeType, Is.EqualTo(gaugeEvent.ActiveGaugeType));
-            Assert.That(gaugeHistory[0].States, Is.EqualTo(gaugeEvent.States));
-        });
+        }
     }
 }

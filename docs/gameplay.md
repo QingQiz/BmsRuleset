@@ -95,7 +95,8 @@ before the tail window gives POOR. For an ordinary **LN long scratch**, hold the
 an early release of that direction judges the drop.
 
 HCN recovery and damage build up over time, with held and released time cancelling each other. During a steady hold
-or release, gauge changes start after more than 200 ms and continue roughly every 200 ms. A tail judged GOOD or
+or release, gauge changes start after more than 200 ms and continue every 200 ms. Delayed updates apply all changes
+due during the elapsed time. A tail judged GOOD or
 better keeps recovery active through the remaining body. After a missed head, holding the body can still recover gauge.
 After a successful early tail judgement, the remaining HCN body stays anchored at the judgement line and shrinks
 until the tail reaches it, then disappears.
@@ -105,13 +106,8 @@ period to continue the hold. Once the period expires, the release is judged usin
 
 ### Pausing and Resuming
 
-Pausing completes the tail judgement of each started long note whose tail is still pending. The pause time acts as
-the release time, so pausing early can give BAD or POOR. A PMS release already in its grace period uses the original
-release time. An HCN completed by pausing ends its body gauge changes at that point.
-
-Resuming gives up to **five seconds of lead-in**, while retaining the judgements already earned. Continue with the
-remaining notes when play reaches the pause point. Empty POOR penalties also resume at that point, so you can
-warm up your keys during the lead-in. The saved score receives the **Paused (PA)** marker.
+Resuming shows the same countdown as osu!mania, then continues from the pause point. Long notes retain their
+state while paused; hold the appropriate keys when play resumes. The saved score receives the **Paused (PA)** marker.
 
 ## Gauge
 

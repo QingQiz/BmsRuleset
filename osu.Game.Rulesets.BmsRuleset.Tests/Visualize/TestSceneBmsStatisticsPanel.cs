@@ -265,6 +265,22 @@ public partial class TestSceneBmsStatisticsPanel : OsuTestScene
         });
     }
 
+    [Test]
+    public void TestOverviewUsesLoadedTimingWithoutWritingTheScore()
+    {
+        DeferredStatisticsPanel panel = null!;
+        var score = new ScoreInfo { Ruleset = new BmsRuleset().RulesetInfo };
+        AddStep("load score with no timing data", () => Child = panel = new DeferredStatisticsPanel(true)
+        {
+            RelativeSizeAxes = Axes.Both,
+            Score = { Value = score },
+        });
+        AddUntilStep("statistics requested", () => panel.Requests.Count == 1);
+        AddStep("finish statistics calculation", () => panel.Requests[0].Completion.SetResult(data(3)));
+        AddUntilStep("overview displays calculated timing", () => panel.ChildrenOfType<BmsResultFastSlow>().Single().SlowCount == 3);
+        AddAssert("score retains its original timing data", () => score.HitEvents, () => Is.Empty);
+    }
+
     private static Container contentFor(BmsStatisticsPanel panel) =>
         panel.ChildrenOfType<Container>().Single(container => container.Name == "Result statistics content");
 
@@ -306,31 +322,34 @@ public partial class TestSceneBmsStatisticsPanel : OsuTestScene
 
         protected override bool StartHidden => false;
 
-        internal DeferredStatisticsPanel()
-            : base(false)
+        internal DeferredStatisticsPanel(bool showOverview = false)
+            : base(showOverview)
         {
             Show();
         }
 
-        protected override Task RestoreReplayDataAsync(ScoreInfo score, CancellationToken cancellationToken) => Task.CompletedTask;
-
-        protected override Task<BmsResultStatisticsData?> LoadStatisticsAsync(ScoreInfo score, CancellationToken cancellationToken)
+        protected override async Task<BmsResultStatisticsData?> LoadStatisticsAsync(ScoreInfo score, CancellationToken cancellationToken)
         {
+            await LoadReplayAsync(score, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             var completion = new TaskCompletionSource<BmsResultStatisticsData?>(TaskCreationOptions.RunContinuationsAsynchronously);
             Requests.Add((completion, cancellationToken));
-            return completion.Task;
+            return await completion.Task;
         }
+
+        protected override Task<Score> LoadReplayAsync(ScoreInfo score, CancellationToken cancellationToken) => Task.FromResult(new Score { ScoreInfo = score });
     }
 
     private partial class DeferredReplayStatisticsPanel : DeferredStatisticsPanel
     {
         internal readonly List<(TaskCompletionSource Completion, CancellationToken Cancellation)> Replays = [];
 
-        protected override Task RestoreReplayDataAsync(ScoreInfo score, CancellationToken cancellationToken)
+        protected override async Task<Score> LoadReplayAsync(ScoreInfo score, CancellationToken cancellationToken)
         {
             var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             Replays.Add((completion, cancellationToken));
-            return completion.Task;
+            await completion.Task;
+            return new Score { ScoreInfo = score };
         }
     }
 }

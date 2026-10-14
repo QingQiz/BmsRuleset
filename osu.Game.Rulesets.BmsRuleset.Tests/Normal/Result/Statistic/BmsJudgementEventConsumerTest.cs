@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Result.Statistic;
 public class BmsJudgementEventConsumerTest
 {
 
-    private static ScoreInfo createStandardLongNoteScore(HitResult result)
+    private static (ScoreInfo Score, BmsJudgementEvent[] Events) createStandardLongNoteScore(HitResult result)
     {
         var longNote = new BmsLongNote { StartTime = 1000, Duration = 500, Column = 1 };
         BmsJudgementEvent[] events =
@@ -29,8 +29,7 @@ public class BmsJudgementEventConsumerTest
         {
             Passed = true, HitEvents = BmsJudgementEventProjection.CreateTimingHitEvents(events)
         };
-        BmsJudgementEventStore.Set(score, events);
-        return score;
+        return (score, events);
     }
 
     private static BmsBeatmap createBeatmap() => new()
@@ -54,7 +53,8 @@ public class BmsJudgementEventConsumerTest
             HitEvents = [new HitEvent(19, 1, HitResult.Ok, new BmsLongNote { StartTime = 1000, Duration = 500 }, null, null)],
         };
 
-        var canonicalSeries = BmsGaugeHistoryGraph.CreateSeries(canonicalScore, createBeatmap()).Single();
+        var canonicalSeries = BmsGaugeHistoryGraph.CreateSeries(canonicalScore.Score, createBeatmap(),
+            BmsJudgementEventProjection.CreateScoringHitEvents(canonicalScore.Events), []).Single();
         var singleEventSeries = BmsGaugeHistoryGraph.CreateSeries(singleEventScore, createBeatmap()).Single();
 
         Assert.That(canonicalSeries.Points.Last().Health, Is.EqualTo(singleEventSeries.Points.Last().Health));
@@ -64,7 +64,8 @@ public class BmsJudgementEventConsumerTest
     public void TestTimelineUsesCanonicalResultAndBothTimingObservations()
     {
         var score = createStandardLongNoteScore(HitResult.Great);
-        var data = BmsTimelineStatistic.CreateData(score, createBeatmap());
+        var data = BmsTimelineStatistic.CreateData(createBeatmap(), score.Score.HitEvents,
+            BmsJudgementEventProjection.CreateScoringHitEvents(score.Events));
 
         Assert.Multiple(() =>
         {
