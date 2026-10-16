@@ -42,6 +42,8 @@ public class BmsGameplayDiagnosticOptionsTest
         Assert.That(options.OmitSnapshots, Is.False);
         Assert.That(BmsGameplayDiagnosticOptions.Parse([.. required, "--omit-snapshots"]).OmitSnapshots, Is.True);
         Assert.That(options.OmitAudioProbe, Is.False);
+        Assert.That(options.InputOffsetMilliseconds, Is.Zero);
+        Assert.That(BmsGameplayDiagnosticOptions.Parse([.. required, "--input-offset-ms", "5"]).InputOffsetMilliseconds, Is.EqualTo(5));
         Assert.That(BmsGameplayDiagnosticOptions.Parse([.. required, "--omit-audio-probe"]).OmitAudioProbe, Is.True);
         var capture = BmsGameplayDiagnosticOptions.Parse([.. required, "--capture-audio"]);
         Assert.That(capture.CaptureAudio, Is.True);
@@ -113,6 +115,8 @@ public class BmsGameplayDiagnosticOptionsTest
     [TestCase("--start", "-1")]
     [TestCase("--duration", "2")]
     [TestCase("--scroll-speed", "Infinity")]
+    [TestCase("--input-offset-ms", "NaN")]
+    [TestCase("--input-offset-ms", "501")]
     [TestCase("--note-height-scale", "NaN")]
     [TestCase("--note-height-scale", "Infinity")]
     [TestCase("--note-height-scale", "0.009")]

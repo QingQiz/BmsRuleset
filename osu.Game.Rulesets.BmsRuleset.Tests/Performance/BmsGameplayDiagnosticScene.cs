@@ -51,7 +51,7 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
 
     public double ChartTime => Player?.GameplayClockContainer?.CurrentTime ?? -1;
 
-    public double SimulationTime => Player?.DrawableRuleset?.FrameStableClock.CurrentTime ?? -1;
+    public double SimulationTime => Player?.DrawableRuleset?.FrameStableClock?.CurrentTime ?? -1;
 
     public double EndTime { get; private set; }
 
@@ -66,7 +66,12 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
     protected override bool UseFreshStoragePerRun => true;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
-        => CreateBmsPlayer(beatmap => new BmsAutoGenerator(beatmap).Generate().Frames.ToList(), options.Skin);
+        => CreateBmsPlayer(beatmap =>
+        {
+            var replay = new BmsAutoGenerator(beatmap).Generate();
+            foreach (var frame in replay.Frames) frame.Time += options.InputOffsetMilliseconds;
+            return replay.Frames;
+        }, options.Skin);
 
     protected override WorkingBeatmap CreateWorkingBeatmap(IBeatmap beatmap, Storyboard storyboard = null!)
         => new BmsWorkingBeatmap(base.CreateWorkingBeatmap(beatmap, storyboard), Audio);
@@ -257,11 +262,23 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
             SimulationTime,
             Playfield.ScrollSpeed,
             ReferenceBpm = Chart.TimingMap?.ScrollReferenceBpm,
+            SpeedFactor = Chart.TimingMap?.GetSpeedFactorAtTime(ChartTime),
+            ScrollFactor = Chart.TimingMap?.GetScrollFactorAtTime(ChartTime),
             Alive = objects.Length,
             Present = objects.Count(p => p.Value.IsPresent),
             NotPresent = objects.Count(p => !p.Value.IsPresent),
-            AliveInvisibleNotes = objects.Count(p => p.Key.HitObject is BmsInvisibleNote),
-            PresentInvisibleNotes = objects.Count(p => p.Key.HitObject is BmsInvisibleNote && p.Value.IsPresent),
+            InvisibleNoteMarkers = Playfield.Stage.Columns.Cast<osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components.BmsColumn>()
+                .Sum(c => c.InvisibleNoteLayer is { IsPresent: true } layer ? layer.Markers.Count : 0),
+            AliveNotes = objects.Count(p => p.Key.HitObject is BmsNote),
+            AliveMines = objects.Count(p => p.Key.HitObject is BmsLandmine),
+            AliveLongNotes = objects.Count(p => p.Key.HitObject is BmsLongNote),
+            PresentNotes = objects.Count(p => p.Key.HitObject is BmsNote && p.Value.IsPresent),
+            PresentMines = objects.Count(p => p.Key.HitObject is BmsLandmine && p.Value.IsPresent),
+            PresentLongNotes = objects.Count(p => p.Key.HitObject is BmsLongNote && p.Value.IsPresent),
+            AliveMineStartMin = objects.Where(p => p.Key.HitObject is BmsLandmine).Select(p => p.Key.HitObject.StartTime).DefaultIfEmpty().Min(),
+            AliveMineStartMax = objects.Where(p => p.Key.HitObject is BmsLandmine).Select(p => p.Key.HitObject.StartTime).DefaultIfEmpty().Max(),
+            AliveMineLifetimeStartMin = objects.Where(p => p.Key.HitObject is BmsLandmine).Select(p => p.Key.LifetimeStart).DefaultIfEmpty().Min(),
+            AliveMineLifetimeStartMax = objects.Where(p => p.Key.HitObject is BmsLandmine).Select(p => p.Key.LifetimeStart).DefaultIfEmpty().Max(),
             AudioVoices = BmsAudioTestAccess.GetActiveVoiceCount(((BmsDrawableRuleset)Player.DrawableRuleset).SamplePlayback),
             FutureSeconds = objects.GroupBy(p => (int)((p.Key.HitObject.StartTime - ChartTime) / 1000))
                 .OrderBy(g => g.Key).Select(g => new { SecondsAhead = g.Key, Count = g.Count() }).ToArray(),

@@ -27,6 +27,8 @@ internal sealed class BmsGameplayDiagnosticOptions
 
     public double ScrollSpeed { get; private set; } = 8;
 
+    public double InputOffsetMilliseconds { get; private set; }
+
     public double NoteHeightScale { get; private set; } = 1;
 
     public bool SoftConstant { get; private set; }
@@ -133,6 +135,8 @@ internal sealed class BmsGameplayDiagnosticOptions
                 case "--warmup-seconds": result.WarmupSeconds = number(value, 0, 120); break;
 
                 case "--scroll-speed": result.ScrollSpeed = number(value, 1, 50); break;
+
+                case "--input-offset-ms": result.InputOffsetMilliseconds = number(value, -500, 500); break;
 
                 case "--note-height-scale": result.NoteHeightScale = number(value, 0.01, 5); break;
 

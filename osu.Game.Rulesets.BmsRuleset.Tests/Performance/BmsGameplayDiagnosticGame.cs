@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 
 internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions options) : OsuGameBase
 {
-    private readonly List<Frame> frames = new(300_000);
+    private readonly FrameBuffer frames = new();
     private readonly Stopwatch timeout = Stopwatch.StartNew();
     private BmsGameplayDiagnosticScene scene = null!;
     private long previousFrame;
@@ -50,6 +50,7 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
     private BmsThreadCpuCounter.CycleSnapshot? initialDrawThreadCycles;
     private Func<ulong>? getDrawFrameIndex;
     private ulong? initialDrawFrameIndex;
+    private ulong? initialRenderFrameIndex;
     private BmsGameplayAudioProbe.Totals? initialAudio;
 
     public int ResultCode { get; private set; } = 1;
@@ -60,10 +61,11 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
     // downloads and decompresses online.db in each fresh report directory during sampling.
     protected override IBeatmapUpdater CreateBeatmapUpdater() => new DiagnosticBeatmapUpdater();
 
-    private readonly record struct Frame(double ChartMs, double SimulationMs, double UpdateMs, double IntervalMs, double GcPauseMs, long AllocatedBytes, int AliveObjects, bool AudioBlocked, bool AudioPaused);
+    internal readonly record struct Frame(double ChartMs, double SimulationMs, double UpdateMs, double IntervalMs, double GcPauseMs, long AllocatedBytes, int AliveObjects, bool AudioBlocked, bool AudioPaused);
 
     private readonly record struct FramePacing(
         bool WindowActive,
+        WindowState? WindowState,
         double UpdateClockHz,
         bool UpdateThrottling,
         double? DrawClockHz,
@@ -108,6 +110,8 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             getVerticalSync = typeof(IRenderer).GetProperty("VerticalSync", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?
                 .GetGetMethod(true)?.CreateDelegate<Func<bool>>(Host.Renderer);
         configureFramePacing();
+        if (!options.Headless)
+            Host.InputThread.Scheduler.Add(() => Host.Window.Raise());
         if (Host.DrawThread is { } drawThread)
         {
             getDrawFrameIndex = typeof(GameThread).GetProperty("FrameIndex", BindingFlags.Instance | BindingFlags.NonPublic)?
@@ -164,7 +168,7 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
         if (!scene.Ready || scene.ChartTime < options.Start * 1000)
             return updated;
 
-        var pacing = new FramePacing(Host.IsActive.Value, Host.UpdateThread.Clock.MaximumUpdateHz, Host.UpdateThread.Clock.Throttling,
+        var pacing = new FramePacing(Host.IsActive.Value, Host.Window?.WindowState, Host.UpdateThread.Clock.MaximumUpdateHz, Host.UpdateThread.Clock.Throttling,
             Host.DrawThread?.Clock.MaximumUpdateHz, Host.DrawThread?.Clock.Throttling, getVerticalSync?.Invoke());
         if (previousPacing != pacing)
         {
@@ -186,6 +190,7 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             initialDrawThreadCpu = drawCounter?.Read();
             initialDrawThreadCycles = drawCounter?.ReadCycles();
             initialDrawFrameIndex = getDrawFrameIndex?.Invoke();
+            initialRenderFrameIndex = options.Headless ? null : Host.Renderer.FrameIndex;
             initialAudio = audioProbe?.ReadTotals();
             boundarySetupMilliseconds = Stopwatch.GetElapsedTime(boundaryStart).TotalMilliseconds;
             if (options.OmitSnapshots)
@@ -247,6 +252,9 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             var drawThreadCycles = BmsThreadCpuCounter.ElapsedCycles(initialDrawThreadCycles, drawCounter?.ReadCycles());
             var drawFrameIndex = getDrawFrameIndex?.Invoke();
             var drawThreadFrames = initialDrawFrameIndex is { } first && drawFrameIndex is { } last && last >= first ? (ulong?)(last - first) : null;
+            var renderFrameIndex = Host.Renderer.FrameIndex;
+            var renderFramesBegun = initialRenderFrameIndex is { } firstRender && renderFrameIndex >= firstRender
+                ? (ulong?)(renderFrameIndex - firstRender) : null;
             var audioDuringMeasurement = initialAudio is { } start ? audioProbe?.ReadTotals().Since(start) : null;
             Directory.CreateDirectory(options.Output);
             scene?.SaveAudioCapture();
@@ -290,6 +298,7 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
                 DrawThreadCpuMilliseconds = drawThreadCpuMilliseconds,
                 DrawThreadCycles = drawThreadCycles,
                 DrawThreadFrames = drawThreadFrames,
+                RenderFramesBegun = renderFramesBegun,
                 LoadMs = scene?.LoadMilliseconds,
                 SeekMs = scene?.SeekMilliseconds,
                 StartupMaxUpdateMs = startupMaxUpdateMs,
@@ -319,6 +328,7 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
     protected override void Dispose(bool isDisposing)
     {
         base.Dispose(isDisposing);
+        frames.Dispose();
         Volatile.Read(ref drawThreadCounter)?.Dispose();
         audioProbe?.Dispose();
     }
