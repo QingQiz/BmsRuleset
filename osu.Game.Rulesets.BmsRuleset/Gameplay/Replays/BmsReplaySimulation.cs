@@ -27,7 +27,8 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 internal static class BmsReplaySimulation
 {
     internal static (IReadOnlyList<BmsJudgementEvent> Judgements, IReadOnlyList<BmsGaugeHistoryEvent> Gauges) Run(
-        BmsBeatmap beatmap, Replay replay, ScoreInfo source, CancellationToken cancellationToken = default)
+        BmsBeatmap beatmap, Replay replay, ScoreInfo source, CancellationToken cancellationToken = default,
+        IReadOnlyList<BmsGaugeStateSnapshot>? courseGaugeStates = null, BmsGaugeProfileFamily? courseGaugeProfileFamily = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var frames = replay.Frames.OfType<BmsReplayFrame>().OrderBy(frame => frame.Time).ToArray();
@@ -44,7 +45,13 @@ internal static class BmsReplaySimulation
         score.ApplyBeatmap(beatmap);
         health.ApplyBeatmap(beatmap);
         var algorithm = BmsReplayFrame.GetAlgorithm(replay);
-        if (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge)
+        if (courseGaugeStates != null)
+        {
+            health.ConfigureGaugeContext(true, courseGaugeProfileFamily);
+            health.SetGaugeTypes(courseGaugeStates.Select(state => state.GaugeType), replaceExisting: true,
+                profileFamilyOverride: courseGaugeProfileFamily, initialStates: courseGaugeStates);
+        }
+        else if (mods.OfType<BmsModAutoGauge>().FirstOrDefault() is { } autoGauge)
             autoGauge.ApplyToHealthProcessor(health);
         else
             foreach (var mod in mods.OfType<IApplicableToHealthProcessor>())

@@ -24,16 +24,19 @@ internal sealed record BmsResultStatisticsData(
 
     internal double GaugeDuration { get; init; }
 
+    internal IReadOnlyList<BmsGaugeStateSnapshot> EndingGaugeStates { get; init; } = [];
+
     internal static BmsResultStatisticsData Create(ScoreInfo score, IBeatmap beatmap, IReadOnlyList<BmsGaugeHistoryEvent>? gauges = null)
         => create(score, beatmap, score.HitEvents, score.HitEvents, gauges ?? []);
 
-    internal static BmsResultStatisticsData? Load(ScoreInfo score, IBeatmap beatmap, Replay replay, CancellationToken cancellationToken)
+    internal static BmsResultStatisticsData? Load(ScoreInfo score, IBeatmap beatmap, Replay replay, CancellationToken cancellationToken,
+                                                  IReadOnlyList<BmsGaugeStateSnapshot>? courseGaugeStates = null, BmsGaugeProfileFamily? courseGaugeProfileFamily = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (beatmap is not BmsBeatmap bmsBeatmap || !replay.HasReceivedAllFrames || replay.Frames.Count == 0)
             return score.HitEvents.Count > 0 ? Create(score, beatmap) : null;
 
-        var simulated = BmsReplaySimulation.Run(bmsBeatmap, replay, score, cancellationToken);
+        var simulated = BmsReplaySimulation.Run(bmsBeatmap, replay, score, cancellationToken, courseGaugeStates, courseGaugeProfileFamily);
         cancellationToken.ThrowIfCancellationRequested();
         return create(score, beatmap,
             BmsJudgementEventProjection.CreateTimingHitEvents(simulated.Judgements),
@@ -55,6 +58,7 @@ internal sealed record BmsResultStatisticsData(
         {
             HitEvents = hitEvents,
             GaugeDuration = Math.Max(timeline.Duration, gauges.Select(entry => entry.Time).DefaultIfEmpty(0).Max()),
+            EndingGaugeStates = gauges.LastOrDefault()?.States ?? [],
         };
     }
 

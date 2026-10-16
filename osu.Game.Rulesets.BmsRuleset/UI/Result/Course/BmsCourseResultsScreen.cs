@@ -12,6 +12,7 @@ using osu.Game.Graphics;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Course;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
+using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Result.Course;
 
@@ -43,7 +44,7 @@ internal partial class BmsCourseResultsScreen : BmsResultsScreen
         AllowRetry = false;
     }
 
-    protected override BmsStatisticsPanel CreateStatisticsPanel() => new(false)
+    protected override BmsStatisticsPanel CreateStatisticsPanel() => new CourseStageStatisticsPanel(this)
     {
         StatisticsLoaded = hitEvents => courseLayout.ShowScore(SelectedScore.Value, hitEvents),
     };
@@ -184,5 +185,11 @@ internal partial class BmsCourseResultsScreen : BmsResultsScreen
             courseLayout.ShowScore(attempt.Score);
             StatisticsPanel.Show();
         });
+    }
+
+    private partial class CourseStageStatisticsPanel(BmsCourseResultsScreen screen) : BmsStatisticsPanel(false)
+    {
+        protected override Task<BmsResultStatisticsData?> LoadStatisticsAsync(ScoreInfo score, CancellationToken cancellationToken)
+            => screen.courseLayout.AggregateStatistics.LoadStageStatisticsAsync(score, cancellationToken);
     }
 }
