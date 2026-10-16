@@ -15,10 +15,12 @@ using osu.Game.Extensions;
 using osu.Game.Models;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.Gauge;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
+using osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -54,13 +56,71 @@ public class BmsReplayArchiveTest
             Assert.Multiple(() =>
             {
                 Assert.That(frames, Has.Count.EqualTo(4));
-                Assert.That(payload.Properties().Select(property => property.Name), Is.EquivalentTo(new[] { "algorithm", "frames" }));
+                Assert.That(payload.Properties().Select(property => property.Name), Is.EquivalentTo(new[] { "version", "algorithm", "frames" }));
+                Assert.That(payload.Value<int>("version"), Is.EqualTo(BmsReplayArchive.CURRENT_VERSION));
                 Assert.That(frames.OfType<JObject>().All(frame => frame.Properties().All(property => property.Name is "time" or "actions")), Is.True);
             });
             return json;
         });
         Assert.That(restored.Replay.Frames.Select(frame => frame.Time), Is.EqualTo(new[] { 0, 900, 1020.125, 1020.125 }));
         Assert.That(restored.Replay.Frames.Cast<BmsReplayFrame>().Select(frame => frame.Actions.Count), Is.EqualTo(new[] { 0, 1, 0, 1 }));
+    }
+
+    [Test]
+    public void TestLegacyOffsetIsAppliedOnce([Values(0, 1, 2, 3, 4, 5)] int version)
+    {
+        const string chart = "#BPM 120\n#LNTYPE 1\n#00051:0101\n#00411:01";
+        var beatmap = BmsTestBeatmaps.CreateBeatmapFromChart(chart);
+        var offset = version < 5 ? 2000 : 0;
+        var original = new Score
+        {
+            Replay = { Frames =
+            [
+                new BmsReplayFrame(offset - 1000) { Version = version, Algorithm = BmsJudgementAlgorithm.Duration },
+                new BmsReplayFrame(offset, BmsAction.Key1),
+                new BmsReplayFrame(offset + 500, BmsAction.Key1),
+            ] },
+        };
+        var restored = BmsTestReplayArchive.RoundTrip(original.DeepClone(), json =>
+        {
+            var payload = JObject.Parse(json);
+            Assert.That(payload.Value<int>("version"), Is.EqualTo(version));
+            if (version == 0) payload.Remove("version");
+            return payload.ToString();
+        });
+        Assert.That(BmsReplayFrame.GetVersion(restored.Replay), Is.EqualTo(version));
+        var corrected = BmsTestReplayArchive.RoundTrip(restored, chart: chart);
+        var exported = BmsTestReplayArchive.RoundTrip(corrected.DeepClone(), chart: chart);
+        Assert.Multiple(() =>
+        {
+            Assert.That(corrected.Replay.Frames.Select(frame => frame.Time), Is.EqualTo(new[] { -1000d, 0, 500 }));
+            Assert.That(restored.Replay.Frames[0].Time, Is.EqualTo(offset - 1000));
+            Assert.That(BmsReplayFrame.GetVersion(exported.Replay), Is.EqualTo(5));
+            Assert.That(BmsReplayFrame.GetAlgorithm(exported.Replay), Is.EqualTo(BmsJudgementAlgorithm.Duration));
+            Assert.That(exported.Replay.Frames.Select(frame => frame.Time), Is.EqualTo(new[] { -1000d, 0, 500 }));
+        });
+
+        foreach (var note in beatmap.HitObjects)
+            note.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+        var result = BmsReplaySimulation.Run(beatmap, corrected.Replay, new ScoreInfo());
+        Assert.That(result.Judgements.SelectMany(entry => entry.TimingObservations).Last().ActualTime, Is.EqualTo(500));
+    }
+
+    [TestCase("#00011:01", 2000)]
+    [TestCase("#00011:0001", 1000)]
+    [TestCase("#00111:01", 0)]
+    [TestCase("#00211:01", 0)]
+    [TestCase("#000D1:01\n#00011:0001", 2000)]
+    [TestCase("#RANDOM 2\n#IF 1\n#00011:01\n#ENDIF\n#IF 2\n#00011:0001\n#ENDIF\n#ENDRANDOM", 1000)]
+    public void TestLegacyOffsetUsesNativeTimingBeforeMods(string objects, double expectedOffset)
+    {
+        var original = new Score
+        {
+            ScoreInfo = { Ruleset = new BmsRuleset().RulesetInfo, Mods = [new BmsModNoMine(), new BmsModBranchReplay { Decisions = { Value = "2:2" } }] },
+            Replay = { Frames = [new BmsReplayFrame(3000) { Version = 4 }] },
+        };
+        var restored = BmsTestReplayArchive.RoundTrip(original, chart: $"#BPM 120\n{objects}");
+        Assert.That(restored.Replay.Frames[0].Time, Is.EqualTo(3000 - expectedOffset));
     }
 
     [Test]
@@ -156,6 +216,7 @@ public class BmsReplayArchiveTest
             Assert.That(frames.Select(frame => frame.Time), Is.EqualTo(new[] { 0, 1000.125, 1020.125, 1020.125, 5000.375 }));
             Assert.That(restored.ScoreInfo.Mods, Is.Empty);
             Assert.That(BmsReplayFrame.GetAlgorithm(restored.Replay), Is.EqualTo(BmsJudgementAlgorithm.Combo));
+            Assert.That(BmsReplayFrame.GetVersion(restored.Replay), Is.EqualTo(version));
             Assert.That(restored.ScoreInfo.HitEvents, Is.Empty);
         });
     }
@@ -174,6 +235,7 @@ public class BmsReplayArchiveTest
         var restored = read("""[{"time":0,"actions":[]},{"time":1000,"actions":[0]}]"""u8.ToArray());
         Assert.That(restored.Replay.Frames.Select(frame => frame.Time), Is.EqualTo(new double[] { 0, 1000 }));
         Assert.That(BmsReplayFrame.GetAlgorithm(restored.Replay), Is.EqualTo(BmsJudgementAlgorithm.Combo));
+        Assert.That(BmsReplayFrame.GetVersion(restored.Replay), Is.Zero);
     }
 
     [Test]

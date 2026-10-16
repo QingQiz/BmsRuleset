@@ -1774,7 +1774,7 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestMinimumLeadInShiftsChartTimelineAndIsPreservedDuringConversion()
+    public void TestConversionPreservesZeroTimeChartTimeline()
     {
         var decoded = decode("""
                              #BPM 120
@@ -1795,14 +1795,14 @@ public class BmsBeatmapDecoderTest
         {
             Assert.That(decoded.HitObjects.Single().StartTime, Is.Zero);
             Assert.That(decodedBms.BackgroundSampleEvents.Single().Time, Is.Zero);
-            Assert.That(converted.HitObjects.Single().StartTime, Is.EqualTo(2000));
-            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(2000));
-            Assert.That(converted.TimingMap.BpmEvents[0].Time, Is.EqualTo(2000));
-            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(2000));
-            Assert.That(converted.LongNoteTailSampleEvents.Single().Time, Is.EqualTo(3000));
-            Assert.That(converted.TextEvents.TextEvents.Single().Time, Is.EqualTo(2000));
-            Assert.That(converted.Bga.Events.Single().Time, Is.EqualTo(2000));
-            Assert.That(converted.Bga.OpacityEvents.Single().Time, Is.EqualTo(2000));
+            Assert.That(converted.HitObjects.Single().StartTime, Is.Zero);
+            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.Zero);
+            Assert.That(converted.TimingMap.BpmEvents[0].Time, Is.Zero);
+            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.Zero);
+            Assert.That(converted.LongNoteTailSampleEvents.Single().Time, Is.EqualTo(1000));
+            Assert.That(converted.TextEvents.TextEvents.Single().Time, Is.Zero);
+            Assert.That(converted.Bga.Events.Single().Time, Is.Zero);
+            Assert.That(converted.Bga.OpacityEvents.Single().Time, Is.Zero);
         });
     }
 
@@ -2031,7 +2031,7 @@ public class BmsBeatmapDecoderTest
     }
 
     [Test]
-    public void TestPartialLeadIn()
+    public void TestConversionPreservesShortChartIntro()
     {
         var lines = """
                     #BPM 120
@@ -2045,9 +2045,9 @@ public class BmsBeatmapDecoderTest
         Assert.Multiple(() =>
         {
             Assert.That(decoded.HitObjects.Select(h => h.StartTime), Is.EqualTo([500, 1000]));
-            Assert.That(converted.HitObjects.Select(h => h.StartTime), Is.EqualTo([2000, 2500]));
-            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.EqualTo(1500));
-            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.EqualTo(1500));
+            Assert.That(converted.HitObjects.Select(h => h.StartTime), Is.EqualTo([500, 1000]));
+            Assert.That(converted.TimingMap!.ProjectTickToTime(0), Is.Zero);
+            Assert.That(converted.BackgroundSampleEvents.Single().Time, Is.Zero);
         });
     }
 

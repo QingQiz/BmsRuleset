@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.IO.Stores;
+using osu.Game.Beatmaps;
 using osu.Game.Extensions;
 using osu.Game.Models;
 using osu.Game.IO.Archives;
@@ -19,7 +20,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests;
 
 internal static class BmsTestReplayArchive
 {
-    public static Score RoundTrip(Score original, Func<string, string>? editJson = null, bool legacy = false)
+    public static Score RoundTrip(Score original, Func<string, string>? editJson = null, bool legacy = false, string? chart = null)
     {
         using var archive = legacy ? CreateLegacy(original) : BmsReplayArchive.Create(original);
         var bytes = archive.Get(BmsReplayArchive.FILENAME);
@@ -35,7 +36,15 @@ internal static class BmsTestReplayArchive
         target.Files.Clear();
         var file = new RealmFile { Hash = "abcdef" };
         target.Files.Add(new RealmNamedFileUsage(file, BmsReplayArchive.FILENAME));
-        using var store = new Store(file.GetStoragePath(), bytes);
+        var resources = new Dictionary<string, byte[]> { [file.GetStoragePath()] = bytes };
+        if (chart != null)
+        {
+            var chartFile = new RealmFile { Hash = "fedcba" };
+            target.BeatmapInfo = new BeatmapInfo(new BmsRuleset().RulesetInfo) { Hash = chartFile.Hash, BeatmapSet = new BeatmapSetInfo() };
+            target.BeatmapInfo.BeatmapSet.Files.Add(new RealmNamedFileUsage(chartFile, "test.bms"));
+            resources[chartFile.GetStoragePath()] = Encoding.UTF8.GetBytes(chart);
+        }
+        using var store = new Store(resources);
         return BmsReplayArchive.ReadScore(target, store);
     }
 
@@ -53,15 +62,15 @@ internal static class BmsTestReplayArchive
         return new ByteArrayArchiveReader(stream.ToArray(), BmsReplayArchive.FILENAME);
     }
 
-    private sealed class Store(string path, byte[] bytes) : IResourceStore<byte[]>
+    private sealed class Store(Dictionary<string, byte[]> resources) : IResourceStore<byte[]>
     {
-        public byte[] Get(string name) => name == path ? bytes : null!;
+        public byte[] Get(string name) => resources.GetValueOrDefault(name)!;
 
         public Stream GetStream(string name) => new MemoryStream(Get(name));
 
         public Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult(Get(name));
 
-        public IEnumerable<string> GetAvailableResources() => [path];
+        public IEnumerable<string> GetAvailableResources() => resources.Keys;
 
         public void Dispose()
         {

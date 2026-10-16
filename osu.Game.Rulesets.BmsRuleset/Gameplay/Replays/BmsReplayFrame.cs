@@ -10,7 +10,12 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 public class BmsReplayFrame : ReplayFrame
 {
     // Replay.DeepClone preserves frames but drops subclass fields, so keep the archive header on the first input.
+    internal int Version { get; init; } = BmsReplayArchive.CURRENT_VERSION;
+
     internal BmsJudgementAlgorithm Algorithm { get; init; }
+
+    internal static int GetVersion(Replay replay)
+        => replay.Frames.OfType<BmsReplayFrame>().FirstOrDefault()?.Version ?? BmsReplayArchive.CURRENT_VERSION;
 
     internal static BmsJudgementAlgorithm GetAlgorithm(Replay replay)
         => replay.Frames.OfType<BmsReplayFrame>().FirstOrDefault()?.Algorithm ?? BmsJudgementAlgorithm.Combo;
