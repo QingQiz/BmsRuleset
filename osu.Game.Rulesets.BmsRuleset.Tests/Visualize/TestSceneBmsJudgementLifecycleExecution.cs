@@ -219,7 +219,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             var note = session.Note;
             var generation = session.Drawable.BindingGeneration;
             var slot = session.Context.GetNoteSlot(note);
-            var heads = readField<SortedSet<(double Time, int Slot)>>(session.Context.Notes, "pendingHeads");
+            var heads = BmsJudgementStateInspection.GetPendingHeads(session.Context);
 
             note.StartTime = 2990;
             session.Recorded.RefreshNoteTiming(note);
@@ -280,7 +280,7 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             var note = session.Note;
             var drawable = session.Drawable;
             var slot = readField<Dictionary<BmsHitObject, int>>(session.Context, "noteSlots")[note];
-            var heads = readField<SortedSet<(double Time, int Slot)>>(session.Context.Notes, "pendingHeads");
+            var heads = BmsJudgementStateInspection.GetPendingHeads(session.Context);
             note.StartTime = 2990;
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             session.Recorded.RefreshNoteConfiguration(note);
@@ -289,13 +289,13 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             Assert.That(heads.Count(h => h.Time == 3000), Is.EqualTo(1));
             Assert.That(session.Context.FirstPendingNote, Is.SameAs(note));
             Assert.That(session.Recorded.FirstPendingNote, Is.SameAs(note));
-            Assert.That(readField<SortedSet<(double Time, int Slot)>>(session.Recorded.Notes, "pendingHeads"), Is.EqualTo(heads));
+            Assert.That(BmsJudgementStateInspection.GetPendingHeads(session.Recorded), Is.EqualTo(heads));
             Assert.That(session.ProductionOutput.GetRepresentation(note), Is.SameAs(drawable));
             note.StartTime = 3000;
             note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             session.Recorded.RefreshNoteConfiguration(note);
             Assert.That(readField<BmsHitObject[]>(session.Context, "columnNotes"), Is.EqualTo(readField<BmsHitObject[]>(session.Recorded, "columnNotes")));
-            Assert.That(readField<SortedSet<(double Time, int Slot)>>(session.Recorded.Notes, "pendingHeads"), Is.EqualTo(heads));
+            Assert.That(BmsJudgementStateInspection.GetPendingHeads(session.Recorded), Is.EqualTo(heads));
         }));
     }
 
@@ -485,6 +485,9 @@ public partial class TestSceneBmsJudgementLifecycleExecution : BmsPlayerTestScen
             };
             using (var probe = new ScopedMethodProbe(typeof(BmsJudgementBridge).GetMethod("Register", instance)!,
                        GetType().GetMethod(nameof(observeEnter), BindingFlags.Static | BindingFlags.NonPublic), GetType().GetMethod(nameof(observeExit), BindingFlags.Static | BindingFlags.NonPublic)))
+            // Register can already be inlined in the real activation caller by an earlier test.
+            using (var caller = new ScopedMethodProbe(typeof(BmsColumnHitObjectContainer).GetMethod("AddDrawable", instance)!,
+                       GetType().GetMethod(nameof(keepBoundary), BindingFlags.Static | BindingFlags.NonPublic)))
             {
                 try { session.Traverse(3500); }
                 finally { observation = null; }

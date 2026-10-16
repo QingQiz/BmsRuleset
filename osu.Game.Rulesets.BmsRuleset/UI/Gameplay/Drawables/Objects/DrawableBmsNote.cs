@@ -10,7 +10,7 @@ public sealed partial class DrawableBmsNote<TCol> : DrawableBmsHitObject<TCol>
     where TCol : struct, IColumnProvider
 {
     // The framework's reflection fallback misses the inherited protected draw-node factory.
-    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
+    protected override bool CanBeFlattened => CanFlattenWithMines && !Masking && !HasProxy && !ForceLocalVertexBatch;
 
     private BmsNoteVisual noteVisual = null!;
 

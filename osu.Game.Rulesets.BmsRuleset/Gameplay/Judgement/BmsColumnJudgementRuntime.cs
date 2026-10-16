@@ -18,9 +18,7 @@ internal sealed class BmsColumnJudgementRuntime
 {
     private readonly BmsNotePressHistory pressHistory = new();
     private readonly BmsHitObject[] columnNotes;
-    private readonly List<BmsJudgementCandidate> pressJudgementCandidates = [];
     private readonly Dictionary<BmsHitObject, int> noteSlots = new(ReferenceEqualityComparer.Instance);
-    private readonly List<(int Slot, BmsJudgementCandidate Candidate)> noteCandidates = [];
     private readonly IBmsJudgementOutput noteOutput;
     private readonly BmsHoldRegistry holds;
     private readonly BmsLandmineRegistry landmines;
@@ -28,6 +26,7 @@ internal sealed class BmsColumnJudgementRuntime
     private readonly Dictionary<BmsHitObject, int> chartOrders = new(ReferenceEqualityComparer.Instance);
     private readonly SortedSet<(double Time, int Order)> automaticEvents = [];
     private readonly double[] automaticTimes;
+    private (double Time, int Order) nextAutomaticEvent = (double.PositiveInfinity, -1);
 
     internal BmsJudgementRules Rules { get; }
 
@@ -183,9 +182,6 @@ internal sealed class BmsColumnJudgementRuntime
         refreshAutomaticEvent(note);
     }
 
-    private bool hasPendingExecutionHead(BmsHitObject note)
-        => note is BmsLongNote ln ? !GetLongNoteState(ln).HeadJudged : !noteOutput.GetMainResult(note).HasResult;
-
     internal void RestoreExecutionState(in BmsFrameContext frame)
     {
         foreach (var note in columnNotes)
@@ -227,83 +223,141 @@ internal sealed class BmsColumnJudgementRuntime
             }
         }
 
-        if (FirstPendingNote is { } first && first.StartTime == press.InputTime && IsNoteCandidate(first)
-            && BmsJudgementProfileProvider.GetTable(LayoutVariant, Index, first.EffectiveJudgementRate, false).ResultForOffset(0) == HitResult.Perfect
-            && TryPressRegisteredNote(first, HitResult.Perfect, press))
+        var search = selectPress(press.InputTime, algorithm);
+        var selection = search.Selection;
+        if (!selection.IsEmptyPoor && selection.Candidate != null && search.Slot >= 0)
         {
-            pressHistory.Record(first, press.InputTime, true);
-            noteOutput.PlaySample(first);
-            return PressOutcome.Hit;
-        }
-
-        noteCandidates.Clear();
-        pressJudgementCandidates.Clear();
-        var low = 0;
-        var high = columnNotes.Length;
-        while (low < high)
-        {
-            var middle = low + (high - low) / 2;
-            if (columnNotes[middle].StartTime < press.InputTime - 500) low = middle + 1;
-            else high = middle;
-        }
-
-        for (var i = low; i < columnNotes.Length && columnNotes[i].StartTime <= press.InputTime + 500; i++)
-        {
-            var note = columnNotes[i];
-            var history = pressHistory.Get(note);
-            if (Notes.IsNoteCandidate(note))
+            var note = NoteRegistrations[search.Slot].Object;
+            if (selection.Result == HitResult.Ok && BmsJudgementProfileProvider.IsPms(LayoutVariant))
             {
-                var candidate = new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), note.Column, note.EffectiveJudgementRate,
-                    note is BmsLongNote, !hasPendingExecutionHead(note), history.Mistake);
-                noteCandidates.Add((noteSlots[note], candidate));
-                pressJudgementCandidates.Add(candidate);
+                pressHistory.Record(note, press.InputTime, false, true);
+                noteOutput.ApplyNonConsumingBad(note, press.Frame);
+                noteOutput.PlaySample(note);
+                return PressOutcome.Hit;
             }
-            else if (history.Judged)
-                pressJudgementCandidates.Add(new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), note.Column,
-                    note.EffectiveJudgementRate, note is BmsLongNote, true, history.Mistake));
-        }
 
-        var selection = BmsJudgementSelector.SelectPress(LayoutVariant, Index, pressJudgementCandidates, press.InputTime, algorithm);
-        if (!selection.IsEmptyPoor && selection.Candidate is { } selected)
-        {
-            foreach (var candidate in noteCandidates)
+            if (TryPressRegisteredNote(note, selection.Result, press))
             {
-                if (!candidate.Candidate.Equals(selected))
-                    continue;
-
-                var note = NoteRegistrations[candidate.Slot].Object;
-                if (selection.Result == HitResult.Ok && BmsJudgementProfileProvider.IsPms(LayoutVariant))
-                {
-                    pressHistory.Record(note, press.InputTime, false, true);
-                    noteOutput.ApplyNonConsumingBad(note, press.Frame);
-                    noteOutput.PlaySample(note);
-                    return PressOutcome.Hit;
-                }
-
-                if (TryPressRegisteredNote(note, selection.Result, press))
-                {
-                    pressHistory.Record(note, press.InputTime, true);
-                    noteOutput.PlaySample(note);
-                    return PressOutcome.Hit;
-                }
-
-                break;
+                pressHistory.Record(note, press.InputTime, true);
+                noteOutput.PlaySample(note);
+                return PressOutcome.Hit;
             }
         }
 
         noteOutput.PlayKeySound();
         if (selection is { IsEmptyPoor: true, Candidate: { } emptyPoor })
         {
-            foreach (var candidate in noteCandidates)
+            // Identical stacked heads share the old empty-POOR mistake marker.
+            for (var i = findFirstNote(emptyPoor.StartTime); i < columnNotes.Length && columnNotes[i].StartTime == emptyPoor.StartTime; i++)
             {
-                if (candidate.Candidate.Equals(emptyPoor))
-                    pressHistory.Record(NoteRegistrations[candidate.Slot].Object, press.InputTime, false, true);
+                var note = columnNotes[i];
+                if (!IsNoteCandidate(note)) continue;
+                var candidate = new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), Index, note.EffectiveJudgementRate,
+                    note is BmsLongNote, note is BmsLongNote hold && GetLongNoteState(hold).HeadJudged, pressHistory.Get(note).Mistake);
+                if (candidate == emptyPoor) pressHistory.Record(note, press.InputTime, false, true);
             }
-
             return PressOutcome.ForEmptyPoor(emptyPoor.StartTime, emptyPoor.Column);
         }
 
         return PressOutcome.Empty;
+    }
+
+    private BmsJudgementSelector.PressSearch selectPress(double inputTime, BmsJudgementAlgorithm? algorithm)
+    {
+        if (algorithm == BmsJudgementAlgorithm.Duration)
+        {
+            var nearest = searchNearest(inputTime, algorithm, false);
+            if (nearest.Selection is { Candidate: not null, IsEmptyPoor: false }) return nearest;
+            return searchNearest(inputTime, algorithm, true);
+        }
+
+        var search = new BmsJudgementSelector.PressSearch(LayoutVariant, Index, inputTime, algorithm);
+        // A hit on the first pending head needs no history search when its algorithm has
+        // already decided. Earlier consumed heads only affect empty POOR, never a hit.
+        var firstHead = Notes.FirstPendingHead;
+        if (firstHead is { } first && first.StartTime >= inputTime - 500 && IsNoteCandidate(first))
+        {
+            var candidate = new BmsJudgementCandidate(first.StartTime, first.GetEndTime(), Index, first.EffectiveJudgementRate,
+                first is BmsLongNote, HasMistake: pressHistory.Get(first).Mistake);
+            if (!search.Consider(candidate, noteSlots[first]) && search.Selection.Result != HitResult.None)
+                return search;
+        }
+
+        search = searchHeads(Math.Max(inputTime - 500, firstHead?.StartTime ?? inputTime + 500), inputTime, algorithm);
+        if (search.Selection is { Candidate: not null, IsEmptyPoor: false }) return search;
+        // Only an empty-POOR lookup needs consumed heads and judged long-note tails.
+        return searchNearest(inputTime, algorithm, true);
+    }
+
+    private BmsJudgementSelector.PressSearch searchNearest(double inputTime, BmsJudgementAlgorithm? algorithm, bool includeHistory)
+    {
+        var search = new BmsJudgementSelector.PressSearch(LayoutVariant, Index, inputTime, algorithm);
+        var split = findFirstNote(inputTime);
+        var right = includeHistory ? split : Notes.FindPendingHead(split, true);
+        var left = includeHistory ? split - 1 : Notes.FindPendingHead(split - 1, false);
+        while (left >= 0 || right < columnNotes.Length)
+        {
+            var leftDistance = left >= 0 ? inputTime - columnNotes[left].StartTime : double.PositiveInfinity;
+            var rightDistance = right < columnNotes.Length ? columnNotes[right].StartTime - inputTime : double.PositiveInfinity;
+            if (Math.Min(leftDistance, rightDistance) > 500) break;
+
+            var from = right;
+            var to = right;
+            if (leftDistance <= rightDistance)
+            {
+                to = left;
+                // Equal-distance ties prefer the earlier timestamp and then stable chart order.
+                var firstAtTime = findFirstNote(columnNotes[left].StartTime);
+                from = includeHistory ? firstAtTime : Notes.FindPendingHead(firstAtTime, true);
+                left = includeHistory ? from - 1 : Notes.FindPendingHead(from - 1, false);
+            }
+            else right = includeHistory ? right + 1 : Notes.FindPendingHead(right + 1, true);
+
+            for (var i = from; i <= to; i = includeHistory ? i + 1 : Notes.FindPendingHead(i + 1, true))
+            {
+                var note = columnNotes[i];
+                var slot = noteSlots[note];
+                var history = pressHistory.Get(note);
+                var completed = includeHistory && noteOutput.GetMainResult(note).HasResult;
+                if (completed && !history.Judged) continue;
+                var candidate = new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), Index, note.EffectiveJudgementRate,
+                    note is BmsLongNote, completed || (includeHistory && note is BmsLongNote hold && GetLongNoteState(hold).HeadJudged), history.Mistake);
+                search.Consider(candidate, completed ? -1 : slot);
+                // Distance ordering settles Duration hits and, after the hit search fails,
+                // empty POOR without visiting every consumed head in a dense burst.
+                if (search.Selection.Candidate != null && (includeHistory || !search.Selection.IsEmptyPoor)) return search;
+            }
+        }
+        return search;
+    }
+
+    private BmsJudgementSelector.PressSearch searchHeads(double from, double inputTime, BmsJudgementAlgorithm? algorithm)
+    {
+        var search = new BmsJudgementSelector.PressSearch(LayoutVariant, Index, inputTime, algorithm);
+        for (var i = Notes.FindPendingHead(findFirstNote(from), true); i < columnNotes.Length && columnNotes[i].StartTime <= inputTime + 500;
+             i = Notes.FindPendingHead(i + 1, true))
+        {
+            var note = columnNotes[i];
+            var slot = noteSlots[note];
+            var candidate = new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), Index, note.EffectiveJudgementRate,
+                note is BmsLongNote, HasMistake: pressHistory.Get(note).Mistake);
+            if (!search.Consider(candidate, slot)) break;
+        }
+
+        return search;
+    }
+
+    private int findFirstNote(double time)
+    {
+        var low = 0;
+        var high = columnNotes.Length;
+        while (low < high)
+        {
+            var middle = low + (high - low) / 2;
+            if (columnNotes[middle].StartTime < time) low = middle + 1;
+            else high = middle;
+        }
+        return low;
     }
 
     internal void HandleExecutionRelease(double inputTime, in BmsFrameContext frame, bool reverseScratch = false)
@@ -356,7 +410,8 @@ internal sealed class BmsColumnJudgementRuntime
     internal double NextBodyTime(bool holding)
     {
         var next = double.PositiveInfinity;
-        foreach (var slot in Notes.ActiveBodies) next = Math.Min(next, holds.NextBodyTime(slot, holding));
+        for (var i = 0; i < Notes.ActiveBodies.Count; i++)
+            next = Math.Min(next, holds.NextBodyTime(Notes.ActiveBodies[i], holding));
         return next;
     }
 
@@ -370,13 +425,13 @@ internal sealed class BmsColumnJudgementRuntime
         foreach (var mine in chartObjects.OfType<BmsLandmine>()) refreshAutomaticEvent(mine);
     }
 
-    internal double NextAutomaticTime => automaticEvents.Count > 0 ? automaticEvents.Min.Time : double.PositiveInfinity;
+    internal double NextAutomaticTime => nextAutomaticEvent.Time;
 
     internal void ProcessAutomatic(in BmsFrameContext frame)
     {
-        while (automaticEvents.Count > 0 && automaticEvents.Min.Time <= frame.SimulationTime)
+        while (automaticEvents.Count > 0 && nextAutomaticEvent.Time <= frame.SimulationTime)
         {
-            var note = chartObjects[automaticEvents.Min.Order];
+            var note = chartObjects[nextAutomaticEvent.Order];
             if (note is BmsLandmine mine)
                 landmines.UpdateLandmine(mine, frame, PressedDirections != 0);
             else
@@ -407,5 +462,6 @@ internal sealed class BmsColumnJudgementRuntime
         };
         automaticTimes[order] = next;
         if (double.IsFinite(next)) automaticEvents.Add((next, order));
+        nextAutomaticEvent = automaticEvents.Count > 0 ? automaticEvents.Min : (double.PositiveInfinity, -1);
     }
 }

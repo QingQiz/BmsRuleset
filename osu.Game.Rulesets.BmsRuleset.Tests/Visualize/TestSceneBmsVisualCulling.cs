@@ -107,9 +107,9 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         });
         AddStep("record warmed pool", () => poolSize = ((BmsColumn)Playfield.Stage.Columns[1]).ChildrenOfType<DrawablePool<BmsHitExplosion>>().Sum(p => p.CurrentPoolSize));
         seek(4850);
-        AddAssert("every pulse remains visible", () => ((BmsColumn)Playfield.Stage.Columns[1]).HitExplosionArea.AliveChildren.Count(d => d.Alpha > 0) == 32);
+        AddAssert("every pulse remains visible", () => ((BmsHitExplosionLayer)Playfield.Stage.Columns[1].HitExplosionArea).Pulses.Count == 32);
         seek(5100);
-        AddUntilStep("pulses expire", () => !((BmsColumn)Playfield.Stage.Columns[1]).HitExplosionArea.AliveChildren.Any());
+        AddUntilStep("pulses expire", () => ((BmsHitExplosionLayer)Playfield.Stage.Columns[1].HitExplosionArea).Pulses.Count == 0);
         AddStep("trigger another burst", () =>
         {
             var column = (BmsColumn)Playfield.Stage.Columns[1];
@@ -133,14 +133,15 @@ public partial class TestSceneBmsVisualCulling : BmsPlayerTestScene
         seek(4990);
         AddStep("all four pulses retain their original fade phase", () =>
         {
-            var pulses = ((BmsColumn)Playfield.Stage.Columns[1]).HitExplosionArea.AliveChildren.OrderBy(d => d.LifetimeStart).ToArray();
+            var area = (BmsHitExplosionLayer)Playfield.Stage.Columns[1].HitExplosionArea;
+            var pulses = area.Pulses.OrderBy(p => p.StartTime).ToArray();
             Assert.That(pulses, Has.Length.EqualTo(4));
             double[] expected = [10d / 120, 60d / 120, 110d / 120, 40d / 80];
             for (var i = 0; i < pulses.Length; i++)
-                Assert.That(pulses[i].Alpha, Is.EqualTo(expected[i]).Within(0.001), $"pulse {i}");
+                Assert.That(BmsHitExplosion.AlphaAt(area.Time.Current - pulses[i].StartTime), Is.EqualTo(expected[i]).Within(0.001), $"pulse {i}");
         });
         seek(5200);
-        AddUntilStep("all pulses expire", () => !((BmsColumn)Playfield.Stage.Columns[1]).HitExplosionArea.AliveChildren.Any());
+        AddUntilStep("all pulses expire", () => ((BmsHitExplosionLayer)Playfield.Stage.Columns[1].HitExplosionArea).Pulses.Count == 0);
     }
 
     [Test]

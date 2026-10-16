@@ -8,16 +8,17 @@ using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
+using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Input.States;
 using osu.Framework.Testing;
+using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
-using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
@@ -119,7 +120,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     }
 
     [Test]
-    public void BatchedTapActivationIncludesTheEarliestInputWindow()
+    public void TapActivationIncludesTheEarliestInputWindow()
     {
         AddStep("load player", () => LoadPlayer());
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
@@ -129,13 +130,13 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             Playfield.ScrollController.SetConfiguredScrollSpeed(50);
             Playfield.RefreshAllLifetimes();
         });
-        AddStep("activation leaves room for one deferred visual update", () =>
+        AddStep("activation covers the earliest input window", () =>
         {
             foreach (var entry in Playfield.Stage.Columns.SelectMany(c => c.HitObjectContainer.Entries))
             {
                 var note = (BmsNote)entry.HitObject;
                 var table = BmsJudgementProfileProvider.GetTable(BmsLayoutVariant.Bme7K, note.Column, note.EffectiveJudgementRate, false);
-                Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(note.StartTime - table.FastWindowFor(HitResult.Miss) - 16));
+                Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(note.StartTime - table.FastWindowFor(HitResult.Miss)));
             }
         });
     }
@@ -262,19 +263,93 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
                 onJudgement(meter, result);
             }
         });
-        AddUntilStep("all hundred markers rendered", () => meter.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count(d => d.IsAlive) == 100);
+        AddUntilStep("all hundred markers rendered", () => meter.Judgements.Lines.Count == 100);
         AddStep("markers and average retain timing semantics", () =>
         {
             var domain = BmsHitErrorMeter.CreateDomain(BmsLayoutVariant.Bme7K, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate);
             var expected = Enumerable.Range(0, 100).Select(i => domain.RelativePosition(i - 50)).Order().ToArray();
-            Assert.That(meter.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Where(d => d.IsAlive).Select(d => d.X).Order(), Is.EqualTo(expected).Within(0.00001));
+            Assert.That(meter.Judgements.Lines.Select(d => d.X).Order(), Is.EqualTo(expected).Within(0.00001));
             var average = Enumerable.Range(0, 100).Aggregate(0d, (value, i) => value * 0.8 + (domain.RelativePosition(i - 50) - 0.5f) * 0.2);
             Assert.That(typeof(BmsHitErrorMeter).GetField("floatingAverage", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(meter), Is.EqualTo(average).Within(0.000001));
             var note = Playfield.Beatmap.HitObjects[0];
             onJudgement(meter, new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
             meter.Clear();
         });
-        AddUntilStep("clear removes every marker", () => !meter.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Any());
+        AddUntilStep("clear removes every marker", () => !meter.Judgements.Lines.Any());
+    }
+
+    [Test]
+    public void HitErrorArrowBurstMatchesIndividualAnimations([Values] bool hidden)
+    {
+        BmsHitErrorMeter meter = null!;
+        Triangle reference = null!;
+        var manual = new ManualClock();
+        var clock = new FramedClock(manual);
+        var onJudgement = typeof(BmsHitErrorMeter).GetMethod("OnNewJudgement", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<Action<BmsHitErrorMeter, JudgementResult>>();
+        var schedule = typeof(Drawable).GetMethod("Schedule", BindingFlags.Instance | BindingFlags.NonPublic, [typeof(Action)])!;
+
+        AddStep("load player and reference arrow", () =>
+        {
+            LoadPlayer();
+            Add(reference = new Triangle { Clock = clock });
+        });
+        AddUntilStep("arrows loaded", () => reference.IsLoaded && Player.IsLoaded
+            && (meter = Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().SingleOrDefault()!)?.IsLoaded == true);
+        seek(0);
+        AddStep("compare burst targets and in-flight retargeting", () =>
+        {
+            meter.Clock = clock;
+            meter.Alpha = hidden ? 0 : 1;
+            meter.Clear();
+            meter.UpdateSubTree();
+            reference.UpdateSubTree();
+            var arrow = meter.ChildrenOfType<Triangle>().Single();
+            var note = Playfield.Beatmap.HitObjects[0];
+            var domain = BmsHitErrorMeter.CreateDomain(BmsLayoutVariant.Bme7K, Playfield.Beatmap.HitObjects[0].EffectiveJudgementRate);
+            reference.X = domain.RelativePosition(0);
+            var average = 0d;
+
+            applyBurst(1000, 40);
+            assertFrame(1040);
+            assertFrame(1200);
+            applyBurst(1300, -40);
+            assertFrame(1300);
+            assertFrame(1600);
+            assertFrame(2100);
+            Assert.That(meter.Judgements.Lines, Has.Count.EqualTo(200));
+
+            onJudgement(meter, new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+            meter.Clear();
+            meter.UpdateSubTree();
+            Assert.That(arrow.X, Is.EqualTo(domain.RelativePosition(0)));
+            Assert.That(arrow.Transforms, Is.Empty, "clear cancels a target queued before the next update");
+
+            void applyBurst(double time, double offset)
+            {
+                manual.CurrentTime = time;
+                schedule.Invoke(meter, [new Action(() =>
+                {
+                    for (var i = 0; i < 100; i++)
+                    {
+                        var result = new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect };
+                        typeof(JudgementResult).GetProperty(nameof(JudgementResult.TimeOffset))!.SetValue(result, offset);
+                        onJudgement(meter, result);
+                        average = average * 0.8 + (domain.RelativePosition(offset) - 0.5f) * 0.2;
+                        reference.MoveToX((float)average + 0.5f, 800, Easing.Out);
+                    }
+                })]);
+                assertFrame(time);
+            }
+
+            void assertFrame(double time)
+            {
+                manual.CurrentTime = time;
+                meter.UpdateSubTree();
+                reference.UpdateSubTree();
+                Assert.That(arrow.X, Is.EqualTo(reference.X).Within(0.00001), $"arrow at {time} ms");
+            }
+        });
     }
 
     [Test]
@@ -321,15 +396,12 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
         {
             var column = (BmsColumnHitObjectContainer)Playfield.Stage.Columns[1].HitObjectContainer;
             var note = column.AliveEntries.Values.First();
-            using var counter = new ScopedMethodProbe(typeof(BmsNoteJudgementWindows).GetMethod("NextPassiveJudgementTime", BindingFlags.Instance | BindingFlags.NonPublic),
+            using var counter = new ScopedMethodProbe(typeof(BmsColumnJudgementRuntime).GetMethod("refreshAutomaticEvent", BindingFlags.Instance | BindingFlags.NonPublic),
                 typeof(TestSceneBmsDenseReplay).GetMethod(nameof(countPassiveDeadline), BindingFlags.Static | BindingFlags.NonPublic));
-            // Rebuild the caller after probing the leaf so a warmed inline cannot hide deadline scans.
-            using var caller = new ScopedMethodProbe(typeof(BmsColumnNoteIndex).GetMethod("RefreshDeadline", BindingFlags.Instance | BindingFlags.NonPublic),
-                typeof(TestSceneBmsDenseReplay).GetMethod(nameof(keepDeadlineBoundary), BindingFlags.Static | BindingFlags.NonPublic));
             passiveDeadlineReads = 0;
             for (var i = 0; i < 20; i++)
                 column.UpdateSubTree();
-            Assert.That(passiveDeadlineReads, Is.LessThan(64), "deadlines change on activation/revert or expiry, not on every visual frame");
+            Assert.That(passiveDeadlineReads, Is.Zero, "deadlines change on judgement or timing invalidation, not on every visual frame");
             passiveDeadlineReads = 0;
             note.HitObject.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
             column.UpdateSubTree();
@@ -353,7 +425,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             Assert.That(pools.Sum(p => p.CurrentPoolSize), Is.EqualTo(count));
         });
         seek(3050);
-        AddAssert("all independent pulses remain visible", () => ((BmsColumn)Playfield.Stage.Columns[1]).HitExplosionArea.AliveChildren.Count(d => d.Alpha > 0) >= note_count / 8);
+        AddAssert("all independent pulses remain visible", () => ((BmsHitExplosionLayer)Playfield.Stage.Columns[1].HitExplosionArea).Pulses.Count >= note_count / 8);
     }
 
     [Test]
@@ -438,7 +510,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
             AddAssert("each column is traversed at most once per game frame", () => columnTraversals.MaxPerFrame, () => Is.EqualTo(1));
             // A fast catch-up can retire all taps before the first outer masking pass.
             AddAssert("each note is masked at most once per game frame", () => noteMaskingTraversals.MaxPerFrame, () => Is.LessThanOrEqualTo(1));
-            AddAssert("each overlapping pulse is masked at most once per game frame", () => explosionMaskingTraversals.MaxPerFrame, () => Is.EqualTo(1));
+            AddAssert("static pulses need no per-pulse masking traversal", () => explosionMaskingTraversals.MaxPerFrame, () => Is.Zero);
         }
     }
 
@@ -463,8 +535,6 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
     private static void countColumnTraversal(BmsColumnHitObjectContainer __instance) => columnTraversals.Count(__instance);
 
     private static void countPassiveDeadline() => passiveDeadlineReads++;
-
-    private static void keepDeadlineBoundary() { }
 
     // ReSharper disable once InconsistentNaming
     private static void countMasking(CompositeDrawable __instance)

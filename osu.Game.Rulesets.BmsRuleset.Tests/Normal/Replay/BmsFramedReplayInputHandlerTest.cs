@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -15,6 +16,44 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Replay;
 [TestFixture]
 public class BmsFramedReplayInputHandlerTest
 {
+    [Test]
+    public void ActionTransitionsMatchFrameworkEvents()
+    {
+        BmsAction[][] states =
+        [
+            [],
+            [BmsAction.Key1],
+            [BmsAction.Key2],
+            [BmsAction.Key1, BmsAction.Key2],
+            [BmsAction.Key2, BmsAction.Key1],
+            [BmsAction.Scratch, BmsAction.P2ScratchReverse, BmsAction.P2PmsKey9],
+            [BmsAction.Key1, BmsAction.Key1, BmsAction.Key2, BmsAction.Key2],
+            [BmsAction.Key2, BmsAction.Key2, BmsAction.Key3, BmsAction.Key3],
+            Enum.GetValues<BmsAction>(),
+        ];
+        var frames = states.SelectMany(previous => states.SelectMany(current => new[] { previous, current }))
+                           .Select((actions, i) => new BmsReplayFrame(i * 1000, actions)).ToArray();
+        using var handler = new BmsFramedReplayInputHandler(new osu.Game.Replays.Replay { Frames = [.. frames] });
+        var state = new RulesetInputManagerInputState<BmsAction>(new InputState());
+        var expectedState = new RulesetInputManagerInputState<BmsAction>(new InputState());
+        var actual = new InputReceiver();
+        var expected = new InputReceiver();
+        var inputs = new List<IInput>();
+        foreach (var frame in frames)
+        {
+            Assert.That(handler.SetFrameFromTime(frame.Time), Is.EqualTo(frame.Time));
+            inputs.Clear();
+            handler.CollectPendingInputs(inputs);
+            foreach (var input in inputs) input.Apply(state, actual);
+            new ReplayState<BmsAction> { PressedActions = frame.Actions }.Apply(expectedState, expected);
+
+            Assert.That(actual.Changes[^1].Released, Is.EqualTo(expected.Changes[^1].Released));
+            Assert.That(actual.Changes[^1].Pressed, Is.EqualTo(expected.Changes[^1].Pressed));
+            Assert.That(state.LastReplayState, Is.SameAs(inputs.OfType<ReplayState<BmsAction>>().Single()));
+        }
+        Assert.That(actual.States, Is.EqualTo(expected.States));
+    }
+
     [Test]
     public void LiveFramesRemainAvailableUntilTheStreamEnds()
     {
@@ -86,6 +125,12 @@ public class BmsFramedReplayInputHandlerTest
         handler.CollectPendingInputs(inputs);
         Assert.That(inputs.OfType<ReplayState<BmsAction>>().Select(state => state.PressedActions.Count), Is.EqualTo(new[] { 1, 0, 1 }));
         Assert.That(handler.CurrentFrame!.Actions, Is.EqualTo(new[] { BmsAction.Key1 }));
+
+        var state = new RulesetInputManagerInputState<BmsAction>(new InputState());
+        var receiver = new InputReceiver();
+        foreach (var input in inputs) input.Apply(state, receiver);
+        Assert.That(receiver.Changes.Select(change => change.Pressed), Is.EqualTo(new BmsAction[][] { [BmsAction.Key1], [], [BmsAction.Key1] }));
+        Assert.That(receiver.Changes.Select(change => change.Released), Is.EqualTo(new BmsAction[][] { [], [BmsAction.Key1], [] }));
     }
 
     [Test]
@@ -115,11 +160,15 @@ public class BmsFramedReplayInputHandlerTest
     private sealed class InputReceiver : IInputStateChangeHandler
     {
         internal List<BmsAction[]> States { get; } = [];
+        internal List<(BmsAction[] Released, BmsAction[] Pressed)> Changes { get; } = [];
 
         public void HandleInputStateChange(InputStateChangeEvent inputStateChange)
         {
             if (inputStateChange is ReplayStateChangeEvent<BmsAction> replay)
+            {
                 States.Add(((ReplayState<BmsAction>)replay.Input).PressedActions.ToArray());
+                Changes.Add((replay.ReleasedActions, replay.PressedActions));
+            }
         }
     }
 }

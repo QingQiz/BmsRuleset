@@ -118,8 +118,8 @@ public partial class TestSceneBmsDrawableTraversal
     private DrawableBmsHitObject[] soundFixtureObjects()
     {
         var drawables = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().Where(d => d.HitObject.StartTime == 5000).ToArray();
-        Assert.That(drawables, Has.Length.EqualTo(4));
-        Assert.That(drawables.Select(d => d.HitObject.GetType()).Distinct().Count(), Is.EqualTo(4));
+        Assert.That(drawables.Select(d => d.HitObject.GetType()), Is.EquivalentTo(new[] { typeof(BmsLongNote), typeof(BmsNote), typeof(BmsLandmine) }));
+        Assert.That(((BmsColumn)Playfield.Stage.Columns[4]).InvisibleNoteLayer!.Markers, Has.Count.EqualTo(1));
         return drawables;
     }
 

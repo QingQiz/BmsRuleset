@@ -3,12 +3,14 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using System;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.UI.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
@@ -34,7 +36,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     // Owned by the column but parented to a stage-level layer (above the judgement line) by BmsStage,
     // so hit explosions render on top of the stage hitTarget instead of behind it.
-    public Container HitExplosionArea { get; } = new() { RelativeSizeAxes = Axes.Y };
+    public Container HitExplosionArea { get; }
 
     public Drawable KeyArea { get; }
 
@@ -88,16 +90,19 @@ public partial class BmsColumn : Playfield, IBmsColumn
             : scroll.TimingMap?.GetScrollPositionAtTime(displayTime) ?? displayTime;
         var headPosition = scroll.GetVisualScrollPosition(note.StartTime, note.ScrollPositionAtStartTime);
         return -(HitTargetPosition + (float)((headPosition - displayPosition)
-                                            * scroll.ScrollCoordinateScale(HitObjectContainer.DrawHeight, HitTargetPosition)));
+                                             * scroll.ScrollCoordinateScale(HitObjectContainer.DrawHeight, HitTargetPosition)));
     }
 
     private BmsColumnKeySound? keySound;
+    private readonly Bindable<bool> showInvisibleNotes = new();
+    private BmsInvisibleNote[] invisibleNotes = [];
+
+    internal BmsInvisibleNoteLayer? InvisibleNoteLayer { get; private set; }
+
     internal BmsColumnJudgementRuntime Judgements { get; set; } = null!;
+
     internal BmsJudgementBridge JudgementBridge { get; set; } = null!;
 
-    internal bool CanBatchUpdates => canBatchUpdates;
-
-    private readonly bool canBatchUpdates;
     private readonly BmsHitExplosionPool normalHitExplosionPool;
     private readonly BmsHitExplosionPool longNoteHitExplosionPool;
 
@@ -112,11 +117,11 @@ public partial class BmsColumn : Playfield, IBmsColumn
         Index = index;
         LayoutVariant = playfield.LayoutVariant;
         IsScratch = BmsLayout.IsScratchColumn(index, LayoutVariant);
-        canBatchUpdates = playfield.Beatmap.HitObjects.All(h => h.Column != index || h is BmsNote or BmsLongNote);
-
         RelativeSizeAxes = Axes.Y;
         Width = defaultColumnWidth(index, LayoutVariant);
         HitObjectContainer.Depth = HIT_OBJECT_DEPTH;
+
+        HitExplosionArea = new BmsHitExplosionLayer(LayoutVariant, Index, spawnHitExplosion);
 
         normalHitExplosionPool = new BmsHitExplosionPool(
             new BmsSkinComponentLookup(BmsSkinComponents.HitExplosion, LayoutVariant, Index), playfield.InitialHitExplosionSizes[index]);
@@ -143,6 +148,7 @@ public partial class BmsColumn : Playfield, IBmsColumn
     {
         if (JudgementBridge != null)
             NewResult -= JudgementBridge.OnFrameworkNewResult;
+        showInvisibleNotes.UnbindAll();
         base.Dispose(isDisposing);
 
         if (skin.IsNotNull())
@@ -161,15 +167,13 @@ public partial class BmsColumn : Playfield, IBmsColumn
     protected override HitObjectContainer CreateHitObjectContainer()
         => new BmsColumnHitObjectContainer(
             ParentPlayfield.ScrollController,
-            () => HitTargetPosition,
-            canBatchUpdates);
+            () => HitTargetPosition);
 
     protected override HitObjectLifetimeEntry CreateLifetimeEntry(HitObject hitObject)
         => new BmsHitObjectLifetimeEntry(
             hitObject,
             ParentPlayfield.ScrollController,
-            () => ParentPlayfield.VisualOffset.Value,
-            canBatchUpdates ? BmsColumnHitObjectContainer.MAX_DEFERRED_UPDATE_TIME : 0);
+            () => ParentPlayfield.VisualOffset.Value);
 
     protected override void LoadComplete()
     {
@@ -184,18 +188,33 @@ public partial class BmsColumn : Playfield, IBmsColumn
             .ThenBy(h => h.Column)
             .ToArray();
 
-        var invisibleNotes = ParentPlayfield.Beatmap.InvisibleNotes
+        invisibleNotes = ParentPlayfield.Beatmap.InvisibleNotes
             .Where(n => n.Column == Index).OrderBy(n => n.StartTime).ToArray();
-        foreach (var note in invisibleNotes)
-            Add(note);
-
-        if (invisibleNotes.Length > 0)
-            ((BmsColumnHitObjectContainer)HitObjectContainer).RefreshAllEntries();
+        showInvisibleNotes.BindValueChanged(_ => updateInvisibleNotes(), true);
+        ((BmsColumnHitObjectContainer)HitObjectContainer).InitializeMineBatch(this);
 
         keySound = new BmsColumnKeySound(columnHitObjects, Judgements, invisibleNotes);
         AddInternal(keySound);
 
         NewResult += JudgementBridge.OnFrameworkNewResult;
+    }
+
+    private void updateInvisibleNotes()
+    {
+        if (invisibleNotes.Length == 0 || (!showInvisibleNotes.Value && InvisibleNoteLayer == null))
+            return;
+
+        if (InvisibleNoteLayer == null)
+        {
+            AddInternal(InvisibleNoteLayer = new BmsInvisibleNoteLayer(invisibleNotes, ParentPlayfield.ScrollController, this)
+            {
+                RelativeSizeAxes = Axes.Both,
+                Colour = Colour4.Yellow,
+                Depth = HIT_OBJECT_DEPTH - 0.001f,
+            });
+        }
+
+        InvisibleNoteLayer.Alpha = showInvisibleNotes.Value ? 1 : 0;
     }
 
     protected override void Update()
@@ -208,9 +227,10 @@ public partial class BmsColumn : Playfield, IBmsColumn
     private static float defaultColumnWidth(int index, BmsLayoutVariant layoutVariant) =>
         BmsLayout.IsScratchColumn(index, layoutVariant) ? SCRATCH_COLUMN_WIDTH : COLUMN_WIDTH;
 
-    [BackgroundDependencyLoader]
-    private void load()
+    [BackgroundDependencyLoader(true)]
+    private void load(BmsRulesetConfigManager? config)
     {
+        config?.BindWith(BmsRulesetSetting.ShowInvisibleNotes, showInvisibleNotes);
         skin.SourceChanged += updateFromSkin;
         updateFromSkin();
     }
@@ -269,9 +289,18 @@ public partial class BmsColumn : Playfield, IBmsColumn
     /// </summary>
     public void TriggerHitExplosion(BmsHitLightStyle style)
     {
+        var offset = ParentPlayfield.Stage.HitTargetPositionOffset;
+        if (((BmsHitExplosionLayer)HitExplosionArea).TryTrigger(style, offset)) return;
+
+        spawnHitExplosion(style, offset, null);
+    }
+
+    private void spawnHitExplosion(BmsHitLightStyle style, float offset, double? startTime)
+    {
         var pool = style == BmsHitLightStyle.Hold ? longNoteHitExplosionPool : normalHitExplosionPool;
         var explosion = pool.Get();
-        explosion.ApplyPositionOffset(ParentPlayfield.Stage.HitTargetPositionOffset);
+        explosion.ApplyPositionOffset(offset);
+        explosion.InheritStartTime(startTime);
         HitExplosionArea.Add(explosion);
     }
 

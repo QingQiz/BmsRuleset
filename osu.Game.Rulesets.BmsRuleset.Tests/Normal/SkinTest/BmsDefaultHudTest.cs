@@ -91,10 +91,15 @@ public class BmsDefaultHudTest
 
         var score = hud!.ChildrenOfType<ArgonScoreCounter>().Single();
         var accuracy = hud.ChildrenOfType<ArgonAccuracyCounter>().Single();
+        score.ShowLabel.Value = false;
+        score.WireframeOpacity.Value = 0.6f;
         var restoredScore = (ArgonScoreCounter)score.CreateSerialisedInfo().CreateInstance();
         var restoredAccuracy = (ArgonAccuracyCounter)accuracy.CreateSerialisedInfo().CreateInstance();
 
         Assert.That(restoredAccuracy.Y - restoredScore.Y, Is.EqualTo(60));
+        Assert.That(restoredScore, Is.TypeOf<BmsScoreCounter>());
+        Assert.That(restoredScore.ShowLabel.Value, Is.False);
+        Assert.That(restoredScore.WireframeOpacity.Value, Is.EqualTo(0.6f));
     }
 
     [Test]

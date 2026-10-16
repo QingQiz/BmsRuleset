@@ -26,6 +26,7 @@ internal sealed class BmsJudgementEngine
 {
     private readonly BmsJudgementRules rules = new();
     private readonly BmsColumnJudgementRuntime[] columns;
+    private readonly BmsColumnJudgementRuntime[] bodyColumns;
     private readonly BmsColumnJudgementRuntime[] columnsByIndex;
     private readonly List<BmsJudgementInput> pendingInputs = [];
     private long scheduleEpoch;
@@ -49,7 +50,9 @@ internal sealed class BmsJudgementEngine
         };
         var orderedDefinitions = definitions.OrderBy(definition => firstScratchLane < 0 || definition.Index > firstScratchLane
             ? definition.Index
-            : definition.Index == 0 ? firstScratchLane : definition.Index - 1).ToArray();
+            : definition.Index == 0
+                ? firstScratchLane
+                : definition.Index - 1).ToArray();
         for (var i = 0; i < orderedDefinitions.Length; i++)
         {
             var definition = orderedDefinitions[i];
@@ -57,6 +60,9 @@ internal sealed class BmsJudgementEngine
             columns[i] = column;
             columnsByIndex[column.Index] = column;
         }
+
+        bodyColumns = columns.Where(column => column.NoteRegistrations.Any(registration =>
+            registration.Object is BmsLongNote { Beatmap.LockedLongNoteMode: BmsLongNoteMode.HellChargeNote })).ToArray();
     }
 
     internal BmsJudgementEngine(BmsHitObject[] notes, BmsLayoutVariant layout, int column, IBmsJudgementOutput output)
@@ -73,8 +79,11 @@ internal sealed class BmsJudgementEngine
             var next = double.PositiveInfinity;
             foreach (var column in columns)
             {
-                next = Math.Min(next, Math.Min(column.NextAutomaticTime, column.NextBodyTime(column.PressedDirections != 0)));
+                next = Math.Min(next, column.NextAutomaticTime);
             }
+
+            foreach (var column in bodyColumns)
+                next = Math.Min(next, column.NextBodyTime(column.PressedDirections != 0));
 
             return next;
         }
@@ -176,7 +185,7 @@ internal sealed class BmsJudgementEngine
 
     private void updateBodies(in BmsFrameContext frame)
     {
-        foreach (var column in columns)
+        foreach (var column in bodyColumns)
             column.UpdateRegisteredBodies(frame, 0, column.PressedDirections != 0);
     }
 

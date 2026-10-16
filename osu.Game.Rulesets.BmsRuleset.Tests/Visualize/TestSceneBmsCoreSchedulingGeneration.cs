@@ -360,7 +360,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
                 .OrderBy(d => ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetNoteSlot(d.HitObject)).ToArray();
             var first = pair[0].HitObject;
             var second = pair[1].HitObject;
-            var entry = pair[0].Entry;
+            var entry = pair[0].Entry!;
             var oldGeneration = pair[1].BindingGeneration;
             var observed = new List<BmsHitObject>();
             void result(osu.Game.Rulesets.Objects.Drawables.DrawableHitObject drawable, osu.Game.Rulesets.Judgements.JudgementResult judgement)

@@ -23,8 +23,10 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 [HeadlessTest]
 public partial class TestSceneBmsHitLightAnimationLifecycle : BmsPlayerTestScene
 {
+    private BmsTestSkins.SkinKind skinKind = BmsTestSkins.SkinKind.Legacy;
+
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
-        => CreateBmsPlayer(_ => [new BmsReplayFrame(0), new BmsReplayFrame(60000)], BmsTestSkins.SkinKind.Legacy);
+        => CreateBmsPlayer(_ => [new BmsReplayFrame(0), new BmsReplayFrame(60000)], skinKind);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -48,6 +50,7 @@ public partial class TestSceneBmsHitLightAnimationLifecycle : BmsPlayerTestScene
         Drawable oldAnimation = null!;
         Drawable finalAnimation = null!;
         BmsColumn column = null!;
+        AddStep("choose animated legacy lights", () => skinKind = BmsTestSkins.SkinKind.Legacy);
         AddStep("load legacy hit light player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully);
         seek(1000);

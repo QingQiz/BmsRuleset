@@ -78,10 +78,7 @@ public partial class TestSceneBmsDrawableTraversal : BmsPlayerTestScene
         AddUntilStep("simulation caught up", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 4800) < .001);
         AddStep("keep core judgement and framework lifetime work", () =>
         {
-            var drawables = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>()
-                .Where(d => d.HitObject.StartTime == 5000).ToArray();
-            Assert.That(drawables, Has.Length.EqualTo(4));
-            Assert.That(drawables.Select(d => d.HitObject.GetType()).Distinct().Count(), Is.EqualTo(4));
+            var drawables = soundFixtureObjects();
             Assert.That(drawables.All(d => d.IsPresent), Is.True);
             var graphics = drawables.SelectMany(d => d.ChildrenOfType<Drawable>().Prepend(d)).ToArray();
             var originalGeometry = graphics.Select(d => (d.Position, d.Size, d.Scale, d.Alpha)).ToArray();
@@ -107,7 +104,7 @@ public partial class TestSceneBmsDrawableTraversal : BmsPlayerTestScene
 
                 foreach (var drawable in drawables) drawable.OnKilled();
                 Assert.That(frameworkResultChecks, Is.EqualTo(drawables.Length), "The framework sample-stop and lifetime boundary still runs.");
-                TestContext.WriteLine($"DRAWABLE_RESULT_CHECKS skin={skin} mode={mode} updates=128 checks=0 removalChecks={frameworkResultChecks}");
+                TestContext.WriteLine($"DRAWABLE_RESULT_CHECKS skin={skin} mode={mode} updates={32 * drawables.Length} checks=0 removalChecks={frameworkResultChecks}");
             }
             finally
             {

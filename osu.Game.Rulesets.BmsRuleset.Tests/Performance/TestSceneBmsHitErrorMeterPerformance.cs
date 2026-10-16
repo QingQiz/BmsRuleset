@@ -80,10 +80,10 @@ public partial class TestSceneBmsHitErrorMeterPerformance : BmsPlayerTestScene
                 var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
 
                 Assert.That(lastDrawNode, Is.Not.Null);
-                var lines = meter.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Where(line => line.IsAlive).ToArray();
+                var lines = meter.Judgements.Lines.ToArray();
                 Assert.That(lines.Length, Is.InRange(500, 501));
-                Assert.That(lines.All(line => line.Alpha is >= 0 and <= 0.4f), Is.True);
-                var state = JsonSerializer.Serialize(lines.Select(line => new { line.X, line.Alpha, line.Width, line.Height }));
+                Assert.That(lines.All(line => line.AlphaAt(meter.Judgements.DisplayTime) is >= 0 and <= 0.4f), Is.True);
+                var state = JsonSerializer.Serialize(lines.Select(line => new { line.X, Alpha = line.AlphaAt(meter.Judgements.DisplayTime), Width = meter.JudgementLineThickness.Value, Height = 1 }));
                 var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(state)));
                 samples.Add(new Sample(elapsed, cpu, allocated, lines.Length, hash));
             }

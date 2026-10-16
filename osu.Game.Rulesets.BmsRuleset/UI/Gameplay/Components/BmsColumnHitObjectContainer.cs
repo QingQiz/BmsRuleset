@@ -18,7 +18,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     internal const double MAX_DEFERRED_UPDATE_TIME = 16;
     private readonly BmsGameplayScrollController scrollController;
     private readonly Func<float> getHitTargetPosition;
-    private readonly bool canBatchUpdates;
     private bool frameOpen;
     private bool hasUpdated;
     private bool updatePending;
@@ -37,16 +36,26 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     {
         base.Add(entry);
         latestLifetimeStart = double.PositiveInfinity;
+        scrollEntriesDirty = true;
+        mineTimesDirty = true;
+    }
+
+    public override bool Remove(HitObjectLifetimeEntry entry)
+    {
+        var removed = base.Remove(entry);
+        if (removed && entry is BmsHitObjectLifetimeEntry mineEntry)
+            mineEntry.SetBatchedMine(false);
+        scrollEntriesDirty |= removed;
+        mineTimesDirty |= removed;
+        return removed;
     }
 
     internal BmsColumnHitObjectContainer(
         BmsGameplayScrollController scrollController,
-        Func<float> getHitTargetPosition,
-        bool canBatchUpdates = false)
+        Func<float> getHitTargetPosition)
     {
         this.scrollController = scrollController;
         this.getHitTargetPosition = getHitTargetPosition;
-        this.canBatchUpdates = canBatchUpdates;
         RelativeSizeAxes = Axes.Both;
     }
 
@@ -83,7 +92,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             UpdateSubTree();
     }
 
-    internal bool CanDeferUpdate => canBatchUpdates && frameOpen && hasUpdated && Time.Elapsed >= 0
+    internal bool CanDeferUpdate => frameOpen && hasUpdated && Time.Elapsed >= 0
                                     && (Clock as IGameplayClock)?.IsRewinding != true
                                     && Time.Current >= lastFullUpdateTime
                                     && (Time.Current - lastFullUpdateTime < MAX_DEFERRED_UPDATE_TIME || lastFullUpdateTime >= latestLifetimeStart);
@@ -91,7 +100,8 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     public override bool UpdateSubTree()
     {
         var now = Time.Current;
-        // The engine advances independently; skins can share the final outer frame's traversal.
+        // Judgement and lifetime activation advance independently, so skins can share
+        // the final outer frame's traversal. The bridge covers objects judged before activation.
         if (CanDeferUpdate)
         {
             updatePending = true;
@@ -118,6 +128,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
     /// </summary>
     public void RefreshAllEntries(double? currentTime = null)
     {
+        scrollEntriesDirty = true;
         latestLifetimeStart = double.NegativeInfinity;
         foreach (var entry in Entries)
         {
@@ -125,7 +136,8 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
                 bmsEntry.RefreshLifetime(currentTime);
             // Once every candidate has been activated, no future input needs another lifetime
             // pass. Full skin traversal on each catch-up step can otherwise prevent recovery.
-            latestLifetimeStart = Math.Max(latestLifetimeStart, entry.LifetimeStart);
+            if (entry.HitObject is not (BmsLandmine or BmsInvisibleNote))
+                latestLifetimeStart = Math.Max(latestLifetimeStart, entry.LifetimeStart);
         }
     }
 
@@ -138,16 +150,20 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         }
     }
 
+    protected override bool CheckChildrenLife()
+    {
+        UpdateScrollEntries();
+        return base.CheckChildrenLife();
+    }
+
     protected override void UpdateAfterChildrenLife()
     {
         base.UpdateAfterChildrenLife();
-
         updateVisuals(visualFrame());
     }
 
     private void updateVisuals(BmsColumnVisualFrame frame)
     {
-
         refreshCoreOrder();
 
         foreach (var entry in AliveEntries)
@@ -161,7 +177,6 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
             var startPosition = scrollController.ConstantScrollActive ? startTime : hitObject.ScrollPositionAtStartTime;
             note.UpdateVisualFrame(frame.YAt(startPosition), frame);
         }
-
     }
 
     internal void InvalidateCoreOrder()
@@ -198,9 +213,9 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
 
             // These representations cannot supply a single Sprite. Reuse this
             // lifecycle traversal so mixed columns never prepare a doomed prefix.
-            if (note.HitObject is BmsLongNote or BmsInvisibleNote)
+            if (note.HitObject is BmsLongNote)
                 spriteBatchHasMultiplePieces = true;
-            if (!coreStartTimes.ContainsKey(note))
+            if (note.HitObject is BmsNote or BmsLongNote && !coreStartTimes.ContainsKey(note))
                 observeStartTime(note);
         }
 
@@ -213,6 +228,8 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         Action<ValueChangedEvent<double>> changed = _ =>
         {
             Judgements.RefreshNoteTiming(note.HitObject);
+            note.Invalidate(Invalidation.DrawNode);
+            mineTimesDirty = true;
             InvalidateCoreOrder();
         };
         note.StartTimeBindable.ValueChanged += changed;

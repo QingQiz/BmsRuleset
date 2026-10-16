@@ -7,6 +7,7 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Tests.Visual;
 
@@ -21,6 +22,8 @@ public partial class TestSceneBmsSoftConstant : BmsPlayerTestScene
     private DrawableBmsHitObject[] notes = [];
     private double duration;
     private float visibleY;
+
+    private BmsInvisibleNoteLayer invisibleNotes => ((BmsColumn)Playfield.Stage.Columns[4]).InvisibleNoteLayer!;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
         => CreateBmsPlayer(_ => [new BmsReplayFrame(0), new BmsReplayFrame(60000)]);
@@ -56,10 +59,10 @@ public partial class TestSceneBmsSoftConstant : BmsPlayerTestScene
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Playfield.Stage.IsLoaded);
         AddStep("read target duration", () => duration = Playfield.ScrollController.ScrollRange / Playfield.ScrollController.ScrollSpeedMultiplier);
         seek(() => 4000 - duration - 100);
-        AddUntilStep("all note types alive", () =>
+        AddUntilStep("drawable note types alive", () =>
         {
             notes = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().Where(n => n.HitObject.StartTime == 4000).ToArray();
-            return notes.Length == 4;
+            return notes.Length == 3 && invisibleNotes.IsLoaded;
         });
         AddUntilStep("hidden before target", () => notes.All(n => visualAlpha(n) == 0));
         AddStep("disable live", () => config.SetValue(BmsRulesetSetting.SoftConstant, false));
@@ -74,11 +77,15 @@ public partial class TestSceneBmsSoftConstant : BmsPlayerTestScene
         AddStep("enable delayed fade", () => config.SetValue(BmsRulesetSetting.SoftConstantFadeIn, -200.0));
         seek(() => 4000 - duration + 100);
         AddUntilStep("delayed fade halfway", () => notes.All(n => Math.Abs(visualAlpha(n) - 0.5f) < 0.001));
+        AddUntilStep("invisible marker halfway faded", () => invisibleNotes.Markers.Count == 1
+            && Math.Abs(invisibleNotes.Markers[0].Alpha - 0.5f) < 0.001);
         seek(() => 4000 - duration + 201);
         AddUntilStep("fully visible", () => notes.All(n => visualAlpha(n) == 1));
+        AddUntilStep("invisible marker fully visible", () => invisibleNotes.Markers.Count == 1 && invisibleNotes.Markers[0].Alpha == 1);
         seek(() => 4000 - duration - 100);
         AddUntilStep("rewind hides notes", () => Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>()
             .Where(n => n.HitObject.StartTime == 4000).All(n => visualAlpha(n) == 0));
+        AddUntilStep("rewind hides invisible marker", () => invisibleNotes.Markers.Count == 0);
         seek(() => 4500);
         AddUntilStep("misses still judged", () => Player.Results.Count >= 2);
         AddStep("restore defaults", () =>

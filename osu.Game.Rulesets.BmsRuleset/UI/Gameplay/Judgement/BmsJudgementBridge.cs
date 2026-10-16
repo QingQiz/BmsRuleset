@@ -22,6 +22,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     private readonly BmsPlayfield playfield;
     private readonly BmsColumn column;
     private readonly Dictionary<BmsHitObject, Binding> representations = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<BmsLandmine, DrawableBmsHitObject> landmineRepresentations = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, Binding> boundObjects = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<BmsHitObject, BmsJudgementResult> results = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLongNoteStateObserver Observer)> presentationObservers = new(ReferenceEqualityComparer.Instance);
@@ -53,6 +54,12 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     internal void ObserveLandmineState(DrawableBmsHitObject drawable, BmsLandmineStateObserver observer)
         => landmineObservers[drawable] = (drawable.BindingGeneration, observer);
 
+    internal void BindLandmine(DrawableBmsHitObject drawable)
+    {
+        if (drawable.HitObject is BmsLandmine mine)
+            landmineRepresentations[mine] = drawable;
+    }
+
     internal void Unbind(DrawableBmsHitObject drawable, long generation)
     {
         boundObjects.TryGetValue(drawable, out var binding);
@@ -61,6 +68,10 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
             presentationObservers.Remove(drawable);
         if (landmineObservers.TryGetValue(drawable, out var mineObserver) && mineObserver.Generation == generation)
             landmineObservers.Remove(drawable);
+
+        if (drawable.HitObject is BmsLandmine mine && landmineRepresentations.TryGetValue(mine, out var representation)
+                                                   && ReferenceEquals(representation, drawable))
+            landmineRepresentations.Remove(mine);
 
         // Pool return may have cleared HitObject; only the binding owns the old identity.
         if (binding == null || binding.Generation != generation)
@@ -75,7 +86,10 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     internal DrawableBmsHitObject GetRepresentation(BmsHitObject note)
         => representations.TryGetValue(note, out var binding) && isCurrent(binding)
             ? binding.Drawable
-            : throw new InvalidOperationException("A main result requires the current representation.");
+            : note is BmsLandmine mine && landmineRepresentations.TryGetValue(mine, out var drawable)
+                                       && ReferenceEquals(drawable.HitObject, mine)
+                ? drawable
+                : throw new InvalidOperationException("A main result requires the current representation.");
 
     private bool isCurrent(Binding binding)
         => binding.Bound && binding.Drawable.BindingGeneration == binding.Generation && ReferenceEquals(binding.Drawable.HitObject, binding.Note);
@@ -136,12 +150,16 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     private void applyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty,
                                  IReadOnlyList<BmsLongNoteEndpointResult>? endpoints = null)
     {
-        var temporary = !representations.TryGetValue(note, out var binding) || !isCurrent(binding);
+        var drawable = representations.TryGetValue(note, out var binding) && isCurrent(binding)
+            ? binding.Drawable
+            : note is BmsLandmine mine && landmineRepresentations.TryGetValue(mine, out var mineDrawable)
+                                       && ReferenceEquals(mineDrawable.HitObject, mine)
+                ? mineDrawable
+                : null;
+        var temporary = drawable == null;
         // A delayed update can pass the entire visible lifetime. Borrow its ordinary framework
         // entry so score notification and rewind still use the same path as visible notes.
-        var drawable = temporary
-            ? (DrawableBmsHitObject)getPooledRepresentation(column, note, null)
-            : binding!.Drawable;
+        drawable ??= (DrawableBmsHitObject)getPooledRepresentation(column, note, null);
         var generation = drawable.BindingGeneration;
         Action<DrawableHitObject, JudgementResult>? temporaryNotification = null;
         if (temporary)
@@ -199,9 +217,10 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
     public void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame)
     {
-        if (!representations.TryGetValue(note, out var binding) || !isCurrent(binding)) return;
+        if (!landmineRepresentations.TryGetValue(note, out var drawable)
+            || !ReferenceEquals(drawable.HitObject, note))
+            return;
 
-        var drawable = binding.Drawable;
         if (landmineObservers.TryGetValue(drawable, out var observer) && observer.Generation == drawable.BindingGeneration)
             observer.Observer(state, frame);
     }

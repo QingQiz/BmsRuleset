@@ -9,7 +9,6 @@ using osu.Game.Rulesets.BmsRuleset.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.Presentation;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Judgement;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
@@ -24,7 +23,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     where TCol : struct, IColumnProvider
 {
     // The framework's reflection fallback misses the inherited protected draw-node factory.
-    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
+    protected override bool CanBeFlattened => CanFlattenWithMines && !Masking && !HasProxy && !ForceLocalVertexBatch;
 
     private BmsNoteVisual head = null!;
 

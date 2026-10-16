@@ -2,12 +2,10 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
 using NUnit.Framework;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
@@ -74,27 +72,26 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddStep("register hidden EPOOR", () =>
             ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(input_time, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
         AddWaitStep("wait for scheduled update", 1);
-        AddAssert("hidden EPOOR adds no line", () => !Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Any());
+        AddAssert("hidden EPOOR adds no line", () => !Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Any());
         AddStep("show EPOOR", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().ShowEmptyPoor.Value = true);
         AddUntilStep("EPOOR window shown", () => emptyPoorWindow().Alpha == 1);
         AddStep("register EPOOR timing", () =>
             ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(input_time, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
-        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 1);
+        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Count() == 1);
         AddAssert("EPOOR line is on fast side", () =>
-            Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Single().ScreenSpaceDrawQuad.Centre.X
-            < Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().ScreenSpaceDrawQuad.Centre.X);
+            Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Single().X
+            < 0.5f);
     }
 
     [Test]
-    public void TestHitErrorMeterExpandsAndReusesPool()
+    public void TestHitErrorMeterKeepsEveryLineWithoutGrowingDrawableTree()
     {
         BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
-        BmsHitErrorMeter.JudgementLinePool pool() => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLinePool>().Single();
+        var drawableCount = 0;
 
         void registerBarrage()
         {
             var processor = (BmsScoreProcessor)Player.GameplayState.ScoreProcessor;
-
             for (var i = 0; i < 100; i++)
                 processor.RegisterEmptyPoor(BmsTestBeatmaps.FIRST_NOTE_TIME - i, BmsTestBeatmaps.FIRST_NOTE_TIME, 0);
         }
@@ -102,53 +99,29 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddStep("stop gameplay clock", () => Player.GameplayClockContainer.Stop());
-        AddAssert("pool starts with fifty reusable lines", () => pool().CurrentPoolSize == 50);
-        AddAssert("pooled lines stay out of the presented tree", () =>
-            meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().All(line => !line.IsPresent));
+        AddStep("remember drawable count", () => drawableCount = meter().ChildrenOfType<Drawable>().Count());
         AddStep("register judgement barrage", registerBarrage);
-        AddUntilStep("all hundred lines are displayed", () => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 100);
-        AddAssert("pool grows past its initial size", () => pool().CurrentPoolSize == 100 && pool().CountInUse == 100);
-        AddStep("thicken existing lines", () => meter().JudgementLineThickness.Value = 5.5f);
-        AddAssert("existing and expanded lines update thickness", () =>
-            meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().All(line => line.Width == 5.5f));
+        AddUntilStep("all hundred lines retained", () => meter().Judgements.Lines.Count == 100);
+        AddAssert("lines add no drawables", () => meter().ChildrenOfType<Drawable>().Count() == drawableCount);
         AddStep("clear judgement lines", () => meter().Clear());
-        AddUntilStep("lines return to pool", () => pool().CountInUse == 0 && pool().CountAvailable == 100);
+        AddAssert("clear removes all lines", () => meter().Judgements.Lines.Count == 0);
         AddStep("use short fade", () => meter().JudgementFadeDuration.Value = 0.5f);
-        AddStep("change thickness while lines are pooled", () => meter().JudgementLineThickness.Value = 1.5f);
         AddStep("register another barrage", registerBarrage);
-        AddUntilStep("all hundred lines are reused", () => pool().CountInUse == 100);
-        AddAssert("reusing lines does not grow pool", () => pool().CurrentPoolSize == 100);
-        AddAssert("reused lines use current thickness", () =>
-            meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().All(line => line.Width == 1.5f));
-        AddUntilStep("faded lines return to pool", () => pool().CountInUse == 0 && pool().CountAvailable == 100);
+        AddUntilStep("all hundred lines retained again", () => meter().Judgements.Lines.Count == 100);
+        AddUntilStep("all lines expire", () => meter().Judgements.Lines.Count == 0);
     }
 
     [Test]
-    public void TestHitErrorMeterDrawSnapshotsTrackLayoutSettingsAndClear()
+    public void TestHitErrorMeterDrawSnapshotsMatchBoxes()
     {
         BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
-        Container judgements() => meter().ChildrenOfType<Container>().Single(child => child.Name == "judgements");
         var generate = typeof(Drawable).GetMethod("GenerateDrawNodeSubtree", BindingFlags.Instance | BindingFlags.NonPublic)!
             .CreateDelegate<Func<Drawable, ulong, int, bool, DrawNode?>>();
-        var readSource = typeof(DrawNode).GetProperty("Source", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetMethod!.CreateDelegate<Func<DrawNode, IDrawable>>();
-        var readQuad = typeof(SpriteDrawNode).GetProperty("ScreenSpaceDrawQuad", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetMethod!.CreateDelegate<Func<SpriteDrawNode, osu.Framework.Graphics.Primitives.Quad>>();
-        var readColour = typeof(DrawNode).GetProperty("DrawColourInfo", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetMethod!.CreateDelegate<Func<DrawNode, DrawColourInfo>>();
-        var canFlatten = typeof(CompositeDrawable).GetProperty("CanBeFlattened", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetMethod!.CreateDelegate<Func<CompositeDrawable, bool>>();
-        var localVertexBatch = typeof(CompositeDrawable).GetProperty(nameof(CompositeDrawable.ForceLocalVertexBatch))!;
-        var masking = typeof(CompositeDrawable).GetProperty("Masking", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
-        // A non-virtual call provides the framework's masking result without the component cache.
-        var baseMaskingMethod = new DynamicMethod("UpdateBaseMasking", typeof(bool), [typeof(CompositeDrawable)], typeof(TestSceneBmsSongProgress), true);
-        var baseMaskingIl = baseMaskingMethod.GetILGenerator();
-        baseMaskingIl.Emit(OpCodes.Ldarg_0);
-        baseMaskingIl.Emit(OpCodes.Call, typeof(CompositeDrawable).GetMethod(nameof(CompositeDrawable.UpdateSubTreeMasking))!);
-        baseMaskingIl.Emit(OpCodes.Ret);
-        var updateBaseMasking = baseMaskingMethod.CreateDelegate<Func<CompositeDrawable, bool>>();
+        var addInternal = typeof(CompositeDrawable).GetMethod("AddInternal", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<Action<CompositeDrawable, Drawable>>();
         var clock = new ManualClock();
         var frame = 0UL;
+        Container references = null!;
 
         AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
@@ -159,122 +132,82 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             meter().Clear();
             var processor = (BmsScoreProcessor)Player.GameplayState.ScoreProcessor;
             for (var i = 0; i < 20; i++)
-                processor.RegisterEmptyPoor(500 + i * 5, 1000, 0);
+                processor.RegisterEmptyPoor(500 + i * 50, 1000, 0);
         });
-        AddUntilStep("twenty lines prepared", () =>
-            meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count(line => line.Alpha == 0.4f) == 20);
-        AddAssert("multiple lines retain their buffered draw node", () => !canFlatten(judgements()));
-        AddStep("check every buffer and refresh boundary", () =>
+        AddUntilStep("twenty lines prepared", () => meter().Judgements.Lines.Count == 20 && meter().Judgements.Lines.All(line => double.IsFinite(line.FadeStart)));
+        AddStep("load reference boxes", () =>
+        {
+            references = new Container { RelativeSizeAxes = Axes.Both };
+            foreach (var line in meter().Judgements.Lines)
+                references.Add(new Box
+                {
+                    X = line.X,
+                    RelativePositionAxes = Axes.X,
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = Axes.Y,
+                    Height = 1,
+                    Width = meter().JudgementLineThickness.Value,
+                    Colour = line.Colour,
+                    Alpha = 0.4f,
+                    Blending = BlendingParameters.Additive,
+                });
+            addInternal(meter(), references);
+        });
+        AddUntilStep("reference boxes loaded", () => references.Children.All(box => box.IsLoaded));
+        AddStep("compare geometry and colours in every buffer", () =>
         {
             assertSnapshots();
-            clock.CurrentTime = 4;
-            meter().UpdateSubTree();
-            assertSnapshots();
-            clock.CurrentTime = 8;
-            meter().UpdateSubTree();
-            assertSnapshots();
             meter().JudgementLineThickness.Value = 6;
-            assertSnapshots();
-            var changedLine = (BmsHitErrorMeter.JudgementLine)judgements().Children.First();
-            changedLine.Alpha = 0.17f;
-            changedLine.Colour = Colour4.Cyan;
-            assertSnapshots();
-            meter().ShowEmptyPoor.Value = false;
+            foreach (var box in references.Children) box.Width = 6;
             assertSnapshots();
             meter().Position += new Vector2(13, 17);
             meter().Scale *= 1.25f;
             meter().Rotation = 11;
-            meter().Colour = Colour4.Cyan;
+            meter().Colour = osu.Framework.Graphics.Colour.ColourInfo.GradientHorizontal(Colour4.Cyan, Colour4.White);
             assertSnapshots();
-            masking.SetValue(meter(), true);
-            assertSnapshots();
-            masking.SetValue(meter(), false);
-            assertSnapshots();
-            judgements().Masking = true;
-            Assert.That(canFlatten(judgements()), Is.False);
-            judgements().Width = 0.4f;
-            assertSnapshots();
-            clock.CurrentTime = 1;
+            clock.CurrentTime = 500;
             meter().UpdateSubTree();
+            foreach (var box in references.Children) box.Alpha = meter().Judgements.Lines[0].AlphaAt(meter().Judgements.DisplayTime);
             assertSnapshots();
-            foreach (var line in judgements().Children.Skip(1))
-                line.Expire();
-            clock.CurrentTime = 9;
-            meter().UpdateSubTree();
-            Assert.That(judgements().Children.Count, Is.EqualTo(1));
-            meter().Rotation = 0;
-            meter().Scale = Vector2.One;
-            judgements().Masking = false;
-            localVertexBatch.SetValue(judgements(), true);
-            Assert.That(canFlatten(judgements()), Is.False);
+            meter().Colour = Colour4.White;
             assertSnapshots();
-            localVertexBatch.SetValue(judgements(), false);
-            Assert.That(canFlatten(judgements()), Is.True);
-            judgements().RelativeSizeAxes = Axes.None;
-            judgements().Size = new Vector2(1, 20);
-            var bounds = judgements().ComputeMaskingBounds();
-            judgements().Position = meter().ToLocalSpace(new Vector2(bounds.Left - 2, bounds.Centre.Y));
-            ((BmsHitErrorMeter.JudgementLine)judgements().Children.Single()).X = 1;
+            meter().Colour = osu.Framework.Graphics.Colour.ColourInfo.GradientVertical(Colour4.Red, Colour4.Blue);
             assertSnapshots();
-            Assert.That(snapshot(generate(meter(), ++frame, 0, false)), Has.Length.EqualTo(1),
-                "A flattened single line can extend into the viewport beyond its container bounds.");
-            judgements().Position = meter().ToLocalSpace(new Vector2(bounds.Left + 2, bounds.Centre.Y));
-            assertSnapshots();
-            Assert.That(snapshot(generate(meter(), ++frame, 0, false)), Has.Length.EqualTo(1),
-                "Moving the container back into the viewport restores the line.");
             meter().Clear();
-            clock.CurrentTime = 10;
-            meter().UpdateSubTree();
-            assertSnapshots();
-            Assert.That(judgements().Children, Is.Empty);
-            judgements().CreateProxy();
-            Assert.That(canFlatten(judgements()), Is.False);
+            for (var slot = 0; slot < 3; slot++)
+                Assert.That(((BmsHitErrorMeter.JudgementsLayer.JudgementsDrawNode)generate(meter().Judgements, ++frame, slot, false)!).Lines, Is.Empty);
         });
 
         void assertSnapshots()
         {
-            var container = judgements();
             meter().UpdateSubTreeMasking();
-            var cachedMasking = snapshot(generate(meter(), ++frame, 0, false));
-            updateBaseMasking(container);
-            Assert.That(snapshot(generate(meter(), ++frame, 0, true)), Is.EqualTo(cachedMasking),
-                "Cached masking differs from the framework's child traversal.");
             for (var slot = 0; slot < 3; slot++)
             {
-                var node = generate(container, ++frame, slot, false);
-                var normal = snapshot(node);
-                // Fresh nodes keep all three buffered snapshots comparable to current Box state.
-                var fresh = snapshot(generate(container, ++frame, slot, true));
-                Assert.That(normal, Is.EqualTo(fresh), $"Buffer {slot} retained stale line state.");
-                Assert.That(snapshot(generate(container, ++frame, slot, false)), Is.EqualTo(fresh));
-            }
-        }
-
-        object[] snapshot(DrawNode? node)
-        {
-            var result = new System.Collections.Generic.List<object>();
-            if (node != null)
-                visit(node);
-            return result.ToArray();
-
-            void visit(DrawNode child)
-            {
-                if (readSource(child) is BmsHitErrorMeter.JudgementLine)
-                    result.Add((readQuad((SpriteDrawNode)child), readColour(child)));
-                if (child is ICompositeDrawNode { Children: { } children })
-                    foreach (var nested in children)
-                        visit(nested);
+                var node = (BmsHitErrorMeter.JudgementsLayer.JudgementsDrawNode)generate(meter().Judgements, ++frame, slot, false)!;
+                Assert.That(node.Lines, Has.Count.EqualTo(references.Children.Count));
+                for (var i = 0; i < node.Lines.Count; i++)
+                {
+                    var actual = node.Lines[i];
+                    var expected = references.Children[i];
+                    Assert.That(Vector2.Distance(actual.Quad.TopLeft, expected.ScreenSpaceDrawQuad.TopLeft), Is.LessThan(0.001));
+                    Assert.That(Vector2.Distance(actual.Quad.BottomRight, expected.ScreenSpaceDrawQuad.BottomRight), Is.LessThan(0.001));
+                    var colour = expected.DrawColourInfo.Colour;
+                    var actualColour = node.GetLineColour(i);
+                    Assert.That((actualColour.TopLeft.ToVector() - colour.TopLeft.ToVector()).Length, Is.LessThan(0.00001));
+                    Assert.That((actualColour.TopRight.ToVector() - colour.TopRight.ToVector()).Length, Is.LessThan(0.00001));
+                    Assert.That((actualColour.BottomLeft.ToVector() - colour.BottomLeft.ToVector()).Length, Is.LessThan(0.00001));
+                    Assert.That((actualColour.BottomRight.ToVector() - colour.BottomRight.ToVector()).Length, Is.LessThan(0.00001));
+                }
             }
         }
     }
 
     [Test]
-    public void TestHitErrorMeterReuseAfterRewind()
+    public void TestHitErrorMeterClearAfterRewindStartsNewFade()
     {
         BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
-        BmsHitErrorMeter.JudgementLinePool pool() => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLinePool>().Single();
         var clock = new ManualClock { CurrentTime = 1000 };
-        BmsHitErrorMeter.JudgementLine original = null!;
         var onJudgement = typeof(BmsHitErrorMeter).GetMethod("OnNewJudgement", BindingFlags.Instance | BindingFlags.NonPublic)!
             .CreateDelegate<Action<BmsHitErrorMeter, JudgementResult>>();
 
@@ -287,21 +220,16 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             meter().JudgementFadeDuration.Value = 1;
         });
         AddStep("add timing line", addLine);
-        AddUntilStep("line begins fading", () => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().SingleOrDefault()?.Alpha == 0.4f);
-        AddStep("remember line and advance halfway", () =>
-        {
-            original = meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Single();
-            clock.CurrentTime = 1500;
-        });
-        AddUntilStep("halfway alpha is preserved", () => Math.Abs(original.Alpha - 0.2f) < 0.00001);
+        AddUntilStep("line begins fading", () => meter().Judgements.Lines.SingleOrDefault().FadeStart == 1000);
+        AddStep("advance halfway", () => clock.CurrentTime = 1500);
+        AddUntilStep("halfway alpha is preserved", () => Math.Abs(meter().Judgements.Lines.Single().AlphaAt(meter().Judgements.DisplayTime) - 0.2f) < 0.00001);
         AddStep("rewind controlled meter clock", () => clock.CurrentTime = 100);
         AddStep("seek backwards and clear", () => Player.GameplayClockContainer.Seek(0));
-        AddUntilStep("seek returns line to pool", () => pool().CountInUse == 0);
-        AddStep("reuse after rewind", addLine);
-        AddUntilStep("same line has full initial alpha", () => pool().CountInUse == 1
-            && meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Single() == original && original.Alpha == 0.4f);
-        AddStep("advance past reused fade", () => clock.CurrentTime = 1101);
-        AddUntilStep("reused line expires on new timeline", () => pool().CountInUse == 0 && pool().CountAvailable == 50);
+        AddUntilStep("seek clears lines", () => meter().Judgements.Lines.Count == 0);
+        AddStep("add line after rewind", addLine);
+        AddUntilStep("new line has full initial alpha", () => meter().Judgements.Lines.Count == 1 && meter().Judgements.Lines[0].FadeStart == 100);
+        AddStep("advance past new fade", () => clock.CurrentTime = 1101);
+        AddUntilStep("line expires on new timeline", () => meter().Judgements.Lines.Count == 0);
 
         void addLine()
         {
@@ -336,7 +264,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             var note = Playfield.Beatmap.HitObjects[0];
             onJudgement(meter(), new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
             meter().UpdateSubTree();
-            var line = meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Single();
+            var line = meter().Judgements.Lines.Single();
             Assert.That(line.LifetimeEnd, Is.EqualTo(reference.LifetimeEnd));
 
             // A settings change applies to new lines; the ongoing fade retains its duration.
@@ -347,48 +275,50 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
                 clock.CurrentTime = 1000 + offset;
                 meter().UpdateSubTree();
                 reference.UpdateSubTree();
-                Assert.That(line.Alpha, Is.EqualTo(reference.Alpha), $"Alpha at {offset} ms");
-                Assert.That(line.IsPresent, Is.EqualTo(reference.IsPresent), $"Presence at {offset} ms");
+                Assert.That(line.AlphaAt(meter().Judgements.DisplayTime), Is.EqualTo(reference.Alpha), $"Alpha at {offset} ms");
+                Assert.That(line.AlphaAt(meter().Judgements.DisplayTime) > 0.0001f, Is.EqualTo(reference.IsPresent), $"Presence at {offset} ms");
             }
 
             clock.CurrentTime = reference.LifetimeEnd + 8;
             meter().UpdateSubTree();
-            Assert.That(meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>(), Is.Empty);
+            Assert.That(meter().Judgements.Lines, Is.Empty);
         });
     }
 
     [Test]
-    public void TestHitErrorMeterDisposesActiveAndRecycledLines()
+    public void TestHitErrorMeterMixedFadeDurationsExpireIndependently()
     {
         BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
-        BmsHitErrorMeter.JudgementLinePool pool() => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLinePool>().Single();
-        BmsHitErrorMeter.JudgementLine[] lines = [];
-        var isDisposed = typeof(Drawable).GetProperty("IsDisposed", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetMethod!.CreateDelegate<Func<Drawable, bool>>();
-
+        var clock = new ManualClock();
+        var onJudgement = typeof(BmsHitErrorMeter).GetMethod("OnNewJudgement", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<Action<BmsHitErrorMeter, JudgementResult>>();
         AddStep("load player", LoadPlayer);
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
-        AddStep("stop gameplay clock and fill pool", () =>
+        AddStep("add overlapping fades", () =>
         {
             Player.GameplayClockContainer.Stop();
-            var processor = (BmsScoreProcessor)Player.GameplayState.ScoreProcessor;
-            for (var i = 0; i < 100; i++)
-                processor.RegisterEmptyPoor(BmsTestBeatmaps.FIRST_NOTE_TIME - i, BmsTestBeatmaps.FIRST_NOTE_TIME, 0);
+            meter().Clock = new FramedClock(clock);
+            meter().Clear();
+            meter().UpdateSubTree();
+            addLine(20);
+            clock.CurrentTime = 100;
+            addLine(0.1f);
+            clock.CurrentTime = 300;
+            meter().UpdateSubTree();
+            Assert.That(meter().Judgements.Lines, Has.Count.EqualTo(1));
+            Assert.That(meter().Judgements.Lines[0].FadeEnd, Is.EqualTo(20000));
+            clock.CurrentTime = 20001;
+            meter().UpdateSubTree();
+            Assert.That(meter().Judgements.Lines, Is.Empty);
         });
-        AddUntilStep("hundred lines active", () => pool().CountInUse == 100);
-        AddStep("remember lines and recycle half", () =>
+
+        void addLine(float duration)
         {
-            lines = meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().ToArray();
-            foreach (var line in lines.Take(50))
-            {
-                line.ClearTransforms();
-                line.Expire();
-            }
-        });
-        AddUntilStep("half the lines recycled", () => pool().CountInUse == 50 && pool().CountAvailable == 50);
-        AddAssert("recycling keeps lines alive for reuse", () => lines.All(line => !isDisposed(line)));
-        AddStep("remove meter", () => meter().Expire());
-        AddUntilStep("all owned lines disposed", () => lines.All(line => isDisposed(line)));
+            meter().JudgementFadeDuration.Value = duration;
+            var note = Playfield.Beatmap.HitObjects[0];
+            onJudgement(meter(), new JudgementResult(note, note.CreateJudgement()) { Type = HitResult.Perfect });
+            meter().UpdateSubTree();
+        }
     }
 
     [Test]
@@ -397,7 +327,7 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         BmsHitErrorMeter meter() => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single();
         Box badWindow() => meter().ChildrenOfType<Box>().Single(child => child.Name == $"{HitResult.Ok} window");
         Container colourBar() => meter().ChildrenOfType<Container>().Single(child => child.Name == "judgement windows");
-        Container judgements() => meter().ChildrenOfType<Container>().Single(child => child.Name == "judgements");
+        Drawable judgements() => meter().Judgements;
 
         float originalWindowWidth = 0;
         float originalJudgementHeight = 0;
@@ -534,14 +464,14 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddStep("register EPOOR timing", () =>
             ((BmsScoreProcessor)Player.GameplayState.ScoreProcessor).RegisterEmptyPoor(
                 BmsTestBeatmaps.FIRST_NOTE_TIME - 400, BmsTestBeatmaps.FIRST_NOTE_TIME, 0));
-        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 1);
+        AddUntilStep("error line appears", () => Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Count() == 1);
         AddAssert("legacy line fades without shrinking", () =>
         {
-            var line = meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Single();
-            return line.Width == 3 && line.Height == 1 && line.RelativeSizeAxes == Axes.Y
-                   && line.Alpha is > 0 and <= 0.4f && line.ChildrenOfType<Drawable>().Count() == 1;
+            var line = meter().Judgements.Lines.Single();
+            return meter().JudgementLineThickness.Value == 3
+                   && line.AlphaAt(meter().Judgements.DisplayTime) is > 0 and <= 0.4f;
         });
-        AddUntilStep("error line expires", () => !Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Any());
+        AddUntilStep("error line expires", () => !Player.HUDOverlay.ChildrenOfType<BmsHitErrorMeter>().Single().Judgements.Lines.Any());
     }
 
     [Test]
@@ -565,14 +495,14 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
         AddUntilStep("hit error meter loaded", () => meter().IsLoaded);
         AddStep("stop gameplay clock", () => Player.GameplayClockContainer.Stop());
         AddStep("register Fast and Slow POOR", registerPoors);
-        AddUntilStep("both POOR lines appear", () => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 2);
+        AddUntilStep("both POOR lines appear", () => meter().Judgements.Lines.Count() == 2);
         AddStep("POOR lines match visible outer edges", () => assertEnds(showEmptyPoor: true));
         AddStep("hide E-POOR", () => meter().ShowEmptyPoor.Value = false);
         AddStep("existing POOR lines follow remaining hit windows", () => assertEnds(showEmptyPoor: false));
         AddStep("clear lines", () => meter().Clear());
-        AddUntilStep("lines returned to pool", () => !meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Any());
+        AddUntilStep("lines cleared", () => !meter().Judgements.Lines.Any());
         AddStep("register POOR with E-POOR hidden", registerPoors);
-        AddUntilStep("both POOR lines appear again", () => meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().Count() == 2);
+        AddUntilStep("both POOR lines appear again", () => meter().Judgements.Lines.Count() == 2);
         AddStep("new POOR lines use remaining hit windows", () => assertEnds(showEmptyPoor: false));
         AddStep("show E-POOR", () => meter().ShowEmptyPoor.Value = true);
         AddStep("existing POOR lines return to outer edges", () => assertEnds(showEmptyPoor: true));
@@ -598,12 +528,12 @@ public partial class TestSceneBmsSongProgress : BmsPlayerTestScene
             };
             var left = window(showEmptyPoor ? HitResult.Miss : hitResult).ScreenSpaceDrawQuad.AABBFloat.Left;
             var right = window(showEmptyPoor && noBad ? HitResult.Miss : hitResult).ScreenSpaceDrawQuad.AABBFloat.Right;
-            var lines = meter().ChildrenOfType<BmsHitErrorMeter.JudgementLine>().OrderBy(line => line.X).ToArray();
+            var lines = meter().Judgements.Lines.OrderBy(line => line.X).ToArray();
 
             Assert.That(lines, Has.Length.EqualTo(2));
             Assert.That(lines.All(line => line.Colour == BmsHitResultColours.ForHitResult(HitResult.Meh)), Is.True);
-            Assert.That(lines[0].ScreenSpaceDrawQuad.Centre.X, Is.EqualTo(left).Within(0.5f));
-            Assert.That(lines[1].ScreenSpaceDrawQuad.Centre.X, Is.EqualTo(right).Within(0.5f));
+            Assert.That(meter().Judgements.ToScreenSpace(new Vector2(lines[0].X * meter().Judgements.DrawWidth, 0)).X, Is.EqualTo(left).Within(0.5f));
+            Assert.That(meter().Judgements.ToScreenSpace(new Vector2(lines[1].X * meter().Judgements.DrawWidth, 0)).X, Is.EqualTo(right).Within(0.5f));
         }
     }
 }

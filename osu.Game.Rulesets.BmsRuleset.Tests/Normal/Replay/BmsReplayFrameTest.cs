@@ -57,7 +57,7 @@ public partial class BmsReplayFrameTest
         Assert.That(repress.Time, Is.EqualTo(press.Time));
         source.CurrentTime = 500;
         clock.ProcessFrame();
-        Assert.That(recorder.CreateFrame([BmsAction.Key1], repress)?.Time, Is.EqualTo(500));
+        Assert.That(recorder.CreateFrame([BmsAction.Key1], repress), Is.Null);
     }
 
     [Test]

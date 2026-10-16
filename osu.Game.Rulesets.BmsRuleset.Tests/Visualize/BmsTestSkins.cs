@@ -28,15 +28,17 @@ public static partial class BmsTestSkins
     /// Creates an <see cref="ISkinSource"/> for the given <see cref="SkinKind"/>.
     /// </summary>
     public static ISkinSource CreateSkinSource(SkinKind kind, IStorageResourceProvider resources)
-        => kind == SkinKind.Legacy
-            ? BmsTestLegacySkin.CreateSkinSource(resources)
-            : kind == SkinKind.LegacyKeysUnderNotes
-                ? BmsTestLegacySkin.CreateSkinSource(resources, keysUnderNotes: true)
-                : kind == SkinKind.LegacyMissingColumnLightTexture
-                    ? BmsTestLegacySkin.CreateSkinSource(resources, includeColumnLightTexture: false)
-                    : new SkinProvidingContainer(kind == SkinKind.Classic
-                        ? new DefaultLegacySkin(resources)
-                        : new ArgonSkin(resources));
+        => Environment.GetEnvironmentVariable("BMS_LIFETIME_SKIN") is { Length: > 0 } storage
+            ? BmsLifetimeLocalSkin.Create(resources, storage)
+            : kind == SkinKind.Legacy
+                ? BmsTestLegacySkin.CreateSkinSource(resources)
+                : kind == SkinKind.LegacyKeysUnderNotes
+                    ? BmsTestLegacySkin.CreateSkinSource(resources, keysUnderNotes: true)
+                    : kind == SkinKind.LegacyMissingColumnLightTexture
+                        ? BmsTestLegacySkin.CreateSkinSource(resources, includeColumnLightTexture: false)
+                        : new SkinProvidingContainer(kind == SkinKind.Classic
+                            ? new DefaultLegacySkin(resources)
+                            : new ArgonSkin(resources));
 
     public enum SkinKind
     {

@@ -236,7 +236,13 @@ public partial class BmsGameplayVirtualisationTest
         playfield.RefreshAllLifetimes();
 
         var entry = playfield.Stage.Columns[1].HitObjectContainer.Entries.Single();
-        Assert.That(entry.LifetimeStart, Is.EqualTo(mine.StartTime - BmsDrawableRuleset.ComputeScrollTime(8)).Within(1));
+        var container = (BmsColumnHitObjectContainer)playfield.Stage.Columns[1].HitObjectContainer;
+        playfield.ScrollController.Update(0);
+        container.UpdateScrollEntries();
+        Assert.That(entry.LifetimeStart, Is.GreaterThan(mine.StartTime));
+        playfield.ScrollController.Update(mine.StartTime);
+        container.UpdateScrollEntries();
+        Assert.That(entry.LifetimeStart, Is.LessThanOrEqualTo(mine.StartTime));
         Assert.That(entry.LifetimeEnd, Is.EqualTo(mine.StartTime + 100));
     }
 

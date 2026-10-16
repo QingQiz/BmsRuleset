@@ -65,6 +65,12 @@ public partial class TestSceneBmsDrawableTraversal
                 GetType().GetMethod(nameof(countTailProjection), counters)!);
             using var historyProbe = new ScopedMethodProbe(drawable.GetType().GetField("visualState", flags)!.FieldType
                 .GetMethod("UpdateHeadYAtStartTime", BindingFlags.Public | flags)!, GetType().GetMethod(nameof(countHistoryObservation), counters)!);
+            // Rebuild callers after installing leaf probes so warmed JIT inlines cannot hide work.
+            var keepBoundary = GetType().GetMethod(nameof(keepLongNoteVisualBoundary), counters)!;
+            using var frameProbe = new ScopedMethodProbe(drawable.GetType().GetMethod("UpdateVisualFrame", flags)!, keepBoundary);
+            using var layoutProbe = new ScopedMethodProbe(drawable.GetType().GetMethod("PrepareVisual", flags)!, keepBoundary);
+            using var observationProbe = new ScopedMethodProbe(drawable.GetType().GetMethods(flags)
+                .Single(method => method.Name == "observeVisualTime" && method.GetParameters().Length == 4), keepBoundary);
             try
             {
                 Playfield.EndGameplayFrame();
@@ -171,4 +177,6 @@ public partial class TestSceneBmsDrawableTraversal
     }
 
     private static void countHistoryObservation() => historyObservations++;
+
+    private static void keepLongNoteVisualBoundary() { }
 }

@@ -152,6 +152,29 @@ public partial class TestSceneBmsColumnSpriteBatchLifecycle : BmsPlayerTestScene
 
     [TestCase(BmsTestSkins.SkinKind.Argon)]
     [TestCase(BmsTestSkins.SkinKind.Legacy)]
+    public void NewlyLoadedSkinSpriteBatchesInItsFirstFrame(BmsTestSkins.SkinKind selectedSkin)
+    {
+        var skinChanged = typeof(BmsNoteVisual).GetMethod("SkinChanged", flags)!;
+        PreparePlayer(selectedSkin);
+        AddStep("load replacement sprites in one traversal", () =>
+        {
+            foreach (var note in notes)
+            {
+                var controller = (BmsNoteVisual)visualLayer.GetValue(note)!;
+                skinChanged.Invoke(controller, [((BmsTestSkins.SkinnedTestPlayer)Player).SkinSource]);
+                var sprite = (BmsResolvedNoteSprite)controller.Drawable;
+                Assert.That(sprite.LoadState, Is.EqualTo(LoadState.Ready), "The fixture must start before the child's first update.");
+                Assert.That(note.SingleSpriteForBatch, Is.Null);
+                note.UpdateSubTree();
+                Assert.That(note.SingleSpriteForBatch, Is.SameAs(sprite));
+                Assert.That(sprite.IsAlive, Is.True, "Reparenting must not hide the loaded sprite for one frame.");
+            }
+            CompareBuffers(4);
+        });
+    }
+
+    [TestCase(BmsTestSkins.SkinKind.Argon)]
+    [TestCase(BmsTestSkins.SkinKind.Legacy)]
     public void LateWrappedNoteFallsBackWithoutChangingDrawState(BmsTestSkins.SkinKind selectedSkin)
     {
         var readAlive = typeof(CompositeDrawable).GetProperty("AliveInternalChildren", flags)!.GetMethod!

@@ -137,7 +137,7 @@ public static class BmsDefaultHud
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
                 },
-                new ArgonScoreCounter
+                new BmsScoreCounter
                 {
                     Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,

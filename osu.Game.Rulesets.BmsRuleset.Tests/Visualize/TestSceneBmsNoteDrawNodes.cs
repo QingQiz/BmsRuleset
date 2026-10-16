@@ -17,6 +17,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
@@ -103,14 +104,15 @@ public partial class TestSceneBmsNoteDrawNodes : BmsPlayerTestScene
         AddUntilStep("note skin layers loaded", () =>
         {
             wrappers = Playfield.ChildrenOfType<DrawableBmsHitObject>().Cast<CompositeDrawable>()
-                                .Concat(Playfield.ChildrenOfType<BmsCachedSkinnableDrawable>())
+                                .Concat(Playfield.ChildrenOfType<BmsCachedSkinnableDrawable>()
+                                                 .Where(wrapper => wrapper.Parent is not BmsHitExplosionLayer))
                                 .Concat(Playfield.ChildrenOfType<BmsResolvedNotePiece>())
                                 .Concat(Playfield.ChildrenOfType<DrawableBmsHitObject>()
                                                  .Where(note => note.HitObject is BmsLongNote)
                                                  .Select(note => (CompositeDrawable)visualLayer.GetValue(note)!))
                                 .Concat(Playfield.ChildrenOfType<BmsSegmentedLongNoteBody>().Where(body => !body.Masking))
                                 .Where(wrapper => wrapper.IsLoaded).ToArray();
-            return wrappers.OfType<DrawableBmsHitObject>().Count(note => note.IsPresent) == 4
+            return wrappers.OfType<DrawableBmsHitObject>().Count(note => note.IsPresent) == 3
                    && wrappers.OfType<BmsCachedSkinnableDrawable>().Any()
                    && (skin != BmsTestSkins.SkinKind.Legacy || wrappers.OfType<BmsSegmentedLongNoteBody>().Any())
                    && (wrappers.OfType<BmsResolvedNotePiece>().Any()
@@ -149,54 +151,6 @@ public partial class TestSceneBmsNoteDrawNodes : BmsPlayerTestScene
                 note.UpdateSoftConstantVisibility(1);
                 localVertexBatch.SetValue(visual, false);
             }
-        });
-        AddStep("compare invisible marker with former composition", () =>
-        {
-            var note = wrappers.OfType<DrawableBmsInvisibleNote>().Single();
-            var marker = note.ChildrenOfType<Container>().Single();
-            Assert.That(marker.Parent, Is.SameAs(note));
-            Assert.That(marker.Masking, Is.True);
-            Assert.That(visualLayer.GetValue(note), Is.SameAs(marker));
-
-            float[] heights = [0.5f, 1, 1.37f];
-            float[] alphas = [1, 0.4f];
-            foreach (var height in heights)
-            foreach (var alpha in alphas)
-            {
-                Playfield.Stage.SetNoteHeightScale(height);
-                note.UpdateSoftConstantVisibility(alpha);
-                note.Alpha = 0.6f;
-                note.UpdateSubTree();
-                for (var slot = 0; slot < 3; slot++)
-                {
-                    var direct = snapshot(generate(note, ++frame, slot, true), out _, out _);
-                    var originalMarker = new Container { RelativeSizeAxes = Axes.X, Scale = marker.Scale };
-                    var originalLayer = new Container
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Alpha = marker.Alpha,
-                        Child = originalMarker,
-                    };
-                    remove(note, marker, false);
-                    marker.Scale = Vector2.One;
-                    marker.Alpha = 1;
-                    originalMarker.Add(marker);
-                    add(note, originalLayer);
-                    note.UpdateSubTree();
-                    var composed = snapshot(generate(note, ++frame, slot, true), out _, out _);
-                    Assert.That(composed, Is.EqualTo(direct), $"Buffer {slot} changed invisible marker state at height {height}, alpha {alpha}.");
-                    originalMarker.Remove(marker, false);
-                    remove(note, originalLayer, true);
-                    add(note, marker);
-                    marker.Scale = new Vector2(1, height);
-                    marker.Alpha = alpha;
-                    note.UpdateSubTree();
-                }
-            }
-            Playfield.Stage.SetNoteHeightScale(1);
-            note.UpdateSoftConstantVisibility(1);
-            note.Alpha = 1;
-            note.UpdateSubTree();
         });
         AddStep("compare direct key pieces with former composition", () =>
         {
@@ -261,15 +215,13 @@ public partial class TestSceneBmsNoteDrawNodes : BmsPlayerTestScene
         void assertSnapshots()
         {
             Assert.That(wrappers.All(canFlatten), Is.True);
-            Assert.That(wrappers.All(wrapper => wrapper.GetType().GetMethod("CreateDrawNode", flags)!.DeclaringType == typeof(CompositeDrawable)), Is.True);
+            Assert.That(wrappers.All(wrapper => wrapper.GetType().GetMethod("CreateDrawNode", flags)!.DeclaringType
+                == (wrapper is DrawableBmsHitObject ? typeof(DrawableBmsHitObject) : typeof(CompositeDrawable))), Is.True);
             Playfield.UpdateSubTreeMasking();
             for (var slot = 0; slot < 3; slot++)
             {
                 var flattened = snapshot(generate(Playfield, ++frame, slot, false), out var flattenedWrappers, out var flattenedNotes);
                 Assert.That(flattened, Is.Not.Empty);
-                var marker = wrappers.OfType<DrawableBmsInvisibleNote>().Single().ChildrenOfType<Container>().Single(container => container.Masking);
-                Assert.That(flattened.OfType<(IDrawable Source, MaskingInfo Masking, DrawColourInfo Colour)>()
-                                     .Any(state => ReferenceEquals(state.Source, marker)), Is.True);
                 Assert.That(flattenedWrappers, Is.Zero);
                 Assert.That(flattenedNotes, Is.Zero);
                 foreach (var wrapper in wrappers)
@@ -277,7 +229,7 @@ public partial class TestSceneBmsNoteDrawNodes : BmsPlayerTestScene
                 Playfield.UpdateSubTreeMasking();
                 var composite = snapshot(generate(Playfield, ++frame, slot, true), out var compositeWrappers, out var compositeNotes);
                 Assert.That(compositeWrappers, Is.GreaterThan(0));
-                Assert.That(compositeNotes, Is.EqualTo(4));
+                Assert.That(compositeNotes, Is.EqualTo(3));
                 Assert.That(composite, Is.EqualTo(flattened), $"Buffer {slot} changed rendered sprite or masking state.");
                 foreach (var wrapper in wrappers)
                     localVertexBatch.SetValue(wrapper, false);

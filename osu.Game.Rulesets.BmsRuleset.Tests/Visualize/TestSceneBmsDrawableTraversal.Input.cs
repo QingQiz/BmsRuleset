@@ -12,7 +12,6 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
-using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osuTK;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -43,9 +42,7 @@ public partial class TestSceneBmsDrawableTraversal
         AddUntilStep("simulation caught up", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 4800) < .001);
         AddStep("compare input queues and descendant work", () =>
         {
-            var notes = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>()
-                                .Where(note => note.HitObject.StartTime == 5000).ToArray();
-            Assert.That(notes, Has.Length.EqualTo(4));
+            var notes = soundFixtureObjects();
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
             var nonPositional = typeof(CompositeDrawable).GetMethod("BuildNonPositionalInputQueue", flags)!
                 .CreateDelegate<Func<CompositeDrawable, List<Drawable>, bool, bool>>();

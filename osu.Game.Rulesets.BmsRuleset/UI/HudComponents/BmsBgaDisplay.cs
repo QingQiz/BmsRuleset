@@ -175,8 +175,8 @@ public sealed partial class BmsBgaDisplay : BmsHudComponent
         // normal frame-sized advances retain the ordered path below.
         // Sorted events let the first item beyond the budget prove a backlog without two binary searches per frame.
         if (time < lastTime
-            || events.Length - nextEventIndex > maximum_incremental_events && events[nextEventIndex + maximum_incremental_events].Time <= time
-            || opacityEvents.Length - nextOpacityEventIndex > maximum_incremental_events && opacityEvents[nextOpacityEventIndex + maximum_incremental_events].Time <= time)
+            || (events.Length - nextEventIndex > maximum_incremental_events && events[nextEventIndex + maximum_incremental_events].Time <= time)
+            || (opacityEvents.Length - nextOpacityEventIndex > maximum_incremental_events && opacityEvents[nextOpacityEventIndex + maximum_incremental_events].Time <= time))
             rebuildStateAt(time);
 
         lastTime = time;

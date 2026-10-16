@@ -22,6 +22,9 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables;
 /// </remarks>
 internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
 {
+    // Geometry, tint and animation are already inherited by the sprite's own draw node.
+    protected override bool CanBeFlattened => !Masking && !HasProxy && !ForceLocalVertexBatch;
+
     public float ResolvedScale { get; }
 
     private readonly string imageName;
@@ -29,6 +32,8 @@ internal sealed partial class LegacyBmsHitExplosion : CompositeDrawable
     private readonly float hitPosition;
 
     private Drawable? hitExplosion;
+
+    internal Sprite? StaticSprite => hitExplosion?.GetType() == typeof(Sprite) ? (Sprite)hitExplosion : null;
 
     public LegacyBmsHitExplosion(BmsLegacySkinTransformer transformer, BmsSkinComponentLookup lookup, Texture[] textures)
     {

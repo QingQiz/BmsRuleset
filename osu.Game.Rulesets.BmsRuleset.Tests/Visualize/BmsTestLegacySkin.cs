@@ -164,9 +164,16 @@ public static class BmsTestLegacySkin
 
     public static string KeyImageDown(int column) => $"key{column}D";
 
-    public static ISkinSource CreateSkinSource(IStorageResourceProvider resources, bool keysUnderNotes = false, bool includeColumnLightTexture = true)
+    public static ISkinSource CreateSkinSource(IStorageResourceProvider resources, bool keysUnderNotes = false, bool includeColumnLightTexture = true, bool animatedMines = false)
     {
-        var skin = new TestLegacyBmsSkin(resources, buildResources(keysUnderNotes, includeColumnLightTexture));
+        var textures = buildResources(keysUnderNotes, includeColumnLightTexture);
+        if (animatedMines)
+        {
+            textures[$"{MINE_IMAGE}-0"] = textures[MINE_IMAGE];
+            textures[$"{MINE_IMAGE}-1"] = solidPng(0, 128, 255);
+            textures.Remove(MINE_IMAGE);
+        }
+        var skin = new TestLegacyBmsSkin(resources, textures);
         return new SkinProvidingContainer(new BmsLegacySkinTransformer(skin, new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K }));
     }
 

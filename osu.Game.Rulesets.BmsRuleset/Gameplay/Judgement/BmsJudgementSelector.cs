@@ -41,7 +41,13 @@ public static class BmsJudgementSelector
             }
 
             Array.Sort(sortedCandidates, 0, count, candidate_comparer);
-            return selectSorted(layout, column, sortedCandidates, count, inputTime, algorithm);
+            var search = new PressSearch(layout, column, inputTime, algorithm);
+            for (var i = 0; i < count; i++)
+            {
+                if (!search.Consider(sortedCandidates[i], i)) break;
+            }
+
+            return search.Selection;
         }
         finally
         {
@@ -49,35 +55,42 @@ public static class BmsJudgementSelector
         }
     }
 
-    private static BmsJudgementSelection selectSorted(
-        BmsLayoutVariant layout,
-        int column,
-        BmsJudgementCandidate[] candidates,
-        int count,
-        double inputTime,
-        BmsJudgementAlgorithm? algorithm)
+    // Gameplay already owns ordered notes. Feed them directly, retaining the selected slot
+    // instead of copying, sorting and finding the chosen note a second time.
+    internal struct PressSearch(BmsLayoutVariant layout, int column, double inputTime, BmsJudgementAlgorithm? algorithm)
     {
-        BmsJudgementCandidate? selected = null;
-        HitResult selectedResult = HitResult.None;
-        BmsJudgementWindowTable? selectedTable = null;
-        BmsJudgementCandidate? emptyPoorCandidate = null;
+        private BmsJudgementCandidate? selected;
+        private HitResult selectedResult;
+        private BmsJudgementWindowTable? selectedTable;
+        private BmsJudgementCandidate? emptyPoorCandidate;
+        private int selectedSlot;
+        private int emptyPoorSlot;
 
-        for (var i = 0; i < count; i++)
+        internal readonly BmsJudgementSelection Selection => selected != null
+            ? new BmsJudgementSelection(selected, selectedResult, false)
+            : new BmsJudgementSelection(emptyPoorCandidate, emptyPoorCandidate != null ? HitResult.Miss : HitResult.None, emptyPoorCandidate != null);
+
+        internal readonly int Slot => selected != null ? selectedSlot : emptyPoorCandidate != null ? emptyPoorSlot : -1;
+
+        internal bool Consider(in BmsJudgementCandidate candidate, int slot)
         {
-            var candidate = candidates[i];
             if (candidate.Column != column)
-                continue;
+                return true;
 
-            var table = BmsJudgementProfileProvider.GetTable(layout, candidate.Column, candidate.JudgementRate, tail: false);
             var offset = inputTime - candidate.StartTime;
             // beatoraja stops its candidate search before the inclusive E-POOR table edge.
             if (offset <= -500)
-                break;
+                return false;
 
+            if (selected is { } current && algorithm == BmsJudgementAlgorithm.Duration
+                                        && candidate.StartTime >= inputTime && Math.Abs(current.StartTime - inputTime) <= -offset)
+                return false;
+
+            var table = BmsJudgementProfileProvider.GetTable(layout, candidate.Column, candidate.JudgementRate, tail: false);
             var result = candidate.IsJudged ? HitResult.None : table.ResultForOffset(offset);
             if (BmsJudgementProfileProvider.IsPms(layout)
                 && (candidate.IsJudged || (candidate.HasMistake && result is not (HitResult.Perfect or HitResult.Great or HitResult.Good))))
-                continue;
+                return true;
 
             if (result != HitResult.None)
             {
@@ -86,27 +99,33 @@ public static class BmsJudgementSelector
                     selected = candidate;
                     selectedResult = result;
                     selectedTable = table;
+                    selectedSlot = slot;
                 }
 
-                // No later candidate can replace an exact-time Perfect under any selector.
-                // This matters for bursts with thousands of future notes inside the hit window.
+                // Once the current choice cannot be replaced, later notes and empty POOR
+                // candidates cannot change the result, even when judgement rates differ.
                 if (selectedResult == HitResult.Perfect && selected.Value.StartTime == inputTime)
-                    break;
+                    return false;
 
-                continue;
+                return (algorithm ?? BmsJudgementAlgorithm.Combo) switch
+                {
+                    BmsJudgementAlgorithm.Lowest => false,
+                    BmsJudgementAlgorithm.Duration => selected.Value.StartTime < inputTime,
+                    BmsJudgementAlgorithm.Combo => selected.Value.StartTime - inputTime < -selectedTable!.SlowWindowFor(HitResult.Good),
+                    BmsJudgementAlgorithm.Score => selected.Value.StartTime - inputTime < -selectedTable!.SlowWindowFor(HitResult.Great),
+                    _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm, null),
+                };
             }
 
             if (table.EPoorWindow?.ContainsOffset(offset) == true
                 && (emptyPoorCandidate == null || Math.Abs(offset) < Math.Abs(inputTime - emptyPoorCandidate.Value.StartTime)))
+            {
                 emptyPoorCandidate = candidate;
+                emptyPoorSlot = slot;
+            }
+
+            return true;
         }
-
-        if (selected != null)
-            return new BmsJudgementSelection(selected, selectedResult, false);
-
-        return emptyPoorCandidate != null
-            ? new BmsJudgementSelection(emptyPoorCandidate, HitResult.Miss, true)
-            : new BmsJudgementSelection(null, HitResult.None, false);
     }
 
     private static bool shouldReplaceSelected(

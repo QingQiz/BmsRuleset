@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
@@ -27,4 +28,11 @@ internal static class BmsJudgementStateInspection
 
     internal static BmsHoldRegistry GetHolds(BmsColumnJudgementRuntime column)
         => (BmsHoldRegistry)typeof(BmsColumnJudgementRuntime).GetField("holds", instance)!.GetValue(column)!;
+
+    internal static IEnumerable<(double Time, int Slot)> GetPendingHeads(BmsColumnJudgementRuntime column)
+    {
+        var notes = (BmsHitObject[])typeof(BmsColumnJudgementRuntime).GetField("columnNotes", instance)!.GetValue(column)!;
+        for (var i = column.Notes.FindPendingHead(0, true); i < notes.Length; i = column.Notes.FindPendingHead(i + 1, true))
+            yield return (notes[i].StartTime, column.GetNoteSlot(notes[i]));
+    }
 }

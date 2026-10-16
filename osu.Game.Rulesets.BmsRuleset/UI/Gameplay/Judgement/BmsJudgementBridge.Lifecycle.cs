@@ -31,7 +31,7 @@ internal sealed partial class BmsJudgementBridge
 
     internal void Register(DrawableBmsHitObject drawable)
     {
-        if (drawable.HitObject is BmsNote or BmsLongNote or BmsLandmine)
+        if (drawable.HitObject is BmsNote or BmsLongNote)
             Bind(drawable);
     }
 
@@ -45,7 +45,7 @@ internal sealed partial class BmsJudgementBridge
         var note = drawable.HitObject;
         if (note is BmsLandmine)
         {
-            Bind(drawable);
+            BindLandmine(drawable);
             return;
         }
 

@@ -12,8 +12,7 @@ namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 internal sealed class BmsHitObjectLifetimeEntry(
     HitObject hitObject,
     BmsGameplayScrollController scrollController,
-    Func<double> getVisualOffset,
-    double activationLeadTime = 0)
+    Func<double> getVisualOffset)
     : HitObjectLifetimeEntry(hitObject)
 {
 
@@ -26,6 +25,11 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
     private double? lifetimeStartWithoutVisualOffset;
     private double unjudgedLifetimeEnd;
+    private double computedLifetimeStart;
+    private double computedLifetimeEnd = double.MaxValue;
+    private bool scrollVisible = true;
+
+    internal bool IsBatchedMine { get; private set; }
 
     #region Constants
 
@@ -80,10 +84,12 @@ internal sealed class BmsHitObjectLifetimeEntry(
         if (HitObject is not BmsHitObject hitObject)
             return;
 
-        var futureLifetime = computeFutureLifetime(hitObject);
+        // Point markers use the container's scroll-coordinate index. A single time interval
+        // cannot describe their repeated appearances when SCROLL reverses.
+        var futureLifetime = hitObject is BmsLandmine or BmsInvisibleNote ? double.MaxValue : computeFutureLifetime(hitObject);
         var pastLifetime = computePastLifetime();
         var slowWindow = getSlowWindow(hitObject);
-        var baseLifetimeStart = hitObject.StartTime - futureLifetime - activationLeadTime;
+        var baseLifetimeStart = hitObject.StartTime - futureLifetime;
         lifetimeStartWithoutVisualOffset = baseLifetimeStart;
         var lifetimeStart = computeLifetimeStartWithVisualOffset(baseLifetimeStart);
 
@@ -123,6 +129,26 @@ internal sealed class BmsHitObjectLifetimeEntry(
         lifetimeComputed = true;
     }
 
+    internal void SetScrollVisibility(bool visible)
+    {
+        if (scrollVisible == visible)
+            return;
+
+        scrollVisible = visible;
+        applyVisibility();
+    }
+
+    internal void SetBatchedMine(bool batched)
+    {
+        if (IsBatchedMine == batched) return;
+
+        IsBatchedMine = batched;
+        applyVisibility();
+    }
+
+    private void applyVisibility() => SetLifetime(scrollVisible && !IsBatchedMine ? computedLifetimeStart : double.MaxValue,
+        scrollVisible && !IsBatchedMine ? computedLifetimeEnd : double.MaxValue);
+
     #endregion
 
     #region Guard overrides: protect computed lifetimes from framework overwrites
@@ -137,7 +163,10 @@ internal sealed class BmsHitObjectLifetimeEntry(
     protected override void SetLifetimeStart(double start)
     {
         if (!lifetimeComputed)
-            base.SetLifetimeStart(start);
+        {
+            computedLifetimeStart = start;
+            base.SetLifetimeStart(scrollVisible && !IsBatchedMine ? start : double.MaxValue);
+        }
     }
 
     /// <summary>
@@ -148,7 +177,8 @@ internal sealed class BmsHitObjectLifetimeEntry(
     {
         // A reverted hit must not retain its previous hit-time expiry: another replay input
         // at that same timestamp may arrive only after the container has processed lifetimes.
-        base.SetLifetimeEnd(lifetimeComputed && end >= double.MaxValue - 1 ? unjudgedLifetimeEnd : end);
+        computedLifetimeEnd = lifetimeComputed && end >= double.MaxValue - 1 ? unjudgedLifetimeEnd : end;
+        base.SetLifetimeEnd(scrollVisible && !IsBatchedMine ? computedLifetimeEnd : double.MaxValue);
     }
 
     #endregion
@@ -250,15 +280,6 @@ internal sealed class BmsHitObjectLifetimeEntry(
 
     private bool isVisibleAt(BmsHitObject hitObject, BmsTimingMap timingMap, double time)
     {
-        if (hitObject is BmsLandmine or BmsInvisibleNote)
-        {
-            // Reverse-scroll mine art can lie many screens below the judgement line long before
-            // its first appearance. A one-sided test keeps tens of thousands of those mines alive.
-            // Keep a full screen of slack below the line for skin geometry and either SPEED sign.
-            var progress = hitObject.ScrollPositionAtStartTime - timingMap.GetScrollPositionAtTime(time);
-            return Math.Abs(progress) <= visibleScrollDistanceAt(timingMap, time);
-        }
-
         if (isVisibleAtPosition(hitObject.ScrollPositionAtStartTime, timingMap, time))
             return true;
 
@@ -274,7 +295,9 @@ internal sealed class BmsHitObjectLifetimeEntry(
     private bool isVisibleAtPosition(double scrollPosition, BmsTimingMap timingMap, double time)
     {
         var progress = scrollPosition - timingMap.GetScrollPositionAtTime(time);
-        return progress <= visibleScrollDistanceAt(timingMap, time);
+        // A note can enter from either side when SCROLL reverses. Bounding both
+        // sides keeps entries behind the viewport from staying alive until hit time.
+        return Math.Abs(progress) <= visibleScrollDistanceAt(timingMap, time);
     }
 
     /// <summary>
@@ -320,7 +343,7 @@ internal sealed class BmsHitObjectLifetimeEntry(
     /// </summary>
     private static double getSlowWindow(BmsHitObject hitObject)
     {
-        if (hitObject is BmsInvisibleNote)
+        if (hitObject is BmsInvisibleNote or BmsLandmine)
             return 0;
 
         if (hitObject is BmsLongNote)

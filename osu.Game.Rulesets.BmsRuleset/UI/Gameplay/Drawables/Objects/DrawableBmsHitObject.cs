@@ -11,12 +11,30 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 
+internal interface IBmsHitObjectDrawNode
+{
+    double StartTime { get; }
+}
+
 public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObject>
 {
+    protected bool CanFlattenWithMines => Parent is not BmsColumnHitObjectContainer { BatchMinesActive: true };
+
+    protected override DrawNode CreateDrawNode() => new BmsHitObjectDrawNode(this);
+
+    private sealed class BmsHitObjectDrawNode(DrawableBmsHitObject source) : CompositeDrawableDrawNode(source), IBmsHitObjectDrawNode
+    {
+        public double StartTime { get; private set; }
+
+        public override void ApplyState()
+        {
+            base.ApplyState();
+            StartTime = source.HitObject.StartTime;
+        }
+    }
 
     public override bool IsPresent => !VisualsSuppressed && base.IsPresent;
 
@@ -188,6 +206,12 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
     protected override void UpdateAfterChildren()
     {
         // The engine owns passive results; the base hook only dispatches an unused per-object check.
+        // A skin child finishes its first load during traversal. Preparing the static path
+        // afterwards avoids falling back for the whole column in its first visible frame.
+        if (unwrappedNoteSprite == null)
+            refreshSinglePieceVisual();
+        if (unwrappedNoteSprite is { IsAlive: false })
+            UpdateChildrenLife();
     }
 
     protected override void LoadAsyncComplete()

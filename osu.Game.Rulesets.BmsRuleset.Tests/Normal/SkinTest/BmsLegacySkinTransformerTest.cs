@@ -34,6 +34,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.NoteTextures;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Runtime;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
 using osuTK.Graphics;
@@ -663,7 +664,21 @@ public class BmsLegacySkinTransformerTest
             {
                 var expectedTypes = expected.OfType<ISerialisableDrawable>().Select(component => component.GetType()).ToArray();
                 Assert.That(expectedTypes, Is.Not.Empty, skin.GetType().Name);
-                Assert.That(actual.OfType<ISerialisableDrawable>().Select(component => component.GetType()), Is.EqualTo(expectedTypes), skin.GetType().Name);
+                Assert.That(actual.OfType<ISerialisableDrawable>().Select(component => component switch
+                {
+                    BmsKeyCounterDisplay => typeof(ArgonKeyCounterDisplay),
+                    BmsScoreCounter => typeof(ArgonScoreCounter),
+                    _ => component.GetType(),
+                }),
+                    Is.EqualTo(expectedTypes), skin.GetType().Name);
+                if (expected.OfType<ArgonKeyCounterDisplay>().Any())
+                    Assert.That(actual.OfType<BmsKeyCounterDisplay>().Count(), Is.EqualTo(1), skin.GetType().Name);
+                if (expected.OfType<ArgonScoreCounter>().SingleOrDefault() is { } score)
+                {
+                    var replacement = actual.OfType<BmsScoreCounter>().Single();
+                    Assert.That(replacement.ShowLabel.Value, Is.EqualTo(score.ShowLabel.Value), skin.GetType().Name);
+                    Assert.That(replacement.WireframeOpacity.Value, Is.EqualTo(score.WireframeOpacity.Value), skin.GetType().Name);
+                }
                 Assert.That(actual.Alpha, Is.EqualTo(expected.Alpha), skin.GetType().Name);
                 Assert.That(actual.AlwaysPresent, Is.EqualTo(expected.AlwaysPresent), skin.GetType().Name);
             }
@@ -683,6 +698,7 @@ public class BmsLegacySkinTransformerTest
             [
                 new ArgonScoreCounter { X = 135, Y = 42, Alpha = 0.7f },
                 new ArgonAccuracyCounter { X = 215, Y = 84 },
+                new ArgonKeyCounterDisplay { X = 100, Y = 200 },
             ],
         };
         var components = original.Children.ToArray();
@@ -705,6 +721,22 @@ public class BmsLegacySkinTransformerTest
             Assert.That(components[0].X, Is.EqualTo(135));
             Assert.That(components[0].Y, Is.EqualTo(42));
             Assert.That(components[0].Alpha, Is.EqualTo(0.7f));
+        });
+    }
+
+    [Test]
+    public void TestBatchedKeyCounterLayoutRoundTrip()
+    {
+        using var counter = new BmsKeyCounterDisplay { X = 123, Y = 45, Anchor = Anchor.BottomRight, UsesFixedAnchor = true };
+        using var restored = new SerialisedDrawableInfo(counter).CreateInstance();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(restored, Is.InstanceOf<BmsKeyCounterDisplay>());
+            Assert.That(restored.Position, Is.EqualTo(counter.Position));
+            Assert.That(restored.Anchor, Is.EqualTo(counter.Anchor));
+            Assert.That(((ISerialisableDrawable)restored).UsesFixedAnchor, Is.True);
+            Assert.That(SerialisedDrawableInfo.GetAllAvailableDrawables(new BmsRuleset().RulesetInfo), Does.Not.Contain(typeof(BmsKeyCounterDisplay)));
         });
     }
 

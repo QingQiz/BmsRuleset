@@ -22,6 +22,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 {
     private static readonly Action<JudgementResult, int> set_combo_after = createComboAfterSetter();
+
     private static readonly Action<JudgementResult, int> set_highest_combo_after = typeof(JudgementResult)
         .GetProperty(nameof(JudgementResult.HighestComboAfterJudgement))!.GetSetMethod(true)!.CreateDelegate<Action<JudgementResult, int>>();
 
@@ -268,7 +269,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     {
         var frameworkEvent = base.CreateHitEvent(result);
         var judgementEvent = createJudgementEvent(result);
-        var timingHitEvent = addJudgementEvent(judgementEvent);
+        var timingHitEvent = addJudgementEvent(judgementEvent, result.HitObject);
         eventsByResult.Add(result, judgementEvent);
 
         if (judgementEvent.SuppressPenalty)
@@ -296,10 +297,10 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         ? HitResult.IgnoreMiss
         : base.GetSimulatedHitResult(judgement);
 
-    private HitEvent? addJudgementEvent(BmsJudgementEvent judgementEvent)
+    private HitEvent? addJudgementEvent(BmsJudgementEvent judgementEvent, HitObject? sourceHitObject = null)
     {
         judgementEvents.Add(judgementEvent);
-        return addTimingHitEvents(judgementEvent);
+        return addTimingHitEvents(judgementEvent, sourceHitObject);
     }
 
     private void removeJudgementEvent(BmsJudgementEvent judgementEvent)
@@ -318,7 +319,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         removeTimingHitEvents(judgementEvent);
     }
 
-    private HitEvent? addTimingHitEvents(BmsJudgementEvent judgementEvent)
+    private HitEvent? addTimingHitEvents(BmsJudgementEvent judgementEvent, HitObject? sourceHitObject)
     {
         if (judgementEvent.SuppressPenalty)
             return null;
@@ -328,7 +329,11 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         foreach (var observation in judgementEvent.TimingObservations)
         {
             var insertionIndex = findTimingInsertionIndex(observation.ActualTime);
-            var hitObject = BmsJudgementEventProjection.CreateTimingHitEvent(judgementEvent.Source, observation, null).HitObject;
+            // Short notes already have the correct timing anchor. Only detached events
+            // and long-note endpoints need a projected object for the timing timeline.
+            var hitObject = sourceHitObject is BmsNote or BmsLandmine
+                ? sourceHitObject
+                : BmsJudgementEventProjection.CreateTimingHitEvent(judgementEvent.Source, observation, null).HitObject;
 
             timingHitEventEntries.Insert(insertionIndex, new TimingHitEventEntry(judgementEvent, observation, hitObject));
             timingHitEvents.Insert(insertionIndex, createTimingHitEvent(insertionIndex));
