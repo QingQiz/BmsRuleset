@@ -44,7 +44,8 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 
     public BindableDouble SoftConstantFadeIn { get; } = new();
 
-    private double displayTime;
+    public double DisplayTime { get; private set; }
+
     private bool softConstantActive;
     private bool softConstantHasFadeIn;
     private double softConstantAlphaEndTime;
@@ -143,7 +144,7 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
 
     public void Update(double currentTime)
     {
-        displayTime = currentTime;
+        DisplayTime = currentTime;
         CurrentScrollPosition = ConstantScrollActive
             ? currentTime
             : TimingMap?.GetScrollPositionAtTime(currentTime) ?? currentTime;
@@ -162,7 +163,7 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
             var fadeIn = SoftConstantFadeIn.Value;
             var fadeStart = duration + Math.Max(0, fadeIn);
             softConstantHasFadeIn = fadeIn != 0;
-            softConstantAlphaEndTime = displayTime + fadeStart * PlaybackRate;
+            softConstantAlphaEndTime = DisplayTime + fadeStart * PlaybackRate;
             softConstantAlphaScale = softConstantHasFadeIn
                 ? 1 / (Math.Abs(fadeIn) * PlaybackRate)
                 : 0;

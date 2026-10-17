@@ -51,7 +51,6 @@ public sealed partial class BmsMeasureLineContainer : Container
         }
 
         lines = timingMap.Measures
-            .Where(m => m.Index > 0)
             .Select(m => new MeasureLineInfo(timingMap.GetVisualScrollPositionAtTick(m.StartTick),
                 timingMap.ProjectTickToTime(m.StartTick)))
             .ToArray();

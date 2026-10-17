@@ -65,9 +65,8 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
             ? timeAtTick - scrollController.CurrentScrollPosition
             : scrollAtTick - scrollController.CurrentScrollPosition;
 
-        // Once the measure start has passed the judgement line (progress < 0),
-        // the measure line should no longer be displayed.
-        if (progress < 0)
+        // STOP and reverse scroll can keep a past measure at or above the judgement line.
+        if (scrollController.DisplayTime > timeAtTick || progress < 0)
         {
             if (lastAlpha != 0)
             {

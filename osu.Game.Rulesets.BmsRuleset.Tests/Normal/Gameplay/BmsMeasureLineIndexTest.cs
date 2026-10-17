@@ -20,6 +20,20 @@ public class BmsMeasureLineIndexTest
 {
     private const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
 
+    [Test]
+    public void LinesIncludeMeasureZeroAndFinalBoundaryWithLeadIn()
+    {
+        var map = BmsChartParser.Parse(["#BPM 120", "#00111:01"]).TimingMap.ShiftedBy(1234.5);
+        using var pair = new Pair(map);
+        var infos = lineInfos(pair.Actual);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(infos.Select(line => line.ScrollPosition), Is.EqualTo(new[] { 0d, 2000, 4000 }));
+            Assert.That(infos.Select(line => line.Time), Is.EqualTo(new[] { 1234.5, 3234.5, 5234.5 }));
+        });
+    }
+
     [TestCase(8)]
     [TestCase(128)]
     [TestCase(4096)]
@@ -86,7 +100,7 @@ public class BmsMeasureLineIndexTest
             {
                 pair.Scroll.Update(time);
                 invoke(pair.Actual, "Update");
-                if (count > 1)
+                if (count > 0)
                     invoke(pair.Reference, "updateRangeByScroll", time, time + pair.Scroll.MeasureLineFutureWindow + 500);
                 pair.RecordExpected(time, time + pair.Scroll.MeasureLineFutureWindow + 500, false);
                 pair.AssertSame();
