@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Testing;
@@ -168,7 +169,7 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
             var first = createScore(ScoreRank.S, "Guest");
             first.Mods = [new BmsModEasyGauge(), new BmsModHideScratch(), new BmsModMirror()];
             var second = createScore(ScoreRank.A, "Guest");
-            second.Mods = [..first.Mods, new BmsModDoubleTime()];
+            second.Mods = [..first.Mods, new BmsModDoubleTime { SpeedChange = { Value = 1.25 } }];
             rows =
             [
                 new BmsLeaderboardScore(first, sheared) { Rank = 1 },
@@ -190,7 +191,7 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
         AddStep("hover second row", () => InputManager.MoveMouseTo(rows[1]));
         assertPositionsAndAlignment();
 
-        int[] widths = [480, 320, 760];
+        int[] widths = [520, 480, 380, 760];
         foreach (var width in widths)
         {
             AddStep($"resize rows to {width}", () => parent.Width = width);
@@ -223,6 +224,33 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
                     pair.First.ScreenSpaceDrawQuad.AABBFloat.Left < pair.Second.ScreenSpaceDrawQuad.AABBFloat.Left
                     && pair.First.ScreenSpaceDrawQuad.AABBFloat.Right > pair.Second.ScreenSpaceDrawQuad.AABBFloat.Left);
             }));
+            AddUntilStep("mods remain visible before score panels", () => rows.All(row =>
+            {
+                var statistics = row.ChildrenOfType<FillFlowContainer>()
+                    .Single(container => container.Name == "Statistics container");
+                var rightContent = row.ChildrenOfType<Container>().Single(container => container.Name == "Right content");
+                var mods = row.ChildrenOfType<FillFlowContainer<Drawable>>()
+                    .Single(container => container.Name == "Leaderboard mods");
+                var rightEdge = rightContent.ScreenSpaceDrawQuad.AABBFloat.Left;
+                if (statistics.DrawColourInfo.Colour.TopLeft.Alpha > 0)
+                    rightEdge = Math.Min(rightEdge, statistics.ScreenSpaceDrawQuad.AABBFloat.Left);
+
+                return mods.DrawColourInfo.Colour.TopLeft.Alpha == 1
+                       && row.ChildrenOfType<ModIcon>().All(icon => icon.DrawColourInfo.Colour.TopLeft.Alpha == 1
+                           && icon.ScreenSpaceDrawQuad.AABBFloat.Right <= rightEdge + 0.5f);
+            }));
+            AddUntilStep("statistics stay aligned across mod counts", () =>
+            {
+                var statistics = rows.Select(row => row.ChildrenOfType<FillFlowContainer>()
+                    .Single(container => container.Name == "Statistics container")).ToArray();
+                return Math.Abs(statistics[0].ScreenSpaceDrawQuad.AABBFloat.Left - statistics[1].ScreenSpaceDrawQuad.AABBFloat.Left) < 0.5f;
+            });
+            AddUntilStep("mod groups stay aligned across mod counts", () =>
+            {
+                var rightEdges = rows.Select(row => row.ChildrenOfType<ModIcon>()
+                    .Max(icon => icon.ScreenSpaceDrawQuad.AABBFloat.Right)).ToArray();
+                return Math.Abs(rightEdges[0] - rightEdges[1]) < 0.5f;
+            });
             AddUntilStep("usernames stay before mods", () => rows.All(row =>
             {
                 var username = row.ChildrenOfType<TruncatingSpriteText>().Single(text => text.Name == "Leaderboard username");
@@ -233,6 +261,51 @@ public partial class TestSceneBmsLeaderboardRank : OsuManualInputManagerTestScen
                     && username.ScreenSpaceDrawQuad.AABBFloat.Right <= row.ChildrenOfType<ModIcon>().Min(icon => icon.ScreenSpaceDrawQuad.AABBFloat.Left);
             }));
         }
+    }
+
+    [TestCase(320, false)]
+    [TestCase(320, true)]
+    [TestCase(380, false)]
+    [TestCase(380, true)]
+    [TestCase(480, false)]
+    [TestCase(480, true)]
+    [TestCase(520, false)]
+    [TestCase(520, true)]
+    public void TestModsUseAvailableSpace(float width, bool sheared)
+    {
+        BmsLeaderboardScore row = null!;
+        var speed = new BmsModDoubleTime { SpeedChange = { Value = 1.25 } };
+        AddStep("load score with extended mod information", () =>
+        {
+            var score = createScore(ScoreRank.A, "Guest");
+            score.Mods = [new BmsModMirror(), speed, new BmsModHardGauge()];
+            Child = new Container
+            {
+                Width = width,
+                Height = BmsLeaderboardScore.HEIGHT,
+                Child = row = new BmsLeaderboardScore(score, sheared) { Rank = 123456 },
+            };
+        });
+        AddUntilStep("score loaded", () => row.IsLoaded);
+        AddUntilStep("all mods are visible between avatar and score", () =>
+        {
+            var avatar = row.ChildrenOfType<ClickableAvatar>().SingleOrDefault();
+            if (avatar == null)
+                return false;
+
+            var rightContent = row.ChildrenOfType<Container>().Single(container => container.Name == "Right content");
+            var icons = row.ChildrenOfType<ModIcon>().ToArray();
+            return icons.Length == 3 && icons.All(icon => icon.DrawColourInfo.Colour.TopLeft.Alpha == 1
+                && icon.ScreenSpaceDrawQuad.AABBFloat.Left >= avatar.ScreenSpaceDrawQuad.AABBFloat.Right
+                && icon.ScreenSpaceDrawQuad.AABBFloat.Right <= rightContent.ScreenSpaceDrawQuad.AABBFloat.Left);
+        });
+        AddUntilStep("speed text is fully visible", () =>
+        {
+            var icon = row.ChildrenOfType<ModIcon>().Single(icon => icon.Mod == speed);
+            var text = icon.ChildrenOfType<OsuSpriteText>().Single(text => text.Text.ToString() == speed.ExtendedIconInformation);
+            return text.DrawColourInfo.Colour.TopLeft.Alpha == 1
+                   && text.ScreenSpaceDrawQuad.AABBFloat.Right <= icon.ScreenSpaceDrawQuad.AABBFloat.Right;
+        });
     }
 
     [Test]

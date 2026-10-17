@@ -87,6 +87,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
     private const float statistics_regular_min_width = 165;
     private const float statistics_compact_min_width = 90;
     private const float rank_label_width = 48;
+    private const float mod_icon_scale = 0.32f;
 
     private const int corner_radius = 10;
     private const float lamp_width = 4;
@@ -294,12 +295,12 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
                                         modsContainer = new FillFlowContainer<Drawable>
                                         {
                                             Name = "Leaderboard mods",
-                                            Anchor = Anchor.Centre,
-                                            Origin = Anchor.Centre,
+                                            Anchor = Anchor.CentreRight,
+                                            Origin = Anchor.CentreRight,
                                             AutoSizeAxes = Axes.Both,
                                             Direction = FillDirection.Horizontal,
                                             Spacing = new Vector2(-10, 0),
-                                            Padding = new MarginPadding { Right = 10 },
+                                            Padding = new MarginPadding { Right = 5 },
                                             Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                         },
                                         new Container
@@ -523,7 +524,7 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
         {
             Anchor = Anchor.CentreLeft,
             Origin = Anchor.CentreLeft,
-            Scale = new Vector2(0.32f),
+            Scale = new Vector2(mod_icon_scale),
         });
     }
 
@@ -583,26 +584,26 @@ internal sealed partial class BmsLeaderboardScore : OsuClickableContainer, IHasC
         var duration = currentMode == null ? 0 : transition_duration;
         if (mode >= DisplayMode.Regular)
         {
-            statisticsContainer.FadeIn(duration, Easing.OutQuint).MoveToX(0, duration, Easing.OutQuint);
+            statisticsContainer.FadeIn(duration, Easing.OutQuint);
             statisticsContainer.Direction = FillDirection.Horizontal;
             statisticsContainer.ScaleTo(1, duration, Easing.OutQuint);
         }
         else if (mode >= DisplayMode.Compact)
         {
-            statisticsContainer.FadeIn(duration, Easing.OutQuint).MoveToX(0, duration, Easing.OutQuint);
+            statisticsContainer.FadeIn(duration, Easing.OutQuint);
             statisticsContainer.Direction = FillDirection.Vertical;
             statisticsContainer.ScaleTo(0.8f, duration, Easing.OutQuint);
         }
         else
-            statisticsContainer.FadeOut(duration, Easing.OutQuint).MoveToX(statisticsContainer.DrawWidth, duration, Easing.OutQuint);
+            statisticsContainer.FadeOut(duration, Easing.OutQuint);
 
         currentMode = mode;
     }
 
     private DisplayMode getCurrentDisplayMode()
     {
-        // Use the unscaled score width so compact scaling cannot toggle the display mode each frame.
-        var availableWidth = DrawWidth - lamp_width - rank_label_width - modsContainer.DrawWidth
+        // Keep statistics aligned across scores with different mods, and avoid feedback from minimal score scaling.
+        var availableWidth = DrawWidth - lamp_width - rank_label_width - HEIGHT - ModIcon.MOD_ICON_SIZE.X * mod_icon_scale
                              - Math.Max(150, totalScoreText.DrawWidth + grade_width + corner_radius * 2);
         if (availableWidth >= username_min_width + statistics_regular_min_width)
             return DisplayMode.Regular;
