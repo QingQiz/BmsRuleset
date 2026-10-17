@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using osu.Framework.Bindables;
+using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
@@ -82,6 +83,18 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
     public double ScrollSpeed { get; private set; } = default_scroll_speed;
 
     public double CurrentScrollPosition { get; private set; }
+
+    private BmsScrollVisibility? visibility;
+
+    internal double TimelineEndTime { get; private set; } = double.PositiveInfinity;
+
+    internal void InitializeVisibility(BmsBeatmap beatmap)
+    {
+        if (TimingMap != null)
+            visibility = new BmsScrollVisibility(beatmap, TimingMap);
+    }
+
+    internal bool IsTimelineVisible(double time) => time <= TimelineEndTime;
 
     public double ChartSpeedFactor { get; private set; } = 1.0;
 
@@ -217,7 +230,13 @@ internal sealed class BmsGameplayScrollController(BmsTimingMap? timingMap)
         updateScrollCoordinateScale();
     }
 
-    private void updateScrollCoordinateScale() => scrollCoordinateScale = ScrollSpeedMultiplier / Math.Max(1.0, ScrollRange);
+    private void updateScrollCoordinateScale()
+    {
+        scrollCoordinateScale = ScrollSpeedMultiplier / Math.Max(1.0, ScrollRange);
+        TimelineEndTime = ConstantScrollActive || visibility == null
+            ? double.PositiveInfinity
+            : visibility.GetEndTime(DisplayTime, CurrentScrollPosition, scrollCoordinateScale);
+    }
 
     public event Action<double>? ScrollSpeedChanged;
 }

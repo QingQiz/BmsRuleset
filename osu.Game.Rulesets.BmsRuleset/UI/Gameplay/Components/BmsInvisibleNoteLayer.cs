@@ -58,7 +58,7 @@ internal sealed partial class BmsInvisibleNoteLayer(BmsInvisibleNote[] notes, Bm
         for (var i = first; i < end; i++)
         {
             var note = ordered[i];
-            if (Time.Current > note.StartTime)
+            if (Time.Current > note.StartTime || !scroll.IsTimelineVisible(note.StartTime))
                 continue;
 
             var alpha = scroll.GetSoftConstantAlpha(note.StartTime);

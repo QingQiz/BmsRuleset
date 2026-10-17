@@ -192,7 +192,7 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         var hitTarget = getHitTargetPosition();
         var height = DrawHeight;
         var scale = scrollController.ScrollCoordinateScale(height, hitTarget);
-        return new BmsColumnVisualFrame(scrollController.CurrentScrollPosition, scale, hitTarget, height);
+        return new BmsColumnVisualFrame(scrollController.CurrentScrollPosition, scale, hitTarget, height, scrollController.TimelineEndTime);
     }
 
     private BmsFrameContext coreFrame()

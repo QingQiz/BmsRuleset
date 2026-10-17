@@ -86,7 +86,7 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected private void ApplyVisualLayout(in BmsColumnVisualFrame frame, in BmsVisualLayout layout)
     {
-        var suppress = SkipFurtherUpdates;
+        var suppress = SkipFurtherUpdates || HitObject.StartTime > frame.TimelineEndTime;
         // The padding is at least one column height. Intersecting that minimum range
         // cannot be culled, so only outlying bounds need the skin's size-dependent height.
         if (!suppress && (layout.MaximumY < -frame.Height - frame.Height || layout.MinimumY > frame.Height))

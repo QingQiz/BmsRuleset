@@ -97,6 +97,7 @@ public sealed partial class BmsColumnHitObjectContainer
         {
             var entry = scrollEntries[i];
             if (!entry.IsBatchedMine || entry.HitObject is not BmsLandmine mine || now >= mine.StartTime + BmsHitObjectLifetimeEntry.MINE_PAST_LIFETIME
+                || !scrollController.IsTimelineVisible(mine.StartTime)
                 || Judgements.GetLandmineState(mine).HandledTime.HasValue)
                 continue;
 

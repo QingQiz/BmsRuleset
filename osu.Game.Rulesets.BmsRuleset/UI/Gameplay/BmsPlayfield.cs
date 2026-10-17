@@ -65,6 +65,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         LayoutVariant = beatmap.LayoutVariant;
         TimingMap = beatmap.TimingMap;
         ScrollController = new BmsGameplayScrollController(TimingMap);
+        ScrollController.InitializeVisibility(beatmap);
         ScrollController.ScrollSpeedChanged += onScrollSpeedChanged;
 
         Anchor = Anchor.Centre;

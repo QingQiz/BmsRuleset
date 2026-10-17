@@ -29,6 +29,8 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
 
     public BmsMeasureLine()
     {
+        // Hidden lines must keep updating to recover when the timeline advances or the pool reuses them.
+        AlwaysPresent = true;
         Anchor = Anchor.TopLeft;
         Origin = Anchor.TopLeft;
 
@@ -66,7 +68,7 @@ public sealed partial class BmsMeasureLine : CompositeDrawable
             : scrollAtTick - scrollController.CurrentScrollPosition;
 
         // STOP and reverse scroll can keep a past measure at or above the judgement line.
-        if (scrollController.DisplayTime > timeAtTick || progress < 0)
+        if (scrollController.DisplayTime > timeAtTick || progress < 0 || !scrollController.IsTimelineVisible(timeAtTick))
         {
             if (lastAlpha != 0)
             {
