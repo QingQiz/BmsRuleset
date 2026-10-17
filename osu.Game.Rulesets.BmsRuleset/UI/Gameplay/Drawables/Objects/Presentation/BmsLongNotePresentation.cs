@@ -46,14 +46,20 @@ internal readonly record struct BmsLongNotePresentation(
         };
 
     private static BmsLongNotePresentation longNote(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context)
-        => complete(new BmsLongNotePresentation(state.HeadJudged, state.IsHolding && context.Held, false, false,
-            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, state.TailResult != HitResult.Meh,
+    {
+        var keepBody = state.TailJudged && state.EarlyReleaseOutsideWindow && context.Time < note.EndTime;
+        return complete(new BmsLongNotePresentation(state.HeadJudged, state.IsHolding && context.Held, false, keepBody,
+            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh && !keepBody, state.TailResult != HitResult.Meh,
             note.EndTime, holdLightActive(note, state, context.Time)), note, state, context);
+    }
 
     private static BmsLongNotePresentation chargeNote(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context)
-        => complete(new BmsLongNotePresentation(state.HeadJudged, state.IsHolding && context.Held, true, false,
-            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh, state.TailResult != HitResult.Meh,
-            chargeLifetimeEnd(note), holdLightActive(note, state, context.Time)), note, state, context);
+    {
+        var keepBody = state.TailJudged && state.EarlyReleaseOutsideWindow && context.Time < note.EndTime;
+        return complete(new BmsLongNotePresentation(state.HeadJudged, state.IsHolding && context.Held, true, keepBody,
+            state.TailJudged && !state.LongNoteStarted && state.HeadResult != HitResult.Meh && !keepBody, state.TailResult != HitResult.Meh,
+            state.TailJudged ? note.EndTime : chargeLifetimeEnd(note), holdLightActive(note, state, context.Time)), note, state, context);
+    }
 
     private static BmsLongNotePresentation hellChargeNote(BmsLongNote note, in BmsLongNoteState state, in BmsLongNotePresentationContext context)
     {
@@ -70,11 +76,13 @@ internal readonly record struct BmsLongNotePresentation(
         => presentation with
         {
             AnimateBody = state.LongNoteStarted,
-            ReleasedStyle = state.LongNoteStarted && context.Time < note.EndTime && !presentation.HoldingBody,
+            // An out-of-window break keeps the released appearance until the remaining body passes.
+            ReleasedStyle = !presentation.Retired && (state.LongNoteStarted || (state.TailJudged && state.HeadResult != HitResult.Meh))
+                            && context.Time < note.EndTime && !presentation.HoldingBody,
             PrepareHeadPin = state.HeadJudged && !state.TailJudged,
             RestoreHeadPin = state.LongNoteStarted,
             HeadReached = context.Time >= note.StartTime,
-            KeepVisibleAfterHit = context.Time < note.EndTime || (presentation.KeepAfterHeadResult && !state.TailJudged),
+            KeepVisibleAfterHit = !presentation.Retired && (context.Time < note.EndTime || (presentation.KeepAfterHeadResult && !state.TailJudged)),
         };
 
     private static bool holdLightActive(BmsLongNote note, in BmsLongNoteState state, double time)

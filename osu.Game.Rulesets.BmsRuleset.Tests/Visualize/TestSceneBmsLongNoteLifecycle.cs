@@ -17,6 +17,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects.LnHelper;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Scoring;
@@ -114,6 +115,69 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
         capture("replayed tail");
         seek(7400);
         capture("retired again");
+    }
+
+    [TestCase(BmsLongNoteMode.LongNote, 5500, true)]
+    [TestCase(BmsLongNoteMode.LongNote, 6834.999, true)]
+    [TestCase(BmsLongNoteMode.LongNote, 6835, false)]
+    [TestCase(BmsLongNoteMode.LongNote, 6840, false)]
+    [TestCase(BmsLongNoteMode.LongNote, 6950, false)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 5500, true)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 6834.999, true)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 6835, false)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 6840, false)]
+    [TestCase(BmsLongNoteMode.ChargeNote, 6950, false)]
+    public void EarlyTailVisibilityTracksWindowAcrossRewind(BmsLongNoteMode longNoteMode, double releaseTime, bool keepBody)
+    {
+        AddStep("load long notes", () => { mode = longNoteMode; includeMine = false; duplicateHeads = false; LoadPlayer(); });
+        AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
+        seek(5000);
+        AddStep("hold head", () => PressColumn(Playfield.Stage.Columns[1], 5000));
+        seek(releaseTime);
+        AddStep("release early", () =>
+        {
+            var drawable = Playfield.GetAliveObjectAtTime(5000)!;
+            var note = (BmsLongNote)drawable.HitObject;
+            ReleaseColumn(Playfield.Stage.Columns[1], releaseTime);
+            if (!keepBody)
+            {
+                Assert.That(drawable.Alpha, Is.Zero);
+                note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
+                Assert.That(drawable.Alpha, Is.Zero, "Reapplying defaults must preserve settled tail visibility.");
+            }
+        });
+        assertReleasedBody();
+        seek(6999);
+        assertReleasedBody();
+        seek(7020);
+        AddAssert("completed body pooled at end", () => Playfield.GetAliveObjectAtTime(5000) == null);
+        seek(releaseTime + 1);
+        assertReleasedBody();
+        seek(7020);
+        AddAssert("restored body pooled at end", () => Playfield.GetAliveObjectAtTime(5000) == null);
+
+        void assertReleasedBody()
+        {
+            AddStep("settled body visibility follows release window", () =>
+            {
+                var note = Playfield.Beatmap.HitObjects.OfType<BmsLongNote>().First();
+                Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).TailJudged, Is.True);
+                var drawable = Playfield.GetAliveObjectAtTime(5000);
+                if (!keepBody)
+                {
+                    Assert.That(drawable == null || drawable.Alpha == 0, Is.True);
+                    return;
+                }
+
+                Assert.That(drawable, Is.Not.Null);
+                Assert.That(drawable!.Alpha, Is.EqualTo(1));
+                Assert.That(drawable.IsPresent, Is.True);
+                Assert.That(drawable.LifetimeEnd, Is.EqualTo(note.EndTime));
+                var body = drawable.ChildrenOfType<BmsSegmentedLongNoteBody>().Single();
+                Assert.That(body.Alpha, Is.EqualTo(0.4f));
+                Assert.That(body.DrawHeight, Is.GreaterThan(0));
+            });
+        }
     }
 
     [TestCase(BmsLongNoteMode.LongNote)]

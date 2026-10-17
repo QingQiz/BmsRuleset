@@ -158,6 +158,7 @@ internal sealed class BmsChargeNoteJudgementRule
             hold.TailJudged = false;
             hold.TailTime = null;
             hold.TailResult = HitResult.None;
+            hold.EarlyReleaseOutsideWindow = false;
         }
 
         hold.Started = hold.HeadResult != HitResult.Meh && (!hold.TailJudged || hold.TailResult == HitResult.Meh)
@@ -192,12 +193,14 @@ internal sealed class BmsChargeNoteJudgementRule
             return;
 
         var result = hold.TailWindow.ResultForOffset(offset);
+        var earlyReleaseOutsideWindow = offset < 0 && result == HitResult.None;
         if (result == HitResult.None)
             result = HitResult.Meh;
         execution.ApplySyntheticEndpoint(hold.Endpoint(BmsLongNoteEndpointKind.Tail, hold.Note.EndTime + offset, frame.GameplayRate, result, eventTime), frame);
         hold.TailJudged = true;
         hold.TailTime = eventTime;
         hold.TailResult = result;
+        hold.EarlyReleaseOutsideWindow = earlyReleaseOutsideWindow;
         if (result != HitResult.Meh)
             hold.Started = false;
         execution.PublishState(hold.Note, state.State, frame);

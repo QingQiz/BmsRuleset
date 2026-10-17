@@ -140,6 +140,7 @@ internal sealed class BmsLongNoteJudgementRule
             hold.TailJudged = false;
             hold.TailTime = null;
             hold.TailResult = HitResult.None;
+            hold.EarlyReleaseOutsideWindow = false;
         }
 
         hold.Started = hold.HeadResult != HitResult.Meh && (!hold.TailJudged || hold.TailResult == HitResult.Meh)
@@ -177,6 +178,8 @@ internal sealed class BmsLongNoteJudgementRule
         hold.TailJudged = true;
         hold.TailTime = frame.SimulationTime;
         hold.TailResult = result;
+        // Forced early BAD and an in-window BAD share a result but have different body lifetimes.
+        hold.EarlyReleaseOutsideWindow = !automatic && offset < 0 && released == HitResult.None;
         if (result != HitResult.Meh)
             hold.Started = false;
         execution.PublishState(hold.Note, state.State, frame);

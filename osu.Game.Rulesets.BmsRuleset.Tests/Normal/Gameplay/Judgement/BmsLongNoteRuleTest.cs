@@ -448,7 +448,7 @@ public class BmsLongNoteRuleTest
         run.Frame(1601, 16, false);
 
         Assert.That(run.Publications, Has.Count.EqualTo(publications));
-        Assert.That(run.Presentation().Retired, Is.True);
+        Assert.That(run.Presentation(time: 1601).Retired, Is.True);
     }
 
     [Test]
@@ -696,7 +696,7 @@ public class BmsLongNoteRuleTest
         Assert.That(run.Results, Is.EqualTo([HitResult.Perfect]));
         Assert.That(run.State.TailJudged, Is.True);
         // Non-POOR tail -> visuals cleared.
-        Assert.That(run.Presentation().Retired, Is.True);
+        Assert.That(run.Presentation(time: 1500).Retired, Is.True);
     }
 
     [Test]

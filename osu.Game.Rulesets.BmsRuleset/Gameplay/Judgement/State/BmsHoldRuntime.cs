@@ -15,6 +15,7 @@ internal struct BmsHoldRuntime
     internal bool HeadJudged;
     internal bool Started;
     internal bool TailJudged;
+    internal bool EarlyReleaseOutsideWindow;
     internal bool HeadReverseScratch;
     internal double HeadOffset;
     internal HitResult HeadResult;
@@ -55,7 +56,7 @@ internal struct BmsHoldRuntime
 
     internal readonly BmsLongNoteState Snapshot(bool activeBody = false)
         => new(HeadJudged, Started, TailJudged, HeadResult, HeadJudged ? Note.StartTime + HeadOffset : null,
-            TailResult, TailTime, PendingRelease, activeBody);
+            TailResult, TailTime, PendingRelease, activeBody, EarlyReleaseOutsideWindow);
 
     internal void RefreshWindows()
     {
@@ -78,7 +79,7 @@ internal struct BmsHoldRuntime
 
     internal void Reset()
     {
-        HeadJudged = Started = TailJudged = HeadReverseScratch = false;
+        HeadJudged = Started = TailJudged = HeadReverseScratch = EarlyReleaseOutsideWindow = false;
         HeadOffset = 0;
         HeadResult = TailResult = HitResult.None;
         TailTime = PendingRelease = null;

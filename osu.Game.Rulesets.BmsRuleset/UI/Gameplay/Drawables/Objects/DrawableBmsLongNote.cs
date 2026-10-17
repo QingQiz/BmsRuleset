@@ -35,7 +35,6 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
     // hold instead of only firing at the head and tail endpoints.
     private const double hold_explosion_interval = BmsLegacySkinTransformer.HIT_EXPLOSION_FADE_IN_DURATION;
 
-    // Body+tail fade to this alpha when the head is judged but the key is released before the tail judged
     private const float released_alpha = 0.4f;
 
     private readonly BmsLongNoteVisualState visualState = new();
@@ -91,6 +90,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         // Only the full simulation traversal records visual history. Share its read with
         // geometry preparation without caching across same-time input or result callbacks.
         var current = readPresentation(Time.Current);
+        applyPresentationLifetime(current);
         // Hold feedback follows visible frames, independently of the next judgement deadline.
         if (Time.Current >= ln.StartTime && Time.Current <= ln.EndTime && current.HoldLightActive
             && Time.Current - lastHoldExplosionTime >= hold_explosion_interval)
@@ -333,7 +333,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
         if (presentation.Retired)
         {
-            // Settled LN/CN tails clear immediately; body expiry retains its final geometry for rewind.
+            // Expired miss bodies retain their final geometry for rewind.
             if (presentation.ClearBodyOnRetire)
             {
                 visualState.Reset();
@@ -343,6 +343,20 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
 
             Alpha = 0;
             LifetimeEnd = frame.SimulationTime;
+        }
+    }
+
+    private void applyPresentationLifetime(in BmsLongNotePresentation current)
+    {
+        if (current.KeepAlive)
+        {
+            Alpha = 1;
+            LifetimeEnd = current.LifetimeEnd;
+        }
+        else if (current.Retired)
+        {
+            Alpha = 0;
+            LifetimeEnd = Time.Current;
         }
     }
 

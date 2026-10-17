@@ -13,7 +13,8 @@ internal readonly record struct BmsLongNoteState(
     HitResult TailResult,
     double? TailTime,
     double? PendingReleaseTime,
-    bool HasActiveBody = false)
+    bool HasActiveBody = false,
+    bool EarlyReleaseOutsideWindow = false)
 {
     internal bool HasPendingTail => HeadJudged && !TailJudged;
 
