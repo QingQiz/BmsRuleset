@@ -224,6 +224,39 @@ E-POOR. The triangle shows average timing.
 Resize horizontally for axis length and vertically for judgement-line height. The initial width follows the timing
 range; a width saved in the skin takes precedence.
 
+### Replay Visualizer
+
+Add `BmsReplayVisualizer` from the skin editor's BMS component toolbox to display note and input timing during
+gameplay or replay playback.
+
+Outlined shapes show notes and long notes. Filled rectangles span each key press to its release. Vertical dashed
+lines connect matching note and input timings along each lane's horizontal centre. The fixed horizontal line marks
+the current time: upcoming notes appear above it, while past notes and inputs move below it.
+
+PGREAT, GREAT, GOOD, and BAD use their judgement colours. Missed notes (POOR) are red, E-POOR inputs are grey, and
+notes or inputs without a corresponding judgement are white.
+
+| Setting | Range / effect | Default |
+|---------|----------------|---------|
+| Visible time range (seconds) | 1–10 seconds across the component's height | 4 seconds |
+| Show notes | Notes and their connections to key presses | On |
+| Show key presses | Input rectangles and their connections to notes | On |
+| Background opacity | 0%–100% | 65% |
+
+<details>
+<summary>Examples</summary>
+
+Both screenshots show the same moment in a replay.
+
+| Notes and key presses | Key presses only (Show notes off) |
+|-----------------------|----------------------------------|
+| ![Replay visualizer with notes, inputs, timing connections, and all judgement colours](images/replay-visualizer-notes-and-inputs.png) | ![The same replay moment with only key presses and the current-time line visible](images/replay-visualizer-inputs-only.png) |
+
+In the first image, the lanes from left to right show a PGREAT long note, PGREAT, GREAT, GOOD, BAD, a missed POOR,
+E-POOR and an unjudged press, and a held PGREAT long note. White outlines show notes awaiting judgement.
+
+</details>
+
 ### Score Graph
 
 Compares the current EX score with two references during play:
@@ -271,8 +304,6 @@ Shows playback progress with a glowing marker: it stays at the top during the in
 The track sits at the Stage's left edge by default; its height determines the marker's travel distance.
 
 **Indicator colour** changes the marker and its glow.
-
----
 
 ### BGA
 

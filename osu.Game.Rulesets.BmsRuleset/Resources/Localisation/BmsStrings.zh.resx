@@ -31,6 +31,14 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="layout" xml:space="preserve"><value>布局</value></data>
+  <data name="replay_visualizer_time_range" xml:space="preserve"><value>可见时间范围（秒）</value></data>
+  <data name="replay_visualizer_time_range_description" xml:space="preserve"><value>音符与按键滚动时间轴显示的时间跨度。</value></data>
+  <data name="replay_visualizer_show_notes" xml:space="preserve"><value>显示音符</value></data>
+  <data name="replay_visualizer_show_notes_description" xml:space="preserve"><value>显示音符及其与按键之间的连线。</value></data>
+  <data name="replay_visualizer_show_inputs" xml:space="preserve"><value>显示按键</value></data>
+  <data name="replay_visualizer_show_inputs_description" xml:space="preserve"><value>显示按住期间的实心矩形，并用虚线连接对应音符。</value></data>
+  <data name="replay_visualizer_background_opacity" xml:space="preserve"><value>背景不透明度</value></data>
+  <data name="replay_visualizer_background_opacity_description" xml:space="preserve"><value>时间轴背景的不透明程度。</value></data>
   <data name="gauge_history" xml:space="preserve"><value>血量历史</value></data>
   <data name="timeline" xml:space="preserve"><value>时间线</value></data>
   <data name="hit_scatter" xml:space="preserve"><value>击打散点图</value></data>

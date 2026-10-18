@@ -5,6 +5,14 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="layout" xml:space="preserve"><value>Layout</value></data>
+  <data name="replay_visualizer_time_range" xml:space="preserve"><value>Visible time range (seconds)</value></data>
+  <data name="replay_visualizer_time_range_description" xml:space="preserve"><value>Time shown by the scrolling note and input timeline.</value></data>
+  <data name="replay_visualizer_show_notes" xml:space="preserve"><value>Show notes</value></data>
+  <data name="replay_visualizer_show_notes_description" xml:space="preserve"><value>Display notes and their connections to key presses.</value></data>
+  <data name="replay_visualizer_show_inputs" xml:space="preserve"><value>Show key presses</value></data>
+  <data name="replay_visualizer_show_inputs_description" xml:space="preserve"><value>Display held-input rectangles and dashed links to their judged notes.</value></data>
+  <data name="replay_visualizer_background_opacity" xml:space="preserve"><value>Background opacity</value></data>
+  <data name="replay_visualizer_background_opacity_description" xml:space="preserve"><value>Opacity of the timeline background.</value></data>
   <data name="gauge_history" xml:space="preserve"><value>Gauge History</value></data>
   <data name="timeline" xml:space="preserve"><value>Timeline</value></data>
   <data name="hit_scatter" xml:space="preserve"><value>Hit Scatter</value></data>

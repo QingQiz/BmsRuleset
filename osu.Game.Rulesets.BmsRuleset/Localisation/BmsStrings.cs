@@ -11,6 +11,22 @@ namespace osu.Game.Rulesets.BmsRuleset.Localisation;
 
 public static class BmsStrings
 {
+    public static LocalisableString ReplayVisualizerTimeRange => get("replay_visualizer_time_range");
+
+    public static LocalisableString ReplayVisualizerTimeRangeDescription => get("replay_visualizer_time_range_description");
+
+    public static LocalisableString ReplayVisualizerShowNotes => get("replay_visualizer_show_notes");
+
+    public static LocalisableString ReplayVisualizerShowNotesDescription => get("replay_visualizer_show_notes_description");
+
+    public static LocalisableString ReplayVisualizerShowInputs => get("replay_visualizer_show_inputs");
+
+    public static LocalisableString ReplayVisualizerShowInputsDescription => get("replay_visualizer_show_inputs_description");
+
+    public static LocalisableString ReplayVisualizerBackgroundOpacity => get("replay_visualizer_background_opacity");
+
+    public static LocalisableString ReplayVisualizerBackgroundOpacityDescription => get("replay_visualizer_background_opacity_description");
+
     private const string resource_prefix = "osu.Game.Rulesets.BmsRuleset.Resources.Localisation.BmsStrings";
 
     private static readonly FrozenDictionary<string, (string English, string Chinese)> templates = loadTemplates();
