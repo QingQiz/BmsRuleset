@@ -40,6 +40,7 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
     private Func<bool>? readAudioBlocked;
     private Func<bool>? readAudioPaused;
     private BmsAudioCaptureSession? audioCapture;
+    private BmsReplayVisualizer? replayVisualizer;
 
     public double? AudioCaptureStartChartMs { get; private set; }
 
@@ -143,6 +144,17 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
         if (!Player.LoadedBeatmapSuccessfully)
             throw new InvalidOperationException("Player failed to load the chart.");
 
+        if (options.ReplayVisualizerRange > 0)
+        {
+            if (replayVisualizer == null)
+                Player.HUDOverlay.Add(replayVisualizer = new BmsReplayVisualizer
+                {
+                    TimeRange = { Value = (float)options.ReplayVisualizerRange },
+                });
+            if (!replayVisualizer.IsLoaded)
+                return;
+        }
+
         // Use the normal HUD setting so diagnostics exercise gameplay's layout path.
         if (options.NoteHeightScale != 1)
         {
@@ -192,6 +204,11 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
 
     public string? CompletionError()
     {
+        if (options.ReplayVisualizerRange > 0 && (replayVisualizer?.IsPresent != true
+                                                  || Math.Abs(replayVisualizer.TimeRange.Value - options.ReplayVisualizerRange) > 0.001
+                                                  || replayVisualizer.Plot.Rectangles.Count <= 1))
+            return "The requested replay visualizer did not remain visible with populated geometry.";
+
         // HUD height and config fade values use their normal setting precision (0.01 and 1).
         if (Math.Abs(Playfield.Stage.NoteHeightScale - options.NoteHeightScale) > 0.005001
             || Playfield.ScrollController.SoftConstant.Value != options.SoftConstant
@@ -251,6 +268,9 @@ internal partial class BmsGameplayDiagnosticScene(BmsGameplayDiagnosticOptions o
             SoftConstant = Playfield.ScrollController.SoftConstant.Value,
             Playfield.ScrollController.SoftConstantActive,
             SoftConstantFadeIn = Playfield.ScrollController.SoftConstantFadeIn.Value,
+            ReplayVisualizerRange = replayVisualizer?.TimeRange.Value ?? 0,
+            ReplayVisualizerPresent = replayVisualizer?.IsPresent ?? false,
+            ReplayVisualizerRectangles = replayVisualizer?.Plot.Rectangles.Count ?? 0,
         };
 
     public object DescribeAlive()

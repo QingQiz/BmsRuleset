@@ -67,14 +67,19 @@ public sealed partial class BmsReplayVisualizer
 
             released.Clear();
             foreach (var action in history.HeldActions)
+            {
                 if (!frame.Actions.Contains(action))
                     released.Add(action);
+            }
+
             foreach (var action in released)
                 history.Release(action, frame.Time);
 
             foreach (var action in frame.Actions)
+            {
                 if (BmsKeyBindingConfiguration.ActionToColumn(action, layout) is { } column && column < columnCount)
                     history.Press(action, column, frame.Time);
+            }
         }
 
         var strokesByColumn = new List<InputStroke>[columnCount];
@@ -93,12 +98,14 @@ public sealed partial class BmsReplayVisualizer
             cancellationToken.ThrowIfCancellationRequested();
             lanes[column] = new InputLane(strokesByColumn[column]);
         }
+
         return lanes;
     }
 
     internal interface ITimelineItem
     {
         double StartTime { get; }
+
         double EndTime { get; }
     }
 
@@ -116,12 +123,12 @@ public sealed partial class BmsReplayVisualizer
 
     internal class TimelineLane<T> where T : struct, ITimelineItem
     {
-        private readonly T[] items;
+        internal readonly T[] Items;
         private readonly double[] maximumEndTimes;
 
         protected TimelineLane(IEnumerable<T> source)
         {
-            items = source.OrderBy(item => item.StartTime).ToArray();
+            var items = Items = source.OrderBy(item => item.StartTime).ToArray();
             maximumEndTimes = new double[items.Length];
             var maximum = double.NegativeInfinity;
             for (var i = 0; i < items.Length; i++)
@@ -130,7 +137,7 @@ public sealed partial class BmsReplayVisualizer
 
         // Prefix maxima keep long notes visible even when their heads have scrolled away.
         public VisibleRange<T> Visible(double firstTime, double lastTime)
-            => new(items, lowerBound(maximumEndTimes, firstTime), firstTime, lastTime);
+            => new(Items, lowerBound(maximumEndTimes, firstTime), firstTime, lastTime);
     }
 
     internal readonly struct VisibleRange<T>(T[] items, int start, double firstTime, double lastTime) where T : struct, ITimelineItem
@@ -146,8 +153,10 @@ public sealed partial class BmsReplayVisualizer
             public bool MoveNext()
             {
                 while (++index < items.Length && items[index].StartTime <= lastTime)
-                    if (items[index].EndTime >= firstTime)
-                        return true;
+                {
+                    if (items[index].EndTime >= firstTime) return true;
+                }
+
                 return false;
             }
         }
@@ -165,6 +174,9 @@ public sealed partial class BmsReplayVisualizer
         private double previousTime = double.NegativeInfinity;
         private double nextExpiry = double.PositiveInfinity;
 
+        internal Action<InputStroke>? Changed;
+        internal Action? Reset;
+
         public long Version { get; private set; }
 
         public IReadOnlyList<InputStroke> Strokes => strokes;
@@ -178,6 +190,7 @@ public sealed partial class BmsReplayVisualizer
 
             held.Add(action, strokes.Count);
             strokes.Add(new InputStroke(action, column, time));
+            Changed?.Invoke(strokes[^1]);
             Version++;
         }
 
@@ -189,6 +202,7 @@ public sealed partial class BmsReplayVisualizer
             var stroke = strokes[index];
             var end = Math.Max(stroke.StartTime, time);
             strokes[index] = stroke with { EndTime = end };
+            Changed?.Invoke(strokes[index]);
             nextExpiry = Math.Min(nextExpiry, end + history_duration);
             Version++;
         }
@@ -217,6 +231,8 @@ public sealed partial class BmsReplayVisualizer
                 }
 
                 strokes.RemoveRange(retained, strokes.Count - retained);
+                if (rewind)
+                    Reset?.Invoke();
                 Version++;
             }
 
@@ -230,6 +246,7 @@ public sealed partial class BmsReplayVisualizer
             previousTime = double.NegativeInfinity;
             nextExpiry = double.PositiveInfinity;
             Version++;
+            Reset?.Invoke();
         }
     }
 
@@ -324,21 +341,30 @@ public sealed partial class BmsReplayVisualizer
         }
 
         public HitResult? ForInput(InputStroke stroke, double now)
+            => DescribeInput(stroke, now).Result;
+
+        public InputDisplay DescribeInput(InputStroke stroke, double now)
         {
-            var press = inputAt(stroke.Column, stroke.StartTime, false, now);
+            var press = findInput(stroke.Column, stroke.StartTime, false, now);
+            var release = findInput(stroke.Column, stroke.EndTime, true, now);
+            var result = inputResult(press, stroke.Column, now);
             // Charge scratch tails are judged on reversal presses.
             if (stroke.Action is BmsAction.Scratch or BmsAction.ScratchReverse or BmsAction.P2Scratch or BmsAction.P2ScratchReverse)
-                press = worseResult(press, inputAt(stroke.Column, stroke.StartTime, true, now));
-            return worseResult(press, inputAt(stroke.Column, stroke.EndTime, true, now));
+            {
+                var reversal = findInput(stroke.Column, stroke.StartTime, true, now);
+                result = worseResult(result, inputResult(reversal, stroke.Column, now));
+                press ??= reversal;
+            }
+
+            return new InputDisplay(worseResult(result, inputResult(release, stroke.Column, now)),
+                press is { IsScoring: true } head ? head.Timing : null,
+                release is { IsScoring: true } tail ? tail.Timing : null);
         }
 
         public BmsTimingObservation? TimingForInput(InputStroke stroke, bool release, double now)
         {
-            var time = release ? stroke.EndTime : stroke.StartTime;
-            var judgement = findInput(stroke.Column, time, release, now);
-            if (!release && stroke.Action is BmsAction.Scratch or BmsAction.ScratchReverse or BmsAction.P2Scratch or BmsAction.P2ScratchReverse)
-                judgement ??= findInput(stroke.Column, time, true, now);
-            return judgement is { IsScoring: true } value ? value.Timing : null;
+            var display = DescribeInput(stroke, now);
+            return release ? display.Release : display.Press;
         }
 
         private InputJudgement? findInput(int column, double time, bool release, double now)
@@ -353,15 +379,17 @@ public sealed partial class BmsReplayVisualizer
             return judgement;
         }
 
-        private HitResult? inputAt(int column, double time, bool release, double now)
+        private HitResult? inputResult(InputJudgement? input, int column, double now)
         {
-            if (findInput(column, time, release, now) is not { } judgement)
+            if (input is not { } judgement)
                 return null;
 
             return judgement.EndTime is { } end
                 ? worseResult(judgement.Result, scoringResult(At(column, end, now)?.Result))
                 : judgement.Result;
         }
+
+        public readonly record struct InputDisplay(HitResult? Result, BmsTimingObservation? Press, BmsTimingObservation? Release);
 
         private readonly record struct InputJudgement(HitResult Result, bool IsScoring, double? EndTime, BmsTimingObservation Timing);
     }

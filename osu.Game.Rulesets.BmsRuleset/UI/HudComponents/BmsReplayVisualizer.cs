@@ -66,16 +66,20 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
     private readonly JudgementCursor judgements = new();
     private readonly InputHistory liveInputs = new();
     private NoteLane[] notes = [];
+    private NoteLane[] longNotes = [];
     private BmsColumn[] columns = [];
     private InputLane[]? replayInputs;
     private BmsLayoutVariant layout = BmsLayoutVariant.Bme7K;
     private int columnCount = 8;
+    private GeometryState? requestedGeometry;
     private GeometryState? preparedGeometry;
 
     internal PlotLayer Plot { get; }
 
     public BmsReplayVisualizer()
     {
+        liveInputs.Changed = cacheLiveInput;
+        liveInputs.Reset = resetLiveCache;
         Size = new Vector2(240, 360);
         Anchor = Anchor.CentreLeft;
         Origin = Anchor.CentreLeft;
@@ -89,7 +93,7 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
             Children =
             [
                 background,
-                Plot = new PlotLayer { RelativeSizeAxes = Axes.Both },
+                Plot = new PlotLayer(prepareGeometry) { RelativeSizeAxes = Axes.Both, InspectGeometry = inspectGeometry },
             ],
         };
         BackgroundOpacity.BindValueChanged(change => background.Alpha = change.NewValue, true);
@@ -105,6 +109,9 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
             columns = ((BmsPlayfield)drawableRuleset.Playfield).Stage.Columns.Cast<BmsColumn>().ToArray();
             notes = Enumerable.Range(0, columnCount)
                 .Select(column => new NoteLane(beatmap.HitObjects.Where(note => note.Column == column && note is not BmsLandmine)))
+                .ToArray();
+            longNotes = Enumerable.Range(0, columnCount)
+                .Select(column => new NoteLane(beatmap.HitObjects.Where(note => note.Column == column && note is BmsLongNote)))
                 .ToArray();
         }
         else
@@ -177,25 +184,62 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
         liveInputs.Advance(now);
         var processor = scoreProcessor as BmsScoreProcessor;
         var geometry = new GeometryState(now, DrawSize, TimeRange.Value, ShowNotes.Value, ShowInputs.Value,
-            liveInputs.Version, processor?.StatisticsVersion ?? 0, replayInputs);
-        if (preparedGeometry == geometry)
+            liveInputs.Version, processor?.StatisticsVersion ?? 0, replayInputs, DrawColourInfo.Colour.HasSingleColour);
+        if (requestedGeometry == geometry)
             return;
 
+        requestedGeometry = geometry;
+        Plot.Invalidate(Invalidation.DrawNode);
+    }
+
+    private void prepareGeometry()
+    {
+        if (requestedGeometry is not { } geometry || preparedGeometry == geometry)
+            return;
+
+        // Keep preparation on the update thread and skip it when the plot is culled.
+        // Draw snapshots are generated on every update, independently of the draw rate.
         preparedGeometry = geometry;
-        var range = TimeRange.Value * 1000;
+        if (geometry.Cached)
+        {
+            prepareCachedGeometry(geometry);
+            return;
+        }
+
+        Plot.Timeline = null;
+        buildGeometry(geometry, true);
+    }
+
+    private GeometryState? inspectedGeometry;
+
+    private void inspectGeometry()
+    {
+        if (preparedGeometry is not { } geometry || inspectedGeometry == geometry)
+            return;
+
+        buildGeometry(geometry, false);
+    }
+
+    private void buildGeometry(GeometryState geometry, bool invalidate)
+    {
+        inspectedGeometry = geometry;
+        var now = geometry.Time;
+        var range = geometry.Range * 1000;
         var firstTime = now - range * (1 - judgement_line);
         var lastTime = now + range * judgement_line;
+        var processor = scoreProcessor as BmsScoreProcessor;
         judgements.Update(processor?.JudgementEvents);
-        Plot.Clear();
+        Plot.Clear(invalidate);
 
         var columnWidth = DrawWidth / columnCount;
-        foreach (var lane in notes)
+        foreach (var lane in geometry.ShowNotes ? notes : geometry.ShowInputs ? longNotes : [])
         {
             foreach (var note in lane.Visible(firstTime, lastTime))
             {
                 var head = observationFor(note, tail: false, now);
-                var tail = observationFor(note, tail: true, now);
-                if (ShowNotes.Value)
+                var isLongNote = note.Source is BmsLongNote;
+                var tail = isLongNote ? observationFor(note, tail: true, now) : null;
+                if (geometry.ShowNotes)
                 {
                     var x = (displayColumn(note.Column) + 0.1f) * columnWidth;
                     var top = positionAt(note.EndTime, now, range);
@@ -203,12 +247,13 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
                     var colour = ColourFor(NoteResult(head, tail));
                     rectangle(x, top, columnWidth * 0.8f, Math.Max(5, bottom - top), colour, kind: PlotElementKind.Note, outline: true);
                 }
-                if (note.EndTime > note.StartTime)
+
+                if (geometry.ShowInputs && isLongNote && note.EndTime > note.StartTime)
                     judgements.ObserveLongNote(note.Column, head, tail, note.EndTime);
             }
         }
 
-        if (ShowInputs.Value)
+        if (geometry.ShowInputs)
         {
             if (replayInputs != null)
             {
@@ -228,7 +273,7 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
         }
 
         rectangle(0, DrawHeight * judgement_line - 0.5f, DrawWidth, 1, Colour4.White, PlotElementKind.Judgement);
-        Plot.Commit();
+        Plot.Commit(invalidate);
     }
 
     private void drawInput(InputStroke stroke, double now, double range, float columnWidth)
@@ -236,13 +281,14 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
         var x = (displayColumn(stroke.Column) + 0.5f) * columnWidth;
         var start = positionAt(stroke.StartTime, now, range);
         var end = positionAt(Math.Min(now, stroke.EndTime), now, range);
-        var colour = ColourFor(judgements.ForInput(stroke, now));
+        var display = judgements.DescribeInput(stroke, now);
+        var colour = ColourFor(display.Result);
         rectangle(x - columnWidth * 0.22f, end - 1.5f, columnWidth * 0.44f, Math.Max(3, start - end + 3), colour);
         if (!ShowNotes.Value)
             return;
 
-        var press = judgements.TimingForInput(stroke, release: false, now);
-        var release = judgements.TimingForInput(stroke, release: true, now);
+        var press = display.Press;
+        var release = display.Release;
         drawConnection(stroke.Column, press, now, range, columnWidth, colour);
         if (release != press)
             drawConnection(stroke.Column, release, now, range, columnWidth, colour);
@@ -258,36 +304,30 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
         if (observation.Kind == BmsTimingObservationKind.Note)
             expected += 2.5f;
         var actual = positionAt(observation.ActualTime, now, range);
-        dashedLine(new Vector2(x, expected), new Vector2(x, actual), colour);
+        dashedLine(x, expected, actual, colour);
     }
 
-    private void dashedLine(Vector2 start, Vector2 end, Colour4 colour)
+    private void dashedLine(float x, float start, float end, Colour4 colour)
     {
         const float dash_length = 4;
         const float dash_period = 7;
         const float thickness = 1.5f;
-        var vertical = start.X == end.X;
-        var delta = vertical ? end.Y - start.Y : end.X - start.X;
+        var delta = end - start;
         var length = Math.Abs(delta);
         if (length <= 0)
             return;
 
         var direction = delta < 0 ? -1 : 1;
-        var origin = vertical ? start.Y : start.X;
-        var limit = vertical ? DrawHeight : DrawWidth;
-        var firstVisible = Math.Max(0, direction > 0 ? -origin : origin - limit);
-        var lastVisible = Math.Min(length, direction > 0 ? limit - origin : origin);
+        var firstVisible = Math.Max(0, direction > 0 ? -start : start - DrawHeight);
+        var lastVisible = Math.Min(length, direction > 0 ? DrawHeight - start : start);
         // Preserve the phase at the note endpoint when either endpoint is clipped.
         var firstDash = Math.Max(0, Math.Floor(firstVisible / dash_period)) * dash_period;
         for (var offset = firstDash; offset < lastVisible; offset += dash_period)
         {
             var dashEnd = Math.Min(length, offset + dash_length);
-            var from = origin + direction * offset;
-            var to = origin + direction * dashEnd;
-            if (vertical)
-                rectangle(start.X - thickness / 2, (float)Math.Min(from, to), thickness, (float)(dashEnd - offset), colour, PlotElementKind.Connection);
-            else
-                rectangle((float)Math.Min(from, to), start.Y - thickness / 2, (float)(dashEnd - offset), thickness, colour, PlotElementKind.Connection);
+            var from = start + direction * offset;
+            var to = start + direction * dashEnd;
+            rectangle(x - thickness / 2, (float)Math.Min(from, to), thickness, (float)(dashEnd - offset), colour, PlotElementKind.Connection);
         }
     }
 
@@ -351,8 +391,16 @@ public sealed partial class BmsReplayVisualizer : BmsHudComponent
         base.Dispose(isDisposing);
     }
 
-    private readonly record struct GeometryState(double Time, Vector2 Size, float Range, bool ShowNotes, bool ShowInputs,
-                                                long InputVersion, long StatisticsVersion, InputLane[]? ReplayInputs);
+    private readonly record struct GeometryState(
+        double Time,
+        Vector2 Size,
+        float Range,
+        bool ShowNotes,
+        bool ShowInputs,
+        long InputVersion,
+        long StatisticsVersion,
+        InputLane[]? ReplayInputs,
+        bool Cached);
 
     private sealed class TriggerSubscription : IDisposable
     {

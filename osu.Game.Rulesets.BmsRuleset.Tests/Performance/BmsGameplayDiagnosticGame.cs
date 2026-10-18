@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics.Rendering;
@@ -17,6 +18,7 @@ using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using SixLabors.ImageSharp;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Performance;
 
@@ -255,6 +257,8 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             var renderFrameIndex = Host.Renderer.FrameIndex;
             var renderFramesBegun = initialRenderFrameIndex is { } firstRender && renderFrameIndex >= firstRender
                 ? (ulong?)(renderFrameIndex - firstRender) : null;
+            if (!options.Headless && renderFramesBegun == 0)
+                error ??= "No render frames were produced during measurement; check whether the window was minimised.";
             var audioDuringMeasurement = initialAudio is { } start ? audioProbe?.ReadTotals().Since(start) : null;
             Directory.CreateDirectory(options.Output);
             scene?.SaveAudioCapture();
@@ -318,6 +322,28 @@ internal partial class BmsGameplayDiagnosticGame(BmsGameplayDiagnosticOptions op
             };
             File.WriteAllText(Path.Combine(options.Output, "summary.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
             ResultCode = report.Success ? 0 : 1;
+        }
+        finally
+        {
+            if (options.CaptureScreenshot && ResultCode == 0)
+                _ = captureAndExit();
+            else
+                Exit();
+        }
+    }
+
+    private async Task captureAndExit()
+    {
+        try
+        {
+            // Capture after recording the interval so GPU readback cannot inflate its timings.
+            using var screenshot = await Host.TakeScreenshotAsync();
+            await screenshot.SaveAsPngAsync(Path.Combine(options.Output, "gameplay.png"));
+        }
+        catch (Exception error)
+        {
+            Console.Error.WriteLine(error);
+            ResultCode = 1;
         }
         finally
         {

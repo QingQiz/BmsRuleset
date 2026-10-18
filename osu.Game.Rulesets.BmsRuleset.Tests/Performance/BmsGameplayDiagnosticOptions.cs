@@ -39,11 +39,15 @@ internal sealed class BmsGameplayDiagnosticOptions
 
     public double DrawHz { get; private set; }
 
+    public double ReplayVisualizerRange { get; private set; }
+
     public bool Headless { get; private set; }
 
     public bool AudioOutput { get; private set; }
 
     public bool CaptureAudio { get; private set; }
+
+    public bool CaptureScreenshot { get; private set; }
 
     public bool OmitSnapshots { get; private set; }
 
@@ -98,6 +102,12 @@ internal sealed class BmsGameplayDiagnosticOptions
                 continue;
             }
 
+            if (argument == "--capture-screenshot")
+            {
+                result.CaptureScreenshot = true;
+                continue;
+            }
+
             if (argument == "--omit-snapshots")
             {
                 result.OmitSnapshots = true;
@@ -146,6 +156,8 @@ internal sealed class BmsGameplayDiagnosticOptions
 
                 case "--draw-hz": result.DrawHz = number(value, 0, 10000); break;
 
+                case "--replay-visualizer-range": result.ReplayVisualizerRange = number(value, 0, 10); break;
+
                 case "--skin": result.Skin = enumValue<BmsTestSkins.SkinKind>(value); break;
 
                 case "--long-note-mode": result.LongNoteMode = enumValue<BmsLongNoteMode>(value); break;
@@ -166,6 +178,10 @@ internal sealed class BmsGameplayDiagnosticOptions
             throw new ArgumentException("Playback warmup must finish before the requested interval ends.");
         if (result.InvertRandomSeed.HasValue && !result.Invert)
             throw new ArgumentException("--invert-random-seed requires --invert.");
+        if (result.CaptureScreenshot && result.Headless)
+            throw new ArgumentException("--capture-screenshot requires the desktop renderer.");
+        if (result.ReplayVisualizerRange is > 0 and < 1)
+            throw new ArgumentException("--replay-visualizer-range must be 0 (off) or between 1 and 10 seconds.");
         if (!File.Exists(result.Chart))
             throw new ArgumentException("--chart must name an existing BMS file with its resources alongside it.");
         if (string.IsNullOrEmpty(result.Output))

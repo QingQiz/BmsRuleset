@@ -92,6 +92,22 @@ public class BmsGameplayDiagnosticOptionsTest
         Assert.That(options.NoteHeightScale, Is.EqualTo(1));
         Assert.That(options.SoftConstant, Is.False);
         Assert.That(options.SoftConstantFadeIn, Is.Zero);
+        Assert.That(options.ReplayVisualizerRange, Is.Zero);
+        Assert.That(options.CaptureScreenshot, Is.False);
+    }
+
+    [TestCase("0", 0)]
+    [TestCase("1", 1)]
+    [TestCase("4", 4)]
+    [TestCase("10", 10)]
+    public void SupportsReplayVisualizerRange(string value, double expected)
+        => Assert.That(BmsGameplayDiagnosticOptions.Parse([.. required, "--replay-visualizer-range", value]).ReplayVisualizerRange, Is.EqualTo(expected));
+
+    [Test]
+    public void ScreenshotCaptureRequiresDesktopRenderer()
+    {
+        Assert.That(BmsGameplayDiagnosticOptions.Parse([.. required, "--capture-screenshot"]).CaptureScreenshot, Is.True);
+        Assert.Throws<ArgumentException>(() => BmsGameplayDiagnosticOptions.Parse([.. required, "--capture-screenshot", "--headless"]));
     }
 
     [TestCase("0.01", "-1000", 0.01, -1000)]
@@ -128,6 +144,11 @@ public class BmsGameplayDiagnosticOptionsTest
     [TestCase("--update-hz", "NaN")]
     [TestCase("--update-hz", "-1")]
     [TestCase("--draw-hz", "Infinity")]
+    [TestCase("--replay-visualizer-range", "NaN")]
+    [TestCase("--replay-visualizer-range", "Infinity")]
+    [TestCase("--replay-visualizer-range", "-1")]
+    [TestCase("--replay-visualizer-range", "0.5")]
+    [TestCase("--replay-visualizer-range", "10.1")]
     [TestCase("--reference-bpm", "999")]
     [TestCase("--long-note-mode", "missing")]
     [TestCase("--skin", "999")]

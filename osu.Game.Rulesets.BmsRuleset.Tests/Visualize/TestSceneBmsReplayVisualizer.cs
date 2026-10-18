@@ -229,6 +229,9 @@ public partial class TestSceneBmsReplayVisualizer : BmsPlayerTestScene
         AddAssert("short live press displayed and coloured", () => primitives().Count(drawable =>
             drawable.Kind == BmsReplayVisualizer.PlotElementKind.Input && !drawable.Outline &&
             drawable.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)) == 1);
+        AddAssert("cached short press matches", () => cachedRectangles().Count(rectangle =>
+            rectangle.Kind == BmsReplayVisualizer.TimelineKind.Input && rectangle.TopTime == 1000 && rectangle.BottomTime == 1000 &&
+            rectangle.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)) == 1);
         seek(2000);
         AddStep("hide notes before long note input", () => visualizer.ShowNotes.Value = false);
         AddStep("hide during long note input", () => visualizer.Alpha = 0);
@@ -240,9 +243,18 @@ public partial class TestSceneBmsReplayVisualizer : BmsPlayerTestScene
             Math.Abs(drawable.Bounds.Y + 1.5f - visualizer.DrawHeight * 0.25f) < 0.001f &&
             drawable.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)) &&
             primitives().All(drawable => drawable.Kind is BmsReplayVisualizer.PlotElementKind.Input or BmsReplayVisualizer.PlotElementKind.Judgement));
+        AddAssert("cached hidden-note hold coloured immediately", () => cachedRectangles().Any(rectangle =>
+            rectangle.Kind == BmsReplayVisualizer.TimelineKind.HeldInput && rectangle.BottomTime == 2000 &&
+            rectangle.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)) &&
+            cachedRectangles().All(rectangle => rectangle.Kind is BmsReplayVisualizer.TimelineKind.Input or
+                BmsReplayVisualizer.TimelineKind.HeldInput or BmsReplayVisualizer.TimelineKind.Fixed));
         AddStep("show notes", () => visualizer.ShowNotes.Value = true);
         AddAssert("head coloured before tail", () => primitives().Any(drawable =>
             drawable.Outline && drawable.Bounds.Height > 20 && drawable.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)));
+        AddAssert("cached head and connection match", () => cachedRectangles().Any(rectangle =>
+            rectangle.Kind == BmsReplayVisualizer.TimelineKind.LongNote && rectangle.BottomTime == 2000 && rectangle.TopTime == 3000 &&
+            rectangle.Colour == (Colour4)BmsHitResultColours.ForHitResult(HitResult.Perfect)) &&
+            cachedRectangles().Any(rectangle => rectangle.Kind == BmsReplayVisualizer.TimelineKind.Connection && rectangle.TopTime == 2000));
         seek(2100);
         AddAssert("held input is a filled rectangle reaching current time", () => primitives().Any(drawable =>
             drawable.Kind == BmsReplayVisualizer.PlotElementKind.Input && !drawable.Outline && drawable.Bounds.Height > 10 &&
@@ -259,6 +271,9 @@ public partial class TestSceneBmsReplayVisualizer : BmsPlayerTestScene
         });
         AddStep("release long note", () =>
             ((BmsInputManager)((BmsDrawableRuleset)Player.DrawableRuleset).KeyBindingInputManager).KeyBindingContainer.TriggerReleased(BmsAction.Key2));
+        AddAssert("cached release replaces held rectangle across buckets", () => cachedRectangles().Any(rectangle =>
+            rectangle.Kind == BmsReplayVisualizer.TimelineKind.Input && rectangle.TopTime == 15000 && rectangle.BottomTime == 2000) &&
+            cachedRectangles().All(rectangle => rectangle.Kind != BmsReplayVisualizer.TimelineKind.HeldInput));
     }
 
     private BmsReplayVisualizer.PlotRectangle[] primitives() => visualizer.Plot.Rectangles.ToArray();
