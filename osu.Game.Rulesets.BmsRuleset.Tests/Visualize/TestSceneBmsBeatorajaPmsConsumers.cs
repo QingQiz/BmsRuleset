@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -27,7 +26,7 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
     private bool badScenario;
     private BmsScoreProcessor score => (BmsScoreProcessor)Player.ScoreProcessor;
     private BmsHitErrorMeter meter => Player.ChildrenOfType<BmsHitErrorMeter>().Single();
-    private Container markers => meter.ChildrenOfType<Container>().Single(c => c.Name == "judgements");
+    private BmsHitErrorMeter.JudgementsLayer markers => meter.Judgements;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(createReplay);
 
@@ -58,9 +57,9 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
         checkpoint(875, () =>
         {
             assertState(0.28, 0, [0]);
-            Assert.That(markers.AliveChildren, Has.Count.EqualTo(1));
-            Assert.That(markers.AliveChildren.Single().X, Is.EqualTo(0.35).Within(1e-6));
-            Assert.That(markers.AliveChildren.Single().Alpha, Is.GreaterThan(0));
+            Assert.That(markers.Lines, Has.Count.EqualTo(1));
+            Assert.That(markers.Lines.Single().X, Is.EqualTo(0.35).Within(1e-6));
+            Assert.That(markers.Lines.Single().AlphaAt(markers.DisplayTime), Is.GreaterThan(0));
             var saved = new ScoreInfo(); score.PopulateScore(saved);
             var hit = saved.HitEvents.Single();
             Assert.That(((BmsHitObject)hit.HitObject).Column, Is.EqualTo(1));
@@ -73,7 +72,7 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
         checkpoint(950, () =>
         {
             assertState(0.28, 0, [0]);
-            Assert.That(markers.AliveChildren, Is.Empty, "the second BAD cannot add a marker after seek clears the old marker");
+            Assert.That(markers.Lines, Is.Empty, "the second BAD cannot add a marker after seek clears the old marker");
         });
         checkpoint(1050, afterRehit);
         checkpoint(875, () => assertState(0.28, 0, [0]));
@@ -99,7 +98,7 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
         checkpoint(2250, () =>
         {
             assertState(0.34, 0, [0, 2, 2]);
-            Assert.That(markers.AliveChildren, Is.Empty, "suppressed passive POOR adds no marker");
+            Assert.That(markers.Lines, Is.Empty, "suppressed passive POOR adds no marker");
             Assert.That(score.JudgementEvents.Last().SuppressPenalty, Is.True);
         });
         checkpoint(3050, finalState);

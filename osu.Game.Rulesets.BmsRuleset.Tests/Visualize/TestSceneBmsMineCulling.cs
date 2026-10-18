@@ -8,6 +8,7 @@ using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Drawables.Objects;
 using osu.Game.Tests.Visual;
 
@@ -61,13 +62,17 @@ public partial class TestSceneBmsMineCulling : BmsPlayerTestScene
     {
         loadMine();
         AddStep("move mine below viewport", () => mine.ScrollPositionAtStartTime = -1_000_000);
-        AddUntilStep("mine culled", () => !drawable.IsPresent);
-        AddAssert("mine remains unjudged", () => !drawable.Judged);
+        AddUntilStep("mine culled", () => !Playfield.AllColumnAliveObjects().Any(d => d.HitObject == mine));
+        AddAssert("mine remains unhandled", () => !((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLandmineState(mine).HandledTime.HasValue);
         AddStep("bring mine back", () => mine.ScrollPositionAtStartTime = Playfield.ScrollController.CurrentScrollPosition + 100);
-        AddUntilStep("mine visible again", () => drawable.IsPresent);
+        AddUntilStep("mine visible again", () =>
+        {
+            drawable = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>().SingleOrDefault(d => d.HitObject == mine)!;
+            return drawable?.IsPresent == true;
+        });
         AddAssert("position refreshed on return", () => drawable.Y < 0 && drawable.Y > -drawable.Parent!.DrawHeight);
         AddStep("move mine above viewport", () => mine.ScrollPositionAtStartTime = 1_000_000);
-        AddUntilStep("mine culled above too", () => !drawable.IsPresent);
+        AddUntilStep("mine culled above too", () => !Playfield.AllColumnAliveObjects().Any(d => d.HitObject == mine));
     }
 
     [Test]
@@ -75,10 +80,10 @@ public partial class TestSceneBmsMineCulling : BmsPlayerTestScene
     {
         loadMine();
         AddStep("move mine outside viewport", () => mine.ScrollPositionAtStartTime = -1_000_000);
-        AddUntilStep("mine culled", () => !drawable.IsPresent);
+        AddUntilStep("mine culled", () => !Playfield.AllColumnAliveObjects().Any(d => d.HitObject == mine));
         AddStep("hold mine column", () => PressColumn(Playfield.Stage.Columns[1], 4800));
         AddStep("advance to mine", () => Player.GameplayClockContainer.Seek(5000));
-        AddUntilStep("mine judged despite culling", () => drawable.Judged);
+        AddUntilStep("mine judged despite culling", () => ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLandmineState(mine).Detonated);
         AddAssert("detonation reached score processor", () => Player.Results.Any(r => r.HitObject == mine));
     }
 
@@ -87,7 +92,7 @@ public partial class TestSceneBmsMineCulling : BmsPlayerTestScene
     {
         loadMine();
         AddStep("move mine outside viewport", () => mine.ScrollPositionAtStartTime = -1_000_000);
-        AddUntilStep("mine culled", () => !drawable.IsPresent);
+        AddUntilStep("mine culled", () => !Playfield.AllColumnAliveObjects().Any(d => d.HitObject == mine));
         AddStep("seek past lifetime", () => Player.GameplayClockContainer.Seek(5300));
         AddUntilStep("mine returned to pool", () => !Playfield.AllColumnAliveObjects().Any(d => d.HitObject == mine));
         AddStep("restore position and rewind", () =>

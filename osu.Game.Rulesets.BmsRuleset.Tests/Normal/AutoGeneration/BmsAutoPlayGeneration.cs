@@ -41,11 +41,13 @@ public partial class BmsAutoPlayGeneration : OsuTestScene
 
         var generated = new BmsAutoGenerator(beatmap).Generate();
 
-        Assert.That(generated.Frames, Has.Count.EqualTo(2));
+        Assert.That(generated.Frames.Select(f => f.Time), Is.EqualTo(new[] { 1000d, 1000, 3000, 3000 }));
         Assert.That(generated.Frames[0].Time, Is.EqualTo(1000));
-        Assert.That(generated.Frames[1].Time, Is.EqualTo(3000));
-        Assert.That(contains(generated.Frames[0], BmsAction.Key1, BmsAction.Key2), Is.True);
-        Assert.That(contains(generated.Frames[1], BmsAction.Key1, BmsAction.Key2), Is.False);
+        Assert.That(contains(generated.Frames[0], BmsAction.Key1), Is.True);
+        Assert.That(contains(generated.Frames[1], BmsAction.Key1, BmsAction.Key2), Is.True);
+        Assert.That(contains(generated.Frames[2], BmsAction.Key1), Is.False);
+        Assert.That(contains(generated.Frames[2], BmsAction.Key2), Is.True);
+        Assert.That(((BmsReplayFrame)generated.Frames[3]).Actions, Is.Empty);
     }
 
     [Test]
@@ -78,14 +80,12 @@ public partial class BmsAutoPlayGeneration : OsuTestScene
 
         var generated = new BmsAutoGenerator(beatmap).Generate();
 
-        Assert.That(generated.Frames, Has.Count.EqualTo(3));
+        Assert.That(generated.Frames.Select(f => f.Time), Is.EqualTo(new[] { 1000d, 3000, 3000, 3000 + BmsAutoGenerator.RELEASE_DELAY }));
         Assert.That(generated.Frames[0].Time, Is.EqualTo(1000));
-        Assert.That(generated.Frames[1].Time, Is.EqualTo(3000));
-        Assert.That(generated.Frames[2].Time, Is.EqualTo(3000 + BmsAutoGenerator.RELEASE_DELAY));
         Assert.That(contains(generated.Frames[0], BmsAction.Key1), Is.True);
-        Assert.That(contains(generated.Frames[1], BmsAction.Key1), Is.False);
-        Assert.That(contains(generated.Frames[1], BmsAction.Key2), Is.True);
-        Assert.That(contains(generated.Frames[2], BmsAction.Key2), Is.False);
+        Assert.That(((BmsReplayFrame)generated.Frames[1]).Actions, Is.Empty);
+        Assert.That(contains(generated.Frames[2], BmsAction.Key2), Is.True);
+        Assert.That(((BmsReplayFrame)generated.Frames[3]).Actions, Is.Empty);
     }
 
     [Test]
@@ -125,11 +125,12 @@ public partial class BmsAutoPlayGeneration : OsuTestScene
 
         var generated = new BmsAutoGenerator(beatmap).Generate();
 
-        Assert.That(generated.Frames, Has.Count.EqualTo(2));
-        Assert.That(generated.Frames[0].Time, Is.EqualTo(1000));
-        Assert.That(generated.Frames[1].Time, Is.EqualTo(1000 + BmsAutoGenerator.RELEASE_DELAY));
-        Assert.That(contains(generated.Frames[0], BmsAction.Key1, BmsAction.Key2), Is.True);
-        Assert.That(contains(generated.Frames[1], BmsAction.Key1, BmsAction.Key2), Is.False);
+        Assert.That(generated.Frames.Select(f => f.Time), Is.EqualTo(new[] { 1000d, 1000, 1000 + BmsAutoGenerator.RELEASE_DELAY, 1000 + BmsAutoGenerator.RELEASE_DELAY }));
+        Assert.That(contains(generated.Frames[0], BmsAction.Key1), Is.True);
+        Assert.That(contains(generated.Frames[1], BmsAction.Key1, BmsAction.Key2), Is.True);
+        Assert.That(contains(generated.Frames[2], BmsAction.Key1), Is.False);
+        Assert.That(contains(generated.Frames[2], BmsAction.Key2), Is.True);
+        Assert.That(((BmsReplayFrame)generated.Frames[3]).Actions, Is.Empty);
     }
 
     [Test]

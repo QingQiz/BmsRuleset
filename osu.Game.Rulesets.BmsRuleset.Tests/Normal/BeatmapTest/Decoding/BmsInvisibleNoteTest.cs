@@ -68,7 +68,7 @@ public class BmsInvisibleNoteTest
     }
 
     [Test]
-    public void TestConversionShiftsClonesAndPrecomputesInvisibleNotes()
+    public void TestConversionPreservesTimingClonesAndPrecomputesInvisibleNotes()
     {
         var decoded = BmsBeatmapDecoder.DecodeBytes(Encoding.UTF8.GetBytes("#BPM 120\n#00011:01\n#00031:02"));
         var converted = (BmsBeatmap)new BmsBeatmapConverter(decoded, new BmsRuleset()).Convert();
@@ -77,8 +77,8 @@ public class BmsInvisibleNoteTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(invisible.StartTime, Is.EqualTo(2000));
-            Assert.That(invisible.ScrollPositionAtStartTime, Is.EqualTo(converted.TimingMap.GetScrollPositionAtTime(2000)));
+            Assert.That(invisible.StartTime, Is.Zero);
+            Assert.That(invisible.ScrollPositionAtStartTime, Is.EqualTo(converted.TimingMap.GetScrollPositionAtTime(0)));
             Assert.That(invisible.Beatmap, Is.SameAs(converted));
             Assert.That(invisible, Is.Not.SameAs(original));
             Assert.That(converted.HitObjects, Has.Count.EqualTo(1));

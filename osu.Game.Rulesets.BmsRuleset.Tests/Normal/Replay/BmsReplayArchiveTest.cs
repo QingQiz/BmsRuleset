@@ -124,6 +124,18 @@ public class BmsReplayArchiveTest
     }
 
     [Test]
+    public void TestBranchDecisionsSurviveScoreCloneAndArchive()
+    {
+        var original = createScore();
+        original.ScoreInfo.Ruleset = new BmsRuleset().RulesetInfo;
+        original.ScoreInfo.Mods = [new BmsModBranchReplay { Decisions = { Value = "2:2,3:1" } }];
+
+        var restored = BmsTestReplayArchive.RoundTrip(original.DeepClone());
+
+        Assert.That(restored.ScoreInfo.Mods.OfType<BmsModBranchReplay>().Single().Decisions.Value, Is.EqualTo("2:2,3:1"));
+    }
+
+    [Test]
     public void TestArchiveReadsOnlyOperationsInTimeOrder()
     {
         var original = createScore();

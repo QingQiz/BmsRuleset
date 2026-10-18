@@ -23,7 +23,7 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
     private readonly List<Action> assertions = [];
     private BmsReplayFrame[] replayFrames = [];
 
-    // No input frame at 3201: the mine's nominal time must differ from its application frame.
+    // Sparse replay frames must preserve logical mine and body deadlines during catch-up.
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(_ => replayFrames);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
@@ -41,6 +41,7 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
     }
 
     [TestCase(false, 3200)]
+    [TestCase(true, 3200)]
     [TestCase(false, 3205)]
     [TestCase(true, 3205)]
     public void MineApplicationCanReplayAcrossLifetime(bool returnToPool, double rewindTime)
@@ -54,11 +55,10 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
 
-        // Java 9cddf911 JudgeManager 219-246 applies crossed mines before HCN body at 306-338.
-        // GaugeProperty NORMAL and GrooveGauge TOTAL give initial 20%, head +4%, body +2%
-        // for TOTAL12 / 3 endpoints; the held mine deducts 10%: 24 -> 14 -> 16.
+        // NORMAL starts at 20%; TOTAL12 / 3 gives head +4%, then body +2%.
+        // The body deadline precedes the held mine's 10% deduction: 24 -> 26 -> 16.
         checkpoint("before", 3200, .24, false, []);
-        checkpoint("first", 3210, .16, true, [.14, .16]);
+        checkpoint("first", 3210, .16, true, [.26, .16]);
         if (returnToPool)
         {
             seek(3500);
@@ -67,11 +67,10 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
         else
             AddAssert("mine remains resident", () => Playfield.AllColumnAliveObjects().Any(d => d.HitObject is BmsLandmine));
 
-        // Rewind expectations come from the host Playfield's RawTime rollback contract,
-        // not from Java rewind behaviour: the result applied at 3210 is undone at 3205,
-        // even though 3205 is later than the nominal mine time. Pooling must not change it.
-        checkpoint("rewound", rewindTime, .24, false, []);
-        checkpoint("replayed", 3210, .16, true, [.14, .16]);
+        // Rewinding before the logical crossing undoes it; later targets retain it,
+        // independently of the outer frame that first displayed the result.
+        checkpoint("rewound", rewindTime, rewindTime < 3201 ? .24 : .16, rewindTime >= 3201, []);
+        checkpoint("replayed", 3210, .16, true, [.26, .16]);
         AddStep("assert captured lifecycle", () => Assert.Multiple(() =>
         {
             foreach (var assertion in assertions)
@@ -79,6 +78,8 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
         }));
     }
 
+    [TestCase(false, false, 3200)]
+    [TestCase(true, true, 3200)]
     [TestCase(false, false, 3205)]
     [TestCase(false, false, 3210)]
     [TestCase(false, false, 3225)]
@@ -100,11 +101,10 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
 
-        // Java 9cddf911 JudgeManager 219-246 tests held only while crossing the mine.
-        // NORMAL initial 20% + TOTAL12/3 head 4% + half-GREAT body 2% is 26%;
-        // only a mine held at the crossing deducts 10%. A press at 3220 cannot add it later.
+        // NORMAL initial 20% + TOTAL12/3 head 4% + half-GREAT body 2% is 26%.
+        // Only a mine held at the crossing deducts 10%; a later press cannot add it.
         var passedHealth = held ? .16 : .26;
-        double[] firstFrame = held ? [.14, .16] : [.26];
+        double[] firstFrame = held ? [.26, .16] : [.26];
         checkpoint("before", 3200, .24, false, []);
         checkpoint("first", 3210, passedHealth, held, firstFrame);
         checkpoint("later press", 3240, passedHealth, held, []);
@@ -116,12 +116,10 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
         else
             AddAssert("mine remains resident", () => Playfield.AllColumnAliveObjects().Any(d => d.HitObject is BmsLandmine));
 
-        // The host's RawTime rollback contract undoes only applications after the target.
-        // Seeking to or after 3210 must preserve an avoided mine even without a result,
-        // including across pooling; this expectation is separate from Java forward rules.
-        checkpoint("rewound", rewindTime, rewindTime < 3210 ? .24 : passedHealth,
-            rewindTime >= 3210 && held, rewindTime == 3210 ? firstFrame : []);
-        if (rewindTime < 3210)
+        // Avoided mines retain their logical crossing across rewinds and pooling too.
+        checkpoint("rewound", rewindTime, rewindTime < 3201 ? .24 : passedHealth,
+            rewindTime >= 3201 && held, rewindTime == 3210 ? firstFrame : []);
+        if (rewindTime < 3201)
             checkpoint("re-cross", 3210, passedHealth, held, firstFrame);
         checkpoint("continued", 3240, passedHealth, held, []);
         AddStep("assert captured crossing boundaries", () => Assert.Multiple(() =>
@@ -148,15 +146,16 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
             var mines = events.Count(e => e.Source.Kind == BmsJudgementSourceKind.Landmine);
             var observations = events.SelectMany(e => e.TimingObservations).ToArray();
             var history = ((BmsHealthProcessor)Player.HealthProcessor).GaugeHistory.ToArray();
-            var frameHealth = history.Where(e => e.Time == time)
+            var interval = history.Where(e => e.Time > (time == 3210 ? 3200 : 3201) && e.Time <= time).ToArray();
+            var frameHealth = interval
                 .Select(e => e.States.Single(s => s.GaugeType == BmsGaugeType.Normal).Health).ToArray();
             HitResult[] expectedResults = expectedMine ? [HitResult.Perfect, HitResult.Meh] : [HitResult.Perfect];
             BmsJudgementSourceKind[] expectedKinds = expectedMine
                 ? [BmsJudgementSourceKind.LongNote, BmsJudgementSourceKind.Landmine] : [BmsJudgementSourceKind.LongNote];
             int[] expectedColumns = expectedMine ? [1, 2] : [1];
             double[] expectedSourceTimes = expectedMine ? [3000, 3201] : [3000];
-            double[] expectedActualTimes = expectedMine ? [3000, 3210] : [3000];
-            double[] expectedOffsets = expectedMine ? [0, 9] : [0];
+            double[] expectedActualTimes = expectedMine ? [3000, 3201] : [3000];
+            double[] expectedOffsets = expectedMine ? [0, 0] : [0];
             double[] expectedDamage = expectedMine ? [0, 10] : [0];
             BmsTimingObservationKind[] expectedTimingKinds = expectedMine
                 ? [BmsTimingObservationKind.LongNoteHead, BmsTimingObservationKind.Note] : [BmsTimingObservationKind.LongNoteHead];
@@ -170,6 +169,9 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
                 Assert.That(health, Is.EqualTo(expectedHealth).Within(1e-8), "health " + label);
                 Assert.That(mines, Is.EqualTo(expectedMine ? 1 : 0), "mine event count " + label);
                 Assert.That(frameHealth, Is.EqualTo(expectedFrameHealth).Within(1e-8), "ordered NORMAL gauge history " + label);
+                if (time == 3210)
+                    Assert.That(interval.Select(e => e.Time), Is.EqualTo(expectedMine
+                        ? new[] { Math.BitIncrement(3200), 3201 } : [Math.BitIncrement(3200)]));
                 Assert.That(history.Any(e => e.Time > time), Is.False, "no future gauge history " + label);
                 Assert.That(events.Select(e => e.Result), Is.EqualTo(expectedResults), "results, without extra endpoints " + label);
                 Assert.That(events.Select(e => e.Source.Kind), Is.EqualTo(expectedKinds), "source kinds " + label);

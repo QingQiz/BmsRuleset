@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -15,6 +16,7 @@ using osu.Game.Rulesets.BmsRuleset.IO.Input;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Screens.Play;
 using osu.Game.Tests.Visual;
 
 namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
@@ -32,7 +34,7 @@ public partial class TestSceneBmsBeatorajaScratchInput : BmsPlayerTestScene
     private IList<ReplayFrame>? customFrames;
     private bool autoScratch;
 
-    protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(createReplay);
+    protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(autoScratch ? null : createReplay);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -54,7 +56,6 @@ public partial class TestSceneBmsBeatorajaScratchInput : BmsPlayerTestScene
     private IList<ReplayFrame> createReplay(BmsBeatmap beatmap)
     {
         if (customFrames != null) return customFrames;
-        if (autoScratch) return [new BmsReplayFrame(0), new BmsReplayFrame(11000)];
         if (!manual) return archiveFrames([..new BmsAutoGenerator(beatmap).Generate().Frames]);
         var head = reversedHead ? reverseAction : forwardAction;
         var tail = reversedHead ? forwardAction : reverseAction;
@@ -312,7 +313,15 @@ public partial class TestSceneBmsBeatorajaScratchInput : BmsPlayerTestScene
 
     private void checkpoint(double time, Action assertion)
     {
-        AddStep("seek " + time, () => { Player.GameplayClockContainer.Stop(); Player.GameplayClockContainer.Seek(time); });
+        AddStep("seek " + time, () =>
+        {
+            if (autoScratch)
+                typeof(GameplayClockContainer).GetMethod("StopGameplayClock", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .Invoke(Player.GameplayClockContainer, null);
+            else
+                Player.GameplayClockContainer.Stop();
+            Player.GameplayClockContainer.Seek(time);
+        });
         AddUntilStep("simulation reached " + time, () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < 0.001);
         AddStep("assert " + time, assertion);
     }

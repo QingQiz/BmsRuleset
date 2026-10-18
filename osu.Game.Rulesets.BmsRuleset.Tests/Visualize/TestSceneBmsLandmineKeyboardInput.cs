@@ -70,11 +70,11 @@ public partial class TestSceneBmsLandmineKeyboardInput : BmsPlayerTestScene
                 .Invoke(inputManager, [keyboard]);
         });
 
-        // Java 9cddf911 JudgeManager 219-338 reads final physical keys, then applies
-        // all mines before bodies. NORMAL TOTAL240 / 3 gives head +80%, body +40%.
+        // Elapsed body recovery precedes a later mine crossing. NORMAL TOTAL240 / 3
+        // gives head +80%, body +40%, then the held mine deducts 10%.
         checkpoint(3000, false, [1]);
         checkpoint(3200, false, []);
-        checkpoint(3201, !releaseAtMine, releaseAtMine ? [1] : [.9, 1]);
+        checkpoint(3201, !releaseAtMine, releaseAtMine ? [] : [.9]);
         checkpoint(3202, !releaseAtMine, []);
         AddStep("assert keyboard mine timeline", () => Assert.Multiple(() =>
         {
@@ -104,7 +104,7 @@ public partial class TestSceneBmsLandmineKeyboardInput : BmsPlayerTestScene
             TestContext.WriteLine($"keyboard {time}: HP={health:R}; frame=[{string.Join(",", frameHealth)}]; replay=null");
             assertions.Add(() =>
             {
-                Assert.That(health, Is.EqualTo(1).Within(1e-8), "final keyboard health at " + time);
+                Assert.That(health, Is.EqualTo(expectedMine ? .9 : 1).Within(1e-8), "final keyboard health at " + time);
                 Assert.That(frameHealth, Is.EqualTo(expectedFrameHealth).Within(1e-8), "ordered keyboard gauge history at " + time);
                 Assert.That(events.Select(e => e.Result), Is.EqualTo(expectedMine
                     ? new[] { HitResult.Perfect, HitResult.Meh } : [HitResult.Perfect]), "no extra endpoints at " + time);

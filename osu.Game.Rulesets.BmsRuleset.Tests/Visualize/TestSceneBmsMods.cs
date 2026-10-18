@@ -59,7 +59,10 @@ public partial class TestSceneBmsMods : BmsPlayerTestScene
     public void TestAutoScratchHoldsAndCompletesScratchLongNote(BmsLongNoteMode mode)
     {
         this.AddSetupStep("load player with AS and LN mode", () =>
-            LoadPlayer([new BmsModAutoScratch(), createLongNoteModeMod(mode)]));
+        {
+            replay = null;
+            LoadPlayer([new BmsModAutoScratch(), createLongNoteModeMod(mode)]);
+        });
         this.AddSetupUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         this.AddSetupAssert("beatmap loaded", () => Player.LoadedBeatmapSuccessfully);
 

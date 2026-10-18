@@ -157,7 +157,7 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
             });
             TestContext.WriteLine("P2_TRACE " + trace);
             var expected = baseline.RootElement.GetProperty("traces").GetProperty(scenario).GetProperty(checkpoint);
-            Assert.That(trace, Is.EqualTo(JsonSerializer.Serialize(expected)), "ordered trace recorded before the P2 migration");
+            Assert.That(trace, Is.EqualTo(JsonSerializer.Serialize(expected)), "ordered trace with logical judgement deadlines");
         });
     }
 

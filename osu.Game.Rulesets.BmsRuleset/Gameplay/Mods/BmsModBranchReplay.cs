@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
 using osu.Game.Rulesets.BmsRuleset.UI.Icons;
@@ -27,7 +29,11 @@ public class BmsModBranchReplay : Mod, IApplicableToBeatmapConverter
 
     public override bool ValidForMultiplayerAsFreeMod => false;
 
+    // APIMod reconstructs cloned and stored scores using SettingSource properties.
+    [SettingSource(typeof(BmsStrings), nameof(BmsStrings.ModBranchReplay))]
     public Bindable<string> Decisions { get; } = new(string.Empty);
+
+    public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription => [];
 
     public void ApplyToBeatmapConverter(IBeatmapConverter beatmapConverter)
     {

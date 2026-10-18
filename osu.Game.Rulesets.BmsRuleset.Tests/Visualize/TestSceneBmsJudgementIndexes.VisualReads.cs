@@ -25,7 +25,7 @@ public partial class TestSceneBmsJudgementIndexes
     [TestCase(true, false)]
     [TestCase(false, true)]
     [TestCase(true, true)]
-    public void VisualLayoutReadsStartTimeOnlyWhenNeeded(bool constant, bool softConstant)
+    public void VisualLayoutReadsStartTimeForTimelineAndScrollModes(bool constant, bool softConstant)
     {
         load(false, longNotes: false);
         seek(3000);
@@ -58,7 +58,9 @@ public partial class TestSceneBmsJudgementIndexes
                     update();
                 measuringVisualReads = false;
                 TestContext.WriteLine($"VISUAL_START_TIME_READS constant={constant} softConstant={softConstant} entries={32 * notes.Length} reads={visualStartTimeReads}");
-                Assert.That(visualStartTimeReads, Is.EqualTo(constant || softConstant ? 32 * notes.Length : 0));
+                // Timeline clipping always reads the time; constant modes also need it for layout or fading.
+                var readsPerNote = constant || softConstant ? 2 : 1;
+                Assert.That(visualStartTimeReads, Is.EqualTo(32 * notes.Length * readsPerNote));
                 Assert.That(notes.Select(note => (note.Y, note.VisualsSuppressed, note.DrawInfo, note.DrawColourInfo)), Is.EqualTo(geometry));
                 Assert.That(Player.Results.Count, Is.EqualTo(results));
                 Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(health));

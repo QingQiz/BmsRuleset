@@ -107,6 +107,52 @@
             "Source": {
               "StartTime": 5000,
               "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 5000,
+              "IsScoring": true
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5000,
+                "ActualTime": 5210.000000000001,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 210.0000000000009
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 5000,
+              "IsScoring": true
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5000,
+                "ActualTime": 5210.000000000001,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 210.0000000000009
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
               "Kind": 1,
               "Duration": 200,
               "LandmineDamagePercent": 0,
@@ -119,10 +165,10 @@
               {
                 "Kind": 1,
                 "ExpectedTime": 5000,
-                "ActualTime": 5211,
+                "ActualTime": 5210.000000000001,
                 "GameplayRate": 1,
                 "Result": 2,
-                "TimeOffset": 211
+                "TimeOffset": 210.0000000000009
               }
             ]
           },
@@ -142,72 +188,20 @@
               {
                 "Kind": 2,
                 "ExpectedTime": 5200,
-                "ActualTime": 5211,
+                "ActualTime": 5210.000000000001,
                 "GameplayRate": 1,
                 "Result": 2,
-                "TimeOffset": 11
-              }
-            ]
-          },
-          {
-            "Source": {
-              "StartTime": 5000,
-              "Column": 1,
-              "Kind": 0,
-              "Duration": 0,
-              "LandmineDamagePercent": 0,
-              "EndTime": 5000,
-              "IsScoring": true
-            },
-            "Result": 2,
-            "SuppressPenalty": false,
-            "TimingObservations": [
-              {
-                "Kind": 0,
-                "ExpectedTime": 5000,
-                "ActualTime": 5210,
-                "GameplayRate": 1,
-                "Result": 2,
-                "TimeOffset": 210
-              }
-            ]
-          },
-          {
-            "Source": {
-              "StartTime": 5000,
-              "Column": 1,
-              "Kind": 0,
-              "Duration": 0,
-              "LandmineDamagePercent": 0,
-              "EndTime": 5000,
-              "IsScoring": true
-            },
-            "Result": 2,
-            "SuppressPenalty": false,
-            "TimingObservations": [
-              {
-                "Kind": 0,
-                "ExpectedTime": 5000,
-                "ActualTime": 5210,
-                "GameplayRate": 1,
-                "Result": 2,
-                "TimeOffset": 210
+                "TimeOffset": 10.00000000000091
               }
             ]
           }
         ],
         "results": [
           {
-            "id": 2,
+            "id": 0,
             "Type": 2,
-            "TimeAbsolute": 5211,
+            "TimeAbsolute": 5210,
             "GameplayRate": 1
-          },
-          {
-            "id": -1,
-            "Type": 2,
-            "TimeAbsolute": 5200,
-            "GameplayRate": null
           },
           {
             "id": 1,
@@ -216,9 +210,15 @@
             "GameplayRate": 1
           },
           {
-            "id": 0,
+            "id": 2,
             "Type": 2,
-            "TimeAbsolute": 5210,
+            "TimeAbsolute": 5210.000000000001,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 2,
+            "TimeAbsolute": 5200,
             "GameplayRate": 1
           }
         ],
@@ -233,7 +233,7 @@
         "total": 0,
         "health": [
           {
-            "Time": 5211,
+            "Time": 5210.000000000001,
             "ActiveGaugeType": 2,
             "States": [
               {
@@ -244,7 +244,7 @@
             ]
           },
           {
-            "Time": 5211,
+            "Time": 5210.000000000001,
             "ActiveGaugeType": 2,
             "States": [
               {
@@ -255,7 +255,7 @@
             ]
           },
           {
-            "Time": 5210,
+            "Time": 5210.000000000001,
             "ActiveGaugeType": 2,
             "States": [
               {
@@ -266,7 +266,7 @@
             ]
           },
           {
-            "Time": 5210,
+            "Time": 5210.000000000001,
             "ActiveGaugeType": 2,
             "States": [
               {
@@ -285,6 +285,52 @@
             "Source": {
               "StartTime": 5000,
               "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 5000,
+              "IsScoring": true
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5000,
+                "ActualTime": 5210.000000000001,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 210.0000000000009
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
+              "Kind": 0,
+              "Duration": 0,
+              "LandmineDamagePercent": 0,
+              "EndTime": 5000,
+              "IsScoring": true
+            },
+            "Result": 2,
+            "SuppressPenalty": false,
+            "TimingObservations": [
+              {
+                "Kind": 0,
+                "ExpectedTime": 5000,
+                "ActualTime": 5210.000000000001,
+                "GameplayRate": 1,
+                "Result": 2,
+                "TimeOffset": 210.0000000000009
+              }
+            ]
+          },
+          {
+            "Source": {
+              "StartTime": 5000,
+              "Column": 1,
               "Kind": 1,
               "Duration": 200,
               "LandmineDamagePercent": 0,
@@ -297,10 +343,10 @@
               {
                 "Kind": 1,
                 "ExpectedTime": 5000,
-                "ActualTime": 5211,
+                "ActualTime": 5210.000000000001,
                 "GameplayRate": 1,
                 "Result": 2,
-                "TimeOffset": 211
+                "TimeOffset": 210.0000000000009
               }
             ]
           },
@@ -320,72 +366,20 @@
               {
                 "Kind": 2,
                 "ExpectedTime": 5200,
-                "ActualTime": 5211,
+                "ActualTime": 5210.000000000001,
                 "GameplayRate": 1,
                 "Result": 2,
-                "TimeOffset": 11
-              }
-            ]
-          },
-          {
-            "Source": {
-              "StartTime": 5000,
-              "Column": 1,
-              "Kind": 0,
-              "Duration": 0,
-              "LandmineDamagePercent": 0,
-              "EndTime": 5000,
-              "IsScoring": true
-            },
-            "Result": 2,
-            "SuppressPenalty": false,
-            "TimingObservations": [
-              {
-                "Kind": 0,
-                "ExpectedTime": 5000,
-                "ActualTime": 5210,
-                "GameplayRate": 1,
-                "Result": 2,
-                "TimeOffset": 210
-              }
-            ]
-          },
-          {
-            "Source": {
-              "StartTime": 5000,
-              "Column": 1,
-              "Kind": 0,
-              "Duration": 0,
-              "LandmineDamagePercent": 0,
-              "EndTime": 5000,
-              "IsScoring": true
-            },
-            "Result": 2,
-            "SuppressPenalty": false,
-            "TimingObservations": [
-              {
-                "Kind": 0,
-                "ExpectedTime": 5000,
-                "ActualTime": 5210,
-                "GameplayRate": 1,
-                "Result": 2,
-                "TimeOffset": 210
+                "TimeOffset": 10.00000000000091
               }
             ]
           }
         ],
         "results": [
           {
-            "id": 2,
+            "id": 0,
             "Type": 2,
-            "TimeAbsolute": 5211,
+            "TimeAbsolute": 5210,
             "GameplayRate": 1
-          },
-          {
-            "id": -1,
-            "Type": 2,
-            "TimeAbsolute": 5200,
-            "GameplayRate": null
           },
           {
             "id": 1,
@@ -394,22 +388,16 @@
             "GameplayRate": 1
           },
           {
-            "id": 0,
-            "Type": 2,
-            "TimeAbsolute": 5210,
-            "GameplayRate": 1
-          },
-          {
             "id": 2,
             "Type": 2,
-            "TimeAbsolute": 5211,
+            "TimeAbsolute": 5210.000000000001,
             "GameplayRate": 1
           },
           {
             "id": -1,
             "Type": 2,
             "TimeAbsolute": 5200,
-            "GameplayRate": null
+            "GameplayRate": 1
           },
           {
             "id": 0,
@@ -421,6 +409,18 @@
             "id": 1,
             "Type": 2,
             "TimeAbsolute": 5210,
+            "GameplayRate": 1
+          },
+          {
+            "id": 2,
+            "Type": 2,
+            "TimeAbsolute": 5210.000000000001,
+            "GameplayRate": 1
+          },
+          {
+            "id": -1,
+            "Type": 2,
+            "TimeAbsolute": 5200,
             "GameplayRate": 1
           }
         ],
@@ -435,7 +435,7 @@
         "total": 0,
         "health": [
           {
-            "Time": 5211,
+            "Time": 5210.000000000001,
             "ActiveGaugeType": 2,
             "States": [
               {
@@ -446,7 +446,7 @@
             ]
           },
           {
-            "Time": 5211,
+            "Time": 5210.000000000001,
             "ActiveGaugeType": 2,
             "States": [
               {
@@ -457,7 +457,7 @@
             ]
           },
           {
-            "Time": 5210,
+            "Time": 5210.000000000001,
             "ActiveGaugeType": 2,
             "States": [
               {
@@ -468,7 +468,7 @@
             ]
           },
           {
-            "Time": 5210,
+            "Time": 5210.000000000001,
             "ActiveGaugeType": 2,
             "States": [
               {

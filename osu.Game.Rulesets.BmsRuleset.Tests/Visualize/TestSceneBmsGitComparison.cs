@@ -55,7 +55,6 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
                 new BmsNote { StartTime = 3000, Column = 1, SampleKey = 13 },
                 new BmsLongNote { StartTime = 3002, Duration = 1000, Column = 1, SampleKey = 14, TailSampleKey = 15 },
                 new BmsNote { StartTime = 3030, Column = 1, SampleKey = 16 },
-                new BmsInvisibleNote { StartTime = 3100, Column = 1, SampleKey = 17 },
                 new BmsLandmine { StartTime = 3201, Column = 1, LandmineDamagePercent = 3 },
                 new BmsLandmine { StartTime = 3202, Column = 0, LandmineDamagePercent = 3 },
                 new BmsNote { StartTime = 3400, Column = 1, SampleKey = 18 },
@@ -64,6 +63,7 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
                 new BmsNote { StartTime = 4200, Column = 2, SampleKey = 22 },
                 new BmsNote { StartTime = 12000, Column = 3 },
             ],
+            InvisibleNotes = [new BmsInvisibleNote { StartTime = 3100, Column = 1, SampleKey = 17 }],
         };
         if (layout == BmsLayoutVariant.Bme7KDouble)
             beatmap.HitObjects.Add(new BmsLongNote { StartTime = 3000, Duration = 1000, Column = 15, SampleKey = 23, TailSampleKey = 24 });
