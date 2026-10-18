@@ -10,6 +10,7 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
+using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Online.Spectator;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
@@ -29,6 +30,7 @@ public static class BmsReplayPatcher
     private static PropertyInfo? playerScoreManagerProperty;
     private static PropertyInfo? modelManagerRealmProperty;
     private static FieldInfo? scoreImporterFilesField;
+    private static FieldInfo? scoreImporterBeatmapsField;
     private static FieldInfo? replayFailIndicatorTrackField;
     private static FieldInfo? replayFailIndicatorFailSampleField;
     private static FieldInfo? mainMenuLogoProxyField;
@@ -46,6 +48,8 @@ public static class BmsReplayPatcher
             var importScorePostfixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(importScorePostfix));
             var getScoreTarget = AccessTools.Method(typeof(ScoreImporter), nameof(ScoreImporter.GetScore), [typeof(ScoreInfo)]);
             var getScorePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(getScorePrefix));
+            var getDatabasedScoreTarget = AccessTools.Method(typeof(ScoreManager), "getDatabasedScoreInfo", [typeof(IScoreInfo)]);
+            var getDatabasedScorePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(getDatabasedScorePrefix));
             var replayFailIndicatorDisposeTarget = AccessTools.Method(typeof(ReplayFailIndicator), "Dispose", [typeof(bool)]);
             var replayFailIndicatorDisposePrefixMethod = AccessTools.Method(typeof(BmsReplayPatcher), nameof(replayFailIndicatorDisposePrefix));
             var mainMenuLogoArrivingTarget = AccessTools.Method(typeof(MainMenu), "LogoArriving", [typeof(OsuLogo), typeof(bool)]);
@@ -58,6 +62,7 @@ public static class BmsReplayPatcher
             playerScoreManagerProperty = AccessTools.Property(typeof(Player), "scoreManager");
             modelManagerRealmProperty = AccessTools.Property(typeof(ModelManager<ScoreInfo>), "Realm");
             scoreImporterFilesField = AccessTools.Field(typeof(RealmArchiveModelImporter<ScoreInfo>), "Files");
+            scoreImporterBeatmapsField = AccessTools.Field(typeof(ScoreImporter), "beatmaps");
             replayFailIndicatorTrackField = AccessTools.Field(typeof(ReplayFailIndicator), "track");
             replayFailIndicatorFailSampleField = AccessTools.Field(typeof(ReplayFailIndicator), "failSample");
             mainMenuLogoProxyField = AccessTools.Field(typeof(MainMenu), "logoProxy");
@@ -68,6 +73,8 @@ public static class BmsReplayPatcher
                 (name: "BmsReplayPatcher.importScorePostfix", member: importScorePostfixMethod),
                 (name: "ScoreImporter.GetScore", member: getScoreTarget),
                 (name: "BmsReplayPatcher.getScorePrefix", member: getScorePrefixMethod),
+                (name: "ScoreManager.getDatabasedScoreInfo", member: getDatabasedScoreTarget),
+                (name: "BmsReplayPatcher.getDatabasedScorePrefix", member: getDatabasedScorePrefixMethod),
                 (name: "ReplayFailIndicator.Dispose", member: replayFailIndicatorDisposeTarget),
                 (name: "BmsReplayPatcher.replayFailIndicatorDisposePrefix", member: replayFailIndicatorDisposePrefixMethod),
                 (name: "MainMenu.LogoArriving", member: mainMenuLogoArrivingTarget),
@@ -79,6 +86,7 @@ public static class BmsReplayPatcher
                 (name: "Player.scoreManager", member: playerScoreManagerProperty),
                 (name: "ModelManager<ScoreInfo>.Realm", member: modelManagerRealmProperty),
                 (name: "RealmArchiveModelImporter<ScoreInfo>.Files", member: scoreImporterFilesField),
+                (name: "ScoreImporter.beatmaps", member: scoreImporterBeatmapsField),
                 (name: "ReplayFailIndicator.track", member: replayFailIndicatorTrackField),
                 (name: "ReplayFailIndicator.failSample", member: replayFailIndicatorFailSampleField),
                 (name: "MainMenu.logoProxy", member: mainMenuLogoProxyField),
@@ -93,6 +101,7 @@ public static class BmsReplayPatcher
             var harmony = new Harmony(harmony_id);
             harmony.Patch(importScoreTarget, postfix: new HarmonyMethod(importScorePostfixMethod));
             harmony.Patch(getScoreTarget, prefix: new HarmonyMethod(getScorePrefixMethod));
+            harmony.Patch(getDatabasedScoreTarget, prefix: new HarmonyMethod(getDatabasedScorePrefixMethod));
             harmony.Patch(replayFailIndicatorDisposeTarget, prefix: new HarmonyMethod(replayFailIndicatorDisposePrefixMethod));
             harmony.Patch(mainMenuLogoArrivingTarget, prefix: new HarmonyMethod(mainMenuLogoArrivingPrefixMethod));
             harmony.Patch(performFromScreenTarget, prefix: new HarmonyMethod(performFromScreenPrefixMethod));
@@ -164,19 +173,51 @@ public static class BmsReplayPatcher
         if (!isBmsScore(score) || score.Files.All(f => f.Filename != BmsReplayArchive.FILENAME))
             return true;
 
+        __result = null!;
         if (scoreImporterFilesField?.GetValue(__instance) is not RealmFileStore files)
             return false;
 
         try
         {
+            if (score.BeatmapInfo == null)
+            {
+                // ScoreManager re-fetches metadata, so the leaderboard's temporary
+                // beatmap link is lost when a chart has been removed and re-imported.
+                var hash = score.BeatmapHash;
+                if (!string.IsNullOrEmpty(hash) && scoreImporterBeatmapsField?.GetValue(__instance) is Func<BeatmapManager> beatmaps)
+                    score.BeatmapInfo = beatmaps().QueryBeatmap(beatmap => beatmap.Hash == hash);
+
+                if (score.BeatmapInfo == null)
+                {
+                    BmsLogger.Log($"The BMS replay cannot be played because its beatmap is missing (hash: {hash}).", LogLevel.Important);
+                    return false;
+                }
+            }
+
             __result = BmsReplayArchive.ReadScore(score, files.Store);
         }
         catch (Exception e)
         {
             BmsLogger.Error(e, "BMS replay patch failed to restore replay data from a local score.");
-            __result = new Score { ScoreInfo = score };
+            __result = null!;
         }
 
+        return false;
+    }
+
+    private static bool getDatabasedScorePrefix(IScoreInfo originalScoreInfo, ScoreManager __instance, ref ScoreInfo __result)
+    {
+        if (originalScoreInfo is not ScoreInfo score || !isBmsScore(score) || score.IsManaged)
+            return true;
+
+        // BMS archives contain inputs only, so distinct scores can share the same
+        // archive hash. Prefer the local identity before the upstream hash lookup.
+        var id = score.ID;
+        var stored = __instance.Query(candidate => candidate.ID == id);
+        if (stored == null)
+            return true;
+
+        __result = stored;
         return false;
     }
 

@@ -14,6 +14,7 @@ using osu.Game.Overlays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.IO.Input;
+using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -59,6 +60,123 @@ public partial class TestSceneBmsSongSelectLampHack
                    && result.ScoreInfo.Statistics.GetValueOrDefault(HitResult.Great) == 1
                    && result.ScoreInfo.HitEvents.Count == 0;
         });
+    }
+
+    [Test]
+    public void TestReplayRestoresMissingStoredBeatmapLink()
+    {
+        Score score = null!;
+        ScoreInfo displayedScore = null!;
+        Task attachment = null!;
+        Task<Score> restored = null!;
+
+        importLampBeatmapSet();
+        AddStep("attach replay to local score", () =>
+        {
+            var info = createScore(lampBeatmapSet.Beatmaps.First(), ScoreRank.A, stats((HitResult.Great, 1)));
+            score = new Score { ScoreInfo = scoreManager.Import(info)!.Value.Detach() };
+            score.Replay.Frames.Add(new BmsReplayFrame(1234, BmsAction.Key1));
+            attachment = BmsReplayPatcher.AttachReplayAsync(scoreManager, Realm, score);
+        });
+        AddUntilStep("attachment completes", () => attachment.IsCompleted);
+        AddStep("remove stored beatmap link", () =>
+        {
+            attachment.GetAwaiter().GetResult();
+            Realm.Write(r => r.Find<ScoreInfo>(score.ScoreInfo.ID)!.BeatmapInfo = null);
+            var stored = scoreManager.Query(info => info.ID == score.ScoreInfo.ID)!;
+            Assert.That(stored.BeatmapInfo, Is.Null);
+            displayedScore = BmsLocalLeaderboardService.SelectScores([stored], stored.BeatmapHash, Constant.SHORT_NAME,
+                null, LeaderboardSortMode.Score, lampBeatmapSet.Beatmaps.First()).Single();
+            Assert.That(displayedScore.BeatmapInfo, Is.Not.Null);
+        });
+        AddStep("load replay through score manager", () => restored = Task.Run(() => scoreManager.GetScore(displayedScore)));
+        AddUntilStep("replay read completes", () => restored.IsCompleted);
+        AddStep("check resolved beatmap and input", () =>
+        {
+            var result = restored.GetAwaiter().GetResult();
+            Assert.Multiple(() =>
+            {
+                Assert.That(BmsReplayPatcher.IsInstalled, Is.True);
+                Assert.That(result, Is.Not.Null);
+                Assert.That(result?.ScoreInfo.BeatmapInfo?.ID, Is.EqualTo(lampBeatmapSet.Beatmaps.First().ID));
+                Assert.That(result?.Replay.Frames.Single().Time, Is.EqualTo(1234));
+            });
+        });
+    }
+
+    [Test]
+    public void TestReplayLookupUsesRequestedScoreWhenInputsMatch()
+    {
+        Score first = null!;
+        Score second = null!;
+        Task attachment = null!;
+        Task<Score> restored = null!;
+
+        importLampBeatmapSet();
+        AddStep("attach identical inputs to two scores", () =>
+        {
+            first = new Score
+            {
+                ScoreInfo = scoreManager.Import(createScore(lampBeatmapSet.Beatmaps[0], ScoreRank.A, stats((HitResult.Great, 1))))!.Value.Detach(),
+            };
+            second = new Score
+            {
+                ScoreInfo = scoreManager.Import(createScore(lampBeatmapSet.Beatmaps[1], ScoreRank.A, stats((HitResult.Great, 1))))!.Value.Detach(),
+            };
+            first.Replay.Frames.Add(new BmsReplayFrame(1234, BmsAction.Key1));
+            second.Replay.Frames.Add(new BmsReplayFrame(1234, BmsAction.Key1));
+            attachment = Task.WhenAll(BmsReplayPatcher.AttachReplayAsync(scoreManager, Realm, first),
+                BmsReplayPatcher.AttachReplayAsync(scoreManager, Realm, second));
+        });
+        AddUntilStep("attachment completes", () => attachment.IsCompleted);
+        AddStep("load the second score", () =>
+        {
+            attachment.GetAwaiter().GetResult();
+            Assert.That(first.ScoreInfo.Hash, Is.EqualTo(second.ScoreInfo.Hash));
+            restored = Task.Run(() => scoreManager.GetScore(second.ScoreInfo));
+        });
+        AddUntilStep("replay read completes", () => restored.IsCompleted);
+        AddStep("check requested score identity", () =>
+        {
+            var result = restored.GetAwaiter().GetResult();
+            Assert.Multiple(() =>
+            {
+                Assert.That(result?.ScoreInfo.ID, Is.EqualTo(second.ScoreInfo.ID));
+                Assert.That(result?.ScoreInfo.BeatmapInfo?.ID, Is.EqualTo(second.ScoreInfo.BeatmapInfo!.ID));
+            });
+        });
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestReplayWithMissingBeatmapIsNotPresented(bool emptyHash)
+    {
+        Score score = null!;
+        Task attachment = null!;
+        Task<Score> restored = null!;
+
+        importLampBeatmapSet();
+        AddStep("attach replay to local score", () =>
+        {
+            var info = createScore(lampBeatmapSet.Beatmaps.First(), ScoreRank.A, stats((HitResult.Great, 1)));
+            score = new Score { ScoreInfo = scoreManager.Import(info)!.Value.Detach() };
+            score.Replay.Frames.Add(new BmsReplayFrame(1234, BmsAction.Key1));
+            attachment = BmsReplayPatcher.AttachReplayAsync(scoreManager, Realm, score);
+        });
+        AddUntilStep("attachment completes", () => attachment.IsCompleted);
+        AddStep("remove matching beatmap", () =>
+        {
+            attachment.GetAwaiter().GetResult();
+            Realm.Write(r =>
+            {
+                var stored = r.Find<ScoreInfo>(score.ScoreInfo.ID)!;
+                stored.BeatmapInfo = null;
+                stored.BeatmapHash = emptyHash ? string.Empty : "unavailable-chart-hash";
+            });
+        });
+        AddStep("load replay through score manager", () => restored = Task.Run(() => scoreManager.GetScore(score.ScoreInfo)));
+        AddUntilStep("replay read completes", () => restored.IsCompleted);
+        AddAssert("invalid score is not returned for presentation", () => restored.GetAwaiter().GetResult(), () => Is.Null);
     }
 
     [Test]
