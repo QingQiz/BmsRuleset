@@ -30,6 +30,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Icons;
 using osu.Game.Rulesets.BmsRuleset.UI.Result;
 using osu.Game.Rulesets.BmsRuleset.UI.Result.Statistic;
 using osu.Game.Rulesets.BmsRuleset.UI.Settings;
+using osu.Game.Rulesets.BmsRuleset.UI.Skinning;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Legacy;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect;
 using osu.Game.Rulesets.BmsRuleset.UI.SongSelect.Components;
@@ -84,6 +85,7 @@ public partial class BmsRuleset : Ruleset
         BmsEditorPatcher.InstallOnce();
         BmsReplayPatcher.InstallOnce();
         BmsSongSelectEntryPatcher.InstallOnce();
+        BmsSkinEditorPatcher.InstallOnce();
         BmsBeatmapNotificationPatcher.InstallOnce();
         BmsResultsScreenEntryPatcher.InstallOnce();
         BmsWorkingBeatmapPatcher.InstallOnce();
