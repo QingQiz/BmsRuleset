@@ -986,6 +986,9 @@ public partial class TestSceneBmsCourseSelect : ScreenTestScene
         AddUntilStep("wait for song select load", () => Stack.CurrentScreen == songSelect && songSelect.IsLoaded);
         AddUntilStep("wait for filtering", () => !carousel.IsFiltering);
         AddStep("show course mode", () => controller.ShowCourseMode());
+        // Normal song select may already have selected the first preview beatmap before course filtering completes.
+        AddUntilStep("course carousel filtered", () => controller.CourseCarousel.GetCarouselItems() != null
+                                                       && !controller.CourseCarousel.IsFiltering);
         AddUntilStep("first course preview selected", () => songSelect.Beatmap.Value.BeatmapInfo.Hash, () => Is.EqualTo(importedBeatmaps[0].Hash));
         // GlobalStatistics is shared by every cache and can report another manager's count.
         // Record this manager's requests instead, independently of weak-reference collection.

@@ -26,6 +26,8 @@ public partial class TestSceneBmsZeroTimeNotes : BmsPlayerTestScene
     private bool useReplay;
     private BmsWorkingBeatmap workingBeatmap = null!;
     private readonly List<(double Time, float Position)> visiblePositions = [];
+    private double previousStartupTime;
+    private double timeBeforeFirstVisible;
     private bool observeStartup;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(
@@ -102,6 +104,8 @@ public partial class TestSceneBmsZeroTimeNotes : BmsPlayerTestScene
             skin = selectedSkin;
             useReplay = replay;
             visiblePositions.Clear();
+            previousStartupTime = double.NaN;
+            timeBeforeFirstVisible = double.NaN;
             observeStartup = true;
             LoadPlayer();
         });
@@ -111,15 +115,21 @@ public partial class TestSceneBmsZeroTimeNotes : BmsPlayerTestScene
         AddAssert("player starts two seconds before zero", () => Player.GameplayClockContainer.StartTime, () => Is.EqualTo(-2000));
         AddUntilStep("natural playback passes zero", () => Player.GameplayClockContainer.CurrentTime > 50);
         AddStep("stop observing startup", () => observeStartup = false);
+        AddStep("report startup geometry", () => TestContext.WriteLine(
+            $"ZERO_TIME_STARTUP skin={skin} replay={useReplay} start={Player.GameplayClockContainer.StartTime} "
+            + $"previous={timeBeforeFirstVisible} first={visiblePositions.FirstOrDefault()} last={visiblePositions.LastOrDefault()} frames={visiblePositions.Count}"));
         AddAssert("observed scrolling before zero", () => visiblePositions.Count, () => Is.GreaterThan(10));
-        AddAssert("first visible note enters at top", () => visiblePositions[0].Position, () => Is.LessThan(0.15f));
+        AddAssert("note enters at top within first observed frame", () =>
+        {
+            var first = visiblePositions[0];
+            var last = visiblePositions[^1];
+            // A slow host frame can span the top edge; use the measured constant-speed motion to bound that unobserved interval.
+            var speed = (last.Position - first.Position) / (last.Time - first.Time);
+            return first.Position - speed * (first.Time - timeBeforeFirstVisible);
+        }, () => Is.LessThan(0.15));
         AddAssert("note visible during negative time", () => visiblePositions[0].Time, () => Is.LessThan(-500));
         AddAssert("note scrolls down continuously", () => visiblePositions.Zip(visiblePositions.Skip(1))
             .All(pair => pair.Second.Position >= pair.First.Position - 0.001f));
-        AddStep("report startup geometry", () => TestContext.WriteLine(
-            $"ZERO_TIME_STARTUP skin={skin} replay={useReplay} start={Player.GameplayClockContainer.StartTime} "
-            + $"first={visiblePositions[0]} last={visiblePositions[^1]} frames={visiblePositions.Count}"));
-
         // The framework freezes live-play simulation while paused; replays can seek to an exact frame.
         if (!replay)
             return;
@@ -143,6 +153,10 @@ public partial class TestSceneBmsZeroTimeNotes : BmsPlayerTestScene
                             || Player.Alpha <= 0 || !Playfield.Stage.IsLoaded)
             return;
 
+        var time = Player.DrawableRuleset.FrameStableClock.CurrentTime;
+        var previousTime = double.IsNaN(previousStartupTime) ? Player.GameplayClockContainer.StartTime : previousStartupTime;
+        previousStartupTime = time;
+
         var note = zeroTimeNotes().FirstOrDefault(n => n.HitObject is not BmsLongNote);
         if (note == null || !note.IsPresent)
             return;
@@ -151,7 +165,12 @@ public partial class TestSceneBmsZeroTimeNotes : BmsPlayerTestScene
         var line = Playfield.JudgementLineY();
         var y = note.ToScreenSpace(Vector2.Zero).Y;
         if (line > top && y >= top && y <= line)
-            visiblePositions.Add((Player.DrawableRuleset.FrameStableClock.CurrentTime, (y - top) / (line - top)));
+        {
+            if (visiblePositions.Count == 0)
+                timeBeforeFirstVisible = previousTime;
+
+            visiblePositions.Add((time, (y - top) / (line - top)));
+        }
     }
 
     private DrawableBmsHitObject[] zeroTimeNotes() => Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>()
