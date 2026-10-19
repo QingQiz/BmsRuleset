@@ -195,6 +195,10 @@ LN 尾部依次回退到头部、普通音符，头部回退到普通音符，�
 - **自动隐藏延迟**：距上次连击增加多久后隐藏，每次增加连击重新计时。范围 -1 至 100 秒，默认 3 秒；-1 禁用自动隐藏。
 - **最低可见连击数**：达到该值才显示，低于时立即隐藏。范围 0 至 100，默认 10。
 
+<p align="center">
+  <img src="images/skin-component-combo.jpg" width="800" alt="皮肤编辑器中选中的 Combo，显示缩放控制柄、自动隐藏延迟和最低可见连击数设置">
+</p>
+
 ### Judgement
 
 显示最新的 PGREAT、GREAT、GOOD、BAD 或 POOR/E-POOR，替换上一结果并重新播放动画。
@@ -203,6 +207,10 @@ LN 尾部依次回退到头部、普通音符，头部回退到普通音符，�
 - **显示 E-POOR**：控制是否在弹窗中显示空 POOR 判定，默认开启。
 
 图案和动画通过皮肤图像文件修改。
+
+<p align="center">
+  <img src="images/skin-component-judgement.jpg" width="800" alt="皮肤编辑器中选中的 Judgement，显示缩放控制柄和显示 E-POOR 设置">
+</p>
 
 ### 误差条
 
@@ -218,6 +226,10 @@ LN 尾部依次回退到头部、普通音符，头部回退到普通音符，�
 | 显示 POOR | 在可见色条两端显示 POOR 误差线 | 开启 |
 
 横向拉伸调整时间轴长度，纵向拉伸调整判定线高度。初始宽度随判定范围确定，皮肤中保存的宽度优先生效。
+
+<p align="center">
+  <img src="images/skin-component-hit-error-meter.jpg" width="640" alt="显示判定窗口、击打误差线和平均时机标记的误差条">
+</p>
 
 ### 回放可视化
 
@@ -236,19 +248,14 @@ PGREAT、GREAT、GOOD 和 BAD 使用对应判定颜色；漏打音符（POOR）�
 | 显示按键 | 显示输入矩形及其与音符的连接线 | 开启 |
 | 背景不透明度 | 0%–100% | 65% |
 
-<details>
-<summary>示例</summary>
-
 两张截图展示同一段回放的同一时刻。
-
-| 音符与按键 | 仅按键（关闭“显示音符”） |
-|------------|--------------------------|
-| ![包含音符、输入、时机连接线和各种判定颜色的回放可视化](images/replay-visualizer-notes-and-inputs.png) | ![同一时刻仅显示按键和当前时刻横线](images/replay-visualizer-inputs-only.png) |
 
 第一张图的轨道从左到右依次展示：PGREAT 长按、PGREAT、GREAT、GOOD、BAD、漏打 POOR、
 E-POOR 与未判定输入、正在按住的 PGREAT 长按。白色边框为尚未判定的音符。
 
-</details>
+| 音符与按键 | 仅按键（关闭“显示音符”） |
+|------------|--------------------------|
+| ![包含音符、输入、时机连接线和各种判定颜色的回放可视化](images/replay-visualizer-notes-and-inputs.png) | ![同一时刻仅显示按键和当前时刻横线](images/replay-visualizer-inputs-only.png) |
 
 ### 成绩图
 
@@ -267,12 +274,11 @@ E-POOR 与未判定输入、正在按住的 PGREAT 长按。白色边框为尚�
 
 组件有最小宽度限制，高度须容纳所有可见区域。
 
-<details>
-<summary>示例</summary>
-
-![](https://github.com/user-attachments/assets/ab14a6e8-e853-42ed-ae08-61cc4427e667)
-
-</details>
+<p align="center">
+  <img src="images/skin-component-score-graph.jpg" width="350" alt="使用默认配色的加高成绩图，包含实时成绩柱、成绩差值和判定数量对比">
+  &emsp;
+  <img src="images/skin-component-score-graph-colours.jpg" width="350" alt="使用自定义成绩柱配色和更高区域背景不透明度的加高成绩图">
+</p>
 
 ### 血条
 
@@ -286,12 +292,20 @@ E-POOR 与未判定输入、正在按住的 PGREAT 长按。白色边框为尚�
 
 Class、ExClass、ExHard Class 分别使用 Hard、ExHard、Hazard 的填充颜色。
 
+<p align="center">
+  <img src="images/skin-component-health-bar.jpg" width="480" alt="从左到右为低、中、高血量的 Normal 血条，以及 Hard、ExHard 和 Hazard 血条">
+</p>
+
 ### 歌曲进度
 
 用发光指示块显示播放进度：前奏时停在顶部，进入可游玩部分后向下移动。
 轨道默认位于 Stage 左侧，其高度决定指示块的移动距离。
 
 **指示块颜色**同时改变指示块及其光晕。
+
+<p align="center">
+  <img src="images/skin-component-song-progress.jpg" width="800" alt="皮肤编辑器中选中的歌曲进度组件，显示缩放控制柄和指示块颜色设置">
+</p>
 
 ### BGA
 
@@ -305,6 +319,10 @@ BGA 等比缩放以适应组件窗口，位于游玩区域后方，隐藏游玩 
   并保留编辑后的 BGA 窗口。
 
 规则集设置中的 **BGA 暗化**对所有组件布局生效。
+
+<p align="center">
+  <img src="images/skin-component-bga.jpg" width="800" alt="皮肤编辑器中选中的 BGA，显示缩放控制柄和铺满屏幕设置">
+</p>
 
 ### Stage
 
@@ -323,12 +341,9 @@ Stage 缩放控制柄有三种功能：
 Stage 是必需组件，不在工具箱中列出。删除后会自动创建默认实例，重置位置、大小和设置（包括判定线偏移）。
 保存的布局中若有多个 Stage，只保留第一个。
 
-<details>
-<summary>示例</summary>
-
-https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
-
-</details>
+<p align="center">
+  <img src="images/skin-component-stage.jpg" width="800" alt="皮肤编辑器中选中的 Stage，显示缩放控制柄、按键数缩放宽度、判定线偏移、光效位置偏移和音符高度设置">
+</p>
 
 ### Text
 
@@ -336,6 +351,18 @@ https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
 滚速变化时显示新倍速及 `>>` 或 `<<` 方向标记。消息短暂显示后自动淡出。
 
 此组件没有侧边栏设置。横幅在消息间隔中透明，编辑器会用 `Sample Text Event` 占位，便于定位和缩放；游玩时不显示占位内容。
+
+<p align="center">
+  <img src="images/skin-component-text.jpg" width="480" alt="Game Start 文字横幅">
+</p>
+
+<p align="center">
+  <img src="images/skin-component-text-speed-up.jpg" width="480" alt="显示向右箭头和 1.5x 的黄色加速横幅">
+</p>
+
+<p align="center">
+  <img src="images/skin-component-text-speed-down.jpg" width="480" alt="显示向左箭头和 0.5x 的蓝色减速横幅">
+</p>
 
 ## 示例 skin.ini (7K)
 

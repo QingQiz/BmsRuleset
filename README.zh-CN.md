@@ -75,7 +75,7 @@
 布局按皮肤保存，不修改谱面或 `skin.ini`。
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c3690c49-3a00-4970-abd8-0e93220d6f11" width="900" alt="osu! 可视化皮肤编辑器中的 BMS 组件">
+  <img src="docs/images/skin-components-overview.jpg" width="900" alt="所有 BMS HUD 组件在 osu! 可视化皮肤编辑器中无重叠排列，显示编辑框和 Stage 设置">
   <br>
   <sub>可视化皮肤编辑器中的 BMS 组件</sub>
 </p>

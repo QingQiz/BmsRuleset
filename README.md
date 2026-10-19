@@ -78,7 +78,7 @@ Use osu!'s visual skin editor to arrange, resize, and configure the playfield, B
 and other components. Layouts are saved per skin without modifying the chart or its `skin.ini`.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c3690c49-3a00-4970-abd8-0e93220d6f11" width="900" alt="BMS components in the osu! visual skin editor">
+  <img src="docs/images/skin-components-overview.jpg" width="900" alt="All BMS HUD components arranged without overlap, with editing outlines and Stage settings in the osu! visual skin editor">
   <br>
   <sub>BMS components in the visual skin editor</sub>
 </p>

@@ -198,6 +198,10 @@ with `ColourBreak` on a combo break. Missing digit textures hide the counter.
   Range: -1 to 100; default: 3; -1 disables automatic hiding.
 - **Min visible combo**: minimum combo to display. Combos below it hide immediately. Range: 0 to 100; default: 10.
 
+<p align="center">
+  <img src="images/skin-component-combo.jpg" width="800" alt="Combo selected in the skin editor, with resize handles, auto-hide delay, and minimum visible combo settings">
+</p>
+
 ### Judgement
 
 Displays the latest PGREAT, GREAT, GOOD, BAD, or POOR/E-POOR, replacing the previous result and restarting its
@@ -206,6 +210,10 @@ animation. Uses `[BMS]` images `HitPGreat` through `HitPoor`, or their osu!mania
 - **Show E-POOR** toggles whether empty POOR judgements appear in the popup. It is enabled by default.
 
 Edit the skin image files to change the artwork or animation.
+
+<p align="center">
+  <img src="images/skin-component-judgement.jpg" width="800" alt="Judgement selected in the skin editor, with resize handles and the Show E-POOR setting">
+</p>
 
 ### Hit Error Meter
 
@@ -223,6 +231,10 @@ E-POOR. The triangle shows average timing.
 
 Resize horizontally for axis length and vertically for judgement-line height. The initial width follows the timing
 range; a width saved in the skin takes precedence.
+
+<p align="center">
+  <img src="images/skin-component-hit-error-meter.jpg" width="640" alt="Hit error meter with judgement windows, timing lines, and average timing marker">
+</p>
 
 ### Replay Visualizer
 
@@ -243,19 +255,14 @@ notes or inputs without a corresponding judgement are white.
 | Show key presses | Input rectangles and their connections to notes | On |
 | Background opacity | 0%–100% | 65% |
 
-<details>
-<summary>Examples</summary>
-
 Both screenshots show the same moment in a replay.
-
-| Notes and key presses | Key presses only (Show notes off) |
-|-----------------------|----------------------------------|
-| ![Replay visualizer with notes, inputs, timing connections, and all judgement colours](images/replay-visualizer-notes-and-inputs.png) | ![The same replay moment with only key presses and the current-time line visible](images/replay-visualizer-inputs-only.png) |
 
 In the first image, the lanes from left to right show a PGREAT long note, PGREAT, GREAT, GOOD, BAD, a missed POOR,
 E-POOR and an unjudged press, and a held PGREAT long note. White outlines show notes awaiting judgement.
 
-</details>
+| Notes and key presses | Key presses only (Show notes off) |
+|-----------------------|----------------------------------|
+| ![Replay visualizer with notes, inputs, timing connections, and all judgement colours](images/replay-visualizer-notes-and-inputs.png) | ![The same replay moment with only key presses and the current-time line visible](images/replay-visualizer-inputs-only.png) |
 
 ### Score Graph
 
@@ -279,12 +286,11 @@ counts from PGREAT to E-POOR. Personal-best judgement counts show as unavailable
 
 The component enforces a minimum width and enough height for the visible sections.
 
-<details>
-<summary>Example</summary>
-
-![](https://github.com/user-attachments/assets/ab14a6e8-e853-42ed-ae08-61cc4427e667)
-
-</details>
+<p align="center">
+  <img src="images/skin-component-score-graph.jpg" width="350" alt="Tall score graph with default colours, live score bars, score differences, and judgement comparison">
+  &emsp;
+  <img src="images/skin-component-score-graph-colours.jpg" width="350" alt="Tall score graph with custom bar colours and more opaque section backgrounds">
+</p>
 
 ### Health Bar
 
@@ -298,12 +304,20 @@ thresholds. The red zone ends at 20%; Assist Easy clears at 60%, Easy and Normal
 
 Class, ExClass, and ExHard Class use the Hard, ExHard, and Hazard fill colours respectively.
 
+<p align="center">
+  <img src="images/skin-component-health-bar.jpg" width="480" alt="Normal gauge at low, medium, and high health, followed by Hard, ExHard, and Hazard gauges">
+</p>
+
 ### Song Progress
 
 Shows playback progress with a glowing marker: it stays at the top during the intro, then moves downward during play.
 The track sits at the Stage's left edge by default; its height determines the marker's travel distance.
 
 **Indicator colour** changes the marker and its glow.
+
+<p align="center">
+  <img src="images/skin-component-song-progress.jpg" width="800" alt="Song Progress selected in the skin editor, with resize handles and the indicator colour setting">
+</p>
 
 ### BGA
 
@@ -319,6 +333,10 @@ and remains visible when the gameplay HUD is hidden.
   or rotating the component automatically disables this option and preserves the edited BGA window.
 
 **BGA dim** in the BMS settings applies to every component layout.
+
+<p align="center">
+  <img src="images/skin-component-bga.jpg" width="800" alt="BGA selected in the skin editor, with resize handles and the Fill screen setting">
+</p>
 
 ### Stage
 
@@ -341,12 +359,9 @@ Stage resize handles have three functions:
 Stage is required and absent from the component toolbox. Deleting it creates a default instance, resetting position,
 size, and settings, including judgement line offset. If a saved layout has duplicates, only the first is kept.
 
-<details>
-<summary>Example</summary>
-
-https://github.com/user-attachments/assets/7d88d698-1e06-4488-9b45-c9aa462adb64
-
-</details>
+<p align="center">
+  <img src="images/skin-component-stage.jpg" width="800" alt="Stage selected in the skin editor, with resize handles and settings for proportional width, judgement line offset, light position offset, and note height">
+</p>
 
 ### Text
 
@@ -355,6 +370,18 @@ Scroll-speed changes show the new multiplier with `>>` or `<<`. Messages fade af
 
 This component has no sidebar settings. The editor shows `Sample Text Event` for positioning and scaling because
 the banner is transparent between messages. The placeholder does not appear during gameplay.
+
+<p align="center">
+  <img src="images/skin-component-text.jpg" width="480" alt="Game Start text banner">
+</p>
+
+<p align="center">
+  <img src="images/skin-component-text-speed-up.jpg" width="480" alt="Yellow acceleration banner showing right arrows and 1.5x">
+</p>
+
+<p align="center">
+  <img src="images/skin-component-text-speed-down.jpg" width="480" alt="Blue deceleration banner showing left arrows and 0.5x">
+</p>
 
 ## Example skin.ini (7K)
 
