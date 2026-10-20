@@ -71,7 +71,7 @@ public class BmsColumnNoteIndexTest
     [TestCase(64)]
     [TestCase(65)]
     [TestCase(129)]
-    public void TimingChangesAndRewindsRestorePendingHeadsAcrossIndexWords(int count)
+    public void TimingChangesAndRebuildsRestorePendingHeadsAcrossIndexWords(int count)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 3 };
         var notes = Enumerable.Range(0, count).Select(i => new BmsNote { Beatmap = beatmap, Column = 1, StartTime = 1000 + i * 10 }).ToArray();
@@ -81,9 +81,10 @@ public class BmsColumnNoteIndexTest
             column.TryPressRegisteredNote(note, HitResult.Perfect, new BmsPressContext(note.StartTime, new BmsFrameContext(note.StartTime, 1)));
         Assert.That(column.FirstPendingNote, Is.Null);
 
-        output.RevertAfter(notes[count / 2].StartTime);
-        column.RewindPressHistory(notes[count / 2].StartTime);
-        column.RestoreExecutionState(new BmsFrameContext(notes[count / 2].StartTime, 1, true));
+        output = new BmsRecordingJudgementOutput();
+        column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, output).GetColumn(1);
+        foreach (var note in notes.Take(count / 2 + 1))
+            column.TryPressRegisteredNote(note, HitResult.Perfect, new BmsPressContext(note.StartTime, new BmsFrameContext(note.StartTime, 1)));
         Assert.That(column.FirstPendingNote, Is.SameAs(notes[count / 2 + 1]));
 
         notes[^1].StartTime = 900;

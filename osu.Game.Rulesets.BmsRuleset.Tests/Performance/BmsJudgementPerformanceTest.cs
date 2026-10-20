@@ -49,30 +49,6 @@ public class BmsJudgementPerformanceTest
         });
     }
 
-    [Test]
-    public void RewindHcnHistory()
-    {
-        const int count = 100000;
-        Measure("HCN-rewind", 100, () =>
-        {
-            var tracker = new BmsHellChargeBodyTracker();
-            for (var i = 1; i <= count; i++)
-                tracker.Update(1, true, static (_, _) => { }, i);
-            return new Measurement(() =>
-            {
-                for (var i = 99; i >= 0; i--)
-                    tracker.Rewind(i * 1000 + .5);
-            }, () =>
-            {
-                var ticks = 0;
-                tracker.Update(200, true, (_, _) => ticks++, 200);
-                Assert.That(ticks, Is.Zero);
-                tracker.Update(1, true, (_, _) => ticks++, 201);
-                Assert.That(ticks, Is.EqualTo(1));
-                return new { Ticks = ticks };
-            });
-        });
-    }
 
     internal static void Measure(string name, int operations, Func<Measurement> setup)
     {

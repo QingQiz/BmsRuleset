@@ -131,7 +131,7 @@ public partial class TestSceneBmsBeatorajaLandmineRewindLifecycle : BmsPlayerTes
 
     private void seek(double time)
     {
-        AddStep("seek " + time, () => { Player.GameplayClockContainer.Stop(); Player.GameplayClockContainer.Seek(time); });
+        AddStep("seek " + time, () => SeekReplayInFrames(time));
         AddUntilStep("reached " + time, () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < .001);
     }
 

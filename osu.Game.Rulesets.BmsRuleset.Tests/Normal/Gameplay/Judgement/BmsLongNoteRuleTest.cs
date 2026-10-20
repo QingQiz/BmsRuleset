@@ -118,7 +118,7 @@ public class BmsLongNoteRuleTest
         run.Rewind(1999);
         Assert.That(run.Presentation(false).HoldingBody, Is.True);
         run.Frame(2000, 1, false);
-        Assert.That(run.FinishedPublications, Is.EqualTo(2));
+        Assert.That(run.FinishedPublications, Is.EqualTo(1));
 
         run.Rewind(1900);
         Assert.That(run.State.TailJudged, Is.False);

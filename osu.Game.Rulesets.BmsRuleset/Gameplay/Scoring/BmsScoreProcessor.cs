@@ -32,8 +32,6 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     private readonly Dictionary<JudgementResult, BmsJudgementEvent> eventsByResult = new();
     private readonly List<TimingHitEventEntry> timingHitEventEntries = [];
     private readonly List<HitEvent> timingHitEvents = [];
-    private readonly List<BmsJudgementEvent> nonConsumingEvents = [];
-    private readonly List<int> nonConsumingComboChanges = [];
     private BmsLayoutVariant layout = BmsLayoutVariant.Bme7K;
 
     public IReadOnlyList<BmsJudgementEvent> JudgementEvents => judgementEvents;
@@ -41,9 +39,19 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
     public int ScoringJudgementEventCount { get; private set; }
 
     /// <summary>
-    ///     Changes whenever the result-count dictionary changes, including rewound non-consuming judgements.
+    ///     Changes whenever the result-count dictionary changes.
     /// </summary>
     public long StatisticsVersion { get; private set; }
+
+    internal bool IsRebuildingReplay { get; set; }
+
+    internal void ResetReplayState()
+    {
+        // The framework deliberately locks failed ranks until a new play is created.
+        ((Bindable<ScoreRank>)Rank).Value = ScoreRank.X;
+        Reset(false);
+        ((BindableBool)HasCompleted).Value = false;
+    }
 
     public event Action<BmsTimingObservation>? EmptyPoorRegistered;
 
@@ -122,33 +130,17 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
         StatisticsVersion++;
         var comboChange = result == HitResult.Ok || BmsJudgementProfileProvider.EmptyPoorBreaksCombo(layout) ? -Combo.Value : 0;
         Combo.Value += comboChange;
-        nonConsumingComboChanges.Add(comboChange);
         var source = new BmsJudgementSource(eventTime, column,
             result == HitResult.Ok ? BmsJudgementSourceKind.NonConsumingBad : BmsJudgementSourceKind.EmptyPoor);
         var observation = new BmsTimingObservation(BmsTimingObservationKind.Note, expectedTime, eventTime, 1, result);
         var judgementEvent = new BmsJudgementEvent(source, result, [observation]);
         addJudgementEvent(judgementEvent);
-        nonConsumingEvents.Add(judgementEvent);
-        NonConsumingJudgementRegistered?.Invoke(observation);
-        if (result == HitResult.Miss)
-            EmptyPoorRegistered?.Invoke(observation);
-    }
-
-    internal void RewindEmptyPoors(double time)
-    {
-        var changed = false;
-        while (nonConsumingEvents.Count > 0 && nonConsumingEvents[^1].Source.StartTime > time)
+        if (!IsRebuildingReplay)
         {
-            changed = true;
-            removeJudgementEvent(nonConsumingEvents[^1]);
-            ScoreResultCounts[nonConsumingEvents[^1].Result]--;
-            nonConsumingEvents.RemoveAt(nonConsumingEvents.Count - 1);
-            Combo.Value -= nonConsumingComboChanges[^1];
-            nonConsumingComboChanges.RemoveAt(nonConsumingComboChanges.Count - 1);
+            NonConsumingJudgementRegistered?.Invoke(observation);
+            if (result == HitResult.Miss)
+                EmptyPoorRegistered?.Invoke(observation);
         }
-
-        if (changed)
-            StatisticsVersion++;
     }
 
     /// <summary>
@@ -197,9 +189,8 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
             maximumScoringJudgementCount = ScoringJudgementEventCount;
 
         base.Reset(storeResults);
+        TotalScoreWithoutMods.Value = 0;
         judgementEvents.Clear();
-        nonConsumingEvents.Clear();
-        nonConsumingComboChanges.Clear();
         eventsByResult.Clear();
         timingHitEventEntries.Clear();
         timingHitEvents.Clear();
@@ -305,8 +296,7 @@ public partial class BmsScoreProcessor() : ScoreProcessor(new BmsRuleset())
 
     private void removeJudgementEvent(BmsJudgementEvent judgementEvent)
     {
-        // Rewinds normally remove the newest event. Searching from the end avoids
-        // visiting the entire historical ledger for every reverted judgement.
+        // Framework reverts usually target the newest event, so search from the end.
         for (var i = judgementEvents.Count - 1; i >= 0; i--)
         {
             if (!ReferenceEquals(judgementEvents[i], judgementEvent))

@@ -490,7 +490,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
                 explosionMaskingTraversals.Reset();
                 frameProbe = new ScopedMethodProbe(typeof(BmsPlayfield).GetMethod("BeginGameplayFrame", BindingFlags.Instance | BindingFlags.NonPublic),
                     typeof(TestSceneBmsDenseReplay).GetMethod(nameof(beginGameplayFrame), BindingFlags.Static | BindingFlags.NonPublic));
-                Player.GameplayClockContainer.Seek(3001);
+                AdvanceReplayClock(3001);
             });
             AddUntilStep("simulation reached target", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 3001) < 0.000001);
             AddStep("stop counting", stopCounting);
@@ -516,7 +516,7 @@ public partial class TestSceneBmsDenseReplay : BmsPlayerTestScene
 
     private void seek(double time)
     {
-        AddStep($"seek {time}", () => { Player.GameplayClockContainer.Stop(); Player.GameplayClockContainer.Seek(time); });
+        AddStep($"seek {time}", () => SeekReplayInFrames(time));
         AddUntilStep("simulation reached target", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < 0.000001);
     }
 

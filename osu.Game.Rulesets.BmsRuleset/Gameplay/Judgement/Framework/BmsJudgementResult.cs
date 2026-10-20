@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
 
@@ -16,6 +17,13 @@ public class BmsJudgementResult(HitObject hitObject, Rulesets.Judgements.Judgeme
     {
         setRawTime(this, time);
         setGameplayRate(this, rate);
+    }
+
+    internal void ResetForReplay()
+    {
+        Type = HitResult.None;
+        setRawTime(this, null);
+        SuppressPenalty = false;
     }
 
     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "get_RawTime")]

@@ -9,6 +9,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Media.Audio.Samples;
 using osu.Game.Rulesets.BmsRuleset.Tests.Audio;
 using osu.Game.Rulesets.BmsRuleset.Tests.Normal;
@@ -22,8 +23,13 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Visualize;
 public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
 {
     private ushort backgroundKey;
+    private bool replayPlayback;
 
-    protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(null);
+    [SetUp]
+    public void ResetReplayPlayback() => replayPlayback = false;
+
+    protected override TestPlayer CreatePlayer(Ruleset ruleset)
+        => CreateBmsPlayer(replayPlayback ? beatmap => new BmsAutoGenerator(beatmap).Generate().Frames : null);
 
     protected override WorkingBeatmap CreateWorkingBeatmap(IBeatmap beatmap, Storyboard storyboard = null!)
     {
@@ -68,12 +74,13 @@ public partial class TestSceneBmsInitialBackgroundAudio : BmsPlayerTestScene
             && Player.GameplayClockContainer.CurrentTime < Player.GameplayState.Beatmap.HitObjects[0].StartTime);
     }
 
-    [Test]
-    public void TestRunningSeekBlocksAudioUntilSimulationReachesTarget()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TestRunningSeekBlocksAudioUntilSimulationReachesTarget(bool withReplay)
     {
         Func<bool> isBlocked = null!;
         var target = 0d;
-        AddStep("load player", LoadPlayer);
+        AddStep("load player", () => { replayPlayback = withReplay; LoadPlayer(); });
         AddUntilStep("player and PCM ready", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully
                                                   && getSamplePlayback().IsSampleReady(backgroundKey));
         AddUntilStep("background is sounding", () => BmsAudioTestAccess.GetActiveVoiceCount(getSamplePlayback()) > 0);

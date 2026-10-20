@@ -108,7 +108,7 @@ public class BmsHellChargeNoteExecutionTest
     }
 
     [Test]
-    public void EqualTimeObjectsKeepSeparateAccumulatorsAndHistories()
+    public void EqualTimeObjectsKeepSeparateAccumulators()
     {
         var (context, output, notes) = create(2);
         var first = notes[0];
@@ -119,11 +119,6 @@ public class BmsHellChargeNoteExecutionTest
         context.UpdateRegisteredBodies(new BmsFrameContext(3201, 1), 101, true);
         Assert.That(context.GetLongNoteState(first).HeadTime, Is.EqualTo(3000));
         Assert.That(context.GetLongNoteState(second).HeadTime, Is.EqualTo(3100));
-        Assert.That(output.BodyTicks.Select(t => t.Note), Is.EqualTo(new[] { first }));
-        context.RewindLongNotes(3150);
-        context.RestoreExecutionState(new BmsFrameContext(3150, 1));
-        output.BodyTicks.Clear();
-        context.UpdateRegisteredBodies(new BmsFrameContext(3201, 1), 51, true);
         Assert.That(output.BodyTicks.Select(t => t.Note), Is.EqualTo(new[] { first }));
         context.UpdateRegisteredBodies(new BmsFrameContext(3251, 1), 50, true);
         Assert.That(output.BodyTicks.Select(t => t.Note), Is.EqualTo(new[] { first }));
@@ -159,10 +154,6 @@ public class BmsHellChargeNoteExecutionTest
         Assert.That(endpoint.ApplicationTime, Is.EqualTo(3990));
         Assert.That(output.SyntheticApplicationTimes.Single(), Is.EqualTo(3997));
         Assert.That(context.GetActiveBodies(), Is.EqualTo(notes));
-        output.RevertSyntheticAfter(3997);
-        Assert.That(output.SyntheticEndpoints, Has.Count.EqualTo(1));
-        output.RevertSyntheticAfter(3996);
-        Assert.That(output.SyntheticEndpoints, Is.Empty);
     }
 
     [Test]

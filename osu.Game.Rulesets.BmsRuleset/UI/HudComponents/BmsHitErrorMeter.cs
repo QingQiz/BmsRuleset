@@ -80,6 +80,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     private double floatingAverage;
     private bool averageUpdatePending;
     private BmsScoreProcessor? scoreProcessor;
+    private IBmsGameplayEvents? gameplayEvents;
 
     private Triangle arrow = null!;
     private Box background = null!;
@@ -98,6 +99,8 @@ public partial class BmsHitErrorMeter : HitErrorMeter
     {
         var beatmap = (drawableRuleset as BmsDrawableRuleset)?.Beatmap as BmsBeatmap;
         this.scoreProcessor = scoreProcessor as BmsScoreProcessor;
+        gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
+        if (gameplayEvents != null) gameplayEvents.ReplaySeeked += resetReplayDisplay;
         var layout = beatmap?.LayoutVariant ?? BmsLayoutVariant.Bme7K;
         var judgementRate = beatmap?.HitObjects.FirstOrDefault(h => h is not BmsLandmine)?.EffectiveJudgementRate
                             ?? BmsJudgementProfileProvider.RateForRank(layout, beatmap?.Rank ?? 2);
@@ -174,6 +177,12 @@ public partial class BmsHitErrorMeter : HitErrorMeter
             windowColourBar.Alpha = height.NewValue > 0 ? 1 : 0;
         }, true);
         JudgementLineThickness.BindValueChanged(_ => Judgements.Invalidate(Invalidation.DrawSize));
+    }
+
+    private void resetReplayDisplay()
+    {
+        arrow.ClearTransforms();
+        Clear();
     }
 
     private void createColourBar(Container target, BmsJudgementWindowTable windows)
@@ -358,6 +367,7 @@ public partial class BmsHitErrorMeter : HitErrorMeter
 
     protected override void Dispose(bool isDisposing)
     {
+        if (gameplayEvents != null) gameplayEvents.ReplaySeeked -= resetReplayDisplay;
         if (scoreProcessor != null)
             scoreProcessor.NonConsumingJudgementRegistered -= onNonConsumingJudgementRegistered;
 

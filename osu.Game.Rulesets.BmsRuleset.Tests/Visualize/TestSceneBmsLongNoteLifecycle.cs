@@ -32,12 +32,17 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
     private BmsLongNoteMode mode;
     private bool includeMine;
     private bool duplicateHeads;
+    private IList<ReplayFrame>? replayInputs;
     private DrawableBmsHitObject first = null!;
     private ScoreInfo simulationScore = null!;
     private BmsScoreProcessor score => (BmsScoreProcessor)Player.ScoreProcessor;
 
     protected override TestPlayer CreatePlayer(Ruleset ruleset)
-        => CreateBmsPlayer(_ => [new BmsReplayFrame(0), new BmsReplayFrame(60000)]);
+    {
+        var frames = replayInputs ?? [new BmsReplayFrame(0), new BmsReplayFrame(60000)];
+        replayInputs = null;
+        return CreateBmsPlayer(_ => frames);
+    }
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {
@@ -69,27 +74,37 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
     {
         BmsLongNote note = null!;
         double? originalHeadTime = null;
-        AddStep("load long notes", () => { mode = longNoteMode; includeMine = mine; duplicateHeads = false; LoadPlayer(); });
+        AddStep("load long notes", () =>
+        {
+            mode = longNoteMode;
+            includeMine = mine;
+            duplicateHeads = false;
+            replayInputs =
+            [
+                new BmsReplayFrame(0), new BmsReplayFrame(5000, BmsAction.Key1), new BmsReplayFrame(6900),
+                new BmsReplayFrame(9000, BmsAction.Key1), new BmsReplayFrame(10000), new BmsReplayFrame(60000),
+            ];
+            LoadPlayer();
+        });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         AddStep("capture score mods", () =>
         {
             simulationScore = new ScoreInfo { Mods = Player.ScoreProcessor.Mods.Value.ToArray() };
         });
-        seek(5000);
+        seek(4900);
         AddStep("observe synchronous head and tail submission", () =>
         {
             first = (DrawableBmsHitObject)Playfield.GetAliveObjectAtTime(5000)!;
             note = (BmsLongNote)first.HitObject;
             first.OnNewResult += (source, _) => Assert.That(((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState((BmsLongNote)source.HitObject).IsHolding, Is.True,
                 "The head is pinned, and the normal-LN tail is not marked judged, when the main result is submitted.");
-            PressColumn(Playfield.Stage.Columns[1], 5000);
-            originalHeadTime = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).HeadTime;
         });
+        seek(5000);
+        AddStep("capture head time", () => originalHeadTime = ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).HeadTime);
         capture("head");
         seek(5501);
         capture("body and mine");
         seek(6900);
-        AddStep("release before tail", () => ReleaseColumn(Playfield.Stage.Columns[1], 6900));
         capture("early tail");
         seek(6999);
         capture("body after successful tail");
@@ -102,7 +117,6 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             Assert.That(context.GetLongNoteState(note).HeadTime, Is.EqualTo(originalHeadTime));
         });
         seek(9000);
-        AddStep("judge another pooled representation", () => PressColumn(Playfield.Stage.Columns[1], 9000));
         capture("second head");
         seek(6000);
         AddAssert("first head restored inside body", () =>
@@ -111,7 +125,6 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
             ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLongNoteState(note).HeadTime == originalHeadTime);
         capture("rewound body");
         seek(6900);
-        AddStep("release restored tail", () => ReleaseColumn(Playfield.Stage.Columns[1], 6900));
         capture("replayed tail");
         seek(7400);
         capture("retired again");
@@ -129,21 +142,31 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
     [TestCase(BmsLongNoteMode.ChargeNote, 6950, false)]
     public void EarlyTailVisibilityTracksWindowAcrossRewind(BmsLongNoteMode longNoteMode, double releaseTime, bool keepBody)
     {
-        AddStep("load long notes", () => { mode = longNoteMode; includeMine = false; duplicateHeads = false; LoadPlayer(); });
+        AddStep("load long notes", () =>
+        {
+            mode = longNoteMode;
+            includeMine = false;
+            duplicateHeads = false;
+            replayInputs =
+            [
+                new BmsReplayFrame(0), new BmsReplayFrame(5000, BmsAction.Key1),
+                new BmsReplayFrame(releaseTime), new BmsReplayFrame(60000),
+            ];
+            LoadPlayer();
+        });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.Alpha == 1);
         seek(5000);
-        AddStep("hold head", () => PressColumn(Playfield.Stage.Columns[1], 5000));
         seek(releaseTime);
-        AddStep("release early", () =>
+        AddStep("released body survives defaults", () =>
         {
-            var drawable = Playfield.GetAliveObjectAtTime(5000)!;
-            var note = (BmsLongNote)drawable.HitObject;
-            ReleaseColumn(Playfield.Stage.Columns[1], releaseTime);
+            var drawable = Playfield.GetAliveObjectAtTime(5000);
+            var note = Playfield.Beatmap.HitObjects.OfType<BmsLongNote>().First();
             if (!keepBody)
             {
-                Assert.That(drawable.Alpha, Is.Zero);
+                Assert.That(drawable == null || drawable.Alpha == 0, Is.True);
                 note.ApplyDefaults(Playfield.Beatmap.ControlPointInfo, Playfield.Beatmap.Difficulty);
-                Assert.That(drawable.Alpha, Is.Zero, "Reapplying defaults must preserve settled tail visibility.");
+                drawable = Playfield.GetAliveObjectAtTime(5000);
+                Assert.That(drawable == null || drawable.Alpha == 0, Is.True, "Reapplying defaults must preserve settled tail visibility.");
             }
         });
         assertReleasedBody();
@@ -273,7 +296,7 @@ public partial class TestSceneBmsLongNoteLifecycle : BmsPlayerTestScene
 
     private void seek(double time)
     {
-        AddStep("seek " + time, () => { Player.GameplayClockContainer.Stop(); Player.GameplayClockContainer.Seek(time); });
+        AddStep("seek " + time, () => SeekReplayInFrames(time));
         AddUntilStep("reached " + time, () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < .001);
     }
 

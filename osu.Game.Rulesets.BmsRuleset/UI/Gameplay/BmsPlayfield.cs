@@ -74,10 +74,22 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
         Stage = new BmsStage(this);
         Stage.SkinHitTargetPositionChanged += onSkinHitTargetPositionChanged;
+        foreach (var column in Stage.Columns.Cast<BmsColumn>())
+            column.JudgementBridge = new BmsJudgementBridge(this, column);
+        initialiseJudgementEngine();
+
+        InternalChildren =
+        [
+            Stage,
+        ];
+    }
+
+    private void initialiseJudgementEngine()
+    {
         var judgementColumns = Stage.Columns.Cast<BmsColumn>().ToArray();
         var judgementObjects = Beatmap.HitObjects.ToArray();
         judgementEngine = new BmsJudgementEngine(judgementColumns.Select(column => new BmsJudgementColumnDefinition(
-            judgementObjects, LayoutVariant, column.Index, column.JudgementBridge = new BmsJudgementBridge(this, column))).ToArray());
+            judgementObjects, LayoutVariant, column.Index, column.JudgementBridge)).ToArray());
         foreach (var column in judgementColumns)
         {
             column.Judgements = judgementEngine.GetColumn(column.Index);
@@ -85,11 +97,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
             container.Judgements = column.Judgements;
             container.JudgementBridge = column.JudgementBridge;
         }
-
-        InternalChildren =
-        [
-            Stage,
-        ];
     }
 
     #endregion
@@ -180,11 +187,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     // Null identifies replays recorded before selectable algorithms were introduced.
     internal BmsJudgementAlgorithm? JudgementAlgorithm { get; set; } = BmsJudgementAlgorithm.Combo;
 
-    // Replay seeks need HCN history; live play only advances the current state.
-    internal bool PreserveLongNoteHistory { get; private set; }
-
-    internal void SetReplayPlayback(bool replayPlayback) => PreserveLongNoteHistory = replayPlayback;
-
     #endregion
 
     #region Skin / DI
@@ -216,7 +218,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     [Resolved]
     private IBmsGameplayEvents gameplayEvents { get; set; } = null!;
 
-    private readonly BmsJudgementEngine judgementEngine;
+    private BmsJudgementEngine judgementEngine = null!;
 
     #endregion
 
@@ -224,6 +226,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public bool OnPressed(KeyBindingPressEvent<BmsAction> e)
     {
+        if (restoringReplayInput) return true;
         switch (e.Action)
         {
             case BmsAction.IncreaseScrollSpeed:
@@ -246,6 +249,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     public void OnReleased(KeyBindingReleaseEvent<BmsAction> e)
     {
+        if (restoringReplayInput) return;
         switch (e.Action)
         {
             case BmsAction.IncreaseScrollSpeed:
@@ -262,8 +266,18 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     }
 
     private void processJudgementFrame()
-        => judgementEngine.ProcessFrame(new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
+    {
+        if (replayVisualsPending && IsReplaySeekFrame)
+        {
+            replayVisualsPending = false;
+            foreach (var column in Stage.Columns.Cast<BmsColumn>())
+                column.JudgementBridge.SynchroniseReplayVisuals();
+            gameplayEvents.RaiseReplaySeeked();
+        }
+
+        judgementEngine.ProcessFrame(new BmsFrameContext(Time.Current, (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate,
             (Clock as IGameplayClock)?.IsRewinding == true), Time.Elapsed, JudgementAlgorithm);
+    }
 
     internal void CompleteAtEnd(double time)
     {
@@ -376,8 +390,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         return base.UpdateSubTree();
     }
 
-    private readonly List<(double Time, BmsLongNoteJudgementResult Result)> syntheticResults = [];
-
     internal double DisplayTime { get; private set; }
 
     internal static double ComputeDisplayTime(double currentTime, double visualOffset, double playbackRate) =>
@@ -422,17 +434,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         updateScrollPosition();
 
-        if (Time.Elapsed < 0)
-            scoreProcessor?.RewindEmptyPoors(Time.Current);
-
-        while (syntheticResults.Count > 0 && syntheticResults[^1].Time > Time.Current)
-        {
-            var result = syntheticResults[^1].Result;
-            syntheticResults.RemoveAt(syntheticResults.Count - 1);
-            healthProcessor?.RevertResult(result);
-            scoreProcessor?.RevertResult(result);
-        }
-
         base.Update();
 
         triggerEvents();
@@ -443,13 +444,6 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
     {
         DisplayTime = ComputeDisplayTime(Time.Current, VisualOffset.Value, ScrollController.PlaybackRate);
         ScrollController.Update(DisplayTime);
-    }
-
-    protected override void UpdateAfterChildren()
-    {
-        base.UpdateAfterChildren();
-        if (Time.Elapsed < 0)
-            healthProcessor?.Rewind(Time.Current);
     }
 
     #endregion
@@ -520,6 +514,7 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
 
     private void requestJudgementDisplay(HitResult result)
     {
+        if (IsRebuildingReplay) return;
         if (result is HitResult.IgnoreMiss or HitResult.IgnoreHit)
             return;
 
@@ -540,11 +535,9 @@ public sealed partial class BmsPlayfield : Playfield, IKeyBindingHandler<BmsActi
         if (scoreResult != null)
         {
             healthProcessor?.ApplySyntheticLongNoteEndpoint(scoreResult);
-            // Synthetic endpoints have no drawable entry in the framework's rewind stack.
-            syntheticResults.Add((endpoint.ApplicationTime ?? endpoint.EventTime, scoreResult));
         }
 
-        if (endpoint.Kind == BmsLongNoteEndpointKind.Tail && endpoint.Result.IsHit())
+        if (!IsRebuildingReplay && endpoint.Kind == BmsLongNoteEndpointKind.Tail && endpoint.Result.IsHit())
         {
             var column = Math.Clamp(note.Column, 0, Stage.Columns.Length - 1);
             Stage.Columns[column].TriggerHitExplosion(BmsHitLightStyle.Hold);

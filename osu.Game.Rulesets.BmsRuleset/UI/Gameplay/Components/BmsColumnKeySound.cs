@@ -16,13 +16,13 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
     public override bool IsPresent => false;
 
     private readonly BmsKeySoundCursor cursor;
-    private readonly BmsColumnJudgementRuntime judgements;
+    internal BmsColumnJudgementRuntime Judgements { get; set; }
     private readonly Func<BmsHitObject, bool> isFinished;
 
     internal BmsColumnKeySound(IReadOnlyList<BmsHitObject> hitObjects, BmsColumnJudgementRuntime judgements,
                               IReadOnlyList<BmsInvisibleNote>? invisibleNotes = null)
     {
-        this.judgements = judgements;
+        Judgements = judgements;
         cursor = new BmsKeySoundCursor(hitObjects, invisibleNotes);
         isFinished = hasNoteFinished;
     }
@@ -66,5 +66,5 @@ internal sealed partial class BmsColumnKeySound : CompositeDrawable
         samplePlaybackDisabled.BindTo(samplePlaybackDisabler.SamplePlaybackDisabled);
     }
 
-    private bool hasNoteFinished(BmsHitObject note) => judgements.IsKeySoundFinished(note, Time.Current);
+    private bool hasNoteFinished(BmsHitObject note) => Judgements.IsKeySoundFinished(note, Time.Current);
 }

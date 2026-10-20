@@ -12,9 +12,13 @@ public sealed class BmsGameplayEvents : IBmsGameplayEvents
 
     public void RaiseJudgementDisplayed(HitResult result) => JudgementDisplayed?.Invoke(result);
 
+    public void RaiseReplaySeeked() => ReplaySeeked?.Invoke();
+
     public event Action<string>? Text;
 
     public event Action<double>? ScrollSpeedChanged;
 
     public event Action<HitResult>? JudgementDisplayed;
+
+    public event Action? ReplaySeeked;
 }

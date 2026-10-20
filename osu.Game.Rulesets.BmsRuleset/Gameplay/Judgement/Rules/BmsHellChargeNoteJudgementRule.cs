@@ -40,7 +40,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
         var previous = state.State;
         if (hold.IsScratch && press.ReverseScratch != hold.HeadReverseScratch)
             applyTail(state, execution, press.InputTime - hold.Note.EndTime, press.InputTime, press.Frame);
-        hold.SetPendingRelease(press.InputTime, null);
+        hold.PendingRelease = null;
         if (previous != state.State)
             execution.PublishState(hold.Note, state.State, press.Frame);
         return true;
@@ -60,7 +60,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
 
         if (offset < 0 && result is HitResult.None or HitResult.Ok && hold.ReleaseMargin > 0)
         {
-            hold.SetPendingRelease(release.Frame.SimulationTime, release.Frame.SimulationTime);
+            hold.PendingRelease = release.Frame.SimulationTime;
         }
         else
             applyTail(state, execution, offset, release.Frame.SimulationTime, release.Frame);
@@ -99,17 +99,12 @@ internal sealed class BmsHellChargeNoteJudgementRule
 
         ref var hold = ref state.Hold;
         var previous = state.State;
-        if (hold.HeadJudged && frame.SimulationTime < hold.Note.StartTime + hold.HeadOffset)
-            Reset(state);
-        else
-        {
-            updateBody(state, execution, frame, holding);
-            resolveRelease(state, execution, frame);
-            if (hold.HeadJudged && !hold.TailJudged && hold.HeadWindow.IsPastPassivePoorOffset(frame.SimulationTime - hold.Note.EndTime))
-                missTail(state, execution, frame);
-            if (hold.Started && hold.TailJudged && frame.SimulationTime >= hold.Note.EndTime)
-                hold.Started = false;
-        }
+        updateBody(state, execution, frame, holding);
+        resolveRelease(state, execution, frame);
+        if (hold.HeadJudged && !hold.TailJudged && hold.HeadWindow.IsPastPassivePoorOffset(frame.SimulationTime - hold.Note.EndTime))
+            missTail(state, execution, frame);
+        if (hold.Started && hold.TailJudged && frame.SimulationTime >= hold.Note.EndTime)
+            hold.Started = false;
 
         if (previous != state.State)
             execution.PublishState(hold.Note, state.State, frame);
@@ -122,44 +117,13 @@ internal sealed class BmsHellChargeNoteJudgementRule
             return false;
 
         var released = hold.PendingRelease ?? frame.SimulationTime;
-        hold.SetPendingRelease(frame.SimulationTime, null);
+        hold.PendingRelease = null;
         applyTail(state, execution, released - hold.Note.EndTime, frame.SimulationTime, frame);
         hold.Started = false;
         execution.PublishState(hold.Note, state.State, frame);
         return true;
     }
 
-    internal void Rewind(BmsHellChargeNoteRuntime state, double time)
-    {
-        ref var hold = ref state.Hold;
-        hold.RewindReleaseHistory(time);
-        state.LastBodyTime = Math.Min(state.LastBodyTime, time);
-        if (!hold.HeadJudged)
-            return;
-
-        if (time < hold.Note.StartTime + hold.HeadOffset)
-        {
-            Reset(state);
-            return;
-        }
-
-        if (hold.TailTime > time)
-        {
-            hold.TailJudged = false;
-            hold.TailTime = null;
-            hold.TailResult = HitResult.None;
-        }
-
-        hold.Started = time < hold.Note.EndTime || !hold.TailJudged;
-        state.Body.Rewind(time);
-    }
-
-    internal void Reset(BmsHellChargeNoteRuntime state)
-    {
-        state.Hold.Reset();
-        state.Body.Reset();
-        state.LastBodyTime = double.NegativeInfinity;
-    }
 
     internal void UpdateBody(BmsHellChargeNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame, double elapsed, bool holding)
     {
@@ -214,7 +178,7 @@ internal sealed class BmsHellChargeNoteJudgementRule
         if (hold.PendingRelease is not { } released || hold.TailJudged || released + hold.ReleaseMargin > frame.SimulationTime)
             return;
 
-        hold.SetPendingRelease(frame.SimulationTime, null);
+        hold.PendingRelease = null;
         applyTail(state, execution, released - hold.Note.EndTime, frame.SimulationTime, frame);
     }
 

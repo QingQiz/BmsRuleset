@@ -28,7 +28,7 @@ public class BmsHealthProcessorTest
         processor.SetGaugeTypes(BmsModAutoGauge.AUTO_GAUGE_CHAIN);
         for (var i = 0; i < events; i++)
             processor.ApplyHellChargeTick(true, eventTime: i);
-        processor.Rewind(-1);
+        processor.ResetReplayState();
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < events; i++)
@@ -41,7 +41,7 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
-    public void GaugeHistoryMatchesAppliedStatesAcrossRewindAndNewBranch([Values] BmsGaugeProfileFamily family)
+    public void GaugeHistoryMatchesAppliedStatesAcrossRebuildAndNewBranch([Values] BmsGaugeProfileFamily family)
     {
         var processor = new BmsHealthProcessor();
         processor.SetGaugeTypes(Enum.GetValues<BmsGaugeType>(), profileFamilyOverride: family);
@@ -62,7 +62,7 @@ public class BmsHealthProcessorTest
             Assert.That(history[i].States, Is.EqualTo(expected[i]), "event " + i);
 
         var discarded = history[^1];
-        processor.Rewind(7);
+        rebuild();
         Assert.That(history, Has.Count.EqualTo(16));
         Assert.That(processor.CurrentGaugeStates, Is.EqualTo(expected[15]));
         processor.ApplyHellChargeTick(true, eventTime: 8);
@@ -70,12 +70,24 @@ public class BmsHealthProcessorTest
         Assert.That(history[^1].States, Is.EqualTo(processor.CurrentGaugeStates));
         Assert.That(discarded.States, Is.EqualTo(expected[^1]), "Read snapshots must survive truncation and storage reuse.");
 
-        processor.Rewind(7);
+        rebuild();
         Assert.That(processor.CurrentGaugeStates, Is.EqualTo(expected[15]));
+
+        void rebuild()
+        {
+            processor.ResetReplayState();
+            for (var i = 0; i < 16; i++)
+            {
+                if (i % 3 == 0)
+                    processor.RegisterNonConsumingJudgement(HitResult.Ok, i / 2);
+                else
+                    processor.ApplyHellChargeTick(i % 3 == 1, eventTime: i / 2);
+            }
+        }
     }
 
     [Test]
-    public void GaugeHistoryRestoresFailureAtApplicationTime()
+    public void GaugeResetClearsFailureAndRebuildsEarlierEvents()
     {
         var processor = createProcessorWithClock(1200);
         processor.SetGaugeType(BmsGaugeType.Hazard);
@@ -86,12 +98,8 @@ public class BmsHealthProcessorTest
         Assert.That(processor.HasFailed, Is.True);
         Assert.That(processor.HasEverFailed, Is.True);
 
-        processor.Rewind(1200);
-        Assert.That(processor.HasFailed, Is.True);
-        Assert.That(processor.HasEverFailed, Is.True);
-        Assert.That(processor.Health.Value, Is.Zero);
-
-        processor.Rewind(Math.BitDecrement(1200));
+        processor.ResetReplayState();
+        processor.ApplyHellChargeTick(true, eventTime: 500);
         Assert.That(processor.GaugeHistory, Has.Count.EqualTo(1));
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
@@ -103,7 +111,7 @@ public class BmsHealthProcessorTest
 
     [TestCase(false, 1000)]
     [TestCase(true, 1100)]
-    public void DelayedEngineResultRewindsAtItsLogicalApplicationTime(bool syntheticTail, double applicationTime)
+    public void DelayedEngineResultRecordsItsLogicalApplicationTime(bool syntheticTail, double applicationTime)
     {
         var processor = createProcessorWithClock(1200);
         processor.SetGaugeType(BmsGaugeType.Hazard);
@@ -125,10 +133,10 @@ public class BmsHealthProcessorTest
         processor.ApplyResult(result);
         Assert.That(processor.GaugeHistory[^1].Time, Is.EqualTo(applicationTime));
 
-        processor.Rewind(applicationTime);
         Assert.That(processor.HasFailed, Is.True);
         Assert.That(processor.Health.Value, Is.Zero);
-        processor.Rewind(Math.BitDecrement(applicationTime));
+        processor.ResetReplayState();
+        processor.ApplyHellChargeTick(true, eventTime: 500);
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
         Assert.That(processor.Health.Value, Is.EqualTo(1));
@@ -136,7 +144,7 @@ public class BmsHealthProcessorTest
     }
 
     [Test]
-    public void TestRewindRestoresFailureAndAllGaugeLayers()
+    public void TestRebuildRestoresFailureAndAllGaugeLayers()
     {
         var processor = new BmsHealthProcessor();
         processor.SetGaugeTypes([BmsGaugeType.Hard, BmsGaugeType.Normal], initialStates:
@@ -152,11 +160,12 @@ public class BmsHealthProcessorTest
         processor.ApplyHellChargeTick(false, 100, 1200);
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
-        processor.Rewind(1100);
+        processor.ResetReplayState();
+        processor.RegisterEmptyPoor(1000);
         Assert.That(processor.CurrentGaugeStates, Is.EqualTo(afterMiss));
         Assert.That(processor.HasFailed, Is.False);
         Assert.That(processor.HasEverFailed, Is.False);
-        processor.Rewind(500);
+        processor.ResetReplayState();
         Assert.That(processor.CurrentGaugeStates, Is.EqualTo(initial));
         Assert.That(processor.GaugeType, Is.EqualTo(BmsGaugeType.Hard));
         Assert.That(processor.GaugeHistory, Has.Count.EqualTo(1));

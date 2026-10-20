@@ -1,8 +1,11 @@
 using System;
+using System.Runtime.CompilerServices;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Framework;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.Rules;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -30,6 +33,27 @@ internal sealed class BmsHitObjectLifetimeEntry(
     private bool scrollVisible = true;
 
     internal bool IsBatchedMine { get; private set; }
+
+    internal BmsJudgementResult? ReplayResult => entryResult(this) as BmsJudgementResult;
+
+    internal BmsJudgementResult GetReplayResult()
+    {
+        ref var result = ref entryResult(this);
+        result ??= HitObject is BmsLongNote
+            ? new BmsLongNoteJudgementResult(HitObject, HitObject.Judgement)
+            : new BmsJudgementResult(HitObject, HitObject.Judgement);
+        return (BmsJudgementResult)result;
+    }
+
+    internal void ResetReplayResult()
+    {
+        if (entryResult(this) is BmsJudgementResult result)
+            result.ResetForReplay();
+        LifetimeEnd = double.MaxValue;
+    }
+
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "Result")]
+    private static extern ref JudgementResult? entryResult(HitObjectLifetimeEntry entry);
 
     #region Constants
 

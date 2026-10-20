@@ -103,7 +103,7 @@ public class BmsJudgementEngineTest
 
     [TestCase(false)]
     [TestCase(true)]
-    public void LandmineHistoryRewindsAtChartTime(bool held)
+    public void LandmineStateIsRecreatedWithTheEngine(bool held)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K };
         var mine = new BmsLandmine { Beatmap = beatmap, Column = 1, StartTime = 1000 };
@@ -113,15 +113,15 @@ public class BmsJudgementEngineTest
 
         column.UpdateLandmines(new BmsFrameContext(1007, 1), held);
 
-        column.RewindLandmines(1007);
         Assert.That(column.GetLandmineState(mine).HandledTime, Is.EqualTo(1000));
-        output.RevertAfter(999);
-        column.RewindLandmines(999);
+        output = new BmsRecordingJudgementOutput();
+        engine = new BmsJudgementEngine([mine], beatmap.LayoutVariant, 1, output);
+        column = engine.GetColumn(1);
         Assert.That(column.GetLandmineState(mine).HandledTime, Is.Null);
 
         column.UpdateLandmines(new BmsFrameContext(1007, 1), true);
         Assert.That(column.GetLandmineState(mine).Detonated, Is.True);
-        Assert.That(output.MainResults, Is.EqualTo(held ? 2 : 1));
+        Assert.That(output.MainResults, Is.EqualTo(1));
     }
 
     [Test]

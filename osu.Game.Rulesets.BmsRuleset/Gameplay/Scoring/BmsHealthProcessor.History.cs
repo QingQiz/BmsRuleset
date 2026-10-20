@@ -29,11 +29,10 @@ public partial class BmsHealthProcessor
             }
         }
 
-        public void Record(List<GaugeState> currentStates, double time, double applicationTime, BmsGaugeType activeGaugeType,
-                           bool failed, bool everFailed)
+        public void Record(List<GaugeState> currentStates, double time, BmsGaugeType activeGaugeType)
         {
             // Keep exact applied values without creating snapshot objects on the judgement path.
-            // Expanding them on read moves that allocation to seeks and score export.
+            // Expanding them on read moves that allocation to graph rendering and score export.
             var offset = states.Count;
             for (var i = 0; i < currentStates.Count; i++)
             {
@@ -41,20 +40,7 @@ public partial class BmsHealthProcessor
                 states.Add(new StoredState(state.CurrentHp, state.GaugeType, state.IsHpFailed));
             }
 
-            events.Add(new StoredEvent(time, applicationTime, offset, currentStates.Count, activeGaugeType, failed, everFailed));
-        }
-
-        public (bool Failed, bool EverFailed) Rewind(double time)
-        {
-            var count = events.Count;
-            while (count > 0 && events[count - 1].ApplicationTime > time)
-                count--;
-
-            var entry = count > 0 ? events[count - 1] : default;
-            var stateCount = entry.StateOffset + entry.StateCount;
-            states.RemoveRange(stateCount, states.Count - stateCount);
-            events.RemoveRange(count, events.Count - count);
-            return (entry.Failed, entry.EverFailed);
+            events.Add(new StoredEvent(time, offset, currentStates.Count, activeGaugeType));
         }
 
         public void Clear()
@@ -73,12 +59,9 @@ public partial class BmsHealthProcessor
 
         private readonly record struct StoredEvent(
             double Time,
-            double ApplicationTime,
             int StateOffset,
             int StateCount,
-            BmsGaugeType ActiveGaugeType,
-            bool Failed,
-            bool EverFailed);
+            BmsGaugeType ActiveGaugeType);
 
         private readonly record struct StoredState(double Health, BmsGaugeType GaugeType, bool Failed);
     }

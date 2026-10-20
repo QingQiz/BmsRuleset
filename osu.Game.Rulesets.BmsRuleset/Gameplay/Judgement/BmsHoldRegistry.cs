@@ -104,26 +104,19 @@ internal sealed class BmsHoldRegistry
         return binding.Operations.CompleteAtEnd(binding.StateIndex, frame);
     }
 
-    internal void Rewind(double time)
-    {
-        // Inactive holds retain history so pool activation cannot resurrect a future head.
-        foreach (var binding in bindings)
-            binding.Operations.Rewind(binding.StateIndex, time);
-    }
-
     internal void UpdateBody(int slot, in BmsFrameContext frame, double elapsed, bool holding)
         => hellCharge!.UpdateBody(bindings[bindingIndices[slot]].StateIndex, frame, elapsed, holding);
 
     internal double NextBodyTime(int slot, bool holding)
         => hellCharge!.NextBodyTime(bindings[bindingIndices[slot]].StateIndex, holding);
 
-    internal void Configure(int slot, bool preserveHistory)
+    internal void Configure(int slot)
     {
         var binding = bindings[bindingIndices[slot]];
         if (mode(binding.Note) != binding.Operations.Mode)
             throw new InvalidOperationException("Changing a registered long-note mode requires a new gameplay engine.");
 
-        binding.Operations.Configure(binding.StateIndex, preserveHistory);
+        binding.Operations.Configure(binding.StateIndex);
     }
 
     private readonly record struct Binding(BmsLongNote Note, HoldOperations Operations, int StateIndex);
@@ -153,9 +146,7 @@ internal sealed class BmsHoldRegistry
 
         internal abstract bool CompleteAtEnd(int index, in BmsFrameContext frame);
 
-        internal abstract void Rewind(int index, double time);
-
-        internal abstract void Configure(int index, bool preserveHistory);
+        internal abstract void Configure(int index);
     }
 
     private sealed class LongNoteOperations(BmsLongNoteJudgementRule rule, BmsJudgementExecutionContext execution) : HoldOperations(execution)
@@ -187,12 +178,7 @@ internal sealed class BmsHoldRegistry
 
         internal override bool CompleteAtEnd(int index, in BmsFrameContext frame) => rule.CompleteAtEnd(states[index], Execution, frame);
 
-        internal override void Rewind(int index, double time) => rule.Rewind(states[index], time);
-
-        internal override void Configure(int index, bool preserveHistory)
-        {
-            states[index].Hold.RefreshWindows();
-        }
+        internal override void Configure(int index) => states[index].Hold.RefreshWindows();
     }
 
     private sealed class ChargeOperations(BmsChargeNoteJudgementRule rule, BmsJudgementExecutionContext execution) : HoldOperations(execution)
@@ -224,12 +210,7 @@ internal sealed class BmsHoldRegistry
 
         internal override bool CompleteAtEnd(int index, in BmsFrameContext frame) => rule.CompleteAtEnd(states[index], Execution, frame);
 
-        internal override void Rewind(int index, double time) => rule.Rewind(states[index], time);
-
-        internal override void Configure(int index, bool preserveHistory)
-        {
-            states[index].Hold.RefreshWindows();
-        }
+        internal override void Configure(int index) => states[index].Hold.RefreshWindows();
     }
 
     private sealed class HellChargeOperations(BmsHellChargeNoteJudgementRule rule, BmsJudgementExecutionContext execution) : HoldOperations(execution)
@@ -261,13 +242,7 @@ internal sealed class BmsHoldRegistry
 
         internal override bool CompleteAtEnd(int index, in BmsFrameContext frame) => rule.CompleteAtEnd(states[index], Execution, frame);
 
-        internal override void Rewind(int index, double time) => rule.Rewind(states[index], time);
-
-        internal override void Configure(int index, bool preserveHistory)
-        {
-            states[index].Hold.RefreshWindows();
-            states[index].Body.HistoryEnabled = preserveHistory;
-        }
+        internal override void Configure(int index) => states[index].Hold.RefreshWindows();
 
         internal void UpdateBody(int index, in BmsFrameContext frame, double elapsed, bool holding)
             => rule.UpdateBody(states[index], Execution, frame, elapsed, holding);

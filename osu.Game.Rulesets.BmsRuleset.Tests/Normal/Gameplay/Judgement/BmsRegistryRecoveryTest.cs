@@ -16,7 +16,7 @@ public class BmsRegistryRecoveryTest
     [TestCase(BmsLongNoteMode.LongNote)]
     [TestCase(BmsLongNoteMode.ChargeNote)]
     [TestCase(BmsLongNoteMode.HellChargeNote)]
-    public void MixedColumnRewindsActiveAndPooledHolds(BmsLongNoteMode mode)
+    public void MixedColumnRebuildsActiveAndPooledHolds(BmsLongNoteMode mode)
     {
         var beatmap = new BmsBeatmap { LayoutVariant = BmsLayoutVariant.Bme7K, Rank = 2, LockedLongNoteMode = mode };
         var first = new BmsLongNote { Beatmap = beatmap, Column = 1, StartTime = 2000, Duration = 400 };
@@ -58,14 +58,15 @@ public class BmsRegistryRecoveryTest
 
         void rewind(double time, long step)
         {
-            output.RevertAfter(time);
-            output.RevertSyntheticAfter(time);
-            column.RewindPressHistory(time);
-            column.Schedule.BeginStep(1, step);
-            var frame = new BmsFrameContext(time, 1, IsRewinding: true);
-            Assert.That(column.Schedule.BeginRewindStep(frame), Is.True);
-            column.RestoreExecutionState(frame);
-            Assert.That(column.Schedule.BeginRewindStep(frame), Is.False);
+            output = new BmsRecordingJudgementOutput();
+            column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, output).GetColumn(1);
+            foreach (var hold in new[] { first, second }.Where(hold => hold.StartTime <= time))
+            {
+                column.PressedDirections = 1;
+                column.TryPressRegisteredNote(hold, HitResult.Perfect, new BmsPressContext(hold.StartTime, new BmsFrameContext(hold.StartTime, 1)));
+                if (hold.EndTime <= time)
+                    column.HandleExecutionRelease(hold.EndTime, new BmsFrameContext(hold.EndTime, 1));
+            }
         }
     }
 

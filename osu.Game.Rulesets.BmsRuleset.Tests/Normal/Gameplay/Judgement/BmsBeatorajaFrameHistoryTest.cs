@@ -123,6 +123,8 @@ public class BmsBeatorajaFrameHistoryTest
             health = new BmsHealthProcessor { Clock = framed };
             health.ApplyBeatmap(beatmap);
             context = new BmsLongNoteTestContext(note);
+            context.BeforeRebuild = health.ResetReplayState;
+            context.BeforeOperation = time;
             context.Output.BeforeResultCheckpoint += (_, _) => health.ApplyResult(new BmsLongNoteJudgementResult(note, note.CreateJudgement(), context.Output.GetEndpoints(note)) { Type = context.Output.GetMainResult(note).Type });
             context.Output.SyntheticEndpoint += (endpoint, applied) =>
             {
@@ -139,7 +141,7 @@ public class BmsBeatorajaFrameHistoryTest
             time(t);
             context.Release(t);
         }
-        public void Rewind(double t) { time(t); context.Rewind(t); health.Rewind(t); }
+        public void Rewind(double t) { context.Rewind(t); time(t); }
         public void Expect(double value) => Assert.That(health.Health.Value, Is.EqualTo(value).Within(1e-10), "HCN health at " + clock.CurrentTime);
         public void Dispose() => health.Dispose();
     }

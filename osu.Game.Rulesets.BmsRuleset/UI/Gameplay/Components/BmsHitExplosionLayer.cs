@@ -23,6 +23,15 @@ internal sealed partial class BmsHitExplosionLayer : Container
 
     internal IReadOnlyList<Pulse> Pulses => pulses;
 
+    internal void ResetReplayPulses()
+    {
+        pulses.Clear();
+        foreach (var child in InternalChildren)
+            if (child is BmsHitExplosion) child.Expire();
+        previousCount = 0;
+        Invalidate(Invalidation.DrawNode);
+    }
+
     private readonly SkinTemplate normal;
     private readonly SkinTemplate hold;
     private readonly Action<BmsHitLightStyle, float, double?> spawnNative;

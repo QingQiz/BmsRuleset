@@ -12,6 +12,8 @@ using osuTK.Graphics;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
+using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.BmsRuleset.UI.HudComponents;
 
@@ -47,6 +49,7 @@ public sealed partial class BmsHealthDisplay : BmsHudComponent
     private BindableNumber<double>? health;
     private double displayedHealth;
     private BmsHealthProcessor? bmsHealthProcessor;
+    private IBmsGameplayEvents? gameplayEvents;
 
     private float lastFillHeight = float.NaN;
     private Color4 lastFillColour;
@@ -61,6 +64,25 @@ public sealed partial class BmsHealthDisplay : BmsHudComponent
 
     [Resolved]
     private HealthProcessor healthProcessor { get; set; } = null!;
+
+    [BackgroundDependencyLoader(true)]
+    private void load(DrawableRuleset? drawableRuleset)
+    {
+        gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
+        if (gameplayEvents != null) gameplayEvents.ReplaySeeked += synchroniseReplayState;
+    }
+
+    protected override void Dispose(bool isDisposing)
+    {
+        if (gameplayEvents != null) gameplayEvents.ReplaySeeked -= synchroniseReplayState;
+        base.Dispose(isDisposing);
+    }
+
+    private void synchroniseReplayState()
+    {
+        displayedHealth = healthProcessor.Health.Value;
+        updateDisplay();
+    }
 
     public BmsHealthDisplay()
     {

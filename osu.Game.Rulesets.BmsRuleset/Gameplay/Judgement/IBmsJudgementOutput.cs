@@ -15,10 +15,10 @@ internal interface IBmsJudgementOutput
     BmsMainResultState GetMainResult(BmsHitObject note);
 
     /// <summary>
-    /// Keeps history notification and derived-index refresh distinct so framework callbacks retain
+    /// Keeps current press state and derived-index refresh distinct so framework callbacks retain
     /// their intermediate observations. Each main result invokes both at its existing callback boundary.
     /// </summary>
-    void SetResultCheckpoints(Action<BmsHitObject, double> recordHistory, Action<BmsHitObject> refreshIndexes);
+    void SetResultCheckpoints(Action<BmsHitObject> recordState, Action<BmsHitObject> refreshIndexes);
 
     void ApplyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty);
 

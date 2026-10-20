@@ -77,8 +77,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal float NoteHeightScale => ParentPlayfield.Stage.NoteHeightScale;
 
-    internal bool PreserveLongNoteHistory => ParentPlayfield.PreserveLongNoteHistory;
-
     protected BmsPlayfield ParentPlayfield { get; }
 
     internal float GetLongNoteHeadYAtStartTime(BmsLongNote note)
@@ -99,7 +97,15 @@ public partial class BmsColumn : Playfield, IBmsColumn
 
     internal BmsInvisibleNoteLayer? InvisibleNoteLayer { get; private set; }
 
-    internal BmsColumnJudgementRuntime Judgements { get; set; } = null!;
+    internal BmsColumnJudgementRuntime Judgements
+    {
+        get;
+        set
+        {
+            field = value;
+            if (keySound != null) keySound.Judgements = value;
+        }
+    } = null!;
 
     internal BmsJudgementBridge JudgementBridge { get; set; } = null!;
 
@@ -215,13 +221,6 @@ public partial class BmsColumn : Playfield, IBmsColumn
         }
 
         InvisibleNoteLayer.Alpha = showInvisibleNotes.Value ? 1 : 0;
-    }
-
-    protected override void Update()
-    {
-        if (Time.Elapsed < 0)
-            Judgements.RewindPressHistory(Time.Current);
-        base.Update();
     }
 
     private static float defaultColumnWidth(int index, BmsLayoutVariant layoutVariant) =>

@@ -20,7 +20,7 @@ public class BmsGaugeHistoryPerformanceTest
             if (warmed)
             {
                 record(processor, count);
-                processor.Rewind(-1);
+                processor.ResetReplayState();
             }
 
             return new BmsJudgementPerformanceTest.Measurement(() => record(processor, count), () => verify(processor, count));
@@ -54,26 +54,6 @@ public class BmsGaugeHistoryPerformanceTest
         });
     }
 
-    [Test]
-    public void RewindGaugeHistory([Values(1, 6)] int layers)
-    {
-        const int count = 100000;
-        BmsJudgementPerformanceTest.Measure($"Gauge-rewind-{layers}", 100, () =>
-        {
-            var processor = createProcessor(layers);
-            record(processor, count);
-            var initial = processor.GaugeHistory[0].States;
-            return new BmsJudgementPerformanceTest.Measurement(() =>
-            {
-                for (var i = 99; i >= 0; i--)
-                    processor.Rewind(i * 1000 + .5);
-            }, () =>
-            {
-                Assert.That(processor.CurrentGaugeStates, Is.EqualTo(initial));
-                return verify(processor, 1);
-            });
-        });
-    }
 
     private static BmsHealthProcessor createProcessor(int layers)
     {

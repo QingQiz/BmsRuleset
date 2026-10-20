@@ -6,8 +6,10 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Threading;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.BmsRuleset.Localisation;
+using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Skinning.Configuration;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -63,6 +65,29 @@ public sealed partial class BmsComboCounter : BmsHudComponent
     private LegacySpriteText displayedCountText = null!;
 
     private Color4 breakColour = Color4.Red;
+    private IBmsGameplayEvents? gameplayEvents;
+
+    protected override void Dispose(bool isDisposing)
+    {
+        if (gameplayEvents != null) gameplayEvents.ReplaySeeked -= resetReplayDisplay;
+        base.Dispose(isDisposing);
+    }
+
+    private void resetReplayDisplay()
+    {
+        countUpdatePending = countIncrementPending = false;
+        pendingBrokenCombo = null;
+        autoHideTask?.Cancel();
+        ClearTransforms();
+        displayedCountText.ClearTransforms();
+        popOutCountText.ClearTransforms();
+        displayedCountText.Scale = Vector2.One;
+        displayedCountText.Colour = Color4.White;
+        displayedCountText.Alpha = Current.Value >= MinVisibleCombo.Value ? 1 : 0;
+        popOutCountText.Hide();
+        DisplayedCount = Current.Value;
+        scheduleAutoHide();
+    }
 
     protected override void LoadComplete()
     {
@@ -82,9 +107,11 @@ public sealed partial class BmsComboCounter : BmsHudComponent
         counterContainer.Size = displayedCountText.Size;
     }
 
-    [BackgroundDependencyLoader]
-    private void load(ISkinSource skin, ScoreProcessor scoreProcessor)
+    [BackgroundDependencyLoader(true)]
+    private void load(ISkinSource skin, ScoreProcessor scoreProcessor, DrawableRuleset? drawableRuleset)
     {
+        gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
+        if (gameplayEvents != null) gameplayEvents.ReplaySeeked += resetReplayDisplay;
         Anchor = Anchor.TopCentre;
         Origin = Anchor.Centre;
 

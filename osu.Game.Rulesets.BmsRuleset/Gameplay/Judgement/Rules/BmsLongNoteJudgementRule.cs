@@ -29,7 +29,7 @@ internal sealed class BmsLongNoteJudgementRule
             return false;
 
         var previous = state.State;
-        hold.SetPendingRelease(press.InputTime, null);
+        hold.PendingRelease = null;
         if (previous != state.State)
             execution.PublishState(hold.Note, state.State, press.Frame);
         return true;
@@ -45,7 +45,7 @@ internal sealed class BmsLongNoteJudgementRule
         var result = hold.TailWindow.ResultForOffset(offset);
         if (offset < 0 && result is HitResult.None or HitResult.Ok && hold.ReleaseMargin > 0)
         {
-            hold.SetPendingRelease(release.Frame.SimulationTime, release.Frame.SimulationTime);
+            hold.PendingRelease = release.Frame.SimulationTime;
             execution.PublishState(hold.Note, state.State, release.Frame);
         }
         else
@@ -89,13 +89,6 @@ internal sealed class BmsLongNoteJudgementRule
             return;
 
         ref var hold = ref state.Hold;
-        if (hold.HeadJudged && frame.SimulationTime < hold.Note.StartTime + hold.HeadOffset)
-        {
-            Reset(state);
-            execution.PublishState(hold.Note, state.State, frame);
-            return;
-        }
-
         resolveRelease(state, execution, frame);
         if (hold.Started && frame.SimulationTime > hold.Note.EndTime + 50)
         {
@@ -111,7 +104,7 @@ internal sealed class BmsLongNoteJudgementRule
             return false;
 
         var released = hold.PendingRelease ?? frame.SimulationTime;
-        hold.SetPendingRelease(frame.SimulationTime, null);
+        hold.PendingRelease = null;
         applyTail(state, execution, hold.TailWindow, released - hold.Note.EndTime, frame, false);
         if (hold.Started)
         {
@@ -122,36 +115,6 @@ internal sealed class BmsLongNoteJudgementRule
         return true;
     }
 
-    internal void Rewind(BmsLongNoteRuntime state, double time)
-    {
-        ref var hold = ref state.Hold;
-        hold.RewindReleaseHistory(time);
-        if (!hold.HeadJudged)
-            return;
-
-        if (time < hold.Note.StartTime + hold.HeadOffset)
-        {
-            Reset(state);
-            return;
-        }
-
-        if (hold.TailTime > time)
-        {
-            hold.TailJudged = false;
-            hold.TailTime = null;
-            hold.TailResult = HitResult.None;
-            hold.EarlyReleaseOutsideWindow = false;
-        }
-
-        hold.Started = hold.HeadResult != HitResult.Meh && (!hold.TailJudged || hold.TailResult == HitResult.Meh)
-                                                        && time <= hold.Note.EndTime + 50;
-    }
-
-    internal void Reset(BmsLongNoteRuntime state)
-    {
-        state.Hold.Reset();
-        state.HeadEndpoint = null;
-    }
 
     private void resolveRelease(BmsLongNoteRuntime state, in BmsJudgementExecutionContext execution, in BmsFrameContext frame)
     {
@@ -159,7 +122,7 @@ internal sealed class BmsLongNoteJudgementRule
         if (hold.PendingRelease is not { } released || hold.TailJudged || released + hold.ReleaseMargin > frame.SimulationTime)
             return;
 
-        hold.SetPendingRelease(frame.SimulationTime, null);
+        hold.PendingRelease = null;
         applyTail(state, execution, hold.TailWindow, released - hold.Note.EndTime, frame, false);
     }
 

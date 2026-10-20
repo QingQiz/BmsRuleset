@@ -19,9 +19,8 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     private readonly Dictionary<BmsHitObject, BmsMainResultState> results = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<BmsHitObject, double?> rawTimes = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<BmsLongNote, IReadOnlyList<BmsLongNoteEndpointResult>> endpoints = new(ReferenceEqualityComparer.Instance);
-    private readonly Stack<BmsHitObject> appliedResults = new();
     private Action<BmsHitObject> checkpoint = null!;
-    private Action<BmsHitObject, double> historyCheckpoint = null!;
+    private Action<BmsHitObject> stateCheckpoint = null!;
     internal Action<BmsHitObject, BmsFrameContext>? BeforeResultCheckpoint;
     internal Action<BmsHitObject, BmsFrameContext>? AfterResultCheckpoint;
     internal Action<string>? Feedback;
@@ -32,10 +31,20 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     internal List<bool> SyntheticPenaltySuppression { get; } = [];
     internal Action<BmsLongNote, bool, double, BmsFrameContext>? BodyTick;
     internal List<(BmsLongNote Note, bool Holding, double Scale, double Time)> BodyTicks { get; } = [];
-    internal Action<BmsHitObject>? Reverting;
-    internal Action<BmsHitObject>? AfterReset;
     internal int MainResults { get; private set; }
     internal int NonConsumingResults { get; private set; }
+
+    internal void Reset()
+    {
+        results.Clear();
+        rawTimes.Clear();
+        endpoints.Clear();
+        SyntheticEndpoints.Clear();
+        SyntheticApplicationTimes.Clear();
+        SyntheticPenaltySuppression.Clear();
+        BodyTicks.Clear();
+        MainResults = NonConsumingResults = 0;
+    }
 
     public BmsMainResultState GetMainResult(BmsHitObject note)
         => results.TryGetValue(note, out var result) ? result : new BmsMainResultState(HitResult.None, note.GetEndTime(), 0, null, false);
@@ -43,9 +52,9 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     internal double? GetRawTime(BmsHitObject note) => rawTimes.GetValueOrDefault(note);
     internal IReadOnlyList<BmsLongNoteEndpointResult> GetEndpoints(BmsLongNote note) => endpoints.GetValueOrDefault(note) ?? [];
 
-    public void SetResultCheckpoints(Action<BmsHitObject, double> recordHistory, Action<BmsHitObject> refreshIndexes)
+    public void SetResultCheckpoints(Action<BmsHitObject> recordState, Action<BmsHitObject> refreshIndexes)
     {
-        historyCheckpoint = recordHistory;
+        stateCheckpoint = recordState;
         checkpoint = refreshIndexes;
     }
 
@@ -58,9 +67,8 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
         results[note] = new BmsMainResultState(result, Math.Min(frame.SimulationTime, note.GetEndTime() + note.MaximumJudgementOffset),
             Math.Min(frame.SimulationTime - note.GetEndTime(), note.MaximumJudgementOffset), frame.GameplayRate, suppressPenalty);
         MainResults++;
-        appliedResults.Push(note);
         BeforeResultCheckpoint?.Invoke(note, frame);
-        historyCheckpoint(note, frame.SimulationTime);
+        stateCheckpoint(note);
         checkpoint(note);
         AfterResultCheckpoint?.Invoke(note, frame);
     }
@@ -88,33 +96,6 @@ internal sealed class BmsRecordingJudgementOutput : IBmsJudgementOutput
     {
         BodyTicks.Add((note, holding, scale, frame.SimulationTime));
         BodyTick?.Invoke(note, holding, scale, frame);
-    }
-
-    internal void RevertSyntheticAfter(double time)
-    {
-        // The submission stack is authoritative even when a legacy endpoint stamps input time.
-        while (SyntheticApplicationTimes.Count > 0 && SyntheticApplicationTimes[^1] > time)
-        {
-            SyntheticApplicationTimes.RemoveAt(SyntheticApplicationTimes.Count - 1);
-            SyntheticEndpoints.RemoveAt(SyntheticEndpoints.Count - 1);
-            SyntheticPenaltySuppression.RemoveAt(SyntheticPenaltySuppression.Count - 1);
-        }
-    }
-
-    internal void RevertAfter(double time)
-    {
-        while (appliedResults.TryPeek(out var note))
-        {
-            var result = results[note];
-            if (rawTimes[note] <= time)
-                break;
-            appliedResults.Pop();
-            Reverting?.Invoke(note);
-            // Framework Reset preserves GameplayRate, supplementary data and endpoint arrays.
-            results[note] = result with { Type = HitResult.None, TimeAbsolute = note.GetEndTime(), TimeOffset = 0 };
-            rawTimes[note] = null;
-            AfterReset?.Invoke(note);
-        }
     }
 
     internal void Reapply(BmsHitObject note)

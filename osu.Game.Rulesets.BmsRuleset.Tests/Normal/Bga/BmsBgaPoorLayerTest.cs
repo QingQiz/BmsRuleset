@@ -210,7 +210,7 @@ public partial class BmsBgaPoorLayerTest
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero, "suppressed replay must not restart an expired poor layer");
         advanceTo(800);
         scoreProcessor.RevertResult(suppressed);
-        scoreProcessor.RewindEmptyPoors(800);
+        scoreProcessor.ResetReplayState();
         Assert.That(layer(BmsBgaLayer.Poor).Alpha, Is.Zero);
         advanceTo(850);
         scoreProcessor.RegisterNonConsumingJudgement(HitResult.Ok, 850, 1000, 1);

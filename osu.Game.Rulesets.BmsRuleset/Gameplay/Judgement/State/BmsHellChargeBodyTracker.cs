@@ -11,18 +11,7 @@ internal sealed class BmsHellChargeBodyTracker
     private double time = double.NaN;
     private double accumulator;
     private int ticks;
-    private BmsHellChargeHistory.Segment segment;
-    private BmsHellChargeHistory? history;
-
-    public bool HistoryEnabled
-    {
-        get;
-        set
-        {
-            field = value;
-            if (!value) history = null;
-        }
-    } = true;
+    private Segment segment;
 
     public void Reset(double startTime = double.NaN)
     {
@@ -30,7 +19,6 @@ internal sealed class BmsHellChargeBodyTracker
         accumulator = 0;
         ticks = 0;
         segment = new(startTime, 0, 0);
-        history?.Clear();
     }
 
     public void End(double endTime)
@@ -40,17 +28,7 @@ internal sealed class BmsHellChargeBodyTracker
         time = endTime;
         accumulator = 0;
         ticks = 0;
-        setSegment(new(endTime, 0, 0));
-    }
-
-    public void Rewind(double rewindTime)
-    {
-        if (!HistoryEnabled) return;
-
-        segment = history?.Rewind(rewindTime) ?? new(rewindTime, 0, 0);
-        time = rewindTime;
-        ticks = countTicks(time);
-        accumulator = valueAt(time);
+        segment = new(endTime, 0, 0);
     }
 
     internal double NextTickTime(bool holding)
@@ -104,14 +82,7 @@ internal sealed class BmsHellChargeBodyTracker
         if (segment.Direction == direction) return;
 
         ticks = 0;
-        setSegment(new(time, accumulator, direction));
-    }
-
-    private void setSegment(BmsHellChargeHistory.Segment next)
-    {
-        segment = next;
-        // Only input direction changes and the body ending are needed to reconstruct a seek.
-        if (HistoryEnabled) (history ??= new()).Add(next);
+        segment = new(time, accumulator, direction);
     }
 
     private double threshold(int index) => segment.Time + tick_interval * (index + 1) - segment.Direction * segment.Accumulator;
@@ -127,4 +98,6 @@ internal sealed class BmsHellChargeBodyTracker
     }
 
     private double valueAt(double end) => segment.Accumulator + segment.Direction * (end - segment.Time - ticks * tick_interval);
+
+    private readonly record struct Segment(double Time, double Accumulator, int Direction);
 }

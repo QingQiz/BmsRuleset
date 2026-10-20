@@ -36,9 +36,4 @@ internal sealed class BmsLandmineJudgementRule
         output.PublishState(note, state.State, eventFrame);
     }
 
-    internal void Rewind(BmsLandmineRuntime state, double time)
-    {
-        if (state.State.HandledTime > time)
-            state.State = default;
-    }
 }

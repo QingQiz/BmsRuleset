@@ -68,7 +68,10 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
     protected override void Dispose(bool isDisposing)
     {
         if (gameplayEvents != null)
+        {
             gameplayEvents.JudgementDisplayed -= showJudgement;
+            gameplayEvents.ReplaySeeked -= resetReplayDisplay;
+        }
         parentSkin.SourceChanged -= updateEmbeddedSkinFallback;
         activeSkin.DisposeEmbeddedSkins();
 
@@ -84,7 +87,16 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
         gameplayEvents = (drawableRuleset as BmsDrawableRuleset)?.GameplayEvents;
 
         if (gameplayEvents != null)
+        {
             gameplayEvents.JudgementDisplayed += showJudgement;
+            gameplayEvents.ReplaySeeked += resetReplayDisplay;
+        }
+    }
+
+    private void resetReplayDisplay()
+    {
+        pendingJudgement = null;
+        displayArea.Hide();
     }
 
     [BackgroundDependencyLoader]
@@ -136,6 +148,7 @@ public sealed partial class BmsJudgementDisplay : BmsHudComponent
             return;
 
         pendingJudgement = null;
+        displayArea.Show();
         if (!drawableCache.TryGetValue(result, out var drawable))
             return;
 

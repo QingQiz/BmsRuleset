@@ -1,3 +1,5 @@
+#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -16,7 +18,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Tests.Normal.Gameplay.Judgement;
 internal sealed class BmsLongNoteTestContext
 {
     internal BmsLongNote Note { get; }
-    internal BmsColumnJudgementRuntime Column { get; }
+    internal BmsColumnJudgementRuntime Column { get; private set; }
     internal BmsRecordingJudgementOutput Output { get; } = new();
     internal BmsLongNoteState State => Column.GetLongNoteState(Note);
     internal List<(HitResult Result, IReadOnlyList<BmsLongNoteEndpointResult> Endpoints)> MainResults { get; } = [];
@@ -30,6 +32,11 @@ internal sealed class BmsLongNoteTestContext
     internal int FinishedPublications => Publications.Count(p => !p.Frame.IsRewinding && p.State.TailJudged && !p.State.LongNoteStarted);
     private BmsLongNoteState lastState;
     private int sampleCount;
+    private readonly List<Operation> operations = [];
+    private bool replaying;
+    private double currentTime = double.NegativeInfinity;
+    internal Action? BeforeRebuild;
+    internal Action<double>? BeforeOperation;
 
     internal BmsLongNoteTestContext(BmsLongNoteMode mode, double start = 1000, double duration = 500,
                                    int column = 1, int rank = 2, BmsLayoutVariant layout = BmsLayoutVariant.Bme7K)
@@ -62,14 +69,20 @@ internal sealed class BmsLongNoteTestContext
 
     internal bool Press(double time, HitResult result, double rate = 1)
     {
+        record(time, () => Press(time, result, rate));
         Column.PressedDirections = 1;
         return Column.TryPressRegisteredNote(Note, result, new BmsPressContext(time, new BmsFrameContext(time, rate)));
     }
 
-    internal bool Repress(double time) => Column.HandleNotePress(new BmsPressContext(time, new BmsFrameContext(time, 1))) == PressOutcome.Hit;
+    internal bool Repress(double time)
+    {
+        record(time, () => Repress(time));
+        return Column.HandleNotePress(new BmsPressContext(time, new BmsFrameContext(time, 1))) == PressOutcome.Hit;
+    }
 
     internal bool Release(double inputTime, double? simulationTime = null)
     {
+        record(simulationTime ?? inputTime, () => Release(inputTime, simulationTime));
         // These rule cases specify a physical release independently of earlier input batches.
         Column.PressedDirections = 1;
         var before = sampleCount;
@@ -78,18 +91,74 @@ internal sealed class BmsLongNoteTestContext
     }
 
     internal void Frame(double time, double elapsed, bool holding)
-        => Column.UpdateRegisteredLongNote(Note, new BmsFrameContext(time, 1), elapsed, holding);
+    {
+        if (!replaying && time < currentTime)
+        {
+            Rewind(time);
+            return;
+        }
+        record(time, () => Frame(time, elapsed, holding), holding, time - elapsed);
+        Column.UpdateRegisteredLongNote(Note, new BmsFrameContext(time, 1), elapsed, holding);
+    }
 
-    internal void Passive(double time) => Column.CheckRegisteredNotePassive(Note, new BmsFrameContext(time, 1));
-    internal void End(double time) => Column.CompleteLongNotesAtEnd(new BmsFrameContext(time, 1));
+    internal void Passive(double time)
+    {
+        record(time, () => Passive(time));
+        Column.CheckRegisteredNotePassive(Note, new BmsFrameContext(time, 1));
+    }
+
+    internal void End(double time)
+    {
+        record(time, () => End(time));
+        Column.CompleteLongNotesAtEnd(new BmsFrameContext(time, 1));
+    }
 
     internal void Rewind(double time)
     {
-        Output.RevertAfter(time);
-        Output.RevertSyntheticAfter(time);
-        Column.RewindLongNotes(time);
-        Column.RestoreExecutionState(new BmsFrameContext(time, 1, true));
+        var previous = operations.ToArray();
+        operations.Clear();
+        BeforeRebuild?.Invoke();
+        Output.Reset();
+        MainResults.Clear();
+        Publications.Clear();
+        HeadPublications = sampleCount = 0;
+        lastState = default;
+        currentTime = double.NegativeInfinity;
+        Column = new BmsJudgementEngine([Note], Note.Beatmap.LayoutVariant, Note.Column, Output).GetColumn(Note.Column);
+        replaying = true;
+        try
+        {
+            foreach (var operation in previous)
+            {
+                if (operation.Time > time)
+                {
+                    if (operation.StartTime <= time && operation.Holding is { } holding)
+                    {
+                        var elapsed = time - operation.StartTime.Value;
+                        operations.Add(new Operation(time, () => Frame(time, elapsed, holding), holding, operation.StartTime));
+                        Frame(time, elapsed, holding);
+                    }
+                    break;
+                }
+                operation.Apply();
+                operations.Add(operation);
+            }
+        }
+        finally
+        {
+            replaying = false;
+            currentTime = time;
+        }
     }
+
+    private void record(double time, Action apply, bool? holding = null, double? startTime = null)
+    {
+        BeforeOperation?.Invoke(time);
+        currentTime = time;
+        if (!replaying) operations.Add(new Operation(time, apply, holding, startTime));
+    }
+
+    private sealed record Operation(double Time, Action Apply, bool? Holding, double? StartTime);
 
     internal BmsLongNotePresentation Presentation(bool held = false, double time = 0)
         => BmsLongNotePresentation.SelectMapping(Note.Beatmap.LockedLongNoteMode)(Note, State, new BmsLongNotePresentationContext(time, held));

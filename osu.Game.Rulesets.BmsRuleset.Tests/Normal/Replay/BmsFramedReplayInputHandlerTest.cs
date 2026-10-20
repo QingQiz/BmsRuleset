@@ -134,7 +134,7 @@ public class BmsFramedReplayInputHandlerTest
     }
 
     [Test]
-    public void BackwardSeekDoesNotConsumeSameTimestampFrames()
+    public void BackwardSeekRestoresTheFinalInputAtTheDestination()
     {
         var replay = new osu.Game.Replays.Replay
         {
@@ -147,7 +147,7 @@ public class BmsFramedReplayInputHandlerTest
         handler.CollectPendingInputs([]);
         Assert.That(handler.SetFrameFromTime(1000), Is.EqualTo(1000));
         handler.CollectPendingInputs([]);
-        Assert.That(handler.SetFrameFromTime(500), Is.EqualTo(1000));
+        Assert.That(handler.SetFrameFromTime(500), Is.EqualTo(500));
 
         var inputs = new List<IInput>();
         handler.CollectPendingInputs(inputs);
@@ -155,6 +155,148 @@ public class BmsFramedReplayInputHandlerTest
         Assert.That(inputs.OfType<ReplayState<BmsAction>>().Select(state => state.PressedActions.Count), Is.EqualTo(new[] { 0 }));
         Assert.That(handler.CurrentFrame!.Actions, Is.Empty);
         Assert.That(handler.NextFrame!.Time, Is.EqualTo(1000));
+    }
+
+    [Test]
+    public void RebuildUsesTheFinalTargetAndRestoresTheLastEqualTimeInput()
+    {
+        var replay = new osu.Game.Replays.Replay
+        {
+            HasReceivedAllFrames = true,
+            Frames = [new BmsReplayFrame(0), new BmsReplayFrame(1000, BmsAction.Key1), new BmsReplayFrame(1000),
+                new BmsReplayFrame(1000, BmsAction.Key2), new BmsReplayFrame(2000)],
+        };
+        using var handler = new BmsFramedReplayInputHandler(replay) { FrameAccuratePlayback = true };
+        while (handler.SetFrameFromTime(2000) != 2000)
+            handler.CollectPendingInputs([]);
+        handler.CollectPendingInputs([]);
+
+        var rebuilds = new List<double>();
+        var inputApplied = false;
+        handler.ConfigureSeeking(() => 1000, time => { rebuilds.Add(time); return true; }, () => inputApplied = true);
+        Assert.That(handler.SetFrameFromTime(1983), Is.EqualTo(1000));
+        var inputs = new List<IInput>();
+        handler.CollectPendingInputs(inputs);
+        Assert.That(rebuilds, Is.EqualTo(new[] { 1000d }));
+        Assert.That(inputs.OfType<ReplayState<BmsAction>>().Single().PressedActions, Is.EqualTo(new[] { BmsAction.Key2 }));
+        Assert.That(handler.NextFrame!.Time, Is.EqualTo(2000));
+        Assert.That(handler.FrameAccuratePlayback, Is.True);
+
+        foreach (var input in inputs)
+            input.Apply(new RulesetInputManagerInputState<BmsAction>(new InputState()), new InputReceiver());
+        Assert.That(inputApplied, Is.True);
+    }
+
+    [TestCase(16)]
+    [TestCase(1000)]
+    [TestCase(1500)]
+    [TestCase(2500)]
+    public void RequestedForwardSeekUsesOneFinalInput(double target)
+    {
+        var replay = new osu.Game.Replays.Replay
+        {
+            Frames = [new BmsReplayFrame(0), new BmsReplayFrame(1000, BmsAction.Key1), new BmsReplayFrame(1000),
+                new BmsReplayFrame(1000, BmsAction.Key2), new BmsReplayFrame(2000)],
+        };
+        var stops = new List<double>();
+        using var handler = new BmsFramedReplayInputHandler(replay, stops.Add) { FrameAccuratePlayback = true };
+        handler.SetFrameFromTime(0);
+        handler.CollectPendingInputs([]);
+        var seeks = new List<double>();
+        var applied = 0;
+        handler.ConfigureSeeking(() => target, time => { seeks.Add(time); return true; }, () => applied++);
+        handler.RequestSeek();
+
+        Assert.That(handler.SetFrameFromTime(16), Is.EqualTo(target));
+        var inputs = new List<IInput>();
+        handler.CollectPendingInputs(inputs);
+        Assert.That(inputs.OfType<ReplayState<BmsAction>>().Single().PressedActions,
+            Is.EqualTo(target >= 1000 && target < 2000 ? new[] { BmsAction.Key2 } : Array.Empty<BmsAction>()));
+        var state = new RulesetInputManagerInputState<BmsAction>(new InputState());
+        foreach (var input in inputs) input.Apply(state, new InputReceiver());
+        Assert.That(seeks, Is.EqualTo(new[] { target }));
+        Assert.That(applied, Is.EqualTo(1));
+        Assert.That(stops, Is.Empty, "The silent simulation already settles terminal holds.");
+        Assert.That(handler.FrameAccuratePlayback, Is.True);
+
+        Assert.That(handler.SetFrameFromTime(target), Is.EqualTo(target));
+        handler.CollectPendingInputs([]);
+        Assert.That(seeks, Has.Count.EqualTo(1), "A seek request is consumed once.");
+    }
+
+    [Test]
+    public void OrdinaryPlaybackKeepsFrameStepping()
+    {
+        using var handler = new BmsFramedReplayInputHandler(new osu.Game.Replays.Replay
+        {
+            Frames = [new BmsReplayFrame(0), new BmsReplayFrame(1000, BmsAction.Key1), new BmsReplayFrame(2000)],
+        });
+        handler.SetFrameFromTime(0);
+        handler.CollectPendingInputs([]);
+        var seeks = 0;
+        handler.ConfigureSeeking(() => 2000, _ => { seeks++; return true; }, () => { });
+
+        Assert.That(handler.SetFrameFromTime(16), Is.EqualTo(16));
+        Assert.That(seeks, Is.Zero);
+    }
+
+    [Test]
+    public void StreamingSeekWaitsForKnownInputAndResumesAsFramesArrive()
+    {
+        var replay = new osu.Game.Replays.Replay { HasReceivedAllFrames = false };
+        using var handler = new BmsFramedReplayInputHandler(replay) { FrameAccuratePlayback = true };
+        var seeks = new List<double>();
+        var target = 2500d;
+        handler.ConfigureSeeking(() => target, time => { seeks.Add(time); return true; }, () => { });
+        handler.RequestSeek();
+        Assert.That(handler.SetFrameFromTime(16), Is.Null);
+        Assert.That(seeks, Is.Empty);
+
+        replay.Frames.Add(new BmsReplayFrame(1000, BmsAction.Key1));
+        Assert.That(handler.SetFrameFromTime(16), Is.EqualTo(1000));
+        handler.CollectPendingInputs([]);
+        Assert.That(handler.WaitingForFrame, Is.True);
+        Assert.That(handler.SetFrameFromTime(1016), Is.Null);
+        Assert.That(seeks, Has.Count.EqualTo(1));
+
+        replay.Frames.Add(new BmsReplayFrame(1000, BmsAction.Key2));
+        Assert.That(handler.SetFrameFromTime(1016), Is.EqualTo(1000));
+        var inputs = new List<IInput>();
+        handler.CollectPendingInputs(inputs);
+        Assert.That(inputs.OfType<ReplayState<BmsAction>>().Single().PressedActions, Is.EqualTo(new[] { BmsAction.Key2 }));
+
+        replay.Frames.Add(new BmsReplayFrame(2000));
+        Assert.That(handler.SetFrameFromTime(1016), Is.EqualTo(2000));
+        handler.CollectPendingInputs([]);
+        target = 500;
+        handler.RequestSeek();
+        Assert.That(handler.SetFrameFromTime(1984), Is.EqualTo(500));
+        handler.CollectPendingInputs([]);
+        Assert.That(handler.CurrentFrame, Is.Null);
+
+        target = 2500;
+        replay.HasReceivedAllFrames = true;
+        handler.RequestSeek();
+        Assert.That(handler.SetFrameFromTime(516), Is.EqualTo(2500));
+        Assert.That(seeks, Is.EqualTo(new[] { 1000d, 1000, 2000, 500, 2500 }));
+    }
+
+    [Test]
+    public void OrdinaryStreamingWaitsEvenWhenTheReferenceClockIsClamped()
+    {
+        var replay = new osu.Game.Replays.Replay
+        {
+            HasReceivedAllFrames = false,
+            Frames = [new BmsReplayFrame(1000, BmsAction.Key1)],
+        };
+        using var handler = new BmsFramedReplayInputHandler(replay);
+        handler.ConfigureSeeking(() => 2000, _ => throw new InvalidOperationException("Ordinary playback must not seek."), () => { });
+        Assert.That(handler.SetFrameFromTime(1000), Is.EqualTo(1000));
+        handler.CollectPendingInputs([]);
+        Assert.That(handler.SetFrameFromTime(1000), Is.Null);
+        replay.Frames.Add(new BmsReplayFrame(1500));
+        Assert.That(handler.SetFrameFromTime(1016), Is.EqualTo(1016));
+        Assert.That(handler.WaitingForFrame, Is.False);
     }
 
     private sealed class InputReceiver : IInputStateChangeHandler

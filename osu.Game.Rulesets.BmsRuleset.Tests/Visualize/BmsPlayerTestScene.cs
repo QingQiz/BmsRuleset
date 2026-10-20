@@ -2,6 +2,7 @@
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Graphics.Rendering;
@@ -9,6 +10,7 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Game.Database;
+using osu.Game.Beatmaps;
 using osu.Game.IO;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Configuration;
@@ -37,6 +39,30 @@ public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageReso
     /// The currently-loaded <see cref="BmsPlayfield"/>. Must be called after the player is loaded.
     /// </summary>
     protected BmsPlayfield Playfield => (BmsPlayfield)Player.DrawableRuleset.Playfield;
+
+    // Presentation tests need ordinary replay frames rather than silent explicit jumps.
+    protected void SeekReplayInFrames(double time)
+    {
+        Player.GameplayClockContainer.Stop();
+        var updates = 0;
+        do
+        {
+            var target = Math.Min(time, Player.DrawableRuleset.FrameStableClock.CurrentTime + 16);
+            if (target < Player.DrawableRuleset.FrameStableClock.CurrentTime)
+                Player.GameplayClockContainer.Seek(target);
+            else
+                AdvanceReplayClock(target);
+            Player.DrawableRuleset.UpdateSubTree();
+            if (++updates > 100000)
+                throw new InvalidOperationException("Replay did not reach the requested time.");
+        } while (Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) > .001);
+    }
+
+    protected void AdvanceReplayClock(double time) => gameplayClock(Player.GameplayClockContainer).Seek(time);
+
+    // Advancing the underlying test clock preserves ordinary playback without raising an explicit seek.
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "GameplayClock")]
+    private static extern ref FramedBeatmapClock gameplayClock(GameplayClockContainer container);
 
     // Fixed-plan execution scenes supply numerical contexts; input-generation scenes use actual input events.
     private protected PressOutcome PressColumn(IBmsColumn column, double inputTime, bool reverseScratch = false)

@@ -77,7 +77,7 @@ public class BmsLongNoteExecutionTest
         var column = new BmsJudgementEngine(notes, beatmap.LayoutVariant, 1, new BmsRecordingJudgementOutput()).GetColumn(1);
         var holds = BmsJudgementStateInspection.GetHolds(column);
         Assert.That((Array)typeof(BmsHoldRegistry).GetField("bindingIndices", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(holds)!, Is.Empty);
-        Assert.DoesNotThrow(() => column.RewindLongNotes(0));
+        Assert.That(column.GetPendingLongNoteTails(), Is.Empty);
     }
 
     [Test]
@@ -99,35 +99,6 @@ public class BmsLongNoteExecutionTest
         Assert.That(column.GetLongNoteState((BmsLongNote)notes[100]).HeadJudged, Is.False);
     }
 
-    [Test]
-    public void SameApplicationTimeRevertsInReverseSubmissionOrder()
-    {
-        var (context, output, notes) = create(2);
-        foreach (var note in notes.OfType<BmsLongNote>())
-            context.TryPressRegisteredNote(note, HitResult.Perfect, new BmsPressContext(3000, new BmsFrameContext(3000, 1)));
-        foreach (var note in notes.OfType<BmsLongNote>())
-            context.CheckRegisteredNotePassive(note, new BmsFrameContext(5000, .75));
-        var reverted = new List<BmsHitObject>();
-        output.Reverting = note =>
-        {
-            reverted.Add(note);
-            Assert.That(output.GetMainResult(note).HasResult, Is.True);
-            Assert.That(output.GetRawTime(note), Is.EqualTo(5000));
-        };
-        output.AfterReset = note =>
-        {
-            Assert.That(output.GetMainResult(note).HasResult, Is.False);
-            Assert.That(output.GetRawTime(note), Is.Null);
-            Assert.That(output.GetMainResult(note).GameplayRate, Is.EqualTo(.75));
-            Assert.That(output.GetEndpoints((BmsLongNote)note), Has.Count.EqualTo(2));
-        };
-        output.RevertAfter(5000);
-        Assert.That(reverted, Is.Empty);
-        output.RevertAfter(4999);
-        Assert.That(reverted, Is.EqualTo(new[] { notes[1], notes[0] }));
-        output.RevertAfter(4998);
-        Assert.That(reverted, Has.Count.EqualTo(2));
-    }
 
     [TestCase((BmsLongNoteMode)999)]
     public void UncoveredModesFailAtComposition(BmsLongNoteMode mode)

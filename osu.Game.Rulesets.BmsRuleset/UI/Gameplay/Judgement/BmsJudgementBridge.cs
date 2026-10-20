@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
@@ -28,7 +29,32 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLongNoteStateObserver Observer)> presentationObservers = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<DrawableBmsHitObject, (long Generation, BmsLandmineStateObserver Observer)> landmineObservers = new(ReferenceEqualityComparer.Instance);
     private Action<BmsHitObject> resultCheckpoint = null!;
-    private Action<BmsHitObject, double> resultHistoryCheckpoint = null!;
+    private Action<BmsHitObject> resultStateCheckpoint = null!;
+    private Dictionary<BmsHitObject, BmsHitObjectLifetimeEntry>? replayEntries;
+
+    internal void PrepareReplayResults()
+    {
+        replayEntries ??= container.Entries.OfType<BmsHitObjectLifetimeEntry>()
+            .ToDictionary(entry => (BmsHitObject)entry.HitObject, (IEqualityComparer<BmsHitObject>)ReferenceEqualityComparer.Instance);
+    }
+
+    internal void ResetReplayResults()
+    {
+        // Rebuilt results replace the stack atomically; emitting undo notifications would
+        // apply stale deltas to the freshly reset processors.
+        judgedEntries(column).Clear();
+        PrepareReplayResults();
+        results.Clear();
+        foreach (var (note, entry) in replayEntries!)
+        {
+            entry.ResetReplayResult();
+            if (entry.ReplayResult is { } result)
+                results[note] = result;
+        }
+    }
+
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "judgedEntries")]
+    private static extern ref Stack<HitObjectLifetimeEntry> judgedEntries(Playfield playfield);
 
     internal BmsJudgementBridge(BmsPlayfield playfield, BmsColumn column)
     {
@@ -126,9 +152,9 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         return new BmsMainResultState(result.Type, result.EventTime, result.EventTime - note.GetEndTime(), result.GameplayRate, result.SuppressPenalty);
     }
 
-    public void SetResultCheckpoints(Action<BmsHitObject, double> recordHistory, Action<BmsHitObject> refreshIndexes)
+    public void SetResultCheckpoints(Action<BmsHitObject> recordState, Action<BmsHitObject> refreshIndexes)
     {
-        resultHistoryCheckpoint = recordHistory;
+        resultStateCheckpoint = recordState;
         resultCheckpoint = refreshIndexes;
     }
 
@@ -139,7 +165,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
         // The column notification precedes the bound result callback; retain both observation boundaries.
         // An earlier observer may have returned the drawable to its pool, so the result owns the identity.
-        resultHistoryCheckpoint(note, ((BmsJudgementResult)result).EventTime);
+        resultStateCheckpoint(note);
         if (BmsColumn.ShouldTriggerHitExplosion(result.Type))
             column.TriggerHitExplosion(note is BmsLongNote ? BmsHitLightStyle.Hold : BmsHitLightStyle.Note);
     }
@@ -150,6 +176,24 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
     private void applyMainResult(BmsHitObject note, HitResult result, in BmsFrameContext frame, bool suppressPenalty,
                                  IReadOnlyList<BmsLongNoteEndpointResult>? endpoints = null)
     {
+        if (playfield.IsRebuildingReplay)
+        {
+            var entry = replayEntries![note];
+            var rebuilt = entry.GetReplayResult();
+            results[note] = rebuilt;
+            if (endpoints != null)
+                ((BmsLongNoteJudgementResult)rebuilt).SetEndpointResults(endpoints);
+            rebuilt.Type = result;
+            rebuilt.SuppressPenalty = suppressPenalty;
+            rebuilt.SetTiming(frame.SimulationTime, frame.GameplayRate);
+            playfield.ApplyRebuiltResult(rebuilt);
+            resultStateCheckpoint(note);
+            resultCheckpoint(note);
+            if (note is not BmsLongNote)
+                entry.LifetimeEnd = frame.SimulationTime;
+            return;
+        }
+
         var drawable = representations.TryGetValue(note, out var binding) && isCurrent(binding)
             ? binding.Drawable
             : note is BmsLandmine mine && landmineRepresentations.TryGetValue(mine, out var mineDrawable)
@@ -203,6 +247,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
     public void PublishState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
     {
+        if (playfield.IsRebuildingReplay) return;
         if (!representations.TryGetValue(note, out var binding) || !isCurrent(binding)) return;
 
         var drawable = binding.Drawable;
@@ -217,6 +262,7 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
 
     public void PublishState(BmsLandmine note, in BmsLandmineState state, in BmsFrameContext frame)
     {
+        if (playfield.IsRebuildingReplay) return;
         if (!landmineRepresentations.TryGetValue(note, out var drawable)
             || !ReferenceEquals(drawable.HitObject, note))
             return;
@@ -233,13 +279,25 @@ internal sealed partial class BmsJudgementBridge : IBmsJudgementOutput
         playfield.RegisterNonConsumingBad(note.StartTime, note.Column, frame.SimulationTime);
     }
 
-    public void PlaySample(BmsHitObject note) => column.PlaySample(note.SampleKey, note.SampleVolume);
+    public void PlaySample(BmsHitObject note)
+    {
+        if (!playfield.IsRebuildingReplay) column.PlaySample(note.SampleKey, note.SampleVolume);
+    }
 
-    public void PlayTailSample(BmsLongNote note) => column.PlaySample(note.TailSampleKey, note.TailSampleVolume);
+    public void PlayTailSample(BmsLongNote note)
+    {
+        if (!playfield.IsRebuildingReplay) column.PlaySample(note.TailSampleKey, note.TailSampleVolume);
+    }
 
-    public void PlayKeySound() => column.PlayKeySound();
+    public void PlayKeySound()
+    {
+        if (!playfield.IsRebuildingReplay) column.PlayKeySound();
+    }
 
     public void ApplyEmptyPoor(double expectedTime, int columnIndex, in BmsFrameContext frame) => playfield.RegisterEmptyPoor(expectedTime, columnIndex, frame.SimulationTime);
 
-    public void PlayLandmineSample(BmsLandmine note) => column.DetonateLandmine(note);
+    public void PlayLandmineSample(BmsLandmine note)
+    {
+        if (!playfield.IsRebuildingReplay) column.DetonateLandmine(note);
+    }
 }

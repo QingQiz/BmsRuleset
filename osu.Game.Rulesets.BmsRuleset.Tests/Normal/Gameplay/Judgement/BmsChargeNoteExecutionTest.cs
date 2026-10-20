@@ -106,10 +106,6 @@ public class BmsChargeNoteExecutionTest
         Assert.That(output.SyntheticEndpoints.Single().ApplicationTime, Is.EqualTo(3990));
         Assert.That(output.SyntheticApplicationTimes.Single(), Is.EqualTo(3997));
         Assert.That(context.GetPendingLongNoteTails(), Is.Empty);
-        output.RevertSyntheticAfter(3997);
-        Assert.That(output.SyntheticEndpoints, Has.Count.EqualTo(1));
-        output.RevertSyntheticAfter(3996);
-        Assert.That(output.SyntheticEndpoints, Is.Empty);
         Assert.That(output.GetMainResult(note).HasResult, Is.True);
     }
 

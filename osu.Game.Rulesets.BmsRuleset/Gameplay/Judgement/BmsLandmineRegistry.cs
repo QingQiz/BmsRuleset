@@ -32,9 +32,4 @@ internal sealed class BmsLandmineRegistry
             rule.CheckPassing(state, output, frame, holding);
     }
 
-    internal void RewindLandmines(double time)
-    {
-        foreach (var state in landmineStates.Values)
-            rule.Rewind(state, time);
-    }
 }

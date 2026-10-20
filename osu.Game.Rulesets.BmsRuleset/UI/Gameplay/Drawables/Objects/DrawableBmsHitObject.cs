@@ -116,8 +116,14 @@ public abstract partial class DrawableBmsHitObject : DrawableHitObject<BmsHitObj
 
     protected virtual bool SkipFurtherUpdates => false;
 
-    internal virtual void RestoreRewoundVisuals()
+    internal virtual void SynchronisePresentation()
     {
+    }
+
+    internal void SynchroniseReplayState()
+    {
+        SynchronisePresentation();
+        UpdateState(Result.IsHit ? ArmedState.Hit : Result.HasResult ? ArmedState.Miss : ArmedState.Idle, true);
     }
 
     protected BmsLayoutVariant LayoutVariant => ParentColumn?.LayoutVariant ?? HitObject?.Beatmap.LayoutVariant ?? BmsLayoutVariant.Bme7K;

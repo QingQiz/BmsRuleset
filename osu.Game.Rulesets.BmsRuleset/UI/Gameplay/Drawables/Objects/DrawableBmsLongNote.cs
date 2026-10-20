@@ -284,7 +284,7 @@ public sealed partial class DrawableBmsLongNote<TCol> : DrawableBmsHitObject<TCo
         Visuals.Add(head = new BmsNoteVisual(BmsSkinComponents.HoldNoteHead, LayoutVariant, Column));
     }
 
-    internal override void RestoreRewoundVisuals()
+    internal override void SynchronisePresentation()
     {
         lastVisualObservation = null;
         visualState.Reset();

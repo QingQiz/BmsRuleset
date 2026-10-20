@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 /// </summary>
 internal sealed class BmsColumnJudgementRuntime
 {
-    private readonly BmsNotePressHistory pressHistory = new();
+    private readonly BmsNotePressState pressState = new();
     private readonly BmsHitObject[] columnNotes;
     private readonly Dictionary<BmsHitObject, int> noteSlots = new(ReferenceEqualityComparer.Instance);
     private readonly IBmsJudgementOutput noteOutput;
@@ -38,22 +38,18 @@ internal sealed class BmsColumnJudgementRuntime
 
     internal BmsColumnNoteIndex Notes { get; }
 
-    internal BmsCoreJudgementSchedule Schedule { get; }
-
     internal BmsNoteRegistration[] NoteRegistrations { get; }
 
     internal BmsNoteJudgementWindows[] NoteWindows { get; }
 
     internal void ApplyEmptyPoor(double expectedTime, in BmsFrameContext frame) => noteOutput.ApplyEmptyPoor(expectedTime, Index, frame);
 
-    internal bool HasPmsMistake(BmsHitObject note) => BmsJudgementProfileProvider.IsPms(LayoutVariant) && pressHistory.Get(note).Mistake;
+    internal bool HasPmsMistake(BmsHitObject note) => BmsJudgementProfileProvider.IsPms(LayoutVariant) && pressState.Get(note).Mistake;
 
     internal bool IsKeySoundFinished(BmsHitObject note, double time)
         => noteSlots.ContainsKey(note) ? GetNoteResult(note).HasResult : time > note.StartTime;
 
-    internal void RecordResult(BmsHitObject note, double time) => pressHistory.Record(note, time, true);
-
-    internal void RewindPressHistory(double time) => pressHistory.Rewind(time);
+    internal void RecordResult(BmsHitObject note) => pressState.Record(note, true);
 
     internal void PublishExecutionState(BmsLongNote note, in BmsLongNoteState state, in BmsFrameContext frame)
     {
@@ -65,11 +61,6 @@ internal sealed class BmsColumnJudgementRuntime
     {
         foreach (var note in GetHoldingNotes().ToArray())
             holds.CompleteAtEnd(noteSlots[note], frame);
-    }
-
-    internal void RewindLongNotes(double time)
-    {
-        holds.Rewind(time);
     }
 
     internal int PressedDirections { get; set; }
@@ -85,7 +76,6 @@ internal sealed class BmsColumnJudgementRuntime
         for (var i = 0; i < chartObjects.Length; i++) chartOrders.Add(chartObjects[i], i);
         columnNotes = notes.Where(n => n.Column == column && n is BmsNote or BmsLongNote).OrderBy(n => n.StartTime).ToArray();
         landmines = new BmsLandmineRegistry(notes, column, rules.Landmine, output);
-        Schedule = new BmsCoreJudgementSchedule(this);
         noteOutput = output;
         var binding = new BmsNoteOperationBinding(this, output);
         NoteRegistrations = new BmsNoteRegistration[columnNotes.Length];
@@ -167,7 +157,7 @@ internal sealed class BmsColumnJudgementRuntime
         refreshAutomaticEvent(note);
     }
 
-    internal void RefreshNoteConfiguration(BmsHitObject note, bool preserveHistory = true)
+    internal void RefreshNoteConfiguration(BmsHitObject note)
     {
         if (!noteSlots.TryGetValue(note, out var slot))
         {
@@ -175,20 +165,11 @@ internal sealed class BmsColumnJudgementRuntime
             return;
         }
 
-        if (note is BmsLongNote) holds.Configure(slot, preserveHistory);
+        if (note is BmsLongNote) holds.Configure(slot);
         else NoteWindows[slot] = new BmsNoteJudgementWindows(note);
         RefreshNoteTiming(note);
         Notes.Refresh(note);
         refreshAutomaticEvent(note);
-    }
-
-    internal void RestoreExecutionState(in BmsFrameContext frame)
-    {
-        foreach (var note in columnNotes)
-            if (note is BmsLongNote hold)
-                noteOutput.PublishState(hold, holds.GetState(noteSlots[note]), frame);
-        Notes.Rebuild();
-        foreach (var note in chartObjects) refreshAutomaticEvent(note);
     }
 
     internal bool TryPressRegisteredNote(BmsHitObject note, HitResult result, in BmsPressContext press)
@@ -230,7 +211,7 @@ internal sealed class BmsColumnJudgementRuntime
             var note = NoteRegistrations[search.Slot].Object;
             if (selection.Result == HitResult.Ok && BmsJudgementProfileProvider.IsPms(LayoutVariant))
             {
-                pressHistory.Record(note, press.InputTime, false, true);
+                pressState.Record(note, false, true);
                 noteOutput.ApplyNonConsumingBad(note, press.Frame);
                 noteOutput.PlaySample(note);
                 return PressOutcome.Hit;
@@ -238,7 +219,7 @@ internal sealed class BmsColumnJudgementRuntime
 
             if (TryPressRegisteredNote(note, selection.Result, press))
             {
-                pressHistory.Record(note, press.InputTime, true);
+                pressState.Record(note, true);
                 noteOutput.PlaySample(note);
                 return PressOutcome.Hit;
             }
@@ -253,8 +234,8 @@ internal sealed class BmsColumnJudgementRuntime
                 var note = columnNotes[i];
                 if (!IsNoteCandidate(note)) continue;
                 var candidate = new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), Index, note.EffectiveJudgementRate,
-                    note is BmsLongNote, note is BmsLongNote hold && GetLongNoteState(hold).HeadJudged, pressHistory.Get(note).Mistake);
-                if (candidate == emptyPoor) pressHistory.Record(note, press.InputTime, false, true);
+                    note is BmsLongNote, note is BmsLongNote hold && GetLongNoteState(hold).HeadJudged, pressState.Get(note).Mistake);
+                if (candidate == emptyPoor) pressState.Record(note, false, true);
             }
             return PressOutcome.ForEmptyPoor(emptyPoor.StartTime, emptyPoor.Column);
         }
@@ -278,7 +259,7 @@ internal sealed class BmsColumnJudgementRuntime
         if (firstHead is { } first && first.StartTime >= inputTime - 500 && IsNoteCandidate(first))
         {
             var candidate = new BmsJudgementCandidate(first.StartTime, first.GetEndTime(), Index, first.EffectiveJudgementRate,
-                first is BmsLongNote, HasMistake: pressHistory.Get(first).Mistake);
+                first is BmsLongNote, HasMistake: pressState.Get(first).Mistake);
             if (!search.Consider(candidate, noteSlots[first]) && search.Selection.Result != HitResult.None)
                 return search;
         }
@@ -317,7 +298,7 @@ internal sealed class BmsColumnJudgementRuntime
             {
                 var note = columnNotes[i];
                 var slot = noteSlots[note];
-                var history = pressHistory.Get(note);
+                var history = pressState.Get(note);
                 var completed = includeHistory && noteOutput.GetMainResult(note).HasResult;
                 if (completed && !history.Judged) continue;
                 var candidate = new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), Index, note.EffectiveJudgementRate,
@@ -340,7 +321,7 @@ internal sealed class BmsColumnJudgementRuntime
             var note = columnNotes[i];
             var slot = noteSlots[note];
             var candidate = new BmsJudgementCandidate(note.StartTime, note.GetEndTime(), Index, note.EffectiveJudgementRate,
-                note is BmsLongNote, HasMistake: pressHistory.Get(note).Mistake);
+                note is BmsLongNote, HasMistake: pressState.Get(note).Mistake);
             if (!search.Consider(candidate, slot)) break;
         }
 
@@ -418,12 +399,6 @@ internal sealed class BmsColumnJudgementRuntime
     internal BmsLandmineState GetLandmineState(BmsLandmine note) => landmines.GetLandmineState(note);
 
     internal void UpdateLandmines(in BmsFrameContext frame, bool holding) => landmines.UpdateLandmines(frame, holding);
-
-    internal void RewindLandmines(double time)
-    {
-        landmines.RewindLandmines(time);
-        foreach (var mine in chartObjects.OfType<BmsLandmine>()) refreshAutomaticEvent(mine);
-    }
 
     internal double NextAutomaticTime => nextAutomaticEvent.Time;
 

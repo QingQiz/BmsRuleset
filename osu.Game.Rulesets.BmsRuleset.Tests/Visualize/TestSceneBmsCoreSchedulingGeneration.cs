@@ -198,7 +198,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
 
     [TestCase(false)]
     [TestCase(true)]
-    public void OrdinaryReplayUsesFrameStabilityCatchupAndRewind(bool mixedStages)
+    public void OrdinaryReplayUsesFrameStabilityAndRebuildsOnRewind(bool mixedStages)
     {
         load(true, mixedStages);
         AddStep("record actual replay catchup and rewind synchronously", () =>
@@ -207,7 +207,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             using var budget = new ScopedMethodProbe(typeof(FrameStabilityContainer).GetMethod("updateClock", instance)!,
                 typeof(TestSceneBmsCoreSchedulingGeneration).GetMethod(nameof(fixWallClockBudget), BindingFlags.Static | BindingFlags.NonPublic)!);
             startRecording();
-            Player.GameplayClockContainer.Seek(4003);
+            AdvanceReplayClock(4003);
             Player.DrawableRuleset.UpdateSubTree();
             Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(4003).Within(.001));
             Assert.That(inputManager.ReplayInputHandler, Is.InstanceOf<BmsFramedReplayInputHandler>());
@@ -223,7 +223,8 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
             Player.DrawableRuleset.UpdateSubTree();
             Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(2998).Within(.001));
             recorder!.Recording = false;
-            Assert.That(recorder.Rows.Any(r => r.Contains("/result.externalRevert=")), Is.True);
+            Assert.That(recorder.Rows.Any(r => r.Contains("/result.externalRevert=")), Is.False);
+            Assert.That(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents, Is.Empty);
             finish($"replay-{mixedStages}");
             stopRecording();
             budgetHost = null;
@@ -234,7 +235,7 @@ public partial class TestSceneBmsCoreSchedulingGeneration : BmsPlayerTestScene
     public void OrdinaryReplayWithRealWallClockBudgetPreservesEffects()
     {
         load(true, false);
-        AddStep("observe unmodified catch-up budget", () => { startRecording(); Player.GameplayClockContainer.Seek(4003); });
+        AddStep("observe unmodified catch-up budget", () => { startRecording(); AdvanceReplayClock(4003); });
         AddUntilStep("replay reached target", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 4003) < .001);
         AddStep("compare full ordinary replay effects", () =>
         {

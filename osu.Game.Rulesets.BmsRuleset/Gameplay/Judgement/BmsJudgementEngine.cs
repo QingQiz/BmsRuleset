@@ -29,8 +29,6 @@ internal sealed class BmsJudgementEngine
     private readonly BmsColumnJudgementRuntime[] bodyColumns;
     private readonly BmsColumnJudgementRuntime[] columnsByIndex;
     private readonly List<BmsJudgementInput> pendingInputs = [];
-    private long scheduleEpoch;
-    private long scheduleStep;
     private double scheduleTime = double.NaN;
     private bool processing;
 
@@ -72,6 +70,8 @@ internal sealed class BmsJudgementEngine
 
     internal bool HasPendingInputs => pendingInputs.Count > 0;
 
+    internal double CurrentTime => scheduleTime;
+
     internal double NextEventTime
     {
         get
@@ -109,18 +109,7 @@ internal sealed class BmsJudgementEngine
         var inputCount = pendingInputs.Count;
         try
         {
-            if (frame.SimulationTime != scheduleTime)
-            {
-                if (frame.SimulationTime < scheduleTime)
-                    scheduleEpoch++;
-                scheduleTime = frame.SimulationTime;
-                scheduleStep++;
-            }
-
-            foreach (var column in columns)
-            {
-                column.Schedule.BeginStep(scheduleEpoch, scheduleStep);
-            }
+            scheduleTime = frame.SimulationTime;
 
             if (frame.IsRewinding || elapsed < 0)
             {

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps;
@@ -44,15 +43,25 @@ public partial class BmsHealthProcessor : HealthProcessor
 
     internal BmsGaugeProfileFamily? ConfiguredProfileFamily { get; private set; }
 
+    private IReadOnlyList<BmsGaugeStateSnapshot>? replayInitialStates;
+    private bool replayInitialGaugeHistory;
+
+    internal void ResetReplayState()
+    {
+        // Course stages and configurable initial health need the original seed, not profile defaults.
+        ensureInitialized();
+        syncActiveStateFromHealth();
+        replayInitialStates ??= initialGaugeStates ?? CurrentGaugeStates;
+        Reset(false);
+        RestoreGaugeStates(replayInitialStates);
+        initialGaugeStates = replayInitialStates;
+        if (replayInitialGaugeHistory)
+            recordGaugeHistory(0);
+    }
+
     private readonly List<GaugeState> gaugeStates = [];
     private readonly GaugeHistoryBuffer gaugeHistory = new();
     private IReadOnlyList<BmsGaugeStateSnapshot>? initialGaugeStates;
-
-    // The framework only restores this flag from a drawable result. Body ticks and Empty POORs
-    // have no such result, so restore the flag together with our gauge snapshots on a seek.
-    private static readonly Action<HealthProcessor, bool> set_failed = typeof(HealthProcessor)
-        .GetProperty(nameof(HasFailed), BindingFlags.Instance | BindingFlags.Public)!
-        .GetSetMethod(true)!.CreateDelegate<Action<HealthProcessor, bool>>();
 
     private int activeGaugeIndex;
     private int endResultIndex;
@@ -205,6 +214,8 @@ public partial class BmsHealthProcessor : HealthProcessor
         if (newStates.Count == 0)
             return;
 
+        replayInitialStates = null;
+        replayInitialGaugeHistory = initialStates?.Count > 0;
         gaugeStates.AddRange(newStates);
         gaugeStates.Sort((a, b) => ((int)b.GaugeType).CompareTo((int)a.GaugeType));
 
@@ -298,29 +309,11 @@ public partial class BmsHealthProcessor : HealthProcessor
             : result is BmsJudgementResult bms
                 ? bms.EventTime
                 : result.TimeAbsolute;
-        // Engine results have already resolved their logical application time; display delivery
-        // must not move the rewind boundary when one update catches up several events.
-        recordGaugeHistory(applicationTime, result is BmsJudgementResult ? applicationTime : Clock?.CurrentTime ?? applicationTime);
+        recordGaugeHistory(applicationTime);
     }
 
     // Gauge layers deplete at exact zero; the framework's epsilon can fail AG before its active layer is replaced.
     protected override bool CheckDefaultFailCondition(JudgementResult result) => Health.Value <= 0;
-
-    internal void Rewind(double time)
-    {
-        // Column result stacks revert independently. Restore all gauge layers after those stacks,
-        // using application time rather than an LN's expected endpoint or clamped judgement time.
-        var failure = gaugeHistory.Rewind(time);
-
-        var states = gaugeHistory.Count > 0 ? gaugeHistory[^1].States : initialGaugeStates;
-        if (states == null)
-            return;
-
-        RestoreGaugeStates(states);
-        HasEverFailed = failure.EverFailed;
-        set_failed(this, failure.Failed);
-        endResultIndex = activeGaugeIndex;
-    }
 
     private void captureInitialGaugeStates() => initialGaugeStates ??= CurrentGaugeStates;
 
@@ -473,7 +466,7 @@ public partial class BmsHealthProcessor : HealthProcessor
         Health.Value = active.CurrentHp;
     }
 
-    private void recordGaugeHistory(double eventTime, double? applicationTime = null)
+    private void recordGaugeHistory(double eventTime)
     {
         if (gaugeStates.Count == 0)
             return;
@@ -482,7 +475,7 @@ public partial class BmsHealthProcessor : HealthProcessor
             ? gaugeStates[activeGaugeIndex].GaugeType
             : gaugeStates[^1].GaugeType;
 
-        gaugeHistory.Record(gaugeStates, eventTime, applicationTime ?? eventTime, activeGaugeType, HasFailed, HasEverFailed);
+        gaugeHistory.Record(gaugeStates, eventTime, activeGaugeType);
     }
 
     private BmsGaugeStateSnapshot[] snapshotGaugeStates()

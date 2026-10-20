@@ -89,8 +89,6 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
             }
             probe(typeof(BmsJudgementBridge), "PublishState", "state.publish",
                 [typeof(BmsLongNote), typeof(BmsLongNoteState).MakeByRefType(), typeof(BmsFrameContext).MakeByRefType()]);
-            probe(typeof(BmsColumnJudgementRuntime), "RewindLongNotes", "history.rewind");
-            probe(typeof(BmsColumnJudgementRuntime), "RestoreExecutionState", "index.rebuild");
             probe(typeof(BmsHellChargeNoteJudgementRule), "updateBody", "body.sample");
             probe(typeof(BmsColumn), "PlaySample", "keysound");
             // Observe the actual effect; the playfield's expression-bodied forwarding call can be inlined.
@@ -160,7 +158,6 @@ internal sealed class BmsCoreSchedulingRecorder : IDisposable
         BmsColumnHitObjectContainer container => playfield.Stage.Columns.Take(2).Any(c => ReferenceEquals(c.HitObjectContainer, container)),
         BmsColumnJudgementRuntime context => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.Judgements, context)),
         BmsJudgementBridge output => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.JudgementBridge, output)),
-        BmsCoreJudgementSchedule schedule => playfield.Stage.Columns.Take(2).Cast<BmsColumn>().Any(c => ReferenceEquals(c.Judgements.Schedule, schedule)),
         BmsFramedReplayInputHandler => true,
         FrameStabilityContainer => true,
         DrawableBmsHitObject drawable => drawable.HitObject != null && identities.ContainsKey(drawable.HitObject),

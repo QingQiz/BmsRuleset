@@ -44,7 +44,6 @@ internal static class BmsReplaySimulation
         score.Mods.Value = mods;
         score.ApplyBeatmap(beatmap);
         health.ApplyBeatmap(beatmap);
-        var algorithm = BmsReplayFrame.GetAlgorithm(replay);
         if (courseGaugeStates != null)
         {
             health.ConfigureGaugeContext(true, courseGaugeProfileFamily);
@@ -65,18 +64,41 @@ internal static class BmsReplaySimulation
             return new BmsJudgementColumnDefinition(notes, beatmap.LayoutVariant, index, new SimulationOutput(score, health));
         }).ToArray());
 
+        AdvanceTo(beatmap, replay, mods, engine, columnCount, frames[^1].Time, time =>
+        {
+            manualClock.CurrentTime = time;
+            clock.ProcessFrame();
+        }, cancellationToken);
+
+        return (score.JudgementEvents, health.GaugeHistory);
+    }
+
+    internal static void AdvanceTo(BmsBeatmap beatmap, Replay replay, IReadOnlyList<Mod> mods, BmsJudgementEngine engine,
+                                   int columnCount, double targetTime, Action<double> updateClock, CancellationToken cancellationToken = default,
+                                   double? fromTime = null)
+    {
+        var frames = replay.Frames.OfType<BmsReplayFrame>().OrderBy(frame => frame.Time).ToArray();
+        var algorithm = BmsReplayFrame.GetAlgorithm(replay);
         var rates = mods.OfType<IApplicableToRate>().ToArray();
         var pressed = new HashSet<BmsAction>();
         var nextInput = 0;
-        var endTime = frames[^1].Time;
-        var time = Math.Min(0, Math.Min(frames[0].Time, objects.Select(note => note.StartTime - 500).DefaultIfEmpty(0).Min()));
+        var time = fromTime ?? Math.Min(targetTime, Math.Min(0, Math.Min(frames.Select(frame => frame.Time).DefaultIfEmpty(0).Min(),
+            beatmap.HitObjects.Select(note => note.StartTime - 500).DefaultIfEmpty(0).Min())));
+        if (fromTime != null)
+        {
+            // The existing engine already consumed every input at the starting timestamp.
+            // Seed transition detection without re-pressing held keys or scratch directions.
+            while (nextInput < frames.Length && frames[nextInput].Time <= time)
+                nextInput++;
+            if (nextInput > 0)
+                pressed.UnionWith(frames[nextInput - 1].Actions);
+        }
         var previousTime = time;
 
-        while (time <= endTime || nextInput < frames.Length)
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            manualClock.CurrentTime = time;
-            clock.ProcessFrame();
+            updateClock(time);
             var rate = rates.Aggregate(1.0, (value, mod) => mod.ApplyToRate(time, value));
             var frame = new BmsFrameContext(time, rate, time < previousTime);
             while (nextInput < frames.Length && frames[nextInput].Time == time)
@@ -101,15 +123,15 @@ internal static class BmsReplaySimulation
 
             engine.ProcessFrame(frame, time - previousTime, algorithm);
             // Aborted attempts also settle held tails at their recorded endpoint.
-            if (nextInput == frames.Length && time == endTime)
+            if (replay.HasReceivedAllFrames && frames.Length > 0 && nextInput == frames.Length && time == frames[^1].Time)
                 engine.CompleteLongNotesAtEnd(frame);
+            if (time == targetTime)
+                return;
             previousTime = time;
             var nextTime = nextInput < frames.Length ? frames[nextInput].Time : double.PositiveInfinity;
             nextTime = Math.Min(nextTime, engine.NextEventTime);
-            time = Math.Max(Math.BitIncrement(time), Math.Min(nextTime, time < endTime ? endTime : Math.BitIncrement(endTime)));
+            time = Math.Max(Math.BitIncrement(time), Math.Min(nextTime, targetTime));
         }
-
-        return (score.JudgementEvents, health.GaugeHistory);
 
         void queue(BmsAction action, bool down, double inputTime)
         {
@@ -121,7 +143,7 @@ internal static class BmsReplaySimulation
     private sealed class SimulationOutput(BmsScoreProcessor score, BmsHealthProcessor health) : IBmsJudgementOutput
     {
         private readonly Dictionary<BmsHitObject, BmsJudgementResult> results = new(ReferenceEqualityComparer.Instance);
-        private Action<BmsHitObject, double> history = null!;
+        private Action<BmsHitObject> stateCheckpoint = null!;
         private Action<BmsHitObject> checkpoint = null!;
 
         public BmsMainResultState GetMainResult(BmsHitObject note)
@@ -129,9 +151,9 @@ internal static class BmsReplaySimulation
                 ? new BmsMainResultState(result.Type, result.EventTime, result.EventTime - note.GetEndTime(), result.GameplayRate, result.SuppressPenalty)
                 : new BmsMainResultState(HitResult.None, note.GetEndTime(), 0, null, false);
 
-        public void SetResultCheckpoints(Action<BmsHitObject, double> recordHistory, Action<BmsHitObject> refreshIndexes)
+        public void SetResultCheckpoints(Action<BmsHitObject> recordState, Action<BmsHitObject> refreshIndexes)
         {
-            history = recordHistory;
+            stateCheckpoint = recordState;
             checkpoint = refreshIndexes;
         }
 
@@ -147,7 +169,7 @@ internal static class BmsReplaySimulation
             results.Add(note, result);
             score.ApplyResult(result);
             health.ApplyResult(result);
-            history(note, frame.SimulationTime);
+            stateCheckpoint(note);
             checkpoint(note);
         }
 

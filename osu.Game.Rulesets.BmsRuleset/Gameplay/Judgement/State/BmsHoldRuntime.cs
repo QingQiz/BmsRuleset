@@ -1,12 +1,11 @@
 using System;
-using System.Collections.Generic;
 using osu.Game.Rulesets.BmsRuleset.Beatmaps.Objects;
 using osu.Game.Rulesets.BmsRuleset.BmsParser;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement.State;
 
-// Endpoint data and release history are shared storage; each rule owns its mode's transitions.
+// Each rule owns its mode's transitions over this shared endpoint state.
 internal struct BmsHoldRuntime
 {
     internal readonly BmsLongNote Note;
@@ -22,7 +21,6 @@ internal struct BmsHoldRuntime
     internal HitResult TailResult;
     internal double? TailTime;
     internal double? PendingRelease;
-    private readonly List<(double Time, double? Release)> releaseHistory = [];
 
     internal BmsHoldRuntime(BmsLongNote note)
     {
@@ -62,28 +60,6 @@ internal struct BmsHoldRuntime
     {
         HeadWindow = BmsJudgementProfileProvider.GetTable(Note.Beatmap.LayoutVariant, Note.Column, Note.EffectiveJudgementRate, false);
         TailWindow = BmsJudgementProfileProvider.GetTable(Note.Beatmap.LayoutVariant, Note.Column, Note.EffectiveJudgementRate, true);
-    }
-
-    internal void SetPendingRelease(double time, double? release)
-    {
-        PendingRelease = release;
-        releaseHistory.Add((time, release));
-    }
-
-    internal void RewindReleaseHistory(double time)
-    {
-        while (releaseHistory.Count > 0 && releaseHistory[^1].Time > time)
-            releaseHistory.RemoveAt(releaseHistory.Count - 1);
-        PendingRelease = releaseHistory.Count > 0 ? releaseHistory[^1].Release : null;
-    }
-
-    internal void Reset()
-    {
-        HeadJudged = Started = TailJudged = HeadReverseScratch = EarlyReleaseOutsideWindow = false;
-        HeadOffset = 0;
-        HeadResult = TailResult = HitResult.None;
-        TailTime = PendingRelease = null;
-        releaseHistory.Clear();
     }
 
     internal readonly BmsLongNoteEndpointResult Endpoint(BmsLongNoteEndpointKind kind, double time, double rate, HitResult result, double? applicationTime = null)

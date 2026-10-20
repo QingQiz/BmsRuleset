@@ -246,12 +246,4 @@ public sealed partial class BmsColumnHitObjectContainer : HitObjectContainer
         base.Dispose(isDisposing);
     }
 
-    protected override void Update()
-    {
-        base.Update();
-        if (Time.Elapsed >= 0)
-            return;
-
-        JudgementBridge.RestoreRewoundState(coreFrame());
-    }
 }

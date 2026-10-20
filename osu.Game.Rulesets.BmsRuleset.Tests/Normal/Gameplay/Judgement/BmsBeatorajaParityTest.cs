@@ -67,30 +67,29 @@ public class BmsBeatorajaParityTest
     }
 
     [Test]
-    public void NonConsumingPressHistoryRewindsIndependentlyOfConsumedNotes()
+    public void NonConsumingMistakeAndConsumedStateAccumulateIndependently()
     {
-        var history = new BmsNotePressHistory();
+        var history = new BmsNotePressState();
         var note = new BmsNote();
-        history.Record(note, 800, false, true);
-        history.Record(note, 1000, true);
-        history.Rewind(900);
+        history.Record(note, false, true);
         Assert.That(history.Get(note), Is.EqualTo((false, true)));
-        history.Rewind(700);
-        Assert.That(history.Get(note), Is.EqualTo((false, false)));
+        history.Record(note, true);
+        Assert.That(history.Get(note), Is.EqualTo((true, true)));
+        Assert.That(new BmsNotePressState().Get(note), Is.EqualTo((false, false)));
     }
 
     [TestCase(BmsLayoutVariant.Bme7K, 3)]
     [TestCase(BmsLayoutVariant.Bms5K, 0)]
     [TestCase(BmsLayoutVariant.Pms9K, 0)]
-    public void EmptyPoorComboRuleAndRewind(BmsLayoutVariant layout, int expectedCombo)
+    public void EmptyPoorComboRuleAndReset(BmsLayoutVariant layout, int expectedCombo)
     {
         var processor = new BmsScoreProcessor();
         processor.ApplyBeatmap(new BmsBeatmap { LayoutVariant = layout });
         processor.Combo.Value = 3;
         processor.RegisterEmptyPoor(1000, 1100, 1);
         Assert.That(processor.Combo.Value, Is.EqualTo(expectedCombo));
-        processor.RewindEmptyPoors(900);
-        Assert.That(processor.Combo.Value, Is.EqualTo(3));
+        processor.ResetReplayState();
+        Assert.That(processor.Combo.Value, Is.Zero);
     }
 
     [Test]
@@ -103,8 +102,8 @@ public class BmsBeatorajaParityTest
         Assert.That(processor.Combo.Value, Is.Zero);
         Assert.That(processor.ScoringJudgementEventCount, Is.Zero);
         Assert.That(processor.JudgementEvents[0].Source.IsScoring, Is.False);
-        processor.RewindEmptyPoors(800);
-        Assert.That(processor.Combo.Value, Is.EqualTo(3));
+        processor.ResetReplayState();
+        Assert.That(processor.Combo.Value, Is.Zero);
         Assert.That(processor.JudgementEvents, Is.Empty);
     }
 

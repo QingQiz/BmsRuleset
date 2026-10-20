@@ -12,9 +12,13 @@ public interface IBmsGameplayEvents
 
     void RaiseJudgementDisplayed(HitResult result);
 
+    void RaiseReplaySeeked();
+
     event Action<string>? Text;
 
     event Action<double>? ScrollSpeedChanged;
 
     event Action<HitResult>? JudgementDisplayed;
+
+    event Action? ReplaySeeked;
 }

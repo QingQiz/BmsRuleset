@@ -12,12 +12,28 @@ namespace osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 public class BmsFramedReplayInputHandler : FramedReplayInputHandler<BmsReplayFrame>
 {
     private readonly Action<double>? onEnd;
+    private readonly Replay replay;
     private bool advancing;
     private bool ended;
+    private Func<double?>? getSeekTarget;
+    private Func<double, bool>? rebuild;
+    private Action? seekInputApplied;
+    private bool rebuiltInput;
+    private bool seekRequested;
+
+    internal void RequestSeek() => seekRequested = true;
+
+    internal void ConfigureSeeking(Func<double?> getTarget, Func<double, bool> rebuildState, Action inputApplied)
+    {
+        getSeekTarget = getTarget;
+        rebuild = rebuildState;
+        seekInputApplied = inputApplied;
+    }
 
     public BmsFramedReplayInputHandler(Replay replay, Action<double>? onEnd = null)
         : base(replay)
     {
+        this.replay = replay;
         this.onEnd = onEnd;
     }
 
@@ -25,6 +41,45 @@ public class BmsFramedReplayInputHandler : FramedReplayInputHandler<BmsReplayFra
 
     public override double? SetFrameFromTime(double time)
     {
+        var target = getSeekTarget?.Invoke() ?? time;
+        // Explicit seeks can skip frame stability; ordinary playback must still deliver each input.
+        if (seekRequested || target < CurrentTime)
+        {
+            if (!double.IsFinite(target) || (!replay.HasReceivedAllFrames && !HasFrames))
+                return null;
+
+            var requestedTarget = target;
+            if (!replay.HasReceivedAllFrames)
+                target = Math.Min(target, Frames[^1].Time);
+            if (requestedTarget > target && target == CurrentTime && (NextFrame == null || NextFrame.Time > target))
+                return null;
+            if (rebuild != null && !rebuild(target))
+                return null;
+            // A stream can only simulate known inputs. Resume the requested jump as frames arrive.
+            seekRequested = requestedTarget > target;
+            // Frame stability has already shortened its proposed step. Return the original
+            // seek target so the entire reconstruction is presented in one update.
+            var accurate = FrameAccuratePlayback;
+            FrameAccuratePlayback = false;
+            try
+            {
+                while (base.SetFrameFromTime(target) is { } current && (current != target || NextFrame?.Time <= target))
+                {
+                }
+            }
+            finally
+            {
+                FrameAccuratePlayback = accurate;
+            }
+            advancing = false;
+            ended = replay.HasReceivedAllFrames && Frames.Count > 0 && target >= Frames[^1].Time;
+            rebuiltInput = true;
+            return target;
+        }
+
+        if (!replay.HasReceivedAllFrames && WaitingForFrame && target > CurrentTime)
+            return null;
+
         advancing = time >= CurrentTime;
         if (!advancing) ended = false;
         return base.SetFrameFromTime(time);
@@ -40,6 +95,12 @@ public class BmsFramedReplayInputHandler : FramedReplayInputHandler<BmsReplayFra
 
             base.SetFrameFromTime(CurrentTime);
         } while (true);
+
+        if (rebuiltInput)
+        {
+            rebuiltInput = false;
+            inputs.Add(new EndInput(() => seekInputApplied?.Invoke()));
+        }
 
         if (advancing && !ended && !WaitingForFrame && NextFrame == null && CurrentFrame is { } terminal && terminal.Time == CurrentTime)
         {

@@ -156,7 +156,7 @@ public class BmsCourseHealthInheritanceTest
     [TestCase(BmsGaugeType.Class)]
     [TestCase(BmsGaugeType.ExClass)]
     [TestCase(BmsGaugeType.ExHardClass)]
-    public void RewindingAFailedInheritedGaugeRestoresItsCarriedHealth(BmsGaugeType type)
+    public void RebuildingAFailedInheritedGaugeRestoresItsCarriedHealth(BmsGaugeType type)
     {
         var session = createSession(type, BmsGaugeProfileFamily.Lr2, false);
         session.BeginCurrentStage();
@@ -169,7 +169,7 @@ public class BmsCourseHealthInheritanceTest
 
         health.RegisterNonConsumingJudgement(HitResult.Ok, 1000);
         Assert.That(health.HasFailed, Is.True);
-        health.Rewind(-500);
+        health.ResetReplayState();
         Assert.Multiple(() =>
         {
             Assert.That(health.CurrentGaugeStates, Is.EqualTo(initial));

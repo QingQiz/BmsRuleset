@@ -14,19 +14,12 @@ internal sealed partial class BmsJudgementBridge
     internal void ObserveVisualTime(DrawableBmsHitObject drawable, BmsVisualTimeObserver observer)
         => container.ObserveVisualTime(drawable, observer);
 
-    internal void RestoreRewoundState(in BmsFrameContext frame)
+    internal void SynchroniseReplayVisuals()
     {
-        if (!context.Schedule.BeginRewindStep(frame))
-            return;
-
-        // Framework results have reverted; rebuild visuals before publishing the restored logical indexes.
+        ((BmsHitExplosionLayer)column.HitExplosionArea).ResetReplayPulses();
         foreach (var drawable in container.AliveEntries.Values)
-        {
             if (drawable is DrawableBmsHitObject bms)
-                bms.RestoreRewoundVisuals();
-        }
-
-        context.RestoreExecutionState(frame);
+                bms.SynchroniseReplayState();
     }
 
     internal void Register(DrawableBmsHitObject drawable)
@@ -49,13 +42,13 @@ internal sealed partial class BmsJudgementBridge
             return;
         }
 
-        // Reapply has no AddDrawable callback. Replace only the binding, retaining ordering and histories.
+        // Reapply has no AddDrawable callback, so it must refresh the representation binding here.
         if (note is BmsNote or BmsLongNote)
         {
             Bind(drawable);
             container.InvalidateCoreOrder();
         }
 
-        context.RefreshNoteConfiguration(note, column.PreserveLongNoteHistory);
+        context.RefreshNoteConfiguration(note);
     }
 }
