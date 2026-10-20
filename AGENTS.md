@@ -35,6 +35,8 @@
 
 ## Git Style
 
+- When the user asks to commit, run the relevant tests before committing and fix failures where possible so CI is likely to pass. Follow the test filters and benchmark restrictions above.
+- A request to commit does not authorise pushing. Push only when the user explicitly requests pushing or publication.
 - Match the existing commit subject style: `type(scope): summary` when a focused scope helps, or `type: summary` when it does not.
 
 ## Comment Style
