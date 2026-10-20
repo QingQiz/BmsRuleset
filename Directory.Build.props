@@ -9,7 +9,7 @@
     </PropertyGroup>
     <PropertyGroup Label="Osu dependency">
         <!-- Preserve the full official version so each lazer revision has its own ruleset releases. -->
-        <OsuVersion Condition="'$(OsuVersion)' == ''">2026.920.0</OsuVersion>
+        <OsuVersion Condition="'$(OsuVersion)' == ''">2026.1005.0</OsuVersion>
         <!-- Keep ruleset-only releases independent from the official lazer revision. -->
         <RulesetRevision Condition="'$(RulesetRevision)' == ''">0</RulesetRevision>
         <!-- Defaults true: $(OsuVersion) targets a local osu checkout (../osu) because that version
