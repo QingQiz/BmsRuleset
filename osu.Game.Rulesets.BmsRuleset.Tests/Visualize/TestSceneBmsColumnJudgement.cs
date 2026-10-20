@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
@@ -94,7 +95,7 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
         AddAssert("distinct heads receive perfect results", () =>
             score.JudgementEvents.Count == 2 && score.JudgementEvents.All(e => e.Result == HitResult.Perfect));
         AddAssert("framework results retain separate object identities", () =>
-            Player.Results.Select(r => r.HitObject).Distinct().Count() == 2);
+            CurrentResults.Select(r => r.HitObject).Distinct().Count() == 2);
     }
 
     private void load(bool hide, bool includeMine)
@@ -149,7 +150,6 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
             {
                 checkpoint,
                 events = score.JudgementEvents,
-                results = Player.Results.Select(r => new { id = Array.IndexOf(objects, r.HitObject), r.Type, r.TimeAbsolute, r.GameplayRate }),
                 progression = BmsExScore.CreateProgression(score.JudgementEvents),
                 combo = score.Combo.Value,
                 total = score.TotalScore.Value,
@@ -157,7 +157,15 @@ public partial class TestSceneBmsColumnJudgement : BmsPlayerTestScene
             });
             TestContext.WriteLine("P2_TRACE " + trace);
             var expected = baseline.RootElement.GetProperty("traces").GetProperty(scenario).GetProperty(checkpoint);
-            Assert.That(trace, Is.EqualTo(JsonSerializer.Serialize(expected)), "ordered trace with logical judgement deadlines");
+            var expectedState = JsonNode.Parse(expected.GetRawText())!.AsObject();
+            // The old trace included synthetic endpoint callbacks; seeks now publish the final state.
+            expectedState.Remove("results");
+            Assert.That(trace, Is.EqualTo(expectedState.ToJsonString()), "ordered trace with logical judgement deadlines");
+            var results = CurrentResults.Select(r => new { id = Array.IndexOf(objects, r.HitObject), r.Type, r.TimeAbsolute, r.GameplayRate });
+            var expectedResults = expected.GetProperty("results").EnumerateArray()
+                .Where(result => result.GetProperty("id").GetInt32() >= 0)
+                .GroupBy(result => result.GetProperty("id").GetInt32()).Select(group => group.Last());
+            Assert.That(JsonSerializer.Serialize(results), Is.EqualTo(JsonSerializer.Serialize(expectedResults)), "main result identities and timing");
         });
     }
 

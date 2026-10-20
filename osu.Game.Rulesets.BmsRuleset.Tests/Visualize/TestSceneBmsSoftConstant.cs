@@ -87,7 +87,7 @@ public partial class TestSceneBmsSoftConstant : BmsPlayerTestScene
             .Where(n => n.HitObject.StartTime == 4000).All(n => visualAlpha(n) == 0));
         AddUntilStep("rewind hides invisible marker", () => invisibleNotes.Markers.Count == 0);
         seek(() => 4500);
-        AddUntilStep("misses still judged", () => Player.Results.Count >= 2);
+        AddUntilStep("misses still judged", () => CurrentResults.Count >= 2);
         AddStep("restore defaults", () =>
         {
             config.SetValue(BmsRulesetSetting.SoftConstant, false);

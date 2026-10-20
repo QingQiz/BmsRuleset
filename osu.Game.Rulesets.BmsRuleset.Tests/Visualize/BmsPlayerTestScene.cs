@@ -2,6 +2,7 @@
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Judgement;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
@@ -18,6 +19,7 @@ using osu.Game.Rulesets.BmsRuleset.UI.Gameplay;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Screens.Play;
 using osu.Game.Tests.Visual;
 
@@ -40,10 +42,20 @@ public abstract partial class BmsPlayerTestScene : PlayerTestScene, IStorageReso
     /// </summary>
     protected BmsPlayfield Playfield => (BmsPlayfield)Player.DrawableRuleset.Playfield;
 
+    // Explicit replay seeks publish the completed state without historical result callbacks.
+    protected IReadOnlyList<JudgementResult> CurrentResults => Playfield.Stage.Columns.Cast<BmsColumn>()
+        .SelectMany(column => column.HitObjectContainer.Entries)
+        .OfType<BmsHitObjectLifetimeEntry>()
+        .Select(entry => entry.ReplayResult)
+        .Where(result => result?.HasResult == true)
+        .OrderBy(result => result!.TimeAbsolute)
+        .Cast<JudgementResult>().ToArray();
+
     // Presentation tests need ordinary replay frames rather than silent explicit jumps.
     protected void SeekReplayInFrames(double time)
     {
         Player.GameplayClockContainer.Stop();
+        Player.DrawableRuleset.UpdateSubTree();
         var updates = 0;
         do
         {

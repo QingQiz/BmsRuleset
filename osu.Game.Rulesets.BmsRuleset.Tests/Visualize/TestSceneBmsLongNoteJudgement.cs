@@ -218,11 +218,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
     {
         // The audio clock can reach a checkpoint while frame-stable simulation is still catching up.
         // Freeze the target so assertions observe exactly one state regardless of test-runner speed.
-        AddStep(description, () =>
-        {
-            Player.GameplayClockContainer.Stop();
-            Player.GameplayClockContainer.Seek(time);
-        });
+        AddStep(description, () => SeekReplayInFrames(time));
         AddUntilStep($"simulation reached {description}", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < 0.001);
     }
 
@@ -513,7 +509,7 @@ public partial class TestSceneBmsLongNoteJudgement : BmsPlayerTestScene
         => new(
             new Dictionary<HitResult, int>(Player.ScoreProcessor.Statistics),
             Player.ScoreProcessor.MaximumStatistics,
-            Player.Results.Select(result => result.Type).ToArray(),
+            ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents.Where(e => e.Source.IsScoring).Select(e => e.Result).ToArray(),
             Player.ScoreProcessor.TotalScoreWithoutMods.Value,
             Player.ScoreProcessor.Combo.Value,
             Player.HealthProcessor.Health.Value);

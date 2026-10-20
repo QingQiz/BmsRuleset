@@ -68,7 +68,7 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
             var scatter = BmsHitScatterStatistic.CreateStatistics((BmsBeatmap)Player.GameplayState.Beatmap, saved.HitEvents);
             Assert.That(scatter.Keys[1].Data.Points.Single().Offset, Is.EqualTo(-150));
             Assert.That(saved.Statistics.GetValueOrDefault(HitResult.Ok), Is.EqualTo(1));
-        });
+        }, advanceNormally: true);
         checkpoint(950, () =>
         {
             assertState(0.28, 0, [0]);
@@ -136,9 +136,18 @@ public partial class TestSceneBmsBeatorajaPmsConsumers : BmsPlayerTestScene
         AddUntilStep("meter loaded", () => Player.ChildrenOfType<BmsHitErrorMeter>().Any(m => m.IsLoaded));
     }
 
-    private void checkpoint(double time, Action assertion)
+    private void checkpoint(double time, Action assertion, bool advanceNormally = false)
     {
-        AddStep("seek " + time, () => { Player.GameplayClockContainer.Stop(); Player.GameplayClockContainer.Seek(time); });
+        AddStep("seek " + time, () =>
+        {
+            if (advanceNormally)
+                SeekReplayInFrames(time);
+            else
+            {
+                Player.GameplayClockContainer.Stop();
+                Player.GameplayClockContainer.Seek(time);
+            }
+        });
         AddUntilStep("simulation reached " + time, () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < 0.001);
         AddWaitStep("HUD scheduled feedback", 2);
         AddStep("assert " + time, assertion);

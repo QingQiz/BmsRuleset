@@ -155,12 +155,11 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
 
             advance(3301);
             Playfield.UpdateSubTree();
-            var wasBoundAtRewind = ReferenceEquals(drawable.HitObject, note);
             advance(2999);
             Playfield.UpdateSubTree();
             recorder.Mark("rewind.restored");
-            Assert.That(context.FirstPendingNote?.StartTime, Is.EqualTo(3000));
-            assertRevertObservations(requireDrawable: wasBoundAtRewind);
+            Assert.That(((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements.FirstPendingNote?.StartTime, Is.EqualTo(3000));
+            assertRebuiltState();
             Assert.That(result.HasResult, Is.False, "The entry retains and resets the result after its representation returns to the pool.");
             advance(3000);
             Playfield.UpdateSubTree();
@@ -188,7 +187,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
 
             advance(2999);
             Playfield.UpdateSubTree();
-            assertRevertObservations(requireDrawable: true);
+            assertRebuiltState();
             Assert.That(result.HasResult, Is.False);
             Assert.That(((BmsColumn)Playfield.Stage.Columns[note.Column]).Judgements.GetLongNoteState(note).HeadJudged, Is.False);
         }));
@@ -218,7 +217,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             Playfield.UpdateSubTree();
             recorder.Mark("rewind.restored");
             Assert.That(column.Judgements.FirstPendingNote?.StartTime, Is.EqualTo(3000));
-            assertRevertObservations(requireDrawable: false);
+            assertRebuiltState();
             finishRecording("lifecycle-note");
         }));
     }
@@ -256,7 +255,7 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
         AddStep("observe replay catch-up", () =>
         {
             startRecording();
-            Player.GameplayClockContainer.Seek(3004);
+            SeekReplayInFrames(3004);
         });
         AddUntilStep("replay reached target", () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 3004) < .001);
         AddStep("check actual replay scheduling", () =>
@@ -314,7 +313,18 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
             Playfield.EndGameplayFrame();
             Playfield.UpdateSubTree();
             var mod = Player.DrawableRuleset.Mods.OfType<BmsModAutoScratch>().Single();
-            action(time => { manual.CurrentTime = time; clock.ProcessFrame(); mod.UpdateActions(time); });
+            action(time =>
+            {
+                var rebuilding = time < manual.CurrentTime;
+                manual.CurrentTime = time;
+                clock.ProcessFrame();
+                if (rebuilding)
+                {
+                    Playfield.SeekReplay(Player.DrawableRuleset.ReplayScore!.Replay!, Player.DrawableRuleset.Mods, time);
+                    Playfield.FinishReplaySeekInput();
+                }
+                mod.UpdateActions(time);
+            });
         }
         finally
         {
@@ -338,21 +348,12 @@ public partial class TestSceneBmsJudgementCheckpoints : BmsPlayerTestScene
         };
     }
 
-    private void assertRevertObservations(bool requireDrawable)
+    private void assertRebuiltState()
     {
-        var rows = recorder!.Rows.Select(r => r.Split('|')).ToArray();
-        var notifications = rows.Where(r => r[4].EndsWith("/result.externalRevert=")).ToArray();
-        Assert.That(notifications, Is.Not.Empty, "Observe the framework revert callback even after pool return.");
-        Assert.That(notifications.All(r => !r[13].StartsWith("None@")), Is.True, "The callback still sees the old main result.");
-        var drawableNotifications = rows.Where(r => r[4].EndsWith("/result.drawableRevert=")).ToArray();
-        if (requireDrawable)
-            Assert.That(drawableNotifications, Is.Not.Empty, "Also observe the callback on a still-bound Drawable.");
-        Assert.That(drawableNotifications.All(r => !r[13].StartsWith("None@")), Is.True);
-        // Observe the caller after Reset: patching the tiny Reset method can miss an inlined call.
-        var resets = rows.Where(r => r[4].EndsWith("/result.revert<")).ToArray();
-        Assert.That(resets, Is.Not.Empty);
-        Assert.That(resets.All(r => r[13].StartsWith("None@")), Is.True);
-        Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(.2).Within(1e-8), "Restore gauge history after all column result stacks.");
+        Assert.That(((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents, Is.Empty);
+        Assert.That(Player.ScoreProcessor.Statistics.Values, Is.All.Zero);
+        Assert.That(CurrentResults, Is.Empty);
+        Assert.That(Player.HealthProcessor.Health.Value, Is.EqualTo(.2).Within(1e-8), "Reconstruction restores the initial gauge at the target time.");
     }
 
     private void finishRecording(string scenario)

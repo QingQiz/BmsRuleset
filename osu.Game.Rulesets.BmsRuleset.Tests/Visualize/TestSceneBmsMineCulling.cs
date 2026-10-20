@@ -82,9 +82,9 @@ public partial class TestSceneBmsMineCulling : BmsPlayerTestScene
         AddStep("move mine outside viewport", () => mine.ScrollPositionAtStartTime = -1_000_000);
         AddUntilStep("mine culled", () => !Playfield.AllColumnAliveObjects().Any(d => d.HitObject == mine));
         AddStep("hold mine column", () => PressColumn(Playfield.Stage.Columns[1], 4800));
-        AddStep("advance to mine", () => Player.GameplayClockContainer.Seek(5000));
+        AddStep("advance to mine", () => SeekReplayInFrames(5000));
         AddUntilStep("mine judged despite culling", () => ((BmsColumn)Playfield.Stage.Columns[1]).Judgements.GetLandmineState(mine).Detonated);
-        AddAssert("detonation reached score processor", () => Player.Results.Any(r => r.HitObject == mine));
+        AddAssert("detonation reached score processor", () => CurrentResults.Any(r => r.HitObject == mine));
     }
 
     [Test]

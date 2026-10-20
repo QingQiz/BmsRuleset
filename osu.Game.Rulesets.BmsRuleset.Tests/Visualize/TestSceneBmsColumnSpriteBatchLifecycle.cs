@@ -76,6 +76,7 @@ public partial class TestSceneBmsColumnSpriteBatchLifecycle : BmsPlayerTestScene
             .CreateDelegate<Func<CompositeDrawable, IReadOnlyList<Drawable>>>();
         BmsColumnHitObjectContainer mixed = null!;
         DrawableBmsHitObject[] original = [];
+        BmsHitObject[] originalObjects = [];
         DrawableBmsHitObject[] future = [];
 
         PreparePlayer(selectedSkin);
@@ -102,7 +103,11 @@ public partial class TestSceneBmsColumnSpriteBatchLifecycle : BmsPlayerTestScene
             }
             longNote.StartTimeBindable.Value = 5000;
         });
-        AddStep("retire mixed notes", () => Player.GameplayClockContainer.Seek(9000));
+        AddStep("retire mixed notes", () =>
+        {
+            originalObjects = original.Select(drawable => drawable.HitObject).ToArray();
+            Player.GameplayClockContainer.Seek(9000);
+        });
         AddUntilStep("original mixed notes returned to pool", () => original.All(n => !n.IsInUse)
             && Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 9000) < .001);
         AddStep("activate later static notes", () => Player.GameplayClockContainer.Seek(14800));
@@ -122,8 +127,13 @@ public partial class TestSceneBmsColumnSpriteBatchLifecycle : BmsPlayerTestScene
                 Assert.That(BmsColumnSpriteBatchSnapshot.Read(generate(mixed, ++frame, slot, false)!), Has.Length.EqualTo(2));
         });
         AddStep("rewind to original mixed notes", () => Player.GameplayClockContainer.Seek(4800));
-        AddUntilStep("mixed bindings restored", () => original.All(n => n.IsInUse && n.IsPresent)
-            && Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 4800) < .001);
+        AddUntilStep("mixed bindings restored", () =>
+        {
+            original = Playfield.AllColumnAliveObjects().OfType<DrawableBmsHitObject>()
+                .Where(drawable => originalObjects.Contains(drawable.HitObject)).ToArray();
+            return original.Length == originalObjects.Length && original.All(n => n.IsInUse && n.IsPresent)
+                && Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - 4800) < .001;
+        });
         AddStep("reused long note restores original flattening", () =>
         {
             foreach (var note in original) note.Alpha = .8f;

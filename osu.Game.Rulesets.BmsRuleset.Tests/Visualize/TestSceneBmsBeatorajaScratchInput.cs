@@ -34,7 +34,7 @@ public partial class TestSceneBmsBeatorajaScratchInput : BmsPlayerTestScene
     private IList<ReplayFrame>? customFrames;
     private bool autoScratch;
 
-    protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(autoScratch ? null : createReplay);
+    protected override TestPlayer CreatePlayer(Ruleset ruleset) => CreateBmsPlayer(createReplay);
 
     protected override IBeatmap CreateBeatmap(RulesetInfo ruleset)
     {

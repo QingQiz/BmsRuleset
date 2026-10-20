@@ -123,6 +123,21 @@ public partial class TestSceneBmsMineBatchLifecycle : BmsPlayerTestScene
         });
         seek(4800);
         AddUntilStep("rewound batch restored", () => column.BatchMinesActive && residentMines() == 1);
+        AddStep("restore native reference after replay rebuild", () => forceBatch.SetValue(column, true));
+        AddUntilStep("rewound native mines ready", () => !column.BatchMinesActive && residentMines() == 128);
+        AddStep("capture rewound native geometry and order", () =>
+        {
+            Playfield.UpdateSubTreeMasking();
+            var restored = read(generate(column, ++frame, 0, true)!);
+            Assert.That(restored, Has.Length.EqualTo(expected.Length));
+            // Rebuilding reactivates native equal-time children; their insertion order can change.
+            var objects = Playfield.Beatmap.HitObjects.ToArray();
+            compare(expected.OrderBy(state => Array.IndexOf(objects, state.Note)).ToArray(),
+                restored.OrderBy(state => Array.IndexOf(objects, state.Note)).ToArray());
+            expected = restored;
+            forceBatch.SetValue(column, false);
+        });
+        AddUntilStep("rewound mine batch active again", () => column.BatchMinesActive && residentMines() == 1);
         AddStep("rewound snapshots preserve native geometry", () =>
         {
             Playfield.UpdateSubTreeMasking();

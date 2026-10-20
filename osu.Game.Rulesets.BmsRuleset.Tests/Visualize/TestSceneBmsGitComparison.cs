@@ -170,13 +170,17 @@ public partial class TestSceneBmsGitComparison : BmsPlayerTestScene
         using var observer = new BmsGitComparisonRecorder(Playfield, Player.ScoreProcessor, Player.HealthProcessor);
         foreach (var time in new[] { 3000d, 3002, 3202, 3401, 3991, 4202, 6000, 2998, 3202, 4202 })
         {
-            Player.GameplayClockContainer.Seek(time);
-            Player.DrawableRuleset.UpdateSubTree();
+            SeekReplayInFrames(time);
             Assert.That(Player.DrawableRuleset.FrameStableClock.CurrentTime, Is.EqualTo(time).Within(.001));
+            if (time == 2998)
+            {
+                Assert.That(Player.ScoreProcessor.Statistics.Values, Is.All.Zero);
+                Assert.That(CurrentResults, Is.Empty);
+            }
             observer.Mark("seek");
         }
 
-        observer.Save(scenario);
+        observer.Save(scenario, rebuiltReplay: true);
         budgetHost = null;
     }
 

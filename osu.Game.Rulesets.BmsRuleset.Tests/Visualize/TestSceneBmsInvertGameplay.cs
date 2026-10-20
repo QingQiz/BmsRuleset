@@ -13,6 +13,7 @@ using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Mods.LongNoteMode;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Replays;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring;
+using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Events;
 using osu.Game.Rulesets.BmsRuleset.Gameplay.Scoring.Gauge;
 using osu.Game.Rulesets.BmsRuleset.UI.Gameplay.Components;
 using osu.Game.Rulesets.Mods;
@@ -75,8 +76,6 @@ public partial class TestSceneBmsInvertGameplay : BmsPlayerTestScene
             ]);
         });
         AddUntilStep("player loaded", () => Player.IsLoaded && Player.LoadedBeatmapSuccessfully && Player.Alpha == 1);
-        // TestPlayer records applied results only; keep the assertions scoped to the current attempt.
-        AddStep("track reverted results", () => Player.ScoreProcessor.JudgementReverted += result => Player.Results.Remove(result));
         AddAssert("IN converted every non-final column note", () =>
         {
             var chart = (BmsBeatmap)Player.GameplayState.Beatmap;
@@ -135,10 +134,13 @@ public partial class TestSceneBmsInvertGameplay : BmsPlayerTestScene
         AddAssert("all heads and tails are perfect", () =>
         {
             var chart = (BmsBeatmap)Player.GameplayState.Beatmap;
-            var endpoints = Player.Results.OfType<BmsLongNoteJudgementResult>().SelectMany(r => r.EndpointResults).ToArray();
+            var endpoints = ((BmsScoreProcessor)Player.ScoreProcessor).JudgementEvents
+                .SelectMany(e => e.TimingObservations.Select(observation => (e.Source.Column, Observation: observation))).ToArray();
             return chart.HitObjects.OfType<BmsLongNote>().All(ln =>
-                endpoints.Count(e => e.Source == ln && e.Kind == BmsLongNoteEndpointKind.Head && e.Result == HitResult.Perfect) == 1
-                && endpoints.Count(e => e.Source == ln && e.Kind == BmsLongNoteEndpointKind.Tail && e.Result == HitResult.Perfect) == 1);
+                endpoints.Count(e => e.Column == ln.Column && e.Observation.ExpectedTime == ln.StartTime
+                    && e.Observation.Kind == BmsTimingObservationKind.LongNoteHead && e.Observation.Result == HitResult.Perfect) == 1
+                && endpoints.Count(e => e.Column == ln.Column && e.Observation.ExpectedTime == ln.EndTime
+                    && e.Observation.Kind == BmsTimingObservationKind.LongNoteTail && e.Observation.Result == HitResult.Perfect) == 1);
         });
         AddAssert("no non-Perfect judgements",
             () => Player.ScoreProcessor.Statistics.Where(p => p.Key != HitResult.Perfect && p.Value != 0).ToArray(), () => Is.Empty);

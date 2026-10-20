@@ -150,11 +150,14 @@ internal sealed class BmsGitComparisonRecorder : IDisposable
         return null;
     }
 
-    internal void Save(string scenario)
+    internal void Save(string scenario, bool rebuiltReplay = false)
     {
         Assert.That(results, Is.GreaterThan(0), "The scenario must submit actual framework results.");
         Assert.That(samples, Is.GreaterThan(0), "The audio observer must see actual sample requests.");
-        Assert.That(reverts, Is.GreaterThan(0), "The scenario must restore the framework result stack.");
+        if (rebuiltReplay)
+            Assert.That(reverts, Is.Zero, "Replay reconstruction replaces results without undo notifications.");
+        else
+            Assert.That(reverts, Is.GreaterThan(0), "The scenario must restore the framework result stack.");
         Assert.That(hitLights, Is.GreaterThan(0), "The feedback observer must see actual hit-light requests after warmup.");
         if (playfield.Beatmap.LockedLongNoteMode == BmsLongNoteMode.HellChargeNote)
             Assert.That(ticks, Is.GreaterThan(0), "The body observer must see actual HCN ticks after warmup.");

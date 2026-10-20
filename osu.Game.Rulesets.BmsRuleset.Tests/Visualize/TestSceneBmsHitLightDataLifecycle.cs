@@ -140,7 +140,7 @@ public partial class TestSceneBmsHitLightDataLifecycle : BmsPlayerTestScene
 
     private void seek(double time)
     {
-        AddStep("seek " + time, () => { Player.GameplayClockContainer.Stop(); Player.GameplayClockContainer.Seek(time); });
+        AddStep("seek " + time, () => SeekReplayInFrames(time));
         AddUntilStep("clock reached " + time, () => Math.Abs(Player.DrawableRuleset.FrameStableClock.CurrentTime - time) < .001);
     }
 
