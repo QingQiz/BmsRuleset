@@ -10,6 +10,22 @@ internal static partial class BmsChartParser
         CodePagesEncodingProvider.Instance.GetEncoding(932)
         ?? throw new InvalidOperationException("Shift-JIS encoding is not available.");
 
+    private static readonly Encoding strict_shift_jis_encoding =
+        CodePagesEncodingProvider.Instance.GetEncoding(932, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback)!;
+
+    private static readonly Encoding euc_kr_encoding =
+        CodePagesEncodingProvider.Instance.GetEncoding(51949, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback)!;
+
+    private static readonly Encoding utf8_encoding = new UTF8Encoding(false, true);
+
+    private static readonly Encoding[] unicode_encodings =
+    [
+        new UTF32Encoding(false, true, true),
+        new UTF32Encoding(true, true, true),
+        new UnicodeEncoding(false, true, true),
+        new UnicodeEncoding(true, true, true),
+    ];
+
     public static string[] ReadAllLines(byte[] bytes) => decodeText(bytes).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
 
     /// <summary>
@@ -329,18 +345,92 @@ internal static partial class BmsChartParser
 
     private static string decodeText(byte[] content)
     {
-        if (content.Length >= 3 && content[0] == 0xef && content[1] == 0xbb && content[2] == 0xbf)
-            return Encoding.UTF8.GetString(content);
+        var bytes = content.AsSpan();
 
-        var utf8 = new UTF8Encoding(false, true);
+        // UTF-32 LE shares UTF-16 LE's prefix, so the longer BOM must take precedence.
+        foreach (var encoding in unicode_encodings)
+        {
+            var preamble = encoding.Preamble;
+            if (bytes.StartsWith(preamble))
+                return Encoding.GetEncoding(encoding.CodePage).GetString(bytes[preamble.Length..]);
+        }
 
+        if (bytes.StartsWith(Encoding.UTF8.Preamble))
+            return Encoding.UTF8.GetString(bytes[Encoding.UTF8.Preamble.Length..]);
+
+        // BOM-less Unicode contains ASCII command bytes separated by NULs. Testing it before
+        // UTF-8 prevents an ASCII-only UTF-16/32 chart from being accepted as UTF-8 with NULs.
+        if (bytes.Contains((byte)0))
+        {
+            foreach (var encoding in unicode_encodings)
+            {
+                if (tryDecodeText(bytes, encoding, out var unicode)
+                    && !unicode.Contains('\0') && hasBmsCommand(unicode))
+                    return unicode;
+            }
+        }
+
+        if (tryDecodeText(bytes, utf8_encoding, out var utf8))
+            return utf8;
+
+        var validShiftJis = tryDecodeText(bytes, strict_shift_jis_encoding, out var shiftJis);
+        if (tryDecodeText(bytes, euc_kr_encoding, out var korean)
+            && (!validShiftJis || (shiftJis.Any(c => c is >= '\uff61' and <= '\uff9f') && hasOnlyKoreanNonAsciiLetters(korean))))
+            return korean;
+
+        // Retain CP932's replacement fallback for damaged legacy charts.
+        return validShiftJis ? shiftJis : shift_jis_encoding.GetString(content);
+    }
+
+    private static bool tryDecodeText(ReadOnlySpan<byte> bytes, Encoding encoding, out string text)
+    {
         try
         {
-            return utf8.GetString(content);
+            text = encoding.GetString(bytes);
+            return true;
         }
         catch (DecoderFallbackException)
         {
-            return shift_jis_encoding.GetString(content);
+            text = string.Empty;
+            return false;
         }
+    }
+
+    private static bool hasBmsCommand(ReadOnlySpan<char> text)
+    {
+        // Byte-swapped characters in metadata can resemble '#', but do not form command lines.
+        while (!text.IsEmpty)
+        {
+            var newline = text.IndexOfAny('\r', '\n');
+            var line = (newline < 0 ? text : text[..newline]).TrimStart();
+            if (line.Length >= 2 && line[0] == '#' && char.IsAsciiLetterOrDigit(line[1]))
+                return true;
+
+            if (newline < 0)
+                break;
+
+            text = text[(newline + 1)..];
+        }
+
+        return false;
+    }
+
+    private static bool hasOnlyKoreanNonAsciiLetters(string text)
+    {
+        var hasHangul = false;
+        foreach (var c in text)
+        {
+            if (c <= 127 || !char.IsLetter(c))
+                continue;
+
+            // Hangul often also decodes as CP932 half-width kana. Keep CP932 for mixed,
+            // ambiguous text rather than interpreting every valid EUC-KR byte pair as Korean.
+            if (c is not (>= '\uac00' and <= '\ud7a3' or >= '\u3130' and <= '\u318f'))
+                return false;
+
+            hasHangul = true;
+        }
+
+        return hasHangul;
     }
 }
